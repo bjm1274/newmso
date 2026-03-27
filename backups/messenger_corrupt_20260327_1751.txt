@@ -1,10 +1,10 @@
-'use client';
+﻿'use client';
 import { toast } from '@/lib/toast';
 import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
-import SmartDatePicker from './공통/SmartDatePicker';
+import SmartDatePicker from './怨듯넻/SmartDatePicker';
 import type { StaffMember, ChatRoom, ChatMessage } from '@/types';
 
 type PollItem = {
@@ -19,16 +19,16 @@ type PollItem = {
 
 const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
 const NOTICE_ROOM_NAME = '공지메시지';
-const CAN_WRITE_NOTICE_POSITIONS = ['대표', '부장', '팀장', '실장', '병원장', '이사', '본부장', '총무부장', '진료부장', '간호부장'];
+const CAN_WRITE_NOTICE_POSITIONS = ['원장', '부원장', '이사장', '실장', '병원장', '이사', '본부장', '총무부장', '진료부장', '간호부장'];
 const CHAT_ROOM_KEY = 'erp_chat_last_room';
 const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
 const CHAT_ROOM_PREFS_KEY = 'erp_chat_room_prefs';
 const CHAT_PINNED_KEY = 'erp_chat_pinned_messages';
 const CHAT_BOOKMARK_KEY = 'erp_chat_bookmarks';
 const CHAT_PINNED_ROOM_ORDER_KEY = 'erp_chat_pinned_room_order';
-// 운영 DB의 legacy `message_reads`는 아직 `chat_messages`를 참조하고 있어
-// 현재 `messages` 기반 채팅과 직접 호환되지 않는다. 읽음 계산은
-// `room_read_cursors`로 이미 처리하므로, 충돌만 일으키는 legacy 쓰기는 비활성화한다.
+// ?댁쁺 DB??legacy `message_reads`???꾩쭅 `chat_messages`瑜?李몄“?섍퀬 ?덉뼱
+// ?꾩옱 `messages` 湲곕컲 梨꾪똿怨?吏곸젒 ?명솚?섏? ?딅뒗?? ?쎌쓬 怨꾩궛?
+// `room_read_cursors`濡??대? 泥섎━?섎?濡? 異⑸룎留??쇱쑝?ㅻ뒗 legacy ?곌린??鍮꾪솢?깊솕?쒕떎.
 const MESSAGE_READ_WRITES_ENABLED = false;
 
 function sortChatRoomsWithNoticeFirst(rooms: ChatRoom[]): ChatRoom[] {
@@ -53,24 +53,24 @@ function isVideoUrl(url: string): boolean {
 
 function extractFileNameFromUrl(url: string | null | undefined): string {
   const rawUrl = String(url || '').trim();
-  if (!rawUrl) return '첨부파일';
+  if (!rawUrl) return '泥⑤??뚯씪';
   try {
     const parsed = new URL(rawUrl);
-    const lastSegment = decodeURIComponent(parsed.pathname.split('/').pop() || '') || '첨부파일';
-    // {타임스탬프}_{UUID}__{원본파일명} 패턴: 원본 파일명 추출
+    const lastSegment = decodeURIComponent(parsed.pathname.split('/').pop() || '') || '泥⑤??뚯씪';
+    // {??꾩뒪?ы봽}_{UUID}__{?먮낯?뚯씪紐? ?⑦꽩: ?먮낯 ?뚯씪紐?異붿텧
     const withOriginal = lastSegment.match(/^\d+_[0-9a-f-]{36}__(.+)$/i);
     if (withOriginal) return withOriginal[1];
-    // {타임스탬프}_{UUID}.ext 패턴: "첨부파일.ext" 로 표시
+    // {??꾩뒪?ы봽}_{UUID}.ext ?⑦꽩: "泥⑤??뚯씪.ext" 濡??쒖떆
     const uuidOnly = lastSegment.match(/^\d+_[0-9a-f-]{36}(\.[a-z0-9]+)?$/i);
-    if (uuidOnly) return `첨부파일${uuidOnly[1] || ''}`;
+    if (uuidOnly) return `泥⑤??뚯씪${uuidOnly[1] || ''}`;
     return lastSegment;
   } catch {
     const withoutQuery = rawUrl.split('?')[0] || '';
-    const lastSegment = decodeURIComponent(withoutQuery.split('/').pop() || '') || '첨부파일';
+    const lastSegment = decodeURIComponent(withoutQuery.split('/').pop() || '') || '泥⑤??뚯씪';
     const withOriginal = lastSegment.match(/^\d+_[0-9a-f-]{36}__(.+)$/i);
     if (withOriginal) return withOriginal[1];
     const uuidOnly = lastSegment.match(/^\d+_[0-9a-f-]{36}(\.[a-z0-9]+)?$/i);
-    if (uuidOnly) return `첨부파일${uuidOnly[1] || ''}`;
+    if (uuidOnly) return `泥⑤??뚯씪${uuidOnly[1] || ''}`;
     return lastSegment;
   }
 }
@@ -122,9 +122,9 @@ function getPendingAttachmentDisplayName(file: File): string {
   const rawName = String(file.name || '').trim();
   if (rawName) return rawName;
   const extension = guessFileExtension(file);
-  if (String(file.type || '').startsWith('image/')) return `붙여넣은 이미지.${extension}`;
-  if (String(file.type || '').startsWith('video/')) return `붙여넣은 동영상.${extension}`;
-  return `첨부파일.${extension}`;
+  if (String(file.type || '').startsWith('image/')) return `遺숈뿬?ｌ? ?대?吏.${extension}`;
+  if (String(file.type || '').startsWith('video/')) return `遺숈뿬?ｌ? ?숈쁺??${extension}`;
+  return `泥⑤??뚯씪.${extension}`;
 }
 
 function normalizeMemberIds(members: unknown): string[] {
@@ -141,7 +141,7 @@ function isActiveChatMember(staff: StaffMember | null | undefined): boolean {
   const isActiveFlag = dynamicStaff.is_active;
 
   if (isActiveFlag === false) return false;
-  if (status === '?댁궗' || status === '?댁쭅') return false;
+  if (status === '??곴텢' || status === '??곸춦') return false;
   if (resignedAt) return false;
   if (resignDate) return false;
   return true;
@@ -165,7 +165,7 @@ function isActiveNoticeMember(staff: StaffMember | null | undefined): boolean {
   const isActiveFlag = dynamicStaff.is_active;
 
   if (isActiveFlag === false) return false;
-  if (status === '퇴사') return false;
+  if (status === '?댁궗') return false;
   if (resignedAt) return false;
   if (resignDate) return false;
   return true;
@@ -289,7 +289,7 @@ function getKoreanTodayString() {
 function getRoomDisplayName(room: ChatRoom | null | undefined, staffs: StaffMember[], currentUserId: string | null | undefined): string {
   if (!room) return '채팅방';
   if (room.id === NOTICE_ROOM_ID) return NOTICE_ROOM_NAME;
-  // 2명 초과(그룹화된 방)면 room.name 우선 사용
+  // Direct rooms should prefer the other participant's name.
   const members = normalizeMemberIds(room.members);
   if (room.type === 'direct' && members.length <= 2) {
     const otherStaff = staffs.find(
@@ -449,9 +449,9 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const lastTimelineTailRef = useRef('');
   const selectedRoomIdRef = useRef<string | null>(null);
   const fetchDataRef = useRef<(() => Promise<void>) | null>(null);
-  /** 방별 입력 draft 저장소 */
+  /** 諛⑸퀎 ?낅젰 draft ??μ냼 */
   const draftMapRef = useRef<Map<string, string>>(new Map());
-  /** 현재 inputMsg 최신값을 ref로 유지 (setRoom 클로저에서 사용) */
+  /** ?꾩옱 inputMsg 理쒖떊媛믪쓣 ref濡??좎? (setRoom ?대줈??먯꽌 ?ъ슜) */
   const inputMsgRef = useRef('');
 
   const [mentionQuery, setMentionQuery] = useState('');
@@ -461,7 +461,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const [unreadUsers, setUnreadUsers] = useState<StaffMember[]>([]);
   const [unreadLoading, setUnreadLoading] = useState(false);
 
-  // 인앱 토스트 알림 (카카오톡 스타일)
+  // ?몄빋 ?좎뒪???뚮┝ (移댁뭅?ㅽ넚 ?ㅽ???
   const [inAppToasts, setInAppToasts] = useState<{ id: string; senderName: string; roomName: string; preview: string; roomId: string }[]>([]);
   const inAppToastTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [chatDirectoryStaffs, setChatDirectoryStaffs] = useState<StaffMember[]>([]);
@@ -553,7 +553,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       if (room?.type === 'direct' && String(memberId) !== String(effectiveChatUserId || user?.id || '')) {
         return {
           id: memberId,
-          name: room?.name || '이름 없음',
+          name: room?.name || '?대쫫 ?놁쓬',
           company: '',
           department: '',
           position: '',
@@ -562,7 +562,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       }
       return {
         id: memberId,
-        name: '이름 없음',
+        name: '?대쫫 ?놁쓬',
         company: '',
         department: '',
         position: '',
@@ -597,7 +597,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
           setChatDirectoryStaffs(Array.isArray(data) ? data.map(( staff: StaffMember) => normalizeProfileUser(staff)) : []);
         }
       } catch (error) {
-        console.error('채팅 직원 디렉터리 로드 실패:', error);
+        console.error('梨꾪똿 吏곸썝 ?붾젆?곕━ 濡쒕뱶 ?ㅽ뙣:', error);
         if (active) {
           setChatDirectoryStaffs([]);
         }
@@ -640,7 +640,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       }
 
       const knownStaff = allKnownStaffMap.get(memberId);
-      // staff 정보가 없는 경우(다른 회사 등)도 방 접근 허용 — 정보가 있으면 활성 여부 체크
+      // staff ?뺣낫媛 ?녿뒗 寃쎌슦(?ㅻⅨ ?뚯궗 ????諛??묎렐 ?덉슜 ???뺣낫媛 ?덉쑝硫??쒖꽦 ?щ? 泥댄겕
       if (!knownStaff || isActiveChatMember(knownStaff)) {
         memberIds.push(memberId);
       }
@@ -718,7 +718,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   }, []);
 
   const setRoom = (roomId: string | null) => {
-    // 현재 방의 입력 draft 저장
+    // Keep the current room draft before switching rooms.
     if (selectedRoomIdRef.current && selectedRoomIdRef.current !== roomId) {
       draftMapRef.current.set(selectedRoomIdRef.current, inputMsgRef.current);
     }
@@ -736,7 +736,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       setPinnedIds([]);
       setPersistedPinnedMessages([]);
       setBookmarkedIds(new Set());
-      // sent 상태 메시지의 deliveryState 정리 (메모리 누적 방지)
+      // sent ?곹깭 硫붿떆吏??deliveryState ?뺣━ (硫붾え由??꾩쟻 諛⑹?)
       setDeliveryStates((prev) => {
         const next: Record<string, DeliveryState> = {};
         for (const [k, v] of Object.entries(prev)) {
@@ -746,11 +746,11 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       });
     }
     setSelectedRoomId(roomId);
-    // 새 방의 저장된 draft 복원
+    // ??諛⑹쓽 ??λ맂 draft 蹂듭썝
     const savedDraft = (roomId ? draftMapRef.current.get(roomId) : '') || '';
     inputMsgRef.current = savedDraft;
     setInputMsg(savedDraft);
-    // 채팅방 열 때 해당 방 관련 미읽 알림/안읽음 개수 즉시 정리
+    // 梨꾪똿諛??????대떦 諛?愿??誘몄씫 ?뚮┝/?덉씫??媛쒖닔 利됱떆 ?뺣━
     if (roomId && effectiveChatUserId) {
       const readAt = new Date().toISOString();
       setRoomUnreadCounts((prev) => {
@@ -1097,7 +1097,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [showPollModal, setShowPollModal] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
-const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
+const [pollOptions, setPollOptions] = useState<string[]>(['李ъ꽦', '諛섎?']);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
   const [showMediaPanel, setShowMediaPanel] = useState(false);
   const [mediaFilter, setMediaFilter] = useState<'all' | 'image' | 'video' | 'file'>('all');
@@ -1110,7 +1110,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const deferredAddMemberSearch = useDeferredValue(addMemberSearch);
   const [addMemberSelectingIds, setAddMemberSelectingIds] = useState<string[]>([]);
-  // 기본 접힌 상태 — 펼쳐진 팀만 별도 추적
+  // 湲곕낯 ?묓엺 ?곹깭 ???쇱퀜吏??留?蹂꾨룄 異붿쟻
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
   const toggleDept = (key: string) =>
     setExpandedDepts((prev) => {
@@ -1136,7 +1136,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     async (rooms: ChatRoom[]) => {
       if (!effectiveChatUserId || !rooms?.length) return;
       try {
-        // 내가 멤버인 방만 카운트 (NOTICE_ROOM_ID 포함)
+        // ?닿? 硫ㅻ쾭??諛⑸쭔 移댁슫??(NOTICE_ROOM_ID ?ы븿)
         const myRooms = rooms.filter(( r: ChatRoom) => {
           if (r.id === NOTICE_ROOM_ID) return true;
           if (Array.isArray(r.members)) {
@@ -1172,7 +1172,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         }
         setRoomUnreadCounts(counts);
       } catch (e) {
-        console.error('채팅방별 안읽은 메시지 계산 실패:', e);
+        console.error('梨꾪똿諛⑸퀎 ?덉씫? 硫붿떆吏 怨꾩궛 ?ㅽ뙣:', e);
       }
     },
     [effectiveChatUserId]
@@ -1247,7 +1247,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         if (prev.some((message: ChatMessage) => String(message.id) === String(row.id))) return prev;
         const newMsg = {
           ...row,
-          staff: resolveStaffProfile(row.sender_id, row.sender_name) || { name: '이름 없음', photo_url: null },
+          staff: resolveStaffProfile(row.sender_id, row.sender_name) || { name: '?대쫫 ?놁쓬', photo_url: null },
         };
         const optimisticIndex = prev.findIndex((message: ChatMessage) => {
           if (!String(message.id || '').startsWith('temp-')) return false;
@@ -1283,13 +1283,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       void updateUnreadForRooms(currentRooms);
     }
 
-    // 인앱 토스트 알림: 다른 방 메시지 or 앱이 백그라운드 상태일 때
+    // Show a lightweight in-app toast for incoming messages in other rooms.
     if (!isOwnMessage) {
       const senderProfile = resolveStaffProfile(row.sender_id, row.sender_name);
-      const senderName = senderProfile?.name || row.sender_name || '알 수 없음';
+      const senderName = senderProfile?.name || row.sender_name || '이름 없음';
       const roomName = currentRoom ? getRoomDisplayName(currentRoom, [], effectiveChatUserId) : '채팅';
       const preview = row.file_url
-        ? `📎 ${getAttachmentDisplayName(row.file_name, row.file_url)}`
+        ? `첨부 ${getAttachmentDisplayName(row.file_name, row.file_url)}`
         : getMessageDisplayText(row.content, row.file_name, row.file_url, '새 메시지');
       const toastId = String(row.id);
       setInAppToasts((prev) => {
@@ -1329,7 +1329,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         .eq('id', NOTICE_ROOM_ID);
       if (error) throw error;
     } catch (error) {
-      console.error('공지방 참여자 동기화 실패:', error);
+      console.error('怨듭?諛?李몄뿬???숆린???ㅽ뙣:', error);
     }
   }, [noticeRoomMemberIds]);
 
@@ -1549,7 +1549,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         setPersistedPinnedMessages([]);
       }
     } catch (error) {
-      console.error('공지 메시지 불러오기 실패:', error);
+      console.error('怨듭? 硫붿떆吏 遺덈윭?ㅺ린 ?ㅽ뙣:', error);
       setPersistedPinnedMessages([]);
     }
 
@@ -1580,7 +1580,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       });
       setPollVotes(vMap);
     } catch (error) {
-      console.error('반응/투표 데이터 불러오기 실패:', error);
+      console.error('諛섏쓳/?ы몴 ?곗씠??遺덈윭?ㅺ린 ?ㅽ뙣:', error);
     }
 
     if (roomIdForFetch && msgs?.length) {
@@ -1608,7 +1608,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
           setRoomUnreadCounts(prev => ({ ...prev, [roomIdForFetch]: 0 }));
         } catch (e) {
-          console.error('자동 읽음 처리 실패:', e);
+          console.error('?먮룞 ?쎌쓬 泥섎━ ?ㅽ뙣:', e);
         }
       }
     }
@@ -1621,8 +1621,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const roomNotifyRef = useRef(true);
   useEffect(() => { roomNotifyRef.current = roomNotifyOn; }, [roomNotifyOn]);
 
-  // fetchDataRef를 항상 최신 fetchData로 동기화
-  useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
+  // fetchDataRef瑜???긽 理쒖떊 fetchData濡??숆린??  useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
 
   useEffect(() => {
     const loadRooms = async () => {
@@ -1646,7 +1645,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       await syncChatRoomsState(rooms || []);
     };
     loadRooms();
-    // selectedRoomId는 의도적으로 제외 — 채팅방 목록은 마운트 시 1회만 로드
+    // selectedRoomId???섎룄?곸쑝濡??쒖쇅 ??梨꾪똿諛?紐⑸줉? 留덉슫????1?뚮쭔 濡쒕뱶
   }, [noticeRoomMemberIds, syncChatRoomsState]);
 
   useEffect(() => {
@@ -1752,7 +1751,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     return () => {
       supabase.removeChannel(channel);
     };
-    // selectedRoomId는 의도적으로 제외 — 전역 메시지 채널은 user 기준으로만 구독
+    // selectedRoomId???섎룄?곸쑝濡??쒖쇅 ???꾩뿭 硫붿떆吏 梨꾨꼸? user 湲곗??쇰줈留?援щ룆
   }, [handleIncomingRealtimeMessage, user?.id]);
 
   useEffect(() => {
@@ -1860,7 +1859,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     channel.onmessage = (event) => {
       const payload = event.data;
       if (!payload?.roomId) return;
-      // ref를 통해 항상 최신 selectedRoomId와 fetchData를 참조 (채널 재생성 없이)
+      // ref瑜??듯빐 ??긽 理쒖떊 selectedRoomId? fetchData瑜?李몄“ (梨꾨꼸 ?ъ깮???놁씠)
       if (payload.roomId === selectedRoomIdRef.current) {
         fetchDataRef.current?.();
       } else if (chatRoomsRef.current.length > 0) {
@@ -1873,7 +1872,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       }
       channel.close();
     };
-    // 마운트 시 1회만 실행 — selectedRoomId·fetchData는 ref로 최신값 참조
+    // 留덉슫????1?뚮쭔 ?ㅽ뻾 ??selectedRoomId쨌fetchData??ref濡?理쒖떊媛?李몄“
   }, [updateUnreadForRooms]);
 
   useEffect(() => {
@@ -1910,8 +1909,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       String(lastMessage?.id || '').startsWith('temp-') ||
       (tailChanged && isOwnNewestMessage);
     if (shouldStick) {
-      // 채팅방 전환 중(pendingBottomAlignRoomIdRef 활성)이면 즉시 이동, 아니면 부드럽게
-      const isRoomSwitch = !!pendingBottomAlignRoomIdRef.current;
+      // 梨꾪똿諛??꾪솚 以?pendingBottomAlignRoomIdRef ?쒖꽦)?대㈃ 利됱떆 ?대룞, ?꾨땲硫?遺?쒕읇寃?      const isRoomSwitch = !!pendingBottomAlignRoomIdRef.current;
       requestAnimationFrame(() => scrollToBottom(
         (!pendingBottomAlignRoomIdRef.current && isOwnNewestMessage)
           ? 'smooth'
@@ -1979,7 +1977,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         : []
     );
     return allKnownStaffs
-      .filter(( s: StaffMember) => s.status !== '퇴사' && s.status !== '퇴직')
+      .filter(( s: StaffMember) => s.status !== '?댁궗' && s.status !== '?댁쭅')
       .filter(( s: StaffMember) => !currentMemberIds.has(String(s.id)))
       .filter(( s: StaffMember) => {
         if (!deferredAddMemberSearch.trim()) return true;
@@ -2273,7 +2271,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         setUnreadUsers(nonReaders.sort(sorter));
       } catch (e) {
         console.error('loadReadStatusForMessage error', e);
-        toast('읽음 현황을 불러오지 못했습니다.');
+        toast('?쎌쓬 ?꾪솴??遺덈윭?ㅼ? 紐삵뻽?듬땲??');
       } finally {
         setUnreadLoading(false);
       }
@@ -2284,10 +2282,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const handleLeaveRoom = async () => {
     if (!selectedRoom) return;
     if (selectedRoom.id === NOTICE_ROOM_ID) {
-      toast('공지 메시지 방은 나갈 수 없습니다.', 'warning');
+      toast('怨듭? 硫붿떆吏 諛⑹? ?섍컝 ???놁뒿?덈떎.', 'warning');
       return;
     }
-    if (!confirm('이 채팅방에서 나가시겠습니까? 나간 뒤에는 다시 초대를 받아야 입장할 수 있습니다.')) return;
+    if (!confirm('??梨꾪똿諛⑹뿉???섍??쒓쿋?듬땲源? ?섍컙 ?ㅼ뿉???ㅼ떆 珥덈?瑜?諛쏆븘???낆옣?????덉뒿?덈떎.')) return;
 
     try {
       const currentMembers: string[] = Array.isArray(selectedRoom.members)
@@ -2302,8 +2300,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         .update({ members: newMembers })
         .eq('id', selectedRoom.id);
 
-      const leaverName = user?.name || '이름 없음';
-      const leaveContent = `[퇴장] ${leaverName}님이 채팅방을 나갔습니다.`;
+      const leaverName = user?.name || '?대쫫 ?놁쓬';
+      const leaveContent = `[?댁옣] ${leaverName}?섏씠 梨꾪똿諛⑹쓣 ?섍컮?듬땲??`;
       let leaveNoticeFailed = false;
 
       try {
@@ -2328,7 +2326,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       }
 
       const leftRoomId = selectedRoom.id;
-      // 방 목록에서 즉시 제거 (실시간 재로드로 덮어쓰이기 전에)
+      // 諛?紐⑸줉?먯꽌 利됱떆 ?쒓굅 (?ㅼ떆媛??щ줈?쒕줈 ??뼱?곗씠湲??꾩뿉)
       setChatRooms((prev) => prev.filter(( room: ChatRoom) => room.id !== leftRoomId));
       setRoomUnreadCounts((prev) => {
         const next = { ...prev };
@@ -2339,11 +2337,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       setMessages([]);
       toast(
         leaveNoticeFailed
-          ? '채팅방에서 나갔지만 퇴장 안내 메시지 저장은 실패했습니다.'
-          : '채팅방에서 나갔습니다.'
+          ? '梨꾪똿諛⑹뿉???섍컮吏留??댁옣 ?덈궡 硫붿떆吏 ??μ? ?ㅽ뙣?덉뒿?덈떎.'
+          : '梨꾪똿諛⑹뿉???섍컮?듬땲??'
       );
     } catch {
-      toast('채팅방 나가기 중 오류가 발생했습니다.', 'error');
+      toast('梨꾪똿諛??섍?湲?以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.', 'error');
     }
   };
 
@@ -2351,7 +2349,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     if (!selectedRoom) return;
     if (selectedRoom?.created_by !== (effectiveChatUserId || user?.id)) return;
     if (String(memberId) === String(effectiveChatUserId || user?.id || '')) return;
-    if (!confirm('이 참여자를 채팅방에서 제거하시겠습니까?')) return;
+    if (!confirm('??李몄뿬?먮? 梨꾪똿諛⑹뿉???쒓굅?섏떆寃좎뒿?덇퉴?')) return;
 
     try {
       const currentMembers: string[] = Array.isArray(selectedRoom.members)
@@ -2369,9 +2367,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       const removedName =
         resolveRoomMemberProfile(selectedRoom, String(memberId))?.name ||
         resolveStaffProfile(memberId)?.name ||
-        '이름 없음';
-      const removerName = user?.name || '이름 없음';
-      const systemContent = `[제거] ${removerName}님이 ${removedName}님을 채팅방에서 제거했습니다.`;
+        '?대쫫 ?놁쓬';
+      const removerName = user?.name || '?대쫫 ?놁쓬';
+      const systemContent = `[?쒓굅] ${removerName}?섏씠 ${removedName}?섏쓣 梨꾪똿諛⑹뿉???쒓굅?덉뒿?덈떎.`;
       const { data: removedMessage } = await supabase
         .from('messages')
         .insert([
@@ -2394,10 +2392,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         )
       );
       await fetchData();
-      toast('참여자를 제거했습니다.');
+      toast('李몄뿬?먮? ?쒓굅?덉뒿?덈떎.');
     } catch (error) {
       console.error('remove member error', error);
-      toast('참여자 제거 중 오류가 발생했습니다.', 'error');
+      toast('李몄뿬???쒓굅 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.', 'error');
     }
   };
 
@@ -2440,27 +2438,27 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     if (!content && !resolvedFileUrl) return;
     if (!roomId) return;
     if (roomId !== NOTICE_ROOM_ID && !visibleRoomIds.includes(String(roomId))) {
-      toast('참여 중인 채팅방에서만 메시지를 보낼 수 있습니다.', 'warning');
+      toast('李몄뿬 以묒씤 梨꾪똿諛⑹뿉?쒕쭔 硫붿떆吏瑜?蹂대궪 ???덉뒿?덈떎.', 'warning');
       setRoom(selectedRoom ? String(selectedRoom.id) : NOTICE_ROOM_ID);
       return;
     }
 
     if (!resolvedFileUrl && content.startsWith('/')) {
-      if (content.startsWith('/연차') || content.startsWith('/?곗감')) {
+      if (content.startsWith('/연차') || content.startsWith('/휴가')) {
         setSlashCommand('annual_leave');
         setSlashForm({
           startDate: '',
           endDate: '',
           reason: content.startsWith('/연차')
             ? content.replace('/연차', '').trim()
-            : content.replace('/?곗감', '').trim(),
+            : content.replace('/휴가', '').trim(),
           itemName: '',
           quantity: 1,
         });
         setShowSlashModal(true);
         return;
       }
-      if (content.startsWith('/발주') || content.startsWith('/諛쒖＜')) {
+      if (content.startsWith('/발주') || content.startsWith('/구매')) {
         setSlashCommand('purchase');
         setSlashForm({
           startDate: '',
@@ -2468,7 +2466,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           reason: '',
           itemName: content.startsWith('/발주')
             ? content.replace('/발주', '').trim()
-            : content.replace('/諛쒖＜', '').trim(),
+            : content.replace('/구매', '').trim(),
           quantity: 1,
         });
         setShowSlashModal(true);
@@ -2477,7 +2475,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     }
     if (roomId === NOTICE_ROOM_ID) {
       if (!canWriteNotice) {
-        toast('공지 메시지 방에는 부서장 이상만 작성할 수 있습니다.');
+        toast('怨듭? 硫붿떆吏 諛⑹뿉??遺?쒖옣 ?댁긽留??묒꽦?????덉뒿?덈떎.');
         return;
       }
     }
@@ -2613,7 +2611,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         [optimisticId]: {
           status: 'failed',
           retryPayload: retrySnapshot,
-          error: error?.message || '메시지 전송 실패',
+          error: error?.message || '硫붿떆吏 ?꾩넚 ?ㅽ뙣',
         },
       }));
       console.error('message send failed', error);
@@ -2636,11 +2634,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const processFileUpload = async (file: File) => {
     if (file.type.startsWith('video/')) {
-      toast('동영상 파일은 업로드할 수 없습니다.\n(사진, 문서, 일반 파일만 가능합니다.)');
+      toast('?숈쁺???뚯씪? ?낅줈?쒗븷 ???놁뒿?덈떎.\n(?ъ쭊, 臾몄꽌, ?쇰컲 ?뚯씪留?媛?ν빀?덈떎.)');
       return;
     }
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      toast('파일 크기는 20MB 이하여야 합니다.');
+      toast('?뚯씪 ?ш린??20MB ?댄븯?ъ빞 ?⑸땲??');
       return;
     }
     setFileUploading(true);
@@ -2656,21 +2654,21 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         error?: string;
       } | null;
       if (!response.ok || !payload?.url) {
-        throw new Error(payload?.error || '파일 업로드에 실패했습니다.');
+        throw new Error(payload?.error || '?뚯씪 ?낅줈?쒖뿉 ?ㅽ뙣?덉뒿?덈떎.');
       }
 
       const publicUrl = payload.url;
       const fileKind = getFileKind(file.type || '');
       await handleSendMessage(publicUrl, file.size, fileKind, undefined, getPendingAttachmentDisplayName(file));
     } catch (err: unknown) {
-      console.error('파일 업로드 실패:', err);
+      console.error('?뚯씪 ?낅줈???ㅽ뙣:', err);
       const msg = (err as Error)?.message || String(err);
       const hint = msg.includes('Unauthorized')
-        ? '로그인 세션이 만료되었을 수 있습니다. 다시 로그인 후 시도해 주세요.'
-        : msg.includes('버킷') || msg.includes('bucket') || msg.includes('not found')
-          ? 'Supabase Storage에 pchos-files 또는 board-attachments 버킷이 실제로 생성되어 있는지 확인해 주세요.'
+        ? '濡쒓렇???몄뀡??留뚮즺?섏뿀?????덉뒿?덈떎. ?ㅼ떆 濡쒓렇?????쒕룄??二쇱꽭??'
+        : msg.includes('踰꾪궥') || msg.includes('bucket') || msg.includes('not found')
+          ? 'Supabase Storage??pchos-files ?먮뒗 board-attachments 踰꾪궥???ㅼ젣濡??앹꽦?섏뼱 ?덈뒗吏 ?뺤씤??二쇱꽭??'
           : msg;
-      toast(`파일 업로드에 실패했습니다.\n\n${hint}`, 'error');
+      toast(`?뚯씪 ?낅줈?쒖뿉 ?ㅽ뙣?덉뒿?덈떎.\n\n${hint}`, 'error');
     } finally {
       setFileUploading(false);
     }
@@ -2724,7 +2722,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     if (!activeActionMsg) return;
     if (type === 'task') {
       if (!effectiveTodoUserId) {
-        toast('연결된 직원 계정을 찾지 못했습니다.');
+        toast('?곌껐??吏곸썝 怨꾩젙??李얠? 紐삵뻽?듬땲??');
         setActiveActionMsg(null);
         return;
       }
@@ -2733,28 +2731,28 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           activeActionMsg.content,
           activeActionMsg.file_name,
           activeActionMsg.file_url
-        ) || '첨부 파일 확인';
+        ) || '泥⑤? ?뚯씪 ?뺤씤';
       const { error } = await supabase.from('todos').insert([{
         user_id: effectiveTodoUserId,
-        content: `[채팅] ${content}`,
+        content: `[梨꾪똿] ${content}`,
         is_complete: false,
         task_date: getKoreanTodayString(),
         source_message_id: activeActionMsg.id,
         source_room_id: activeActionMsg.room_id,
       }]);
       if (!error) {
-        toast('할 일 등록 완료', 'success');
+        toast('?????깅줉 ?꾨즺', 'success');
         if (onRefresh) onRefresh();
       } else {
-        toast('할 일 등록 중 오류가 발생했습니다.', 'error');
+        toast('?????깅줉 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.', 'error');
       }
     }
     setActiveActionMsg(null);
   };
 
   const createGroupChat = async () => {
-    if (!groupName.trim() || selectedMembers.length === 0) return toast('방 이름과 멤버를 선택해 주세요.', 'warning');
-    if (!effectiveChatUserId) return toast('연결된 직원 계정을 찾지 못했습니다.', 'error');
+    if (!groupName.trim() || selectedMembers.length === 0) return toast('諛??대쫫怨?硫ㅻ쾭瑜??좏깮??二쇱꽭??', 'warning');
+    if (!effectiveChatUserId) return toast('?곌껐??吏곸썝 怨꾩젙??李얠? 紐삵뻽?듬땲??', 'error');
     const { data: room, error } = await supabase.from('chat_rooms').insert([{
       name: groupName,
       type: 'group',
@@ -2800,7 +2798,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const openDirectChat = useCallback(async ( staff: StaffMember) => {
     const otherId = String(staff?.id || '').trim();
     if (!effectiveChatUserId || !otherId) {
-      toast('채팅 상대를 찾지 못했습니다.');
+      toast('梨꾪똿 ?곷?瑜?李얠? 紐삵뻽?듬땲??');
       return;
     }
 
@@ -2855,7 +2853,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       setViewMode('chat');
     } catch (error) {
       console.error('openDirectChat failed', error);
-      toast('채팅방을 여는 중 오류가 발생했습니다.', 'error');
+      toast('梨꾪똿諛⑹쓣 ?щ뒗 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.', 'error');
     }
   }, [effectiveChatUserId, fetchData, repairDirectRooms]);
   const openMemberFromGlobalSearch = useCallback(async (staff: StaffMember) => {
@@ -2915,9 +2913,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   }, [showMentionList, mentionQuery, roomMembers, staffs]);
 
   const handleCreatePoll = async () => {
-    if (!pollQuestion.trim()) { toast('질문을 입력해 주세요.', 'warning'); return; }
+    if (!pollQuestion.trim()) { toast('吏덈Ц???낅젰??二쇱꽭??', 'warning'); return; }
     const options = pollOptions.map((o) => o.trim()).filter(Boolean);
-    if (options.length < 2) { toast('선택지는 최소 2개 이상 입력해 주세요.', 'warning'); return; }
+    if (options.length < 2) { toast('?좏깮吏??理쒖냼 2媛??댁긽 ?낅젰??二쇱꽭??', 'warning'); return; }
     try {
         const { data: poll, error } = await supabase.from('polls').insert([{
         room_id: selectedRoomId, creator_id: effectiveChatUserId || user?.id, question: pollQuestion, options
@@ -2925,21 +2923,21 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       if (!error && poll) {
         setPolls((p) => [...p, poll as PollItem]);
         setPollQuestion('');
-        setPollOptions(['찬성', '반대']);
+        setPollOptions(['李ъ꽦', '諛섎?']);
         setShowPollModal(false);
       } else throw new Error();
     } catch {
       const id = Date.now().toString();
       setPolls((p) => [...p, { id, room_id: selectedRoomId, question: pollQuestion, options }]);
       setPollQuestion('');
-      setPollOptions(['찬성', '반대']);
+      setPollOptions(['李ъ꽦', '諛섎?']);
       setShowPollModal(false);
     }
   };
 
   const handleVote = async (pollId: string, optionIndex: number) => {
     try {
-      // 이전 투표 옵션 확인
+      // ?댁쟾 ?ы몴 ?듭뀡 ?뺤씤
       const { data: prevVote } = await supabase
         .from('poll_votes')
         .select('option_index')
@@ -2953,7 +2951,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         { onConflict: 'poll_id,user_id' }
       );
       if (!error) {
-        // 낙관적 업데이트: 이전 옵션 -1, 새 옵션 +1
+        // ?숆????낅뜲?댄듃: ?댁쟾 ?듭뀡 -1, ???듭뀡 +1
         setPollVotes((prev) => {
           const ex = { ...(prev[pollId] || {}) };
           if (prevOptionIndex != null && prevOptionIndex !== optionIndex) {
@@ -3008,8 +3006,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       }
       await fetchData();
     } catch (error) {
-      console.error('공지 등록 상태 변경 실패:', error);
-      toast(isPinned ? '공지 해제에 실패했습니다.' : '공지 등록에 실패했습니다.', 'error');
+      console.error('怨듭? ?깅줉 ?곹깭 蹂寃??ㅽ뙣:', error);
+      toast(isPinned ? '怨듭? ?댁젣???ㅽ뙣?덉뒿?덈떎.' : '怨듭? ?깅줉???ㅽ뙣?덉뒿?덈떎.', 'error');
     }
   };
 
@@ -3073,7 +3071,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         setGlobalSearchResults([]);
         return;
       }
-      // 대화내용 + 파일URL(파일명·사진명) 통합 OR 검색
+      // Search both message text and attached file URLs.
       const { data, error } = await supabase
         .from('messages')
         .select('*')
@@ -3132,7 +3130,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     if (deferredChatSearch.trim()) {
       const q = deferredChatSearch.toLowerCase();
       return msgs.filter((m) =>
-        ((m.is_deleted ? '삭제된 메시지입니다' : (m.content || ''))).toLowerCase().includes(q) ||
+        ((m.is_deleted ? '삭제된 메시지입니다.' : (m.content || ''))).toLowerCase().includes(q) ||
         ((m.staff as { name?: string } | null | undefined)?.name || '').toLowerCase().includes(q)
       );
     }
@@ -3179,7 +3177,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const deleteMessage = async (msg: ChatMessage) => {
     if (selectedRoom?.id === NOTICE_ROOM_ID && !isMso) {
-      toast('공지 채널 메시지는 삭제할 수 없습니다.', 'success');
+      toast('공지 채널 메시지는 삭제할 수 없습니다.', 'warning');
       return;
     }
     if (String(msg.sender_id) !== String(effectiveChatUserId || user?.id || '') && !isMso) return;
@@ -3195,7 +3193,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       )
     );
     await supabase.from('messages').update({ is_deleted: true }).eq('id', msg.id);
-    // 媛먯궗 濡쒓렇 湲곕줉
+    // Audit logging is best-effort only.
     try {
       await supabase.from('audit_logs').insert([
         {
@@ -3263,7 +3261,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     const targetMessage = editingMessage;
     const nextContent = editingMessageDraft.trim();
     if (!nextContent) {
-      toast('메시지 내용을 입력해 주세요.', 'warning');
+      toast('硫붿떆吏 ?댁슜???낅젰??二쇱꽭??', 'warning');
       return;
     }
 
@@ -3291,7 +3289,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       .eq('id', targetMessage.id);
 
     if (error) {
-      toast('메시지 수정 실패', 'error');
+      toast('硫붿떆吏 ?섏젙 ?ㅽ뙣', 'error');
       fetchData();
       return;
     }
@@ -3300,7 +3298,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   return (
     <div data-testid="chat-view" className="flex flex-1 min-h-0 overflow-hidden relative font-sans bg-[var(--background)] md:h-[100dvh] md:max-h-[100dvh] md:bg-[var(--card)]">
 
-      {/* 카카오톡 스타일 인앱 토스트 알림 (모바일) */}
+      {/* 移댁뭅?ㅽ넚 ?ㅽ????몄빋 ?좎뒪???뚮┝ (紐⑤컮?? */}
       {inAppToasts.length > 0 && (
         <div className="fixed top-3 left-0 right-0 z-[9999] flex flex-col gap-2 px-3 md:hidden pointer-events-none">
           {inAppToasts.map((toast) => (
@@ -3314,7 +3312,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               className="pointer-events-auto w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-zinc-900/95 backdrop-blur-md shadow-lg text-left animate-in slide-in-from-top-2 duration-300"
             >
               <div className="w-9 h-9 rounded-xl bg-[var(--accent)] flex items-center justify-center text-white text-base shrink-0">
-                💬
+                ?뮠
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2 mb-0.5">
@@ -3331,8 +3329,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 }}
                 className="shrink-0 text-zinc-500 hover:text-zinc-300 p-1"
               >
-                ✕
-              </button>
+                ??              </button>
             </button>
           ))}
         </div>
@@ -3349,7 +3346,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   : 'text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-5)] dark:hover:text-[var(--toss-gray-3)]'
                   }`}
               >
-                채팅
+                梨꾪똿
               </button>
               <button
                 data-testid="chat-tab-org"
@@ -3359,10 +3356,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   : 'text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-5)] dark:hover:text-[var(--toss-gray-3)]'
                   }`}
               >
-                조직도
-              </button>
+                議곗쭅??              </button>
             </div>
-            {/* 통합 검색 버튼 — 항상 노출 */}
+            {/* ?듯빀 寃??踰꾪듉 ????긽 ?몄텧 */}
             <button
               data-testid="chat-open-group-modal"
               type="button"
@@ -3377,7 +3373,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             <button
               data-testid="chat-open-global-search"
               onClick={openGlobalSearch}
-              title="대화내용·파일·사진 통합 검색"
+              title="통합 검색"
               className="shrink-0 flex items-center justify-center w-9 h-8 rounded-xl bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)] hover:text-[var(--accent)] hover:bg-[var(--toss-blue-light)] transition-all"
             >
               <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3393,7 +3389,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             <>
               <div className="flex items-center justify-between px-1 pb-2">
                 <span className="text-[10px] font-medium text-[var(--toss-gray-3)]">
-                  {showHiddenRooms ? '숨김 대화 포함' : '숨김 대화 제외'}
+                  {showHiddenRooms ? '?④? ????ы븿' : '?④? ????쒖쇅'}
                 </span>
                 <button
                   type="button"
@@ -3401,7 +3397,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   onClick={() => setShowHiddenRooms((prev) => !prev)}
                   className="text-[10px] font-semibold text-blue-500 hover:text-blue-600"
                 >
-                  {showHiddenRooms ? '숨김방 닫기' : '숨김방 보기'}
+                  {showHiddenRooms ? '?④?諛??リ린' : '?④?諛?蹂닿린'}
                 </button>
               </div>
               {sidebarRoomItems.map(({ room, roomId, unread, isSelected, isNoticeChannel, label, preview, isPeerOnline, isPinned, isHidden, pinnedIndex, pinnedCount }) => {
@@ -3420,7 +3416,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       )}
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className={`relative w-8 h-8 rounded-lg flex items-center justify-center text-sm ${isNoticeChannel ? 'bg-blue-100 text-blue-600' : 'bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)]'}`}>
-                          {isNoticeChannel ? '📢' : '💬'}
+                          {isNoticeChannel ? '?뱼' : '?뮠'}
                           {!isNoticeChannel && isPeerOnline && (
                             <span className="absolute -right-0.5 -bottom-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-white dark:border-zinc-900" />
                           )}
@@ -3453,9 +3449,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                  toggleRoomPinned(room.id, !isPinned);
                               }}
                               className={`min-w-[44px] min-h-[44px] flex items-center justify-center px-1.5 py-1 rounded-md text-[9px] font-bold ${isSelected ? 'text-white/80 hover:bg-[var(--card)]/10' : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800'}`}
-                              title={isPinned ? '고정 해제' : '상단 고정'}
+                              title={isPinned ? '怨좎젙 ?댁젣' : '?곷떒 怨좎젙'}
                             >
-                              {isPinned ? '해제' : '고정'}
+                              {isPinned ? '?댁젣' : '怨좎젙'}
                             </button>
                             {isPinned && (
                               <>
@@ -3489,7 +3485,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             )}
                             <button
                               type="button"
-                               data-testid={`chat-room-hide-${roomId}`}
+                              data-testid={`chat-room-hide-${roomId}`}
                               onClick={(event) => {
                                 event.stopPropagation();
                                 updateRoomPreference(room.id, { hidden: !isHidden });
@@ -3510,30 +3506,30 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             <div data-testid="chat-org-list" className="space-y-3">
               {Object.entries(groupedStaffs).map(([company, depts]) => (
                 <div key={company} className="space-y-1">
-                  {/* 회사 헤더 */}
+                  {/* ?뚯궗 ?ㅻ뜑 */}
                   <div className="flex items-center gap-2 px-1 py-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
                     <h3 className="text-[11px] font-black text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] uppercase tracking-wider truncate">{company}</h3>
                     <div className="flex-1 h-[1px] bg-[var(--tab-bg)] dark:bg-zinc-800/50" />
                   </div>
-                  {/* 팀(부서) — 클릭 시 접기/펼치기 */}
+                  {/* ?(遺?? ???대┃ ???묎린/?쇱튂湲?*/}
                   <div className="space-y-0.5 pl-1">
                     {Object.entries(depts as Record<string, StaffMember[]>).map(([dept, members]) => {
                       const key = `${company}::${dept}`;
                       const collapsed = !expandedDepts.has(key);
                       return (
                         <div key={dept}>
-                          {/* 팀 헤더 (토글 버튼) */}
+                          {/* ? ?ㅻ뜑 (?좉? 踰꾪듉) */}
                           <button
                             type="button"
                             onClick={() => toggleDept(key)}
                             className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800/60 transition-colors text-left"
                           >
-                            <span className={`text-[9px] text-[var(--toss-gray-3)] transition-transform duration-200 ${collapsed ? '-rotate-90' : 'rotate-0'}`}>▼</span>
+                            <span className={`text-[9px] text-[var(--toss-gray-3)] transition-transform duration-200 ${collapsed ? '-rotate-90' : 'rotate-0'}`}>⌄</span>
                             <span className="text-[10px] font-bold text-[var(--toss-gray-3)] dark:text-[var(--toss-gray-4)] flex-1 truncate">{dept}</span>
                             <span className="text-[9px] font-semibold text-[var(--toss-gray-3)] shrink-0">{(members as StaffMember[]).length}명</span>
                           </button>
-                          {/* 팀원 목록 (접힐 때 숨김) */}
+                          {/* ???紐⑸줉 (?묓옄 ???④?) */}
                           {!collapsed && (
                             <div className="space-y-0.5 pl-2 pt-0.5 pb-1">
                               {(members as StaffMember[]).map((s: StaffMember) => (
@@ -3552,8 +3548,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                     onClick={() => void openDirectChat(s)}
                                     className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md text-[9px] font-bold opacity-100 transition-all border border-blue-100 dark:border-blue-800/50 shrink-0"
                                   >
-                                    대화
-                                  </button>
+                                    ???                                  </button>
                                 </div>
                               ))}
                             </div>
@@ -3573,9 +3568,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         {selectedRoomId && selectedRoom && (
           <header className="px-4 py-2.5 flex items-center justify-between border-b border-[var(--border)]/50 dark:border-zinc-800/50 glass glass-border shrink-0 z-40">
             <div className="flex items-center gap-3 min-w-0">
-              <button onClick={() => setRoom(null)} className="md:hidden text-[var(--toss-gray-3)]">뒤로</button>
+              <button onClick={() => setRoom(null)} className="md:hidden text-[var(--toss-gray-3)]">?ㅻ줈</button>
               <div className="w-9 h-9 rounded-lg bg-[var(--tab-bg)] dark:bg-zinc-800 flex items-center justify-center text-lg">
-                {selectedRoom.id === NOTICE_ROOM_ID ? '📢' : '💬'}
+                {selectedRoom.id === NOTICE_ROOM_ID ? '?뱼' : '?뮠'}
               </div>
               <div className="min-w-0">
                 <h3 className="text-[13px] font-bold text-foreground truncate">
@@ -3598,7 +3593,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 data-testid="chat-open-drawer"
                 onClick={() => setShowDrawer(true)}
                 className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 text-[var(--toss-gray-4)] hover:text-foreground"
-                title="채팅방 정보 및 참여자 보기"
+                title="梨꾪똿諛??뺣낫 諛?李몄뿬??蹂닿린"
               >
                 <svg
                   aria-hidden="true"
@@ -3628,13 +3623,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   onClick={() => scrollToMessage(pinnedMessage.id)}
                   className="min-w-0 max-w-full rounded-[var(--radius-lg)] border border-orange-200 bg-[var(--card)] px-3 py-2 text-left shadow-sm transition-colors hover:bg-orange-100"
                 >
-                  <p className="text-[10px] font-bold text-orange-500">공지 메시지</p>
+                  <p className="text-[10px] font-bold text-orange-500">怨듭? 硫붿떆吏</p>
                   <p className="mt-1 max-w-[280px] truncate text-xs font-semibold text-[var(--foreground)]">
                     {getMessageDisplayText(
                       pinnedMessage.content,
                       pinnedMessage.file_name,
                       pinnedMessage.file_url,
-                      '첨부 파일 메시지'
+                      '泥⑤? ?뚯씪 硫붿떆吏'
                     )}
                   </p>
                 </button>
@@ -3646,17 +3641,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         <div
           ref={messageListRef}
           onScroll={updateScrollPositionState}
-          className="flex-1 min-h-0 overflow-y-auto px-3 py-1 pb-2 md:px-4 md:py-2 md:pb-2 space-y-0 custom-scrollbar"
+          className="flex-1 min-h-0 overflow-y-auto px-2.5 py-0.5 pb-1 md:px-4 md:py-2 md:pb-2 space-y-0 custom-scrollbar"
         >
           {!selectedRoomId ? (
             <div className="h-full flex flex-col items-center justify-center text-[var(--toss-gray-3)]">
-              <span className="text-4xl mb-2">💬</span>
-              <p className="text-sm font-bold">채팅방을 선택하세요.</p>
+              <span className="text-4xl mb-2">?뮠</span>
+              <p className="text-sm font-bold">梨꾪똿諛⑹쓣 ?좏깮?섏꽭??</p>
             </div>
           ) : messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center opacity-20">
-              <span className="text-6xl mb-4">💬</span>
-              <p className="font-semibold text-sm">대화 내용이 없습니다.</p>
+              <span className="text-6xl mb-4">?뮠</span>
+              <p className="font-semibold text-sm">????댁슜???놁뒿?덈떎.</p>
             </div>
           ) : (
             (() => {
@@ -3670,7 +3665,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   return (
                     <div data-testid={`chat-poll-${pollItem.id}`} key={`poll-${pollItem.id}`} className="max-w-[85%] md:max-w-[70%] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-2xl p-4 shadow-soft">
                       <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                        <span className="text-sm">🗳️</span> 투표
+                        <span className="text-sm">🗳</span> 투표
                       </p>
                       <p className="mb-4 text-xs font-bold text-foreground leading-relaxed">{pollItem.question}</p>
                       <div className="space-y-1.5">
@@ -3722,7 +3717,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   ? `${readersCount}`
                   : readStatusSummary;
 
-                const TOOLBAR_EMOJIS = ['👍', '❤️', '👏', '🎉', '🔥', '✅', '👀', '🙏'];
+                const TOOLBAR_EMOJIS = ['👍', '❤️', '😂', '🎉', '👏', '🔥', '🙏', '✔️'];
 
                 const created = new Date(msg.created_at || 0);
                 const dateLabel = created.toLocaleDateString('ko-KR', {
@@ -3734,15 +3729,15 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 const showDateDivider = dateLabel !== lastDateLabel;
                 if (showDateDivider) lastDateLabel = dateLabel;
 
-                const isSystemInvite = typeof msg.content === 'string' && msg.content.startsWith('[초대]');
-                const systemText = isSystemInvite ? (msg.content as string).replace(/^\[초대\]\s*/, '') : '';
+                const isSystemInvite = typeof msg.content === 'string' && msg.content.startsWith('[珥덈?]');
+                const systemText = isSystemInvite ? (msg.content as string).replace(/^\[珥덈?\]\s*/, '') : '';
                 const isContinuous = !showDateDivider && !isSystemInvite && String(msg.sender_id) === lastSenderId;
                 lastSenderId = String(msg.sender_id);
 
                 return (
                   <div key={msg.id} className={isContinuous ? 'mt-0.5' : 'mt-1.5 md:mt-2'}>
                     {showDateDivider && (
-                      <div className="my-1 flex items-center justify-center gap-1.5 md:my-2 md:gap-2">
+                      <div className="my-1 flex items-center justify-center gap-2 md:my-2">
                         <div className="flex-1 h-px bg-[var(--border)]" />
                         <span className="px-2.5 py-0.5 rounded-full bg-[var(--muted)] text-[10px] font-semibold text-[var(--toss-gray-3)] shrink-0">
                           {dateLabel}
@@ -3753,7 +3748,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     {isSystemInvite ? (
                       <div className="flex justify-center my-1">
                         <span className="px-2.5 py-0.5 rounded-full bg-[var(--toss-blue-light)] text-[10px] font-semibold text-[var(--accent)]">
-                          초대 {systemText}
+                          珥덈? {systemText}
                         </span>
                       </div>
                     ) : (
@@ -3775,10 +3770,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           }}
                           className={`group relative ${
                             isDeletedMessage
-                              ? 'border border-dashed border-[var(--border)] bg-[var(--muted)] px-2.5 py-1.5 text-[var(--toss-gray-3)] italic md:px-3'
+                              ? 'px-3 py-1.5 border border-dashed border-[var(--border)] bg-[var(--muted)] text-[var(--toss-gray-3)] italic'
                               : !msg.content
                                 ? 'p-0 bg-transparent shadow-none border-none'
-                                : 'border px-2.5 py-1.5 md:px-3'
+                                : 'border px-2.5 py-1.5 md:px-3 md:py-1.5'
                           } rounded-[var(--radius-md)] text-[13px] md:text-sm ${isDeletedMessage ? 'cursor-default' : 'cursor-pointer'} transition-all max-w-[78%] md:max-w-[72%] ${
                             isDeletedMessage
                               ? isMine
@@ -3796,7 +3791,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             if (isDeletedMessage) return;
                             if (e.key === 'Enter') markMessageRead(msg);
                           }}
-                          aria-label={`${msg.staff?.name || '이름 없음'} ${isDeletedMessage ? '삭제된 메시지' : '메시지'}`}
+                          aria-label={`${msg.staff?.name || '?대쫫 ?놁쓬'} ${isDeletedMessage ? '??젣??硫붿떆吏' : '硫붿떆吏'}`}
                         >
                           {!isDeletedMessage && msg.reply_to_id && (() => {
                             const parent = messages.find(( m: ChatMessage) => m.id === msg.reply_to_id);
@@ -3809,20 +3804,20 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                   scrollToMessage(msg.reply_to_id!);
                                 }}
                               >
-                                <span className="font-bold opacity-80">답글 {(parent.staff as { name?: string } | null | undefined)?.name}: </span>
+                                <span className="font-bold opacity-80">?듦? {(parent.staff as { name?: string } | null | undefined)?.name}: </span>
                                 <span className="truncate block mt-0.5">
                                   {getMessageDisplayText(
                                     parent.content,
                                     parent.file_name,
                                     parent.file_url,
-                                    '첨부 파일'
+                                    '泥⑤? ?뚯씪'
                                   )}
                                 </span>
                               </div>
                             ) : null;
                           })()}
                           <div className={`leading-relaxed ${(msg.content && !isDeletedMessage) ? 'mb-0.5' : ''}`}>
-                            {isDeletedMessage ? '삭제된 메시지입니다.' : renderMessageContent(msg.content || '', isMine)}
+                            {isDeletedMessage ? '??젣??硫붿떆吏?낅땲??' : renderMessageContent(msg.content || '', isMine)}
                           </div>
                           {!isDeletedMessage && msg.file_url && (() => { const furl = msg.file_url!; const attachmentName = getAttachmentDisplayName(msg.file_name, furl); return (
                             <div className="space-y-1 mt-2" onClick={(e) => e.stopPropagation()}>
@@ -3831,14 +3826,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                   <button type="button" className="block" onClick={() => setImagePreviewUrl(furl)}>
                                     <img
                                       src={furl}
-                                      alt="첨부 이미지"
+                                      alt="泥⑤? ?대?吏"
                                       className={`max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] object-cover cursor-zoom-in ${msg.content ? 'border border-[var(--border)]' : 'shadow-sm'}`}
                                     />
                                   </button>
                                   <div className="absolute opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity inset-0 flex items-center justify-center bg-black/40 rounded-[var(--radius-md)] gap-2 pointer-events-none">
                                     <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setImagePreviewUrl(furl); }} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-[var(--radius-md)] text-white" title="미리보기">보기</button>
-                                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard.writeText(furl).then(() => toast('공유 링크를 복사했습니다.')) }} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-[var(--radius-md)] text-white" title="공유">공유</button>
-                                    <a href={furl} download={attachmentName} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-full text-white" title="다운로드">저장</a>
+                                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard.writeText(furl).then(() => toast('공유 링크를 복사했습니다.')); }} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-[var(--radius-md)] text-white" title="공유">공유</button>
+                                    <a href={furl} download={attachmentName} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-full text-white" title="다운로드">다운로드</a>
                                   </div>
                                   <p className={`mt-1 max-w-[200px] md:max-w-[240px] truncate text-[10px] font-semibold ${isMine ? 'text-white/85' : 'text-[var(--toss-gray-4)]'}`}>{attachmentName}</p>
                                 </div>
@@ -3851,13 +3846,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                 </div>
                               ) : (
                                 <div className={`p-3 rounded-[var(--radius-md)] border ${isMine ? 'bg-white/95 border-white/40 text-slate-900' : 'bg-[var(--toss-gray-0)] border-[var(--border)] text-[var(--foreground)]'} flex items-start gap-3 shadow-sm min-w-[200px]`}>
-                                  <div className="text-3xl">📎</div>
+                                  <div className="text-3xl">?뱨</div>
                                   <div className="flex-1 min-w-0 pt-0.5">
                                     <p className="font-bold text-[12px] truncate mb-1 text-[var(--foreground)]">{attachmentName}</p>
                                     <div className="flex items-center gap-1.5 mt-2">
-                                      <button onClick={() => window.open(furl, '_blank')} className="text-[10px] font-bold text-[var(--accent)] hover:text-blue-600 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 rounded-md">미리보기</button>
-                                      <button onClick={() => { navigator.clipboard.writeText(furl).then(() => toast('공유 링크를 복사했습니다.')) }} className="text-[10px] font-bold text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-4)] px-2 py-1 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-md">공유</button>
-                                  <a href={furl} download={attachmentName} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/30 rounded-md inline-block">다운로드</a>
+                                      <button onClick={() => window.open(furl, '_blank')} className="text-[10px] font-bold text-[var(--accent)] hover:text-blue-600 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 rounded-md">誘몃━蹂닿린</button>
+                                      <button onClick={() => { navigator.clipboard.writeText(furl).then(() => toast('怨듭쑀 留곹겕瑜?蹂듭궗?덉뒿?덈떎.')) }} className="text-[10px] font-bold text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-4)] px-2 py-1 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-md">怨듭쑀</button>
+                                  <a href={furl} download={attachmentName} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/30 rounded-md inline-block">?ㅼ슫濡쒕뱶</a>
                                     </div>
                                   </div>
                                 </div>
@@ -3920,8 +3915,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                               }}
                               className="px-2.5 py-1 rounded-[var(--radius-md)] text-[10px] font-bold bg-red-50 text-red-500 hover:bg-red-100"
                             >
-                              재전송
-                            </button>
+                              ?ъ쟾??                            </button>
                           </div>
                         )}
                         <div
@@ -3933,15 +3927,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             onClick={() => { startReplyToMessage(msg); }}
                             className="p-1 px-2 rounded-lg hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-blue-500 transition-colors"
                           >
-                            답장
+                            ?듭옣
                           </button>
                           <button
                             type="button"
                             onClick={() => { openMessageActions(msg); }}
                             className="p-1 px-2 rounded-lg hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] transition-colors"
                           >
-                            더보기
-                          </button>
+                            ?붾낫湲?                          </button>
                         </div>
                       </div>
                     )}
@@ -3961,14 +3954,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               onClick={() => scrollToBottom('smooth')}
               className="px-3 py-2 rounded-[var(--radius-md)] bg-[var(--card)] border border-[var(--border)] shadow-sm text-[11px] font-bold text-[var(--foreground)]"
             >
-              최신 메시지
+              理쒖떊 硫붿떆吏
             </button>
           </div>
         )}
 
         <div
           data-testid="chat-upload-dropzone"
-          className={`relative z-10 shrink-0 bg-[var(--card)] px-1.5 py-1 md:px-2.5 md:py-1.5 transition-all ${isDragging ? 'border-t-2 border-[var(--accent)] border-dashed bg-blue-50 dark:bg-blue-900/20' : 'border-t border-[var(--border)]'}`}
+          className={`relative px-1.5 py-1 md:px-3 md:py-2 bg-[var(--card)] shrink-0 transition-all z-10 ${isDragging ? 'border-t-2 border-[var(--accent)] border-dashed bg-blue-50 dark:bg-blue-900/20' : 'border-t border-[var(--border)]'}`}
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
           onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
           onDrop={async (e) => {
@@ -3978,19 +3971,19 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           }}
         >
           {replyTo && (
-            <div className="mb-1.5 flex items-center justify-between rounded-[var(--radius-lg)] border border-[var(--toss-blue-light)] bg-[var(--toss-blue-light)] px-2.5 py-1.5 animate-in slide-in-from-bottom-2">
-              <p className="text-[11px] font-bold text-[var(--accent)]">@{(replyTo.staff as { name?: string } | null | undefined)?.name}님에게 답글 작성 중...</p>
-              <button onClick={() => setReplyTo(null)} className="text-[var(--accent)] hover:text-[var(--accent)] font-semibold">닫기</button>
+            <div className="mb-2 flex items-center justify-between bg-[var(--toss-blue-light)] px-3 py-2 rounded-[var(--radius-lg)] border border-[var(--toss-blue-light)] animate-in slide-in-from-bottom-2">
+              <p className="text-[11px] font-bold text-[var(--accent)]">@{(replyTo.staff as { name?: string } | null | undefined)?.name}?섏뿉寃??듦? ?묒꽦 以?..</p>
+              <button onClick={() => setReplyTo(null)} className="text-[var(--accent)] hover:text-[var(--accent)] font-semibold">?リ린</button>
             </div>
           )}
 
           {pendingAttachmentFiles.length > 0 && (
             <div
               data-testid="chat-pending-upload-panel"
-              className="mb-1.5 flex flex-col gap-1.5 rounded-[var(--radius-lg)] border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[12px] text-blue-900"
+              className="mb-2 flex flex-col gap-2 rounded-[var(--radius-lg)] border border-blue-200 bg-blue-50 px-3 py-2 text-[12px] text-blue-900"
             >
               <p className="font-semibold">
-                선택한 파일 {pendingAttachmentFiles.length}개를 채팅방에 전송할까요?
+                ?좏깮???뚯씪 {pendingAttachmentFiles.length}媛쒕? 梨꾪똿諛⑹뿉 ?꾩넚?좉퉴??
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {pendingAttachmentFiles.map((file, index) => {
@@ -4012,17 +4005,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   type="button"
                   data-testid="chat-pending-upload-cancel-button"
                   onClick={cancelPendingAttachmentUpload}
-                  className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-[11px] font-bold text-[var(--foreground)]"
+                  className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)]"
                 >
-                  취소
+                  痍⑥냼
                 </button>
                 <button
                   type="button"
                   data-testid="chat-pending-upload-send-button"
                   onClick={() => void confirmPendingAttachmentUpload()}
-                  className="rounded-[var(--radius-md)] bg-[var(--accent)] px-2.5 py-1 text-[11px] font-bold text-white"
+                  className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white"
                 >
-                  전송
+                  ?꾩넚
                 </button>
               </div>
             </div>
@@ -4037,7 +4030,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             ) : null}
           </div>
 
-          <div className={`flex items-center md:items-end gap-1.5 rounded-[var(--radius-lg)] border px-1.5 py-1.5 md:gap-2 md:px-2.5 md:py-2 transition-all ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
+          <div className={`flex items-center md:items-end gap-1.5 px-1.5 py-1.5 md:gap-2.5 md:px-3 md:py-2.5 rounded-[var(--radius-lg)] border transition-all ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
             ? 'bg-[var(--muted)] border-[var(--border)] opacity-80 pointer-events-none'
             : 'bg-[var(--muted)] border-[var(--border)] focus-within:bg-[var(--card)] focus-within:ring-2 focus-within:ring-[var(--accent)]/50'
             }`}>
@@ -4045,10 +4038,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={fileUploading}
-              title="파일 첨부"
+              title="?뚯씪 泥⑤?"
               className="flex h-7 w-7 items-center justify-center text-[var(--toss-gray-3)] transition-colors hover:text-[var(--accent)] disabled:opacity-50 md:h-8 md:w-8"
             >
-              {fileUploading ? <span className="animate-pulse text-xs">...</span> : '첨부'}
+              {fileUploading ? <span className="animate-pulse text-xs">...</span> : '泥⑤?'}
             </button>
             <div className="relative flex-1">
               <textarea
@@ -4099,20 +4092,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     >
                       <span className="text-[11px] font-semibold text-[var(--foreground)] truncate">{m.name}</span>
                       <span className="text-[11px] text-[var(--toss-gray-3)] truncate">
-                        {(m.department || '')}{m.position ? ` · ${m.position}` : ''}
+                        {(m.department || '')}{m.position ? ` 쨌 ${m.position}` : ''}
                       </span>
                     </button>
                   ))}
                 </div>
               )}
             </div>
-            <button
-              data-testid="chat-send-button"
-              onClick={() => handleSendMessage()}
-              className="flex h-7 min-w-[48px] items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)] px-2 text-[12px] font-bold text-white shadow-sm transition-all hover:scale-105 active:scale-95 md:h-8 md:min-w-[56px] md:px-3 md:text-sm"
-            >
-              전송
-            </button>
+            <button data-testid="chat-send-button" onClick={() => handleSendMessage()} className="flex h-7 min-w-[48px] items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)] px-2 text-[12px] font-bold text-white shadow-sm transition-all hover:scale-105 active:scale-95 md:h-8 md:min-w-[56px] md:px-3 md:text-sm">전송</button>
           </div>
         </div>
 
@@ -4121,13 +4108,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             <div className="absolute inset-0 bg-black/10 z-50 animate-in fade-in duration-200" onClick={() => setShowDrawer(false)} aria-hidden="true" />
             <div data-testid="chat-room-drawer" className="absolute top-0 right-0 bottom-0 w-full md:w-80 bg-[var(--card)] dark:bg-zinc-900 shadow-sm z-[60] flex flex-col animate-in slide-in-from-right duration-300 border-l border-[var(--border)]">
               <div className="p-4 border-b border-[var(--border)] flex items-center justify-between bg-[var(--card)]">
-                <span className="text-sm font-bold">채팅방 정보</span>
-              <button onClick={() => setShowDrawer(false)} className="p-2 text-[var(--toss-gray-3)] hover:text-black dark:hover:text-white rounded-[var(--radius-md)]">닫기</button>
+                <span className="text-sm font-bold">梨꾪똿諛??뺣낫</span>
+              <button onClick={() => setShowDrawer(false)} className="p-2 text-[var(--toss-gray-3)] hover:text-black dark:hover:text-white rounded-[var(--radius-md)]">?リ린</button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
                 <div className="flex items-center justify-between p-3 bg-[var(--tab-bg)] dark:bg-zinc-800/50 rounded-2xl">
-                  <span className="text-sm font-semibold">알림 설정</span>
+                  <span className="text-sm font-semibold">?뚮┝ ?ㅼ젙</span>
                   <button
                     onClick={() => setRoomNotifyOn(!roomNotifyOn)}
                     className={`w-12 h-6 rounded-full transition-colors relative ${roomNotifyOn ? 'bg-emerald-500' : 'bg-zinc-300'}`}
@@ -4138,25 +4125,25 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
                 <button data-testid="chat-open-poll-modal" onClick={() => { setShowPollModal(true); setShowDrawer(false); }} className="w-full flex items-center justify-between p-3.5 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors group">
                   <div className="flex items-center gap-3">
-                    <span className="text-lg">🗳️</span>
+                    <span className="text-lg">🗳</span>
                     <span className="text-xs font-bold text-blue-700 dark:text-blue-300">새 투표 만들기</span>
                   </div>
                   <span className="text-[10px] text-blue-400 font-bold group-hover:translate-x-1 transition-transform">열기</span>
                 </button>
 
                 <div className="space-y-3">
-                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider px-1">상단 공지</p>
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider px-1">?곷떒 怨듭?</p>
                   <div data-testid="chat-drawer-notice" className="p-4 bg-orange-50 dark:bg-orange-950/20 rounded-2xl border border-orange-100 dark:border-orange-900/30">
-                    <p className="text-xs font-bold text-orange-800 dark:text-orange-300 mb-1">공지</p>
+                    <p className="text-xs font-bold text-orange-800 dark:text-orange-300 mb-1">怨듭?</p>
                     <p className="text-xs text-orange-900/70 dark:text-orange-200/50 leading-relaxed whitespace-pre-wrap">
-                      {currentNoticeMessage?.content || '등록된 공지가 없습니다.'}
+                      {currentNoticeMessage?.content || '?깅줉??怨듭?媛 ?놁뒿?덈떎.'}
                     </p>
                   </div>
                 </div>
 
                 <div className="space-y-3">
                   <div className="flex justify-between items-center px-1">
-                <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">사진 및 동영상</p>
+                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">사진 및 동영상</p>
                     <button onClick={() => { setMediaFilter('all'); setShowMediaPanel(true); }} className="text-[10px] font-bold text-[var(--accent)]">전체보기</button>
                   </div>
                   <div className="grid grid-cols-3 gap-1 rounded-2xl overflow-hidden">
@@ -4165,13 +4152,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         {m.file_kind === 'image' ? (
                           <img src={m.file_url || ''} alt="Attached image" className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-xl">🎬</div>
+                          <div className="w-full h-full flex items-center justify-center text-xl">?렗</div>
                         )}
                       </div>
                     ))}
                     {sharedMediaPreviewMessages.length === 0 && (
                       <div className="col-span-3 py-5 text-center bg-[var(--tab-bg)] dark:bg-zinc-800/30 rounded-2xl border border-dashed border-[var(--border)] dark:border-zinc-700">
-                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">주고받은 미디어가 없습니다.</p>
+                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">二쇨퀬諛쏆? 誘몃뵒?닿? ?놁뒿?덈떎.</p>
                       </div>
                     )}
                   </div>
@@ -4179,8 +4166,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
                 <div className="space-y-3">
                   <div className="flex justify-between items-center px-1">
-                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">파일</p>
-                    <button onClick={() => { setMediaFilter('file'); setShowMediaPanel(true); }} className="text-[10px] font-bold text-[var(--accent)]">전체보기</button>
+                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">?뚯씪</p>
+                    <button onClick={() => { setMediaFilter('file'); setShowMediaPanel(true); }} className="text-[10px] font-bold text-[var(--accent)]">?꾩껜蹂닿린</button>
                   </div>
                   <div className="space-y-2">
                     {sharedFilePreviewMessages.map((m) => {
@@ -4189,15 +4176,15 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       return (
                         <div key={m.id} className="p-3 bg-[var(--tab-bg)] dark:bg-zinc-800/50 rounded-xl border border-[var(--border-subtle)] dark:border-zinc-800">
                           <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-[var(--card)] dark:bg-zinc-900 flex items-center justify-center text-lg shrink-0">📎</div>
+                            <div className="w-10 h-10 rounded-xl bg-[var(--card)] dark:bg-zinc-900 flex items-center justify-center text-lg shrink-0">?뱨</div>
                             <div className="min-w-0 flex-1">
                               <p className="text-[11px] font-bold text-foreground truncate">{attachmentName}</p>
                               <p className="text-[10px] text-[var(--toss-gray-4)] truncate mt-0.5">
-                                {(m.staff as { name?: string } | null | undefined)?.name || '알 수 없음'} · {new Date(m.created_at || 0).toLocaleDateString()}
+                                {(m.staff as { name?: string } | null | undefined)?.name || '?????놁쓬'} 쨌 {new Date(m.created_at || 0).toLocaleDateString()}
                               </p>
                               <div className="flex items-center gap-2 mt-2">
-                                <button onClick={() => window.open(fileUrl, '_blank')} className="text-[10px] font-bold text-[var(--accent)] hover:text-blue-600">미리보기</button>
-                                <a href={fileUrl} download={attachmentName} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700">다운로드</a>
+                                <button onClick={() => window.open(fileUrl, '_blank')} className="text-[10px] font-bold text-[var(--accent)] hover:text-blue-600">誘몃━蹂닿린</button>
+                                <a href={fileUrl} download={attachmentName} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700">?ㅼ슫濡쒕뱶</a>
                               </div>
                             </div>
                           </div>
@@ -4206,14 +4193,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     })}
                     {sharedFilePreviewMessages.length === 0 && (
                       <div className="py-4 text-center bg-[var(--tab-bg)] dark:bg-zinc-800/30 rounded-xl border border-[var(--border-subtle)] dark:border-zinc-800">
-                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">공유된 파일이 없습니다.</p>
+                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">怨듭쑀???뚯씪???놁뒿?덈떎.</p>
                       </div>
                     )}
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider px-1">링크</p>
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider px-1">留곹겕</p>
                   <div className="space-y-2">
                     {sharedLinkPreviewMessages.map((m) => {
                       const urlMatch = (m.content || '').match(/https?:\/\/[^\s]+/);
@@ -4221,13 +4208,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       return (
                         <a key={m.id} href={url} target="_blank" rel="noreferrer" className="block p-3 bg-[var(--tab-bg)] dark:bg-zinc-800/50 rounded-xl border border-[var(--border-subtle)] dark:border-zinc-800 hover:border-emerald-500 transition-colors">
                           <p className="text-[11px] font-bold truncate text-emerald-600 mb-0.5">{url}</p>
-                          <p className="text-[10px] text-[var(--toss-gray-4)] truncate">{(m.staff as { name?: string } | null | undefined)?.name} · {new Date(m.created_at || 0).toLocaleDateString()}</p>
+                          <p className="text-[10px] text-[var(--toss-gray-4)] truncate">{(m.staff as { name?: string } | null | undefined)?.name} 쨌 {new Date(m.created_at || 0).toLocaleDateString()}</p>
                         </a>
                       );
                     })}
                     {sharedLinkPreviewMessages.length === 0 && (
                       <div className="py-4 text-center bg-[var(--tab-bg)] dark:bg-zinc-800/30 rounded-xl border border-[var(--border-subtle)] dark:border-zinc-800">
-                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">공유된 링크가 없습니다.</p>
+                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">怨듭쑀??留곹겕媛 ?놁뒿?덈떎.</p>
                       </div>
                     )}
                   </div>
@@ -4235,7 +4222,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
                 <div className="space-y-3">
                   <div className="flex justify-between items-center px-1">
-                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">참여자 ({roomMembers.length || 0})</p>
+                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">李몄뿬??({roomMembers.length || 0})</p>
               {selectedRoom?.id !== NOTICE_ROOM_ID && (
                 <button data-testid="chat-open-add-member-modal" onClick={() => setShowAddMemberModal(true)} className="w-6 h-6 flex items-center justify-center bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-[var(--radius-md)] text-[var(--toss-gray-4)] hover:text-emerald-500 transition-colors">+</button>
               )}
@@ -4255,12 +4242,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                               {s?.photo_url ? <img src={s.photo_url} alt={`${s.name}'s profile`} className="w-full h-full rounded-full object-cover" /> : (s?.name?.[0] || '?')}
                             </div>
                             <div>
-                              <p className="text-xs font-bold text-foreground">{s?.name || '이름 없음'}</p>
-                              <p className="text-[10px] text-[var(--toss-gray-4)] font-medium">{[s?.department, s?.position].filter(Boolean).join(' · ')}</p>
+                              <p className="text-xs font-bold text-foreground">{s?.name || '?대쫫 ?놁쓬'}</p>
+                              <p className="text-[10px] text-[var(--toss-gray-4)] font-medium">{[s?.department, s?.position].filter(Boolean).join(' 쨌 ')}</p>
                             </div>
                           </div>
                           {isOwner && String(memberId) !== String(effectiveChatUserId || user?.id || '') && (
-                            <button data-testid={`chat-remove-member-${memberId}`} onClick={() => { void removeRoomMember(String(memberId)); }} className="opacity-0 group-hover:opacity-100 p-1 text-red-500 text-[10px] font-bold hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-all">내보내기</button>
+                            <button data-testid={`chat-remove-member-${memberId}`} onClick={() => { void removeRoomMember(String(memberId)); }} className="opacity-0 group-hover:opacity-100 p-1 text-red-500 text-[10px] font-bold hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-all">?대낫?닿린</button>
                           )}
                         </div>
                       );
@@ -4270,7 +4257,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               </div>
 
               <div className="p-4 bg-[var(--tab-bg)] dark:bg-zinc-800/50 border-t border-[var(--border)] flex flex-col gap-2">
-                {/* 이름 수정 인라인 폼 */}
+                {/* ?대쫫 ?섏젙 ?몃씪????*/}
                 {editingRoomName ? (
                   <div className="flex gap-2">
                     <input
@@ -4284,11 +4271,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           await supabase.from('chat_rooms').update({ name }).eq('id', selectedRoom.id);
                           setChatRooms(prev => prev.map((r: ChatRoom) => r.id === selectedRoom.id ? { ...r, name } : r));
                           setEditingRoomName(false);
-                          toast('채팅방 이름이 변경되었습니다.');
+                          toast('梨꾪똿諛??대쫫??蹂寃쎈릺?덉뒿?덈떎.');
                         }
                         if (e.key === 'Escape') setEditingRoomName(false);
                       }}
-                      placeholder="새 채팅방 이름"
+                      placeholder="??梨꾪똿諛??대쫫"
                       className="flex-1 px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] text-sm font-bold outline-none focus:border-[var(--accent)]"
                     />
                     <button
@@ -4309,10 +4296,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     {selectedRoom?.id !== NOTICE_ROOM_ID && (
                       <button onClick={() => { setShowDrawer(false); handleLeaveRoom(); }} className="flex-1 py-2.5 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl text-[11px] font-bold hover:bg-red-100 transition-colors">방 나가기</button>
                     )}
-                    {/* 이름 수정: 그룹방 or 멤버 3명 이상(direct→그룹 전환) */}
+                    {/* ?대쫫 ?섏젙: 洹몃９諛?or 硫ㅻ쾭 3紐??댁긽(direct?믨렇猷??꾪솚) */}
                     {selectedRoom?.id !== NOTICE_ROOM_ID &&
                       (selectedRoom?.type !== 'direct' || (Array.isArray(selectedRoom?.members) && selectedRoom.members.length > 2)) && (
-                      <button onClick={() => { setEditingRoomName(true); setRoomNameDraft(selectedRoom?.name || ''); }} className="flex-1 py-2.5 bg-[var(--muted)] text-foreground rounded-xl text-[11px] font-bold hover:bg-[var(--toss-gray-2)] transition-colors">이름 수정</button>
+                      <button onClick={() => { setEditingRoomName(true); setRoomNameDraft(selectedRoom?.name || ''); }} className="flex-1 py-2.5 bg-[var(--muted)] text-foreground rounded-xl text-[11px] font-bold hover:bg-[var(--toss-gray-2)] transition-colors">?대쫫 ?섏젙</button>
                     )}
                   </div>
                 )}
@@ -4329,31 +4316,31 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               <div className="w-12 h-1.5 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-full mx-auto my-3 shrink-0" />
               <div className="px-4 pb-8 space-y-4 overflow-y-auto">
                 <div className="flex justify-between items-center bg-[var(--tab-bg)] dark:bg-zinc-800/50 p-2 rounded-[var(--radius-xl)] gap-1 px-4">
-                  {['👍', '❤️', '👏', '🎉', '🔥', '✅', '👀', '🙏'].map(emoji => (
+                  {['👍', '❤️', '😂', '🎉', '👏', '🔥', '🙏', '✔️'].map(emoji => (
                     <button key={emoji} onClick={() => { toggleReaction(activeActionMsg.id, emoji); setActiveActionMsg(null); }} className="text-2xl hover:scale-110 transition-transform p-1">{emoji}</button>
                   ))}
                 </div>
                 <div className="space-y-1">
                   <button onClick={() => { handleAction('task'); setActiveActionMsg(null) }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
                     <span className="text-xl">✅</span>
-                    <span className="text-sm font-bold">할 일 추가</span>
+                    <span className="text-sm font-bold">할일 추가</span>
                   </button>
                   <button onClick={() => { if (!activeActionMsg) return; void togglePin(activeActionMsg.id); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
-                    <span className="text-xl">📢</span>
+                    <span className="text-xl">📌</span>
                     <span className="text-sm font-bold">{pinnedIds.includes(String(activeActionMsg.id)) ? '공지 해제' : '공지 등록'}</span>
                   </button>
                   <button data-testid="chat-message-action-bookmark-mobile" onClick={() => { if (!activeActionMsg) return; void toggleBookmark(activeActionMsg.id); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
                     <span className="text-xl">🔖</span>
                     <span className="text-sm font-bold">{bookmarkedIds.has(String(activeActionMsg.id)) ? '북마크 해제' : '북마크 등록'}</span>
                   </button>
-                  <button onClick={async () => { await navigator.clipboard?.writeText(activeActionMsg.content || ''); toast('복사했습니다.'); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
+                  <button onClick={async () => { await navigator.clipboard?.writeText(activeActionMsg.content || ''); toast('蹂듭궗?덉뒿?덈떎.'); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
                     <span className="text-xl">📋</span>
                     <span className="text-sm font-bold">복사</span>
                   </button>
                   {String(activeActionMsg.sender_id) === String(effectiveChatUserId || user?.id || '') && !activeActionMsg.is_deleted && (
                     <button data-testid="chat-message-action-edit-mobile" onClick={() => { startEditMessage(activeActionMsg); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
-                      <span className="text-xl">✏️</span>
-                      <span className="text-sm font-bold">수정</span>
+                      <span className="text-xl">?륅툘</span>
+                      <span className="text-sm font-bold">?섏젙</span>
                     </button>
                   )}
                   {String(activeActionMsg.sender_id) === String(effectiveChatUserId || user?.id || '') && (
@@ -4376,51 +4363,51 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
             <div data-testid="chat-message-actions-panel" className="hidden md:flex absolute top-0 right-0 bottom-0 w-80 bg-[var(--card)] border-l border-[var(--border)] shadow-sm z-40 flex-col animate-in slide-in-from-right duration-300">
               <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">메시지 작업</span>
-            <button onClick={() => { setActiveActionMsg(null); }} className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[var(--radius-md)] hover:bg-[var(--muted)]">닫기</button>
+                <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">硫붿떆吏 ?묒뾽</span>
+            <button onClick={() => { setActiveActionMsg(null); }} className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[var(--radius-md)] hover:bg-[var(--muted)]">?リ린</button>
               </div>
               <div className="p-4 space-y-4 overflow-y-auto flex-1">
-                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">빠른 반응</p>
+                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">鍮좊Ⅸ 諛섏쓳</p>
                 <div className="flex gap-2 flex-wrap">
-                  {['👍', '❤️', '👏', '🔥', '🙏'].map(emoji => (
+                  {['?몟', '?ㅿ툘', '?몡', '?뵦', '?솋'].map(emoji => (
                     <button key={emoji} onClick={() => { toggleReaction(activeActionMsg.id, emoji); }} className="w-11 h-11 flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--muted)] hover:bg-[var(--toss-blue-light)] text-xl transition-colors" title={emoji}>
                       {emoji}
                     </button>
                   ))}
                 </div>
-                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase pt-2">기능</p>
+                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase pt-2">湲곕뒫</p>
                 <div className="space-y-1">
                   <button
                     onClick={() => { startReplyToMessage(activeActionMsg); }}
                     className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors"
                   >
-                    답글 달기
+                    ?듦? ?ш린
                   </button>
                   {String(activeActionMsg.sender_id) === String(effectiveChatUserId || user?.id || '') && !activeActionMsg.is_deleted && (
-                    <button data-testid="chat-message-action-edit" onClick={() => { startEditMessage(activeActionMsg); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">메시지 수정</button>
+                    <button data-testid="chat-message-action-edit" onClick={() => { startEditMessage(activeActionMsg); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">硫붿떆吏 ?섏젙</button>
                   )}
                   {String(activeActionMsg.sender_id) === String(effectiveChatUserId || user?.id || '') && (
-                    <button data-testid="chat-message-action-delete" onClick={() => { void deleteMessageFromActions(activeActionMsg); }} className="w-full p-3 text-left hover:bg-red-50 rounded-[var(--radius-md)] text-xs font-semibold text-red-600 transition-colors">메시지 삭제</button>
+                    <button data-testid="chat-message-action-delete" onClick={() => { void deleteMessageFromActions(activeActionMsg); }} className="w-full p-3 text-left hover:bg-red-50 rounded-[var(--radius-md)] text-xs font-semibold text-red-600 transition-colors">硫붿떆吏 ??젣</button>
                   )}
-                  <button data-testid="chat-message-action-pin" onClick={() => { void togglePin(activeActionMsg.id); setActiveActionMsg(null); }} className={`w-full p-3 text-left rounded-[var(--radius-md)] text-xs font-semibold transition-colors ${pinnedIds.includes(String(activeActionMsg.id)) ? 'hover:bg-[var(--muted)] text-[var(--toss-gray-3)]' : 'hover:bg-orange-50 text-orange-500'}`}>{pinnedIds.includes(String(activeActionMsg.id)) ? '공지 해제' : '공지로 등록'}</button>
-                  <button onClick={() => { handleAction('task'); setActiveActionMsg(null) }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">할 일로 등록</button>
+                  <button data-testid="chat-message-action-pin" onClick={() => { void togglePin(activeActionMsg.id); setActiveActionMsg(null); }} className={`w-full p-3 text-left rounded-[var(--radius-md)] text-xs font-semibold transition-colors ${pinnedIds.includes(String(activeActionMsg.id)) ? 'hover:bg-[var(--muted)] text-[var(--toss-gray-3)]' : 'hover:bg-orange-50 text-orange-500'}`}>{pinnedIds.includes(String(activeActionMsg.id)) ? '怨듭? ?댁젣' : '怨듭?濡??깅줉'}</button>
+                  <button onClick={() => { handleAction('task'); setActiveActionMsg(null) }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">???쇰줈 ?깅줉</button>
                   <button
                     data-testid="chat-message-action-read-status"
                     onClick={() => { openReadStatusPanel(activeActionMsg); }}
                     className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors"
                   >
-                    읽음 확인
+                    ?쎌쓬 ?뺤씤
                   </button>
                   <button
                     data-testid="chat-message-action-forward"
                     onClick={() => { startForwardMessage(activeActionMsg); }}
                     className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors"
                   >
-                    다른 채팅방으로 전달
+                    ?ㅻⅨ 梨꾪똿諛⑹쑝濡??꾨떖
                   </button>
-                  <button data-testid="chat-message-action-thread" onClick={() => { openThreadPanel(activeActionMsg); }} className="w-full p-3 text-left hover:bg-[var(--toss-blue-light)] rounded-[var(--radius-md)] text-xs font-semibold text-[var(--accent)] transition-colors">이 메시지 스레드 보기</button>
-                  <button onClick={async () => { try { const base = `[채팅] ${(activeActionMsg.staff as { name?: string } | null | undefined)?.name || '이름 없음'} (${new Date(activeActionMsg.created_at || 0).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[전자결재 메모]\n${base}`); toast('전자결재용으로 복사했습니다.'); } catch { toast('복사 실패', 'error'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">전자결재용 내용 복사</button>
-                  <button onClick={async () => { try { const base = `[채팅] ${(activeActionMsg.staff as { name?: string } | null | undefined)?.name || '이름 없음'} (${new Date(activeActionMsg.created_at || 0).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[게시판 메모]\n${base}`); toast('게시판용으로 복사했습니다.'); } catch { toast('복사 실패', 'error'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">게시판용 내용 복사</button>
+                  <button data-testid="chat-message-action-thread" onClick={() => { openThreadPanel(activeActionMsg); }} className="w-full p-3 text-left hover:bg-[var(--toss-blue-light)] rounded-[var(--radius-md)] text-xs font-semibold text-[var(--accent)] transition-colors">??硫붿떆吏 ?ㅻ젅??蹂닿린</button>
+                  <button onClick={async () => { try { const base = `[梨꾪똿] ${(activeActionMsg.staff as { name?: string } | null | undefined)?.name || '?대쫫 ?놁쓬'} (${new Date(activeActionMsg.created_at || 0).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n?뚯씪: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[?꾩옄寃곗옱 硫붾え]\n${base}`); toast('?꾩옄寃곗옱?⑹쑝濡?蹂듭궗?덉뒿?덈떎.'); } catch { toast('蹂듭궗 ?ㅽ뙣', 'error'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">?꾩옄寃곗옱???댁슜 蹂듭궗</button>
+                  <button onClick={async () => { try { const base = `[梨꾪똿] ${(activeActionMsg.staff as { name?: string } | null | undefined)?.name || '?대쫫 ?놁쓬'} (${new Date(activeActionMsg.created_at || 0).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n?뚯씪: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[寃뚯떆??硫붾え]\n${base}`); toast('寃뚯떆?먯슜?쇰줈 蹂듭궗?덉뒿?덈떎.'); } catch { toast('蹂듭궗 ?ㅽ뙣', 'error'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">寃뚯떆?먯슜 ?댁슜 蹂듭궗</button>
                   <button data-testid="chat-message-action-bookmark" onClick={() => { void toggleBookmark(activeActionMsg.id); setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">{bookmarkedIds.has(String(activeActionMsg.id)) ? '북마크 해제' : '중요 메시지 북마크'}</button>
                 </div>
               </div>
@@ -4432,8 +4419,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[115] p-4" onClick={() => setEditingMessage(null)}>
             <div className="bg-[var(--card)] w-full max-w-md rounded-2xl p-5 shadow-sm border border-[var(--border)] space-y-4" onClick={(e) => e.stopPropagation()}>
               <div className="space-y-1">
-                <h3 className="text-lg font-bold text-foreground">메시지 수정</h3>
-                <p className="text-[11px] font-medium text-[var(--toss-gray-3)]">전송한 메시지를 수정한 뒤 다시 저장합니다.</p>
+                <h3 className="text-lg font-bold text-foreground">硫붿떆吏 ?섏젙</h3>
+                <p className="text-[11px] font-medium text-[var(--toss-gray-3)]">?꾩넚??硫붿떆吏瑜??섏젙?????ㅼ떆 ??ν빀?덈떎.</p>
               </div>
               <textarea
                 data-testid="chat-message-edit-input"
@@ -4441,15 +4428,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 onChange={(e) => setEditingMessageDraft(e.target.value)}
                 rows={4}
                 className="w-full p-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-[var(--radius-lg)] text-sm font-medium outline-none resize-none focus:border-[var(--accent)]"
-                placeholder="수정할 메시지를 입력하세요."
+                placeholder="?섏젙??硫붿떆吏瑜??낅젰?섏꽭??"
               />
               <div className="flex gap-3">
                 <button type="button" onClick={() => setEditingMessage(null)} className="flex-1 py-3 bg-[var(--muted)] text-[var(--toss-gray-3)] rounded-[var(--radius-md)] font-semibold text-sm">
-                  취소
+                  痍⑥냼
                 </button>
                 <button data-testid="chat-message-edit-save" type="button" onClick={() => { void saveEditedMessage(); }} className="flex-1 py-3 bg-[var(--accent)] text-white rounded-[var(--radius-md)] font-semibold text-sm shadow-sm">
-                  저장
-                </button>
+                  ???                </button>
               </div>
             </div>
           </div>
@@ -4473,14 +4459,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           if (e.target.checked) setSelectedMembers([...selectedMembers, s.id]);
                           else setSelectedMembers(selectedMembers.filter(id => id !== s.id));
                         }} className="w-4 h-4 rounded border-[var(--border)] text-[var(--accent)] focus:ring-[var(--accent)]" />
-                        <span className="text-xs font-bold text-[var(--foreground)]">{s.name} ({s.company ? `${s.company} · ` : ''}{s.position})</span>
+                        <span className="text-xs font-bold text-[var(--foreground)]">{s.name} ({s.company ? `${s.company} 쨌 ` : ''}{s.position})</span>
                       </label>
                     ))}
                   </div>
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={() => setShowGroupModal(false)} className="flex-1 py-4 bg-[var(--muted)] text-[var(--toss-gray-3)] rounded-[var(--radius-md)] font-semibold text-xs">취소</button>
-                  <button onClick={createGroupChat} className="flex-2 py-4 bg-[var(--accent)] text-white rounded-[var(--radius-md)] font-semibold text-xs shadow-sm shadow-[var(--accent)]">채팅방 생성</button>
+                  <button onClick={() => setShowGroupModal(false)} className="flex-1 py-4 bg-[var(--muted)] text-[var(--toss-gray-3)] rounded-[var(--radius-md)] font-semibold text-xs">痍⑥냼</button>
+                  <button onClick={createGroupChat} className="flex-2 py-4 bg-[var(--accent)] text-white rounded-[var(--radius-md)] font-semibold text-xs shadow-sm shadow-[var(--accent)]">梨꾪똿諛??앹꽦</button>
                 </div>
               </div>
             </div>
@@ -4491,23 +4477,23 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       {showPollModal && (
         <div data-testid="chat-poll-modal" className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4">
           <div className="bg-[var(--card)] w-full max-w-md rounded-2xl p-4 space-y-4 shadow-sm border border-[var(--border)]">
-              <h3 className="text-lg font-semibold text-[var(--foreground)]">새 투표 만들기</h3>
+              <h3 className="text-lg font-semibold text-[var(--foreground)]">???ы몴 留뚮뱾湲?/h3>
             <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
-              질문과 선택지를 입력해 주세요. 선택지는 항목별로 따로 입력합니다.
+              吏덈Ц怨??좏깮吏瑜??낅젰??二쇱꽭?? ?좏깮吏????ぉ蹂꾨줈 ?곕줈 ?낅젰?⑸땲??
             </p>
             <div className="space-y-3">
               <div>
-                <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">질문</label>
+                <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">吏덈Ц</label>
                 <input
                   data-testid="chat-poll-question"
                   value={pollQuestion}
                   onChange={(e) => setPollQuestion(e.target.value)}
                   className="w-full mt-1 p-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-[var(--radius-lg)] text-xs font-bold outline-none focus:border-[var(--accent)]"
-                  placeholder="예: 이번 주 회의 시간은 언제가 좋을까요?"
+                  placeholder="?? ?대쾲 二??뚯쓽 ?쒓컙? ?몄젣媛 醫뗭쓣源뚯슂?"
                 />
               </div>
               <div>
-                <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">선택지</label>
+                <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">?좏깮吏</label>
                 <div className="mt-1 space-y-2">
                   {pollOptions.map((opt, idx) => (
                     <div key={idx} className="flex gap-2">
@@ -4520,7 +4506,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           setPollOptions(newOpts);
                         }}
                         className="flex-1 p-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-[var(--radius-lg)] text-xs font-bold outline-none focus:border-[var(--accent)]"
-                        placeholder={`선택지 ${idx + 1}`}
+                        placeholder={`?좏깮吏 ${idx + 1}`}
                       />
                       {pollOptions.length > 2 && (
                         <button
@@ -4528,7 +4514,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== idx))}
                           className="w-10 h-10 flex items-center justify-center bg-red-50 text-red-500 rounded-xl hover:bg-red-100"
                         >
-                          삭제
+                          ??젣
                         </button>
                       )}
                     </div>
@@ -4538,7 +4524,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     onClick={() => setPollOptions([...pollOptions, ''])}
                     className="w-full py-3 border-2 border-dashed border-[var(--border)] rounded-xl text-xs font-bold text-[var(--toss-gray-4)] hover:text-blue-500 hover:border-blue-300"
                   >
-                    + 항목 추가
+                    + ??ぉ 異붽?
                   </button>
                 </div>
               </div>
@@ -4549,7 +4535,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 onClick={() => setShowPollModal(false)}
                 className="flex-1 py-3 rounded-[var(--radius-lg)] text-[11px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
               >
-                취소
+                痍⑥냼
               </button>
               <button
                 data-testid="chat-poll-submit"
@@ -4557,7 +4543,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 onClick={handleCreatePoll}
                 className="flex-1 py-3 rounded-[var(--radius-lg)] text-[11px] font-semibold bg-[var(--accent)] text-white hover:bg-[var(--accent)] shadow-md"
               >
-                투표 생성
+                ?ы몴 ?앹꽦
               </button>
             </div>
           </div>
@@ -4568,17 +4554,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4" onClick={() => setShowSlashModal(false)}>
           <div className="bg-[var(--card)] w-full max-w-md rounded-2xl p-4 space-y-4 shadow-sm border border-[var(--border)]" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-[var(--foreground)]">
-              {slashCommand === 'annual_leave' ? '연차 요청 초안 만들기' : '발주 요청 초안 만들기'}
+              {slashCommand === 'annual_leave' ? '?곗감 ?붿껌 珥덉븞 留뚮뱾湲? : '諛쒖＜ ?붿껌 珥덉븞 留뚮뱾湲?}
             </h3>
             {slashCommand === 'annual_leave' ? (
               <>
                 <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
-                  시작일, 종료일, 사유를 입력하면 전자결재용 연차/휴가 초안을 생성합니다.
+                  ?쒖옉?? 醫낅즺?? ?ъ쑀瑜??낅젰?섎㈃ ?꾩옄寃곗옱???곗감/?닿? 珥덉븞???앹꽦?⑸땲??
                 </p>
                 <div className="space-y-3 text-xs font-bold">
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-[11px] text-[var(--toss-gray-3)] mb-1">시작일</label>
+                      <label className="block text-[11px] text-[var(--toss-gray-3)] mb-1">?쒖옉??/label>
                       <input
                         type="date"
                         value={slashForm.startDate}
@@ -4587,7 +4573,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] text-[var(--toss-gray-3)] mb-1">종료일</label>
+                      <label className="block text-[11px] text-[var(--toss-gray-3)] mb-1">醫낅즺??/label>
                       <input
                         type="date"
                         value={slashForm.endDate}
@@ -4597,12 +4583,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[11px] text-[var(--toss-gray-3)] mb-1">사유(선택)</label>
+                    <label className="block text-[11px] text-[var(--toss-gray-3)] mb-1">?ъ쑀(?좏깮)</label>
                     <input
                       type="text"
                       value={slashForm.reason}
                       onChange={e => setSlashForm((f) => ({ ...f, reason: e.target.value }))}
-                      placeholder="예: 개인 일정, 병원 방문"
+                      placeholder="?? 媛쒖씤 ?쇱젙, 蹂묒썝 諛⑸Ц"
                       className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-lg)] text-xs"
                     />
                   </div>
@@ -4613,67 +4599,67 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     onClick={() => setShowSlashModal(false)}
                     className="flex-1 py-3 rounded-[var(--radius-lg)] text-[11px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
                   >
-                    취소
+                    痍⑥냼
                   </button>
                   <button
                     type="button"
                     onClick={async () => {
                       if (!slashForm.startDate || !slashForm.endDate) {
-                        toast('시작일과 종료일을 입력해 주세요.', 'warning');
+                        toast('?쒖옉?쇨낵 醫낅즺?쇱쓣 ?낅젰??二쇱꽭??', 'warning');
                         return;
                       }
                       try {
-                        const title = `[채팅]/연차 자동 기안 - ${user?.name}`;
+                        const title = `[梨꾪똿]/?곗감 ?먮룞 湲곗븞 - ${user?.name}`;
                         const contentLines = [
-                          `요청자: ${user?.name} (${user?.department || ''} ${user?.position || ''})`,
-                          `기간: ${slashForm.startDate} ~ ${slashForm.endDate}`,
-                          slashForm.reason ? `사유: ${slashForm.reason}` : '',
+                          `?붿껌?? ${user?.name} (${user?.department || ''} ${user?.position || ''})`,
+                          `湲곌컙: ${slashForm.startDate} ~ ${slashForm.endDate}`,
+                          slashForm.reason ? `?ъ쑀: ${slashForm.reason}` : '',
                           '',
-                          '이 요청서는 채팅 명령어(/연차)로 자동 생성되었습니다.',
+                          '???붿껌?쒕뒗 梨꾪똿 紐낅졊??/?곗감)濡??먮룞 ?앹꽦?섏뿀?듬땲??',
                         ].filter(Boolean);
                         await supabase.from('approvals').insert([
                           {
                             sender_id: effectiveChatUserId || user?.id,
                             sender_name: user?.name,
                             sender_company: user?.company,
-                            type: '연차/휴가',
+                            type: '?곗감/?닿?',
                             title,
                             content: contentLines.join('\n'),
-                            status: '대기',
+                            status: '?湲?,
                           },
                         ]);
-                        toast('연차/휴가 전자결재 초안을 생성했습니다. 전자결재 메뉴에서 내용을 확인 후 제출해 주세요.', 'warning');
+                        toast('?곗감/?닿? ?꾩옄寃곗옱 珥덉븞???앹꽦?덉뒿?덈떎. ?꾩옄寃곗옱 硫붾돱?먯꽌 ?댁슜???뺤씤 ???쒖텧??二쇱꽭??', 'warning');
                       } catch {
-                        toast('연차 초안 생성 중 오류가 발생했습니다.', 'error');
+                        toast('?곗감 珥덉븞 ?앹꽦 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.', 'error');
                       } finally {
                         setShowSlashModal(false);
                       }
                     }}
                     className="flex-1 py-3 rounded-[var(--radius-lg)] text-[11px] font-semibold bg-[var(--accent)] text-white hover:bg-[var(--accent)] shadow-md"
                   >
-                    전자결재 초안 생성
+                    ?꾩옄寃곗옱 珥덉븞 ?앹꽦
                   </button>
                 </div>
               </>
             ) : (
               <>
                 <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
-                  품목명과 수량을 입력하면 비품구매(발주) 결재 초안을 생성합니다.
+                  ?덈ぉ紐낃낵 ?섎웾???낅젰?섎㈃ 鍮꾪뭹援щℓ(諛쒖＜) 寃곗옱 珥덉븞???앹꽦?⑸땲??
                 </p>
                 <div className="space-y-3 text-xs font-bold">
                   <div>
-                    <label className="block text-[11px] text-[var(--toss-gray-3)] mb-1">품목명</label>
+                    <label className="block text-[11px] text-[var(--toss-gray-3)] mb-1">?덈ぉ紐?/label>
                     <input
                       type="text"
                       value={slashForm.itemName}
                       onChange={e => setSlashForm((f) => ({ ...f, itemName: e.target.value }))}
-                      placeholder="예: A4 용지, 프린터 토너"
+                      placeholder="?? A4 ?⑹?, ?꾨┛???좊꼫"
                       className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-lg)] text-xs"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-[11px] text-[var(--toss-gray-3)] mb-1">수량</label>
+                      <label className="block text-[11px] text-[var(--toss-gray-3)] mb-1">?섎웾</label>
                       <input
                         type="number"
                         min={1}
@@ -4683,12 +4669,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] text-[var(--toss-gray-3)] mb-1">비고(선택)</label>
+                      <label className="block text-[11px] text-[var(--toss-gray-3)] mb-1">鍮꾧퀬(?좏깮)</label>
                       <input
                         type="text"
                         value={slashForm.reason}
                         onChange={e => setSlashForm((f) => ({ ...f, reason: e.target.value }))}
-                        placeholder="예: 재고 부족, 교체 주기 도래"
+                        placeholder="?? ?ш퀬 遺議? 援먯껜 二쇨린 ?꾨옒"
                         className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-lg)] text-xs"
                       />
                     </div>
@@ -4700,46 +4686,46 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     onClick={() => setShowSlashModal(false)}
                     className="flex-1 py-3 rounded-[var(--radius-lg)] text-[11px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
                   >
-                    취소
+                    痍⑥냼
                   </button>
                   <button
                     type="button"
                     onClick={async () => {
                       if (!slashForm.itemName || !slashForm.quantity) {
-                        toast('품목명과 수량을 입력해 주세요.', 'warning');
+                        toast('?덈ぉ紐낃낵 ?섎웾???낅젰??二쇱꽭??', 'warning');
                         return;
                       }
                       try {
-                        const title = `[채팅]/발주 자동 기안 - ${slashForm.itemName} x ${slashForm.quantity}`;
+                        const title = `[梨꾪똿]/諛쒖＜ ?먮룞 湲곗븞 - ${slashForm.itemName} x ${slashForm.quantity}`;
                         const contentLines = [
-                          `요청자: ${user?.name} (${user?.department || ''} ${user?.position || ''})`,
-                          `품목: ${slashForm.itemName}`,
-                          `수량: ${slashForm.quantity}`,
-                          slashForm.reason ? `비고: ${slashForm.reason}` : '',
+                          `?붿껌?? ${user?.name} (${user?.department || ''} ${user?.position || ''})`,
+                          `?덈ぉ: ${slashForm.itemName}`,
+                          `?섎웾: ${slashForm.quantity}`,
+                          slashForm.reason ? `鍮꾧퀬: ${slashForm.reason}` : '',
                           '',
-                          '이 요청서는 채팅 명령어(/발주)로 자동 생성되었습니다.',
+                          '???붿껌?쒕뒗 梨꾪똿 紐낅졊??/諛쒖＜)濡??먮룞 ?앹꽦?섏뿀?듬땲??',
                         ].filter(Boolean);
                         await supabase.from('approvals').insert([
                           {
                             sender_id: effectiveChatUserId || user?.id,
                             sender_name: user?.name,
                             sender_company: user?.company,
-                            type: '비품구매',
+                            type: '鍮꾪뭹援щℓ',
                             title,
                             content: contentLines.join('\n'),
-                            status: '대기',
+                            status: '?湲?,
                           },
                         ]);
-                        toast('비품구매 전자결재 초안을 생성했습니다. 전자결재 메뉴에서 내용을 확인 후 제출해 주세요.', 'warning');
+                        toast('鍮꾪뭹援щℓ ?꾩옄寃곗옱 珥덉븞???앹꽦?덉뒿?덈떎. ?꾩옄寃곗옱 硫붾돱?먯꽌 ?댁슜???뺤씤 ???쒖텧??二쇱꽭??', 'warning');
                       } catch {
-                        toast('발주 초안 생성 중 오류가 발생했습니다.', 'error');
+                        toast('諛쒖＜ 珥덉븞 ?앹꽦 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.', 'error');
                       } finally {
                         setShowSlashModal(false);
                       }
                     }}
                     className="flex-1 py-3 rounded-[var(--radius-lg)] text-[11px] font-semibold bg-[var(--accent)] text-white hover:bg-[var(--accent)] shadow-md"
                   >
-                    전자결재 초안 생성
+                    ?꾩옄寃곗옱 珥덉븞 ?앹꽦
                   </button>
                 </div>
               </>
@@ -4759,14 +4745,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
-                  스레드
-                </p>
+                  ?ㅻ젅??                </p>
                 <p className="text-xs font-semibold text-[var(--foreground)] mt-0.5 line-clamp-2">
                   {getMessageDisplayText(
                     threadRoot.content,
                     threadRoot.file_name,
                     threadRoot.file_url,
-                    '첨부 파일 메시지'
+                    '泥⑤? ?뚯씪 硫붿떆吏'
                   )}
                 </p>
               </div>
@@ -4774,13 +4759,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 onClick={() => setThreadRoot(null)}
                 className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[var(--radius-md)] hover:bg-[var(--muted)]"
               >
-                닫기
+                ?リ린
               </button>
             </div>
             <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-3">
               {threadMessages.length === 0 ? (
                 <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-4 text-center">
-                  이 메시지에 연결된 대화가 없습니다.
+                  ??硫붿떆吏???곌껐????붽? ?놁뒿?덈떎.
                 </p>
               ) : (
                 threadMessages.map(( m: ChatMessage) => {
@@ -4795,7 +4780,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-semibold text-[var(--foreground)] truncate">
-                          {staff?.name || '이름 없음'} {staff?.position || ''}
+                          {staff?.name || '?대쫫 ?놁쓬'} {staff?.position || ''}
                         </span>
                         <span className="text-[11px] text-[var(--toss-gray-3)]">
                           {createdAt.toLocaleDateString('ko-KR', {
@@ -4813,7 +4798,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           m.content,
                           m.file_name,
                           m.file_url,
-                          '첨부 파일 메시지'
+                          '泥⑤? ?뚯씪 硫붿떆吏'
                         )}
                       </p>
                       {m.file_url && (
@@ -4841,14 +4826,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
-                  읽음 확인 상세
+                  ?쎌쓬 ?뺤씤 ?곸꽭
                 </p>
                 <p className="text-xs font-semibold text-[var(--foreground)] mt-0.5 line-clamp-1 opacity-60">
                   {getMessageDisplayText(
                     unreadModalMsg.content,
                     unreadModalMsg.file_name,
                     unreadModalMsg.file_url,
-                    '첨부 파일 메시지'
+                    '泥⑤? ?뚯씪 硫붿떆吏'
                   )}
                 </p>
               </div>
@@ -4856,7 +4841,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 onClick={() => setUnreadModalMsg(null)}
                 className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[var(--radius-md)] hover:bg-[var(--muted)]"
               >
-                닫기
+                ?リ린
               </button>
             </div>
 
@@ -4869,10 +4854,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 <>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between px-1">
-                      <p className="text-[11px] font-bold text-red-500 uppercase tracking-wider">읽지 않음 ({unreadUsers.length})</p>
+                      <p className="text-[11px] font-bold text-red-500 uppercase tracking-wider">?쎌? ?딆쓬 ({unreadUsers.length})</p>
                     </div>
                     {unreadUsers.length === 0 ? (
-                      <p className="text-[10px] text-[var(--toss-gray-3)] font-bold py-2 px-1">모두 읽었습니다.</p>
+                      <p className="text-[10px] text-[var(--toss-gray-3)] font-bold py-2 px-1">紐⑤몢 ?쎌뿀?듬땲??</p>
                     ) : (
                       <div className="grid grid-cols-1 gap-1">
                         {unreadUsers.map((u: StaffMember) => (
@@ -4892,10 +4877,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between px-1">
-                      <p className="text-[11px] font-bold text-emerald-500 uppercase tracking-wider">읽음 ({readUsers.length})</p>
+                      <p className="text-[11px] font-bold text-emerald-500 uppercase tracking-wider">?쎌쓬 ({readUsers.length})</p>
                     </div>
                     {readUsers.length === 0 ? (
-                      <p className="text-[10px] text-[var(--toss-gray-3)] font-bold py-2 px-1">아직 읽은 사람이 없습니다.</p>
+                      <p className="text-[10px] text-[var(--toss-gray-3)] font-bold py-2 px-1">?꾩쭅 ?쎌? ?щ엺???놁뒿?덈떎.</p>
                     ) : (
                       <div className="grid grid-cols-1 gap-1">
                         {readUsers.map((u: StaffMember) => (
@@ -4922,14 +4907,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       {showForwardModal && forwardSourceMsg && (
         <div data-testid="chat-forward-modal" className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4" onClick={() => { setShowForwardModal(false); setForwardSourceMsg(null); }}>
           <div className="bg-[var(--card)] w-full max-w-md rounded-2xl p-4 space-y-4 shadow-sm border border-[var(--border)]" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-[var(--foreground)]">다른 채팅방으로 전달</h3>
+            <h3 className="text-lg font-semibold text-[var(--foreground)]">?ㅻⅨ 梨꾪똿諛⑹쑝濡??꾨떖</h3>
             <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
-              선택한 메시지를 전달할 채팅방을 선택하세요.
+              ?좏깮??硫붿떆吏瑜??꾨떖??梨꾪똿諛⑹쓣 ?좏깮?섏꽭??
             </p>
             <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-2">
               {forwardTargetRooms.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-[var(--border)] px-4 py-6 text-center text-sm text-[var(--toss-gray-3)]">
-                  전달할 수 있는 채팅방이 없습니다.
+                  ?꾨떖?????덈뒗 梨꾪똿諛⑹씠 ?놁뒿?덈떎.
                 </div>
               ) : (
                 forwardTargetRooms.map(( room: ChatRoom) => (
@@ -4944,12 +4929,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             room_id: room.id,
                             sender_id: effectiveChatUserId || user?.id,
                             content:
-                              `[전달] ${(forwardSourceMsg.staff as { name?: string } | null | undefined)?.name || '이름 없음'}: ` +
+                              `[?꾨떖] ${(forwardSourceMsg.staff as { name?: string } | null | undefined)?.name || '?대쫫 ?놁쓬'}: ` +
                               getMessageDisplayText(
                                 forwardSourceMsg.content,
                                 forwardSourceMsg.file_name,
                                 forwardSourceMsg.file_url,
-                                '첨부 파일'
+                                '泥⑤? ?뚯씪'
                               ),
                             file_url: forwardSourceMsg.file_url || null,
                             file_name: forwardSourceMsg.file_name || null,
@@ -4960,9 +4945,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         if (forwardedMessage?.id && forwardedMessage?.room_id) {
                           await triggerChatPush(String(forwardedMessage.room_id), String(forwardedMessage.id));
                         }
-                        toast(`"${room.name || '채팅방'}"으로 메시지를 전달했습니다.`);
+                        toast(`"${room.name || '梨꾪똿諛?}"?쇰줈 硫붿떆吏瑜??꾨떖?덉뒿?덈떎.`);
                       } catch {
-                        toast('메시지 전달 중 오류가 발생했습니다.', 'error');
+                        toast('硫붿떆吏 ?꾨떖 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.', 'error');
                       } finally {
                         setShowForwardModal(false);
                         setForwardSourceMsg(null);
@@ -4971,8 +4956,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     className="w-full flex items-center justify-between px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] hover:bg-[var(--toss-blue-light)] text-left text-xs font-bold text-[var(--foreground)]"
                   >
                     <span className="truncate">
-                      {room.id === NOTICE_ROOM_ID ? '공 ' : '채 '}
-                      {room.name || '채팅방'}
+                      {room.id === NOTICE_ROOM_ID ? '怨?' : '梨?'}
+                      {room.name || '梨꾪똿諛?}
                     </span>
                     <span className="text-[11px] text-[var(--toss-gray-3)]">
                       {roomUnreadCounts[room.id] ? String(roomUnreadCounts[room.id]) : ''}
@@ -4987,7 +4972,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 onClick={() => { setShowForwardModal(false); setForwardSourceMsg(null); }}
                 className="flex-1 py-3 rounded-[var(--radius-lg)] text-[11px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
               >
-                닫기
+                ?リ린
               </button>
             </div>
           </div>
@@ -5008,10 +4993,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-semibold text-[var(--foreground)]">
-              참여자 추가
+              李몄뿬??異붽?
             </h3>
             <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
-              현재 채팅방에 새로 초대할 직원을 선택하세요.
+              ?꾩옱 梨꾪똿諛⑹뿉 ?덈줈 珥덈???吏곸썝???좏깮?섏꽭??
             </p>
             <input
               data-testid="chat-add-member-search"
@@ -5019,12 +5004,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               value={addMemberSearch}
               onChange={(e) => setAddMemberSearch(e.target.value)}
               className="w-full px-3 py-2 rounded-[var(--radius-lg)] border border-[var(--border)] text-xs font-bold outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
-              placeholder="이름, 부서, 직급으로 검색"
+              placeholder="?대쫫, 遺?? 吏곴툒?쇰줈 寃??
             />
             <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-1">
               {addableMembers.length === 0 ? (
                 <p className="text-[11px] text-[var(--toss-gray-3)] font-bold py-4 text-center">
-                  추가할 수 있는 직원이 없습니다.
+                  異붽??????덈뒗 吏곸썝???놁뒿?덈떎.
                 </p>
               ) : (
                 addableMembers.map(( s: StaffMember) => {
@@ -5058,7 +5043,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         <span className="ml-1 text-[var(--toss-gray-3)]">
                           {s.position ? ` ${s.position}` : ''}
                           {s.company || s.department
-                            ? ` · ${s.company || s.department}`
+                            ? ` 쨌 ${s.company || s.department}`
                             : ''}
                         </span>
                       </span>
@@ -5077,7 +5062,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 }}
                 className="flex-1 py-3 rounded-[var(--radius-lg)] text-[11px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
               >
-                취소
+                痍⑥냼
               </button>
               <button
                 data-testid="chat-add-member-submit"
@@ -5105,10 +5090,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       .eq('id', selectedRoom.id);
 
                     const invitedNames = addMemberSelectingIds
-                      .map((id) => resolveStaffProfile(id)?.name || '이름 없음')
+                      .map((id) => resolveStaffProfile(id)?.name || '?대쫫 ?놁쓬')
                       .join(', ');
-                    const inviterName = user?.name || '이름 없음';
-                    const systemContent = `[초대] ${inviterName}님이 ${invitedNames}님을 초대했습니다.`;
+                    const inviterName = user?.name || '?대쫫 ?놁쓬';
+                    const systemContent = `[珥덈?] ${inviterName}?섏씠 ${invitedNames}?섏쓣 珥덈??덉뒿?덈떎.`;
                     const { data: inviteMessage, error: inviteMessageError } = await supabase.from('messages').insert([{
                       room_id: selectedRoom.id,
                       sender_id: effectiveChatUserId || user?.id,
@@ -5129,15 +5114,15 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     setShowAddMemberModal(false);
                     setAddMemberSelectingIds([]);
                     fetchData();
-                    toast('참여자가 추가되었습니다.');
+                    toast('李몄뿬?먭? 異붽??섏뿀?듬땲??');
                   } catch (e) {
                     console.error('add members error', e);
-                    toast('참여자 추가 중 오류가 발생했습니다.', 'error');
+                    toast('李몄뿬??異붽? 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.', 'error');
                   }
                 }}
                 className="flex-1 py-3 rounded-[var(--radius-lg)] text-[11px] font-semibold text-white bg-[var(--accent)] disabled:bg-[var(--toss-gray-3)] hover:bg-[var(--accent)]"
               >
-                추가하기
+                異붽??섍린
               </button>
             </div>
           </div>
@@ -5149,8 +5134,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           <div className="fixed inset-0 bg-black/5 z-[100] md:z-30 animate-in fade-in" onClick={() => setShowMediaPanel(false)} />
           <aside className="fixed top-0 right-0 bottom-0 w-80 bg-[var(--card)] border-l border-[var(--border)] shadow-sm z-[101] md:z-40 flex flex-col animate-in slide-in-from-right duration-300">
             <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
-              <span className="text-xs font-black text-[var(--toss-gray-4)] uppercase tracking-widest">파일/링크 내역</span>
-            <button onClick={() => setShowMediaPanel(false)} className="p-2 text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-xl">닫기</button>
+              <span className="text-xs font-black text-[var(--toss-gray-4)] uppercase tracking-widest">?뚯씪/留곹겕 ?댁뿭</span>
+            <button onClick={() => setShowMediaPanel(false)} className="p-2 text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-xl">?リ린</button>
             </div>
 
             <div className="flex p-2 gap-1 bg-[var(--tab-bg)] dark:bg-zinc-900 border-b border-[var(--border)]">
@@ -5160,7 +5145,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   onClick={() => setMediaFilter(f)}
                   className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${mediaFilter === f ? 'bg-[var(--card)] dark:bg-zinc-800 text-blue-600 shadow-soft' : 'text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)]'}`}
                 >
-                  {f === 'all' ? '전체' : f === 'image' ? '이미지' : f === 'video' ? '동영상' : '파일'}
+                  {f === 'all' ? '?꾩껜' : f === 'image' ? '?대?吏' : f === 'video' ? '?숈쁺?? : '?뚯씪'}
                 </button>
               ))}
             </div>
@@ -5168,8 +5153,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
               {filteredMediaMessages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center opacity-30 text-[var(--toss-gray-3)]">
-                  <span className="text-4xl mb-2">📭</span>
-                  <p className="text-[11px] font-bold">내역이 없습니다.</p>
+                  <span className="text-4xl mb-2">?벊</span>
+                  <p className="text-[11px] font-bold">?댁뿭???놁뒿?덈떎.</p>
                 </div>
               ) : (
                 filteredMediaMessages.map(( m: ChatMessage) => {
@@ -5180,7 +5165,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     {isImageUrl(furl) ? (
                       <img src={furl} alt="Attached media" className="w-full h-24 object-cover rounded-lg mb-2 cursor-zoom-in" onClick={() => setImagePreviewUrl(furl)} />
                     ) : (
-                      <div className="w-full h-12 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-lg mb-2 flex items-center justify-center text-xl">📄</div>
+                      <div className="w-full h-12 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-lg mb-2 flex items-center justify-center text-xl">?뱞</div>
                     )}
                     <div className="flex flex-col gap-1 min-w-0">
                       <p className="text-[11px] font-bold text-foreground truncate">{attachmentName}</p>
@@ -5189,7 +5174,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       )}
                       <div className="flex items-center justify-between">
                         <span className="text-[9px] font-bold text-[var(--toss-gray-3)]">{new Date(m.created_at || 0).toLocaleDateString()}</span>
-                        <a href={furl} download={attachmentName} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-blue-600 hover:underline">다운로드</a>
+                        <a href={furl} download={attachmentName} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-blue-600 hover:underline">?ㅼ슫濡쒕뱶</a>
                       </div>
                     </div>
                   </div>
@@ -5215,7 +5200,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   value={globalSearchQuery}
                   onChange={e => setGlobalSearchQuery(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && void handleGlobalSearch(globalSearchQuery)}
-                  placeholder="멤버, 채팅방, 메시지, 파일을 통합 검색"
+                  placeholder="硫ㅻ쾭, 梨꾪똿諛? 硫붿떆吏, ?뚯씪???듯빀 寃??
                   className="flex-1 bg-transparent text-foreground text-sm font-bold outline-none placeholder:text-[var(--toss-gray-3)] placeholder:font-normal"
                 />
                 <button
@@ -5224,24 +5209,23 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   onClick={openGroupFromGlobalSearch}
                   className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors whitespace-nowrap"
                 >
-                  새 그룹
+                  ??洹몃９
                 </button>
                 <button
                   data-testid="chat-global-search-submit"
                   onClick={() => { void handleGlobalSearch(globalSearchQuery); }}
                   className="px-3 py-1.5 bg-[var(--accent)] text-white font-bold text-xs rounded-lg hover:opacity-90 transition-opacity whitespace-nowrap"
                 >
-                  검색
-                </button>
-                <button onClick={closeGlobalSearch} className="text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] text-lg font-bold leading-none px-1">×</button>
+                  寃??                </button>
+                <button onClick={closeGlobalSearch} className="text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] text-lg font-bold leading-none px-1">횞</button>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {([
-                  ['all', '전체', globalSearchCounts.all],
-                  ['member', '멤버', globalSearchCounts.member],
-                  ['room', '채팅방', globalSearchCounts.room],
-                  ['message', '메시지', globalSearchCounts.message],
-                  ['file', '파일', globalSearchCounts.file],
+                  ['all', '?꾩껜', globalSearchCounts.all],
+                  ['member', '硫ㅻ쾭', globalSearchCounts.member],
+                  ['room', '梨꾪똿諛?, globalSearchCounts.room],
+                  ['message', '硫붿떆吏', globalSearchCounts.message],
+                  ['file', '?뚯씪', globalSearchCounts.file],
                 ] as const).map(([tab, label, count]) => (
                   <button
                     key={tab}
@@ -5258,25 +5242,24 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             <div className="flex-1 overflow-y-auto custom-scrollbar bg-[var(--tab-bg)] dark:bg-zinc-950 p-3">
               {!globalSearchQuery.trim() ? (
                 <div className="h-40 flex flex-col items-center justify-center text-[var(--toss-gray-3)] gap-2">
-                  <p className="text-sm font-bold">통합 검색으로 멤버, 채팅방, 메시지, 파일을 한 번에 찾을 수 있습니다.</p>
+                  <p className="text-sm font-bold">?듯빀 寃?됱쑝濡?硫ㅻ쾭, 梨꾪똿諛? 硫붿떆吏, ?뚯씪????踰덉뿉 李얠쓣 ???덉뒿?덈떎.</p>
                   <button
                     type="button"
                     onClick={openGroupFromGlobalSearch}
                     className="px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors"
                   >
-                    새 그룹 채팅 만들기
-                  </button>
+                    ??洹몃９ 梨꾪똿 留뚮뱾湲?                  </button>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {globalSearchLoading && (
-                    <div className="px-1 text-[11px] font-bold text-[var(--toss-gray-3)]">메시지와 파일을 검색하고 있습니다…</div>
+                    <div className="px-1 text-[11px] font-bold text-[var(--toss-gray-3)]">硫붿떆吏? ?뚯씪??寃?됲븯怨??덉뒿?덈떎??/div>
                   )}
 
                   {(globalSearchTab === 'all' || globalSearchTab === 'member') && (
                     globalSearchMemberResults.length > 0 ? (
                       <div className="space-y-2">
-                        {globalSearchTab === 'all' && <p className="px-1 text-[10px] font-bold text-[var(--toss-gray-3)]">멤버</p>}
+                        {globalSearchTab === 'all' && <p className="px-1 text-[10px] font-bold text-[var(--toss-gray-3)]">硫ㅻ쾭</p>}
                         {globalSearchMemberResults.slice(0, globalSearchTab === 'all' ? 4 : globalSearchMemberResults.length).map((staff: StaffMember) => (
                           <button
                             key={`member-${staff.id}`}
@@ -5290,22 +5273,22 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                               </div>
                               <div className="min-w-0 flex-1">
                                 <p className="text-[12px] font-bold text-foreground truncate">{staff.name}</p>
-                                <p className="text-[10px] text-[var(--toss-gray-3)] truncate">{[staff.company, staff.department, staff.position].filter(Boolean).join(' · ')}</p>
+                                <p className="text-[10px] text-[var(--toss-gray-3)] truncate">{[staff.company, staff.department, staff.position].filter(Boolean).join(' 쨌 ')}</p>
                               </div>
-                              <span className="text-[10px] font-bold text-blue-600 shrink-0">대화</span>
+                              <span className="text-[10px] font-bold text-blue-600 shrink-0">???/span>
                             </div>
                           </button>
                         ))}
                       </div>
                     ) : globalSearchTab === 'member' ? (
-                      <div className="h-24 flex items-center justify-center text-[var(--toss-gray-3)] text-sm font-bold">멤버 검색 결과가 없습니다.</div>
+                      <div className="h-24 flex items-center justify-center text-[var(--toss-gray-3)] text-sm font-bold">硫ㅻ쾭 寃??寃곌낵媛 ?놁뒿?덈떎.</div>
                     ) : null
                   )}
 
                   {(globalSearchTab === 'all' || globalSearchTab === 'room') && (
                     globalSearchRoomResults.length > 0 ? (
                       <div className="space-y-2">
-                        {globalSearchTab === 'all' && <p className="px-1 text-[10px] font-bold text-[var(--toss-gray-3)]">채팅방</p>}
+                        {globalSearchTab === 'all' && <p className="px-1 text-[10px] font-bold text-[var(--toss-gray-3)]">梨꾪똿諛?/p>}
                         {globalSearchRoomResults.slice(0, globalSearchTab === 'all' ? 4 : globalSearchRoomResults.length).map(({ room, roomId, label, preview, memberCount, isHidden, isNoticeChannel }) => (
                           <button
                             key={`room-${roomId}`}
@@ -5317,18 +5300,18 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5 min-w-0">
                                   <p className="text-[12px] font-bold text-foreground truncate">{label}</p>
-                                  {isNoticeChannel && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-bold shrink-0">공지</span>}
-                                  {isHidden && <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-500 font-bold shrink-0">숨김</span>}
+                                  {isNoticeChannel && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-bold shrink-0">怨듭?</span>}
+                                  {isHidden && <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-500 font-bold shrink-0">?④?</span>}
                                 </div>
-                                <p className="text-[10px] text-[var(--toss-gray-3)] truncate">{preview || '대화가 없습니다.'}</p>
+                                <p className="text-[10px] text-[var(--toss-gray-3)] truncate">{preview || '??붽? ?놁뒿?덈떎.'}</p>
                               </div>
-                              <span className="text-[10px] font-bold text-[var(--toss-gray-3)] shrink-0">{memberCount}명</span>
+                              <span className="text-[10px] font-bold text-[var(--toss-gray-3)] shrink-0">{memberCount}紐?/span>
                             </div>
                           </button>
                         ))}
                       </div>
                     ) : globalSearchTab === 'room' ? (
-                      <div className="h-24 flex items-center justify-center text-[var(--toss-gray-3)] text-sm font-bold">채팅방 검색 결과가 없습니다.</div>
+                      <div className="h-24 flex items-center justify-center text-[var(--toss-gray-3)] text-sm font-bold">梨꾪똿諛?寃??寃곌낵媛 ?놁뒿?덈떎.</div>
                     ) : null
                   )}
 
@@ -5342,17 +5325,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     if (!globalSearchLoading && targetResults.length === 0) {
                       return (globalSearchTab === 'message' || globalSearchTab === 'file') ? (
                         <div className="h-24 flex items-center justify-center text-[var(--toss-gray-3)] text-sm font-bold">
-                          {globalSearchTab === 'file' ? '파일 검색 결과가 없습니다.' : '메시지 검색 결과가 없습니다.'}
+                          {globalSearchTab === 'file' ? '?뚯씪 寃??寃곌낵媛 ?놁뒿?덈떎.' : '硫붿떆吏 寃??寃곌낵媛 ?놁뒿?덈떎.'}
                         </div>
                       ) : null;
                     }
                     return (
                       <div className="space-y-2">
-                        {globalSearchTab === 'all' && <p className="px-1 text-[10px] font-bold text-[var(--toss-gray-3)]">메시지 / 파일</p>}
+                        {globalSearchTab === 'all' && <p className="px-1 text-[10px] font-bold text-[var(--toss-gray-3)]">硫붿떆吏 / ?뚯씪</p>}
                         {targetResults.slice(0, globalSearchTab === 'all' ? 6 : targetResults.length).map((msg: ChatMessage) => {
                           type SearchRoom = { name?: string; type?: string; members?: string[] };
                           const msgRoom = (msg.chat_rooms as SearchRoom | null | undefined);
-                          let roomName = msgRoom?.name || '채팅방';
+                          let roomName = msgRoom?.name || '梨꾪똿諛?;
                           if (msgRoom?.type === 'direct' && Array.isArray(msgRoom?.members)) {
                             const otherStaff = allKnownStaffs.find((s: StaffMember) => msgRoom.members!.includes(String(s.id)) && String(s.id) !== effectiveChatUserId);
                             if (otherStaff) roomName = otherStaff.name;
@@ -5374,9 +5357,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                   <span className="px-1.5 py-0.5 bg-[var(--muted)] dark:bg-zinc-800 text-[var(--toss-gray-4)] rounded text-[10px] font-bold truncate shrink-0 max-w-[110px]">
                                     {roomName}
                                   </span>
-                                  <span className="text-[11px] font-bold text-foreground truncate">{(msg.staff as { name?: string } | null | undefined)?.name || '이름 없음'}</span>
-                                  {isImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold shrink-0">이미지</span>}
-                                  {isFile && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-bold shrink-0">파일</span>}
+                                  <span className="text-[11px] font-bold text-foreground truncate">{(msg.staff as { name?: string } | null | undefined)?.name || '?대쫫 ?놁쓬'}</span>
+                                  {isImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold shrink-0">?대?吏</span>}
+                                  {isFile && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-bold shrink-0">?뚯씪</span>}
                                 </div>
                                 <span className="text-[10px] font-medium text-[var(--toss-gray-3)] shrink-0">
                                   {new Date(msg.created_at || 0).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} {new Date(msg.created_at || 0).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
@@ -5388,7 +5371,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                 </p>
                               )}
                               {fileName && (
-                                <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] truncate mt-0.5">첨부 {fileName}</p>
+                                <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] truncate mt-0.5">泥⑤? {fileName}</p>
                               )}
                             </button>
                           );
@@ -5399,8 +5382,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
                   {!globalSearchLoading && globalSearchCounts.all === 0 && (
                     <div className="h-24 flex flex-col items-center justify-center text-[var(--toss-gray-3)]">
-                      <p className="text-sm font-bold">검색 결과가 없습니다.</p>
-                      <p className="text-xs mt-1 text-[var(--toss-gray-3)]">멤버, 채팅방, 메시지, 파일을 함께 검색했습니다.</p>
+                      <p className="text-sm font-bold">寃??寃곌낵媛 ?놁뒿?덈떎.</p>
+                      <p className="text-xs mt-1 text-[var(--toss-gray-3)]">硫ㅻ쾭, 梨꾪똿諛? 硫붿떆吏, ?뚯씪???④퍡 寃?됲뻽?듬땲??</p>
                     </div>
                   )}
                 </div>
@@ -5413,7 +5396,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       {false && showGlobalSearch && (
         <div data-testid="chat-global-search-modal" className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-start md:items-center justify-center p-4 pt-12 md:p-4 animate-in fade-in" onClick={() => { setShowGlobalSearch(false); setGlobalSearchQuery(''); setGlobalSearchResults([]); }}>
           <div className="bg-[var(--card)] dark:bg-zinc-900 w-full max-w-2xl rounded-2xl shadow-sm overflow-hidden flex flex-col max-h-[80vh] md:max-h-[85vh] border border-[var(--border)] dark:border-zinc-800" onClick={e => e.stopPropagation()}>
-            {/* 검색 헤더 */}
+            {/* 寃???ㅻ뜑 */}
             <div className="p-3 border-b border-[var(--border)] dark:border-zinc-800 flex items-center gap-2">
               <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-[var(--toss-gray-3)]">
                 <circle cx="9" cy="9" r="6"/><line x1="15" y1="15" x2="19" y2="19"/>
@@ -5424,7 +5407,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 value={globalSearchQuery}
                 onChange={e => setGlobalSearchQuery(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleGlobalSearch()}
-                placeholder="대화내용, 파일명, 사진명 통합 검색..."
+                placeholder="??붾궡?? ?뚯씪紐? ?ъ쭊紐??듯빀 寃??.."
                 className="flex-1 bg-transparent text-foreground text-sm font-bold outline-none placeholder:text-[var(--toss-gray-3)] placeholder:font-normal"
               />
               <button
@@ -5434,30 +5417,30 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 }}
                 className="px-3 py-1.5 bg-[var(--accent)] text-white font-bold text-xs rounded-lg hover:opacity-90 transition-opacity whitespace-nowrap"
               >
-                {globalSearchLoading ? '검색중…' : '검색'}
+                {globalSearchLoading ? '寃?됱쨷?? : '寃??}
               </button>
-              <button onClick={() => { setShowGlobalSearch(false); setGlobalSearchQuery(''); setGlobalSearchResults([]); }} className="text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] text-lg font-bold leading-none px-1">×</button>
+              <button onClick={() => { setShowGlobalSearch(false); setGlobalSearchQuery(''); setGlobalSearchResults([]); }} className="text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] text-lg font-bold leading-none px-1">횞</button>
             </div>
 
-            {/* 결과 목록 */}
+            {/* 寃곌낵 紐⑸줉 */}
             <div className="flex-1 overflow-y-auto custom-scrollbar bg-[var(--tab-bg)] dark:bg-zinc-950 p-3">
               {globalSearchLoading && (
-                <div className="h-40 flex items-center justify-center text-sm text-[var(--toss-gray-3)] font-bold">검색 중…</div>
+                <div className="h-40 flex items-center justify-center text-sm text-[var(--toss-gray-3)] font-bold">寃??以묅?/div>
               )}
               {!globalSearchLoading && globalSearchResults.length === 0 && globalSearchQuery.trim() && (
                 <div className="h-40 flex flex-col items-center justify-center text-[var(--toss-gray-3)]">
-                  <p className="text-sm font-bold">검색 결과가 없습니다.</p>
-                  <p className="text-xs mt-1 text-[var(--toss-gray-3)]">대화내용, 파일명, 사진명으로 검색됩니다.</p>
+                  <p className="text-sm font-bold">寃??寃곌낵媛 ?놁뒿?덈떎.</p>
+                  <p className="text-xs mt-1 text-[var(--toss-gray-3)]">??붾궡?? ?뚯씪紐? ?ъ쭊紐낆쑝濡?寃?됰맗?덈떎.</p>
                 </div>
               )}
               {!globalSearchLoading && globalSearchResults.length > 0 && (
-                <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-2 px-1">{globalSearchResults.length}건 검색됨</p>
+                <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-2 px-1">{globalSearchResults.length}嫄?寃?됰맖</p>
               )}
               <div className="space-y-2">
                 {globalSearchResults.map((msg: ChatMessage) => {
                   type SearchRoom = { name?: string; type?: string; members?: string[] };
                   const msgRoom = (msg.chat_rooms as SearchRoom | null | undefined);
-                  let roomName = msgRoom?.name || '채팅방';
+                  let roomName = msgRoom?.name || '梨꾪똿諛?;
                   if (msgRoom?.type === 'direct' && Array.isArray(msgRoom?.members)) {
                     const otherStaff = allKnownStaffs.find(( s: StaffMember) => msgRoom.members!.includes(String(s.id)) && String(s.id) !== effectiveChatUserId);
                     if (otherStaff) roomName = otherStaff.name;
@@ -5478,9 +5461,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           <span className="px-1.5 py-0.5 bg-[var(--muted)] dark:bg-zinc-800 text-[var(--toss-gray-4)] rounded text-[10px] font-bold truncate shrink-0 max-w-[110px]">
                             {roomName}
                           </span>
-                          <span className="text-[11px] font-bold text-foreground truncate">{(msg.staff as { name?: string } | null | undefined)?.name || '알 수 없음'}</span>
-                          {isImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold shrink-0">사진</span>}
-                          {isFile && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-bold shrink-0">파일</span>}
+                          <span className="text-[11px] font-bold text-foreground truncate">{(msg.staff as { name?: string } | null | undefined)?.name || '?????놁쓬'}</span>
+                          {isImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold shrink-0">?ъ쭊</span>}
+                          {isFile && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-bold shrink-0">?뚯씪</span>}
                         </div>
                         <span className="text-[10px] font-medium text-[var(--toss-gray-3)] shrink-0">
                           {new Date(msg.created_at || 0).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} {new Date(msg.created_at || 0).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
@@ -5493,7 +5476,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       )}
                       {fileName && (
                         <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] truncate mt-0.5">
-                          📎 {fileName}
+                          ?뱨 {fileName}
                         </p>
                       )}
                     </div>
@@ -5505,7 +5488,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         </div>
       )}
 
-      {/* ── 이미지 전체화면 미리보기 모달 ── */}
+      {/* ?? ?대?吏 ?꾩껜?붾㈃ 誘몃━蹂닿린 紐⑤떖 ?? */}
       {imagePreviewUrl && (
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-sm"
@@ -5513,16 +5496,15 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           onKeyDown={(e) => { if (e.key === 'Escape') setImagePreviewUrl(null); }}
           tabIndex={-1}
         >
-          {/* 닫기 */}
+          {/* ?リ린 */}
           <button
             type="button"
             className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white text-xl transition-colors z-10"
             onClick={() => setImagePreviewUrl(null)}
-            aria-label="닫기"
+            aria-label="?リ린"
           >
-            ✕
-          </button>
-          {/* 다운로드 */}
+            ??          </button>
+          {/* ?ㅼ슫濡쒕뱶 */}
           <a
             href={imagePreviewUrl}
             download
@@ -5530,15 +5512,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
             className="absolute top-4 right-14 w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white text-base transition-colors z-10"
-            aria-label="다운로드"
-            title="다운로드"
+            aria-label="?ㅼ슫濡쒕뱶"
+            title="?ㅼ슫濡쒕뱶"
           >
-            ↓
-          </a>
-          {/* 이미지 */}
+            ??          </a>
+          {/* ?대?吏 */}
           <img
             src={imagePreviewUrl}
-            alt="미리보기"
+            alt="誘몃━蹂닿린"
             className="max-w-[92vw] max-h-[88vh] rounded-xl object-contain shadow-2xl select-none"
             onClick={(e) => e.stopPropagation()}
             draggable={false}
