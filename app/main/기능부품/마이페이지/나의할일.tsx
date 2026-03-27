@@ -298,16 +298,16 @@ function TodoItem({ task: _rawTask, onToggle: _onToggle, onDelete: _onDelete, on
   const onChatNavigate = _onChatNavigate as ((roomId: string, messageId: string) => void) | undefined;
   const isChatSource = !!(task.source_message_id && task.source_room_id);
   return (
-    <div className="group flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] hover:border-[var(--accent)] hover:shadow-sm transition-all animate-fade-in-up">
-      <button onClick={() => onToggle(task.id, task.is_complete)} className={`w-6 h-6 rounded-[var(--radius-md)] border-2 flex items-center justify-center transition-all flex-shrink-0 ${task.is_complete ? 'bg-green-500 border-green-500 text-white' : 'border-[var(--border)] hover:border-[var(--accent)]'}`}>
+    <div className="group flex items-start gap-3 p-4 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] hover:border-[var(--accent)] hover:shadow-sm transition-all animate-fade-in-up">
+      <button onClick={() => onToggle(task.id, task.is_complete)} className={`mt-0.5 w-6 h-6 rounded-[var(--radius-md)] border-2 flex items-center justify-center transition-all flex-shrink-0 ${task.is_complete ? 'bg-green-500 border-green-500 text-white' : 'border-[var(--border)] hover:border-[var(--accent)]'}`}>
         {!!task.is_complete && <span className="text-[11px] font-bold">V</span>}
       </button>
-      <div className="flex-1 flex items-center gap-2 min-w-0">
-        <span className={`flex-1 text-sm font-bold truncate ${task.is_complete ? 'text-[var(--toss-gray-3)] line-through decoration-2' : 'text-[var(--foreground)]'}`}>
+      <div className="flex-1 flex flex-col items-start gap-1 min-w-0">
+        <span className={`block w-full text-sm font-bold leading-snug whitespace-normal break-words ${task.is_complete ? 'text-[var(--toss-gray-3)] line-through decoration-2' : 'text-[var(--foreground)]'}`}>
           {task.content as string}
         </span>
         {!!task.task_date && (
-          <span className="shrink-0 text-[11px] font-bold text-[var(--toss-gray-3)]">
+          <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">
             {task.task_date as string}
           </span>
         )}

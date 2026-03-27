@@ -111,6 +111,7 @@ export const ADMIN_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'admin_문서양식', label: '문서양식' },
   { key: 'admin_급여이상치', label: '급여이상치' },
   { key: 'admin_공문서대장', label: '공문서대장' },
+  { key: 'admin_비품대여설정', label: '비품대여 설정' },
 ];
 
 export const STAFF_META_PERMISSION_ITEMS: FeaturePermissionItem[] = [

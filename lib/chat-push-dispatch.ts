@@ -498,6 +498,26 @@ export async function dispatchChatPushForMessage(params: {
     console.error('[FCM] 배치 전송 오류:', fcmErr);
   }
 
+  const hasWebPushOnlyTargets =
+    uniqueSubscriptions.size > 0 &&
+    uniqueFcmTokens.length === 0;
+
+  if (pushDisabled && hasWebPushOnlyTargets) {
+    await updateChatPushJobByMessageId(supabase, params.messageId, {
+      processing_started_at: null,
+      last_error: 'web-push-disabled',
+    });
+
+    return {
+      sent,
+      failed,
+      targets: targetIds.length,
+      notificationsCreated: notificationRows.length,
+      pushDisabled: true,
+      reason: 'web-push-disabled',
+    } satisfies ChatPushDispatchResult;
+  }
+
   await updateChatPushJobByMessageId(supabase, params.messageId, {
     processed_at: new Date().toISOString(),
     processing_started_at: null,

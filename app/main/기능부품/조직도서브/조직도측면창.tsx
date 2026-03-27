@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canAccessMainMenu } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
+import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import NotificationCenter from '../NotificationCenter';
 
 const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
@@ -74,6 +75,7 @@ export const SUB_MENUS: Record<string, SubMenuItem[]> = {
     { id: '수술검사템플릿', label: '수술 / 검사 템플릿', group: '시스템 설정', icon: '🧪' },
     { id: '팝업관리', label: '팝업 관리', group: '시스템 설정', icon: '🪟' },
     { id: '문서양식', label: '문서 양식', group: '시스템 설정', icon: '📄' },
+    { id: '비품대여설정', label: '비품대여 설정', group: '시스템 설정', icon: '🧰' },
     { id: '엑셀등록', label: '엑셀 일괄 등록', group: '데이터 관리', icon: '📥' },
     { id: '급여이상치', label: '급여 이상치 감지', group: '데이터 관리', icon: '⚠️' },
     { id: '데이터백업', label: '백업 / 복원', group: '데이터 관리', icon: '💾' },
@@ -107,14 +109,51 @@ type SidebarUser = {
 
 export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; mainMenu?: string; onMenuChange: (menuId: string) => void }) {
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const normalizedUser = useMemo(
+    () => normalizeStaffLike((user ?? {}) as Record<string, unknown>) as SidebarUser,
+    [user]
+  );
+  const [resolvedUser, setResolvedUser] = useState<SidebarUser | null>(() => {
+    const directId = getStaffLikeId(normalizedUser as Record<string, unknown>);
+    return directId ? normalizedUser : null;
+  });
+  const effectiveUser = (resolvedUser || normalizedUser) as SidebarUser;
+  const effectiveUserId = getStaffLikeId(effectiveUser as Record<string, unknown>);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncUserIdentity = async () => {
+      const directId = getStaffLikeId(normalizedUser as Record<string, unknown>);
+      if (directId) {
+        setResolvedUser(normalizedUser);
+        return;
+      }
+
+      if (!normalizedUser?.name && !normalizedUser?.employee_no && !normalizedUser?.auth_user_id) {
+        setResolvedUser(normalizedUser);
+        return;
+      }
+
+      const recoveredUser = await resolveStaffLike(normalizedUser as Record<string, unknown>);
+      if (!cancelled) {
+        setResolvedUser(recoveredUser as SidebarUser);
+      }
+    };
+
+    void syncUserIdentity();
+    return () => {
+      cancelled = true;
+    };
+  }, [normalizedUser?.id, normalizedUser?.name, normalizedUser?.employee_no, normalizedUser?.auth_user_id]);
 
   const visibleMenus = useMemo(
-    () => MAIN_MENUS.filter((menu) => canAccessMainMenu(user, menu.id)),
-    [user]
+    () => MAIN_MENUS.filter((menu) => canAccessMainMenu(effectiveUser, menu.id)),
+    [effectiveUser]
   );
 
   const fetchChatUnreadCount = useCallback(async () => {
-    if (!user?.id) {
+    if (!effectiveUserId) {
       setChatUnreadCount(0);
       return;
     }
@@ -128,7 +167,7 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
 
       const myRooms = (rooms || []).filter((room: any) => {
         if (room.id === NOTICE_ROOM_ID) return true;
-        return Array.isArray(room.members) && room.members.some((id: string) => String(id) === String(user.id));
+        return Array.isArray(room.members) && room.members.some((id: string) => String(id) === effectiveUserId);
       });
 
       if (myRooms.length === 0) {
@@ -140,7 +179,7 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
       const { data: cursors, error: cursorError } = await supabase
         .from('room_read_cursors')
         .select('room_id, last_read_at')
-        .eq('user_id', user.id)
+        .eq('user_id', effectiveUserId)
         .in('room_id', roomIds);
 
       if (cursorError) throw cursorError;
@@ -156,7 +195,7 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
           .from('messages')
           .select('id', { count: 'exact', head: true })
           .eq('room_id', roomId)
-          .neq('sender_id', user.id)
+          .neq('sender_id', effectiveUserId)
           .eq('is_deleted', false);
 
         const lastReadAt = cursorMap[roomId];
@@ -174,17 +213,21 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
       console.error('메인 메뉴 채팅 안읽음 계산 실패:', error);
       setChatUnreadCount(0);
     }
-  }, [user?.id]);
+  }, [effectiveUserId]);
 
   useEffect(() => {
     void fetchChatUnreadCount();
   }, [fetchChatUnreadCount]);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!effectiveUserId) return;
+
+    const handleChatSync = () => {
+      void fetchChatUnreadCount();
+    };
 
     const channel = supabase
-      .channel(`sidebar-chat-unread-${user.id}`)
+      .channel(`sidebar-chat-unread-${effectiveUserId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
         void fetchChatUnreadCount();
       })
@@ -196,10 +239,19 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
       })
       .subscribe();
 
+    if (typeof window !== 'undefined') {
+      window.addEventListener('erp-chat-sync', handleChatSync);
+      document.addEventListener('visibilitychange', handleChatSync);
+    }
+
     return () => {
       supabase.removeChannel(channel);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('erp-chat-sync', handleChatSync);
+        document.removeEventListener('visibilitychange', handleChatSync);
+      }
     };
-  }, [fetchChatUnreadCount, user?.id]);
+  }, [effectiveUserId, fetchChatUnreadCount]);
 
   const handleMenuClick = useCallback((menuId: string) => {
     if (menuId === '내정보' && typeof window !== 'undefined') {
@@ -221,7 +273,7 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
         data-testid="desktop-sidebar"
       >
         <div className="mb-2 flex w-full shrink-0 flex-col items-center px-1.5">
-          {user && <NotificationCenter user={user} onOpenMenu={onMenuChange} />}
+          {effectiveUserId && <NotificationCenter user={effectiveUser} onOpenMenu={onMenuChange} />}
         </div>
 
         <div className="no-scrollbar flex w-full flex-1 flex-col gap-0.5 overflow-y-auto px-1.5">
@@ -281,9 +333,9 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
         <div className="min-h-[56px] w-[56px] flex-none" />
       </nav>
       {/* 알림버튼 - overflow 클리핑 방지를 위해 nav 외부에 fixed 위치로 렌더링 */}
-      {user && (
+      {effectiveUserId && (
         <div className="fixed bottom-0 right-0 z-[200] flex min-h-[56px] w-[56px] flex-col items-center justify-center md:hidden safe-area-pb">
-          <NotificationCenter user={user} onOpenMenu={onMenuChange} />
+          <NotificationCenter user={effectiveUser} onOpenMenu={onMenuChange} />
         </div>
       )}
     </>
