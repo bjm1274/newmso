@@ -85,10 +85,19 @@ function normalizeText(value: unknown) {
 
 function isResignedStaff(staff: StaffMember) {
   const status = normalizeText(staff.status);
-  if (status.includes('퇴사') || status.includes('퇴직')) return true;
+  const resignedAt = normalizeText((staff as StaffMember & { resigned_at?: string | null }).resigned_at);
   const resignDate = normalizeText(staff.resign_date);
-  if (!resignDate) return false;
-  const resignTime = Date.parse(resignDate);
+  const effectiveResignDate = resignedAt || resignDate;
+
+  if (status.includes('퇴사예정')) {
+    if (!effectiveResignDate) return false;
+    const scheduledTime = Date.parse(effectiveResignDate);
+    return Number.isFinite(scheduledTime) && scheduledTime <= Date.now();
+  }
+
+  if (status.includes('퇴사') || status.includes('퇴직')) return true;
+  if (!effectiveResignDate) return false;
+  const resignTime = Date.parse(effectiveResignDate);
   return Number.isFinite(resignTime) && resignTime <= Date.now();
 }
 

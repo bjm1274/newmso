@@ -28,6 +28,18 @@ export default function OffboardingView({ staffs, selectedCo = '전체', onRefre
         return ['계정파기', '비품회수', '서약서징구', '퇴직금정산'].every(k => items[k]);
     };
 
+    const getOffboardingOriginalStatus = (staff: any) => {
+        const saved = staff?.permissions?.offboarding_original_status;
+        if (typeof saved === 'string' && saved.trim()) return saved.trim();
+        return staff?.status === '계약' ? '계약' : '재직';
+    };
+
+    const getOffboardingOriginalRole = (staff: any) => {
+        const saved = staff?.permissions?.offboarding_original_role;
+        if (typeof saved === 'string' && saved.trim()) return saved.trim();
+        return staff?.role === 'inactive' ? 'staff' : (staff?.role || 'staff');
+    };
+
     // Filter active staffs who are NOT currently offboarding
     // Filter active staffs who are NOT currently offboarding, respect company filter
     const eligibleStaffs = _staffs.filter((s: any) =>
@@ -45,7 +57,19 @@ export default function OffboardingView({ staffs, selectedCo = '전체', onRefre
         setLoading(true);
         try {
             // 1. Status change logic
-            await supabase.from('staff_members').update({ status: '퇴사예정', resigned_at: exitDate }).eq('id', selectedStaff);
+            const nextPermissions = {
+                ...(staff.permissions || {}),
+                offboarding_original_status: staff.status || '재직',
+                offboarding_original_role: staff.role || 'staff',
+                offboarding_started_at: new Date().toISOString(),
+                offboarding_reason: reason || '개인 사유',
+            };
+            const { error } = await supabase
+                .from('staff_members')
+                .update({ status: '퇴사예정', resigned_at: exitDate, permissions: nextPermissions })
+                .eq('id', selectedStaff);
+
+            if (error) throw error;
 
             // 2. Offboarding checklist tracking (create a new record in a custom table if exists, else we simulate it)
             // For this UI, we can just visually update or rely on '퇴사예정' status
@@ -70,16 +94,54 @@ export default function OffboardingView({ staffs, selectedCo = '전체', onRefre
         (selectedCo === '전체' || s.company === selectedCo)
     );
 
+    const cancelOffboarding = async (staff: any) => {
+        if (!confirm(`${staff.name} 님의 퇴사 예정 상태를 취소하시겠습니까?`)) return;
+        setLoading(true);
+        try {
+            const nextPermissions = { ...(staff.permissions || {}) };
+            delete nextPermissions.offboarding_original_status;
+            delete nextPermissions.offboarding_original_role;
+            delete nextPermissions.offboarding_started_at;
+            delete nextPermissions.offboarding_reason;
+
+            const { error } = await supabase
+                .from('staff_members')
+                .update({
+                    status: getOffboardingOriginalStatus(staff),
+                    role: getOffboardingOriginalRole(staff),
+                    resigned_at: null,
+                    permissions: nextPermissions,
+                })
+                .eq('id', staff.id);
+
+            if (error) throw error;
+
+            setChecklist((prev) => {
+                const next = { ...prev };
+                delete next[String(staff.id)];
+                return next;
+            });
+            toast(`${staff.name} 님의 퇴사 예정이 취소되었습니다.`, 'success');
+            _onRefresh();
+        } catch (e) {
+            console.error(e);
+            toast('퇴사 예정 취소 중 오류가 발생했습니다.', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const concludeOffboarding = async (id: string, name: string) => {
         if (!confirm(`${name} 님의 모든 체크리스트가 완료되었습니다.\n최종 퇴사 처리하시겠습니까?`)) return;
         setLoading(true);
         try {
             // 1. 직원 상태 변경 + 권한 비활성화
-            await supabase.from('staff_members').update({
+            const { error: staffUpdateError } = await supabase.from('staff_members').update({
                 status: '퇴사',
                 permissions: {},
                 role: 'inactive',
             }).eq('id', id);
+            if (staffUpdateError) throw staffUpdateError;
 
             // 2. 채팅방 멤버에서 제거
             await supabase.from('chat_participants').delete().eq('user_id', id);
@@ -214,20 +276,31 @@ export default function OffboardingView({ staffs, selectedCo = '전체', onRefre
                                     </label>
                                 </div>
 
-                                <button
-                                    data-testid={`offboarding-finalize-${s.id}`}
-                                    onClick={() => {
-                                        if (!allChecked(s.id)) {
-                                            toast('모든 체크리스트 항목을 완료해주세요.', 'warning');
-                                            return;
-                                        }
-                                        concludeOffboarding(s.id, s.name);
-                                    }}
-                                    disabled={loading}
-                                    className={`w-full py-3 text-white text-[11px] font-black rounded-xl transition-colors disabled:opacity-50 ${allChecked(s.id) ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-900 hover:bg-slate-800 opacity-60'}`}
-                                >
-                                    {allChecked(s.id) ? '최종 퇴사 처리 (계정 비활성화)' : '체크리스트를 먼저 완료해주세요'}
-                                </button>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        data-testid={`offboarding-cancel-${s.id}`}
+                                        onClick={() => cancelOffboarding(s)}
+                                        disabled={loading}
+                                        className="flex-1 py-3 border border-[var(--border)] bg-[var(--card)] text-[11px] font-black text-[var(--foreground)] rounded-xl transition-colors hover:bg-[var(--tab-bg)] disabled:opacity-50"
+                                    >
+                                        퇴사 예정 취소
+                                    </button>
+                                    <button
+                                        data-testid={`offboarding-finalize-${s.id}`}
+                                        onClick={() => {
+                                            if (!allChecked(s.id)) {
+                                                toast('모든 체크리스트 항목을 완료해주세요.', 'warning');
+                                                return;
+                                            }
+                                            concludeOffboarding(s.id, s.name);
+                                        }}
+                                        disabled={loading}
+                                        className={`flex-[1.4] py-3 text-white text-[11px] font-black rounded-xl transition-colors disabled:opacity-50 ${allChecked(s.id) ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-900 hover:bg-slate-800 opacity-60'}`}
+                                    >
+                                        {allChecked(s.id) ? '최종 퇴사 처리 (계정 비활성화)' : '체크리스트를 먼저 완료해주세요'}
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
