@@ -26,7 +26,6 @@ type AttendanceCorrectionFormProps = {
 
 const REQUEST_VIEW = '신청';
 const STATUS_VIEW = '현황';
-const APPROVAL_VIEW = '결재';
 const DEFAULT_CORRECTION_TYPE = '정상반영';
 
 const DEFAULT_CORRECTION_STATUS = '대기';
@@ -82,8 +81,6 @@ export default function AttendanceCorrectionForm({
   const [correctionType, setCorrectionType] = useState(DEFAULT_CORRECTION_TYPE);
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState(REQUEST_VIEW);
-
-  const canApprove = user?.department === '행정팀' || user?.role === 'admin';
 
   const fetchCorrections = useCallback(async () => {
     const { data } = await withAttendanceCorrectionsFallback<any[]>(
@@ -366,44 +363,7 @@ export default function AttendanceCorrectionForm({
     );
   };
 
-  const handleApprove = async (correction: any, newStatus: string) => {
-    const dateStr = getCorrectionDate(correction);
-    const approvedAt = new Date().toISOString();
-    const { error } = await withAttendanceCorrectionsFallback<null>(
-      () =>
-        supabase
-          .from('attendance_corrections')
-          .update({ approval_status: newStatus, status: newStatus, approved_by: user.id, approved_at: approvedAt })
-          .eq('id', correction.id),
-      () =>
-        supabase
-          .from('attendance_corrections')
-          .update({ status: newStatus })
-          .eq('id', correction.id)
-    );
-
-    if (error) {
-      toast('처리 중 오류가 발생했습니다.', 'error');
-      return;
-    }
-
-    if (newStatus === '승인' && dateStr && correction.staff_id) {
-      await applyCorrectionToAttendance(
-        correction.staff_id,
-        dateStr,
-        correction.correction_type || DEFAULT_CORRECTION_TYPE
-      );
-    }
-
-    toast(newStatus === '승인' ? '승인되었으며 근태에 반영되었습니다.' : '처리되었습니다.', 'success');
-    fetchCorrections();
-    fetchProblemDates();
-  };
-
   const myCorrections = corrections.filter((item) => item.staff_id === user.id);
-  const pendingCorrections = corrections.filter(
-    (item) => getCorrectionStatus(item) === DEFAULT_CORRECTION_STATUS
-  );
 
   /* ── 날짜 포맷 헬퍼 ── */
   const fmtDate = (dateStr: string) => {
@@ -430,7 +390,7 @@ export default function AttendanceCorrectionForm({
             출결 정정 신청
           </h2>
           <p className="mt-1 text-[11px] font-bold uppercase text-[var(--toss-gray-3)] md:text-xs">
-            지각 또는 미기록 사유 제출 및 결재
+            지각 또는 미기록 사유 제출 및 신청 현황
           </p>
         </header>
 
@@ -439,7 +399,6 @@ export default function AttendanceCorrectionForm({
           {[
             { id: REQUEST_VIEW, label: '신청하기' },
             { id: STATUS_VIEW, label: '신청 현황' },
-            ...(canApprove ? [{ id: APPROVAL_VIEW, label: `결재 대기${pendingCorrections.length > 0 ? ` (${pendingCorrections.length})` : ''}` }] : []),
           ].map(({ id, label }) => (
             <button
               key={id}
@@ -684,57 +643,6 @@ export default function AttendanceCorrectionForm({
                   </div>
                 );
               })
-            )}
-          </div>
-        )}
-
-        {/* ── 결재 대기 탭 ── */}
-        {viewMode === APPROVAL_VIEW && canApprove && (
-          <div className="space-y-3">
-            {pendingCorrections.length === 0 ? (
-              <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-6 text-center text-sm font-bold text-[var(--toss-gray-3)] shadow-sm">
-                결재 대기 중인 출결 정정 문서가 없습니다.
-              </div>
-            ) : (
-              pendingCorrections.map((correction, index) => (
-                <div
-                  key={correction.id || `${getCorrectionDate(correction)}-${index}`}
-                  className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm"
-                >
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-[var(--foreground)]">
-                        {getCorrectionDate(correction)}
-                      </p>
-                      <p className="mt-0.5 text-xs text-[var(--toss-gray-3)]">{correction.reason}</p>
-                    </div>
-                    <span className="rounded-full bg-orange-100 dark:bg-orange-900/30 px-3 py-1 text-[11px] font-semibold text-orange-500">
-                      대기
-                    </span>
-                  </div>
-                  <div className="space-y-2 border-t border-[var(--border)] pt-3">
-                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">
-                      정정 유형: {correction.correction_type}
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleApprove(correction, '승인')}
-                        className="flex-1 rounded-[var(--radius-md)] bg-green-600 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:scale-[0.98]"
-                      >
-                        승인
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleApprove(correction, '거절')}
-                        className="flex-1 rounded-[var(--radius-md)] bg-red-600 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:scale-[0.98]"
-                      >
-                        거절
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))
             )}
           </div>
         )}

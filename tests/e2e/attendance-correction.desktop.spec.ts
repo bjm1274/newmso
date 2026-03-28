@@ -56,7 +56,7 @@ test('attendance correction submit works with the legacy attendance_corrections 
   await expect(page.getByText('대기')).toBeVisible();
 });
 
-test('attendance correction approval updates legacy-schema rows and attendance records', async ({
+test('attendance correction form keeps pending items out of the compose screen and uses request/status views only', async ({
   page,
 }) => {
   const correctionDate = '2026-03-09';
@@ -97,35 +97,10 @@ test('attendance correction approval updates legacy-schema rows and attendance r
   await page.getByTestId('approval-form-type-8').click();
   await expect(page.getByTestId('attendance-correction-view')).toBeVisible();
 
-  await page.getByRole('button', { name: '결재 대기' }).click();
-  await expect(page.getByText('레거시 승인 테스트')).toBeVisible();
-  await page.getByRole('button', { name: '승인' }).first().click();
-  await expect(
-    page.getByText('결재 대기 중인 출결 정정 문서가 없습니다.')
-  ).toBeVisible();
+  await expect(page.getByRole('button', { name: '결재 대기' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '신청하기' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '신청 현황' })).toBeVisible();
 
-  const snapshot = await page.evaluate(async ({ correctionId, date, staffId }) => {
-    const headers = { Accept: 'application/json' };
-    const [correctionsResponse, attendanceResponse, attendancesResponse] = await Promise.all([
-      fetch(`/rest/v1/attendance_corrections?id=eq.${correctionId}&select=*`, { headers }),
-      fetch(`/rest/v1/attendance?staff_id=eq.${staffId}&date=eq.${date}&select=*`, { headers }),
-      fetch(`/rest/v1/attendances?staff_id=eq.${staffId}&work_date=eq.${date}&select=*`, {
-        headers,
-      }),
-    ]);
-
-    return {
-      corrections: await correctionsResponse.json(),
-      attendance: await attendanceResponse.json(),
-      attendances: await attendancesResponse.json(),
-    };
-  }, {
-    correctionId: 'attendance-correction-1',
-    date: correctionDate,
-    staffId: fakeUser.id,
-  });
-
-  expect(snapshot.corrections[0]?.status).toBe('승인');
-  expect(snapshot.attendance[0]?.status).toBe('정상');
-  expect(snapshot.attendances[0]?.status).toBe('present');
+  await page.getByRole('button', { name: '신청 현황' }).click();
+  await expect(page.getByText('신청한 출결 정정 문서가 없습니다.')).toBeVisible();
 });

@@ -5,4 +5,4 @@ export const WORKPLACE_LOCATION = {
   longitude: 126.405525,
 } as const;
 
-export const ALLOWED_DISTANCE_M = 300;
+export const ALLOWED_DISTANCE_M = 50;

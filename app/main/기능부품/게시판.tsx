@@ -1,6 +1,6 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { useDeferredValue, useState, useEffect, useMemo, useRef } from 'react';
+import { useDeferredValue, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { canAccessBoard, isPrivilegedUser } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
@@ -947,6 +947,30 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     setEditingPostId(null);
   };
 
+  const uploadBoardAttachment = useCallback(async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch('/api/board/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.url) {
+      throw new Error(payload?.error || '첨부파일 업로드에 실패했습니다.');
+    }
+
+    return {
+      url: `${payload.url}?t=${Date.now()}`,
+      name: String(payload.fileName || file.name || '첨부파일'),
+      type: String(
+        payload.type ||
+          (file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'file')
+      ),
+    };
+  }, []);
+
   const handleNewPost = async () => {
     if (!canCreatePost) {
       toast('이 게시판에 글을 작성할 권한이 없습니다.', 'error');
@@ -1038,33 +1062,20 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         postData.title = sidePrefix + (postData.title || '');
       }
 
-      // 공지/자유/경조사/소리함: 사진·동영상·파일 첨부 업로드 (Storage 키는 영문/숫자만 사용, 한글 파일명은 Invalid key 방지)
+      // 공지/자유/경조사/소리함: 사진·동영상·파일 첨부 업로드
       const boardWithAttach = ['공지사항', '자유게시판', '경조사', '익명소리함'];
       if (boardWithAttach.includes(activeBoard) && attachmentFiles.length > 0) {
-        const BUCKET = 'board-attachments';
-        const safeExt = (name: string) => {
-          const i = name.lastIndexOf('.');
-          const ext = i >= 0 ? name.slice(i).replace(/[^a-zA-Z0-9.]/g, '') || '.bin' : '.bin';
-          return ext.startsWith('.') ? ext : `.${ext}`;
-        };
         const uploaded: { url: string; name: string; type: string }[] = [];
         let lastUploadError: string | null = null;
         for (let i = 0; i < attachmentFiles.length; i++) {
           const file = attachmentFiles[i];
-          const ext = safeExt(file.name);
-          const path = `${user?.id || 'anon'}_${Date.now()}_${i}${ext}`;
-          const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true });
-          if (upErr) {
-            lastUploadError = upErr.message || String(upErr);
-            console.error('[게시판 첨부 업로드 실패]', upErr);
-          } else {
-            const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-            const type = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'file';
-            uploaded.push({
-              url: `${data.publicUrl}?t=${Date.now()}`,
-              name: file.name,
-              type,
-            });
+          try {
+            const uploadedItem = await uploadBoardAttachment(file);
+            uploaded.push(uploadedItem);
+          } catch (uploadError) {
+            lastUploadError =
+              uploadError instanceof Error ? uploadError.message : String(uploadError || '첨부 업로드 실패');
+            console.error('[게시판 첨부 업로드 실패]', uploadError);
           }
         }
         if (uploaded.length === 0 && attachmentFiles.length > 0) {

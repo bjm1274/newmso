@@ -152,10 +152,10 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
           setDistance(Math.floor(dist)); // 거리 상태 업데이트 (m 단위)
 
           if (dist <= ALLOWED_RADIUS_METER) {
-            resolve(true); // 100m 이내 (성공)
+            resolve(true); // 허용 반경 이내 (성공)
           } else {
-            toast(`🏥 병원과 거리가 너무 멉니다! (현재 거리: ${Math.floor(dist)}m)\n병원 내(300m)에서만 출퇴근이 가능합니다.`);
-            resolve(false); // 100m 밖 (실패)
+            toast(`🏥 병원과 거리가 너무 멉니다! (현재 거리: ${Math.floor(dist)}m)\n병원 반경 ${ALLOWED_RADIUS_METER}m 안에서만 출퇴근이 가능합니다.`);
+            resolve(false); // 허용 반경 밖 (실패)
           }
         },
         (error) => {

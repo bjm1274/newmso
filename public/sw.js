@@ -4,6 +4,32 @@ const BADGE_URL = '/badge-72x72.png';
 const ICON_URL = '/sy-logo.png';
 const recentlyShownNotifications = new Map();
 
+async function getWindowClients() {
+  return self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+}
+
+function isVisibleClient(client) {
+  return client?.visibilityState === 'visible' || client?.focused === true;
+}
+
+async function broadcastPreviewToVisibleClients(payload) {
+  const clientList = await getWindowClients();
+  const visibleClients = clientList.filter(isVisibleClient);
+
+  visibleClients.forEach((client) => {
+    try {
+      client.postMessage({
+        type: 'erp-push-preview',
+        payload,
+      });
+    } catch {
+      // ignore postMessage failures
+    }
+  });
+
+  return visibleClients.length > 0;
+}
+
 function shouldShowNotification(key) {
   const now = Date.now();
   for (const [entryKey, timestamp] of recentlyShownNotifications.entries()) {
@@ -21,37 +47,47 @@ function shouldShowNotification(key) {
 self.addEventListener('push', (event) => {
   if (!event.data) return;
 
-  let data;
-  try {
-    data = event.data.json();
-  } catch {
-    data = { title: '새 알림', body: event.data.text() };
-  }
+  event.waitUntil((async () => {
+    let data;
+    try {
+      data = event.data.json();
+    } catch {
+      data = { title: '새 알림', body: event.data.text() };
+    }
 
-  // firebase-messaging-sw.js와 동일한 tag 형식 사용 → 이중 알림 방지
-  const messageId = data.data?.message_id || data.data?.id || '';
-  const tag = messageId ? 'chat-msg-' + messageId : (data.data?.type || 'notification') + '-' + Date.now();
-  if (!shouldShowNotification(tag)) return;
+    // firebase-messaging-sw.js와 동일한 tag 형식 사용 → 이중 알림 방지
+    const messageId = data.data?.message_id || data.data?.id || '';
+    const tag = messageId ? 'chat-msg-' + messageId : (data.data?.type || 'notification') + '-' + Date.now();
+    if (!shouldShowNotification(tag)) return;
 
-  const options = {
-    body: data.body || '새 알림이 있습니다.',
-    icon: ICON_URL,
-    badge: BADGE_URL,
-    tag: tag,
-    requireInteraction: true,    // 사용자가 확인할 때까지 유지 (카카오톡 방식)
-    renotify: false,             // 같은 tag는 조용히 업데이트 (이중 알림 방지)
-    silent: false,
-    vibrate: [200, 100, 200],    // 프리미엄 진동 패턴
-    data: data.data || {},
-    actions: [
-      { action: 'open', title: '확인하기' },
-      { action: 'close', title: '닫기' }
-    ],
-  };
+    const previewPayload = {
+      title: data.title || '알림',
+      body: data.body || '새 알림이 있습니다.',
+      tag,
+      data: data.data || {},
+    };
 
-  event.waitUntil(
-    self.registration.showNotification(data.title || '알림', options)
-  );
+    const hasVisibleClient = await broadcastPreviewToVisibleClients(previewPayload);
+    if (hasVisibleClient) return;
+
+    const options = {
+      body: previewPayload.body,
+      icon: ICON_URL,
+      badge: BADGE_URL,
+      tag,
+      requireInteraction: true,
+      renotify: false,
+      silent: false,
+      vibrate: [200, 100, 200],
+      data: previewPayload.data,
+      actions: [
+        { action: 'open', title: '확인하기' },
+        { action: 'close', title: '닫기' }
+      ],
+    };
+
+    await self.registration.showNotification(previewPayload.title, options);
+  })());
 });
 
 // 2. 알림 클릭 시 이동 처리

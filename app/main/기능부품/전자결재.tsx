@@ -5,6 +5,19 @@ import { canAccessApprovalSection } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { syncApprovalToDocumentRepository } from '@/lib/approval-document-archive';
 import { ensureApprovedAnnualLeaveRequest, isAnnualLeaveType, syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
+import {
+  appendApprovalHistory,
+  buildApprovalDocNumber,
+  buildRevisionDocNumber,
+  formatApprovalHistoryActionLabel,
+  getApprovalEditHistory,
+  getApprovalRevision,
+  isApprovalLocked,
+  isApprovalOverdue,
+  lockApprovalMeta,
+  markDelayNotification,
+  shouldSendDelayNotification,
+} from '@/lib/approval-workflow';
 import { isMissingColumnError, withMissingColumnFallback } from '@/lib/supabase-compat';
 import type { StaffMember } from '@/types';
 import {
@@ -310,6 +323,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const [approverTemplates, setApproverTemplates] = useState<{id: string; name: string; line: StaffMember[]}[]>([]);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [templateNameInput, setTemplateNameInput] = useState('');
+  const [showApproverTemplateMenu, setShowApproverTemplateMenu] = useState(false);
   // 결재함 일괄 처리용
   const [selectedApprovalIds, setSelectedApprovalIds] = useState<string[]>([]);
   // 작성하기 자동 저장용
@@ -890,6 +904,129 @@ window.onload = () => window.print();
     if (item?.status !== '대기' || !user?.id) return false;
     return String(item?.sender_id || '') === String(user.id);
   }, [user?.id]);
+  const isApprovalEditLockedItem = useCallback((item: Record<string, unknown>) => {
+    const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+    return isApprovalLocked(metaData);
+  }, []);
+  const buildApprovalHistoryEntry = useCallback((action: Parameters<typeof appendApprovalHistory>[1]['action'], note?: string | null) => ({
+    action,
+    actor_id: user?.id ? String(user.id) : null,
+    actor_name: user?.name ? String(user.name) : null,
+    note: note ?? null,
+  }), [user?.id, user?.name]);
+  const buildNextApprovalMetaData = useCallback(
+    (
+      baseMetaData: Record<string, unknown> | null | undefined,
+      action: Parameters<typeof appendApprovalHistory>[1]['action'],
+      options?: {
+        note?: string | null;
+        lock?: boolean;
+        currentApproverId?: string | null;
+        revision?: number | null;
+      }
+    ) => {
+      let nextMetaData = appendApprovalHistory(baseMetaData, {
+        ...buildApprovalHistoryEntry(action, options?.note),
+        current_approver_id: options?.currentApproverId ?? null,
+        revision: options?.revision ?? null,
+      });
+      if (options?.lock) {
+        nextMetaData = appendApprovalHistory(lockApprovalMeta(nextMetaData, user?.id ? String(user.id) : null), {
+          ...buildApprovalHistoryEntry('locked', '결재 완료 문서 잠금'),
+          revision: options?.revision ?? null,
+        });
+      }
+      return nextMetaData;
+    },
+    [buildApprovalHistoryEntry, user?.id]
+  );
+  const createStructuredDocNumber = useCallback(async (params: {
+    formSlug?: string | null;
+    typeName?: string | null;
+    companyName?: string | null;
+    companyId?: string | null;
+    sourceMetaData?: Record<string, unknown> | null | undefined;
+    sourceDocNumber?: string | null;
+  }) => {
+    const revision = getApprovalRevision(params.sourceMetaData) + (params.sourceDocNumber ? 1 : 0);
+    if (params.sourceDocNumber) {
+      return {
+        docNumber: buildRevisionDocNumber(params.sourceDocNumber, revision),
+        revision,
+      };
+    }
+
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+
+    let countQuery = supabase
+      .from('approvals')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', dayStart.toISOString())
+      .lt('created_at', dayEnd.toISOString());
+
+    if (params.companyId) countQuery = countQuery.eq('company_id', params.companyId);
+    else if (params.companyName) countQuery = countQuery.eq('sender_company', params.companyName);
+
+    const { count } = await countQuery;
+    return {
+      docNumber: buildApprovalDocNumber({
+        companyName: params.companyName,
+        companyId: params.companyId,
+        formSlug: params.formSlug,
+        typeName: params.typeName,
+        createdAt: new Date(),
+        sequence: (count || 0) + 1,
+      }),
+      revision: 1,
+    };
+  }, []);
+  const syncApprovalDelayNotifications = useCallback(async (items: Record<string, unknown>[]) => {
+    const overdueItems = items.filter((item) => {
+      if (!isApprovalOverdue(item)) return false;
+      const currentApproverId = resolveCurrentApproverId(item);
+      if (!currentApproverId) return false;
+      const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+      return shouldSendDelayNotification(metaData, currentApproverId);
+    });
+
+    if (overdueItems.length === 0) return;
+
+    for (const item of overdueItems) {
+      const currentApproverId = resolveCurrentApproverId(item);
+      if (!currentApproverId) continue;
+      const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+      const nextMetaData = appendApprovalHistory(
+        markDelayNotification(metaData, currentApproverId),
+        {
+          ...buildApprovalHistoryEntry('delay_notified', '결재 지연 알림 발송'),
+          current_approver_id: currentApproverId,
+          revision: getApprovalRevision(metaData),
+        }
+      );
+
+      try {
+        await supabase.from('notifications').insert({
+          user_id: currentApproverId,
+          type: 'approval',
+          title: `[결재 지연] ${String(item.title || '전자결재 문서')}`,
+          body: `${String(item.sender_name || '기안자')} 문서가 24시간 이상 대기 중입니다.`,
+          metadata: {
+            id: item.id,
+            approval_id: item.id,
+            type: 'approval',
+            approval_view: '결재함',
+            approval_role: 'delayed',
+          },
+        });
+        await supabase.from('approvals').update({ meta_data: nextMetaData }).eq('id', item.id);
+      } catch (delayError) {
+        console.error('approval delay notification failed:', delayError);
+      }
+    }
+  }, [buildApprovalHistoryEntry, resolveCurrentApproverId]);
   const syncApprovalRouting = useCallback(async (item: Record<string, unknown>, currentApproverId: string | null) => {
     if (!item?.id || !currentApproverId) return null;
     const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
@@ -1118,8 +1255,12 @@ window.onload = () => window.print();
         return query;
       }
     );
-    if (data) setApprovals(data as Record<string, unknown>[]);
-  }, [isMso, user?.company_id, user?.company, selectedCompanyId, selectedCo]);
+    if (data) {
+      const nextItems = data as Record<string, unknown>[];
+      setApprovals(nextItems);
+      void syncApprovalDelayNotifications(nextItems);
+    }
+  }, [isMso, selectedCo, selectedCompanyId, syncApprovalDelayNotifications, user?.company, user?.company_id]);
 
   // 항상 최신 fetchApprovals를 ref에 유지 (realtime 클로저 stale 방지)
   useEffect(() => { fetchApprovalsRef.current = fetchApprovals; }, [fetchApprovals]);
@@ -1189,6 +1330,10 @@ window.onload = () => window.print();
 
   const hydrateComposeFromApproval = useCallback((approval: Record<string, unknown>) => {
     const approvalMeta = approval.meta_data as Record<string, unknown> | null | undefined;
+    if (isApprovalLocked(approvalMeta)) {
+      toast('결재가 완료되어 잠긴 문서는 수정할 수 없습니다.', 'warning');
+      return;
+    }
     const nextFormType = normalizeComposeFormType(
       String(approvalMeta?.form_name || approvalMeta?.form_slug || approval.type || '업무기안')
     );
@@ -1343,9 +1488,15 @@ window.onload = () => window.print();
       const routingError = await syncApprovalRouting(item, currentApproverId);
       if (routingError) return id;
       const itemMetaData = item.meta_data as Record<string, unknown> | null | undefined;
+      const nextMetaData = buildNextApprovalMetaData(itemMetaData, 'rejected', {
+        note: reason || '일괄 반려',
+        lock: true,
+        currentApproverId,
+        revision: getApprovalRevision(itemMetaData),
+      });
       const { error } = await supabase.from('approvals').update({
         status: '반려',
-        meta_data: { ...(itemMetaData || {}), reject_reason: reason },
+        meta_data: { ...nextMetaData, reject_reason: reason },
       }).eq('id', id);
       return error ? id : null;
     }));
@@ -1403,11 +1554,28 @@ window.onload = () => window.print();
     }
     const isFinalApproval = currentIndex === lineIds.length - 1;
 
+    const itemMetaData = item.meta_data as Record<string, unknown> | null | undefined;
     const updateData: Record<string, unknown> = {};
     if (isFinalApproval) {
       updateData.status = '승인';
     } else {
       updateData.current_approver_id = lineIds[currentIndex + 1];
+    }
+
+    if (isFinalApproval) {
+      updateData.meta_data = buildNextApprovalMetaData(itemMetaData, 'approved_final', {
+        note: '理쒖쥌 ?뱀씤',
+        lock: true,
+        currentApproverId,
+        revision: getApprovalRevision(itemMetaData),
+      });
+    } else {
+      updateData.current_approver_id = lineIds[currentIndex + 1];
+      updateData.meta_data = buildNextApprovalMetaData(itemMetaData, 'approved_step', {
+        note: `${currentIndex + 1}李? ?뱀씤`,
+        currentApproverId: lineIds[currentIndex + 1],
+        revision: getApprovalRevision(itemMetaData),
+      });
     }
 
     const { error: appError } = await supabase.from('approvals').update(updateData).eq('id', item.id);
@@ -1635,6 +1803,21 @@ window.onload = () => window.print();
       return;
     }
     const rejectMetaData = item.meta_data as Record<string, unknown> | null | undefined;
+    const nextRejectedMetaData = buildNextApprovalMetaData(rejectMetaData, 'rejected', {
+      note: reason || '諛섎젮',
+      lock: true,
+      currentApproverId,
+      revision: getApprovalRevision(rejectMetaData),
+    });
+    const rejectResult = await supabase
+      .from('approvals')
+      .update({ status: '諛섎젮', meta_data: { ...nextRejectedMetaData, reject_reason: reason } })
+      .eq('id', item.id);
+    if (!rejectResult.error) {
+      toast("諛섎젮 泥섎━?섏뿀?듬땲??", 'success');
+      fetchApprovals();
+      return;
+    }
     const { error } = await supabase
       .from('approvals')
       .update({ status: '반려', meta_data: { ...(rejectMetaData || {}), reject_reason: reason } })
@@ -1661,13 +1844,17 @@ window.onload = () => window.print();
       recalled_at: new Date().toISOString(),
       recalled_by: user?.id,
     };
+    const recalledHistoryMetaData = appendApprovalHistory(recalledMetaData, {
+      ...buildApprovalHistoryEntry('recalled', '?뚯닔 ???섏젙'),
+      revision: getApprovalRevision(recalledMetaData),
+    });
 
     const { error } = await supabase
       .from('approvals')
       .update({
         status: '회수',
         current_approver_id: null,
-        meta_data: recalledMetaData,
+        meta_data: recalledHistoryMetaData,
       })
       .eq('id', item.id);
 
@@ -1680,7 +1867,7 @@ window.onload = () => window.print();
       ...item,
       status: '회수',
       current_approver_id: null,
-      meta_data: recalledMetaData,
+      meta_data: recalledHistoryMetaData,
     });
     setSelectedApprovalId(null);
     const nextView = resolveAccessibleView('작성하기');
@@ -1728,14 +1915,23 @@ window.onload = () => window.print();
     const cc_departments = Array.from(new Set([...extraCc, ...requiredCc]));
 
     // 문서번호 자동 채번: 연도월-타임스탬프(충돌 방지)
-    const now = new Date();
-    const docPrefix = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const docSeq = `${Date.now().toString(36).toUpperCase().slice(-6)}`;
-    const docNumber = `${docPrefix}-${docSeq}`;
     const selectedCustomForm = customFormTypes.find((item) => item.slug === formType);
     const builtInForm = BUILTIN_FORM_TYPE_DEFINITIONS.find((item) => item.slug === formType || item.name === formType);
     const resolvedFormSlug = selectedCustomForm?.slug || builtInForm?.slug || formType;
     const resolvedFormName = selectedCustomForm?.name || builtInForm?.name || formType;
+    const sourceApprovalMeta = composeSeedApproval?.meta_data as Record<string, unknown> | null | undefined;
+    const sourceDocNumber = String(
+      composeSeedApproval?.doc_number || sourceApprovalMeta?.doc_number || ''
+    ).trim() || null;
+    const companyId = user.company_id ?? selectedCompanyId ?? null;
+    const { docNumber: structuredDocNumber, revision } = await createStructuredDocNumber({
+      formSlug: resolvedFormSlug,
+      typeName: resolvedFormName,
+      companyName: user.company || '',
+      companyId: companyId ? String(companyId) : null,
+      sourceMetaData: sourceApprovalMeta,
+      sourceDocNumber,
+    });
 
     const row: Record<string, unknown> = {
       sender_id: user.id,
@@ -1753,12 +1949,19 @@ window.onload = () => window.print();
         cc_departments,
         cc_users: ccLine.map(c => ({ id: c.id, name: c.name })),
         approver_line: approverLine.map((a) => a.id),
-        doc_number: docNumber,
+        doc_number: structuredDocNumber,
+        revision,
+        source_approval_id: composeSeedApproval?.id || null,
+        previous_doc_number: sourceDocNumber,
       },
-      doc_number: docNumber,
+      doc_number: structuredDocNumber,
       status: '대기',
     };
-    const companyId = user.company_id ?? selectedCompanyId ?? null;
+    row.meta_data = appendApprovalHistory(row.meta_data as Record<string, unknown> | null | undefined, {
+      ...buildApprovalHistoryEntry(composeSeedApproval?.id ? 'resubmitted' : 'created', composeSeedApproval?.id ? '?뚯닔 ???곸떊' : '理쒖큹 ?곸떊'),
+      current_approver_id: approverLine[0]?.id ?? null,
+      revision,
+    });
     if (companyId != null) row.company_id = companyId;
 
     const { error, data: insertedApproval } = await insertApprovalWithLegacyFallback(row);
@@ -1775,7 +1978,15 @@ window.onload = () => window.print();
       toast('결재 문서는 상신됐지만 문서보관함 저장에는 실패했습니다.', 'warning');
     }
     await createApprovalReferenceNotifications((insertedApproval as Record<string, unknown> | null) ?? row);
+    if (composeSeedApproval?.id) {
+      const supersededMetaData = {
+        ...((sourceApprovalMeta || {}) as Record<string, unknown>),
+        superseded_by: (insertedApproval as Record<string, unknown> | null | undefined)?.id || null,
+      };
+      await supabase.from('approvals').update({ meta_data: supersededMetaData }).eq('id', composeSeedApproval.id);
+    }
     clearDraftFromStorage();
+    setComposeSeedApproval(null);
     setCcLine(resolveDefaultReferenceUsersForForm(formType));
     toast("상신 완료!", 'success');
     const nextView = resolveAccessibleView('기안함');
@@ -1983,73 +2194,99 @@ window.onload = () => window.print();
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-2 items-start sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                  <select data-testid="approval-approver-select" onChange={(e) => {
-                    const s = approverCandidates.find((st) => st.id === e.target.value);
-                    if (s && !approverLine.find(al => al.id === s.id)) setApproverLine([...approverLine, s]);
-                    e.target.value = '';
-                  }} className="min-w-0 w-full p-3 bg-[var(--input-bg)] rounded-[var(--radius-md)] text-xs font-bold border border-[var(--border)] outline-none shadow-sm">
-                    <option value="">결재자 추가...</option>
-                    {approverCandidates.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name} {s.position || ''} {s.company ? `(${s.company})` : ''}</option>
-                    ))}
-                  </select>
-                  <select data-testid="approval-cc-select" onChange={e => {
-                    const s = staffs.find((sf) => String(sf.id) === e.target.value);
-                    if (s && !ccLine.find(c => c.id === s.id)) setCcLine(prev => [...prev, { id: s.id, name: s.name, position: s.position }]);
-                    e.target.value = '';
-                  }} className="min-w-0 w-full p-3 bg-[var(--input-bg)] rounded-[var(--radius-md)] text-xs font-bold border border-[var(--border)] outline-none shadow-sm">
-                    <option value="">참조자 추가...</option>
-                    {staffs.filter((s) => !ccLine.find(c => c.id === s.id)).map((s) => <option key={s.id} value={s.id}>{s.name} ({s.position})</option>)}
-                  </select>
+                <div className="grid grid-cols-1 gap-2 items-start md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                  <label className="space-y-1.5">
+                    <span className="block text-[11px] font-bold text-[var(--toss-gray-4)]">결재자 선택</span>
+                    <select data-testid="approval-approver-select" onChange={(e) => {
+                      const s = approverCandidates.find((st) => st.id === e.target.value);
+                      if (s && !approverLine.find(al => al.id === s.id)) setApproverLine([...approverLine, s]);
+                      e.target.value = '';
+                    }} className="min-h-[48px] min-w-0 w-full p-3 bg-[var(--input-bg)] rounded-[var(--radius-md)] text-sm font-bold border border-[var(--border)] outline-none shadow-sm">
+                      <option value="">결재자 추가...</option>
+                      {approverCandidates.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name} {s.position || ''} {s.company ? `(${s.company})` : ''}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="space-y-1.5">
+                    <span className="block text-[11px] font-bold text-[var(--toss-gray-4)]">참조자 선택</span>
+                    <select data-testid="approval-cc-select" onChange={e => {
+                      const s = staffs.find((sf) => String(sf.id) === e.target.value);
+                      if (s && !ccLine.find(c => c.id === s.id)) setCcLine(prev => [...prev, { id: s.id, name: s.name, position: s.position }]);
+                      e.target.value = '';
+                    }} className="min-h-[48px] min-w-0 w-full p-3 bg-[var(--input-bg)] rounded-[var(--radius-md)] text-sm font-bold border border-[var(--border)] outline-none shadow-sm">
+                      <option value="">참조자 추가...</option>
+                      {staffs.filter((s) => !ccLine.find(c => c.id === s.id)).map((s) => <option key={s.id} value={s.id}>{s.name} ({s.position})</option>)}
+                    </select>
+                  </label>
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <button
                     type="button"
                     onClick={() => { setTemplateNameInput(''); setShowTemplateModal(true); }}
-                    className="w-full px-3 py-3 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--muted)] whitespace-nowrap sm:w-auto"
+                    className="w-full px-3 py-3 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] text-[12px] font-bold text-[var(--accent)] hover:bg-[var(--muted)]"
                   >
                     💾 템플릿 저장
                   </button>
                   {approverTemplates.length > 0 && (
-                    <div className="relative group col-span-3 justify-self-end">
-                      <button type="button" className="w-full sm:w-auto px-4 py-3 bg-[var(--accent)] border border-[var(--accent)] rounded-[var(--radius-md)] text-[11px] font-bold text-white shadow-sm hover:opacity-95">
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowApproverTemplateMenu((prev) => !prev)}
+                        className="w-full px-4 py-3 bg-[var(--accent)] border border-[var(--accent)] rounded-[var(--radius-md)] text-[12px] font-bold text-white shadow-sm hover:opacity-95"
+                      >
                         📂 템플릿 불러오기 ({approverTemplates.length})
                       </button>
-                      <div className="absolute right-0 top-full mt-1 w-56 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] shadow-sm z-50 hidden group-hover:block">
-                        {approverTemplates.map(tpl => (
-                          <div key={tpl.id} className="flex items-center justify-between px-3 py-2 hover:bg-[var(--muted)] first:rounded-t-[12px] last:rounded-b-[12px]">
-                            <button
-                              type="button"
-                              onClick={() => setApproverLine(tpl.line)}
-                              className="flex-1 text-left text-xs font-semibold text-[var(--foreground)]"
-                            >
-                              {tpl.name}
-                              <span className="text-[10px] text-[var(--toss-gray-3)] ml-1">({tpl.line.length}명)</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const next = approverTemplates.filter(t => t.id !== tpl.id);
-                                setApproverTemplates(next);
-                                if (typeof window !== 'undefined' && user?.id) {
-                                  window.localStorage.setItem(`erp_approveline_templates_${user.id}`, JSON.stringify(next));
-                                }
-                              }}
-                              className="ml-2 text-[var(--toss-gray-3)] hover:text-red-500 text-xs"
-                            >✕</button>
-                          </div>
-                        ))}
-                      </div>
+                      {showApproverTemplateMenu && (
+                        <div className="absolute left-0 right-0 top-full mt-1 overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] shadow-sm z-50 md:left-auto md:right-0 md:w-64">
+                          {approverTemplates.map(tpl => (
+                            <div key={tpl.id} className="flex items-center justify-between px-3 py-2 hover:bg-[var(--muted)] first:rounded-t-[12px] last:rounded-b-[12px]">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setApproverLine(tpl.line);
+                                  setShowApproverTemplateMenu(false);
+                                }}
+                                className="flex-1 text-left text-xs font-semibold text-[var(--foreground)]"
+                              >
+                                {tpl.name}
+                                <span className="text-[10px] text-[var(--toss-gray-3)] ml-1">({tpl.line.length}명)</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = approverTemplates.filter(t => t.id !== tpl.id);
+                                  setApproverTemplates(next);
+                                  if (typeof window !== 'undefined' && user?.id) {
+                                    window.localStorage.setItem(`erp_approveline_templates_${user.id}`, JSON.stringify(next));
+                                  }
+                                  if (next.length === 0) {
+                                    setShowApproverTemplateMenu(false);
+                                  }
+                                }}
+                                className="ml-2 text-[var(--toss-gray-3)] hover:text-red-500 text-xs"
+                              >✕</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-                <div className="flex gap-2 flex-wrap">{approverLine.map((a, i) => <div key={i} className="bg-[var(--card)] px-4 py-2.5 rounded-[var(--radius-md)] border border-[var(--border)] text-[11px] font-bold shadow-sm text-[var(--accent)] flex items-center gap-2">{i + 1}. {a.name} {a.position} <button onClick={() => setApproverLine(approverLine.filter((_, idx) => idx !== i))} className="ml-1 text-[var(--toss-gray-3)] hover:text-red-500">✕</button></div>)}</div>
+                <div className="space-y-2">
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-4)]">결재선</p>
+                  <div className="grid gap-2 sm:grid-cols-2">{approverLine.map((a, i) => <div key={i} className="bg-[var(--card)] px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] text-[12px] font-bold shadow-sm text-[var(--accent)] flex items-center justify-between gap-3"><span className="min-w-0 flex-1 truncate">{i + 1}. {a.name} {a.position}</span><button onClick={() => setApproverLine(approverLine.filter((_, idx) => idx !== i))} className="shrink-0 ml-1 text-[var(--toss-gray-3)] hover:text-red-500">✕</button></div>)}</div>
+                </div>
                 {ccLine.length > 0 && (
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-bold text-[var(--toss-gray-4)]">참조자</p>
+                    <div className="flex gap-2 flex-wrap">
                     {ccLine.map((c, i) => (
                       <div key={i} className="bg-yellow-50 border border-yellow-200 px-3 py-1.5 rounded-[var(--radius-md)] text-[11px] font-bold text-yellow-700 flex items-center gap-1.5">
                         CC {c.name} <button onClick={() => setCcLine(prev => prev.filter((_, idx) => idx !== i))} className="text-yellow-400 hover:text-red-500">✕</button>
                       </div>
                     ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -2358,6 +2595,16 @@ window.onload = () => window.print();
                             </span>
                             <span className={`px-1.5 py-[2px] rounded-md text-[10px] font-semibold ${itemStatus === '승인' ? 'bg-green-100 text-green-600' : itemStatus === '반려' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-500'}`}>{itemStatus}</span>
                             <span className="px-1.5 py-[2px] bg-[var(--toss-blue-light)] rounded-md text-[10px] font-semibold text-[var(--accent)]">{itemSenderCompany}</span>
+                            {isApprovalEditLockedItem(item) && (
+                              <span className="px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600">
+                                수정 잠금
+                              </span>
+                            )}
+                            {itemStatus === '?湲?' && isApprovalOverdue(item) && (
+                              <span className="px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-rose-50 text-rose-600 border border-rose-200">
+                                결재 지연
+                              </span>
+                            )}
                           </div>
                           <h3 className="font-semibold text-[13px] text-[var(--foreground)] tracking-tight line-clamp-2 leading-[1.35]">{itemTitle}</h3>
                           <p className="text-[10px] text-[var(--toss-gray-3)] font-medium mt-0.5 line-clamp-2 leading-[1.35]">기안자: {itemSenderName || '사용자'} | {new Date(itemCreatedAt).toLocaleDateString()}{itemDocNumber && ` | 문서번호: ${itemDocNumber}`}</p>
@@ -2454,6 +2701,8 @@ window.onload = () => window.print();
         const detailStatus = item.status as string | null | undefined;
         const detailMetaData = item.meta_data as Record<string, unknown> | null | undefined;
         const detailCcUsers = normalizeApprovalCcUsers(detailMetaData?.cc_users, staffs);
+        const detailHistory = getApprovalEditHistory(detailMetaData);
+        const detailLocked = isApprovalLocked(detailMetaData);
         const templateMeta = resolveApprovalTemplateMeta(item);
         const templateDesign = resolveApprovalTemplateDesign(item);
         return (
@@ -2498,6 +2747,35 @@ window.onload = () => window.print();
                         {ccUser.position ? ` ${ccUser.position}` : ''}
                       </span>
                     ))}
+                  </div>
+                )}
+                {(detailLocked || detailHistory.length > 0) && (
+                  <div className="mb-4 space-y-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/60 px-3 py-3">
+                    {detailLocked && (
+                      <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-700">
+                        <span className="inline-flex items-center rounded-full bg-slate-200 px-2 py-0.5">수정 잠금</span>
+                        <span>최종 처리된 문서라 수정할 수 없습니다.</span>
+                      </div>
+                    )}
+                    {detailHistory.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-[11px] font-bold text-[var(--foreground)]">문서 이력</p>
+                        <div className="space-y-1.5">
+                          {detailHistory.slice().reverse().map((entry, index) => (
+                            <div key={`${entry.at}-${entry.action}-${index}`} className="rounded-[var(--radius-sm)] bg-[var(--card)] px-2.5 py-2 text-[11px] text-[var(--toss-gray-4)]">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <span className="font-semibold text-[var(--foreground)]">{formatApprovalHistoryActionLabel(entry.action)}</span>
+                                <span>{entry.actor_name || entry.actor_id || '시스템'}</span>
+                                <span>{new Date(entry.at).toLocaleString('ko-KR')}</span>
+                              </div>
+                              {entry.note && (
+                                <p className="mt-1 text-[10px] text-[var(--toss-gray-3)]">{entry.note}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
                 <div className="text-sm text-[var(--toss-gray-4)] whitespace-pre-wrap border-t border-[var(--border)] pt-4">{detailContent || '-'}</div>

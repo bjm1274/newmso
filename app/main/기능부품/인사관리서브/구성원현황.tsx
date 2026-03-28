@@ -56,6 +56,19 @@ function getMonthlyWorkingHours(weeklyHours: number) {
   return Math.max(1, Math.round(MONTHLY_STANDARD_HOURS * (normalizedWeeklyHours / 40) * 10) / 10);
 }
 
+function normalizeResidentNo(value: string | null | undefined) {
+  return String(value || '').replace(/[^0-9]/g, '');
+}
+
+function normalizeStaffName(value: string | null | undefined) {
+  return String(value || '').trim();
+}
+
+function isDuplicateStaffIdentityError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || '');
+  return message.includes('duplicate_staff_identity');
+}
+
 // ESLint가 React 컴포넌트로 인식하도록 함수 이름을
 // 영문 대문자로 시작하는 형태로 지정합니다.
 // default export이므로 외부 import 이름(구성원관리 등)은 그대로 사용 가능합니다.
@@ -345,6 +358,25 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     });
   }, [창상태, 편집모드, 선택사업체, 팀목록캐시]);
 
+  const findDuplicateStaffMember = async (staffName: string, residentNo: string, excludeId?: string | number | null) => {
+    const normalizedName = normalizeStaffName(staffName);
+    const normalizedResident = normalizeResidentNo(residentNo);
+
+    if (!normalizedName || !normalizedResident) return null;
+
+    const { data, error } = await supabase
+      .from('staff_members')
+      .select('id, name, employee_no, resident_no, status')
+      .eq('name', normalizedName);
+
+    if (error) throw error;
+
+    return (data || []).find((staff) => {
+      if (excludeId != null && String(staff.id) === String(excludeId)) return false;
+      return normalizeResidentNo(String(staff.resident_no || '')) === normalizedResident;
+    }) || null;
+  };
+
   const 정보저장 = async () => {
     if (!편집모드 && !canRegisterNewStaff) {
       return toast('신규 직원 등록 권한이 없습니다.', 'error');
@@ -353,13 +385,26 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     try {
       const actor = readClientAuditActor();
       const dateOrNull = (val: string) => (val === '0000-00-00' || val === '0000-00' || !val || val === '') ? null : val;
+      const duplicateStaff = await findDuplicateStaffMember(
+        신규직원.성명,
+        신규직원.주민번호,
+        편집모드 ? 선택된직원ID : null
+      );
+
+      if (duplicateStaff) {
+        return toast(
+          `같은 이름과 주민번호를 가진 직원이 이미 있습니다. (${duplicateStaff.name} / 사번 ${duplicateStaff.employee_no || '-'} / ${duplicateStaff.status || '재직'})`,
+          'warning'
+        );
+      }
+
       const commonData = {
-        name: 신규직원.성명,
+        name: normalizeStaffName(신규직원.성명),
         phone: 신규직원.전화번호,
         company: 신규직원.사업체,
         department: 신규직원.팀 === '' ? null : 신규직원.팀,
         position: 신규직원.직함,
-        resident_no: 신규직원.주민번호,
+        resident_no: 신규직원.주민번호.trim(),
         email: 신규직원.이메일,
         address: 신규직원.주소,
         license: 신규직원.면허사항,
@@ -493,6 +538,10 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       }
       닫기함수(); 새로고침?.();
     } catch (error: unknown) {
+      if (isDuplicateStaffIdentityError(error)) {
+        toast('같은 이름과 주민번호를 가진 직원은 중복 등록할 수 없습니다.', 'error');
+        return;
+      }
       toast('처리 중 오류가 발생했습니다: ' + (((error as Error)?.message ?? String(error)) || 'Unknown error'), 'error');
     }
   };
@@ -638,7 +687,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
   return (
     <div className="flex flex-col h-full app-page">
-      <header className="p-3 md:p-4 border-b border-[var(--border)] bg-[var(--card)] shrink-0 flex items-center justify-between gap-4">
+      <header className="border-b border-[var(--border)] bg-[var(--card)] p-3 md:p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-col gap-1">
           <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tight">
             {보기상태 === '퇴사' ? '퇴사자 현황' : '실시간 구성원 현황'}{' '}
@@ -650,7 +700,40 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
               : '재직 중인 직원만 표시됩니다.'}
           </p>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={staffNameSearchInput}
+              onChange={(event) => setStaffNameSearchInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  setAppliedStaffNameSearch(staffNameSearchInput);
+                }
+              }}
+              placeholder="직원 검색"
+              className="h-10 w-[140px] rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 text-[12px] font-semibold text-[var(--foreground)] outline-none transition focus:border-[var(--accent)] md:w-[170px]"
+            />
+            <button
+              type="button"
+              onClick={() => setAppliedStaffNameSearch(staffNameSearchInput)}
+              className="h-10 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[11px] font-semibold text-[var(--foreground)] transition hover:bg-[var(--muted)]"
+            >
+              검색
+            </button>
+            {(staffNameSearchInput || appliedStaffNameSearch) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setStaffNameSearchInput('');
+                  setAppliedStaffNameSearch('');
+                }}
+                className="h-10 rounded-[var(--radius-md)] border border-[var(--border)] px-3 text-[11px] font-semibold text-[var(--toss-gray-4)] transition hover:bg-[var(--muted)]"
+              >
+                초기화
+              </button>
+            )}
+          </div>
           {essRequests.length > 0 && (
             <button
               onClick={() => setShowEssModal(true)}
@@ -673,51 +756,10 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
             신규 직원 등록
           </button>
         </div>
+        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-        <div className="mb-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end">
-            <div className="flex-1">
-              <label className="mb-1 block text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                직원 이름 검색
-              </label>
-              <input
-                type="text"
-                value={staffNameSearchInput}
-                onChange={(event) => setStaffNameSearchInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    setAppliedStaffNameSearch(staffNameSearchInput);
-                  }
-                }}
-                placeholder="직원 이름 검색"
-                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--accent)]"
-              />
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setAppliedStaffNameSearch(staffNameSearchInput)}
-                className="h-[42px] rounded-[var(--radius-md)] bg-[var(--accent)] px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
-              >
-                검색
-              </button>
-              {(staffNameSearchInput || appliedStaffNameSearch) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStaffNameSearchInput('');
-                    setAppliedStaffNameSearch('');
-                  }}
-                  className="h-[42px] rounded-[var(--radius-md)] border border-[var(--border)] px-4 text-sm font-semibold text-[var(--foreground)] transition hover:bg-[var(--muted)]"
-                >
-                  초기화
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
         {false && (
           <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
           {[

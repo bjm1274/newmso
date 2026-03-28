@@ -175,9 +175,9 @@ function AdminActionCard({
   onValueClick?: () => void;
 }) {
   return (
-    <div className="flex h-[128px] w-full items-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-left sm:w-[calc(50%-0.375rem)] xl:w-[164px]">
+    <div className="flex min-h-[88px] w-full items-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-left sm:min-h-[104px] sm:w-[calc(50%-0.375rem)] xl:min-h-[128px] xl:w-[164px]">
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--card)]/85 text-base shadow-sm ring-1 ring-black/5">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--card)]/85 text-sm shadow-sm ring-1 ring-black/5 sm:h-9 sm:w-9 sm:text-base">
           {icon}
         </div>
         <div className="min-w-0 flex-1">
@@ -188,12 +188,12 @@ function AdminActionCard({
             <button
               type="button"
               onClick={onValueClick}
-              className="mt-1.5 text-left text-xl font-black text-[var(--accent)] transition hover:opacity-80 focus:outline-none"
+              className="mt-1 text-left text-lg font-black text-[var(--accent)] transition hover:opacity-80 focus:outline-none sm:mt-1.5 sm:text-xl"
             >
               {value}
             </button>
           ) : (
-            <p className="mt-1.5 text-xl font-black text-[var(--foreground)]">{value}</p>
+            <p className="mt-1 text-lg font-black text-[var(--foreground)] sm:mt-1.5 sm:text-xl">{value}</p>
           )}
         </div>
       </div>
@@ -328,7 +328,7 @@ function AdminDashboard({
   openApprovalInbox: () => void;
 }) {
   return (
-    <div className="mb-0 flex flex-wrap items-stretch gap-3">
+    <div className="mb-0 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-stretch sm:gap-3">
       <AdminActionCard
         title="결재 대기"
         value={`${pendingApprovals}건`}

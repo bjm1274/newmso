@@ -218,6 +218,32 @@ function getNotificationDisplayKey(row: Record<string, unknown>) {
   return String(row.id || '');
 }
 
+function buildNotificationRowFromPushPreview(payload: {
+  title?: unknown;
+  body?: unknown;
+  tag?: unknown;
+  data?: unknown;
+}) {
+  const metadata =
+    payload?.data && typeof payload.data === 'object'
+      ? (payload.data as Record<string, unknown>)
+      : {};
+  const type =
+    typeof metadata.type === 'string' && metadata.type.trim()
+      ? metadata.type
+      : 'notification';
+  const messageId = String(metadata.message_id || metadata.id || payload?.tag || Date.now());
+
+  return {
+    id: `push-preview-${messageId}`,
+    type,
+    title: toNotificationText(payload?.title, '알림'),
+    body: toNotificationText(payload?.body, ''),
+    metadata,
+    created_at: new Date().toISOString(),
+  } satisfies Record<string, unknown>;
+}
+
 function claimNotificationSlot(key: string, ownerId: string, ttlMs: number) {
   if (typeof window === 'undefined') return true;
   try {
@@ -1081,6 +1107,30 @@ export default function NotificationSystem({
       window.removeEventListener('erp-mock-notification-insert', onMockNotificationInsert as EventListener);
     };
   }, [effectiveUserId, emitIncomingNotification]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      const message = event.data as {
+        type?: string;
+        payload?: {
+          title?: unknown;
+          body?: unknown;
+          tag?: unknown;
+          data?: unknown;
+        };
+      } | null;
+
+      if (!message || message.type !== 'erp-push-preview' || !message.payload) return;
+      emitIncomingNotification(buildNotificationRowFromPushPreview(message.payload));
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+    };
+  }, [emitIncomingNotification]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !effectiveUserId) return;
