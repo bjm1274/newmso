@@ -1,7 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { useDeferredValue, useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { canAccessBoard, isPrivilegedUser } from '@/lib/access-control';
+import { canAccessBoard, isAdminUser, isPrivilegedUser } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import SmartDatePicker from './공통/SmartDatePicker';
@@ -15,6 +15,7 @@ const BOARD_POST_OPTIONAL_COLUMNS = [
   'tags',
   'attachments',
   'likes_count',
+  'scheduled_publish_at',
   'schedule_date',
   'schedule_time',
   'schedule_room',
@@ -30,6 +31,8 @@ const SCHEDULE_META_PREFIX = '[[SCHEDULE_META]]';
 const SCHEDULE_META_SUFFIX = '[[/SCHEDULE_META]]';
 const ATTACHMENTS_META_PREFIX = '[[ATTACHMENTS_META]]';
 const ATTACHMENTS_META_SUFFIX = '[[/ATTACHMENTS_META]]';
+const BOARD_META_PREFIX = '[[BOARD_META]]';
+const BOARD_META_SUFFIX = '[[/BOARD_META]]';
 
 type ScheduleMetaPayload = {
   date?: string;
@@ -42,6 +45,10 @@ type ScheduleMetaPayload = {
   caregiver?: boolean;
   transfusion?: boolean;
   contrast?: boolean;
+};
+
+type BoardMetaPayload = {
+  scheduled_publish_at?: string;
 };
 
 function inferAttachmentType(nameOrUrl: string, explicitType?: string | null) {
@@ -113,6 +120,34 @@ function buildAttachmentMetaContent(visibleContent: string, attachments: Attachm
   }));
 
   return `${normalizedVisibleContent}${normalizedVisibleContent ? '\n' : ''}${ATTACHMENTS_META_PREFIX}${JSON.stringify(attachmentPayload)}${ATTACHMENTS_META_SUFFIX}`;
+}
+
+function normalizeScheduledPublishAtValue(value: unknown) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+
+  const normalized = raw.replace(' ', 'T');
+  const parsed = new Date(normalized);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString();
+  }
+
+  return raw;
+}
+
+function formatScheduledPublishInputValue(value: unknown) {
+  const normalized = normalizeScheduledPublishAtValue(value);
+  if (!normalized) return '';
+
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return '';
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  const hour = String(parsed.getHours()).padStart(2, '0');
+  const minute = String(parsed.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hour}:${minute}`;
 }
 
 function buildScheduleTimeValue(period: string, hour: string, minute: string) {
@@ -189,15 +224,52 @@ function buildScheduleMetaContent(chartNo: string, meta: ScheduleMetaPayload) {
   return `${visibleContent}${visibleContent ? '\n' : ''}${SCHEDULE_META_PREFIX}${JSON.stringify(meta)}${SCHEDULE_META_SUFFIX}`;
 }
 
+function extractBoardMetaFromContent(value: unknown) {
+  const raw = String(value ?? '');
+  const start = raw.indexOf(BOARD_META_PREFIX);
+  const end = raw.indexOf(BOARD_META_SUFFIX);
+  if (start < 0 || end < 0 || end <= start) {
+    return {
+      displayContent: raw.trim(),
+      meta: null as BoardMetaPayload | null,
+      hasEmbeddedMeta: false,
+    };
+  }
+
+  const displayContent = `${raw.slice(0, start)}${raw.slice(end + BOARD_META_SUFFIX.length)}`.trim();
+  const metaText = raw.slice(start + BOARD_META_PREFIX.length, end).trim();
+
+  try {
+    const parsed = JSON.parse(metaText) as BoardMetaPayload;
+    return { displayContent, meta: parsed, hasEmbeddedMeta: true };
+  } catch {
+    return { displayContent, meta: null as BoardMetaPayload | null, hasEmbeddedMeta: true };
+  }
+}
+
+function buildBoardMetaContent(visibleContent: string, meta: BoardMetaPayload | null) {
+  const normalizedVisibleContent = visibleContent.trim();
+  if (!meta || !meta.scheduled_publish_at) return normalizedVisibleContent;
+  return `${normalizedVisibleContent}${normalizedVisibleContent ? '\n' : ''}${BOARD_META_PREFIX}${JSON.stringify(meta)}${BOARD_META_SUFFIX}`;
+}
+
 function normalizeBoardPost<T extends Partial<BoardPost>>(post: T): T {
   if (!post) return post;
   const {
     displayContent: attachmentStrippedContent,
     attachments: embeddedAttachments,
   } = extractAttachmentMetaFromContent(post.content ?? '');
-  const { displayContent, meta, hasEmbeddedMeta } = extractScheduleMetaFromContent(attachmentStrippedContent);
-  const normalizedScheduleDate = normalizeScheduleDateValue(post.schedule_date ?? meta?.date ?? '');
-  const normalizedScheduleTime = normalizeScheduleTimeValue(post.schedule_time ?? meta?.time ?? '');
+  const {
+    displayContent: scheduleStrippedContent,
+    meta: scheduleMeta,
+    hasEmbeddedMeta,
+  } = extractScheduleMetaFromContent(attachmentStrippedContent);
+  const {
+    displayContent,
+    meta: boardMeta,
+  } = extractBoardMetaFromContent(scheduleStrippedContent);
+  const normalizedScheduleDate = normalizeScheduleDateValue(post.schedule_date ?? scheduleMeta?.date ?? '');
+  const normalizedScheduleTime = normalizeScheduleTimeValue(post.schedule_time ?? scheduleMeta?.time ?? '');
   const scheduleMetaLegacyMissing = isScheduleBoardType(post.board_type) && !normalizedScheduleDate && !hasEmbeddedMeta;
   const normalizedAttachments = (Array.isArray(post.attachments) && post.attachments.length > 0 ? post.attachments : embeddedAttachments).map((item) => ({
     ...item,
@@ -208,22 +280,32 @@ function normalizeBoardPost<T extends Partial<BoardPost>>(post: T): T {
     ...post,
     content: displayContent,
     attachments: normalizedAttachments,
+    scheduled_publish_at: normalizeScheduledPublishAtValue(post.scheduled_publish_at ?? boardMeta?.scheduled_publish_at ?? ''),
     schedule_date: normalizedScheduleDate,
     schedule_time: normalizedScheduleTime,
-    schedule_room: String(post.schedule_room ?? meta?.room ?? '').trim(),
-    patient_name: String(post.patient_name ?? meta?.patient ?? '').trim(),
-    surgery_fasting: typeof post.surgery_fasting === 'boolean' ? post.surgery_fasting : Boolean(meta?.fasting),
-    surgery_inpatient: typeof post.surgery_inpatient === 'boolean' ? post.surgery_inpatient : Boolean(meta?.inpatient),
-    surgery_guardian: typeof post.surgery_guardian === 'boolean' ? post.surgery_guardian : Boolean(meta?.guardian),
-    surgery_caregiver: typeof post.surgery_caregiver === 'boolean' ? post.surgery_caregiver : Boolean(meta?.caregiver),
-    surgery_transfusion: typeof post.surgery_transfusion === 'boolean' ? post.surgery_transfusion : Boolean(meta?.transfusion),
+    schedule_room: String(post.schedule_room ?? scheduleMeta?.room ?? '').trim(),
+    patient_name: String(post.patient_name ?? scheduleMeta?.patient ?? '').trim(),
+    surgery_fasting: typeof post.surgery_fasting === 'boolean' ? post.surgery_fasting : Boolean(scheduleMeta?.fasting),
+    surgery_inpatient: typeof post.surgery_inpatient === 'boolean' ? post.surgery_inpatient : Boolean(scheduleMeta?.inpatient),
+    surgery_guardian: typeof post.surgery_guardian === 'boolean' ? post.surgery_guardian : Boolean(scheduleMeta?.guardian),
+    surgery_caregiver: typeof post.surgery_caregiver === 'boolean' ? post.surgery_caregiver : Boolean(scheduleMeta?.caregiver),
+    surgery_transfusion: typeof post.surgery_transfusion === 'boolean' ? post.surgery_transfusion : Boolean(scheduleMeta?.transfusion),
     mri_contrast_required:
       typeof post.mri_contrast_required === 'boolean'
         ? post.mri_contrast_required
-        : Boolean(meta?.contrast),
+        : Boolean(scheduleMeta?.contrast),
     schedule_meta_embedded: hasEmbeddedMeta,
     schedule_meta_legacy_missing: scheduleMetaLegacyMissing,
   };
+}
+
+function isScheduledNoticePending(post: Partial<BoardPost>, nowMs: number) {
+  if (post.board_type !== '공지사항') return false;
+  const scheduledPublishAt = normalizeScheduledPublishAtValue(post.scheduled_publish_at);
+  if (!scheduledPublishAt) return false;
+  const scheduledMs = new Date(scheduledPublishAt).getTime();
+  if (Number.isNaN(scheduledMs)) return false;
+  return scheduledMs > nowMs;
 }
 
 function getMissingBoardPostColumn(error: unknown) {
@@ -291,6 +373,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [tagsInput, setTagsInput] = useState('');
+  const [scheduledPublishAt, setScheduledPublishAt] = useState('');
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
   const [scheduleRoom, setScheduleRoom] = useState('');
@@ -322,6 +405,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const [comments, setComments] = useState<Record<string, Record<string, unknown>[]>>({});
   const [newComment, setNewComment] = useState('');
   const [myLikedPostIds, setMyLikedPostIds] = useState<Set<string>>(new Set());
+  const [noticeVisibilityTick, setNoticeVisibilityTick] = useState(() => Date.now());
 
   // 수술/검사명 프리셋 (Supabase surgery_templates / mri_templates)
   const [surgeryTemplates, setSurgeryTemplates] = useState<Record<string, unknown>[]>([]);
@@ -394,6 +478,21 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     description: '',
   };
   const canCreatePost = canAccessBoard(user, activeBoard, 'write');
+  const canScheduleNoticePost =
+    activeBoard === '공지사항' && (isAdminUser(user) || isPrivilegedUser(user));
+
+  useEffect(() => {
+    if (activeBoard !== '공지사항') return;
+    const timer = window.setInterval(() => setNoticeVisibilityTick(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, [activeBoard]);
+
+  const visiblePosts = useMemo(() => {
+    return posts.filter((post) => {
+      if (!isScheduledNoticePending(post, noticeVisibilityTick)) return true;
+      return canScheduleNoticePost;
+    });
+  }, [posts, noticeVisibilityTick, canScheduleNoticePost]);
   const scheduleCalendarData = useMemo(() => {
     const toKey = (date: Date) =>
       `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -810,8 +909,8 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   };
 
   const selectedPostFromList = useMemo(
-    () => posts.find((p: BoardPost) => p.id === selectedPostId) || null,
-    [posts, selectedPostId]
+    () => visiblePosts.find((p: BoardPost) => p.id === selectedPostId) || null,
+    [visiblePosts, selectedPostId]
   );
   const [selectedPostDetail, setSelectedPostDetail] = useState<BoardPost | null>(null);
   const selectedPost = selectedPostDetail || selectedPostFromList;
@@ -840,10 +939,18 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     }
     (async () => {
       const { data } = await supabase.from('board_posts').select('*').eq('id', selectedPostId).maybeSingle();
-      if (data) setSelectedPostDetail(normalizeBoardPost(data));
+      if (data) {
+        const normalized = normalizeBoardPost(data);
+        if (!isScheduledNoticePending(normalized, noticeVisibilityTick) || canScheduleNoticePost) {
+          setSelectedPostDetail(normalized);
+        } else {
+          setSelectedPostDetail(null);
+          setSelectedPostId(null);
+        }
+      }
       else setSelectedPostDetail(null);
     })();
-  }, [selectedPostId]);
+  }, [selectedPostId, noticeVisibilityTick, canScheduleNoticePost]);
 
   // 상세 보기 열릴 때 조회수 1회만 증가 (selectedPostId 변경 시에만 실행, posts 제외해 중복 방지)
   useEffect(() => {
@@ -994,6 +1101,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     } else {
       setContent(post.content || '');
       setTagsInput((post.tags || []).join(', '));
+      setScheduledPublishAt(formatScheduledPublishInputValue(post.scheduled_publish_at));
       setExistingAttachmentItems(Array.isArray(post.attachments) ? (post.attachments as AttachmentItem[]) : []);
       setAttachmentFiles([]);
     }
@@ -1004,6 +1112,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const resetForm = () => {
     setTitle('');
     setContent('');
+    setScheduledPublishAt('');
     setScheduleDate('');
     setScheduleTime('');
     setSchedulePeriod('');
@@ -1068,6 +1177,9 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     const normalizedSchedulePatient = schedulePatient.trim();
     const normalizedScheduleChartNo = scheduleChartNo.trim();
     const normalizedScheduleDate = normalizeScheduleDateValue(scheduleDate);
+    const normalizedScheduledPublishAt = canScheduleNoticePost
+      ? normalizeScheduledPublishAtValue(scheduledPublishAt)
+      : '';
     const resolvedScheduleTime = buildScheduleTimeValue(schedulePeriod, scheduleHour, scheduleMinute) || scheduleTime;
     const normalizedScheduleTime = normalizeScheduleTimeValue(resolvedScheduleTime);
 
@@ -1080,6 +1192,10 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
     if (isScheduleBoard && (!normalizedScheduleDate || !normalizedScheduleTime)) {
       return toast('필수 정보를 입력해 주세요.', 'warning');
+    }
+
+    if (canScheduleNoticePost && scheduledPublishAt && !normalizedScheduledPublishAt) {
+      return toast('예약 게시 시간을 다시 확인해 주세요.', 'warning');
     }
 
     setLoading(true);
@@ -1128,6 +1244,9 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       }
       if (user?.company_id) {
         postData.company_id = user.company_id;
+      }
+      if (activeBoard === '공지사항') {
+        postData.scheduled_publish_at = normalizedScheduledPublishAt || null;
       }
 
       // 수술/검사 일정의 경우 수술 관련 체크값을 함께 저장
@@ -1178,10 +1297,17 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       if (!isScheduleBoard) {
         const uploadedAttachments = Array.isArray(postData.attachments) ? (postData.attachments as AttachmentItem[]) : [];
         const persistedAttachments = [...existingAttachmentItems, ...uploadedAttachments];
+        let normalizedBoardContent = normalizedContent || '';
         if (persistedAttachments.length > 0) {
           postData.attachments = persistedAttachments;
-          postData.content = buildAttachmentMetaContent(normalizedContent || '', persistedAttachments);
+          normalizedBoardContent = buildAttachmentMetaContent(normalizedBoardContent, persistedAttachments);
         }
+        postData.content = buildBoardMetaContent(
+          normalizedBoardContent,
+          activeBoard === '공지사항' && normalizedScheduledPublishAt
+            ? { scheduled_publish_at: normalizedScheduledPublishAt }
+            : null
+        ) || null;
       }
 
       // 수정 모드인 경우 업데이트
@@ -1236,7 +1362,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         if (isScheduleBoard && normalizedScheduleDate) {
           setCalendarMonth(new Date(`${normalizedScheduleDate}T00:00:00`));
         }
-        if (activeBoard === '공지사항' || activeBoard === '경조사') {
+        const shouldNotifyImmediately =
+          activeBoard === '경조사' ||
+          (activeBoard === '공지사항' &&
+            (!normalizedScheduledPublishAt || new Date(normalizedScheduledPublishAt).getTime() <= Date.now()));
+        if (shouldNotifyImmediately) {
           try {
             const { data: staffList } = await supabase.from('staff_members').select('id');
             const staffIds = (staffList || []).map((s: { id: string }) => s.id).filter(Boolean);
@@ -1562,6 +1692,22 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                         className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20 mb-4"
                       />
                     </div>
+                    {canScheduleNoticePost && (
+                      <div>
+                        <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">
+                          예약 게시 시간
+                        </label>
+                        <input
+                          type="datetime-local"
+                          value={scheduledPublishAt}
+                          onChange={(e) => setScheduledPublishAt(e.target.value)}
+                          className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
+                        />
+                        <p className="mt-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                          비워두면 즉시 게시되고, 지정하면 해당 시각 전까지는 관리자 이상에게만 보입니다.
+                        </p>
+                      </div>
+                    )}
                     <div>
                       <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">내용</label>
                       <textarea
@@ -2039,10 +2185,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
           {/* 게시물 목록 (수술일정·MRI일정은 달력으로만 표시) */}
           {(activeBoard !== '수술일정' && activeBoard !== 'MRI일정') && (
             <div data-testid="board-post-list" className="space-y-2">
-              {posts.length > 0 ? (
-                posts.map((post, idx) => {
-                  const rowNumber = posts.length - idx;
+              {visiblePosts.length > 0 ? (
+                visiblePosts.map((post, idx) => {
+                  const rowNumber = visiblePosts.length - idx;
                   const isSchedule = activeBoard === '수술일정' || activeBoard === 'MRI일정';
+                  const isPendingScheduledNotice = isScheduledNoticePending(post, noticeVisibilityTick);
                   return (
                     <div
                       key={post.id || idx}
@@ -2117,6 +2264,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                             <p className="font-bold text-[var(--foreground)] truncate group-hover:text-[var(--accent)]">
                               {post.title}
                             </p>
+                            {isPendingScheduledNotice && (
+                              <span className="shrink-0 rounded-[var(--radius-md)] bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700">
+                                예약
+                              </span>
+                            )}
                             {(Array.isArray(post.attachments) ? post.attachments : []).length > 0 && (
                               <span className="shrink-0 text-[var(--toss-gray-3)]" title="첨부파일 있음">📎</span>
                             )}
@@ -2130,7 +2282,9 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                             {post.author_name || '익명'}
                           </div>
                           <div className="w-20 md:w-24 text-[11px] font-bold text-[var(--toss-gray-3)] text-center shrink-0">
-                            {new Date(post.created_at ?? '').toLocaleDateString()}
+                            {isPendingScheduledNotice && post.scheduled_publish_at
+                              ? new Date(post.scheduled_publish_at).toLocaleDateString()
+                              : new Date(post.created_at ?? '').toLocaleDateString()}
                           </div>
                           <div className="w-14 text-[11px] font-bold text-[var(--toss-gray-3)] text-center shrink-0">
                             조회 {(post.views as number) ?? 0}
@@ -2177,6 +2331,12 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                       👤 {selectedPost.author_name || '익명'} ·{' '}
                       {new Date(selectedPost.created_at ?? '').toLocaleString('ko-KR')}
                     </p>
+                    {selectedPost.board_type === '공지사항' && selectedPost.scheduled_publish_at && (
+                      <p className="mt-1 text-[11px] md:text-[12px] font-bold text-amber-700">
+                        예약 게시: {new Date(selectedPost.scheduled_publish_at).toLocaleString('ko-KR')}
+                        {isScheduledNoticePending(selectedPost, noticeVisibilityTick) ? ' · 게시 전' : ' · 게시됨'}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
