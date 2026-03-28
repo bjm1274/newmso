@@ -163,7 +163,7 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
             <button onClick={nextMonth} className="p-2 rounded-[var(--radius-md)] hover:bg-[var(--muted)]">▶</button>
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             {/* 달력 */}
             <div className="flex-1">
               <div className="grid grid-cols-7 mb-1">
@@ -196,7 +196,7 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
             </div>
 
             {/* 사이드바 */}
-            <div className="w-44 shrink-0 space-y-3">
+            <div className="w-full sm:w-44 shrink-0 space-y-3 grid grid-cols-2 sm:grid-cols-1 gap-3 sm:gap-0 sm:space-y-3">
               <div className="p-3 bg-[var(--muted)] rounded-[var(--radius-md)]">
                 <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">근무 가능일</p>
                 <p className="text-xl font-bold text-[var(--accent)]">{workingDays}일</p>

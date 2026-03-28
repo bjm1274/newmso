@@ -22,6 +22,11 @@ const NOTICE_ROOM_NAME = '공지메시지';
 const CAN_WRITE_NOTICE_POSITIONS = ['대표', '부장', '팀장', '실장', '병원장', '이사', '본부장', '총무부장', '진료부장', '간호부장'];
 const CHAT_ROOM_KEY = 'erp_chat_last_room';
 const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
+const MOBILE_CHAT_MEDIA_QUERY = '(max-width: 767px), (hover: none) and (pointer: coarse)';
+
+function isMobileChatViewport() {
+  return typeof window !== 'undefined' && window.matchMedia(MOBILE_CHAT_MEDIA_QUERY).matches;
+}
 const CHAT_ROOM_PREFS_KEY = 'erp_chat_room_prefs';
 const CHAT_PINNED_KEY = 'erp_chat_pinned_messages';
 const CHAT_BOOKMARK_KEY = 'erp_chat_bookmarks';
@@ -855,13 +860,15 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     } else {
       scrollRef.current?.scrollIntoView({ behavior, block: 'end' });
     }
-    requestAnimationFrame(() => {
-      composerRef.current?.scrollIntoView({
-        behavior,
-        block: 'end',
-        inline: 'nearest',
+    if (!isMobileChatViewport()) {
+      requestAnimationFrame(() => {
+        composerRef.current?.scrollIntoView({
+          behavior,
+          block: 'end',
+          inline: 'nearest',
+        });
       });
-    });
+    }
     isNearBottomRef.current = true;
     setShowScrollToLatest(false);
   }, []);
@@ -918,11 +925,13 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       scrollRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
     }
 
-    composerRef.current?.scrollIntoView({
-      behavior: 'auto',
-      block: 'end',
-      inline: 'nearest',
-    });
+    if (!isMobileChatViewport()) {
+      composerRef.current?.scrollIntoView({
+        behavior: 'auto',
+        block: 'end',
+        inline: 'nearest',
+      });
+    }
 
     isNearBottomRef.current = true;
     setShowScrollToLatest(false);
@@ -3226,7 +3235,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     setActiveActionMsg(null);
     requestAnimationFrame(() => {
       composerRef.current?.focus();
-      composerRef.current?.scrollIntoView({ block: 'nearest' });
+      if (!isMobileChatViewport()) {
+        composerRef.current?.scrollIntoView({ block: 'nearest' });
+      }
     });
   }, []);
 
@@ -3850,7 +3861,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                   <p className={`mt-1 max-w-[200px] md:max-w-[240px] truncate text-[10px] font-semibold ${isMine ? 'text-white/85' : 'text-[var(--toss-gray-4)]'}`}>{attachmentName}</p>
                                 </div>
                               ) : (
-                                <div className={`p-3 rounded-[var(--radius-md)] border ${isMine ? 'bg-white/95 border-white/40 text-slate-900' : 'bg-[var(--toss-gray-0)] border-[var(--border)] text-[var(--foreground)]'} flex items-start gap-3 shadow-sm min-w-[200px]`}>
+                                <div className={`p-3 rounded-[var(--radius-md)] border ${isMine ? 'bg-white/95 border-white/40 text-slate-900' : 'bg-[var(--toss-gray-0)] border-[var(--border)] text-[var(--foreground)]'} flex items-start gap-3 shadow-sm min-w-0 sm:min-w-[200px]`}>
                                   <div className="text-3xl">📎</div>
                                   <div className="flex-1 min-w-0 pt-0.5">
                                     <p className="font-bold text-[12px] truncate mb-1 text-[var(--foreground)]">{attachmentName}</p>
@@ -3968,7 +3979,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
         <div
           data-testid="chat-upload-dropzone"
-          className={`relative z-10 shrink-0 bg-[var(--card)] px-1.5 py-1 md:px-2.5 md:py-1.5 transition-all ${isDragging ? 'border-t-2 border-[var(--accent)] border-dashed bg-blue-50 dark:bg-blue-900/20' : 'border-t border-[var(--border)]'}`}
+          className={`relative z-10 shrink-0 bg-[var(--card)] px-1.5 py-1 pb-[calc(env(safe-area-inset-bottom)+6px)] md:px-2.5 md:py-1.5 md:pb-1.5 transition-all ${isDragging ? 'border-t-2 border-[var(--accent)] border-dashed bg-blue-50 dark:bg-blue-900/20' : 'border-t border-[var(--border)]'}`}
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
           onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
           onDrop={async (e) => {
@@ -4037,7 +4048,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             ) : null}
           </div>
 
-          <div className={`flex items-center md:items-end gap-1.5 rounded-[var(--radius-lg)] border px-1.5 py-1.5 md:gap-2 md:px-2.5 md:py-2 transition-all ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
+          <div className={`flex items-end gap-1.5 rounded-[var(--radius-lg)] border px-1.5 py-1.5 md:gap-2 md:px-2.5 md:py-2 transition-all ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
             ? 'bg-[var(--muted)] border-[var(--border)] opacity-80 pointer-events-none'
             : 'bg-[var(--muted)] border-[var(--border)] focus-within:bg-[var(--card)] focus-within:ring-2 focus-within:ring-[var(--accent)]/50'
             }`}>
@@ -4046,16 +4057,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               onClick={() => fileInputRef.current?.click()}
               disabled={fileUploading}
               title="파일 첨부"
-              className="flex h-7 w-7 items-center justify-center text-[var(--toss-gray-3)] transition-colors hover:text-[var(--accent)] disabled:opacity-50 md:h-8 md:w-8"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] transition-colors hover:text-[var(--accent)] disabled:opacity-50 md:h-8 md:w-8"
             >
-              {fileUploading ? <span className="animate-pulse text-xs">...</span> : '첨부'}
+              {fileUploading ? <span className="animate-pulse text-xs">...</span> : <span className="text-[11px] font-bold md:text-xs">첨부</span>}
             </button>
             <div className="relative flex-1">
               <textarea
                 ref={composerRef}
                 data-testid="chat-message-input"
                 rows={1}
-                className="block min-h-[22px] w-full min-w-0 resize-none bg-transparent px-1 py-0.5 text-[14px] font-bold leading-5 outline-none md:px-2 md:py-1 md:text-sm"
+                className="block min-h-[32px] w-full min-w-0 resize-none bg-transparent px-1 py-1 text-[16px] font-bold leading-6 outline-none md:min-h-[22px] md:px-2 md:py-1 md:text-sm md:leading-5"
+                style={{ fontSize: '16px' }}
                 placeholder={selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice ? "부서장 이상만 공지 작성 가능" : "메시지를 입력하세요... (@이름 멘션 가능)"}
                 value={inputMsg}
                 onChange={e => {
@@ -4067,9 +4079,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   if (e.key !== 'Enter') return;
                   if (e.nativeEvent.isComposing) return;
 
-                  const isMobileComposer =
-                    typeof window !== 'undefined' &&
-                    window.matchMedia('(max-width: 767px), (hover: none) and (pointer: coarse)').matches;
+                  const isMobileComposer = isMobileChatViewport();
 
                   if (isMobileComposer || e.shiftKey) {
                     return;
@@ -4109,7 +4119,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             <button
               data-testid="chat-send-button"
               onClick={() => handleSendMessage()}
-              className="flex h-7 min-w-[48px] items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)] px-2 text-[12px] font-bold text-white shadow-sm transition-all hover:scale-105 active:scale-95 md:h-8 md:min-w-[56px] md:px-3 md:text-sm"
+              className="flex h-8 min-w-[56px] shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)] px-2.5 text-[13px] font-bold text-white shadow-sm transition-all hover:scale-105 active:scale-95 md:h-8 md:min-w-[56px] md:px-3 md:text-sm"
             >
               전송
             </button>
@@ -4325,7 +4335,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           <>
             <div className="absolute inset-0 bg-black/10 z-30 animate-in fade-in duration-200" onClick={() => { setActiveActionMsg(null); }} aria-hidden="true" />
 
-            <div className="md:hidden absolute left-0 right-0 bottom-0 bg-[var(--card)] dark:bg-zinc-900 rounded-t-[24px] shadow-sm z-40 flex flex-col animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-hidden">
+            <div className="md:hidden absolute left-0 right-0 bottom-0 bg-[var(--card)] dark:bg-zinc-900 rounded-t-[24px] shadow-sm z-40 flex flex-col animate-in slide-in-from-bottom duration-300 max-h-[70vh] overflow-hidden">
               <div className="w-12 h-1.5 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-full mx-auto my-3 shrink-0" />
               <div className="px-4 pb-8 space-y-4 overflow-y-auto">
                 <div className="flex justify-between items-center bg-[var(--tab-bg)] dark:bg-zinc-800/50 p-2 rounded-[var(--radius-xl)] gap-1 px-4">

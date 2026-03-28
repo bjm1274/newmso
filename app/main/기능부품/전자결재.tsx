@@ -752,6 +752,55 @@ window.onload = () => window.print();
   const resolveCurrentApproverId = useCallback((item: Record<string, unknown>): string | null => {
     return resolveEffectiveApproverId(resolveStoredCurrentApproverId(item));
   }, [resolveEffectiveApproverId, resolveStoredCurrentApproverId]);
+  const resolveApprovalDelegateSnapshot = useCallback((item: Record<string, unknown>) => {
+    const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+    const originalApproverId = String(metaData?.delegated_from_id || resolveStoredCurrentApproverId(item) || '');
+    const effectiveApproverId = String(metaData?.delegated_to_id || resolveCurrentApproverId(item) || '');
+    if (!originalApproverId || !effectiveApproverId || originalApproverId === effectiveApproverId) return null;
+    const originalApprover = approvalStaffMap.get(originalApproverId);
+    const effectiveApprover = approvalStaffMap.get(effectiveApproverId);
+    return {
+      originalApproverId,
+      effectiveApproverId,
+      originalApproverName: originalApprover?.name || originalApproverId,
+      effectiveApproverName: effectiveApprover?.name || effectiveApproverId,
+      delegatedAt: String(metaData?.delegated_at || ''),
+    };
+  }, [approvalStaffMap, resolveCurrentApproverId, resolveStoredCurrentApproverId]);
+  const resolveApprovalDelaySnapshot = useCallback((item: Record<string, unknown>) => {
+    const originalApproverId = resolveStoredCurrentApproverId(item);
+    const thresholdHours = resolveApprovalDelayHoursForStaff(originalApproverId);
+    const createdAt = String(item?.created_at || '');
+    const createdDate = createdAt ? new Date(createdAt) : null;
+    const elapsedHours =
+      createdDate && !Number.isNaN(createdDate.getTime())
+        ? Math.max(0, Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60)))
+        : 0;
+    const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+    const tracker =
+      metaData?.delay_notification && typeof metaData.delay_notification === 'object'
+        ? (metaData.delay_notification as Record<string, unknown>)
+        : null;
+    return {
+      thresholdHours,
+      elapsedHours,
+      overdue: String(item?.status || '').trim() === '대기' && isApprovalOverdue(item, thresholdHours),
+      lastNotifiedAt: String(tracker?.last_notified_at || ''),
+      notificationCount: Math.max(0, Number(tracker?.count) || 0),
+    };
+  }, [resolveApprovalDelayHoursForStaff, resolveStoredCurrentApproverId]);
+  const resolveApprovalLockSnapshot = useCallback((item: Record<string, unknown>) => {
+    const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+    if (!isApprovalLocked(metaData)) return null;
+    const lockedById = String(metaData?.edit_locked_by || '');
+    const lockedByStaff = lockedById ? approvalStaffMap.get(lockedById) : null;
+    return {
+      lockedAt: String(metaData?.edit_locked_at || ''),
+      lockedById,
+      lockedByName: lockedByStaff?.name || lockedById || '시스템',
+      revision: getApprovalRevision(metaData),
+    };
+  }, [approvalStaffMap]);
   const insertApprovalWithLegacyFallback = useCallback(async (row: Record<string, unknown>) => {
     let candidateRow = { ...row };
 
@@ -1962,7 +2011,7 @@ window.onload = () => window.print();
     });
     const rejectResult = await supabase
       .from('approvals')
-      .update({ status: '諛섎젮', meta_data: { ...nextRejectedMetaData, reject_reason: reason } })
+      .update({ status: '반려', meta_data: { ...nextRejectedMetaData, reject_reason: reason } })
       .eq('id', item.id);
     if (!rejectResult.error) {
       toast("諛섎젮 泥섎━?섏뿀?듬땲??", 'success');
@@ -2557,7 +2606,7 @@ window.onload = () => window.print();
                   <select
                     value={approvalDocumentFilter}
                     onChange={(e) => setApprovalDocumentFilter(e.target.value)}
-                    className="h-10 min-w-[128px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                    className="h-10 w-full sm:w-auto sm:min-w-[128px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
                     aria-label="문서 종류 선택"
                     data-testid="approval-document-filter"
                   >
@@ -2570,7 +2619,7 @@ window.onload = () => window.print();
                     type="search"
                     value={approvalKeyword}
                     onChange={(e) => setApprovalKeyword(e.target.value)}
-                    className="h-10 min-w-[180px] flex-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                    className="h-10 w-full sm:w-auto sm:min-w-[180px] flex-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
                     aria-label={viewMode === '참조 문서함' ? '참조 문서 검색' : '문서 검색'}
                     placeholder={viewMode === '참조 문서함' ? '참조 문서 검색' : '문서 검색'}
                     data-testid="approval-keyword-filter"
@@ -2579,7 +2628,7 @@ window.onload = () => window.print();
                     type="date"
                     value={approvalDateFrom}
                     onChange={(e) => setApprovalDateFrom(e.target.value)}
-                    className="h-10 min-w-[138px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                    className="h-10 w-full sm:w-auto sm:min-w-[138px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
                     aria-label="조회 시작일"
                   />
                   <span className="text-sm font-semibold text-[var(--toss-gray-3)]">~</span>
@@ -2587,7 +2636,7 @@ window.onload = () => window.print();
                     type="date"
                     value={approvalDateTo}
                     onChange={(e) => setApprovalDateTo(e.target.value)}
-                    className="h-10 min-w-[138px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                    className="h-10 w-full sm:w-auto sm:min-w-[138px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
                     aria-label="조회 종료일"
                   />
                   {(approvalDocumentFilter !== ALL_DOCUMENT_FILTER || approvalKeyword || approvalDateFrom || approvalDateTo) && (
@@ -2709,6 +2758,9 @@ window.onload = () => window.print();
                   const templateDesign = resolveApprovalTemplateDesign(item);
                   const itemMetaData = item.meta_data as Record<string, unknown> | null | undefined;
                   const cardCcUsers = normalizeApprovalCcUsers(itemMetaData?.cc_users, staffs);
+                  const delegateSnapshot = resolveApprovalDelegateSnapshot(item);
+                  const delaySnapshot = resolveApprovalDelaySnapshot(item);
+                  const lockSnapshot = resolveApprovalLockSnapshot(item);
                   return (
                     <div
                       key={itemId}
@@ -2785,6 +2837,26 @@ window.onload = () => window.print();
                         </div>
                       </div>
 
+                      {(delegateSnapshot.delegatedToName || delaySnapshot.notificationCount > 0 || (lockSnapshot.revision ?? 1) > 1) && (
+                        <div className="flex flex-wrap gap-1 px-8 pb-1 text-[10px] font-semibold">
+                          {delegateSnapshot.delegatedToName && (
+                            <span className="inline-flex items-center rounded-md border border-indigo-200 bg-indigo-50 px-1.5 py-[2px] text-indigo-700">
+                              {delegateSnapshot.delegatedFromName ? `${delegateSnapshot.delegatedFromName} → ${delegateSnapshot.delegatedToName}` : `대결 ${delegateSnapshot.delegatedToName}`}
+                            </span>
+                          )}
+                          {delaySnapshot.notificationCount > 0 && (
+                            <span className="inline-flex items-center rounded-md border border-rose-200 bg-rose-50 px-1.5 py-[2px] text-rose-600">
+                              지연 알림 {delaySnapshot.notificationCount}회
+                            </span>
+                          )}
+                          {(lockSnapshot.revision ?? 1) > 1 && (
+                            <span className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-[2px] text-slate-600">
+                              Rev.{lockSnapshot.revision}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       <div className="flex flex-wrap gap-1 shrink-0 pt-0" onClick={(e) => e.stopPropagation()}>
                         <button type="button" onClick={() => {
                           openApprovalPrintView(item);
@@ -2856,6 +2928,9 @@ window.onload = () => window.print();
         const detailCcUsers = normalizeApprovalCcUsers(detailMetaData?.cc_users, staffs);
         const detailHistory = getApprovalEditHistory(detailMetaData);
         const detailLocked = isApprovalLocked(detailMetaData);
+        const detailDelegateSnapshot = resolveApprovalDelegateSnapshot(item);
+        const detailDelaySnapshot = resolveApprovalDelaySnapshot(item);
+        const detailLockSnapshot = resolveApprovalLockSnapshot(item);
         const templateMeta = resolveApprovalTemplateMeta(item);
         const templateDesign = resolveApprovalTemplateDesign(item);
         return (

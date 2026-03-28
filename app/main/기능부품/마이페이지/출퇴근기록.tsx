@@ -484,7 +484,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     <div data-testid="commute-record-view" className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-2xl px-4 py-5 sm:p-5 h-full flex flex-col space-y-7">
 
       {/* 실시간 상태 카드 */}
-      <div className="flex justify-between items-center gap-3 bg-[var(--foreground)] px-4 py-4 sm:px-5 sm:py-5 rounded-[var(--radius-lg)] text-white shadow-sm relative overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 bg-[var(--foreground)] px-4 py-4 sm:px-5 sm:py-5 rounded-[var(--radius-lg)] text-white shadow-sm relative overflow-hidden">
         {/* 배경 장식 */}
         <div className="absolute -right-10 -top-10 w-40 h-40 bg-[var(--card)] opacity-5 rounded-full blur-3xl"></div>
 
@@ -505,13 +505,13 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
           </div>
         </div>
 
-        <div className="flex gap-4 z-10 shrink-0">
+        <div className="flex gap-3 z-10 shrink-0">
           {!todayLog && (
             <button
               data-testid="commute-check-in-button"
               onClick={() => handleCommute('in')}
               disabled={isProcessing}
-              className="px-10 py-5 bg-[var(--accent)] hover:opacity-90 rounded-[var(--radius-md)] font-semibold text-lg shadow-sm active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-5 py-3 sm:px-10 sm:py-5 w-full sm:w-auto bg-[var(--accent)] hover:opacity-90 rounded-[var(--radius-md)] font-semibold text-base sm:text-lg shadow-sm active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span>{isProcessing ? '위치 확인 처리 중...' : '출근하기 ☀️'}</span>
               <span className="text-[11px] font-normal opacity-70">GPS 인증 필요</span>
@@ -522,7 +522,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
               data-testid="commute-check-out-button"
               onClick={() => handleCommute('out')}
               disabled={isProcessing}
-              className="px-10 py-5 bg-red-600 hover:bg-red-500 rounded-[var(--radius-md)] font-semibold text-lg shadow-sm active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-5 py-3 sm:px-10 sm:py-5 w-full sm:w-auto bg-red-600 hover:bg-red-500 rounded-[var(--radius-md)] font-semibold text-base sm:text-lg shadow-sm active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span>{isProcessing ? '위치 확인 처리 중...' : '퇴근하기 🌙'}</span>
               <span className="text-[11px] font-normal opacity-70">GPS 인증 필요</span>
@@ -532,7 +532,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       </div>
 
       {/* 통계 */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <StatItem label="이번 달 근무" value={`${logs.length}일`} />
         <StatItem label="지각" value={`${logs.filter(l => l.status === '지각').length}회`} isWarning />
         <StatItem label="정상 출근" value={`${logs.filter(l => l.status === '정상').length}회`} isSuccess />
@@ -543,9 +543,9 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">근무 히스토리</h3>
           <div className="flex gap-2">
-            <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} className="p-2 border rounded-[var(--radius-md)] hover:bg-[var(--muted)]">◀</button>
+            <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center border rounded-[var(--radius-md)] hover:bg-[var(--muted)]">◀</button>
             <span className="font-semibold px-2">{currentMonth.getFullYear()}. {currentMonth.getMonth() + 1}</span>
-            <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} className="p-2 border rounded-[var(--radius-md)] hover:bg-[var(--muted)]">▶</button>
+            <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center border rounded-[var(--radius-md)] hover:bg-[var(--muted)]">▶</button>
           </div>
         </div>
 
@@ -555,7 +555,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
             return (
               <div
                 key={log.id}
-                className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 bg-[var(--muted)] rounded-[var(--radius-md)] border border-transparent hover:border-[var(--border)] transition-all"
+                className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 sm:gap-4 p-3 sm:p-5 bg-[var(--muted)] rounded-[var(--radius-md)] border border-transparent hover:border-[var(--border)] transition-all"
               >
                 <div className="flex items-center gap-4">
                   <div

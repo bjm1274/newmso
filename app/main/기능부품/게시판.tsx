@@ -44,6 +44,21 @@ type ScheduleMetaPayload = {
   contrast?: boolean;
 };
 
+function inferAttachmentType(nameOrUrl: string, explicitType?: string | null) {
+  const normalizedExplicitType = String(explicitType || '').trim().toLowerCase();
+  if (normalizedExplicitType === 'image' || normalizedExplicitType === 'video' || normalizedExplicitType === 'file') {
+    return normalizedExplicitType;
+  }
+
+  const raw = String(nameOrUrl || '').trim().toLowerCase();
+  const clean = raw.split('?')[0];
+  const ext = clean.includes('.') ? clean.slice(clean.lastIndexOf('.') + 1) : '';
+
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic', 'heif'].includes(ext)) return 'image';
+  if (['mp4', 'mov', 'avi', 'wmv', 'webm', 'mkv', 'm4v'].includes(ext)) return 'video';
+  return 'file';
+}
+
 function extractAttachmentMetaFromContent(value: unknown) {
   const raw = String(value ?? '');
   const start = raw.indexOf(ATTACHMENTS_META_PREFIX);
@@ -66,7 +81,10 @@ function extractAttachmentMetaFromContent(value: unknown) {
           .map((item) => ({
             name: String((item as AttachmentItem)?.name ?? '').trim(),
             url: String((item as AttachmentItem)?.url ?? '').trim(),
-            type: String((item as AttachmentItem)?.type ?? 'file').trim() || 'file',
+            type: inferAttachmentType(
+              String((item as AttachmentItem)?.name ?? (item as AttachmentItem)?.url ?? ''),
+              String((item as AttachmentItem)?.type ?? '')
+            ),
           }))
           .filter((item) => item.name && item.url)
       : [];
@@ -91,7 +109,7 @@ function buildAttachmentMetaContent(visibleContent: string, attachments: Attachm
   const attachmentPayload = attachments.map((item) => ({
     name: String(item.name || '').trim(),
     url: String(item.url || '').trim(),
-    type: String(item.type || 'file').trim() || 'file',
+    type: inferAttachmentType(String(item.name || item.url || ''), String(item.type || '')),
   }));
 
   return `${normalizedVisibleContent}${normalizedVisibleContent ? '\n' : ''}${ATTACHMENTS_META_PREFIX}${JSON.stringify(attachmentPayload)}${ATTACHMENTS_META_SUFFIX}`;
@@ -181,7 +199,10 @@ function normalizeBoardPost<T extends Partial<BoardPost>>(post: T): T {
   const normalizedScheduleDate = normalizeScheduleDateValue(post.schedule_date ?? meta?.date ?? '');
   const normalizedScheduleTime = normalizeScheduleTimeValue(post.schedule_time ?? meta?.time ?? '');
   const scheduleMetaLegacyMissing = isScheduleBoardType(post.board_type) && !normalizedScheduleDate && !hasEmbeddedMeta;
-  const normalizedAttachments = Array.isArray(post.attachments) && post.attachments.length > 0 ? post.attachments : embeddedAttachments;
+  const normalizedAttachments = (Array.isArray(post.attachments) && post.attachments.length > 0 ? post.attachments : embeddedAttachments).map((item) => ({
+    ...item,
+    type: inferAttachmentType(String(item?.name || item?.url || ''), String(item?.type || '')),
+  }));
 
   return {
     ...post,
@@ -286,6 +307,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const deferredSearchKeyword = useDeferredValue(searchKeyword);
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
+  const [existingAttachmentItems, setExistingAttachmentItems] = useState<AttachmentItem[]>([]);
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [hasPoll, setHasPoll] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
@@ -972,7 +994,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     } else {
       setContent(post.content || '');
       setTagsInput((post.tags || []).join(', '));
-      // 첨부파일 복구 로직 (단순 파일 목록 복구는 File 객체가 아니므로 어려움, 기존 유지)
+      setExistingAttachmentItems(Array.isArray(post.attachments) ? (post.attachments as AttachmentItem[]) : []);
       setAttachmentFiles([]);
     }
     setShowNewPost(true);
@@ -998,6 +1020,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     setScheduleContrastRequired(false);
     setScheduleSide('');
     setAttachmentFiles([]);
+    setExistingAttachmentItems([]);
     setTagsInput('');
     setIsAnonymous(false);
     setHasPoll(false);
@@ -1051,7 +1074,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     if (!normalizedTitle) return toast('제목을 입력해주세요.', 'warning');
     if (isScheduleBoard) {
       if (!scheduleDate || !resolvedScheduleTime) return toast('필수 정보를 입력해주세요.', 'warning');
-    } else if (!normalizedContent && attachmentFiles.length === 0) {
+    } else if (!normalizedContent && attachmentFiles.length === 0 && existingAttachmentItems.length === 0) {
       return toast('내용을 입력해주세요.', 'warning');
     }
 
@@ -1063,12 +1086,6 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     try {
       const tags = tagsInput ? tagsInput.split(',').map((t) => t.trim()).filter(Boolean) : [];
       const useAnonymous = activeBoard === '익명소리함' || isAnonymous;
-      const currentEditingPost = editingPostId
-        ? posts.find((post) => String(post.id) === String(editingPostId)) ?? selectedPostDetail
-        : null;
-      const existingAttachments = Array.isArray(currentEditingPost?.attachments)
-        ? (currentEditingPost.attachments as AttachmentItem[])
-        : [];
       const postData: Partial<BoardPost> & Record<string, unknown> = {
         board_type: activeBoard,
         title: normalizedTitle,
@@ -1159,9 +1176,8 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       }
 
       if (!isScheduleBoard) {
-        const persistedAttachments = (Array.isArray(postData.attachments) ? (postData.attachments as AttachmentItem[]) : []).length > 0
-          ? (postData.attachments as AttachmentItem[])
-          : existingAttachments;
+        const uploadedAttachments = Array.isArray(postData.attachments) ? (postData.attachments as AttachmentItem[]) : [];
+        const persistedAttachments = [...existingAttachmentItems, ...uploadedAttachments];
         if (persistedAttachments.length > 0) {
           postData.attachments = persistedAttachments;
           postData.content = buildAttachmentMetaContent(normalizedContent || '', persistedAttachments);
@@ -1630,8 +1646,43 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                         }}
                         className="w-full text-sm font-bold text-[var(--toss-gray-4)] file:mr-3 file:py-2 file:px-4 file:rounded-[var(--radius-md)] file:border-0 file:bg-[var(--toss-blue-light)] file:text-[var(--accent)] file:font-bold"
                       />
-                      {attachmentFiles.length > 0 && (
+                      {(existingAttachmentItems.length > 0 || attachmentFiles.length > 0) && (
                         <div className="mt-3 space-y-3">
+                          {existingAttachmentItems.length > 0 && (
+                            <div className="space-y-2">
+                              <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                                기존 첨부파일 {existingAttachmentItems.length}개
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {existingAttachmentItems.map((att, i) => (
+                                  <div
+                                    key={`${att.url}-${i}`}
+                                    className="flex max-w-full items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2"
+                                  >
+                                    <a
+                                      href={att.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="max-w-[240px] truncate text-xs font-bold text-[var(--accent)] hover:underline"
+                                      title={att.name}
+                                    >
+                                      {att.type === 'image' ? '🖼️ ' : att.type === 'video' ? '🎬 ' : '📎 '}
+                                      {att.name}
+                                    </a>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setExistingAttachmentItems((prev) => prev.filter((_, idx) => idx !== i))
+                                      }
+                                      className="shrink-0 rounded border border-red-200 px-2 py-1 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                                    >
+                                      삭제
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                           <div className="flex flex-wrap gap-3">
                             {attachmentFiles.map((f, i) => {
                               const isImg = f.type.startsWith('image/');
@@ -1709,12 +1760,12 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
               }}
             >
               <div
-                className="w-full max-w-7xl max-h-[94vh] bg-[var(--card)] rounded-[var(--radius-xl)] shadow-sm border border-[var(--border)] p-4 md:p-4 flex flex-col md:flex-row gap-4 md:gap-4"
+                className="w-full max-w-[calc(100vw-24px)] md:max-w-7xl max-h-[94vh] bg-[var(--card)] rounded-[var(--radius-xl)] shadow-sm border border-[var(--border)] p-3 md:p-4 flex flex-col md:flex-row gap-3 md:gap-4"
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* 왼쪽: 생성된 전신 이미지 + 부위 클릭 (이미지와 동일 비율 박스 안에서 좌표 고정) */}
-                <div className="flex-1 flex items-center justify-center min-h-[400px] max-h-[640px] bg-[#020617] rounded-[var(--radius-xl)] border border-slate-800 overflow-hidden p-2">
-                  <div className="relative w-full max-w-[400px] aspect-[2/3] max-h-[600px] shrink-0 -translate-y-6">
+                <div className="flex-1 flex items-center justify-center min-h-[280px] md:min-h-[400px] max-h-[50vh] md:max-h-[640px] bg-[#020617] rounded-[var(--radius-xl)] border border-slate-800 overflow-hidden p-2">
+                  <div className="relative w-full max-w-[280px] md:max-w-[400px] aspect-[2/3] max-h-[45vh] md:max-h-[600px] shrink-0 -translate-y-6">
                     <img
                       src="/human-body-mri.png"
                       alt="사람 전신 모형"
@@ -2113,7 +2164,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
           {/* 게시글 상세 보기 모달 */}
           {selectedPost && (
             <div data-testid="board-post-detail-overlay" className="fixed inset-0 z-[110] flex items-end md:items-center justify-center bg-black/40 p-0 md:p-5">
-              <div data-testid="board-post-detail" className="w-full max-w-4xl max-h-[90dvh] overflow-y-auto bg-[var(--card)] border-0 md:border border-[var(--border)] rounded-t-[24px] md:rounded-[var(--radius-xl)] shadow-sm p-4 md:p-4 pb-8 space-y-5 text-[13px] md:text-[14px] safe-area-pb">
+              <div data-testid="board-post-detail" className="w-full max-w-4xl max-h-[90dvh] overflow-y-auto bg-[var(--card)] border-0 md:border border-[var(--border)] rounded-t-[24px] md:rounded-[var(--radius-xl)] shadow-sm p-3 md:p-4 pb-8 space-y-4 md:space-y-5 text-[13px] md:text-[14px] safe-area-pb">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <p className="text-[11px] md:text-[12px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">
