@@ -16,6 +16,8 @@ import {
   isApprovalOverdue,
   lockApprovalMeta,
   markDelayNotification,
+  parseApprovalDelayHours,
+  resolveApprovalDelegateConfig,
   shouldSendDelayNotification,
 } from '@/lib/approval-workflow';
 import { isMissingColumnError, withMissingColumnFallback } from '@/lib/supabase-compat';
@@ -709,11 +711,47 @@ window.onload = () => window.print();
     if (item?.current_approver_id != null) return [String(item.current_approver_id)];
     return [];
   }, [normalizeApprovalLineIds]);
-  const resolveCurrentApproverId = useCallback((item: Record<string, unknown>): string | null => {
-    if (item?.current_approver_id != null) return String(item.current_approver_id);
+  const approvalStaffMap = useMemo(
+    () => new Map((Array.isArray(staffs) ? staffs : []).map((staff) => [String(staff.id), staff])),
+    [staffs]
+  );
+  const resolveApprovalDelayHoursForStaff = useCallback((staffId: string | null | undefined) => {
+    if (!staffId) return 24;
+    const matchedStaff = approvalStaffMap.get(String(staffId));
+    const permissions =
+      matchedStaff?.permissions && typeof matchedStaff.permissions === 'object'
+        ? (matchedStaff.permissions as Record<string, unknown>)
+        : null;
+    return parseApprovalDelayHours(permissions?.approval_delay_hours, 24);
+  }, [approvalStaffMap]);
+  const resolveEffectiveApproverId = useCallback((approverId: string | null | undefined) => {
+    if (!approverId) return null;
+    const matchedStaff = approvalStaffMap.get(String(approverId));
+    const delegateConfig = resolveApprovalDelegateConfig(
+      matchedStaff && typeof matchedStaff === 'object' ? (matchedStaff as unknown as Record<string, unknown>) : null
+    );
+    if (delegateConfig.active && delegateConfig.delegateId) {
+      return String(delegateConfig.delegateId);
+    }
+    return String(approverId);
+  }, [approvalStaffMap]);
+  const resolveStoredCurrentApproverId = useCallback((item: Record<string, unknown>): string | null => {
+    const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+    if (item?.current_approver_id != null) {
+      const currentApproverId = String(item.current_approver_id);
+      const delegatedToId = String(metaData?.delegated_to_id || '');
+      const delegatedFromId = String(metaData?.delegated_from_id || '');
+      if (delegatedToId && delegatedToId === currentApproverId && delegatedFromId) {
+        return delegatedFromId;
+      }
+      return currentApproverId;
+    }
     const lineIds = resolveApprovalLineIds(item);
     return lineIds[0] ?? null;
   }, [resolveApprovalLineIds]);
+  const resolveCurrentApproverId = useCallback((item: Record<string, unknown>): string | null => {
+    return resolveEffectiveApproverId(resolveStoredCurrentApproverId(item));
+  }, [resolveEffectiveApproverId, resolveStoredCurrentApproverId]);
   const insertApprovalWithLegacyFallback = useCallback(async (row: Record<string, unknown>) => {
     let candidateRow = { ...row };
 
@@ -1059,6 +1097,107 @@ window.onload = () => window.print();
       effectiveUpdates = legacyUpdates;
     }
   }, [normalizeApprovalLineIds]);
+  const syncDelegatedApprovalDelayNotifications = useCallback(async (items: Record<string, unknown>[]) => {
+    const overdueItems = items.filter((item) => {
+      const originalApproverId = resolveStoredCurrentApproverId(item);
+      const currentApproverId = resolveEffectiveApproverId(originalApproverId);
+      if (!currentApproverId) return false;
+      const delayHours = resolveApprovalDelayHoursForStaff(originalApproverId);
+      if (!isApprovalOverdue(item, delayHours)) return false;
+      const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+      return shouldSendDelayNotification(metaData, currentApproverId, delayHours);
+    });
+
+    if (overdueItems.length === 0) return;
+
+    for (const item of overdueItems) {
+      const originalApproverId = resolveStoredCurrentApproverId(item);
+      const currentApproverId = resolveEffectiveApproverId(originalApproverId);
+      if (!currentApproverId) continue;
+      const delayHours = resolveApprovalDelayHoursForStaff(originalApproverId);
+      const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+      const nextMetaData = appendApprovalHistory(
+        markDelayNotification(metaData, currentApproverId, delayHours),
+        {
+          ...buildApprovalHistoryEntry('delay_notified', '결재 지연 알림 발송'),
+          current_approver_id: currentApproverId,
+          revision: getApprovalRevision(metaData),
+        }
+      );
+
+      try {
+        await supabase.from('notifications').insert({
+          user_id: currentApproverId,
+          type: 'approval',
+          title: `[결재 지연] ${String(item.title || '전자결재 문서')}`,
+          body: `${String(item.sender_name || '기안자')} 문서가 ${delayHours}시간 이상 대기 중입니다.`,
+          metadata: {
+            id: item.id,
+            approval_id: item.id,
+            type: 'approval',
+            approval_view: '결재함',
+            approval_role: 'delayed',
+            delay_hours: delayHours,
+          },
+        });
+        await supabase.from('approvals').update({ meta_data: nextMetaData }).eq('id', item.id);
+      } catch (delayError) {
+        console.error('approval delay notification failed:', delayError);
+      }
+    }
+  }, [buildApprovalHistoryEntry, resolveApprovalDelayHoursForStaff, resolveEffectiveApproverId, resolveStoredCurrentApproverId]);
+  const syncDelegatedApprovalRouting = useCallback(async (item: Record<string, unknown>, currentApproverId: string | null) => {
+    if (!item?.id || !currentApproverId) return null;
+    const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+    const storedLineIds = normalizeApprovalLineIds(item.approver_line ?? metaData?.approver_line);
+    const effectiveApproverId = resolveEffectiveApproverId(currentApproverId) || currentApproverId;
+    const updates: Record<string, unknown> = {};
+
+    if (String(item.current_approver_id || '') !== String(effectiveApproverId)) {
+      updates.current_approver_id = effectiveApproverId;
+    }
+    if (storedLineIds.length === 0) {
+      updates.approver_line = [currentApproverId];
+    }
+    if (
+      String(effectiveApproverId) !== String(currentApproverId) &&
+      String(metaData?.delegated_to_id || '') !== String(effectiveApproverId)
+    ) {
+      updates.meta_data = appendApprovalHistory(
+        {
+          ...(metaData || {}),
+          delegated_from_id: currentApproverId,
+          delegated_to_id: effectiveApproverId,
+          delegated_at: new Date().toISOString(),
+        },
+        {
+          ...buildApprovalHistoryEntry('delegated', `${currentApproverId} -> ${effectiveApproverId}`),
+          current_approver_id: effectiveApproverId,
+          revision: getApprovalRevision(metaData),
+        }
+      );
+    }
+
+    if (Object.keys(updates).length === 0) return null;
+
+    let effectiveUpdates = { ...updates };
+    while (true) {
+      if (Object.keys(effectiveUpdates).length === 0) return null;
+
+      const { error } = await supabase.from('approvals').update(effectiveUpdates).eq('id', item.id);
+      if (!isMissingColumnError(error, 'approver_line') || !('approver_line' in effectiveUpdates)) {
+        if (!error) {
+          setApprovals((prev) => prev.map((approval) => (
+            approval.id === item.id ? { ...approval, ...effectiveUpdates } : approval
+          )));
+        }
+        return error;
+      }
+
+      const { approver_line, ...legacyUpdates } = effectiveUpdates;
+      effectiveUpdates = legacyUpdates;
+    }
+  }, [buildApprovalHistoryEntry, normalizeApprovalLineIds, resolveEffectiveApproverId]);
 
   useEffect(() => {
     const normalizedFallbackTypes = [
@@ -1258,9 +1397,14 @@ window.onload = () => window.print();
     if (data) {
       const nextItems = data as Record<string, unknown>[];
       setApprovals(nextItems);
-      void syncApprovalDelayNotifications(nextItems);
+      void Promise.allSettled(
+        nextItems
+          .filter((item) => String(item?.status || '') === '대기')
+          .map((item) => syncDelegatedApprovalRouting(item, resolveStoredCurrentApproverId(item)))
+      );
+      void syncDelegatedApprovalDelayNotifications(nextItems);
     }
-  }, [isMso, selectedCo, selectedCompanyId, syncApprovalDelayNotifications, user?.company, user?.company_id]);
+  }, [isMso, resolveStoredCurrentApproverId, selectedCo, selectedCompanyId, syncDelegatedApprovalDelayNotifications, syncDelegatedApprovalRouting, user?.company, user?.company_id]);
 
   // 항상 최신 fetchApprovals를 ref에 유지 (realtime 클로저 stale 방지)
   useEffect(() => { fetchApprovalsRef.current = fetchApprovals; }, [fetchApprovals]);
@@ -1483,9 +1627,10 @@ window.onload = () => window.print();
     const results = await Promise.all(selectedApprovalIds.map(async (id) => {
       const item = approvals.find((a) => a.id === id);
       if (!item) return null;
-      const currentApproverId = resolveCurrentApproverId(item);
+      const originalCurrentApproverId = resolveStoredCurrentApproverId(item);
+      const currentApproverId = resolveEffectiveApproverId(originalCurrentApproverId);
       if (!currentApproverId || String(currentApproverId) !== String(user?.id)) return id;
-      const routingError = await syncApprovalRouting(item, currentApproverId);
+      const routingError = await syncDelegatedApprovalRouting(item, originalCurrentApproverId);
       if (routingError) return id;
       const itemMetaData = item.meta_data as Record<string, unknown> | null | undefined;
       const nextMetaData = buildNextApprovalMetaData(itemMetaData, 'rejected', {
@@ -1523,7 +1668,8 @@ window.onload = () => window.print();
   const handleApproveAction = async (item: Record<string, unknown>) => {
     if (!confirm("승인하시겠습니까? 관련 데이터가 즉시 업데이트됩니다.")) return;
 
-    const currentApproverId = resolveCurrentApproverId(item);
+    const originalCurrentApproverId = resolveStoredCurrentApproverId(item);
+    const currentApproverId = resolveEffectiveApproverId(originalCurrentApproverId);
     if (!currentApproverId) {
       toast("결재자가 지정되지 않아 승인할 수 없습니다. 결재선을 다시 확인해 주세요.", 'warning');
       return;
@@ -1532,7 +1678,7 @@ window.onload = () => window.print();
       toast("현재 결재자만 승인할 수 있습니다.");
       return;
     }
-    const routingError = await syncApprovalRouting(item, currentApproverId);
+    const routingError = await syncDelegatedApprovalRouting(item, originalCurrentApproverId);
     if (routingError) {
       toast("결재선을 초기화하지 못했습니다. 잠시 후 다시 시도해 주세요.");
       return;
@@ -1541,25 +1687,29 @@ window.onload = () => window.print();
     const itemMetaForLine = item?.meta_data as Record<string, unknown> | null | undefined;
     const lineIds = resolveApprovalLineIds({
       ...item,
-      current_approver_id: currentApproverId,
+      current_approver_id: originalCurrentApproverId,
       approver_line:
         normalizeApprovalLineIds(item.approver_line ?? itemMetaForLine?.approver_line).length > 0
           ? (item.approver_line ?? itemMetaForLine?.approver_line)
-          : [currentApproverId],
+          : [originalCurrentApproverId],
     });
-    const currentIndex = lineIds.findIndex((id: string) => String(id) === String(currentApproverId));
+    const currentIndex = lineIds.findIndex((id: string) => String(id) === String(originalCurrentApproverId));
     if (currentIndex === -1) {
       toast('결재선에서 현재 결재자를 찾을 수 없습니다. 관리자에게 문의하세요.', 'error');
       return;
     }
     const isFinalApproval = currentIndex === lineIds.length - 1;
+    const nextLineApproverId = !isFinalApproval ? lineIds[currentIndex + 1] : null;
+    const nextApproverId = nextLineApproverId
+      ? (resolveEffectiveApproverId(nextLineApproverId) || nextLineApproverId)
+      : null;
 
     const itemMetaData = item.meta_data as Record<string, unknown> | null | undefined;
     const updateData: Record<string, unknown> = {};
     if (isFinalApproval) {
       updateData.status = '승인';
     } else {
-      updateData.current_approver_id = lineIds[currentIndex + 1];
+      updateData.current_approver_id = nextApproverId;
     }
 
     if (isFinalApproval) {
@@ -1570,10 +1720,10 @@ window.onload = () => window.print();
         revision: getApprovalRevision(itemMetaData),
       });
     } else {
-      updateData.current_approver_id = lineIds[currentIndex + 1];
+      updateData.current_approver_id = nextApproverId;
       updateData.meta_data = buildNextApprovalMetaData(itemMetaData, 'approved_step', {
         note: `${currentIndex + 1}李? ?뱀씤`,
-        currentApproverId: lineIds[currentIndex + 1],
+        currentApproverId: nextApproverId,
         revision: getApprovalRevision(itemMetaData),
       });
     }
@@ -1786,7 +1936,8 @@ window.onload = () => window.print();
   };
 
   const handleRejectAction = async (item: Record<string, unknown>) => {
-    const currentApproverId = resolveCurrentApproverId(item);
+    const originalCurrentApproverId = resolveStoredCurrentApproverId(item);
+    const currentApproverId = resolveEffectiveApproverId(originalCurrentApproverId);
     if (!currentApproverId) {
       toast("결재자가 지정되지 않아 반려할 수 없습니다. 결재선을 다시 확인해 주세요.", 'warning');
       return;
@@ -1797,7 +1948,7 @@ window.onload = () => window.print();
     }
     const reason = window.prompt("반려 사유를 입력해 주세요. (선택)");
     if (reason === null) return;
-    const routingError = await syncApprovalRouting(item, currentApproverId);
+    const routingError = await syncDelegatedApprovalRouting(item, originalCurrentApproverId);
     if (routingError) {
       toast("결재선을 초기화하지 못했습니다. 잠시 후 다시 시도해 주세요.");
       return;
@@ -1932,12 +2083,14 @@ window.onload = () => window.print();
       sourceMetaData: sourceApprovalMeta,
       sourceDocNumber,
     });
+    const firstApproverId = String(approverLine[0]?.id || '');
+    const initialApproverId = resolveEffectiveApproverId(firstApproverId) || firstApproverId;
 
     const row: Record<string, unknown> = {
       sender_id: user.id,
       sender_name: user.name || '이름 없음',
       sender_company: user.company || '',
-      current_approver_id: approverLine[0].id,
+      current_approver_id: initialApproverId,
       approver_line: approverLine.map((a) => a.id),
       type: formType,
       title: formTitle,
@@ -1959,7 +2112,7 @@ window.onload = () => window.print();
     };
     row.meta_data = appendApprovalHistory(row.meta_data as Record<string, unknown> | null | undefined, {
       ...buildApprovalHistoryEntry(composeSeedApproval?.id ? 'resubmitted' : 'created', composeSeedApproval?.id ? '?뚯닔 ???곸떊' : '理쒖큹 ?곸떊'),
-      current_approver_id: approverLine[0]?.id ?? null,
+      current_approver_id: initialApproverId || null,
       revision,
     });
     if (companyId != null) row.company_id = companyId;

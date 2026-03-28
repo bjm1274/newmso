@@ -67,6 +67,10 @@ const STAFF_LIST_SELECT =
   'id, employee_no, name, company, department, position, role, permissions';
 
 const APPROVAL_REFERENCE_DEFAULTS_PERMISSION_KEY = 'approval_reference_defaults';
+const APPROVAL_DELEGATE_ID_PERMISSION_KEY = 'approval_delegate_id';
+const APPROVAL_DELEGATE_START_PERMISSION_KEY = 'approval_delegate_start';
+const APPROVAL_DELEGATE_END_PERMISSION_KEY = 'approval_delegate_end';
+const APPROVAL_DELAY_HOURS_PERMISSION_KEY = 'approval_delay_hours';
 const APPROVAL_REFERENCE_TARGETS = [
   { key: 'all', label: '모든 문서' },
   { key: 'leave', label: '연차/휴가' },
@@ -408,6 +412,17 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       }),
     [currentApprovalReferenceUsers, selectedStaff?.id, staffs]
   );
+  const approvalDelegateCandidateStaffs = useMemo(
+    () => staffs.filter((staff) => String(staff?.id) !== String(selectedStaff?.id || '')),
+    [selectedStaff?.id, staffs]
+  );
+  const selectedApprovalDelegateId = String(selectedPermissions[APPROVAL_DELEGATE_ID_PERMISSION_KEY] || '');
+  const selectedApprovalDelegateStart = String(selectedPermissions[APPROVAL_DELEGATE_START_PERMISSION_KEY] || '');
+  const selectedApprovalDelegateEnd = String(selectedPermissions[APPROVAL_DELEGATE_END_PERMISSION_KEY] || '');
+  const selectedApprovalDelayHours = Math.min(
+    168,
+    Math.max(1, Number(selectedPermissions[APPROVAL_DELAY_HOURS_PERMISSION_KEY] || 24) || 24)
+  );
   const permissionStats = useMemo(() => {
     return FEATURE_PERMISSION_GROUPS.map((group) => ({
       id: group.id,
@@ -472,6 +487,24 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     },
     [currentApprovalReferenceUsers, selectedApprovalReferenceFormKey, updateApprovalReferenceDefaults]
   );
+  const updateApprovalAutomationSettings = useCallback(
+    async (partial: Record<string, unknown>) => {
+      if (!selectedStaff?.id) return false;
+      const nextPermissions = {
+        ...selectedPermissions,
+        ...partial,
+      };
+      return setPermissions(String(selectedStaff.id), nextPermissions);
+    },
+    [selectedPermissions, selectedStaff?.id, setPermissions]
+  );
+  const clearApprovalDelegate = useCallback(async () => {
+    await updateApprovalAutomationSettings({
+      [APPROVAL_DELEGATE_ID_PERMISSION_KEY]: null,
+      [APPROVAL_DELEGATE_START_PERMISSION_KEY]: null,
+      [APPROVAL_DELEGATE_END_PERMISSION_KEY]: null,
+    });
+  }, [updateApprovalAutomationSettings]);
 
   if (loading) {
     return <div className="p-5 text-center text-[var(--toss-gray-3)] font-bold">로딩 중...</div>;
@@ -712,9 +745,93 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                       ))}
                     </div>
                   ) : (
-                    <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-3 py-3 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                      <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-3 py-3 text-[10px] font-semibold text-[var(--toss-gray-3)]">
                         현재 선택한 문서 종류에 자동 참조자가 없습니다.
                     </div>
+                  )}
+                </div>
+
+                <div className="bg-[var(--card)] p-3 rounded-[var(--radius-md)] shadow-sm border border-[var(--border)] space-y-3">
+                  <div>
+                    <p className="text-[13px] font-semibold text-[var(--foreground)]">전자결재 자동화</p>
+                    <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                      부재중일 때 대신 결재할 대결자와 결재 지연 알림 기준 시간을 설정합니다.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <select
+                      data-testid="staff-approval-delegate-select"
+                      value={selectedApprovalDelegateId}
+                      onChange={(e) => {
+                        void updateApprovalAutomationSettings({
+                          [APPROVAL_DELEGATE_ID_PERMISSION_KEY]: e.target.value || null,
+                        });
+                      }}
+                      className="w-full px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
+                    >
+                      <option value="">자동 대결자 없음</option>
+                      {approvalDelegateCandidateStaffs.map((staff) => (
+                        <option key={`approval-delegate-${staff.id}`} value={String(staff.id)}>
+                          {staff.name} {staff.position ? `(${staff.position})` : ''} {staff.company ? ` · ${staff.company}` : ''}
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        data-testid="staff-approval-delegate-start"
+                        type="date"
+                        value={selectedApprovalDelegateStart}
+                        onChange={(e) => {
+                          void updateApprovalAutomationSettings({
+                            [APPROVAL_DELEGATE_START_PERMISSION_KEY]: e.target.value || null,
+                          });
+                        }}
+                        className="w-full px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
+                      />
+                      <input
+                        data-testid="staff-approval-delegate-end"
+                        type="date"
+                        value={selectedApprovalDelegateEnd}
+                        onChange={(e) => {
+                          void updateApprovalAutomationSettings({
+                            [APPROVAL_DELEGATE_END_PERMISSION_KEY]: e.target.value || null,
+                          });
+                        }}
+                        className="w-full px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
+                      />
+                    </div>
+
+                    <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                      <label className="text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                        결재 지연 알림 기준 시간
+                      </label>
+                      <input
+                        data-testid="staff-approval-delay-hours"
+                        type="number"
+                        min={1}
+                        max={168}
+                        value={selectedApprovalDelayHours}
+                        onChange={(e) => {
+                          void updateApprovalAutomationSettings({
+                            [APPROVAL_DELAY_HOURS_PERMISSION_KEY]: Math.min(168, Math.max(1, Number(e.target.value) || 24)),
+                          });
+                        }}
+                        className="w-full md:w-24 px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
+                      />
+                    </div>
+                  </div>
+
+                  {(selectedApprovalDelegateId || selectedApprovalDelegateStart || selectedApprovalDelegateEnd) && (
+                    <button
+                      type="button"
+                      data-testid="staff-approval-delegate-clear"
+                      onClick={() => void clearApprovalDelegate()}
+                      className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-[10px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                    >
+                      대결 설정 초기화
+                    </button>
                   )}
                 </div>
 
