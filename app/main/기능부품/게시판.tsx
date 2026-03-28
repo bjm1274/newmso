@@ -28,6 +28,8 @@ const BOARD_POST_OPTIONAL_COLUMNS = [
 ];
 const SCHEDULE_META_PREFIX = '[[SCHEDULE_META]]';
 const SCHEDULE_META_SUFFIX = '[[/SCHEDULE_META]]';
+const ATTACHMENTS_META_PREFIX = '[[ATTACHMENTS_META]]';
+const ATTACHMENTS_META_SUFFIX = '[[/ATTACHMENTS_META]]';
 
 type ScheduleMetaPayload = {
   date?: string;
@@ -41,6 +43,59 @@ type ScheduleMetaPayload = {
   transfusion?: boolean;
   contrast?: boolean;
 };
+
+function extractAttachmentMetaFromContent(value: unknown) {
+  const raw = String(value ?? '');
+  const start = raw.indexOf(ATTACHMENTS_META_PREFIX);
+  const end = raw.indexOf(ATTACHMENTS_META_SUFFIX);
+  if (start < 0 || end < 0 || end <= start) {
+    return {
+      displayContent: raw.trim(),
+      attachments: [] as AttachmentItem[],
+      hasEmbeddedAttachments: false,
+    };
+  }
+
+  const displayContent = `${raw.slice(0, start)}${raw.slice(end + ATTACHMENTS_META_SUFFIX.length)}`.trim();
+  const attachmentsText = raw.slice(start + ATTACHMENTS_META_PREFIX.length, end).trim();
+
+  try {
+    const parsed = JSON.parse(attachmentsText);
+    const attachments = Array.isArray(parsed)
+      ? parsed
+          .map((item) => ({
+            name: String((item as AttachmentItem)?.name ?? '').trim(),
+            url: String((item as AttachmentItem)?.url ?? '').trim(),
+            type: String((item as AttachmentItem)?.type ?? 'file').trim() || 'file',
+          }))
+          .filter((item) => item.name && item.url)
+      : [];
+
+    return {
+      displayContent,
+      attachments,
+      hasEmbeddedAttachments: attachments.length > 0,
+    };
+  } catch {
+    return {
+      displayContent,
+      attachments: [] as AttachmentItem[],
+      hasEmbeddedAttachments: true,
+    };
+  }
+}
+
+function buildAttachmentMetaContent(visibleContent: string, attachments: AttachmentItem[]) {
+  if (!attachments.length) return visibleContent.trim();
+  const normalizedVisibleContent = visibleContent.trim();
+  const attachmentPayload = attachments.map((item) => ({
+    name: String(item.name || '').trim(),
+    url: String(item.url || '').trim(),
+    type: String(item.type || 'file').trim() || 'file',
+  }));
+
+  return `${normalizedVisibleContent}${normalizedVisibleContent ? '\n' : ''}${ATTACHMENTS_META_PREFIX}${JSON.stringify(attachmentPayload)}${ATTACHMENTS_META_SUFFIX}`;
+}
 
 function buildScheduleTimeValue(period: string, hour: string, minute: string) {
   if (!period || !hour) return '';
@@ -118,14 +173,20 @@ function buildScheduleMetaContent(chartNo: string, meta: ScheduleMetaPayload) {
 
 function normalizeBoardPost<T extends Partial<BoardPost>>(post: T): T {
   if (!post) return post;
-  const { displayContent, meta, hasEmbeddedMeta } = extractScheduleMetaFromContent(post.content ?? '');
+  const {
+    displayContent: attachmentStrippedContent,
+    attachments: embeddedAttachments,
+  } = extractAttachmentMetaFromContent(post.content ?? '');
+  const { displayContent, meta, hasEmbeddedMeta } = extractScheduleMetaFromContent(attachmentStrippedContent);
   const normalizedScheduleDate = normalizeScheduleDateValue(post.schedule_date ?? meta?.date ?? '');
   const normalizedScheduleTime = normalizeScheduleTimeValue(post.schedule_time ?? meta?.time ?? '');
   const scheduleMetaLegacyMissing = isScheduleBoardType(post.board_type) && !normalizedScheduleDate && !hasEmbeddedMeta;
+  const normalizedAttachments = Array.isArray(post.attachments) && post.attachments.length > 0 ? post.attachments : embeddedAttachments;
 
   return {
     ...post,
     content: displayContent,
+    attachments: normalizedAttachments,
     schedule_date: normalizedScheduleDate,
     schedule_time: normalizedScheduleTime,
     schedule_room: String(post.schedule_room ?? meta?.room ?? '').trim(),
@@ -1002,6 +1063,12 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     try {
       const tags = tagsInput ? tagsInput.split(',').map((t) => t.trim()).filter(Boolean) : [];
       const useAnonymous = activeBoard === '익명소리함' || isAnonymous;
+      const currentEditingPost = editingPostId
+        ? posts.find((post) => String(post.id) === String(editingPostId)) ?? selectedPostDetail
+        : null;
+      const existingAttachments = Array.isArray(currentEditingPost?.attachments)
+        ? (currentEditingPost.attachments as AttachmentItem[])
+        : [];
       const postData: Partial<BoardPost> & Record<string, unknown> = {
         board_type: activeBoard,
         title: normalizedTitle,
@@ -1089,6 +1156,16 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
           console.warn('일부 첨부만 업로드됨.', lastUploadError);
         }
         postData.attachments = uploaded;
+      }
+
+      if (!isScheduleBoard) {
+        const persistedAttachments = (Array.isArray(postData.attachments) ? (postData.attachments as AttachmentItem[]) : []).length > 0
+          ? (postData.attachments as AttachmentItem[])
+          : existingAttachments;
+        if (persistedAttachments.length > 0) {
+          postData.attachments = persistedAttachments;
+          postData.content = buildAttachmentMetaContent(normalizedContent || '', persistedAttachments);
+        }
       }
 
       // 수정 모드인 경우 업데이트
