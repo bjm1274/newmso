@@ -1092,7 +1092,7 @@ export default function HandoverNotes({ user }: Props) {
             </div>
           </section>
 
-          <section className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+          <section className="grid gap-3 grid-cols-3 xl:grid-cols-1">
             <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--page-bg)] p-3">
               <div className="text-xs font-bold text-[var(--toss-gray-3)]">선택일 공통 인계</div>
               <div className="mt-2 text-xl font-black text-[var(--foreground)]">{generalNotes.length}건</div>
@@ -1222,7 +1222,7 @@ export default function HandoverNotes({ user }: Props) {
                 </div>
               </div>
             ) : (
-              <div className="grid gap-3 lg:grid-cols-[140px_140px_minmax(0,1fr)_auto]">
+              <div className="grid gap-3 grid-cols-2 lg:grid-cols-[140px_140px_minmax(0,1fr)_auto]">
                 <select
                   value={shift}
                   onChange={(event) => setShift(event.target.value)}
