@@ -125,8 +125,8 @@ export default function SuppliesForm({ setExtraData, initialItems }: Record<stri
 
   return (
     <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm animate-in fade-in duration-300">
-      <div className="p-3 bg-[var(--toss-blue-light)]/50 border-b border-[var(--toss-blue-light)] flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="p-3 bg-[var(--toss-blue-light)]/50 border-b border-[var(--toss-blue-light)] flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:flex md:flex-wrap md:items-center">
           <p className="text-[11px] font-semibold text-[var(--accent)] uppercase tracking-widest flex items-center gap-2">
             <span className="w-2 h-2 bg-[var(--accent)] rounded-full animate-pulse"></span> 실시간 재고
           </p>
@@ -149,31 +149,120 @@ export default function SuppliesForm({ setExtraData, initialItems }: Record<stri
             품목 제거하기
           </button>
         </div>
-        <div className="flex items-center gap-2 text-[11px] font-semibold text-[var(--toss-gray-4)]">
+        <div className="flex flex-col gap-2 text-[11px] font-semibold text-[var(--toss-gray-4)] sm:flex-row sm:items-center sm:flex-wrap">
           <span>수령부서 일괄 적용</span>
-          <select
-            value={bulkDept}
-            onChange={e => setBulkDept(e.target.value)}
-            className="px-3 py-1.5 border-none rounded-[var(--radius-md)] bg-[var(--card)] shadow-sm text-[11px] font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-          >
-            <option value="">선택...</option>
-            {departments.map(d => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={applyBulkDept}
-            disabled={!bulkDept}
-            className="px-4 py-1.5 rounded-[var(--radius-md)] bg-black text-white text-[11px] font-semibold disabled:opacity-40 transition-opacity"
-          >
-            전체 적용
-          </button>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:flex sm:items-center">
+            <select
+              value={bulkDept}
+              onChange={e => setBulkDept(e.target.value)}
+              className="min-h-[44px] px-3 py-2 border-none rounded-[var(--radius-md)] bg-[var(--card)] shadow-sm text-[13px] font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+            >
+              <option value="">선택...</option>
+              {departments.map(d => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={applyBulkDept}
+              disabled={!bulkDept}
+              className="min-h-[44px] px-4 py-2 rounded-[var(--radius-md)] bg-black text-white text-[12px] font-semibold disabled:opacity-40 transition-opacity"
+            >
+              전체 적용
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="bg-[var(--tab-bg)]/20 p-2 md:p-3">
-        <div className="overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
+        <div className="space-y-3 md:hidden">
+          {items.map((item, idx) => (
+            <div
+              key={idx}
+              className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm"
+            >
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <span className="text-[12px] font-black text-[var(--foreground)]">품목 {idx + 1}</span>
+                {item.currentStock !== null && (
+                  <span className={`shrink-0 rounded-[var(--radius-md)] px-2 py-1 text-[10px] font-bold ${item.currentStock <= 5 ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                    재고 {item.currentStock}
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <label className="block space-y-1.5">
+                  <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">물품명</span>
+                  <div className="relative">
+                    <input
+                      data-testid={`supplies-item-name-mobile-${idx}`}
+                      value={item.name}
+                      onChange={e => handleSearch(idx, e.target.value)}
+                      onFocus={e => handleSearch(idx, e.target.value)}
+                      className="h-12 w-full rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-3 text-sm font-bold text-[var(--foreground)] outline-none transition-all focus:bg-[var(--card)] focus:ring-2 focus:ring-[var(--accent)]/20"
+                      placeholder="품목명 입력"
+                    />
+                    {item.suggestions.length > 0 && (
+                      <div className="absolute left-0 top-full z-[100] mt-1 w-full overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
+                        {item.suggestions.map((s, si) => (
+                          <div
+                            key={si}
+                            onClick={() => selectItem(idx, s)}
+                            className="flex cursor-pointer items-center justify-between border-b p-3 text-[12px] font-bold transition-colors last:border-none hover:bg-[var(--muted)]"
+                          >
+                            <span className="text-[var(--foreground)]">{s.name}</span>
+                            <span className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${s.stock <= s.min_stock ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                              재고: {s.stock}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </label>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block space-y-1.5">
+                    <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">수량</span>
+                    <input
+                      data-testid={`supplies-item-qty-mobile-${idx}`}
+                      type="number"
+                      min="1"
+                      value={item.qty}
+                      onChange={e => updateItemField(idx, 'qty', Number(e.target.value))}
+                      className="h-12 w-full rounded-[var(--radius-md)] border-none bg-[var(--toss-blue-light)]/50 px-3 text-center text-2xl font-black tabular-nums text-[var(--accent)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                    />
+                  </label>
+                  <label className="block space-y-1.5">
+                    <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">수령부서</span>
+                    <select
+                      data-testid={`supplies-item-dept-mobile-${idx}`}
+                      className="h-12 w-full rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-3 text-sm font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+                      value={item.dept}
+                      onChange={e => updateItemField(idx, 'dept', e.target.value)}
+                    >
+                      <option value="">부서 선택</option>
+                      {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </label>
+                </div>
+
+                <label className="block space-y-1.5">
+                  <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">용도</span>
+                  <input
+                    data-testid={`supplies-item-purpose-mobile-${idx}`}
+                    value={item.purpose}
+                    onChange={e => updateItemField(idx, 'purpose', e.target.value)}
+                    className="h-12 w-full rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none transition-all focus:bg-[var(--card)] focus:ring-2 focus:ring-[var(--accent)]/20"
+                    placeholder="용도 입력"
+                  />
+                </label>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="hidden overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-sm md:block">
           <table className="w-full max-w-full table-fixed border-collapse">
             <colgroup>
               <col className="w-[40%]" />
