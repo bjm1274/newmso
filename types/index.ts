@@ -86,6 +86,7 @@ export interface BoardPost {
   likes_count?: number | null;
   tags?: string[] | null;
   attachments?: AttachmentItem[] | null;
+  scheduled_publish_at?: string | null;
   schedule_date?: string | null;
   schedule_time?: string | null;
   schedule_room?: string | null;
