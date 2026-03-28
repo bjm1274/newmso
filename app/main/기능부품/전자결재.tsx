@@ -756,14 +756,22 @@ window.onload = () => window.print();
     const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
     const originalApproverId = String(metaData?.delegated_from_id || resolveStoredCurrentApproverId(item) || '');
     const effectiveApproverId = String(metaData?.delegated_to_id || resolveCurrentApproverId(item) || '');
-    if (!originalApproverId || !effectiveApproverId || originalApproverId === effectiveApproverId) return null;
+    if (!originalApproverId || !effectiveApproverId || originalApproverId === effectiveApproverId) {
+      return {
+        delegatedFromId: '',
+        delegatedToId: '',
+        delegatedFromName: '',
+        delegatedToName: '',
+        delegatedAt: '',
+      };
+    }
     const originalApprover = approvalStaffMap.get(originalApproverId);
     const effectiveApprover = approvalStaffMap.get(effectiveApproverId);
     return {
-      originalApproverId,
-      effectiveApproverId,
-      originalApproverName: originalApprover?.name || originalApproverId,
-      effectiveApproverName: effectiveApprover?.name || effectiveApproverId,
+      delegatedFromId: originalApproverId,
+      delegatedToId: effectiveApproverId,
+      delegatedFromName: originalApprover?.name || originalApproverId,
+      delegatedToName: effectiveApprover?.name || effectiveApproverId,
       delegatedAt: String(metaData?.delegated_at || ''),
     };
   }, [approvalStaffMap, resolveCurrentApproverId, resolveStoredCurrentApproverId]);
@@ -791,7 +799,14 @@ window.onload = () => window.print();
   }, [resolveApprovalDelayHoursForStaff, resolveStoredCurrentApproverId]);
   const resolveApprovalLockSnapshot = useCallback((item: Record<string, unknown>) => {
     const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
-    if (!isApprovalLocked(metaData)) return null;
+    if (!isApprovalLocked(metaData)) {
+      return {
+        lockedAt: '',
+        lockedById: '',
+        lockedByName: '',
+        revision: 1,
+      };
+    }
     const lockedById = String(metaData?.edit_locked_by || '');
     const lockedByStaff = lockedById ? approvalStaffMap.get(lockedById) : null;
     return {
@@ -2977,12 +2992,56 @@ window.onload = () => window.print();
                     ))}
                   </div>
                 )}
-                {(detailLocked || detailHistory.length > 0) && (
+                {(detailLocked || detailHistory.length > 0 || detailDelegateSnapshot.delegatedToName || detailDelaySnapshot.overdue || detailDelaySnapshot.notificationCount > 0 || detailLockSnapshot.lockedAt) && (
                   <div className="mb-4 space-y-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/60 px-3 py-3">
                     {detailLocked && (
                       <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-700">
                         <span className="inline-flex items-center rounded-full bg-slate-200 px-2 py-0.5">수정 잠금</span>
                         <span>최종 처리된 문서라 수정할 수 없습니다.</span>
+                      </div>
+                    )}
+                    {(detailDelegateSnapshot.delegatedToName || detailDelaySnapshot.overdue || detailDelaySnapshot.notificationCount > 0 || detailLockSnapshot.lockedAt) && (
+                      <div className="grid gap-2 md:grid-cols-2">
+                        {detailDelegateSnapshot.delegatedToName && (
+                          <div className="rounded-[var(--radius-sm)] bg-[var(--card)] px-2.5 py-2 text-[11px] text-[var(--toss-gray-4)]">
+                            <p className="font-semibold text-[var(--foreground)]">대결 정보</p>
+                            <p className="mt-1">
+                              {detailDelegateSnapshot.delegatedFromName
+                                ? `${detailDelegateSnapshot.delegatedFromName} → ${detailDelegateSnapshot.delegatedToName}`
+                                : detailDelegateSnapshot.delegatedToName}
+                            </p>
+                            {detailDelegateSnapshot.delegatedAt && (
+                              <p className="mt-1 text-[10px] text-[var(--toss-gray-3)]">
+                                대결 시점 {new Date(detailDelegateSnapshot.delegatedAt).toLocaleString('ko-KR')}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {(detailDelaySnapshot.overdue || detailDelaySnapshot.notificationCount > 0) && (
+                          <div className="rounded-[var(--radius-sm)] bg-[var(--card)] px-2.5 py-2 text-[11px] text-[var(--toss-gray-4)]">
+                            <p className="font-semibold text-[var(--foreground)]">결재 지연 상태</p>
+                            <p className="mt-1">
+                              기준 {detailDelaySnapshot.thresholdHours}시간
+                              {detailDelaySnapshot.elapsedHours > 0 ? ` · 경과 ${detailDelaySnapshot.elapsedHours}시간` : ''}
+                            </p>
+                            {detailDelaySnapshot.notificationCount > 0 && (
+                              <p className="mt-1 text-[10px] text-[var(--toss-gray-3)]">
+                                지연 알림 {detailDelaySnapshot.notificationCount}회
+                                {detailDelaySnapshot.lastNotifiedAt ? ` · 최근 ${new Date(detailDelaySnapshot.lastNotifiedAt).toLocaleString('ko-KR')}` : ''}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {detailLockSnapshot.lockedAt && (
+                          <div className="rounded-[var(--radius-sm)] bg-[var(--card)] px-2.5 py-2 text-[11px] text-[var(--toss-gray-4)] md:col-span-2">
+                            <p className="font-semibold text-[var(--foreground)]">잠금 이력</p>
+                            <p className="mt-1">
+                              Rev.{detailLockSnapshot.revision ?? 1}
+                              {detailLockSnapshot.lockedByName ? ` · ${detailLockSnapshot.lockedByName}` : ''}
+                              {detailLockSnapshot.lockedAt ? ` · ${new Date(detailLockSnapshot.lockedAt).toLocaleString('ko-KR')}` : ''}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
                     {detailHistory.length > 0 && (
