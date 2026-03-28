@@ -423,6 +423,11 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     168,
     Math.max(1, Number(selectedPermissions[APPROVAL_DELAY_HOURS_PERMISSION_KEY] || 24) || 24)
   );
+  const selectedApprovalDelegateStaff = useMemo(
+    () =>
+      approvalDelegateCandidateStaffs.find((staff) => String(staff.id) === selectedApprovalDelegateId) || null,
+    [approvalDelegateCandidateStaffs, selectedApprovalDelegateId]
+  );
   const permissionStats = useMemo(() => {
     return FEATURE_PERMISSION_GROUPS.map((group) => ({
       id: group.id,
@@ -824,14 +829,28 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                   </div>
 
                   {(selectedApprovalDelegateId || selectedApprovalDelegateStart || selectedApprovalDelegateEnd) && (
-                    <button
-                      type="button"
-                      data-testid="staff-approval-delegate-clear"
-                      onClick={() => void clearApprovalDelegate()}
-                      className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-[10px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
-                    >
-                      대결 설정 초기화
-                    </button>
+                    <div className="space-y-2">
+                      <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-[10px] font-semibold text-[var(--toss-gray-4)]">
+                        <p>
+                          현재 대결자:{' '}
+                          {selectedApprovalDelegateStaff
+                            ? `${selectedApprovalDelegateStaff.name}${selectedApprovalDelegateStaff.position ? ` (${selectedApprovalDelegateStaff.position})` : ''}`
+                            : '미설정'}
+                        </p>
+                        <p className="mt-1">
+                          대결 기간: {selectedApprovalDelegateStart || '상시'} ~ {selectedApprovalDelegateEnd || '미지정'}
+                        </p>
+                        <p className="mt-1">지연 알림: {selectedApprovalDelayHours}시간 경과 시</p>
+                      </div>
+                      <button
+                        type="button"
+                        data-testid="staff-approval-delegate-clear"
+                        onClick={() => void clearApprovalDelegate()}
+                        className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-[10px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                      >
+                        대결 설정 초기화
+                      </button>
+                    </div>
                   )}
                 </div>
 

@@ -269,8 +269,8 @@ export default function DailyClosurePage({ user }: { user: any }) {
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
                             {checks.map((check, idx) => (
-                                <div key={idx} className="p-4 bg-[var(--tab-bg)] rounded-xl relative group">
-                                    <div className="grid grid-cols-2 gap-4">
+                                <div key={idx} className="p-3 sm:p-4 bg-[var(--tab-bg)] rounded-xl relative group">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-[var(--toss-gray-3)]">수표번호</label>
                                             <input
@@ -307,14 +307,14 @@ export default function DailyClosurePage({ user }: { user: any }) {
 
                     {/* 요약 및 저장 */}
                     <div className="bg-gray-900 rounded-2xl p-5 text-white shadow-sm space-y-4">
-                        <div className="grid grid-cols-2 gap-3 border-b border-white/10 pb-8">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-b border-white/10 pb-8">
                             <div>
                                 <p className="text-xs font-bold text-[var(--toss-gray-3)] mb-2 uppercase tracking-wider">오늘 총 수납금액</p>
-                                <p className="text-3xl font-black">{totalCalculated.toLocaleString()}원</p>
+                                <p className="text-2xl sm:text-3xl font-black">{totalCalculated.toLocaleString()}원</p>
                             </div>
-                            <div className="text-right">
+                            <div className="sm:text-right">
                                 <p className="text-xs font-bold text-[var(--toss-gray-3)] mb-2 uppercase tracking-wider">정산 오차 (현금)</p>
-                                <p className={`text-3xl font-black ${balance === 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                <p className={`text-2xl sm:text-3xl font-black ${balance === 0 ? 'text-green-400' : 'text-red-400'}`}>
                                     {balance === 0 ? '정상' : `${balance > 0 ? '+' : ''}${balance.toLocaleString()}원`}
                                 </p>
                             </div>

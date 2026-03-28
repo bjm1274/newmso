@@ -6222,12 +6222,12 @@ export default function AutoRosterPlanner({
           <div className="flex flex-wrap items-center gap-3">
             <h3 className="shrink-0 text-xl font-bold text-[var(--foreground)]">패턴 기반 근무표 생성</h3>
 
-            <label className="flex shrink-0 items-center gap-2">
+            <label className="flex w-full sm:w-auto shrink-0 items-center gap-2">
               <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">팀</span>
               <select
                 value={selectedDepartment}
                 onChange={(event) => setSelectedDepartment(event.target.value)}
-                className="min-w-[180px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                className="w-full sm:w-auto sm:min-w-[180px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
                 data-testid="roster-team-select"
               >
                 {teamOptions.map((department) => (
@@ -6238,12 +6238,12 @@ export default function AutoRosterPlanner({
               </select>
             </label>
 
-            <label className="flex shrink-0 items-center gap-2">
+            <label className="flex w-full sm:w-auto shrink-0 items-center gap-2">
               <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">교대방식 패턴</span>
               <select
                 value={selectedPatternProfileId}
                 onChange={(event) => setSelectedPatternProfileId(event.target.value)}
-                className="min-w-[220px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                className="w-full sm:w-auto sm:min-w-[220px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
                 data-testid="roster-pattern-profile-select"
               >
                 <option value="">팀 기준 기본 규칙</option>
@@ -6255,12 +6255,12 @@ export default function AutoRosterPlanner({
               </select>
             </label>
 
-            <label className="flex shrink-0 items-center gap-2">
+            <label className="flex w-full sm:w-auto shrink-0 items-center gap-2">
               <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">근무규칙</span>
               <select
                 value={selectedGenerationRuleId}
                 onChange={(event) => setSelectedGenerationRuleId(event.target.value)}
-                className="min-w-[220px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                className="w-full sm:w-auto sm:min-w-[220px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
                 data-testid="roster-generation-rule-select"
               >
                 <option value="">팀 기준 기본 규칙</option>

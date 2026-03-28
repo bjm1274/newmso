@@ -40,9 +40,13 @@ function buildSafeFilePath(fileName: string, mimeType: string) {
   return `board/${Date.now()}_${crypto.randomUUID()}.${safeExt}`;
 }
 
-function detectAttachmentType(mimeType: string) {
+function detectAttachmentType(fileName: string, mimeType: string) {
   if (mimeType.startsWith('image/')) return 'image';
   if (mimeType.startsWith('video/')) return 'video';
+
+  const ext = guessFileExtension(fileName, mimeType);
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic', 'heif'].includes(ext)) return 'image';
+  if (['mp4', 'mov', 'avi', 'wmv', 'webm', 'mkv', 'm4v'].includes(ext)) return 'video';
   return 'file';
 }
 
@@ -97,7 +101,7 @@ export async function POST(request: NextRequest) {
           bucket,
           path: filePath,
           fileName: file.name,
-          type: detectAttachmentType(file.type || ''),
+          type: detectAttachmentType(file.name, file.type || ''),
           url: data.publicUrl,
         });
       }

@@ -311,26 +311,26 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: Record<str
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[var(--border)] text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">
-              <th className="p-4 text-left">직원</th>
-              <th className="p-4 text-left">물품</th>
-              <th className="p-4 text-left">대여일</th>
-              <th className="p-4 text-left">반납일</th>
-              <th className="p-4 text-right">관리</th>
+              <th className="p-2 sm:p-4 text-left">직원</th>
+              <th className="p-2 sm:p-4 text-left">물품</th>
+              <th className="p-2 sm:p-4 text-left hidden sm:table-cell">대여일</th>
+              <th className="p-2 sm:p-4 text-left">반납일</th>
+              <th className="p-2 sm:p-4 text-right">관리</th>
             </tr>
           </thead>
           <tbody>
             {list.map((row) => (
               <tr key={row.id} className="border-b border-[var(--border-subtle)]">
-                <td className="p-4">{row.staff_members?.name}</td>
-                <td className="p-4">
+                <td className="p-2 sm:p-4">{row.staff_members?.name}</td>
+                <td className="p-2 sm:p-4">
                   {row.asset_type}
                   {row.asset_name ? ` (${row.asset_name})` : ''}
                 </td>
-                <td className="p-4">{row.loaned_at}</td>
-                <td className="p-4">
+                <td className="p-2 sm:p-4 hidden sm:table-cell">{row.loaned_at}</td>
+                <td className="p-2 sm:p-4">
                   {row.returned_at ? row.returned_at : <span className="text-orange-600 font-bold">미반납</span>}
                 </td>
-                <td className="p-4 text-right">
+                <td className="p-2 sm:p-4 text-right">
                   {!row.returned_at && (
                     <button
                       onClick={() => handleReturn(row.id)}
@@ -348,11 +348,11 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: Record<str
 
       {adding && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]"
+          className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-[110] p-0 sm:p-4"
           onClick={() => setAdding(false)}
         >
           <div
-            className="bg-[var(--card)] p-5 rounded-[var(--radius-md)] max-w-md w-full space-y-4"
+            className="bg-[var(--card)] p-4 sm:p-5 rounded-t-[24px] sm:rounded-[var(--radius-md)] max-w-md w-full space-y-4"
             onClick={(event) => event.stopPropagation()}
           >
             <h4 className="font-semibold">장비 대여 등록</h4>
@@ -411,11 +411,11 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: Record<str
 
       {settingOpen && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[120]"
+          className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-[120] p-0 sm:p-4"
           onClick={() => setSettingOpen(false)}
         >
           <div
-            className="bg-[var(--card)] p-5 rounded-[var(--radius-md)] max-w-lg w-full space-y-4"
+            className="bg-[var(--card)] p-4 sm:p-5 rounded-t-[24px] sm:rounded-[var(--radius-md)] max-w-lg w-full max-h-[85vh] overflow-y-auto space-y-4"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">

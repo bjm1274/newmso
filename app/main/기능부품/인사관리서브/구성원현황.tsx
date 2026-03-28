@@ -790,9 +790,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         )}
         {/* PC 버전 테이블 */}
         <div className="hidden md:block bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] overflow-x-auto shadow-sm">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse min-w-[900px]">
             <thead className="bg-[var(--muted)] text-[11px] font-semibold text-[var(--toss-gray-3)] border-b border-[var(--border)] uppercase tracking-widest">
-              <tr><th className="p-4">사번</th><th className="p-4">성명/직함</th><th className="p-4">소속</th><th className="p-4">부서/팀</th><th className="p-4">연락/계정</th><th className="p-4">근무정보</th><th className="p-4">면허/자격</th><th className="p-4">상태</th><th className="p-4 text-right">관리</th></tr>
+              <tr><th className="p-3 lg:p-4">사번</th><th className="p-3 lg:p-4">성명/직함</th><th className="p-3 lg:p-4">소속</th><th className="p-3 lg:p-4">부서/팀</th><th className="p-3 lg:p-4">연락/계정</th><th className="p-3 lg:p-4">근무정보</th><th className="p-3 lg:p-4">면허/자격</th><th className="p-3 lg:p-4">상태</th><th className="p-3 lg:p-4 text-right">관리</th></tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {필터목록.map((직원: StaffMember) => (
