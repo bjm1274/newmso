@@ -4,9 +4,33 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { jsPDF } from 'jspdf';
 
-export default function MyDocuments(props: Record<string, unknown>) {
+type ContractRecord = {
+    id: string;
+    contract_type?: string | null;
+    status?: string | null;
+    requested_at?: string | null;
+    signed_at?: string | null;
+    signature_data?: string | null;
+};
+
+type MyDocumentsProps = {
+    user?: { id?: string; name?: string; company?: string } | null;
+    latestContract?: ContractRecord | null;
+    pendingContract?: ContractRecord | null;
+    onOpenContractSignature?: (contract: ContractRecord) => void;
+};
+
+function formatDate(value?: string | null) {
+    if (!value) return '-';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleDateString('ko-KR');
+}
+
+export default function MyDocuments(props: MyDocumentsProps) {
     const user = props.user as { id?: string; name?: string; company?: string } | undefined;
     const [documents, setDocuments] = useState<any[]>([]);
+    const [contracts, setContracts] = useState<ContractRecord[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [scanningDoc, setScanningDoc] = useState<any | null>(null);
@@ -40,14 +64,66 @@ export default function MyDocuments(props: Record<string, unknown>) {
     const fetchDocuments = async () => {
         if (!user?.id) return;
         setIsLoading(true);
-        const { data } = await supabase
-            .from('document_repository')
-            .select('*')
-            .eq('created_by', user.id)
-            .order('created_at', { ascending: false });
-        setDocuments(data || []);
+        const [{ data: nextDocuments }, { data: nextContracts }] = await Promise.all([
+            supabase
+                .from('document_repository')
+                .select('*')
+                .eq('created_by', user.id)
+                .order('created_at', { ascending: false }),
+            supabase
+                .from('employment_contracts')
+                .select('id, contract_type, status, requested_at, signed_at, signature_data')
+                .eq('staff_id', user.id)
+                .order('created_at', { ascending: false }),
+        ]);
+        setDocuments(nextDocuments || []);
+        setContracts((nextContracts as ContractRecord[]) || []);
         setIsLoading(false);
     };
+
+    useEffect(() => {
+        if (props.latestContract) {
+            setContracts((prev) => {
+                const next = prev.filter((contract) => String(contract.id) !== String(props.latestContract?.id));
+                return [props.latestContract!, ...next];
+            });
+        }
+    }, [props.latestContract]);
+
+    useEffect(() => {
+        const handleContractSigned = () => {
+            void fetchDocuments();
+        };
+        window.addEventListener('erp-contract-signed', handleContractSigned);
+        return () => {
+            window.removeEventListener('erp-contract-signed', handleContractSigned);
+        };
+    }, [user?.id]);
+
+    const openRepositoryDocument = (document: any) => {
+        if (document?.file_url) {
+            window.open(document.file_url, '_blank');
+            return;
+        }
+        if (typeof document?.content === 'string' && document.content.trim()) {
+            const preview = window.open('', '_blank');
+            if (!preview) return;
+            preview.document.write(`
+              <html>
+                <head>
+                  <title>${document.title || '문서 보기'}</title>
+                  <style>body{font-family:'Noto Sans KR',sans-serif;line-height:1.6;padding:24px;color:#111827} img{max-width:100%;height:auto}</style>
+                </head>
+                <body>${document.content}</body>
+              </html>
+            `);
+            preview.document.close();
+        }
+    };
+
+    const pendingContract = props.pendingContract || contracts.find((contract) => contract.status === '서명대기') || null;
+    const latestContract = props.latestContract || contracts[0] || null;
+    const latestContractDocument = documents.find((document) => ['계약서', '근로계약서'].includes(document.category));
 
     const handleUploadSuccess = async (blobs: Blob[], docType: string) => {
         setUploading(true);
@@ -136,6 +212,61 @@ export default function MyDocuments(props: Record<string, unknown>) {
             <div className="flex justify-between items-end border-b border-[var(--border)] pb-4">
                 <div>
                     <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">스마트 서류 제출</h2>
+                </div>
+            </div>
+
+            <div className="rounded-[var(--radius-xl)] border border-violet-100 bg-violet-50/60 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="min-w-0">
+                        <p className="text-[11px] font-black tracking-wide text-violet-700">직원 문서 전자서명</p>
+                        <h3 className="mt-1 text-sm font-bold text-[var(--foreground)]">
+                            {latestContract?.contract_type || '근로계약 전자서명 대기 없음'}
+                        </h3>
+                        <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-[var(--toss-gray-3)]">
+                            <span className="rounded-full bg-white px-2 py-1 font-semibold">
+                                상태 {pendingContract ? '서명대기' : latestContract?.status || '미등록'}
+                            </span>
+                            {latestContract?.requested_at ? (
+                                <span className="rounded-full bg-white px-2 py-1 font-semibold">
+                                    요청일 {formatDate(latestContract.requested_at)}
+                                </span>
+                            ) : null}
+                            {latestContract?.signed_at ? (
+                                <span className="rounded-full bg-white px-2 py-1 font-semibold">
+                                    서명일 {formatDate(latestContract.signed_at)}
+                                </span>
+                            ) : null}
+                        </div>
+                        <p className="mt-2 text-[11px] font-medium text-[var(--toss-gray-4)]">
+                            {pendingContract
+                                ? '전자서명이 필요한 근로계약서가 있습니다. 아래 버튼으로 다시 열 수 있습니다.'
+                                : latestContract?.status === '서명완료'
+                                    ? '최근 전자서명 완료 계약 상태를 여기에서 확인할 수 있습니다.'
+                                    : '계약서 발송 후 이 영역에서 서명 상태를 확인할 수 있습니다.'}
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {pendingContract && props.onOpenContractSignature ? (
+                            <button
+                                type="button"
+                                data-testid="contract-sign-open-button"
+                                onClick={() => props.onOpenContractSignature?.(pendingContract)}
+                                className="rounded-[var(--radius-md)] bg-violet-600 px-4 py-2 text-[11px] font-black text-white shadow-sm hover:bg-violet-700"
+                            >
+                                전자서명 진행
+                            </button>
+                        ) : null}
+                        {latestContractDocument ? (
+                            <button
+                                type="button"
+                                data-testid="contract-document-view-button"
+                                onClick={() => openRepositoryDocument(latestContractDocument)}
+                                className="rounded-[var(--radius-md)] border border-violet-200 bg-white px-4 py-2 text-[11px] font-black text-violet-700 hover:bg-violet-50"
+                            >
+                                서명본 보기
+                            </button>
+                        ) : null}
+                    </div>
                 </div>
             </div>
 

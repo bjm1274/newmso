@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 
@@ -76,6 +76,16 @@ interface MyPageMainProps {
   onOpenChatMessage?: (roomId: string, messageId: string) => void;
 }
 
+type EmploymentContractRecord = {
+  id: string;
+  contract_type?: string | null;
+  status?: string | null;
+  requested_at?: string | null;
+  signed_at?: string | null;
+  signature_data?: string | null;
+  [key: string]: unknown;
+};
+
 export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInitialTab, onOpenApproval, setMainMenu, onOpenChatMessage }: MyPageMainProps) {
   const isRetired = user?.status === '퇴사';
   const [activeTab, setActiveTab] = useState<'profile' | 'records' | 'todo' | 'commute' | 'documents' | 'notifications'>('profile');
@@ -87,32 +97,53 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
   const [showSecret, setShowSecret] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
 
-  const [pendingContract, setPendingContract] = useState<Record<string, unknown> | null>(null);
+  const [pendingContract, setPendingContract] = useState<EmploymentContractRecord | null>(null);
+  const [latestContract, setLatestContract] = useState<EmploymentContractRecord | null>(null);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
 
   // 미서명 계약서 확인
   useEffect(() => {
     if (!user?.id) return;
     const checkPendingContracts = async () => {
-      const { data } = await supabase
-        .from('employment_contracts')
-        .select('*')
-        .eq('staff_id', user.id as string)
-        .eq('status', '서명대기')
-        .order('requested_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (data) {
-        setPendingContract(data);
+      const [{ data: nextPending }, { data: nextLatest }] = await Promise.all([
+        supabase
+          .from('employment_contracts')
+          .select('*')
+          .eq('staff_id', user.id as string)
+          .eq('status', '서명대기')
+          .order('requested_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('employment_contracts')
+          .select('*')
+          .eq('staff_id', user.id as string)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+
+      const nextLatestContract = (nextLatest as EmploymentContractRecord | null) ?? null;
+      const nextPendingContract =
+        (nextPending as EmploymentContractRecord | null) ??
+        (nextLatestContract && !nextLatestContract.signed_at ? nextLatestContract : null);
+
+      setLatestContract(nextLatestContract);
+
+      if (nextPendingContract) {
+        setPendingContract(nextPendingContract);
+        setShowSignaturePad(true);
       } else {
         setPendingContract(null);
+        setShowSignaturePad(false);
       }
     };
-    checkPendingContracts();
+    void checkPendingContracts();
   }, [user?.id]);
 
   const handleSignComplete = async (signatureDataUrl: string, contractText: string) => {
-    if (!pendingContract) return;
+    const currentUserId = typeof user?.id === 'string' ? user.id : null;
+    if (!pendingContract || !currentUserId) return;
     try {
       await supabase
         .from('employment_contracts')
@@ -123,13 +154,43 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
         })
         .eq('id', pendingContract.id);
 
+      const { data: checklistRows } = await supabase
+        .from('onboarding_checklists')
+        .select('id, checklist_type, items, target_date')
+        .eq('staff_id', currentUserId);
+
+      const { isChecklistComplete, normalizeChecklistItems, syncChecklistWithContract } = await import('@/lib/hr-checklists');
+      const entryChecklistRow = Array.isArray(checklistRows)
+        ? checklistRows.find((row) => String(row?.checklist_type ?? '').trim() === '입사') ?? null
+        : null;
+      const signedAt = new Date().toISOString();
+      const syncedItems = syncChecklistWithContract(
+        normalizeChecklistItems(entryChecklistRow?.items ?? null, '입사'),
+        '입사',
+        {
+          status: '서명완료',
+          requestedAt: (pendingContract.requested_at as string) || null,
+          signedAt,
+        },
+      );
+      await supabase.from('onboarding_checklists').upsert(
+        {
+          staff_id: currentUserId,
+          checklist_type: '입사',
+          items: syncedItems,
+          target_date: entryChecklistRow?.target_date ?? null,
+          completed_at: isChecklistComplete(syncedItems) ? signedAt : null,
+        },
+        { onConflict: 'staff_id,checklist_type' },
+      );
+
       // 문서 보관함으로 자동 저장 (PDF는 보관함에서 열 때 생성됨)
       await supabase.from('document_repository').insert({
         title: `${user?.name} 근로계약서 (${new Date().toLocaleDateString()})`,
         category: '계약서',
         content: contractText,
         company_name: (user?.company as string) || '전체',
-        created_by: user?.id,
+        created_by: currentUserId,
         version: 1
       });
 
@@ -143,7 +204,14 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
       });
 
       toast('근로계약서 서명이 성공적으로 완료되었습니다. 마이페이지 > 급여·증명서 또는 문서보관함에서 확인하실 수 있습니다.', 'success');
+      window.dispatchEvent(new CustomEvent('erp-contract-signed', { detail: { staffId: user?.id, contractId: pendingContract.id } }));
       setPendingContract(null);
+      setLatestContract({
+        ...pendingContract,
+        status: '서명완료',
+        signed_at: signedAt,
+        signature_data: signatureDataUrl,
+      });
       setShowSignaturePad(false);
     } catch (e) {
       toast('서명 저장 중 오류가 발생했습니다.', 'error');
@@ -398,11 +466,11 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
     <div className="relative h-full min-h-0 flex flex-col overflow-x-hidden app-page px-3 py-2.5 md:px-4 md:py-3">
 
       {/* 전자 서명 전용 신규 모달 */}
-      {pendingContract && (
+      {pendingContract && showSignaturePad && (
         <ContractSignatureModal
           contract={pendingContract}
           user={user}
-          onClose={() => setPendingContract(null)}
+          onClose={() => setShowSignaturePad(false)}
           onSuccess={handleSignComplete}
         />
       )}
@@ -571,7 +639,19 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
               />
             </div>
           )}
-          {activeTab === 'documents' && <div data-testid="mypage-documents-tab" className="pb-3"><MyDocuments user={user} /></div>}
+          {activeTab === 'documents' && (
+            <div data-testid="mypage-documents-tab" className="pb-3">
+              <MyDocuments
+                user={user}
+                latestContract={latestContract}
+                pendingContract={pendingContract}
+                onOpenContractSignature={(contract: EmploymentContractRecord) => {
+                  setPendingContract(contract);
+                  setShowSignaturePad(true);
+                }}
+              />
+            </div>
+          )}
           {activeTab === 'notifications' && <div data-testid="mypage-notifications-tab" className="pb-3"><NotificationInbox user={user} onRefresh={() => { }} /></div>}
       </div>
 
@@ -817,4 +897,5 @@ function QuickFavoriteButton({ label, icon, onClick, active, onRemove }: {
     </button>
   );
 }
+
 

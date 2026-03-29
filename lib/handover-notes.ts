@@ -1,5 +1,5 @@
 ﻿export type HandoverNoteScope = 'general' | 'patient';
-export type HandoverNoteKind = 'note' | 'room_config';
+export type HandoverNoteKind = 'note' | 'room_config' | 'template';
 
 export type HandoverBedConfig = {
   bedNumber: number;
@@ -31,6 +31,9 @@ export type HandoverNoteRow = {
   room_capacity?: number | string | null;
   bed_number?: number | string | null;
   bed_key?: string | null;
+  handover_kind?: string | null;
+  template_name?: string | null;
+  template_version?: number | string | null;
 };
 
 export type HandoverNote = HandoverNoteRow & {
@@ -44,6 +47,8 @@ export type HandoverNote = HandoverNoteRow & {
   bed_number: number | null;
   bed_key: string | null;
   handover_kind: HandoverNoteKind;
+  template_name: string | null;
+  template_version: number | null;
 };
 
 type DecodedHandoverMetadata = {
@@ -55,6 +60,8 @@ type DecodedHandoverMetadata = {
   roomCapacity: number | null;
   bedNumber: number | null;
   handoverKind: HandoverNoteKind;
+  templateName: string | null;
+  templateVersion: number | null;
 };
 
 type HandoverContentOptions = {
@@ -65,6 +72,8 @@ type HandoverContentOptions = {
   roomCapacity?: number | null;
   bedNumber?: number | null;
   handoverKind?: HandoverNoteKind | null;
+  templateName?: string | null;
+  templateVersion?: number | null;
 };
 
 const HANDOVER_MARKER_REGEX = /^\s*\[\[([a-z0-9-]+):(.*?)\]\]\s*/i;
@@ -209,6 +218,8 @@ function decodeHandoverMetadata(content?: string | null): DecodedHandoverMetadat
     roomCapacity: null,
     bedNumber: null,
     handoverKind: 'note',
+    templateName: null,
+    templateVersion: null,
   };
 
   while (true) {
@@ -232,7 +243,12 @@ function decodeHandoverMetadata(content?: string | null): DecodedHandoverMetadat
     } else if (key === 'handover-bed') {
       decoded.bedNumber = normalizeBedNumber(rawValue);
     } else if (key === 'handover-kind') {
-      decoded.handoverKind = rawValue === 'room_config' ? 'room_config' : 'note';
+      decoded.handoverKind =
+        rawValue === 'room_config' || rawValue === 'template' ? rawValue : 'note';
+    } else if (key === 'handover-template-name') {
+      decoded.templateName = rawValue || null;
+    } else if (key === 'handover-template-version') {
+      decoded.templateVersion = normalizeTemplateVersion(rawValue);
     }
 
     remaining = remaining.slice(match[0].length);
@@ -248,10 +264,20 @@ function buildMarkerLine(key: string, value: string | number | null | undefined)
   return normalized ? `[[${key}:${normalized}]]` : null;
 }
 
+function normalizeTemplateVersion(value?: number | string | null): number | null {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  const rounded = Math.trunc(parsed);
+  return rounded > 0 ? rounded : null;
+}
+
 export function encodeHandoverContent(content: string, options: HandoverContentOptions = {}): string {
   const cleanedContent = String(content || '').trim();
   const markers = [
-    buildMarkerLine('handover-kind', options.handoverKind === 'room_config' ? 'room_config' : null),
+    buildMarkerLine(
+      'handover-kind',
+      options.handoverKind === 'room_config' || options.handoverKind === 'template' ? options.handoverKind : null,
+    ),
     buildMarkerLine('handover-date', normalizeDateKey(options.handoverDate)),
     buildMarkerLine(
       'handover-scope',
@@ -261,6 +287,8 @@ export function encodeHandoverContent(content: string, options: HandoverContentO
     buildMarkerLine('handover-room', normalizeRoomNumber(options.roomNumber)),
     buildMarkerLine('handover-capacity', normalizeRoomCapacity(options.roomCapacity)),
     buildMarkerLine('handover-bed', normalizeBedNumber(options.bedNumber)),
+    buildMarkerLine('handover-template-name', options.templateName),
+    buildMarkerLine('handover-template-version', normalizeTemplateVersion(options.templateVersion)),
   ].filter((marker): marker is string => !!marker);
 
   return [...markers, cleanedContent].filter(Boolean).join('\n');
@@ -272,6 +300,12 @@ export function normalizeHandoverNote(row: HandoverNoteRow): HandoverNote {
   const roomNumber = normalizeRoomNumber(row.room_number || decoded.roomNumber) || null;
   const roomCapacity = normalizeRoomCapacity(row.room_capacity ?? decoded.roomCapacity);
   const bedNumber = normalizeBedNumber(row.bed_number ?? decoded.bedNumber);
+  const templateName = String(row.template_name || decoded.templateName || '').trim() || null;
+  const templateVersion = normalizeTemplateVersion(row.template_version ?? decoded.templateVersion);
+  const handoverKind: HandoverNoteKind =
+    row.handover_kind === 'room_config' || row.handover_kind === 'template'
+      ? row.handover_kind
+      : decoded.handoverKind;
   const noteScope: HandoverNoteScope =
     row.note_scope === 'patient' || decoded.noteScope === 'patient' || patientName
       ? 'patient'
@@ -291,7 +325,9 @@ export function normalizeHandoverNote(row: HandoverNoteRow): HandoverNote {
     room_capacity: roomCapacity,
     bed_number: bedNumber,
     bed_key: row.bed_key || buildBedKey(roomNumber, bedNumber),
-    handover_kind: decoded.handoverKind,
+    handover_kind: handoverKind,
+    template_name: templateName,
+    template_version: templateVersion,
   };
 }
 

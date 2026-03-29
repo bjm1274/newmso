@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useDeferredValue, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { canAccessBoard, isAdminUser, isPrivilegedUser } from '@/lib/access-control';
+import { getStaffLikeId, resolveStaffLike } from '@/lib/staff-identity';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import SmartDatePicker from './공통/SmartDatePicker';
@@ -15,6 +16,7 @@ const BOARD_POST_OPTIONAL_COLUMNS = [
   'tags',
   'attachments',
   'likes_count',
+  'status',
   'scheduled_publish_at',
   'schedule_date',
   'schedule_time',
@@ -49,7 +51,16 @@ type ScheduleMetaPayload = {
 
 type BoardMetaPayload = {
   scheduled_publish_at?: string;
+  status?: string;
 };
+
+type BoardReadRow = {
+  post_id: string;
+  user_id: string;
+  read_at?: string | null;
+};
+
+type StaffSummary = Pick<StaffMember, 'id' | 'name' | 'company' | 'company_id' | 'department' | 'position' | 'status'>;
 
 function inferAttachmentType(nameOrUrl: string, explicitType?: string | null) {
   const normalizedExplicitType = String(explicitType || '').trim().toLowerCase();
@@ -249,7 +260,7 @@ function extractBoardMetaFromContent(value: unknown) {
 
 function buildBoardMetaContent(visibleContent: string, meta: BoardMetaPayload | null) {
   const normalizedVisibleContent = visibleContent.trim();
-  if (!meta || !meta.scheduled_publish_at) return normalizedVisibleContent;
+  if (!meta || (!meta.scheduled_publish_at && !meta.status)) return normalizedVisibleContent;
   return `${normalizedVisibleContent}${normalizedVisibleContent ? '\n' : ''}${BOARD_META_PREFIX}${JSON.stringify(meta)}${BOARD_META_SUFFIX}`;
 }
 
@@ -280,6 +291,7 @@ function normalizeBoardPost<T extends Partial<BoardPost>>(post: T): T {
     ...post,
     content: displayContent,
     attachments: normalizedAttachments,
+    status: String(post.status ?? boardMeta?.status ?? '').trim() || null,
     scheduled_publish_at: normalizeScheduledPublishAtValue(post.scheduled_publish_at ?? boardMeta?.scheduled_publish_at ?? ''),
     schedule_date: normalizedScheduleDate,
     schedule_time: normalizedScheduleTime,
@@ -313,6 +325,42 @@ function getMissingBoardPostColumn(error: unknown) {
   const e = error as Record<string, unknown>;
   const message = `${e?.message || ''} ${e?.details || ''} ${e?.hint || ''}`.toLowerCase();
   return BOARD_POST_OPTIONAL_COLUMNS.find((column) => message.includes(column.toLowerCase())) || null;
+}
+
+function isMissingBoardReadStorageError(error: unknown) {
+  const e = error as Record<string, unknown> | null;
+  const code = String(e?.code || '').trim();
+  const message = `${e?.message || ''} ${e?.details || ''} ${e?.hint || ''}`.toLowerCase();
+  return (
+    code === '42P01' ||
+    code === '42703' ||
+    code === '42P10' ||
+    message.includes('board_post_reads') ||
+    message.includes('relation') && message.includes('does not exist')
+  );
+}
+
+function normalizeBoardPostStatus(value: unknown) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '게시중';
+  return raw;
+}
+
+const BOARD_POST_STATUSES = ['게시중', '중요', '검토중', '완료', '보류'] as const;
+
+function getBoardStatusTone(status: string | null | undefined) {
+  switch (normalizeBoardPostStatus(status)) {
+    case '중요':
+      return 'bg-red-50 text-red-600';
+    case '검토중':
+      return 'bg-amber-50 text-amber-700';
+    case '완료':
+      return 'bg-emerald-50 text-emerald-700';
+    case '보류':
+      return 'bg-slate-100 text-slate-600';
+    default:
+      return 'bg-[var(--toss-blue-light)] text-[var(--accent)]';
+  }
 }
 
 async function runBoardPostMutation<T>(
@@ -374,6 +422,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const [content, setContent] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [scheduledPublishAt, setScheduledPublishAt] = useState('');
+  const [postStatus, setPostStatus] = useState<string>('게시중');
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
   const [scheduleRoom, setScheduleRoom] = useState('');
@@ -405,7 +454,14 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const [comments, setComments] = useState<Record<string, Record<string, unknown>[]>>({});
   const [newComment, setNewComment] = useState('');
   const [myLikedPostIds, setMyLikedPostIds] = useState<Set<string>>(new Set());
+  const [postReadMap, setPostReadMap] = useState<Record<string, Set<string>>>({});
+  const [boardAudience, setBoardAudience] = useState<StaffSummary[]>([]);
+  const [readStatusPost, setReadStatusPost] = useState<BoardPost | null>(null);
+  const [readStatusLoading, setReadStatusLoading] = useState(false);
   const [noticeVisibilityTick, setNoticeVisibilityTick] = useState(() => Date.now());
+  const [effectiveBoardUserId, setEffectiveBoardUserId] = useState<string>(
+    () => getStaffLikeId((user ?? null) as Record<string, unknown> | null) || String(user?.id ?? '').trim()
+  );
 
   // 수술/검사명 프리셋 (Supabase surgery_templates / mri_templates)
   const [surgeryTemplates, setSurgeryTemplates] = useState<Record<string, unknown>[]>([]);
@@ -439,6 +495,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const viewedPostIdRef = useRef<string | null>(null);
   // 댓글 대댓글용 부모 댓글 ID
   const [replyParentId, setReplyParentId] = useState<string | null>(null);
+  const readMarkingRef = useRef<Set<string>>(new Set());
 
   // 알림 등에서 딥링크 ID로 진입 시 해당 게시물 모달 즉시 열기
   useEffect(() => {
@@ -447,6 +504,25 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       onConsumePostId?.();
     }
   }, [initialPostId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      if (!user) {
+        if (!cancelled) setEffectiveBoardUserId('');
+        return;
+      }
+
+      const resolved = await resolveStaffLike((user ?? null) as Record<string, unknown> | null);
+      if (cancelled) return;
+      setEffectiveBoardUserId(getStaffLikeId(resolved) || String(resolved?.id ?? '').trim());
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.employee_no, user?.name]);
 
   // 근무형태별 오늘 근무 현황 및 교대근무 부분 삭제 처리됨
 
@@ -493,6 +569,107 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       return canScheduleNoticePost;
     });
   }, [posts, noticeVisibilityTick, canScheduleNoticePost]);
+
+  const loadBoardAudience = useCallback(async () => {
+    if (!effectiveBoardUserId) {
+      setBoardAudience([]);
+      return;
+    }
+
+    const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
+    const scopedCompanyId = isMso ? selectedCompanyId : user?.company_id;
+    const scopedCompanyName =
+      isMso
+        ? selectedCo && selectedCo !== '전체'
+          ? selectedCo
+          : null
+        : user?.company ?? null;
+
+    const loadStaff = async () => {
+      let query = supabase
+        .from('staff_members')
+        .select('id, name, company, company_id, department, position, status')
+        .neq('status', '퇴사');
+      if (scopedCompanyId) {
+        query = query.eq('company_id', scopedCompanyId);
+      } else if (scopedCompanyName) {
+        query = query.eq('company', scopedCompanyName);
+      }
+      return query.order('name', { ascending: true });
+    };
+
+    const { data, error } = await loadStaff();
+    if (error) {
+      console.warn('board audience load failed', error);
+      return;
+    }
+    setBoardAudience((data || []) as StaffSummary[]);
+  }, [effectiveBoardUserId, selectedCo, selectedCompanyId, user]);
+
+  const loadBoardReadState = useCallback(async (postIds?: string[]) => {
+    const targetIds = (postIds || visiblePosts.map((post) => String(post.id ?? '').trim()).filter(Boolean));
+    if (targetIds.length === 0) {
+      setPostReadMap({});
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('board_post_reads')
+      .select('post_id, user_id, read_at')
+      .in('post_id', targetIds);
+
+    if (error) {
+      if (!isMissingBoardReadStorageError(error)) {
+        console.warn('board read state load failed', error);
+      }
+      return;
+    }
+
+    const nextMap: Record<string, Set<string>> = {};
+    (data as BoardReadRow[] | null | undefined)?.forEach((row) => {
+      const postId = String(row.post_id || '').trim();
+      const userId = String(row.user_id || '').trim();
+      if (!postId || !userId) return;
+      if (!nextMap[postId]) nextMap[postId] = new Set<string>();
+      nextMap[postId].add(userId);
+    });
+    setPostReadMap(nextMap);
+  }, [visiblePosts]);
+
+  const markBoardPostRead = useCallback(async (post: BoardPost | null) => {
+    if (!post?.id || !effectiveBoardUserId) return;
+    const postId = String(post.id).trim();
+    if (!postId || readMarkingRef.current.has(postId)) return;
+
+    readMarkingRef.current.add(postId);
+    setPostReadMap((prev) => {
+      const next = { ...prev };
+      const current = new Set(next[postId] || []);
+      current.add(effectiveBoardUserId);
+      next[postId] = current;
+      return next;
+    });
+
+    const { error } = await supabase.from('board_post_reads').upsert(
+      [{ post_id: postId, user_id: effectiveBoardUserId, read_at: new Date().toISOString() }],
+      { onConflict: 'post_id,user_id' }
+    );
+
+    if (error && !isMissingBoardReadStorageError(error)) {
+      console.warn('board read mark failed', error);
+    }
+
+    readMarkingRef.current.delete(postId);
+  }, [effectiveBoardUserId]);
+  const openReadStatusModal = useCallback(async (post: BoardPost) => {
+    setReadStatusPost(post);
+    setReadStatusLoading(true);
+    try {
+      await loadBoardReadState([String(post.id)]);
+    } finally {
+      setReadStatusLoading(false);
+    }
+  }, [loadBoardReadState]);
   const scheduleCalendarData = useMemo(() => {
     const toKey = (date: Date) =>
       `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -692,9 +869,10 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
   useEffect(() => {
     fetchPosts();
+    void loadBoardAudience();
     // 내 좋아요 목록 로드
-    if (user?.id) {
-      supabase.from('board_post_likes').select('post_id').eq('user_id', user.id).then(({ data }) => {
+    if (effectiveBoardUserId) {
+      supabase.from('board_post_likes').select('post_id').eq('user_id', effectiveBoardUserId).then(({ data }) => {
         setMyLikedPostIds(
           new Set(
             (data || [])
@@ -708,7 +886,24 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     if (activeBoard === '수술일정' || activeBoard === 'MRI일정') {
       setCalendarMonth(new Date());
     }
-  }, [activeBoard, selectedCo, selectedCompanyId, user?.id, user?.company, user?.company_id]);
+  }, [activeBoard, effectiveBoardUserId, selectedCo, selectedCompanyId, user?.company, user?.company_id, loadBoardAudience]);
+
+  useEffect(() => {
+    void loadBoardReadState();
+  }, [loadBoardReadState]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('board-post-reads-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'board_post_reads' }, () => {
+        void loadBoardReadState();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadBoardReadState]);
 
   // 수술/검사 템플릿 필터링 로직 (유지)
 
@@ -742,9 +937,10 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     fetchComments(selectedPostId);
   }, [selectedPostId, comments]);
 
+
   // 수술·MRI 일정 카드 → 관련 채팅방 열기
   const openChatForSchedule = async (post: BoardPost) => {
-    if (!user?.id) {
+    if (!effectiveBoardUserId) {
       toast('직원 계정으로 로그인한 경우에만 채팅을 사용할 수 있습니다.');
       return;
     }
@@ -765,7 +961,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
             {
               name: roomName,
               type: 'group',
-              members: [user.id],
+              members: [effectiveBoardUserId],
             },
           ])
           .select()
@@ -792,7 +988,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const likingRef = useRef(false);
   const [likingPostId, setLikingPostId] = useState<string | null>(null);
   const handleLike = async (post: BoardPost) => {
-    if (!user?.id || likingRef.current) return;
+    if (!effectiveBoardUserId || likingRef.current) return;
     const postId = String(post.id ?? '').trim();
     if (!postId) return;
     likingRef.current = true;
@@ -818,10 +1014,10 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
     try {
       if (isLiked) {
-        const { error: unlikeError } = await supabase.from('board_post_likes').delete().eq('post_id', post.id).eq('user_id', user.id);
+        const { error: unlikeError } = await supabase.from('board_post_likes').delete().eq('post_id', post.id).eq('user_id', effectiveBoardUserId);
         if (unlikeError && !(unlikeError.code === '42P01' || unlikeError.message?.includes('does not exist'))) throw unlikeError;
       } else {
-        const { error: likeError } = await supabase.from('board_post_likes').insert([{ post_id: post.id, user_id: user.id }]);
+        const { error: likeError } = await supabase.from('board_post_likes').insert([{ post_id: post.id, user_id: effectiveBoardUserId }]);
         if (likeError && !(likeError.code === '42P01' || likeError.message?.includes('does not exist'))) throw likeError;
       }
       // ── 실제 COUNT 기반으로 likes_count 동기화 (race condition 방지) ──
@@ -847,7 +1043,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
   const handleAddComment = async (postId: string, parentCommentId?: string | null) => {
     if (!newComment.trim()) return;
-    if (!user?.id) {
+    if (!effectiveBoardUserId) {
       toast('로그인한 후 댓글을 등록할 수 있습니다.', 'success');
       return;
     }
@@ -855,8 +1051,8 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       .from('board_post_comments')
       .insert([{
         post_id: postId,
-        author_id: user.id,
-        author_name: user.name ?? '익명',
+        author_id: effectiveBoardUserId,
+        author_name: user?.name ?? '익명',
         content: newComment.trim(),
         parent_comment_id: parentCommentId ?? null,
       }])
@@ -877,12 +1073,12 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   };
 
   const handleDeleteComment = async (postId: string, commentId: string) => {
-    if (!user?.id) return;
+    if (!effectiveBoardUserId) return;
     const list = comments[postId] || [];
     const comment = list.find((c: Record<string, unknown>) => c.id === commentId);
     if (!comment) return;
     const isSysAdmin = isPrivilegedUser(user);
-    if (String(comment.author_id) !== String(user.id) && !isSysAdmin) {
+    if (String(comment.author_id) !== effectiveBoardUserId && !isSysAdmin) {
       toast('본인이 작성한 댓글만 삭제할 수 있습니다.', 'error');
       return;
     }
@@ -931,6 +1127,23 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
     return { roots, repliesByParent };
   }, [selectedPostComments]);
+  const readStatusReaders = useMemo(() => {
+    if (!readStatusPost) return [];
+    const postId = String(readStatusPost.id ?? '').trim();
+    const readSet = postReadMap[postId] || new Set<string>();
+    return boardAudience.filter((member) => readSet.has(String(member.id ?? '').trim()));
+  }, [boardAudience, postReadMap, readStatusPost]);
+  const readStatusPendingAudience = useMemo(() => {
+    if (!readStatusPost) return [];
+    const postId = String(readStatusPost.id ?? '').trim();
+    const readSet = postReadMap[postId] || new Set<string>();
+    return boardAudience.filter((member) => !readSet.has(String(member.id ?? '').trim()));
+  }, [boardAudience, postReadMap, readStatusPost]);
+
+  useEffect(() => {
+    if (!selectedPost) return;
+    void markBoardPostRead(selectedPost);
+  }, [selectedPost, markBoardPostRead]);
 
   useEffect(() => {
     if (!selectedPostId) {
@@ -991,13 +1204,13 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     if (!user) return false;
     if (!canAccessBoard(user, (post?.board_type as string) || activeBoard, 'write')) return false;
     // 일반 직원도 자신이 올린 수술/MRI일정에 대해 '요청'을 할 수 있도록 조건 완화 (작성자 본인 포함)
-    return (post.author_id && String(post.author_id) === String(user.id)) || isDepartmentHead;
+    return (post.author_id && String(post.author_id) === effectiveBoardUserId) || isDepartmentHead;
   };
 
   const canDeletePost = (post: BoardPost) => {
     if (!user) return false;
     if (!canAccessBoard(user, (post?.board_type as string) || activeBoard, 'write')) return false;
-    const isAuthor = Boolean(post.author_id && String(post.author_id) === String(user.id));
+    const isAuthor = Boolean(post.author_id && String(post.author_id) === effectiveBoardUserId);
     // 작성자 본인 또는 시스템관리자만 삭제 가능
     return isAuthor || isPrivilegedUser(user);
   };
@@ -1006,7 +1219,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     if (!user) return;
     try {
       const rows: Record<string, unknown>[] = [{
-        sender_id: user.id,
+        sender_id: effectiveBoardUserId,
         sender_name: user.name,
         sender_company: user.company,
         type: '기타',
@@ -1062,6 +1275,29 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     }
     setEditingPostId(post.id);
     setTitle(post.title || '');
+    const rawPoll =
+      post.poll && typeof post.poll === 'object' && !Array.isArray(post.poll)
+        ? (post.poll as Record<string, unknown>)
+        : null;
+    const restoredPollOptions = rawPoll && Array.isArray(rawPoll.options)
+      ? rawPoll.options.map((option) => String(option ?? '').trim()).filter(Boolean)
+      : [];
+
+    setPostStatus(normalizeBoardPostStatus(post.status));
+    setTagsInput((post.tags || []).join(', '));
+    setScheduledPublishAt(formatScheduledPublishInputValue(post.scheduled_publish_at));
+    setExistingAttachmentItems(Array.isArray(post.attachments) ? (post.attachments as AttachmentItem[]) : []);
+    setAttachmentFiles([]);
+    setIsAnonymous(Boolean(post.is_anonymous));
+    setHasPoll(Boolean(rawPoll));
+    setPollQuestion(rawPoll ? String(rawPoll.question ?? '') : '');
+    setPollOptions(
+      rawPoll
+        ? [...restoredPollOptions, ...Array.from({ length: Math.max(0, 2 - restoredPollOptions.length) }, () => '')]
+        : ['', '']
+    );
+    setPollAnonymous(Boolean(rawPoll?.anonymous));
+    setPollMultiple(Boolean(rawPoll?.multiple));
     if (activeBoard === '수술일정' || activeBoard === 'MRI일정') {
       const parts = (post.title || '').split(' ');
       if (['좌측', '우측'].includes(parts[0])) {
@@ -1100,10 +1336,6 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       setScheduleContrastRequired(!!post.mri_contrast_required);
     } else {
       setContent(post.content || '');
-      setTagsInput((post.tags || []).join(', '));
-      setScheduledPublishAt(formatScheduledPublishInputValue(post.scheduled_publish_at));
-      setExistingAttachmentItems(Array.isArray(post.attachments) ? (post.attachments as AttachmentItem[]) : []);
-      setAttachmentFiles([]);
     }
     setShowNewPost(true);
     setSelectedPostId(null);
@@ -1113,6 +1345,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     setTitle('');
     setContent('');
     setScheduledPublishAt('');
+    setPostStatus('게시중');
     setScheduleDate('');
     setScheduleTime('');
     setSchedulePeriod('');
@@ -1219,14 +1452,17 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
               contrast: activeBoard === 'MRI일정' ? scheduleContrastRequired : false,
             }) || null
           : normalizedContent || null,
+        status: normalizeBoardPostStatus(postStatus),
         company: user?.company || null,
         tags: tags,
         author_name: useAnonymous ? '익명' : (user?.name || '익명'),
         author_id: useAnonymous ? null : user?.id,
         is_anonymous: useAnonymous,
-        likes_count: 0,
-        created_at: new Date().toISOString(),
       };
+      if (!editingPostId) {
+        postData.likes_count = 0;
+        postData.created_at = new Date().toISOString();
+      }
       // 투표 데이터 포함
       if (hasPoll) {
         const validOptions = pollOptions.map((o) => o.trim()).filter(Boolean);
@@ -1241,6 +1477,8 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
           anonymous: pollAnonymous,
           multiple: pollMultiple,
         };
+      } else if (editingPostId) {
+        postData.poll = null;
       }
       if (user?.company_id) {
         postData.company_id = user.company_id;
@@ -1263,6 +1501,10 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         postData.mri_contrast_required = activeBoard === 'MRI일정' ? scheduleContrastRequired : null;
         const sidePrefix = scheduleSide === '좌' ? '좌측 ' : scheduleSide === '우' ? '우측 ' : '';
         postData.title = sidePrefix + (postData.title || '');
+        postData.content =
+          buildBoardMetaContent(String(postData.content || ''), {
+            status: normalizeBoardPostStatus(postStatus),
+          }) || null;
       }
 
       // 공지/자유/경조사/소리함: 사진·동영상·파일 첨부 업로드
@@ -1297,17 +1539,19 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       if (!isScheduleBoard) {
         const uploadedAttachments = Array.isArray(postData.attachments) ? (postData.attachments as AttachmentItem[]) : [];
         const persistedAttachments = [...existingAttachmentItems, ...uploadedAttachments];
+        const shouldPersistAttachments = boardWithAttach.includes(activeBoard);
         let normalizedBoardContent = normalizedContent || '';
-        if (persistedAttachments.length > 0) {
+        const normalizedPostMeta = {
+          scheduled_publish_at: activeBoard === '공지사항' ? normalizedScheduledPublishAt || undefined : undefined,
+          status: normalizeBoardPostStatus(postStatus),
+        };
+        if (shouldPersistAttachments) {
           postData.attachments = persistedAttachments;
-          normalizedBoardContent = buildAttachmentMetaContent(normalizedBoardContent, persistedAttachments);
+          if (persistedAttachments.length > 0) {
+            normalizedBoardContent = buildAttachmentMetaContent(normalizedBoardContent, persistedAttachments);
+          }
         }
-        postData.content = buildBoardMetaContent(
-          normalizedBoardContent,
-          activeBoard === '공지사항' && normalizedScheduledPublishAt
-            ? { scheduled_publish_at: normalizedScheduledPublishAt }
-            : null
-        ) || null;
+        postData.content = buildBoardMetaContent(normalizedBoardContent, normalizedPostMeta) || null;
       }
 
       // 수정 모드인 경우 업데이트
@@ -1527,6 +1771,23 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                         placeholder="게시물 제목을 입력하세요."
                         className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
                       />
+                      <div className="mt-4">
+                        <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">
+                          게시 상태
+                        </label>
+                        <select
+                          data-testid="board-post-status"
+                          value={postStatus}
+                          onChange={(e) => setPostStatus(normalizeBoardPostStatus(e.target.value))}
+                          className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
+                        >
+                          {BOARD_POST_STATUSES.map((status) => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </>
                   )}
                 </div>
@@ -1680,6 +1941,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                         </label>
                       </div>
                     )}
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className={`rounded-[var(--radius-md)] px-2 py-1 text-[11px] font-semibold ${getBoardStatusTone(postStatus)}`}>
+                        {normalizeBoardPostStatus(postStatus)}
+                      </span>
+                    </div>
                   </div>
                 ) : (
                   <>
@@ -2264,6 +2530,9 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                             <p className="font-bold text-[var(--foreground)] truncate group-hover:text-[var(--accent)]">
                               {post.title}
                             </p>
+                            <span className={`shrink-0 rounded-[var(--radius-md)] px-2 py-1 text-[11px] font-semibold ${getBoardStatusTone(post.status)}`}>
+                              {normalizeBoardPostStatus(post.status)}
+                            </span>
                             {isPendingScheduledNotice && (
                               <span className="shrink-0 rounded-[var(--radius-md)] bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700">
                                 예약
@@ -2331,6 +2600,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                       👤 {selectedPost.author_name || '익명'} ·{' '}
                       {new Date(selectedPost.created_at ?? '').toLocaleString('ko-KR')}
                     </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className={`rounded-[var(--radius-md)] px-2 py-1 text-[11px] font-semibold ${getBoardStatusTone(selectedPost.status)}`}>
+                        {normalizeBoardPostStatus(selectedPost.status)}
+                      </span>
+                    </div>
                     {selectedPost.board_type === '공지사항' && selectedPost.scheduled_publish_at && (
                       <p className="mt-1 text-[11px] md:text-[12px] font-bold text-amber-700">
                         예약 게시: {new Date(selectedPost.scheduled_publish_at).toLocaleString('ko-KR')}
@@ -2350,6 +2624,13 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                       }`}
                     >
                       {myLikedPostIds.has(String(selectedPost.id ?? '').trim()) ? '♥' : '♡'} 좋아요 {(selectedPost.likes_count as number) ?? 0}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void openReadStatusModal(selectedPost)}
+                      className="px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--border)] text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
+                    >
+                      읽음 확인
                     </button>
                     {(canEditPost(selectedPost) || canDeletePost(selectedPost)) && (
                       <>
@@ -2388,7 +2669,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                 {((selectedPost as Record<string, unknown>).poll ? (() => {
                   const poll = (selectedPost as Record<string, unknown>).poll as { question?: string; options?: string[]; anonymous?: boolean; multiple?: boolean };
                   const votes = ((selectedPost as Record<string, unknown>).poll_votes || {}) as Record<string, string[]>;
-                  const myId = user?.id;
+                  const myId = effectiveBoardUserId;
                   const hasVoted = Object.values(votes).some((arr) => Array.isArray(arr) && arr.includes(String(myId)));
                   const totalVotes = Object.values(votes).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
 
@@ -2636,7 +2917,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                                     답글
                                   </button>
                                 )}
-                                {((user?.id && String(c.author_id) === String(user.id)) || isPrivilegedUser(user)) && (
+                                {((effectiveBoardUserId && String(c.author_id) === effectiveBoardUserId) || isPrivilegedUser(user)) && (
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteComment(selectedPost.id, c.id)}
@@ -2651,7 +2932,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                               <div key={r.id} className="ml-6 text-xs text-[var(--toss-gray-4)] flex gap-2 items-center flex-wrap">
                                 <span className="font-bold">{r.author_name}:</span>
                                 <span className="flex-1 min-w-0">{r.content}</span>
-                                {((user?.id && String(r.author_id) === String(user.id)) || isPrivilegedUser(user)) && (
+                                {((effectiveBoardUserId && String(r.author_id) === effectiveBoardUserId) || isPrivilegedUser(user)) && (
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteComment(selectedPost.id, r.id)}
@@ -2691,6 +2972,92 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                   </div>
                 </div>
 
+              </div>
+            </div>
+          )}
+          {readStatusPost && (
+            <div
+              className="fixed inset-0 z-[120] flex items-end md:items-center justify-center bg-black/40 p-0 md:p-5"
+              onClick={() => setReadStatusPost(null)}
+            >
+              <div
+                className="w-full max-w-2xl max-h-[80dvh] overflow-y-auto bg-[var(--card)] border-0 md:border border-[var(--border)] rounded-t-[24px] md:rounded-[var(--radius-xl)] shadow-sm p-4 md:p-5 space-y-4 safe-area-pb"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">
+                      읽음 현황
+                    </p>
+                    <h3 className="text-lg font-semibold text-[var(--foreground)]">
+                      {readStatusPost.title}
+                    </h3>
+                    <p className="mt-1 text-[12px] text-[var(--toss-gray-3)] font-medium">
+                      읽음 {readStatusReaders.length}명 · 미확인 {readStatusPendingAudience.length}명
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setReadStatusPost(null)}
+                    className="px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--border)] text-[11px] font-bold text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
+                  >
+                    닫기
+                  </button>
+                </div>
+                {readStatusLoading ? (
+                  <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-4 py-6 text-center text-sm font-semibold text-[var(--toss-gray-3)]">
+                    읽음 현황을 불러오는 중입니다.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-bold text-[var(--foreground)]">읽음</p>
+                        <span className="text-xs font-semibold text-emerald-600">{readStatusReaders.length}명</span>
+                      </div>
+                      <div className="space-y-2">
+                        {readStatusReaders.length > 0 ? (
+                          readStatusReaders.map((member) => (
+                            <div
+                              key={`reader-${String(member.id ?? '')}`}
+                              className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)]/40 px-3 py-2"
+                            >
+                              <p className="text-sm font-semibold text-[var(--foreground)]">{member.name || '이름 없음'}</p>
+                              <p className="text-[11px] text-[var(--toss-gray-3)] font-medium">
+                                {[member.department, member.position].filter(Boolean).join(' · ') || '부서/직급 미지정'}
+                              </p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-[12px] font-medium text-[var(--toss-gray-3)]">아직 읽은 직원이 없습니다.</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-bold text-[var(--foreground)]">미확인</p>
+                        <span className="text-xs font-semibold text-amber-600">{readStatusPendingAudience.length}명</span>
+                      </div>
+                      <div className="space-y-2">
+                        {readStatusPendingAudience.length > 0 ? (
+                          readStatusPendingAudience.map((member) => (
+                            <div
+                              key={`pending-${String(member.id ?? '')}`}
+                              className="rounded-[var(--radius-md)] bg-amber-50 px-3 py-2"
+                            >
+                              <p className="text-sm font-semibold text-[var(--foreground)]">{member.name || '이름 없음'}</p>
+                              <p className="text-[11px] text-[var(--toss-gray-3)] font-medium">
+                                {[member.department, member.position].filter(Boolean).join(' · ') || '부서/직급 미지정'}
+                              </p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-[12px] font-medium text-[var(--toss-gray-3)]">모든 대상자가 읽었습니다.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

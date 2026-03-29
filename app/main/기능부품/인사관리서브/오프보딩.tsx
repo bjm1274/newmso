@@ -1,353 +1,673 @@
 'use client';
-import { toast } from '@/lib/toast';
-import { useState, useMemo } from 'react';
-import { supabase } from '@/lib/supabase';
+
+import { useEffect, useMemo, useState } from 'react';
 import SmartDatePicker from '../공통/SmartDatePicker';
+import { toast } from '@/lib/toast';
+import { supabase } from '@/lib/supabase';
+import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
+import {
+  countChecklistDone,
+  getDefaultChecklist,
+  getChecklistTargetDate,
+  isChecklistComplete,
+  normalizeChecklistItems,
+  toggleChecklistItem,
+  type ChecklistItem,
+} from '@/lib/hr-checklists';
+import type { StaffMember } from '@/types';
 
-export default function OffboardingView({ staffs, selectedCo = '전체', onRefresh }: Record<string, unknown>) {
-    const _staffs = (staffs as Record<string, unknown>[]) ?? [];
-    const _onRefresh = onRefresh as () => void;
-    const [activeTab, setActiveTab] = useState<'진행중' | '과거이력'>('진행중');
-    const [selectedStaff, setSelectedStaff] = useState<string>('');
-    const [exitDate, setExitDate] = useState<string>('');
-    const [reason, setReason] = useState<string>('개인 사유');
-    const [offboardings, setOffboardings] = useState<any[]>([]); // mock or fetch from DB
-    const [loading, setLoading] = useState(false);
-    const [checklist, setChecklist] = useState<Record<string, Record<string, boolean>>>({});
+type Props = {
+  staffs?: StaffMember[];
+  selectedCo?: string;
+  onRefresh?: () => void;
+};
 
-    const toggleCheck = (staffId: string, item: string) => {
-        setChecklist(prev => ({
-            ...prev,
-            [staffId]: { ...(prev[staffId] || {}), [item]: !(prev[staffId]?.[item]) }
-        }));
+type ChecklistRow = {
+  staff_id: string;
+  checklist_type: '퇴사';
+  items: ChecklistItem[];
+};
+
+function getOriginalStatus(staff: StaffMember) {
+  const saved = staff.permissions?.offboarding_original_status;
+  if (typeof saved === 'string' && saved.trim()) return saved.trim();
+  return staff.status === '계약' ? '계약' : '재직';
+}
+
+function getOriginalRole(staff: StaffMember) {
+  const saved = staff.permissions?.offboarding_original_role;
+  if (typeof saved === 'string' && saved.trim()) return saved.trim();
+  return staff.role === 'inactive' ? 'staff' : staff.role || 'staff';
+}
+
+function getPendingChecklist(checklistRow?: ChecklistRow | null) {
+  return checklistRow ? normalizeChecklistItems(checklistRow.items, '퇴사') : getDefaultChecklist('퇴사');
+}
+
+function getDisplayText(value: unknown, fallback = '-') {
+  return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+}
+
+export default function OffboardingView({
+  staffs = [],
+  selectedCo = '전체',
+  onRefresh,
+}: Props) {
+  const [activeTab, setActiveTab] = useState<'진행중' | '과거이력'>('진행중');
+  const [selectedStaff, setSelectedStaff] = useState('');
+  const [exitDate, setExitDate] = useState('');
+  const [reason, setReason] = useState('개인 사유');
+  const [loading, setLoading] = useState(false);
+  const [checklistsByStaff, setChecklistsByStaff] = useState<Record<string, ChecklistItem[]>>({});
+  const [existingChecklistRows, setExistingChecklistRows] = useState<Record<string, boolean>>({});
+
+  const filteredStaffs = useMemo(() => {
+    return staffs.filter((staff) => selectedCo === '전체' || staff.company === selectedCo);
+  }, [selectedCo, staffs]);
+
+  const eligibleStaffs = useMemo(() => {
+    return filteredStaffs.filter((staff) => staff.status === '재직' || staff.status === '계약');
+  }, [filteredStaffs]);
+
+  const pendingList = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return filteredStaffs.filter((staff) => {
+      if (staff.status === '퇴사예정') return true;
+      if (staff.status !== '퇴사') return false;
+      if (typeof staff.resigned_at !== 'string' || !staff.resigned_at) return false;
+      return staff.resigned_at >= today;
+    });
+  }, [filteredStaffs]);
+
+  const pastList = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return filteredStaffs.filter((staff) => {
+      if (staff.status !== '퇴사') return false;
+      if (!staff.resigned_at) return true;
+      return staff.resigned_at < today;
+    });
+  }, [filteredStaffs]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadChecklists = async () => {
+      if (pendingList.length === 0) {
+        if (!cancelled) {
+          setChecklistsByStaff({});
+          setExistingChecklistRows({});
+        }
+        return;
+      }
+
+      const ids = pendingList.map((staff) => String(staff.id));
+      const { data, error } = await supabase
+        .from('onboarding_checklists')
+        .select('staff_id, checklist_type, items, target_date')
+        .eq('checklist_type', '퇴사')
+        .in('staff_id', ids);
+
+      if (cancelled) return;
+
+      if (error) {
+        console.warn('퇴사 체크리스트 조회 실패:', error);
+        const fallback = ids.reduce<Record<string, ChecklistItem[]>>((acc, id) => {
+          acc[id] = getDefaultChecklist('퇴사');
+          return acc;
+        }, {});
+        setChecklistsByStaff(fallback);
+        setExistingChecklistRows({});
+        return;
+      }
+
+      const rows = [...(data ?? [])];
+      const missingStaffs = pendingList.filter(
+        (staff) => !rows.some((row) => String(row.staff_id) === String(staff.id)),
+      );
+
+      if (missingStaffs.length > 0) {
+        const fallbackRows = missingStaffs.map((staff) => {
+          const resignedAt =
+            typeof staff.resigned_at === 'string' && staff.resigned_at.trim()
+              ? staff.resigned_at
+              : null;
+
+          return {
+            staff_id: staff.id,
+            checklist_type: '퇴사' as const,
+            items: getDefaultChecklist('퇴사'),
+            target_date: getChecklistTargetDate('퇴사', resignedAt),
+            completed_at: null,
+          };
+        });
+
+        const { data: createdRows, error: createError } = await supabase
+          .from('onboarding_checklists')
+          .upsert(fallbackRows, { onConflict: 'staff_id,checklist_type' })
+          .select('staff_id, checklist_type, items, target_date');
+
+        if (createError) {
+          console.warn('퇴사 체크리스트 자동 보정 실패:', createError);
+        } else if (createdRows) {
+          rows.push(...createdRows);
+        }
+      }
+
+      const nextRows: Record<string, boolean> = {};
+      const nextChecklists: Record<string, ChecklistItem[]> = {};
+      ids.forEach((id) => {
+        const matched = rows.find((row) => String(row.staff_id) === id);
+        nextRows[id] = Boolean(matched);
+        nextChecklists[id] = getPendingChecklist(matched as ChecklistRow | undefined);
+      });
+
+      setExistingChecklistRows(nextRows);
+      setChecklistsByStaff(nextChecklists);
     };
-    const isChecked = (staffId: string, item: string) => !!checklist[staffId]?.[item];
-    const allChecked = (staffId: string) => {
-        const items = checklist[staffId];
-        if (!items) return false;
-        return ['계정파기', '비품회수', '서약서징구', '퇴직금정산'].every(k => items[k]);
-    };
 
-    const getOffboardingOriginalStatus = (staff: any) => {
-        const saved = staff?.permissions?.offboarding_original_status;
-        if (typeof saved === 'string' && saved.trim()) return saved.trim();
-        return staff?.status === '계약' ? '계약' : '재직';
-    };
+    loadChecklists();
 
-    const getOffboardingOriginalRole = (staff: any) => {
-        const saved = staff?.permissions?.offboarding_original_role;
-        if (typeof saved === 'string' && saved.trim()) return saved.trim();
-        return staff?.role === 'inactive' ? 'staff' : (staff?.role || 'staff');
+    return () => {
+      cancelled = true;
     };
+  }, [pendingList]);
 
-    // Filter active staffs who are NOT currently offboarding
-    // Filter active staffs who are NOT currently offboarding, respect company filter
-    const eligibleStaffs = _staffs.filter((s: any) =>
-        (s.status === '재직' || s.status === '계약') &&
-        (selectedCo === '전체' || s.company === selectedCo)
+  const persistChecklist = async (staffId: string, items: ChecklistItem[]) => {
+    const { error } = await supabase.from('onboarding_checklists').upsert(
+      {
+        staff_id: staffId,
+        checklist_type: '퇴사',
+        items,
+      },
+      { onConflict: 'staff_id,checklist_type' },
     );
 
-    const handleStartOffboarding = async () => {
-        if (!selectedStaff || !exitDate) return toast('대상자와 퇴사 예정일을 선택해주세요.', 'warning');
-        const staff = _staffs.find((s: any) => s.id === selectedStaff);
-        if (!staff) return;
+    if (error) throw error;
+    setExistingChecklistRows((prev) => ({ ...prev, [staffId]: true }));
+  };
 
-        if (!confirm(`[${staff.name}] 님의 오프보딩 파이프라인을 가동하시겠습니까?\n퇴사 예정일: ${exitDate}`)) return;
+  const handleToggleChecklist = async (staffId: string, itemKey: string) => {
+    const currentItems = checklistsByStaff[staffId] || getDefaultChecklist('퇴사');
+    const nextItems = toggleChecklistItem(currentItems, itemKey);
+    setChecklistsByStaff((prev) => ({ ...prev, [staffId]: nextItems }));
 
-        setLoading(true);
-        try {
-            // 1. Status change logic
-            const nextPermissions = {
-                ...(staff.permissions || {}),
-                offboarding_original_status: staff.status || '재직',
-                offboarding_original_role: staff.role || 'staff',
-                offboarding_started_at: new Date().toISOString(),
-                offboarding_reason: reason || '개인 사유',
-            };
-            const { error } = await supabase
-                .from('staff_members')
-                .update({ status: '퇴사예정', resigned_at: exitDate, permissions: nextPermissions })
-                .eq('id', selectedStaff);
+    try {
+      await persistChecklist(staffId, nextItems);
+    } catch (error) {
+      console.error('퇴사 체크리스트 저장 실패:', error);
+      toast('체크리스트 저장에 실패했습니다.', 'error');
+      setChecklistsByStaff((prev) => ({ ...prev, [staffId]: currentItems }));
+    }
+  };
 
-            if (error) throw error;
+  const handleStartOffboarding = async () => {
+    if (!selectedStaff || !exitDate) {
+      toast('대상자와 퇴사 예정일을 선택해주세요.', 'warning');
+      return;
+    }
 
-            // 2. Offboarding checklist tracking (create a new record in a custom table if exists, else we simulate it)
-            // For this UI, we can just visually update or rely on '퇴사예정' status
-            toast(`${staff.name} 오프보딩 파이프라인이 생성되었습니다.`);
-            _onRefresh();
-            setSelectedStaff('');
-            setExitDate('');
-        } catch (e) {
-            console.error(e);
-            toast('처리 중 오류가 발생했습니다.', 'error');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const staff = staffs.find((item) => String(item.id) === selectedStaff);
+    if (!staff) {
+      toast('선택한 직원을 찾지 못했습니다.', 'error');
+      return;
+    }
 
-    const pendingList = _staffs.filter((s: any) =>
-        (s.status === '퇴사예정' || (s.status === '퇴사' && s.resigned_at > new Date().toISOString().slice(0, 10))) &&
-        (selectedCo === '전체' || s.company === selectedCo)
-    );
-    const pastList = _staffs.filter((s: any) =>
-        s.status === '퇴사' &&
-        (selectedCo === '전체' || s.company === selectedCo)
-    );
+    if (
+      !window.confirm(
+        `[${staff.name}]님의 오프보딩을 시작할까요?\n퇴사 예정일: ${exitDate}\n사유: ${reason}`,
+      )
+    ) {
+      return;
+    }
 
-    const cancelOffboarding = async (staff: any) => {
-        if (!confirm(`${staff.name} 님의 퇴사 예정 상태를 취소하시겠습니까?`)) return;
-        setLoading(true);
-        try {
-            const nextPermissions = { ...(staff.permissions || {}) };
-            delete nextPermissions.offboarding_original_status;
-            delete nextPermissions.offboarding_original_role;
-            delete nextPermissions.offboarding_started_at;
-            delete nextPermissions.offboarding_reason;
+    setLoading(true);
+    const actor = readClientAuditActor();
 
-            const { error } = await supabase
-                .from('staff_members')
-                .update({
-                    status: getOffboardingOriginalStatus(staff),
-                    role: getOffboardingOriginalRole(staff),
-                    resigned_at: null,
-                    permissions: nextPermissions,
-                })
-                .eq('id', staff.id);
+    try {
+      const nextPermissions = {
+        ...(staff.permissions || {}),
+        offboarding_original_status: staff.status || '재직',
+        offboarding_original_role: staff.role || 'staff',
+        offboarding_started_at: new Date().toISOString(),
+        offboarding_reason: reason,
+      };
 
-            if (error) throw error;
+      const { error } = await supabase
+        .from('staff_members')
+        .update({
+          status: '퇴사예정',
+          resigned_at: exitDate,
+          permissions: nextPermissions,
+        })
+        .eq('id', selectedStaff);
 
-            setChecklist((prev) => {
-                const next = { ...prev };
-                delete next[String(staff.id)];
-                return next;
-            });
-            toast(`${staff.name} 님의 퇴사 예정이 취소되었습니다.`, 'success');
-            _onRefresh();
-        } catch (e) {
-            console.error(e);
-            toast('퇴사 예정 취소 중 오류가 발생했습니다.', 'error');
-        } finally {
-            setLoading(false);
-        }
-    };
+      if (error) throw error;
 
-    const concludeOffboarding = async (id: string, name: string) => {
-        if (!confirm(`${name} 님의 모든 체크리스트가 완료되었습니다.\n최종 퇴사 처리하시겠습니까?`)) return;
-        setLoading(true);
-        try {
-            // 1. 직원 상태 변경 + 권한 비활성화
-            const { error: staffUpdateError } = await supabase.from('staff_members').update({
-                status: '퇴사',
-                permissions: {},
-                role: 'inactive',
-            }).eq('id', id);
-            if (staffUpdateError) throw staffUpdateError;
+      const checklistItems = getDefaultChecklist('퇴사');
+      await persistChecklist(selectedStaff, checklistItems);
 
-            // 2. 채팅방 멤버에서 제거
-            await supabase.from('chat_participants').delete().eq('user_id', id);
+      await logAudit(
+        '오프보딩시작',
+        'staff_member',
+        selectedStaff,
+        {
+          staff_name: staff.name,
+          reason,
+          effective_date: exitDate,
+          ...buildAuditDiff(
+            {
+              status: staff.status || null,
+              resigned_at: staff.resigned_at || null,
+            },
+            {
+              status: '퇴사예정',
+              resigned_at: exitDate,
+            },
+            ['status', 'resigned_at'],
+          ),
+        },
+        actor.userId,
+        actor.userName,
+      );
 
-            // 3. 알림 구독 해제 (push_subscriptions)
-            await supabase.from('push_subscriptions').delete().eq('user_id', id);
+      toast(`${staff.name}님의 오프보딩 파이프라인을 시작했습니다.`, 'success');
+      setSelectedStaff('');
+      setExitDate('');
+      setReason('개인 사유');
+      onRefresh?.();
+    } catch (error) {
+      console.error('오프보딩 시작 실패:', error);
+      toast('오프보딩 시작 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-            // 4. 미읽은 알림 정리 (일괄 읽음 처리)
-            await supabase.from('notifications')
-                .update({ read_at: new Date().toISOString() })
-                .eq('user_id', id)
-                .is('read_at', null);
+  const cancelOffboarding = async (staff: StaffMember) => {
+    if (!window.confirm(`${staff.name}님의 퇴사 예정 상태를 취소할까요?`)) return;
+    setLoading(true);
+    const actor = readClientAuditActor();
 
-            // 5. 활성 세션 무효화 (force_logout)
-            await supabase.from('staff_members').update({
-                force_logout_at: new Date().toISOString(),
-            }).eq('id', id);
+    try {
+      const nextPermissions = { ...(staff.permissions || {}) };
+      delete nextPermissions.offboarding_original_status;
+      delete nextPermissions.offboarding_original_role;
+      delete nextPermissions.offboarding_started_at;
+      delete nextPermissions.offboarding_reason;
 
-            // 6. 감사 로그 기록
-            await supabase.from('audit_logs').insert({
-                action: '퇴사처리완료',
-                target_type: 'staff_member',
-                target_id: id,
-                details: { name, completed_at: new Date().toISOString() },
-            });
+      const restoredStatus = getOriginalStatus(staff);
+      const restoredRole = getOriginalRole(staff);
 
-            toast(`${name} 님의 최종 퇴사 처리가 완료되었습니다.`, 'success');
-            _onRefresh();
-        } catch (e) {
-            console.error(e);
-            toast('퇴사 처리 중 일부 오류가 발생했습니다.', 'error');
-        } finally {
-            setLoading(false);
-        }
-    };
+      const { error } = await supabase
+        .from('staff_members')
+        .update({
+          status: restoredStatus,
+          role: restoredRole,
+          resigned_at: null,
+          permissions: nextPermissions,
+        })
+        .eq('id', staff.id);
 
-    return (
-        <div className="space-y-4 animate-in fade-in duration-500 max-w-6xl mx-auto" data-testid="offboarding-view">
-            <div className="flex justify-between items-end border-b border-[var(--border)] pb-4">
-                <div>
-                    <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">원클릭 오프보딩 파이프라인</h2>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={() => setActiveTab('진행중')} className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors ${activeTab === '진행중' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'}`}>진행 중인 퇴사자</button>
-                    <button onClick={() => setActiveTab('과거이력')} className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors ${activeTab === '과거이력' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'}`}>과거 이력</button>
-                </div>
-            </div>
+      if (error) throw error;
 
-            {activeTab === '진행중' && (
-                <div className="space-y-5">
-                    {/* 오프보딩 시작 패널 */}
-                    <div className="bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-700 relative overflow-hidden flex flex-col md:flex-row gap-3 items-center">
-                        <div className="absolute top-0 right-0 p-5 text-8xl opacity-5 transform translate-x-1/4 -translate-y-1/4">🚪</div>
-                        <div className="flex-1 space-y-2 z-10 w-full">
-                            <h3 className="text-xl font-black text-white">새 오프보딩 시작</h3>
-                            <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">퇴사 예정일을 입력하면 권한 회수, 비품 반납 체커가 자동으로 세팅됩니다.</p>
+      await supabase
+        .from('onboarding_checklists')
+        .delete()
+        .eq('staff_id', staff.id)
+        .eq('checklist_type', '퇴사');
 
-                            <div className="flex flex-col sm:flex-row gap-3 mt-4">
-                                <select
-                                    data-testid="offboarding-staff-select"
-                                    className="px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold text-sm flex-1 focus:ring-2 focus:ring-[var(--accent)]"
-                                    value={selectedStaff}
-                                    onChange={e => setSelectedStaff(e.target.value)}
-                                >
-                                    <option value="">대상 직원 선택</option>
-                                    {eligibleStaffs.map((s: any) => (
-                                        <option key={s.id} value={s.id}>{s.name} ({s.department} / {s.company})</option>
-                                    ))}
-                                </select>
-                                <SmartDatePicker
-                                    data-testid="offboarding-date-input"
-                                    inputClassName="px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold text-sm shrink-0"
-                                    value={exitDate}
-                                    onChange={val => setExitDate(val)}
-                                />
-                                <select data-testid="offboarding-reason-select" value={reason} onChange={e => setReason(e.target.value)} className="px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold text-sm">
-                                    <option value="개인 사유">개인 사유 (자발적)</option>
-                                    <option value="권고사직">권고사직</option>
-                                    <option value="계약만료">계약만료</option>
-                                </select>
-                            </div>
-                        </div>
-                        <button
-                            data-testid="offboarding-start-button"
-                            onClick={handleStartOffboarding}
-                            disabled={loading}
-                            className="z-10 w-full md:w-auto px-5 py-4 bg-[var(--accent)] text-white text-sm font-black rounded-xl hover:scale-105 active:scale-95 transition-transform shadow-md disabled:opacity-50"
-                        >
-                            {loading ? '처리중...' : '파이프라인 가동 🚀'}
-                        </button>
-                    </div>
+      await logAudit(
+        '오프보딩취소',
+        'staff_member',
+        String(staff.id),
+        {
+          staff_name: staff.name,
+          ...buildAuditDiff(
+            {
+              status: staff.status || null,
+              resigned_at: staff.resigned_at || null,
+            },
+            {
+              status: restoredStatus,
+              resigned_at: null,
+            },
+            ['status', 'resigned_at'],
+          ),
+        },
+        actor.userId,
+        actor.userName,
+      );
 
-                    {/* 진행 중인 리스트 */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {pendingList.length === 0 && (
-                            <div className="col-span-full py-20 text-center">
-                                <p className="text-4xl mb-4 opacity-50">🏃</p>
-                                <p className="text-sm font-bold text-[var(--toss-gray-3)]">현재 퇴사 수속을 밟고 있는 직원이 없습니다.</p>
-                            </div>
-                        )}
-                        {pendingList.map((s: any) => (
-                            <div key={s.id} className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm relative overflow-hidden group">
-                                <div className="absolute top-0 w-full left-0 h-1 bg-gradient-to-r from-orange-400 to-red-500"></div>
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-12 h-12 rounded-full bg-orange-100 text-orange-600 font-black text-lg flex items-center justify-center">{s.name[0]}</div>
-                                        <div>
-                                            <h4 className="text-lg font-black text-[var(--foreground)]">{s.name}</h4>
-                                            <p className="text-[10px] font-bold text-[var(--toss-gray-3)] tracking-widest uppercase">{s.department}</p>
-                                        </div>
-                                    </div>
-                                    <span className="bg-orange-100 text-orange-600 px-2 py-1 rounded text-[10px] font-black">D-{(new Date(s.resigned_at || new Date()).getTime() - new Date().getTime()) / (1000 * 3600 * 24) | 0}</span>
-                                </div>
+      setChecklistsByStaff((prev) => {
+        const next = { ...prev };
+        delete next[String(staff.id)];
+        return next;
+      });
+      setExistingChecklistRows((prev) => {
+        const next = { ...prev };
+        delete next[String(staff.id)];
+        return next;
+      });
 
-                                {/* Checklist - 실제 상태 추적 */}
-                                <div className="space-y-3 mb-4">
-                                    <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--tab-bg)] cursor-pointer transition-colors">
-                                        <input type="checkbox" className="w-5 h-5 accent-[var(--accent)]" checked={isChecked(s.id, '계정파기')} onChange={() => toggleCheck(s.id, '계정파기')} />
-                                        <span className={`text-xs font-bold ${isChecked(s.id, '계정파기') ? 'text-green-500 line-through' : 'text-[var(--toss-gray-5)]'}`}>사내 시스템 계정 파기</span>
-                                    </label>
-                                    <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--tab-bg)] cursor-pointer transition-colors">
-                                        <input type="checkbox" className="w-5 h-5 accent-[var(--accent)]" checked={isChecked(s.id, '비품회수')} onChange={() => toggleCheck(s.id, '비품회수')} />
-                                        <span className={`text-xs font-bold ${isChecked(s.id, '비품회수') ? 'text-green-500 line-through' : 'text-[var(--toss-gray-5)]'}`}>대여 비품 (노트북 등) 회수</span>
-                                    </label>
-                                    <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--tab-bg)] cursor-pointer transition-colors">
-                                        <input type="checkbox" className="w-5 h-5 accent-[var(--accent)]" checked={isChecked(s.id, '서약서징구')} onChange={() => toggleCheck(s.id, '서약서징구')} />
-                                        <span className={`text-xs font-bold ${isChecked(s.id, '서약서징구') ? 'text-green-500 line-through' : 'text-[var(--toss-gray-5)]'}`}>보안 서약서 및 사직서 징구</span>
-                                    </label>
-                                    <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--tab-bg)] cursor-pointer transition-colors">
-                                        <input type="checkbox" className="w-5 h-5 accent-[var(--accent)]" checked={isChecked(s.id, '퇴직금정산')} onChange={() => toggleCheck(s.id, '퇴직금정산')} />
-                                        <span className={`text-[11px] font-bold ${isChecked(s.id, '퇴직금정산') ? 'text-green-500 line-through' : 'text-[var(--accent)]'} underline underline-offset-2`}>퇴직금 정산 시작하기 💸</span>
-                                    </label>
-                                </div>
+      toast(`${staff.name}님의 퇴사 예정이 취소되었습니다.`, 'success');
+      onRefresh?.();
+    } catch (error) {
+      console.error('오프보딩 취소 실패:', error);
+      toast('퇴사 예정 취소 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-                                <div className="flex gap-2">
-                                    <button
-                                        type="button"
-                                        data-testid={`offboarding-cancel-${s.id}`}
-                                        onClick={() => cancelOffboarding(s)}
-                                        disabled={loading}
-                                        className="flex-1 py-3 border border-[var(--border)] bg-[var(--card)] text-[11px] font-black text-[var(--foreground)] rounded-xl transition-colors hover:bg-[var(--tab-bg)] disabled:opacity-50"
-                                    >
-                                        퇴사 예정 취소
-                                    </button>
-                                    <button
-                                        data-testid={`offboarding-finalize-${s.id}`}
-                                        onClick={() => {
-                                            if (!allChecked(s.id)) {
-                                                toast('모든 체크리스트 항목을 완료해주세요.', 'warning');
-                                                return;
-                                            }
-                                            concludeOffboarding(s.id, s.name);
-                                        }}
-                                        disabled={loading}
-                                        className={`flex-[1.4] py-3 text-white text-[11px] font-black rounded-xl transition-colors disabled:opacity-50 ${allChecked(s.id) ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-900 hover:bg-slate-800 opacity-60'}`}
-                                    >
-                                        {allChecked(s.id) ? '최종 퇴사 처리 (계정 비활성화)' : '체크리스트를 먼저 완료해주세요'}
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+  const concludeOffboarding = async (staff: StaffMember) => {
+    const staffId = String(staff.id);
+    const checklistItems = checklistsByStaff[staffId] || getDefaultChecklist('퇴사');
+    const hasChecklist = Boolean(existingChecklistRows[staffId]);
 
-            {activeTab === '과거이력' && (
-                <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm overflow-hidden min-h-[500px]">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-[11px]">
-                            <thead className="bg-[var(--tab-bg)]">
-                                <tr className="border-b border-[var(--border-subtle)] text-[var(--toss-gray-4)] uppercase tracking-widest font-black">
-                                    <th className="px-4 py-4">직원명</th>
-                                    <th className="px-4 py-4">부서 / 회사</th>
-                                    <th className="px-4 py-4">입사일</th>
-                                    <th className="px-4 py-4 text-danger">퇴사일</th>
-                                    <th className="px-4 py-4">근속 일수</th>
-                                    <th className="px-4 py-4 text-right">증명서 발급</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {pastList.length === 0 && (
-                                    <tr><td colSpan={6} className="text-center py-10 text-[var(--toss-gray-3)] font-bold">퇴사자 이력이 없습니다.</td></tr>
-                                )}
-                                {pastList.map((s: any) => {
-                                    const days = Math.floor((new Date(s.resigned_at).getTime() - new Date(s.joined_at).getTime()) / (1000 * 3600 * 24));
-                                    return (
-                                        <tr key={s.id} className="hover:bg-[var(--tab-bg)] transition-colors">
-                                            <td className="px-4 py-4 font-black flex items-center gap-2 text-[var(--foreground)]">
-                                                <div className="w-6 h-6 rounded-full bg-[var(--tab-bg)] flex items-center justify-center text-[8px] opacity-50">{s.name[0]}</div>
-                                                {s.name}
-                                            </td>
-                                            <td className="px-4 py-4 font-bold text-[var(--toss-gray-4)]">{s.department} <br /> <span className="text-[9px] font-medium">{s.company}</span></td>
-                                            <td className="px-4 py-4 font-mono text-[var(--toss-gray-4)]">{s.joined_at}</td>
-                                            <td className="px-4 py-4 font-mono text-danger font-bold">{s.resigned_at}</td>
-                                            <td className="px-4 py-4 font-bold text-[var(--toss-gray-5)]">{days > 0 ? `${days}일` : '-'}</td>
-                                            <td className="px-4 py-4 text-right">
-                                                <button className="px-3 py-1.5 bg-[var(--tab-bg)] text-[10px] font-bold text-[var(--toss-gray-4)] rounded hover:bg-[var(--tab-bg)]">경력증명서 📄</button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
+    if (hasChecklist && !isChecklistComplete(checklistItems)) {
+      toast('퇴사 체크리스트를 모두 완료해주세요.', 'warning');
+      return;
+    }
+
+    if (!window.confirm(`${staff.name}님의 최종 퇴사 처리를 완료할까요?`)) return;
+
+    setLoading(true);
+    const actor = readClientAuditActor();
+
+    try {
+      const nextPermissions = { ...(staff.permissions || {}) };
+      delete nextPermissions.offboarding_original_status;
+      delete nextPermissions.offboarding_original_role;
+      delete nextPermissions.offboarding_started_at;
+      delete nextPermissions.offboarding_reason;
+      nextPermissions.offboarding_finalized_at = new Date().toISOString();
+
+      const { error: staffUpdateError } = await supabase
+        .from('staff_members')
+        .update({
+          status: '퇴사',
+          role: 'inactive',
+          resigned_at: staff.resigned_at || new Date().toISOString().slice(0, 10),
+          permissions: nextPermissions,
+          force_logout_at: new Date().toISOString(),
+        })
+        .eq('id', staffId);
+
+      if (staffUpdateError) throw staffUpdateError;
+
+      if (hasChecklist) {
+        await persistChecklist(staffId, checklistItems);
+      }
+
+      await supabase.from('push_subscriptions').delete().eq('staff_id', staffId);
+      await supabase.from('push_subscriptions').delete().eq('user_id', staffId);
+      await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('user_id', staffId).is('read_at', null);
+
+      await logAudit(
+        '오프보딩완료',
+        'staff_member',
+        staffId,
+        {
+          staff_name: staff.name,
+          checklist_completed: hasChecklist ? isChecklistComplete(checklistItems) : 'legacy-no-checklist',
+          ...buildAuditDiff(
+            {
+              status: staff.status || null,
+              role: staff.role || null,
+            },
+            {
+              status: '퇴사',
+              role: 'inactive',
+            },
+            ['status', 'role'],
+          ),
+        },
+        actor.userId,
+        actor.userName,
+      );
+
+      toast(`${staff.name}님의 최종 퇴사 처리가 완료되었습니다.`, 'success');
+      onRefresh?.();
+    } catch (error) {
+      console.error('오프보딩 완료 실패:', error);
+      toast('퇴사 처리 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-6xl space-y-4" data-testid="offboarding-view">
+      <div className="flex flex-col gap-3 border-b border-[var(--border)] pb-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-[var(--foreground)]">원클릭 오프보딩 파이프라인</h2>
+          <p className="text-sm text-[var(--toss-gray-3)]">
+            퇴사 예정, 체크리스트, 최종 퇴사 처리를 한 화면에서 관리합니다.
+          </p>
         </div>
-    );
+        <div className="flex gap-2">
+          {(['진행중', '과거이력'] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`rounded-xl px-4 py-2 text-xs font-bold transition-colors ${
+                activeTab === tab
+                  ? 'bg-[var(--accent)] text-white'
+                  : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'
+              }`}
+            >
+              {tab === '진행중' ? '진행 중인 퇴사자' : '과거 이력'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {activeTab === '진행중' && (
+        <div className="space-y-5">
+          <div className="relative overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-sm">
+            <div className="absolute right-0 top-0 translate-x-1/4 -translate-y-1/4 text-[120px] opacity-5">
+              🚪
+            </div>
+            <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-end">
+              <div className="flex-1 space-y-2">
+                <h3 className="text-xl font-black text-white">새 오프보딩 시작</h3>
+                <p className="text-xs text-slate-300">
+                  퇴사 예정일을 설정하면 계정 회수와 정산 체크리스트가 함께 열립니다.
+                </p>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <select
+                    data-testid="offboarding-staff-select"
+                    value={selectedStaff}
+                    onChange={(event) => setSelectedStaff(event.target.value)}
+                    className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                  >
+                    <option value="">대상 직원 선택</option>
+                    {eligibleStaffs.map((staff) => (
+                      <option key={staff.id} value={String(staff.id)}>
+                        {staff.name} ({staff.department || '부서 미지정'} / {staff.company})
+                      </option>
+                    ))}
+                  </select>
+                  <SmartDatePicker
+                    data-testid="offboarding-date-input"
+                    value={exitDate}
+                    onChange={setExitDate}
+                    inputClassName="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                  />
+                  <select
+                    data-testid="offboarding-reason-select"
+                    value={reason}
+                    onChange={(event) => setReason(event.target.value)}
+                    className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                  >
+                    <option value="개인 사유">개인 사유</option>
+                    <option value="권고사직">권고사직</option>
+                    <option value="계약만료">계약만료</option>
+                    <option value="조직개편">조직개편</option>
+                  </select>
+                </div>
+              </div>
+              <button
+                type="button"
+                data-testid="offboarding-start-button"
+                onClick={handleStartOffboarding}
+                disabled={loading}
+                className="rounded-xl bg-[var(--accent)] px-5 py-4 text-sm font-black text-white shadow-md transition-transform hover:scale-[1.01] disabled:opacity-50"
+              >
+                {loading ? '처리 중...' : '파이프라인 가동'}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {pendingList.length === 0 ? (
+              <div className="col-span-full rounded-2xl border border-[var(--border)] bg-[var(--card)] py-20 text-center shadow-sm">
+                <p className="mb-4 text-4xl opacity-50">🏃</p>
+                <p className="text-sm font-bold text-[var(--toss-gray-3)]">
+                  현재 퇴사 수속을 밟고 있는 직원이 없습니다.
+                </p>
+              </div>
+            ) : (
+              pendingList.map((staff) => {
+                const staffId = String(staff.id);
+                const checklistItems = checklistsByStaff[staffId] || getDefaultChecklist('퇴사');
+                const hasChecklist = Boolean(existingChecklistRows[staffId]);
+                const doneCount = countChecklistDone(checklistItems);
+                const completed = hasChecklist && isChecklistComplete(checklistItems);
+
+                return (
+                  <div key={staffId} className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+                    <div className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-orange-400 to-red-500" />
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-lg font-black text-orange-600">
+                          {staff.name[0]}
+                        </div>
+                        <div>
+                          <h4 className="text-lg font-black text-[var(--foreground)]">{staff.name}</h4>
+                          <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">
+                            {staff.department || '부서 미지정'}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="rounded-lg bg-orange-100 px-2 py-1 text-[10px] font-black text-orange-600">
+                        {typeof staff.resigned_at === 'string' && staff.resigned_at.trim()
+                          ? staff.resigned_at.trim()
+                          : '퇴사 예정'}
+                      </span>
+                    </div>
+
+                    <div className="mb-4 flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--muted)] px-3 py-2">
+                      <span className="text-xs font-bold text-[var(--foreground)]">
+                        체크리스트 {doneCount}/{checklistItems.length}
+                      </span>
+                      <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">
+                        {hasChecklist ? (completed ? '완료' : '진행 중') : '레거시 데이터'}
+                      </span>
+                    </div>
+
+                    <div className="mb-4 space-y-2">
+                      {checklistItems.map((item) => (
+                        <label
+                          key={item.key}
+                          className="flex cursor-pointer items-center gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors hover:border-[var(--border)] hover:bg-[var(--tab-bg)]"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={item.done}
+                            onChange={() => handleToggleChecklist(staffId, item.key)}
+                            className="h-5 w-5 accent-[var(--accent)]"
+                          />
+                          <span
+                            className={`text-sm font-medium ${
+                              item.done
+                                ? 'text-emerald-600 line-through'
+                                : 'text-[var(--foreground)]'
+                            }`}
+                          >
+                            {item.label}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        data-testid={`offboarding-cancel-${staffId}`}
+                        onClick={() => cancelOffboarding(staff)}
+                        disabled={loading}
+                        className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-xs font-black text-[var(--foreground)] transition-colors hover:bg-[var(--tab-bg)] disabled:opacity-50"
+                      >
+                        퇴사 예정 취소
+                      </button>
+                      <button
+                        type="button"
+                        data-testid={`offboarding-finalize-${staffId}`}
+                        onClick={() => concludeOffboarding(staff)}
+                        disabled={loading}
+                        className={`flex-[1.4] rounded-xl px-4 py-3 text-xs font-black text-white transition-colors disabled:opacity-50 ${
+                          completed || !hasChecklist
+                            ? 'bg-red-600 hover:bg-red-700'
+                            : 'bg-slate-800 hover:bg-slate-900'
+                        }`}
+                      >
+                        {hasChecklist && !completed
+                          ? '체크리스트 확인 후 퇴사 처리'
+                          : '최종 퇴사 처리'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === '과거이력' && (
+        <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-[var(--muted)]">
+                <tr className="border-b border-[var(--border)] text-[11px] uppercase tracking-widest text-[var(--toss-gray-4)]">
+                  <th className="px-4 py-3 font-bold">직원명</th>
+                  <th className="px-4 py-3 font-bold">부서 / 회사</th>
+                  <th className="px-4 py-3 font-bold">입사일</th>
+                  <th className="px-4 py-3 font-bold text-danger">퇴사일</th>
+                  <th className="px-4 py-3 font-bold">상태</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pastList.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-12 text-center text-sm font-semibold text-[var(--toss-gray-3)]">
+                      퇴사 이력이 없습니다.
+                    </td>
+                  </tr>
+                ) : (
+                  pastList.map((staff) => (
+                    <tr key={staff.id} className="border-b border-[var(--border)] last:border-0">
+                      <td className="px-4 py-3 font-bold text-[var(--foreground)]">{staff.name}</td>
+                      <td className="px-4 py-3 text-[var(--toss-gray-4)]">
+                        {staff.department || '부서 미지정'} / {staff.company}
+                      </td>
+                      <td className="px-4 py-3 text-[var(--toss-gray-4)]">{getDisplayText(staff.hire_date)}</td>
+                      <td className="px-4 py-3 text-[var(--toss-gray-4)]">{getDisplayText(staff.resigned_at)}</td>
+                      <td className="px-4 py-3">
+                        <span className="rounded-lg bg-[var(--tab-bg)] px-2 py-1 text-[11px] font-bold text-[var(--foreground)]">
+                          {getDisplayText(staff.status, '퇴사')}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

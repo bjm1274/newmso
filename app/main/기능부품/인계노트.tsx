@@ -66,6 +66,15 @@ type PatientGroup = {
   endDate: string | null;
   notes: HandoverNote[];
 };
+type TemplateFamily = {
+  key: string;
+  name: string;
+  scope: HandoverNoteScope;
+  latestVersion: number;
+  count: number;
+  latestCreatedAt?: string | null;
+  latestAuthorName?: string | null;
+};
 
 const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 const DEFAULT_SHIFT = 'Day';
@@ -201,6 +210,8 @@ export default function HandoverNotes({ user }: Props) {
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState('');
   const [noteMutationId, setNoteMutationId] = useState<string | null>(null);
+  const [selectedTemplateFamilyKey, setSelectedTemplateFamilyKey] = useState('');
+  const [selectedTemplateNoteId, setSelectedTemplateNoteId] = useState('');
 
   const roomStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -368,6 +379,77 @@ export default function HandoverNotes({ user }: Props) {
       .filter((note) => note.handover_kind === 'note')
       .sort((left, right) => new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime());
   }, [notes]);
+
+  const templateNotes = useMemo(() => {
+    return notes
+      .filter((note) => note.handover_kind === 'template' && note.template_name)
+      .sort((left, right) => {
+        const versionDiff = Number(right.template_version || 0) - Number(left.template_version || 0);
+        if (versionDiff !== 0) return versionDiff;
+        return new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime();
+      });
+  }, [notes]);
+
+  const templateFamilies = useMemo<TemplateFamily[]>(() => {
+    const families = new Map<string, TemplateFamily>();
+
+    templateNotes.forEach((note) => {
+      const name = String(note.template_name || '').trim();
+      if (!name) return;
+      const key = `${note.note_scope}:${name}`;
+      const version = Number(note.template_version || 1);
+      const current = families.get(key);
+      if (!current) {
+        families.set(key, {
+          key,
+          name,
+          scope: note.note_scope,
+          latestVersion: version,
+          count: 1,
+          latestCreatedAt: note.created_at || null,
+          latestAuthorName: note.author_name || null,
+        });
+        return;
+      }
+
+      current.count += 1;
+      const currentCreatedAt = new Date(current.latestCreatedAt || 0).getTime();
+      const nextCreatedAt = new Date(note.created_at || 0).getTime();
+      if (version > current.latestVersion || (version === current.latestVersion && nextCreatedAt > currentCreatedAt)) {
+        current.latestVersion = version;
+        current.latestCreatedAt = note.created_at || null;
+        current.latestAuthorName = note.author_name || null;
+      }
+    });
+
+    return Array.from(families.values()).sort((left, right) => {
+      if (left.scope !== right.scope) return left.scope.localeCompare(right.scope, 'ko-KR');
+      return left.name.localeCompare(right.name, 'ko-KR');
+    });
+  }, [templateNotes]);
+
+  const filteredTemplateFamilies = useMemo(
+    () => templateFamilies.filter((family) => family.scope === noteScope),
+    [noteScope, templateFamilies],
+  );
+
+  const selectedTemplateVersions = useMemo(() => {
+    return templateNotes.filter((note) => {
+      const name = String(note.template_name || '').trim();
+      if (!name) return false;
+      return `${note.note_scope}:${name}` === selectedTemplateFamilyKey;
+    });
+  }, [selectedTemplateFamilyKey, templateNotes]);
+
+  const selectedTemplateNote = useMemo(
+    () => selectedTemplateVersions.find((note) => note.id === selectedTemplateNoteId) || selectedTemplateVersions[0] || null,
+    [selectedTemplateNoteId, selectedTemplateVersions],
+  );
+  const selectedTemplateFamily = useMemo(
+    () => filteredTemplateFamilies.find((family) => family.key === selectedTemplateFamilyKey) || null,
+    [filteredTemplateFamilies, selectedTemplateFamilyKey],
+  );
+  const latestTemplateNote = useMemo(() => selectedTemplateVersions[0] || null, [selectedTemplateVersions]);
 
   const patientEpisodes = useMemo<PatientEpisode[]>(() => {
     const episodes: PatientEpisode[] = [];
@@ -592,6 +674,28 @@ export default function HandoverNotes({ user }: Props) {
     }
   }, [patientGroups, selectedPatientGroupKey]);
 
+  useEffect(() => {
+    if (filteredTemplateFamilies.length === 0) {
+      if (selectedTemplateFamilyKey) setSelectedTemplateFamilyKey('');
+      return;
+    }
+
+    if (!filteredTemplateFamilies.some((family) => family.key === selectedTemplateFamilyKey)) {
+      setSelectedTemplateFamilyKey(filteredTemplateFamilies[0]?.key || '');
+    }
+  }, [filteredTemplateFamilies, selectedTemplateFamilyKey]);
+
+  useEffect(() => {
+    if (selectedTemplateVersions.length === 0) {
+      if (selectedTemplateNoteId) setSelectedTemplateNoteId('');
+      return;
+    }
+
+    if (!selectedTemplateVersions.some((note) => note.id === selectedTemplateNoteId)) {
+      setSelectedTemplateNoteId(selectedTemplateVersions[0]?.id || '');
+    }
+  }, [selectedTemplateNoteId, selectedTemplateVersions]);
+
   const selectedBed = useMemo(() => bedOptions.find((option) => option.selectionKey === selectedBedKey) || null, [bedOptions, selectedBedKey]);
   function openBedSettings() {
     setRoomConfigs(effectiveRoomConfigs);
@@ -778,6 +882,104 @@ export default function HandoverNotes({ user }: Props) {
     } catch (error) {
       console.error('인계노트 저장 중 오류:', error);
       toast('인계노트 저장 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function applySelectedTemplate() {
+    if (!selectedTemplateNote) {
+      toast('불러올 템플릿이 없습니다.', 'warning');
+      return;
+    }
+
+    setNoteScope(selectedTemplateNote.note_scope);
+    setShift(selectedTemplateNote.shift || DEFAULT_SHIFT);
+    setPriority(selectedTemplateNote.priority || DEFAULT_PRIORITY);
+    setContent(selectedTemplateNote.content || '');
+    toast(
+      `${selectedTemplateNote.template_name || '템플릿'} v${selectedTemplateNote.template_version || 1} 템플릿을 불러왔습니다.`,
+      'success',
+    );
+  }
+
+  async function saveCurrentAsTemplate() {
+    const trimmedContent = content.trim();
+    if (!trimmedContent || saving) {
+      toast('템플릿으로 저장할 내용을 먼저 입력해 주세요.', 'warning');
+      return;
+    }
+
+    const suggestedName = selectedTemplateNote?.template_name || `${noteScope === 'patient' ? '환자별' : '공통'} 인계`;
+    const templateName = String(window.prompt('템플릿 이름을 입력해 주세요.', suggestedName) || '').trim();
+    if (!templateName) return;
+
+    const nextVersion =
+      templateNotes
+        .filter((note) => note.note_scope === noteScope && String(note.template_name || '').trim() === templateName)
+        .reduce((max, note) => Math.max(max, Number(note.template_version || 0)), 0) + 1;
+
+    setSaving(true);
+    try {
+      const { data, error } = await withMissingColumnsFallback(
+        (omittedColumns) => {
+          const storeMetadataInContent =
+            omittedColumns.has('patient_name') ||
+            omittedColumns.has('patient_key') ||
+            omittedColumns.has('note_scope') ||
+            omittedColumns.has('handover_date') ||
+            omittedColumns.has('room_number') ||
+            omittedColumns.has('room_capacity') ||
+            omittedColumns.has('bed_number') ||
+            omittedColumns.has('bed_key') ||
+            omittedColumns.has('template_name') ||
+            omittedColumns.has('template_version');
+
+          const payload: Record<string, any> = {
+            content: storeMetadataInContent
+              ? encodeHandoverContent(trimmedContent, {
+                  noteScope,
+                  handoverDate: selectedDateKey,
+                  handoverKind: 'template',
+                  templateName,
+                  templateVersion: nextVersion,
+                })
+              : trimmedContent,
+            author_id: user?.id || 'unknown',
+            author_name: user?.name || '이름 없음',
+            shift,
+            priority,
+            is_completed: false,
+            created_at: new Date().toISOString(),
+          };
+
+          if (!omittedColumns.has('note_scope')) payload.note_scope = noteScope;
+          if (!omittedColumns.has('handover_date')) payload.handover_date = selectedDateKey;
+          if (!omittedColumns.has('template_name')) payload.template_name = templateName;
+          if (!omittedColumns.has('template_version')) payload.template_version = nextVersion;
+
+          return supabase.from('handover_notes').insert([payload]).select('*').single();
+        },
+        ['patient_name', 'patient_key', 'note_scope', 'handover_date', 'room_number', 'room_capacity', 'bed_number', 'bed_key', 'template_name', 'template_version'],
+      );
+
+      if (error) {
+        console.error('인계노트 템플릿 저장 실패:', error);
+        toast('템플릿 저장 중 오류가 발생했습니다.', 'error');
+        return;
+      }
+
+      if (data) {
+        const normalized = normalizeHandoverNote(data as HandoverNoteRow);
+        setNotes((prev) => [normalized, ...prev.filter((note) => note.id !== normalized.id)]);
+        setSelectedTemplateFamilyKey(`${noteScope}:${templateName}`);
+        setSelectedTemplateNoteId(normalized.id);
+      }
+
+      toast(`${templateName} v${nextVersion} 템플릿으로 저장했습니다.`, 'success');
+    } catch (error) {
+      console.error('인계노트 템플릿 저장 오류:', error);
+      toast('템플릿 저장 중 오류가 발생했습니다.', 'error');
     } finally {
       setSaving(false);
     }
@@ -1137,6 +1339,140 @@ export default function HandoverNotes({ user }: Props) {
                 </button>
               </div>
               <span className="text-xs font-medium text-[var(--toss-gray-3)]">{fullDateLabel(selectedDate)}</span>
+            </div>
+
+            <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-3">
+              <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div className="grid gap-2 md:grid-cols-[minmax(0,180px)_minmax(0,140px)]">
+                  <label className="space-y-1">
+                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">템플릿</span>
+                    <select
+                      value={selectedTemplateFamilyKey}
+                      onChange={(event) => setSelectedTemplateFamilyKey(event.target.value)}
+                      data-testid="handover-template-family-select"
+                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]"
+                    >
+                      {filteredTemplateFamilies.length === 0 ? (
+                        <option value="">저장된 템플릿 없음</option>
+                      ) : (
+                        filteredTemplateFamilies.map((family) => (
+                          <option key={family.key} value={family.key}>
+                            {family.name}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">버전</span>
+                    <select
+                      value={selectedTemplateNoteId}
+                      onChange={(event) => setSelectedTemplateNoteId(event.target.value)}
+                      data-testid="handover-template-version-select"
+                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]"
+                    >
+                      {selectedTemplateVersions.length === 0 ? (
+                        <option value="">버전 없음</option>
+                      ) : (
+                        selectedTemplateVersions.map((note) => (
+                          <option key={note.id} value={note.id}>
+                            v{note.template_version || 1} · {createdLabel(note.created_at)}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </label>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={applySelectedTemplate}
+                    data-testid="handover-template-apply"
+                    disabled={!selectedTemplateNote}
+                    className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] px-3 py-2 text-xs font-semibold text-[var(--foreground)] transition hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    템플릿 불러오기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void saveCurrentAsTemplate()}
+                    data-testid="handover-template-save"
+                    disabled={saving || !content.trim()}
+                    className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    현재 내용으로 템플릿 저장
+                  </button>
+                </div>
+              </div>
+              {selectedTemplateNote ? (
+                <div className="mt-2 space-y-3">
+                  <p className="text-[11px] text-[var(--toss-gray-3)]">
+                    {selectedTemplateNote.template_name} v{selectedTemplateNote.template_version || 1} · {selectedTemplateNote.shift} ·{' '}
+                    {selectedTemplateNote.priority}
+                  </p>
+                  <div
+                    className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] px-3 py-3"
+                    data-testid="handover-template-version-history"
+                  >
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-[12px] font-bold text-[var(--foreground)]">템플릿 버전 이력</p>
+                        <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                          {selectedTemplateFamily?.name || selectedTemplateNote.template_name} · 총 {selectedTemplateFamily?.count || selectedTemplateVersions.length}
+                          개 버전
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold">
+                        {latestTemplateNote ? (
+                          <span className="rounded-[var(--radius-md)] bg-emerald-50 px-2.5 py-1 text-emerald-700">
+                            최신 v{latestTemplateNote.template_version || 1}
+                          </span>
+                        ) : null}
+                        {selectedTemplateFamily?.latestCreatedAt ? (
+                          <span className="rounded-[var(--radius-md)] bg-[var(--card)] px-2.5 py-1 text-[var(--toss-gray-3)]">
+                            최근 저장 {createdLabel(selectedTemplateFamily.latestCreatedAt)}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                      {selectedTemplateVersions.slice(0, 6).map((note) => {
+                        const isSelected = note.id === selectedTemplateNote?.id;
+                        const isLatest = note.id === latestTemplateNote?.id;
+                        return (
+                          <button
+                            key={note.id}
+                            type="button"
+                            onClick={() => setSelectedTemplateNoteId(note.id)}
+                            data-testid={`handover-template-version-card-${note.id}`}
+                            className={`rounded-[var(--radius-md)] border px-3 py-2 text-left transition ${
+                              isSelected
+                                ? 'border-[var(--accent)] bg-[var(--card)] shadow-sm'
+                                : 'border-[var(--border)] bg-white hover:border-[var(--accent)]/60'
+                            }`}
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-sm font-bold text-[var(--foreground)]">v{note.template_version || 1}</span>
+                              <span className="flex flex-wrap items-center gap-1 text-[10px] font-bold">
+                                {isSelected ? (
+                                  <span className="rounded-full bg-[var(--accent)]/10 px-2 py-0.5 text-[var(--accent)]">선택됨</span>
+                                ) : null}
+                                {isLatest ? (
+                                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700">최신</span>
+                                ) : null}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{createdLabel(note.created_at)}</p>
+                            <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">
+                              {note.author_name || '작성자 없음'} · {note.shift} · {note.priority}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             {noteScope === 'patient' ? (

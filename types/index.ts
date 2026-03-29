@@ -84,6 +84,7 @@ export interface BoardPost {
   created_at?: string | null;
   updated_at?: string | null;
   likes_count?: number | null;
+  status?: string | null;
   tags?: string[] | null;
   attachments?: AttachmentItem[] | null;
   scheduled_publish_at?: string | null;

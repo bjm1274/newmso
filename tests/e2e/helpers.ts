@@ -155,6 +155,8 @@ export type MockFixtures = {
   payrollRecords?: any[];
   boardPosts?: any[];
   boardPostComments?: any[];
+  boardPostReads?: any[];
+  boardPostLikes?: any[];
   companies?: any[];
   inventoryItems?: any[];
   inventoryLogs?: any[];
@@ -170,6 +172,8 @@ export type MockFixtures = {
   approvalFormTypes?: any[];
   systemConfigs?: any[];
   generatedContracts?: any[];
+  employmentContracts?: any[];
+  onboardingChecklists?: any[];
   insuranceRecords?: any[];
   documentRepository?: any[];
   certificateIssuances?: any[];
@@ -384,6 +388,8 @@ function buildFixtures(overrides: MockFixtures = {}) {
       ],
     boardPosts: overrides.boardPosts ?? [],
     boardPostComments: overrides.boardPostComments ?? [],
+    boardPostReads: overrides.boardPostReads ?? [],
+    boardPostLikes: overrides.boardPostLikes ?? [],
     companies:
       overrides.companies ?? [
         {
@@ -406,6 +412,8 @@ function buildFixtures(overrides: MockFixtures = {}) {
     orgTeams: overrides.orgTeams ?? [],
     approvalFormTypes: overrides.approvalFormTypes ?? [],
     generatedContracts: overrides.generatedContracts ?? [],
+    employmentContracts: overrides.employmentContracts ?? [],
+    onboardingChecklists: overrides.onboardingChecklists ?? [],
     insuranceRecords: overrides.insuranceRecords ?? [],
     documentRepository: overrides.documentRepository ?? [],
     certificateIssuances: overrides.certificateIssuances ?? [],
@@ -654,6 +662,8 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   let workShifts = [...fixtures.workShifts];
   let orgTeams = [...fixtures.orgTeams];
   let generatedContracts = [...fixtures.generatedContracts];
+  let employmentContracts = [...fixtures.employmentContracts];
+  let onboardingChecklists = [...fixtures.onboardingChecklists];
   let insuranceRecords = [...fixtures.insuranceRecords];
   let documentRepository = [...fixtures.documentRepository];
   let certificateIssuances = [...fixtures.certificateIssuances];
@@ -678,6 +688,8 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   let payrollRecords = [...fixtures.payrollRecords];
   let boardPosts = [...fixtures.boardPosts];
   let boardPostComments = [...fixtures.boardPostComments];
+  let boardPostReads = [...fixtures.boardPostReads];
+  let boardPostLikes = [...fixtures.boardPostLikes];
 
   const updateChatRoomMeta = (roomId?: string, content?: string | null, createdAt?: string) => {
     if (!roomId) return;
@@ -823,6 +835,93 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       }
 
       return json(route, boardPostComments);
+    }
+
+    if (path.includes('/board_post_reads')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(boardPostReads, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const upserted = payloads.map((payload: any) => {
+          const existing = boardPostReads.find(
+            (row: any) =>
+              String(row.post_id) === String(payload.post_id) &&
+              String(row.user_id) === String(payload.user_id)
+          );
+
+          if (existing) {
+            return { ...existing, ...payload };
+          }
+
+          return {
+            id: payload.id || `board-post-read-${boardPostReads.length + 1}`,
+            created_at: payload.created_at || new Date().toISOString(),
+            ...payload,
+          };
+        });
+
+        boardPostReads = [
+          ...boardPostReads.filter(
+            (row: any) =>
+              !upserted.some(
+                (candidate: any) =>
+                  String(candidate.post_id) === String(row.post_id) &&
+                  String(candidate.user_id) === String(row.user_id)
+              )
+          ),
+          ...upserted,
+        ];
+
+        return json(route, wantsObject ? upserted[0] : upserted);
+      }
+
+      return json(route, boardPostReads);
+    }
+
+    if (path.includes('/board_post_likes')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(boardPostLikes, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any) => ({
+          id: payload.id || `board-post-like-${boardPostLikes.length + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+
+        boardPostLikes = [
+          ...boardPostLikes.filter(
+            (row: any) =>
+              !inserted.some(
+                (candidate: any) =>
+                  String(candidate.post_id) === String(row.post_id) &&
+                  String(candidate.user_id) === String(row.user_id)
+              )
+          ),
+          ...inserted,
+        ];
+
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'DELETE') {
+        const deleting = applyQueryFilters(boardPostLikes, url);
+        const deleteKeys = new Set(
+          deleting.map((row: any) => `${String(row.post_id)}::${String(row.user_id)}`)
+        );
+        boardPostLikes = boardPostLikes.filter(
+          (row: any) => !deleteKeys.has(`${String(row.post_id)}::${String(row.user_id)}`)
+        );
+        return json(route, wantsObject ? deleting[0] ?? null : deleting);
+      }
+
+      return json(route, boardPostLikes);
     }
 
     if (path.includes('/notifications')) {
@@ -2104,6 +2203,79 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       }
 
       return json(route, generatedContracts);
+    }
+
+    if (path.includes('/employment_contracts')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(employmentContracts, url), wantsObject));
+      }
+
+      if (method === 'PATCH') {
+        const body = request.postDataJSON();
+        employmentContracts = employmentContracts.map((row: any) =>
+          matchFilters(row, url) ? { ...row, ...body } : row
+        );
+        const updated = applyQueryFilters(employmentContracts, url);
+        return json(route, wantsObject ? updated[0] ?? null : updated);
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `employment-contract-${employmentContracts.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        employmentContracts = [...employmentContracts, ...inserted];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      return json(route, employmentContracts);
+    }
+
+    if (path.includes('/onboarding_checklists')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(onboardingChecklists, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const upserted = payloads.map((payload: any, index: number) => {
+          const existing = onboardingChecklists.find(
+            (row: any) =>
+              String(row.staff_id) === String(payload.staff_id) &&
+              String(row.checklist_type) === String(payload.checklist_type),
+          );
+
+          if (existing) {
+            return { ...existing, ...payload };
+          }
+
+          return {
+            id: payload.id || `onboarding-checklist-${onboardingChecklists.length + index + 1}`,
+            created_at: payload.created_at || new Date().toISOString(),
+            ...payload,
+          };
+        });
+
+        onboardingChecklists = [
+          ...onboardingChecklists.filter(
+            (row: any) =>
+              !upserted.some(
+                (candidate: any) =>
+                  String(candidate.staff_id) === String(row.staff_id) &&
+                  String(candidate.checklist_type) === String(row.checklist_type),
+              ),
+          ),
+          ...upserted,
+        ];
+
+        return json(route, wantsObject ? upserted[0] : upserted);
+      }
+
+      return json(route, onboardingChecklists);
     }
 
     if (path.includes('/insurance_records')) {

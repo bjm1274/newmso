@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+﻿import { expect, test, type Page } from '@playwright/test';
 import { dismissDialogs, fakeUser, mockSupabase, seedSession } from './helpers';
 
 function trackRuntimeErrors(page: Page) {
@@ -322,3 +322,147 @@ test('mypage certificates can open a print popup and trigger a browser download'
   expect(download.suggestedFilename()).toContain('.html');
   expect(runtimeErrors).toEqual([]);
 });
+
+test('mypage documents can complete pending contract signature and sync onboarding artifacts', async ({
+  page,
+}) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const contractId = 'employment-contract-1';
+
+  await page.addInitScript(() => {
+    window.open = () =>
+      ({
+        document: {
+          write() {},
+          close() {},
+        },
+        print() {},
+        close() {},
+        focus() {},
+      } as Window);
+  });
+
+  await mockSupabase(page, {
+    companies: [
+      {
+        id: fakeUser.company_id,
+        name: fakeUser.company,
+        ceo_name: '??? ??',
+        business_no: '123-45-67890',
+        address: '서울 강남구 1',
+        phone: '02-1234-5678',
+        is_active: true,
+      },
+    ],
+    employmentContracts: [
+      {
+        id: contractId,
+        staff_id: fakeUser.id,
+        company_name: fakeUser.company,
+        contract_type: '근로계약서',
+        status: '서명대기',
+        requested_at: '2026-03-29T09:00:00.000Z',
+        created_at: '2026-03-29T09:00:00.000Z',
+      },
+    ],
+    onboardingChecklists: [
+      {
+        id: 'onboarding-checklist-1',
+        staff_id: fakeUser.id,
+        checklist_type: '입사',
+        target_date: '2026-04-12',
+        items: [
+          {
+            key: 'contract_signature',
+            label: '근로계약 서명 완료',
+            done: false,
+            doneAt: null,
+          },
+        ],
+        completed_at: null,
+      },
+    ],
+    documentRepository: [],
+  });
+
+  await page.route('**/rest/v1/contract_templates**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: 'contract-template-1',
+          company_name: fakeUser.company,
+          template_content: '근로계약 내용 {{staff_name}} / {{company_name}}',
+          seal_url: null,
+        },
+      ]),
+    });
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '내정보',
+      erp_mypage_tab: 'documents',
+    },
+  });
+
+  await openMyPage(page);
+  await expect(page.getByTestId('contract-signature-modal')).toBeVisible();
+
+  await page.getByTestId('contract-signature-next-button').click();
+
+  const agreementChecks = page.locator('[data-testid^="contract-agreement-"]');
+  const agreementCount = await agreementChecks.count();
+  for (let index = 0; index < agreementCount; index += 1) {
+    await agreementChecks.nth(index).check();
+  }
+  await page.getByTestId('contract-signature-next-button').click();
+
+  await page.getByTestId('contract-confidentiality-checkbox').check();
+  await page.getByTestId('contract-signature-next-button').click();
+
+  const signatureCanvas = page.getByTestId('contract-signature-canvas');
+  const signatureBox = await signatureCanvas.boundingBox();
+  if (!signatureBox) {
+    throw new Error('signature canvas box missing');
+  }
+
+  await page.mouse.move(signatureBox.x + 40, signatureBox.y + 60);
+  await page.mouse.down();
+  await page.mouse.move(signatureBox.x + 120, signatureBox.y + 90, { steps: 12 });
+  await page.mouse.move(signatureBox.x + 180, signatureBox.y + 70, { steps: 12 });
+  await page.mouse.up();
+
+  await page.getByTestId('contract-signature-submit-button').click();
+
+  await expect(page.getByTestId('contract-signature-modal')).toHaveCount(0);
+
+  const snapshot = await page.evaluate(async ({ staffId, currentContractId }) => {
+    const [contractsResponse, checklistResponse, docsResponse] = await Promise.all([
+      fetch(`/rest/v1/employment_contracts?id=eq.${currentContractId}&select=*`),
+      fetch(`/rest/v1/onboarding_checklists?staff_id=eq.${staffId}&select=*`),
+      fetch(`/rest/v1/document_repository?created_by=eq.${staffId}&select=*`),
+    ]);
+
+    return {
+      contracts: await contractsResponse.json(),
+      checklists: await checklistResponse.json(),
+      documents: await docsResponse.json(),
+    };
+  }, { staffId: fakeUser.id, currentContractId: contractId });
+
+    expect(snapshot.contracts[0]?.signed_at).toBeTruthy();
+  expect(
+    snapshot.checklists.some((row: any) =>
+      row?.items?.some((item: any) => item.key === 'contract_signature' && item.done),
+    ),
+  ).toBe(true);
+  expect(
+    snapshot.documents.some(
+      (document: any) => String(document.title || '').includes(String(fakeUser.name)),
+    ),
+  ).toBe(true);
+  expect(runtimeErrors).toEqual([]);
+});
+

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { dismissDialogs, mockSupabase, seedSession } from './helpers';
+import { dismissDialogs, fakeUser, mockSupabase, seedSession } from './helpers';
 
 const BOARD_MENU = '\uAC8C\uC2DC\uD310';
 const NOTICE_BOARD = '\uACF5\uC9C0\uC0AC\uD56D';
@@ -247,6 +247,87 @@ test('legacy schedule posts without metadata are surfaced with a repair warning'
   await page.getByTestId('board-legacy-schedule-item-legacy-surgery-1').click();
   await expect(page.getByTestId('board-post-detail')).toBeVisible();
   await expect(page.getByTestId('board-schedule-legacy-warning')).toBeVisible();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('board read status modal shows read and pending audience counts', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    staffMembers: [
+      {
+        id: '11111111-1111-1111-1111-111111111111',
+        employee_no: 'E2E-001',
+        name: 'E2E Tester',
+        company: 'E2E Clinic',
+        company_id: '22222222-2222-2222-2222-222222222222',
+        department: '간호부',
+        position: '부서장',
+        status: '재직',
+        permissions: { ...fakeUser.permissions },
+      },
+      {
+        id: 'reader-1',
+        name: '읽음 직원',
+        company: 'E2E Clinic',
+        company_id: '22222222-2222-2222-2222-222222222222',
+        department: '원무부',
+        position: '사원',
+        status: '재직',
+      },
+      {
+        id: 'pending-1',
+        name: '미확인 직원',
+        company: 'E2E Clinic',
+        company_id: '22222222-2222-2222-2222-222222222222',
+        department: '행정부',
+        position: '사원',
+        status: '재직',
+      },
+    ],
+    boardPosts: [
+      {
+        id: 'board-post-read-1',
+        board_type: FREE_BOARD,
+        title: '읽음 현황 테스트',
+        content: '상세 본문',
+        author_id: 'reader-1',
+        author_name: '읽음 직원',
+        company: 'E2E Clinic',
+        company_id: '22222222-2222-2222-2222-222222222222',
+        created_at: '2026-03-27T01:00:00.000Z',
+      },
+    ],
+    boardPostComments: [],
+    boardPostReads: [
+      {
+        id: 'board-read-1',
+        post_id: 'board-post-read-1',
+        user_id: 'reader-1',
+        read_at: '2026-03-27T02:00:00.000Z',
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: BOARD_MENU,
+      erp_last_subview: FREE_BOARD,
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent(BOARD_MENU)}`);
+
+  await expect(page.getByTestId('board-view')).toBeVisible();
+  await openBoardMenu(page, FREE_BOARD);
+  await page.getByTestId('board-post-board-post-read-1').click();
+  await expect(page.getByTestId('board-post-detail')).toBeVisible();
+  await page.getByRole('button', { name: '읽음 확인' }).click();
+  await expect(page.getByText('읽음 2명 · 미확인 1명')).toBeVisible();
+  await expect(page.getByText('E2E Tester')).toBeVisible();
+  await expect(page.getByText(/^읽음 직원$/).last()).toBeVisible();
+  await expect(page.getByText(/^미확인 직원$/).last()).toBeVisible();
 
   expect(runtimeErrors).toEqual([]);
 });

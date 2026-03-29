@@ -385,7 +385,7 @@ export default function SalaryAnomalyDetector({ staffs = [] as StaffLike[] }) {
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
           <div className="text-xs font-bold text-[var(--toss-gray-3)]">분석기간</div>
           <div className="mt-2 text-lg font-black text-[var(--foreground)]">

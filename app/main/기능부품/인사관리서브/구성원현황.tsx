@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { StaffMember } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
+import { getChecklistTargetDate, getDefaultChecklist } from '@/lib/hr-checklists';
 import StaffHistoryTimeline from './인사이력타임라인';
 import OnboardingChecklist from './급여명세/입퇴사온보딩';
 import CertTransferPanel from './교육자격인사이동패널';
@@ -522,6 +523,32 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           return toast('직원 등록 실패: ' + (insertErr.message || 'DB 오류'), 'error');
         }
 
+        let onboardingChecklistInitFailed = false;
+        if (insertedStaff?.id) {
+          const { error: onboardingInitError } = await supabase
+            .from('onboarding_checklists')
+            .upsert(
+              {
+                staff_id: insertedStaff.id,
+                checklist_type: '입사',
+                items: getDefaultChecklist('입사'),
+                target_date: getChecklistTargetDate(
+                  '입사',
+                  (insertedStaff.joined_at as string) ||
+                    (insertedStaff.join_date as string) ||
+                    dateOrNull(신규직원.입사일),
+                ),
+                completed_at: null,
+              },
+              { onConflict: 'staff_id,checklist_type' },
+            );
+
+          if (onboardingInitError) {
+            onboardingChecklistInitFailed = true;
+            console.warn('입사 온보딩 체크리스트 초기화 실패:', onboardingInitError);
+          }
+        }
+
         await logAudit(
           '직원등록',
           'staff_member',
@@ -534,7 +561,12 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           actor.userId,
           actor.userName
         );
-        toast(`직원 등록 완료!\n로그인 아이디: 사번 ${newEmployeeNo} 또는 이름 ${신규직원.성명}\n(동명이인이 있으면 사번으로 로그인하세요)`, 'success');
+        toast(
+          onboardingChecklistInitFailed
+            ? `직원 등록 완료!\n로그인 아이디: 사번 ${newEmployeeNo} 또는 이름 ${신규직원.성명}\n(온보딩 패키지 자동 생성은 실패해 직원 상세에서 다시 생성됩니다.)`
+            : `직원 등록 완료!\n로그인 아이디: 사번 ${newEmployeeNo} 또는 이름 ${신규직원.성명}\n(동명이인이 있으면 사번으로 로그인하세요)`,
+          onboardingChecklistInitFailed ? 'warning' : 'success',
+        );
       }
       닫기함수(); 새로고침?.();
     } catch (error: unknown) {
@@ -781,8 +813,30 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <StaffHistoryTimeline staffId={선택된직원ID} staffName={필터목록.find((s: StaffMember) => s.id === 선택된직원ID)?.name || 직원목록.find((s: StaffMember) => s.id === 선택된직원ID)?.name || ''} />
               <div className="flex gap-4 flex-wrap">
-                <OnboardingChecklist staffId={String(선택된직원ID)} staffName={필터목록.find((s: StaffMember) => s.id === 선택된직원ID)?.name || ''} type="입사" />
-                <OnboardingChecklist staffId={String(선택된직원ID)} staffName={필터목록.find((s: StaffMember) => s.id === 선택된직원ID)?.name || ''} type="퇴사" />
+                <OnboardingChecklist
+                  staffId={String(선택된직원ID)}
+                  staffName={필터목록.find((s: StaffMember) => s.id === 선택된직원ID)?.name || ''}
+                  joinedAt={
+                    (필터목록.find((s: StaffMember) => s.id === 선택된직원ID)?.joined_at as string) ||
+                    (필터목록.find((s: StaffMember) => s.id === 선택된직원ID)?.join_date as string) ||
+                    null
+                  }
+                  company={필터목록.find((s: StaffMember) => s.id === 선택된직원ID)?.company || null}
+                  position={필터목록.find((s: StaffMember) => s.id === 선택된직원ID)?.position || null}
+                  type="입사"
+                />
+                <OnboardingChecklist
+                  staffId={String(선택된직원ID)}
+                  staffName={필터목록.find((s: StaffMember) => s.id === 선택된직원ID)?.name || ''}
+                  joinedAt={
+                    (필터목록.find((s: StaffMember) => s.id === 선택된직원ID)?.joined_at as string) ||
+                    (필터목록.find((s: StaffMember) => s.id === 선택된직원ID)?.join_date as string) ||
+                    null
+                  }
+                  company={필터목록.find((s: StaffMember) => s.id === 선택된직원ID)?.company || null}
+                  position={필터목록.find((s: StaffMember) => s.id === 선택된직원ID)?.position || null}
+                  type="퇴사"
+                />
               </div>
             </div>
             <CertTransferPanel staffId={String(선택된직원ID)} staffName={필터목록.find((s: StaffMember) => s.id === 선택된직원ID)?.name || ''} />
