@@ -16,8 +16,9 @@ import {
   isApprovalOverdue,
   lockApprovalMeta,
   markDelayNotification,
-  parseApprovalDelayHours,
+  resolveApprovalDelayConfig,
   resolveApprovalDelegateConfig,
+  resolveApprovalDocNumberConfig,
   shouldSendDelayNotification,
 } from '@/lib/approval-workflow';
 import { isMissingColumnError, withMissingColumnFallback } from '@/lib/supabase-compat';
@@ -715,15 +716,16 @@ window.onload = () => window.print();
     () => new Map((Array.isArray(staffs) ? staffs : []).map((staff) => [String(staff.id), staff])),
     [staffs]
   );
-  const resolveApprovalDelayHoursForStaff = useCallback((staffId: string | null | undefined) => {
-    if (!staffId) return 24;
+  const resolveApprovalDelayConfigForStaff = useCallback((staffId: string | null | undefined) => {
+    if (!staffId) return resolveApprovalDelayConfig(null);
     const matchedStaff = approvalStaffMap.get(String(staffId));
-    const permissions =
-      matchedStaff?.permissions && typeof matchedStaff.permissions === 'object'
-        ? (matchedStaff.permissions as Record<string, unknown>)
-        : null;
-    return parseApprovalDelayHours(permissions?.approval_delay_hours, 24);
+    return resolveApprovalDelayConfig(
+      matchedStaff && typeof matchedStaff === 'object' ? (matchedStaff as unknown as Record<string, unknown>) : null
+    );
   }, [approvalStaffMap]);
+  const resolveApprovalDelayHoursForStaff = useCallback((staffId: string | null | undefined) => {
+    return resolveApprovalDelayConfigForStaff(staffId).thresholdHours;
+  }, [resolveApprovalDelayConfigForStaff]);
   const resolveEffectiveApproverId = useCallback((approverId: string | null | undefined) => {
     if (!approverId) return null;
     const matchedStaff = approvalStaffMap.get(String(approverId));
@@ -777,7 +779,8 @@ window.onload = () => window.print();
   }, [approvalStaffMap, resolveCurrentApproverId, resolveStoredCurrentApproverId]);
   const resolveApprovalDelaySnapshot = useCallback((item: Record<string, unknown>) => {
     const originalApproverId = resolveStoredCurrentApproverId(item);
-    const thresholdHours = resolveApprovalDelayHoursForStaff(originalApproverId);
+    const delayConfig = resolveApprovalDelayConfigForStaff(originalApproverId);
+    const thresholdHours = delayConfig.thresholdHours;
     const createdAt = String(item?.created_at || '');
     const createdDate = createdAt ? new Date(createdAt) : null;
     const elapsedHours =
@@ -791,12 +794,14 @@ window.onload = () => window.print();
         : null;
     return {
       thresholdHours,
+      repeatHours: Math.max(1, Number(tracker?.repeat_hours) || delayConfig.repeatHours),
+      maxNotifications: Math.max(1, Number(tracker?.max_notifications) || delayConfig.maxNotifications),
       elapsedHours,
       overdue: String(item?.status || '').trim() === '대기' && isApprovalOverdue(item, thresholdHours),
       lastNotifiedAt: String(tracker?.last_notified_at || ''),
       notificationCount: Math.max(0, Number(tracker?.count) || 0),
     };
-  }, [resolveApprovalDelayHoursForStaff, resolveStoredCurrentApproverId]);
+  }, [resolveApprovalDelayConfigForStaff, resolveStoredCurrentApproverId]);
   const resolveApprovalLockSnapshot = useCallback((item: Record<string, unknown>) => {
     const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
     if (!isApprovalLocked(metaData)) {
@@ -1077,31 +1082,51 @@ window.onload = () => window.print();
       docNumber: buildApprovalDocNumber({
         companyName: params.companyName,
         companyId: params.companyId,
+        departmentName: user?.department || null,
         formSlug: params.formSlug,
         typeName: params.typeName,
         createdAt: new Date(),
         sequence: (count || 0) + 1,
+        config: resolveApprovalDocNumberConfig(
+          user && typeof user === 'object' ? (user as unknown as Record<string, unknown>) : null
+        ),
       }),
       revision: 1,
     };
-  }, []);
+  }, [user]);
   const syncApprovalDelayNotifications = useCallback(async (items: Record<string, unknown>[]) => {
     const overdueItems = items.filter((item) => {
-      if (!isApprovalOverdue(item)) return false;
+      const originalApproverId = resolveStoredCurrentApproverId(item);
+      const delayConfig = resolveApprovalDelayConfigForStaff(originalApproverId);
+      if (!isApprovalOverdue(item, delayConfig.thresholdHours)) return false;
       const currentApproverId = resolveCurrentApproverId(item);
       if (!currentApproverId) return false;
       const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
-      return shouldSendDelayNotification(metaData, currentApproverId);
+      return shouldSendDelayNotification(
+        metaData,
+        currentApproverId,
+        delayConfig.thresholdHours,
+        delayConfig.repeatHours,
+        delayConfig.maxNotifications
+      );
     });
 
     if (overdueItems.length === 0) return;
 
     for (const item of overdueItems) {
+      const originalApproverId = resolveStoredCurrentApproverId(item);
+      const delayConfig = resolveApprovalDelayConfigForStaff(originalApproverId);
       const currentApproverId = resolveCurrentApproverId(item);
       if (!currentApproverId) continue;
       const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
       const nextMetaData = appendApprovalHistory(
-        markDelayNotification(metaData, currentApproverId),
+        markDelayNotification(
+          metaData,
+          currentApproverId,
+          delayConfig.thresholdHours,
+          delayConfig.repeatHours,
+          delayConfig.maxNotifications
+        ),
         {
           ...buildApprovalHistoryEntry('delay_notified', '결재 지연 알림 발송'),
           current_approver_id: currentApproverId,
@@ -1114,13 +1139,16 @@ window.onload = () => window.print();
           user_id: currentApproverId,
           type: 'approval',
           title: `[결재 지연] ${String(item.title || '전자결재 문서')}`,
-          body: `${String(item.sender_name || '기안자')} 문서가 24시간 이상 대기 중입니다.`,
+          body: `${String(item.sender_name || '기안자')} 문서가 ${delayConfig.thresholdHours}시간 이상 대기 중입니다.`,
           metadata: {
             id: item.id,
             approval_id: item.id,
             type: 'approval',
             approval_view: '결재함',
             approval_role: 'delayed',
+            delay_hours: delayConfig.thresholdHours,
+            delay_repeat_hours: delayConfig.repeatHours,
+            delay_max_notifications: delayConfig.maxNotifications,
           },
         });
         await supabase.from('approvals').update({ meta_data: nextMetaData }).eq('id', item.id);
@@ -1128,7 +1156,7 @@ window.onload = () => window.print();
         console.error('approval delay notification failed:', delayError);
       }
     }
-  }, [buildApprovalHistoryEntry, resolveCurrentApproverId]);
+  }, [buildApprovalHistoryEntry, resolveApprovalDelayConfigForStaff, resolveCurrentApproverId, resolveStoredCurrentApproverId]);
   const syncApprovalRouting = useCallback(async (item: Record<string, unknown>, currentApproverId: string | null) => {
     if (!item?.id || !currentApproverId) return null;
     const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
@@ -1166,10 +1194,16 @@ window.onload = () => window.print();
       const originalApproverId = resolveStoredCurrentApproverId(item);
       const currentApproverId = resolveEffectiveApproverId(originalApproverId);
       if (!currentApproverId) return false;
-      const delayHours = resolveApprovalDelayHoursForStaff(originalApproverId);
-      if (!isApprovalOverdue(item, delayHours)) return false;
+      const delayConfig = resolveApprovalDelayConfigForStaff(originalApproverId);
+      if (!isApprovalOverdue(item, delayConfig.thresholdHours)) return false;
       const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
-      return shouldSendDelayNotification(metaData, currentApproverId, delayHours);
+      return shouldSendDelayNotification(
+        metaData,
+        currentApproverId,
+        delayConfig.thresholdHours,
+        delayConfig.repeatHours,
+        delayConfig.maxNotifications
+      );
     });
 
     if (overdueItems.length === 0) return;
@@ -1178,10 +1212,17 @@ window.onload = () => window.print();
       const originalApproverId = resolveStoredCurrentApproverId(item);
       const currentApproverId = resolveEffectiveApproverId(originalApproverId);
       if (!currentApproverId) continue;
-      const delayHours = resolveApprovalDelayHoursForStaff(originalApproverId);
+      const delayConfig = resolveApprovalDelayConfigForStaff(originalApproverId);
+      const delayHours = delayConfig.thresholdHours;
       const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
       const nextMetaData = appendApprovalHistory(
-        markDelayNotification(metaData, currentApproverId, delayHours),
+        markDelayNotification(
+          metaData,
+          currentApproverId,
+          delayConfig.thresholdHours,
+          delayConfig.repeatHours,
+          delayConfig.maxNotifications
+        ),
         {
           ...buildApprovalHistoryEntry('delay_notified', '결재 지연 알림 발송'),
           current_approver_id: currentApproverId,
@@ -1201,7 +1242,9 @@ window.onload = () => window.print();
             type: 'approval',
             approval_view: '결재함',
             approval_role: 'delayed',
-            delay_hours: delayHours,
+            delay_hours: delayConfig.thresholdHours,
+            delay_repeat_hours: delayConfig.repeatHours,
+            delay_max_notifications: delayConfig.maxNotifications,
           },
         });
         await supabase.from('approvals').update({ meta_data: nextMetaData }).eq('id', item.id);
@@ -1209,7 +1252,7 @@ window.onload = () => window.print();
         console.error('approval delay notification failed:', delayError);
       }
     }
-  }, [buildApprovalHistoryEntry, resolveApprovalDelayHoursForStaff, resolveEffectiveApproverId, resolveStoredCurrentApproverId]);
+  }, [buildApprovalHistoryEntry, resolveApprovalDelayConfigForStaff, resolveEffectiveApproverId, resolveStoredCurrentApproverId]);
   const syncDelegatedApprovalRouting = useCallback(async (item: Record<string, unknown>, currentApproverId: string | null) => {
     if (!item?.id || !currentApproverId) return null;
     const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
@@ -2820,7 +2863,7 @@ window.onload = () => window.print();
                                 수정 잠금
                               </span>
                             )}
-                            {itemStatus === '?湲?' && isApprovalOverdue(item) && (
+                            {itemStatus === '?湲?' && delaySnapshot.overdue && (
                               <span className="px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-rose-50 text-rose-600 border border-rose-200">
                                 결재 지연
                               </span>
@@ -3015,6 +3058,9 @@ window.onload = () => window.print();
                                 대결 시점 {new Date(detailDelegateSnapshot.delegatedAt).toLocaleString('ko-KR')}
                               </p>
                             )}
+                            <p className="mt-1 text-[10px] text-[var(--toss-gray-3)]">
+                              재알림 {detailDelaySnapshot.repeatHours}시간마다 · 최대 {detailDelaySnapshot.maxNotifications}회
+                            </p>
                           </div>
                         )}
                         {(detailDelaySnapshot.overdue || detailDelaySnapshot.notificationCount > 0) && (

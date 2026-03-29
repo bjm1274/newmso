@@ -71,6 +71,12 @@ const APPROVAL_DELEGATE_ID_PERMISSION_KEY = 'approval_delegate_id';
 const APPROVAL_DELEGATE_START_PERMISSION_KEY = 'approval_delegate_start';
 const APPROVAL_DELEGATE_END_PERMISSION_KEY = 'approval_delegate_end';
 const APPROVAL_DELAY_HOURS_PERMISSION_KEY = 'approval_delay_hours';
+const APPROVAL_DELAY_REPEAT_HOURS_PERMISSION_KEY = 'approval_delay_repeat_hours';
+const APPROVAL_DELAY_MAX_NOTIFICATIONS_PERMISSION_KEY = 'approval_delay_max_notifications';
+const APPROVAL_DOC_NUMBER_PREFIX_PERMISSION_KEY = 'approval_doc_number_prefix';
+const APPROVAL_DOC_NUMBER_INCLUDE_DEPARTMENT_PERMISSION_KEY = 'approval_doc_number_include_department';
+const APPROVAL_DOC_NUMBER_DATE_MODE_PERMISSION_KEY = 'approval_doc_number_date_mode';
+const APPROVAL_DOC_NUMBER_SEQUENCE_PADDING_PERMISSION_KEY = 'approval_doc_number_sequence_padding';
 const APPROVAL_REFERENCE_TARGETS = [
   { key: 'all', label: '모든 문서' },
   { key: 'leave', label: '연차/휴가' },
@@ -423,6 +429,23 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     168,
     Math.max(1, Number(selectedPermissions[APPROVAL_DELAY_HOURS_PERMISSION_KEY] || 24) || 24)
   );
+  const selectedApprovalDelayRepeatHours = Math.min(
+    168,
+    Math.max(1, Number(selectedPermissions[APPROVAL_DELAY_REPEAT_HOURS_PERMISSION_KEY] || 24) || 24)
+  );
+  const selectedApprovalDelayMaxNotifications = Math.min(
+    10,
+    Math.max(1, Number(selectedPermissions[APPROVAL_DELAY_MAX_NOTIFICATIONS_PERMISSION_KEY] || 3) || 3)
+  );
+  const selectedApprovalDocNumberPrefix = String(selectedPermissions[APPROVAL_DOC_NUMBER_PREFIX_PERMISSION_KEY] || '');
+  const selectedApprovalDocNumberIncludeDepartment = selectedPermissions[APPROVAL_DOC_NUMBER_INCLUDE_DEPARTMENT_PERMISSION_KEY] === true;
+  const selectedApprovalDocNumberDateMode = ['full', 'month', 'year'].includes(String(selectedPermissions[APPROVAL_DOC_NUMBER_DATE_MODE_PERMISSION_KEY] || ''))
+    ? String(selectedPermissions[APPROVAL_DOC_NUMBER_DATE_MODE_PERMISSION_KEY])
+    : 'full';
+  const selectedApprovalDocNumberSequencePadding = Math.min(
+    6,
+    Math.max(2, Number(selectedPermissions[APPROVAL_DOC_NUMBER_SEQUENCE_PADDING_PERMISSION_KEY] || 3) || 3)
+  );
   const selectedApprovalDelegateStaff = useMemo(
     () =>
       approvalDelegateCandidateStaffs.find((staff) => String(staff.id) === selectedApprovalDelegateId) || null,
@@ -508,6 +531,14 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       [APPROVAL_DELEGATE_ID_PERMISSION_KEY]: null,
       [APPROVAL_DELEGATE_START_PERMISSION_KEY]: null,
       [APPROVAL_DELEGATE_END_PERMISSION_KEY]: null,
+    });
+  }, [updateApprovalAutomationSettings]);
+  const clearApprovalDocNumberRule = useCallback(async () => {
+    await updateApprovalAutomationSettings({
+      [APPROVAL_DOC_NUMBER_PREFIX_PERMISSION_KEY]: null,
+      [APPROVAL_DOC_NUMBER_INCLUDE_DEPARTMENT_PERMISSION_KEY]: false,
+      [APPROVAL_DOC_NUMBER_DATE_MODE_PERMISSION_KEY]: 'full',
+      [APPROVAL_DOC_NUMBER_SEQUENCE_PADDING_PERMISSION_KEY]: 3,
     });
   }, [updateApprovalAutomationSettings]);
 
@@ -760,7 +791,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                   <div>
                     <p className="text-[13px] font-semibold text-[var(--foreground)]">전자결재 자동화</p>
                     <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                      부재중일 때 대신 결재할 대결자와 결재 지연 알림 기준 시간을 설정합니다.
+                      부재중일 때 대신 결재할 대결자, 결재 지연 알림 세부 기준, 문서번호 규칙을 설정합니다.
                     </p>
                   </div>
 
@@ -810,7 +841,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
 
                     <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
                       <label className="text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                        결재 지연 알림 기준 시간
+                        첫 지연 알림 기준 시간
                       </label>
                       <input
                         data-testid="staff-approval-delay-hours"
@@ -826,9 +857,127 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                         className="w-full md:w-24 px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
                       />
                     </div>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                        <label className="text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                          재알림 간격 시간
+                        </label>
+                        <input
+                          data-testid="staff-approval-delay-repeat-hours"
+                          type="number"
+                          min={1}
+                          max={168}
+                          value={selectedApprovalDelayRepeatHours}
+                          onChange={(e) => {
+                            void updateApprovalAutomationSettings({
+                              [APPROVAL_DELAY_REPEAT_HOURS_PERMISSION_KEY]: Math.min(168, Math.max(1, Number(e.target.value) || 24)),
+                            });
+                          }}
+                          className="w-full md:w-24 px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
+                        />
+                      </div>
+                      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                        <label className="text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                          최대 알림 횟수
+                        </label>
+                        <input
+                          data-testid="staff-approval-delay-max-notifications"
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={selectedApprovalDelayMaxNotifications}
+                          onChange={(e) => {
+                            void updateApprovalAutomationSettings({
+                              [APPROVAL_DELAY_MAX_NOTIFICATIONS_PERMISSION_KEY]: Math.min(10, Math.max(1, Number(e.target.value) || 3)),
+                            });
+                          }}
+                          className="w-full md:w-24 px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/40 px-3 py-3">
+                      <div>
+                        <p className="text-[11px] font-bold text-[var(--foreground)]">문서번호 규칙</p>
+                        <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                          접두사, 날짜 형식, 부서 포함 여부, 일련번호 자릿수를 조정합니다.
+                        </p>
+                      </div>
+
+                      <div className="grid gap-2 md:grid-cols-2">
+                        <input
+                          data-testid="staff-approval-doc-prefix"
+                          type="text"
+                          placeholder="접두사 (예: SYHQ)"
+                          value={selectedApprovalDocNumberPrefix}
+                          onChange={(e) => {
+                            void updateApprovalAutomationSettings({
+                              [APPROVAL_DOC_NUMBER_PREFIX_PERMISSION_KEY]: e.target.value.trim() || null,
+                            });
+                          }}
+                          className="w-full px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
+                        />
+                        <select
+                          data-testid="staff-approval-doc-date-mode"
+                          value={selectedApprovalDocNumberDateMode}
+                          onChange={(e) => {
+                            void updateApprovalAutomationSettings({
+                              [APPROVAL_DOC_NUMBER_DATE_MODE_PERMISSION_KEY]: e.target.value,
+                            });
+                          }}
+                          className="w-full px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
+                        >
+                          <option value="full">날짜 8자리 (YYYYMMDD)</option>
+                          <option value="month">월 6자리 (YYYYMM)</option>
+                          <option value="year">연도 4자리 (YYYY)</option>
+                        </select>
+                      </div>
+
+                      <div className="grid gap-2 md:grid-cols-[auto_minmax(0,1fr)_minmax(0,120px)] md:items-center">
+                        <label className="flex items-center gap-2 text-[10px] font-semibold text-[var(--toss-gray-4)]">
+                          <input
+                            data-testid="staff-approval-doc-include-department"
+                            type="checkbox"
+                            checked={selectedApprovalDocNumberIncludeDepartment}
+                            onChange={(e) => {
+                              void updateApprovalAutomationSettings({
+                                [APPROVAL_DOC_NUMBER_INCLUDE_DEPARTMENT_PERMISSION_KEY]: e.target.checked,
+                              });
+                            }}
+                            className="rounded border-[var(--border)]"
+                          />
+                          부서 코드 포함
+                        </label>
+                        <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                          예시: {selectedApprovalDocNumberPrefix || '회사코드'}-{selectedApprovalDocNumberIncludeDepartment ? '부서-' : ''}LEV-{selectedApprovalDocNumberDateMode === 'year' ? '2026' : selectedApprovalDocNumberDateMode === 'month' ? '202603' : '20260329'}-{String(1).padStart(selectedApprovalDocNumberSequencePadding, '0')}
+                        </p>
+                        <input
+                          data-testid="staff-approval-doc-sequence-padding"
+                          type="number"
+                          min={2}
+                          max={6}
+                          value={selectedApprovalDocNumberSequencePadding}
+                          onChange={(e) => {
+                            void updateApprovalAutomationSettings({
+                              [APPROVAL_DOC_NUMBER_SEQUENCE_PADDING_PERMISSION_KEY]: Math.min(6, Math.max(2, Number(e.target.value) || 3)),
+                            });
+                          }}
+                          className="w-full px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        data-testid="staff-approval-doc-rule-clear"
+                        onClick={() => void clearApprovalDocNumberRule()}
+                        className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-[10px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                      >
+                        문서번호 규칙 초기화
+                      </button>
+                    </div>
                   </div>
 
-                  {(selectedApprovalDelegateId || selectedApprovalDelegateStart || selectedApprovalDelegateEnd) && (
+                  {(selectedApprovalDelegateId || selectedApprovalDelegateStart || selectedApprovalDelegateEnd || selectedApprovalDelayHours !== 24 || selectedApprovalDelayRepeatHours !== 24 || selectedApprovalDelayMaxNotifications !== 3 || selectedApprovalDocNumberPrefix || selectedApprovalDocNumberIncludeDepartment || selectedApprovalDocNumberDateMode !== 'full' || selectedApprovalDocNumberSequencePadding !== 3) && (
                     <div className="space-y-2">
                       <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-[10px] font-semibold text-[var(--toss-gray-4)]">
                         <p>
@@ -840,7 +989,13 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                         <p className="mt-1">
                           대결 기간: {selectedApprovalDelegateStart || '상시'} ~ {selectedApprovalDelegateEnd || '미지정'}
                         </p>
-                        <p className="mt-1">지연 알림: {selectedApprovalDelayHours}시간 경과 시</p>
+                        <p className="mt-1">지연 알림: {selectedApprovalDelayHours}시간 후 시작 · {selectedApprovalDelayRepeatHours}시간마다 · 최대 {selectedApprovalDelayMaxNotifications}회</p>
+                        <p className="mt-1">
+                          문서번호 규칙: {(selectedApprovalDocNumberPrefix || '회사코드')}
+                          {selectedApprovalDocNumberIncludeDepartment ? ' · 부서 포함' : ' · 부서 미포함'}
+                          {selectedApprovalDocNumberDateMode === 'month' ? ' · 월 단위 날짜' : selectedApprovalDocNumberDateMode === 'year' ? ' · 연 단위 날짜' : ' · 전체 날짜'}
+                          {' · '}일련번호 {selectedApprovalDocNumberSequencePadding}자리
+                        </p>
                       </div>
                       <button
                         type="button"
