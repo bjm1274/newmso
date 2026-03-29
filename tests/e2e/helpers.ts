@@ -1107,6 +1107,17 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
         };
         messages = [...messages, inserted];
         updateChatRoomMeta(inserted.room_id, inserted.content, inserted.created_at);
+        try {
+          await page.evaluate((row) => {
+            window.dispatchEvent(
+              new CustomEvent('erp-mock-chat-message-insert', {
+                detail: { row },
+              })
+            );
+          }, inserted);
+        } catch {
+          // ignore mock realtime dispatch failures in tests
+        }
         return json(route, firstOrList([inserted], wantsObject));
       }
       return json(route, messages);

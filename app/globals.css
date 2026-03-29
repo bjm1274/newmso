@@ -428,6 +428,14 @@ select.premium:focus {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+.safe-area-pt {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-area-inset-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
 /* ── No scrollbar ────────────────────────────────── */
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }

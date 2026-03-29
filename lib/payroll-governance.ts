@@ -216,7 +216,7 @@ export function buildMonthlyPayrollComparison(params: {
 }): PayrollMonthlyComparison {
   const previousYearMonth = getPreviousYearMonth(params.currentYearMonth);
   const staffMap = new Map(params.staffs.map((staff) => [String(staff.id), staff]));
-  const selectedCompany = params.selectedCompany && params.selectedCompany !== '?꾩껜'
+  const selectedCompany = params.selectedCompany && params.selectedCompany !== '전체'
     ? params.selectedCompany
     : null;
 

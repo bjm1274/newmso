@@ -129,6 +129,8 @@ test('chat detailed walkthrough opens each internal menu in practical order', as
   await page.getByTestId('chat-global-search-result-msg-group-1').click();
   await expect(page.getByTestId('chat-global-search-modal')).toBeHidden();
 
+  await page.getByTestId('chat-open-global-search').click();
+  await expect(page.getByTestId('chat-global-search-modal')).toBeVisible();
   await page.getByTestId('chat-open-group-modal').click();
   await expect(page.getByTestId('chat-group-modal')).toBeVisible();
   await page.getByTestId('chat-group-modal').locator('button').first().click();

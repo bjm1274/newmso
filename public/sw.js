@@ -67,6 +67,13 @@ self.addEventListener('push', (event) => {
       data: data.data || {},
     };
 
+    // 앱 아이콘 뱃지 증가 (백그라운드 알림 도착 시)
+    try {
+      if (self.navigator && 'setAppBadge' in self.navigator) {
+        self.navigator.setAppBadge().catch(() => {});
+      }
+    } catch {}
+
     const hasVisibleClient = await broadcastPreviewToVisibleClients(previewPayload);
     if (hasVisibleClient) return;
 
@@ -93,6 +100,13 @@ self.addEventListener('push', (event) => {
 // 2. 알림 클릭 시 이동 처리
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+
+  // 알림 클릭 시 뱃지 즉시 클리어 (앱 열리면 정확한 카운트로 재동기화됨)
+  try {
+    if (self.navigator && 'clearAppBadge' in self.navigator) {
+      self.navigator.clearAppBadge().catch(() => {});
+    }
+  } catch {}
 
   if (event.action === 'close') return;
 

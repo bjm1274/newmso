@@ -26,20 +26,52 @@ export async function sendFcmNotification(
     const collapseKey = messageId ? `chat-msg-${messageId}` : undefined;
     await admin.messaging(app).send({
       token: fcmToken,
+      // notification 필드: Android/iOS 헤드업(미리보기) 알림 활성화
+      notification: {
+        title: payload.title,
+        body: payload.body,
+      },
       data: messageData,
       webpush: {
         fcmOptions: { link: '/main' },
+        notification: {
+          title: payload.title,
+          body: payload.body,
+          icon: '/sy-logo.png',
+          badge: '/badge-72x72.png',
+          requireInteraction: false,
+          silent: false,
+        },
       },
       android: {
         priority: 'high',
         ...(collapseKey ? { collapseKey } : {}),
+        notification: {
+          channelId: 'chat_high_importance',
+          sound: 'default',
+          defaultSound: true,
+          defaultVibrateTimings: true,
+          priority: 'high',
+        },
       },
       apns: {
         headers: {
           'apns-priority': '10',
+          'apns-push-type': 'alert',
           ...(collapseKey ? { 'apns-collapse-id': collapseKey } : {}),
         },
-        payload: { aps: { sound: 'default', badge: 1, contentAvailable: true } },
+        payload: {
+          aps: {
+            sound: 'default',
+            badge: 1,
+            contentAvailable: true,
+            // alert 필드: iPhone 미리보기 텍스트 표시 (필수)
+            alert: {
+              title: payload.title,
+              body: payload.body,
+            },
+          },
+        },
       },
     });
     return true;

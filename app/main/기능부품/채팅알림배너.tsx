@@ -131,7 +131,8 @@ export default function ChatAlertBanner({
       tabIndex={0}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
-      className={`fixed top-0 left-0 right-0 z-[100] flex items-center gap-3 px-4 py-3 ${cfg.bg}/90 text-white shadow-sm animate-in slide-in-from-top duration-200 safe-area-inset-top select-none md:hidden`}
+      className={`fixed top-0 left-0 right-0 z-[500] flex items-center gap-3 px-4 pb-3 ${cfg.bg} text-white shadow-md animate-in slide-in-from-top duration-200 select-none md:hidden`}
+      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
     >
       {/* 아이콘 */}
       <span className="text-2xl shrink-0 drop-shadow-sm">{cfg.icon}</span>

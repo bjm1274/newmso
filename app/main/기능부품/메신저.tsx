@@ -21,6 +21,7 @@ const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
 const NOTICE_ROOM_NAME = '공지메시지';
 const CAN_WRITE_NOTICE_POSITIONS = ['대표', '부장', '팀장', '실장', '병원장', '이사', '본부장', '총무부장', '진료부장', '간호부장'];
 const CHAT_ROOM_KEY = 'erp_chat_last_room';
+const CHAT_ACTIVE_ROOM_KEY = 'erp_chat_active_room';
 const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
 const MOBILE_CHAT_MEDIA_QUERY = '(max-width: 767px), (hover: none) and (pointer: coarse)';
 
@@ -146,7 +147,7 @@ function isActiveChatMember(staff: StaffMember | null | undefined): boolean {
   const isActiveFlag = dynamicStaff.is_active;
 
   if (isActiveFlag === false) return false;
-  if (status === '?댁궗' || status === '?댁쭅') return false;
+  if (status === '퇴사' || status === '퇴직') return false;
   if (resignedAt) return false;
   if (resignDate) return false;
   return true;
@@ -210,6 +211,14 @@ type PresenceInfo = {
   onlineAt: string;
 };
 
+type AttachmentPreviewKind = 'image' | 'video' | 'file';
+
+type AttachmentPreview = {
+  url: string;
+  name: string;
+  kind: AttachmentPreviewKind;
+};
+
 type MessageRetryPayload = {
   roomId: string;
   content: string;
@@ -226,7 +235,92 @@ type DeliveryState = {
   error?: string | null;
 };
 
+type ChatRealtimeState = 'idle' | 'connecting' | 'connected' | 'reconnecting';
+
 type GlobalSearchTab = 'all' | 'member' | 'room' | 'message' | 'file';
+
+type AttachmentQuickActionsVariant = 'pill' | 'subtle' | 'overlay';
+
+type AttachmentQuickActionsProps = {
+  url: string;
+  name: string;
+  onPreview: () => void;
+  variant?: AttachmentQuickActionsVariant;
+  className?: string;
+};
+
+function AttachmentQuickActions({
+  url,
+  name,
+  onPreview,
+  variant = 'pill',
+  className = '',
+}: AttachmentQuickActionsProps) {
+  const handleShare = async (event: { preventDefault?: () => void; stopPropagation?: () => void }) => {
+    event.preventDefault?.();
+    event.stopPropagation?.();
+    try {
+      if (!navigator?.clipboard?.writeText) throw new Error('clipboard unavailable');
+      await navigator.clipboard.writeText(url);
+      toast('공유 링크를 복사했습니다.');
+    } catch {
+      toast('공유 링크 복사에 실패했습니다.', 'error');
+    }
+  };
+
+  const actionClassByVariant: Record<AttachmentQuickActionsVariant, string> = {
+    pill: 'px-2 py-1 rounded-md text-[10px] font-bold',
+    subtle: 'text-[10px] font-bold hover:underline underline-offset-2',
+    overlay: 'pointer-events-auto px-2 py-1 rounded-[var(--radius-md)] bg-black/40 hover:bg-black/60 text-white text-[10px] font-bold',
+  };
+
+  const previewClassByVariant: Record<AttachmentQuickActionsVariant, string> = {
+    pill: `${actionClassByVariant.pill} bg-blue-50 dark:bg-blue-900/30 text-[var(--accent)] hover:text-blue-600`,
+    subtle: `${actionClassByVariant.subtle} text-[var(--accent)] hover:text-blue-600`,
+    overlay: actionClassByVariant.overlay,
+  };
+
+  const shareClassByVariant: Record<AttachmentQuickActionsVariant, string> = {
+    pill: `${actionClassByVariant.pill} bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-4)]`,
+    subtle: `${actionClassByVariant.subtle} text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-4)]`,
+    overlay: actionClassByVariant.overlay,
+  };
+
+  const downloadClassByVariant: Record<AttachmentQuickActionsVariant, string> = {
+    pill: `${actionClassByVariant.pill} bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 hover:text-emerald-700`,
+    subtle: `${actionClassByVariant.subtle} text-emerald-600 hover:text-emerald-700`,
+    overlay: actionClassByVariant.overlay,
+  };
+
+  return (
+    <div className={`flex items-center gap-1.5 flex-wrap ${className}`}>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onPreview();
+        }}
+        className={previewClassByVariant[variant]}
+      >
+        미리보기
+      </button>
+      <button type="button" onClick={handleShare} className={shareClassByVariant[variant]}>
+        공유
+      </button>
+      <a
+        href={url}
+        download={name}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(event) => event.stopPropagation()}
+        className={downloadClassByVariant[variant]}
+      >
+        다운로드
+      </a>
+    </div>
+  );
+}
 
 function getRoomPrefsStorageKey(userId: string | null | undefined): string {
   return `${CHAT_ROOM_PREFS_KEY}:${userId || 'guest'}`;
@@ -454,6 +548,8 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const lastTimelineTailRef = useRef('');
   const selectedRoomIdRef = useRef<string | null>(null);
   const fetchDataRef = useRef<(() => Promise<void>) | null>(null);
+  const globalRealtimeRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const roomRealtimeRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** 방별 입력 draft 저장소 */
   const draftMapRef = useRef<Map<string, string>>(new Map());
   /** 현재 inputMsg 최신값을 ref로 유지 (setRoom 클로저에서 사용) */
@@ -465,10 +561,10 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const [unreadModalMsg, setUnreadModalMsg] = useState<any | null>(null);
   const [unreadUsers, setUnreadUsers] = useState<StaffMember[]>([]);
   const [unreadLoading, setUnreadLoading] = useState(false);
-
-  // 인앱 토스트 알림 (카카오톡 스타일)
-  const [inAppToasts, setInAppToasts] = useState<{ id: string; senderName: string; roomName: string; preview: string; roomId: string }[]>([]);
-  const inAppToastTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const [globalRealtimeState, setGlobalRealtimeState] = useState<ChatRealtimeState>('connecting');
+  const [roomRealtimeState, setRoomRealtimeState] = useState<ChatRealtimeState>('idle');
+  const [globalRealtimeRetryToken, setGlobalRealtimeRetryToken] = useState(0);
+  const [roomRealtimeRetryToken, setRoomRealtimeRetryToken] = useState(0);
   const [chatDirectoryStaffs, setChatDirectoryStaffs] = useState<StaffMember[]>([]);
   const [persistedPinnedMessages, setPersistedPinnedMessages] = useState<ChatMessage[]>([]);
 
@@ -785,12 +881,32 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     try {
       if (roomId) {
         window.localStorage.setItem(CHAT_ROOM_KEY, roomId);
+        window.sessionStorage.setItem(CHAT_ACTIVE_ROOM_KEY, roomId);
       } else {
         window.localStorage.removeItem(CHAT_ROOM_KEY);
+        window.sessionStorage.removeItem(CHAT_ACTIVE_ROOM_KEY);
       }
     } catch {
     }
   };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      if (selectedRoomId) {
+        window.sessionStorage.setItem(CHAT_ACTIVE_ROOM_KEY, selectedRoomId);
+      } else {
+        window.sessionStorage.removeItem(CHAT_ACTIVE_ROOM_KEY);
+      }
+    } catch {
+    }
+    return () => {
+      try {
+        window.sessionStorage.removeItem(CHAT_ACTIVE_ROOM_KEY);
+      } catch {
+      }
+    };
+  }, [selectedRoomId]);
 
   const roomPrefsUserId = effectiveChatUserId || user?.id || null;
 
@@ -1116,7 +1232,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [addMemberSearch, setAddMemberSearch] = useState('');
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [attachmentPreview, setAttachmentPreview] = useState<AttachmentPreview | null>(null);
   const deferredAddMemberSearch = useDeferredValue(addMemberSearch);
   const [addMemberSelectingIds, setAddMemberSelectingIds] = useState<string[]>([]);
   // 기본 접힌 상태 — 펼쳐진 팀만 별도 추적
@@ -1128,6 +1244,39 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       else next.add(key);
       return next;
     });
+
+  const closeAttachmentPreview = useCallback(() => {
+    setAttachmentPreview(null);
+  }, []);
+
+  const openAttachmentPreview = useCallback(
+    (url: string | null | undefined, fileName?: string | null, forcedKind?: AttachmentPreviewKind) => {
+      const resolvedUrl = String(url || '').trim();
+      if (!resolvedUrl) return;
+
+      const resolvedKind: AttachmentPreviewKind =
+        forcedKind || (isImageUrl(resolvedUrl) ? 'image' : isVideoUrl(resolvedUrl) ? 'video' : 'file');
+
+      setAttachmentPreview({
+        url: resolvedUrl,
+        name: getAttachmentDisplayName(fileName, resolvedUrl),
+        kind: resolvedKind,
+      });
+    },
+    []
+  );
+
+  const imagePreviewUrl = attachmentPreview?.kind === 'image' ? attachmentPreview.url : null;
+  const setImagePreviewUrl = useCallback(
+    (nextUrl: string | null) => {
+      if (nextUrl) {
+        openAttachmentPreview(nextUrl, null, 'image');
+        return;
+      }
+      closeAttachmentPreview();
+    },
+    [closeAttachmentPreview, openAttachmentPreview]
+  );
 
   const [threadRoot, setThreadRoot] = useState<any | null>(null);
 
@@ -1216,6 +1365,36 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     return true;
   }, []);
 
+  const isRoomInSelectedConversation = useCallback((roomId: string | null | undefined, rooms?: ChatRoom[]) => {
+    const nextRoomId = String(roomId || '').trim();
+    const selectedId = String(selectedRoomIdRef.current || '').trim();
+    if (!nextRoomId || !selectedId) return false;
+    if (nextRoomId === selectedId) return true;
+
+    const sourceRooms = Array.isArray(rooms) ? rooms : chatRoomsRef.current;
+    const selectedRoom = sourceRooms.find((room: ChatRoom) => String(room.id) === selectedId) || null;
+    const incomingRoom = sourceRooms.find((room: ChatRoom) => String(room.id) === nextRoomId) || null;
+    if (!selectedRoom || !incomingRoom) return false;
+
+    const selectedRoomKey = getDirectRoomMembersKey(selectedRoom);
+    if (!selectedRoomKey) return false;
+    return selectedRoomKey === getDirectRoomMembersKey(incomingRoom);
+  }, []);
+
+  const scheduleRealtimeReconnect = useCallback((scope: 'global' | 'room') => {
+    const retryRef = scope === 'global' ? globalRealtimeRetryTimerRef : roomRealtimeRetryTimerRef;
+    if (retryRef.current) return;
+
+    retryRef.current = setTimeout(() => {
+      retryRef.current = null;
+      if (scope === 'global') {
+        setGlobalRealtimeRetryToken((prev) => prev + 1);
+      } else {
+        setRoomRealtimeRetryToken((prev) => prev + 1);
+      }
+    }, 1200);
+  }, []);
+
   const handleIncomingRealtimeMessage = useCallback(async (row: ChatMessage) => {
     if (!row?.id || !row.room_id) return;
     if (!claimIncomingRealtimeMessage(row.id)) return;
@@ -1225,7 +1404,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     const currentRoom = currentRooms.find((room: ChatRoom) => String(room.id) === roomId) || null;
     if (currentRoom && !isRoomAccessibleToCurrentUser(currentRoom)) return;
 
-    const isCurrentRoom = String(selectedRoomIdRef.current || '') === roomId;
+    const currentConversationRoomId = String(selectedRoomIdRef.current || roomId);
+    const isCurrentRoom = isRoomInSelectedConversation(roomId, currentRooms);
     const isOwnMessage = String(row.sender_id || '') === String(effectiveChatUserId || '');
     const previewText = getMessageDisplayText(
       row.content,
@@ -1251,7 +1431,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     });
 
     if (isCurrentRoom) {
-      pendingBottomAlignRoomIdRef.current = roomId;
+      pendingBottomAlignRoomIdRef.current = currentConversationRoomId;
       setMessages((prev) => {
         if (prev.some((message: ChatMessage) => String(message.id) === String(row.id))) return prev;
         const newMsg = {
@@ -1283,13 +1463,16 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             broadcastChatSync('message-read', roomId);
           })
           .catch(() => {});
-        setRoomUnreadCounts((prev) => ({ ...prev, [roomId]: 0 }));
+        setRoomUnreadCounts((prev) => {
+          const next = { ...prev, [roomId]: 0 };
+          if (currentConversationRoomId && currentConversationRoomId !== roomId) {
+            next[currentConversationRoomId] = 0;
+          }
+          return next;
+        });
       }
+      void fetchDataRef.current?.();
       return;
-    }
-
-    if (!isOwnMessage && currentRooms.length > 0) {
-      void updateUnreadForRooms(currentRooms);
     }
 
     // 인앱 토스트 알림: 다른 방 메시지 or 앱이 백그라운드 상태일 때
@@ -1321,6 +1504,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     resolveStaffProfile,
     updateUnreadForRooms,
     user?.id,
+    isRoomInSelectedConversation,
   ]);
 
   const syncNoticeRoomMembers = useCallback(async (rooms?: ChatRoom[]) => {
@@ -1632,6 +1816,18 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   // fetchDataRef를 항상 최신 fetchData로 동기화
   useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
+  useEffect(() => {
+    return () => {
+      if (globalRealtimeRetryTimerRef.current) {
+        clearTimeout(globalRealtimeRetryTimerRef.current);
+        globalRealtimeRetryTimerRef.current = null;
+      }
+      if (roomRealtimeRetryTimerRef.current) {
+        clearTimeout(roomRealtimeRetryTimerRef.current);
+        roomRealtimeRetryTimerRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const loadRooms = async () => {
@@ -1745,6 +1941,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   useEffect(() => {
     if (!user?.id) return;
+    let disposed = false;
+    setGlobalRealtimeState((prev) => (prev === 'connected' ? prev : 'connecting'));
     const channel = supabase
       .channel('chat-global-messages')
       .on(
@@ -1756,16 +1954,36 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           await handleIncomingRealtimeMessage(msg);
         }
       )
-      .subscribe();
+      .subscribe((status: string) => {
+        if (disposed) return;
+        if (status === 'SUBSCRIBED') {
+          setGlobalRealtimeState('connected');
+          return;
+        }
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setGlobalRealtimeState('reconnecting');
+          scheduleRealtimeReconnect('global');
+          return;
+        }
+        if (status === 'CLOSED') {
+          setGlobalRealtimeState('reconnecting');
+        }
+      });
 
     return () => {
+      disposed = true;
       supabase.removeChannel(channel);
     };
     // selectedRoomId는 의도적으로 제외 — 전역 메시지 채널은 user 기준으로만 구독
-  }, [handleIncomingRealtimeMessage, user?.id]);
+  }, [globalRealtimeRetryToken, handleIncomingRealtimeMessage, scheduleRealtimeReconnect, user?.id]);
 
   useEffect(() => {
-    if (!selectedRoomId) return;
+    if (!selectedRoomId) {
+      setRoomRealtimeState('idle');
+      return;
+    }
+    let disposed = false;
+    setRoomRealtimeState((prev) => (prev === 'connected' ? prev : 'connecting'));
     fetchData();
     const channel = supabase.channel(`chat-realtime-${selectedRoomId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, (payload: Record<string, unknown>) => {
@@ -1783,9 +2001,26 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pinned_messages' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'polls' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, () => fetchData())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [selectedRoomId, fetchData, effectiveTodoUserId, user?.id, handleIncomingRealtimeMessage]);
+      .subscribe((status: string) => {
+        if (disposed) return;
+        if (status === 'SUBSCRIBED') {
+          setRoomRealtimeState('connected');
+          return;
+        }
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setRoomRealtimeState('reconnecting');
+          scheduleRealtimeReconnect('room');
+          return;
+        }
+        if (status === 'CLOSED') {
+          setRoomRealtimeState('reconnecting');
+        }
+      });
+    return () => {
+      disposed = true;
+      supabase.removeChannel(channel);
+    };
+  }, [selectedRoomId, roomRealtimeRetryToken, fetchData, effectiveTodoUserId, user?.id, handleIncomingRealtimeMessage, scheduleRealtimeReconnect]);
 
   useEffect(() => {
     if (!selectedRoomId) {
@@ -1870,7 +2105,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       const payload = event.data;
       if (!payload?.roomId) return;
       // ref를 통해 항상 최신 selectedRoomId와 fetchData를 참조 (채널 재생성 없이)
-      if (payload.roomId === selectedRoomIdRef.current) {
+      if (isRoomInSelectedConversation(String(payload.roomId), chatRoomsRef.current)) {
         fetchDataRef.current?.();
       } else if (chatRoomsRef.current.length > 0) {
         updateUnreadForRooms(chatRoomsRef.current);
@@ -1883,7 +2118,24 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       channel.close();
     };
     // 마운트 시 1회만 실행 — selectedRoomId·fetchData는 ref로 최신값 참조
-  }, [updateUnreadForRooms]);
+  }, [isRoomInSelectedConversation, updateUnreadForRooms]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleMockRealtimeInsert = (event: Event) => {
+      const detail = (event as CustomEvent<{ rows?: ChatMessage[]; row?: ChatMessage }>).detail;
+      const rows = Array.isArray(detail?.rows) ? detail.rows : detail?.row ? [detail.row] : [];
+      rows.forEach((row) => {
+        if (!row?.id) return;
+        void handleIncomingRealtimeMessage(row);
+      });
+    };
+
+    window.addEventListener('erp-mock-chat-message-insert', handleMockRealtimeInsert as EventListener);
+    return () => {
+      window.removeEventListener('erp-mock-chat-message-insert', handleMockRealtimeInsert as EventListener);
+    };
+  }, [handleIncomingRealtimeMessage]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -2237,6 +2489,35 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     () => (selectedPeer ? isStaffCurrentlyOnline(selectedPeer) : false),
     [selectedPeer, isStaffCurrentlyOnline]
   );
+  const realtimeConnectionMeta = useMemo(() => {
+    const state = selectedRoomId ? roomRealtimeState : globalRealtimeState;
+    if (state === 'connected') {
+      return {
+        label: '실시간 연결됨',
+        dotClassName: 'bg-emerald-500',
+        textClassName: 'text-emerald-500',
+      };
+    }
+    if (state === 'reconnecting') {
+      return {
+        label: '실시간 재연결 중',
+        dotClassName: 'bg-amber-500',
+        textClassName: 'text-amber-500',
+      };
+    }
+    if (state === 'connecting') {
+      return {
+        label: '실시간 연결 중',
+        dotClassName: 'bg-sky-500',
+        textClassName: 'text-sky-500',
+      };
+    }
+    return {
+      label: '실시간 대기 중',
+      dotClassName: 'bg-[var(--toss-gray-4)]',
+      textClassName: 'text-[var(--toss-gray-4)]',
+    };
+  }, [globalRealtimeState, roomRealtimeState, selectedRoomId]);
 
   const threadMessages = useMemo(() => {
     if (!threadRoot) return [];
@@ -2329,7 +2610,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           .single();
         if (leaveMessageError) throw leaveMessageError;
         if (leaveMessage?.id && leaveMessage?.room_id) {
-          await triggerChatPush(String(leaveMessage.room_id), String(leaveMessage.id));
+          void triggerChatPush(String(leaveMessage.room_id), String(leaveMessage.id));
         }
       } catch (leaveNoticeError) {
         leaveNoticeFailed = true;
@@ -2394,7 +2675,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         .single();
 
       if (removedMessage?.id && removedMessage?.room_id) {
-        await triggerChatPush(String(removedMessage.room_id), String(removedMessage.id));
+        void triggerChatPush(String(removedMessage.room_id), String(removedMessage.id));
       }
 
       setChatRooms((prev) =>
@@ -2455,29 +2736,25 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     }
 
     if (!resolvedFileUrl && content.startsWith('/')) {
-      if (content.startsWith('/연차') || content.startsWith('/?곗감')) {
+      if (content.startsWith('/연차')) {
         setSlashCommand('annual_leave');
         setSlashForm({
           startDate: '',
           endDate: '',
-          reason: content.startsWith('/연차')
-            ? content.replace('/연차', '').trim()
-            : content.replace('/?곗감', '').trim(),
+          reason: content.replace('/연차', '').trim(),
           itemName: '',
           quantity: 1,
         });
         setShowSlashModal(true);
         return;
       }
-      if (content.startsWith('/발주') || content.startsWith('/諛쒖＜')) {
+      if (content.startsWith('/발주')) {
         setSlashCommand('purchase');
         setSlashForm({
           startDate: '',
           endDate: '',
           reason: '',
-          itemName: content.startsWith('/발주')
-            ? content.replace('/발주', '').trim()
-            : content.replace('/諛쒖＜', '').trim(),
+          itemName: content.replace('/발주', '').trim(),
           quantity: 1,
         });
         setShowSlashModal(true);
@@ -2615,7 +2892,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         )
       );
       broadcastChatSync('message-sent', roomId);
-      await triggerChatPush(String(inserted.room_id), String(inserted.id));
+      void triggerChatPush(String(inserted.room_id), String(inserted.id));
     } else {
       setDeliveryStates((prev) => ({
         ...prev,
@@ -3204,7 +3481,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       )
     );
     await supabase.from('messages').update({ is_deleted: true }).eq('id', msg.id);
-    // 媛먯궗 濡쒓렇 湲곕줉
+    // 감사 로그 기록
     try {
       await supabase.from('audit_logs').insert([
         {
@@ -3375,7 +3652,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             </div>
             {/* 통합 검색 버튼 — 항상 노출 */}
             <button
-              data-testid="chat-open-group-modal"
+              data-testid="chat-open-group-modal-legacy"
               type="button"
               onClick={() => setShowGroupModal(true)}
               title="새 그룹 채팅방 만들기"
@@ -3592,15 +3869,22 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 <h3 className="text-[13px] font-bold text-foreground truncate">
                   {selectedRoomLabel}
                 </h3>
-                <p className="text-[10px] text-[var(--toss-gray-4)] font-medium">
-                  {typingNoticeText
-                    ? typingNoticeText
-                    : selectedPeer
-                      ? selectedPeerIsOnline
-                        ? '온라인'
-                        : '오프라인'
-                      : `${roomMembers.length || 0}명 참여중`}
-                </p>
+                <div className="flex items-center gap-1.5 text-[10px] font-medium">
+                  <p className="text-[var(--toss-gray-4)]">
+                    {typingNoticeText
+                      ? typingNoticeText
+                      : selectedPeer
+                        ? selectedPeerIsOnline
+                          ? '온라인'
+                          : '오프라인'
+                        : `${roomMembers.length || 0}명 참여중`}
+                  </p>
+                  <span className="text-[var(--toss-gray-4)]">·</span>
+                  <span className={`inline-flex items-center gap-1 ${realtimeConnectionMeta.textClassName}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${realtimeConnectionMeta.dotClassName}`} />
+                    <span>{realtimeConnectionMeta.label}</span>
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -3839,7 +4123,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             <div className="space-y-1 mt-2" onClick={(e) => e.stopPropagation()}>
                               {isImageUrl(furl) ? (
                                 <div className="relative group inline-block">
-                                  <button type="button" className="block" onClick={() => setImagePreviewUrl(furl)}>
+                                  <button type="button" className="block" onClick={() => openAttachmentPreview(furl, attachmentName, 'image')}>
                                     <img
                                       src={furl}
                                       alt="첨부 이미지"
@@ -3847,9 +4131,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                     />
                                   </button>
                                   <div className="absolute opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity inset-0 flex items-center justify-center bg-black/40 rounded-[var(--radius-md)] gap-2 pointer-events-none">
-                                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setImagePreviewUrl(furl); }} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-[var(--radius-md)] text-white" title="미리보기">보기</button>
-                                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard.writeText(furl).then(() => toast('공유 링크를 복사했습니다.')) }} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-[var(--radius-md)] text-white" title="공유">공유</button>
-                                    <a href={furl} download={attachmentName} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-full text-white" title="다운로드">저장</a>
+                                    <AttachmentQuickActions
+                                      url={furl}
+                                      name={attachmentName}
+                                      onPreview={() => setImagePreviewUrl(furl)}
+                                      variant="overlay"
+                                    />
                                   </div>
                                   <p className={`mt-1 max-w-[200px] md:max-w-[240px] truncate text-[10px] font-semibold ${isMine ? 'text-white/85' : 'text-[var(--toss-gray-4)]'}`}>{attachmentName}</p>
                                 </div>
@@ -3858,6 +4145,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                   <video controls className={`max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] bg-black ${msg.content ? 'border border-[var(--border)]' : 'shadow-sm'}`}>
                                     <source src={furl} />
                                   </video>
+                                  <AttachmentQuickActions
+                                    url={furl}
+                                    name={attachmentName}
+                                    onPreview={() => openAttachmentPreview(furl, attachmentName, 'video')}
+                                    variant="subtle"
+                                    className="mt-2"
+                                  />
                                   <p className={`mt-1 max-w-[200px] md:max-w-[240px] truncate text-[10px] font-semibold ${isMine ? 'text-white/85' : 'text-[var(--toss-gray-4)]'}`}>{attachmentName}</p>
                                 </div>
                               ) : (
@@ -3865,11 +4159,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                   <div className="text-3xl">📎</div>
                                   <div className="flex-1 min-w-0 pt-0.5">
                                     <p className="font-bold text-[12px] truncate mb-1 text-[var(--foreground)]">{attachmentName}</p>
-                                    <div className="flex items-center gap-1.5 mt-2">
-                                      <button onClick={() => window.open(furl, '_blank')} className="text-[10px] font-bold text-[var(--accent)] hover:text-blue-600 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 rounded-md">미리보기</button>
-                                      <button onClick={() => { navigator.clipboard.writeText(furl).then(() => toast('공유 링크를 복사했습니다.')) }} className="text-[10px] font-bold text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-4)] px-2 py-1 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-md">공유</button>
-                                  <a href={furl} download={attachmentName} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/30 rounded-md inline-block">다운로드</a>
-                                    </div>
+                                    <AttachmentQuickActions
+                                      url={furl}
+                                      name={attachmentName}
+                                      onPreview={() => openAttachmentPreview(furl, attachmentName, 'file')}
+                                      variant="pill"
+                                      className="mt-2"
+                                    />
                                   </div>
                                 </div>
                               )}
@@ -4171,11 +4467,21 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   </div>
                   <div className="grid grid-cols-3 gap-1 rounded-2xl overflow-hidden">
                     {sharedMediaPreviewMessages.map((m) => (
-                      <div key={m.id} className="aspect-square bg-[var(--tab-bg)] dark:bg-zinc-800 relative group cursor-pointer" onClick={() => m.file_kind === 'image' && setImagePreviewUrl(m.file_url || '')}>
+                      <div key={m.id} className="aspect-square bg-[var(--tab-bg)] dark:bg-zinc-800 relative group cursor-pointer" onClick={() => m.file_url && openAttachmentPreview(m.file_url, m.file_name || null, m.file_kind === 'video' ? 'video' : m.file_kind === 'image' ? 'image' : 'file')}>
                         {m.file_kind === 'image' ? (
                           <img src={m.file_url || ''} alt="Attached image" className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-xl">🎬</div>
+                        )}
+                        {m.file_url && (
+                          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity bg-black/40 flex items-center justify-center rounded-[inherit] pointer-events-none px-2">
+                            <AttachmentQuickActions
+                              url={m.file_url}
+                              name={getAttachmentDisplayName(m.file_name, m.file_url)}
+                              onPreview={() => openAttachmentPreview(m.file_url, m.file_name || null, m.file_kind === 'video' ? 'video' : m.file_kind === 'image' ? 'image' : 'file')}
+                              variant="overlay"
+                            />
+                          </div>
                         )}
                       </div>
                     ))}
@@ -4205,10 +4511,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                               <p className="text-[10px] text-[var(--toss-gray-4)] truncate mt-0.5">
                                 {(m.staff as { name?: string } | null | undefined)?.name || '알 수 없음'} · {new Date(m.created_at || 0).toLocaleDateString()}
                               </p>
-                              <div className="flex items-center gap-2 mt-2">
-                                <button onClick={() => window.open(fileUrl, '_blank')} className="text-[10px] font-bold text-[var(--accent)] hover:text-blue-600">미리보기</button>
-                                <a href={fileUrl} download={attachmentName} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700">다운로드</a>
-                              </div>
+                              <AttachmentQuickActions
+                                url={fileUrl}
+                                name={attachmentName}
+                                onPreview={() => openAttachmentPreview(fileUrl, attachmentName, 'file')}
+                                variant="subtle"
+                                className="mt-2"
+                              />
                             </div>
                           </div>
                         </div>
@@ -4826,16 +5135,18 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           '첨부 파일 메시지'
                         )}
                       </p>
-                      {m.file_url && (
-                        <a
-                          href={m.file_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 px-2 py-1 mt-1 rounded-[var(--radius-md)] bg-[var(--card)] border border-[var(--border)] text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
-                        >
-                          {getAttachmentDisplayName(m.file_name, m.file_url)}
-                        </a>
-                      )}
+                      {m.file_url && (() => {
+                        const attachmentUrl = String(m.file_url);
+                        return (
+                          <AttachmentQuickActions
+                            url={attachmentUrl}
+                            name={getAttachmentDisplayName(m.file_name, attachmentUrl)}
+                            onPreview={() => openAttachmentPreview(attachmentUrl, m.file_name, isImageUrl(attachmentUrl) ? 'image' : isVideoUrl(attachmentUrl) ? 'video' : 'file')}
+                            variant="subtle"
+                            className="mt-2"
+                          />
+                        );
+                      })()}
                     </div>
                   );
                 })
@@ -4968,7 +5279,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         );
                         if (error) throw error;
                         if (forwardedMessage?.id && forwardedMessage?.room_id) {
-                          await triggerChatPush(String(forwardedMessage.room_id), String(forwardedMessage.id));
+                          void triggerChatPush(String(forwardedMessage.room_id), String(forwardedMessage.id));
                         }
                         toast(`"${room.name || '채팅방'}"으로 메시지를 전달했습니다.`);
                       } catch {
@@ -5126,7 +5437,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     }]).select('id, room_id').single();
                     if (inviteMessageError) throw inviteMessageError;
                     if (inviteMessage?.id && inviteMessage?.room_id) {
-                      await triggerChatPush(String(inviteMessage.room_id), String(inviteMessage.id));
+                      void triggerChatPush(String(inviteMessage.room_id), String(inviteMessage.id));
                     }
 
                     setChatRooms((prev) =>
@@ -5199,7 +5510,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       )}
                       <div className="flex items-center justify-between">
                         <span className="text-[9px] font-bold text-[var(--toss-gray-3)]">{new Date(m.created_at || 0).toLocaleDateString()}</span>
-                        <a href={furl} download={attachmentName} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-blue-600 hover:underline">다운로드</a>
+                        <AttachmentQuickActions
+                          url={furl}
+                          name={attachmentName}
+                          onPreview={() => openAttachmentPreview(furl, attachmentName, isImageUrl(furl) ? 'image' : isVideoUrl(furl) ? 'video' : 'file')}
+                          variant="subtle"
+                        />
                       </div>
                     </div>
                   </div>
@@ -5372,12 +5688,19 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           const isFile = !!fileUrl && !isImage;
                           const fileName = fileUrl ? getAttachmentDisplayName(msg.file_name, fileUrl) : '';
                           return (
-                            <button
+                            <div
                               data-testid={`chat-global-search-result-${msg.id}`}
                               key={msg.id}
-                              type="button"
+                              role="button"
+                              tabIndex={0}
                               onClick={() => openRoomFromGlobalSearch(String(msg.room_id))}
-                              className="w-full text-left p-3 bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-xl hover:border-[var(--accent)] hover:shadow-sm transition-all"
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault();
+                                  openRoomFromGlobalSearch(String(msg.room_id));
+                                }
+                              }}
+                              className="w-full text-left p-3 bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-xl hover:border-[var(--accent)] hover:shadow-sm transition-all cursor-pointer"
                             >
                               <div className="flex items-center justify-between mb-1.5 gap-3">
                                 <div className="flex items-center gap-1.5 min-w-0">
@@ -5400,7 +5723,16 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                               {fileName && (
                                 <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] truncate mt-0.5">첨부 {fileName}</p>
                               )}
-                            </button>
+                              {fileUrl && (
+                                <AttachmentQuickActions
+                                  url={fileUrl}
+                                  name={fileName}
+                                  onPreview={() => openAttachmentPreview(fileUrl, fileName, isImage ? 'image' : 'file')}
+                                  variant="subtle"
+                                  className="mt-2"
+                                />
+                              )}
+                            </div>
                           );
                         })}
                       </div>
@@ -5506,6 +5838,15 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           📎 {fileName}
                         </p>
                       )}
+                      {fileUrl && (
+                        <AttachmentQuickActions
+                          url={fileUrl}
+                          name={fileName}
+                          onPreview={() => openAttachmentPreview(fileUrl, fileName, isImage ? 'image' : 'file')}
+                          variant="subtle"
+                          className="mt-2"
+                        />
+                      )}
                     </div>
                   );
                 })}
@@ -5516,6 +5857,89 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       )}
 
       {/* ── 이미지 전체화면 미리보기 모달 ── */}
+      {attachmentPreview && attachmentPreview.kind !== 'image' && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-sm"
+          onClick={closeAttachmentPreview}
+          onKeyDown={(e) => { if (e.key === 'Escape') closeAttachmentPreview(); }}
+          tabIndex={-1}
+        >
+          <button
+            type="button"
+            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white text-xl transition-colors z-10"
+            onClick={closeAttachmentPreview}
+            aria-label="닫기"
+          >
+            ×
+          </button>
+          <a
+            href={attachmentPreview.url}
+            download={attachmentPreview.name}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="absolute top-4 right-14 h-9 inline-flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 px-3 text-white text-xs font-semibold transition-colors z-10"
+            aria-label="다운로드"
+            title="다운로드"
+          >
+            다운로드
+          </a>
+          <a
+            href={attachmentPreview.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="absolute top-14 right-4 h-9 inline-flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 px-3 text-white text-xs font-semibold transition-colors z-10"
+          >
+            새 창 열기
+          </a>
+          <div
+            className="max-w-[92vw] max-h-[88vh] w-full flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {attachmentPreview.kind === 'video' ? (
+              <video
+                src={attachmentPreview.url}
+                controls
+                autoPlay
+                playsInline
+                className="max-w-[92vw] max-h-[88vh] rounded-xl bg-black shadow-2xl"
+              />
+            ) : /\.pdf(\?|#|$)/i.test(attachmentPreview.url) ? (
+              <iframe
+                src={attachmentPreview.url}
+                title={attachmentPreview.name}
+                className="w-[92vw] h-[88vh] rounded-xl bg-white shadow-2xl"
+              />
+            ) : (
+              <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl text-left">
+                <p className="text-sm font-bold text-[var(--foreground)] break-all">{attachmentPreview.name}</p>
+                <p className="mt-2 text-xs text-[var(--toss-gray-4)] break-all">{attachmentPreview.url}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <a
+                    href={attachmentPreview.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center rounded-lg bg-[var(--accent)] px-3 py-2 text-xs font-bold text-white"
+                  >
+                    새 창 열기
+                  </a>
+                  <a
+                    href={attachmentPreview.url}
+                    download={attachmentPreview.name}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center rounded-lg bg-[var(--tab-bg)] px-3 py-2 text-xs font-bold text-[var(--foreground)]"
+                  >
+                    다운로드
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {imagePreviewUrl && (
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-sm"

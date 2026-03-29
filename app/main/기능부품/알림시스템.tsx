@@ -1187,6 +1187,20 @@ export default function NotificationSystem({
     };
   }, [syncBadge]);
 
+  // 탭/앱 복귀 시 뱃지 재동기화 — 다른 기기나 탭에서 읽은 경우 반영
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void syncBadge();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [syncBadge]);
+
   useEffect(() => () => { timersRef.current.forEach(t => clearTimeout(t)); timersRef.current.clear(); }, []);
 
   if (toasts.length === 0) return null;

@@ -1,7 +1,7 @@
 {
   "packageId": "kr.co.pchos.erp",
   "host": "erp.pchos.kr",
-  "name": "SY INC. MSO 통합 시스템",
+  "name": "SY INC. MSO ERP",
   "launcherName": "SY INC. ERP",
   "display": "standalone",
   "themeColor": "#2563eb",

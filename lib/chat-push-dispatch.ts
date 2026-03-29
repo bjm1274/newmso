@@ -261,23 +261,25 @@ export async function dispatchChatPushForMessage(params: {
 }) {
   const supabase = params.supabase || getAdminClient();
 
-  // ── 이중 발송 방지: 처리 시작 전 processing_started_at 선점 ──
-  // 다른 경로(cron 등)가 같은 job을 동시에 처리하지 못하게 한다.
-  await updateChatPushJobByMessageId(supabase, params.messageId, {
-    processing_started_at: new Date().toISOString(),
-  });
-
-  const [messageRes, roomRes] = await Promise.all([
-    supabase
-      .from('messages')
-      .select('id, room_id, sender_id, content, created_at, file_url, file_kind')
-      .eq('id', params.messageId)
-      .single(),
-    supabase
-      .from('chat_rooms')
-      .select('id, name, type, members')
-      .eq('id', params.roomId)
-      .single(),
+  // ── 이중 발송 방지 + 초기 데이터 병렬 로드 ──
+  // processing_started_at 선점, 메시지/방 조회, 뮤트 목록 조회를 동시에 실행
+  const [, [messageRes, roomRes], mutedIdsEarly] = await Promise.all([
+    updateChatPushJobByMessageId(supabase, params.messageId, {
+      processing_started_at: new Date().toISOString(),
+    }),
+    Promise.all([
+      supabase
+        .from('messages')
+        .select('id, room_id, sender_id, content, created_at, file_url, file_kind')
+        .eq('id', params.messageId)
+        .single(),
+      supabase
+        .from('chat_rooms')
+        .select('id, name, type, members')
+        .eq('id', params.roomId)
+        .single(),
+    ]),
+    getMutedUserIds(supabase, params.roomId), // roomId는 params에서 이미 알고 있으므로 병렬 실행 가능
   ]);
 
   if (messageRes.error || roomRes.error || !messageRes.data || !roomRes.data) {
@@ -316,8 +318,7 @@ export async function dispatchChatPushForMessage(params: {
     } satisfies ChatPushDispatchResult;
   }
 
-  const mutedIds = await getMutedUserIds(supabase, params.roomId);
-  const targetIds = members.filter((id) => id && id !== senderId && !mutedIds.has(id));
+  const targetIds = members.filter((id) => id && id !== senderId && !mutedIdsEarly.has(id));
 
   if (targetIds.length === 0) {
     await updateChatPushJobByMessageId(supabase, params.messageId, {
@@ -378,15 +379,16 @@ export async function dispatchChatPushForMessage(params: {
     created_at: message.created_at || new Date().toISOString(),
   }));
 
-  if (notificationRows.length > 0) {
-    const { error: notificationInsertError } = await supabase
-      .from('notifications')
-      .upsert(notificationRows, { onConflict: 'id' });
-
-    if (notificationInsertError) {
-      console.error('chat notification insert failed', notificationInsertError);
-    }
-  }
+  // 알림 DB 저장은 백그라운드로 — push 전송과 병렬 실행
+  const notificationInsertPromise =
+    notificationRows.length > 0
+      ? supabase
+          .from('notifications')
+          .upsert(notificationRows, { onConflict: 'id' })
+          .then(({ error }) => {
+            if (error) console.error('chat notification insert failed', error);
+          })
+      : Promise.resolve();
 
   let pushDisabled = false;
   try {
@@ -413,10 +415,13 @@ export async function dispatchChatPushForMessage(params: {
   );
 
   if (uniqueSubscriptions.size === 0 && uniqueFcmTokens.length === 0) {
-    await updateChatPushJobByMessageId(supabase, params.messageId, {
-      processing_started_at: null,
-      last_error: 'no-active-subscriptions',
-    });
+    await Promise.all([
+      notificationInsertPromise,
+      updateChatPushJobByMessageId(supabase, params.messageId, {
+        processing_started_at: null,
+        last_error: 'no-active-subscriptions',
+      }),
+    ]);
 
     return {
       sent: 0,
@@ -439,7 +444,9 @@ export async function dispatchChatPushForMessage(params: {
   let failed = 0;
   const expiredIds: string[] = [];
 
-  if (!pushDisabled) {
+  // Web Push + FCM 병렬 전송
+  const webPushPromise = (async () => {
+    if (pushDisabled) return;
     const payload = JSON.stringify({
       title,
       body: previewBody,
@@ -452,30 +459,32 @@ export async function dispatchChatPushForMessage(params: {
       },
     });
 
-    for (const subscription of uniqueSubscriptions.values()) {
-      // FCM 토큰이 있는 구독 자체 또는 해당 staff_id가 FCM 구독을 별도로 보유하면 Web Push 생략
-      if (subscription.fcm_token) continue;
-      if (staffIdsWithFcmToken.has(String(subscription.staff_id))) continue;
-      try {
-        await sendWebPushNotification(subscription, payload);
+    const targets = Array.from(uniqueSubscriptions.values()).filter(
+      (sub) => !sub.fcm_token && !staffIdsWithFcmToken.has(String(sub.staff_id))
+    );
+
+    // 구독자별 Web Push 병렬 전송
+    const results = await Promise.allSettled(
+      targets.map((subscription) => sendWebPushNotification(subscription, payload).then(() => ({ ok: true as const, id: subscription.id })))
+    );
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      if (r.status === 'fulfilled' && r.value.ok) {
         sent += 1;
-      } catch (error: any) {
+      } else {
         failed += 1;
-        const statusCode = Number(error?.statusCode || error?.status || 0);
+        const err = r.status === 'rejected' ? r.reason : null;
+        const statusCode = Number(err?.statusCode || err?.status || 0);
         if (statusCode === 404 || statusCode === 410) {
-          expiredIds.push(subscription.id);
+          expiredIds.push(targets[i].id);
         }
       }
     }
-  }
+  })();
 
-  if (expiredIds.length > 0) {
-    await supabase.from('push_subscriptions').delete().in('id', expiredIds);
-  }
-
-  // FCM 전송 (Web Push와 병렬 — 모바일 백그라운드 알림)
-  try {
-    if (uniqueFcmTokens.length > 0) {
+  const fcmPromise = (async () => {
+    if (uniqueFcmTokens.length === 0) return;
+    try {
       const fcmResult = await sendFcmBatch(uniqueFcmTokens, {
         title,
         body: previewBody,
@@ -486,16 +495,22 @@ export async function dispatchChatPushForMessage(params: {
         },
       });
       sent += fcmResult.success.length;
-      // 만료된 FCM 토큰 정리
       if (fcmResult.expired.length > 0) {
         await supabase
           .from('push_subscriptions')
           .update({ fcm_token: null })
           .in('fcm_token', fcmResult.expired);
       }
+    } catch (fcmErr) {
+      console.error('[FCM] 배치 전송 오류:', fcmErr);
     }
-  } catch (fcmErr) {
-    console.error('[FCM] 배치 전송 오류:', fcmErr);
+  })();
+
+  // 알림 저장 + Web Push + FCM 동시 완료 대기
+  await Promise.all([notificationInsertPromise, webPushPromise, fcmPromise]);
+
+  if (expiredIds.length > 0) {
+    await supabase.from('push_subscriptions').delete().in('id', expiredIds);
   }
 
   const hasWebPushOnlyTargets =
