@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/lib/ThemeContext";
@@ -14,11 +14,17 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover', // iPhone 노치/다이나믹 아일랜드 safe area 활성화
+};
+
 export const metadata: Metadata = {
   title: "SY INC. MSO 통합 시스템",
   description: "병원 경영 통합 관리 시스템",
   manifest: "/manifest.json",
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "MSO" },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "MSO" },
   icons: { icon: "/sy-logo.png", apple: "/sy-logo.png" },
 };
 

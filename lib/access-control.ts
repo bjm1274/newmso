@@ -310,12 +310,12 @@ export function canAccessMainMenu(user: UserLike | null | undefined, menuId: str
   }
   /*
   const explicitMenuPermissionKeyByMenu: Partial<Record<MainMenuId, string>> = {
-    '異붽?湲곕뒫': 'menu_異붽?湲곕뒫',
-    '寃뚯떆??: 'menu_寃뚯떆??,
-    '?꾩옄寃곗옱': 'menu_?꾩옄寃곗옱',
-    '?몄궗愿由?: 'menu_?몄궗愿由?,
-    '?ш퀬愿由?: 'menu_?ш퀬愿由?,
-    '愿由ъ옄': 'menu_愿由ъ옄',
+    '추가기능': 'menu_추가기능',
+    '게시판': 'menu_게시판',
+    '전자결재': 'menu_전자결재',
+    '인사관리': 'menu_인사관리',
+    '재고관리': 'menu_재고관리',
+    '관리자': 'menu_관리자',
   };
   const explicitMenuPermissionKey = explicitMenuPermissionKeyByMenu[menuId as MainMenuId];
   if (explicitMenuPermissionKey) {

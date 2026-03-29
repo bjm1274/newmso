@@ -1821,7 +1821,7 @@ window.onload = () => window.print();
 
     if (isFinalApproval) {
       updateData.meta_data = buildNextApprovalMetaData(itemMetaData, 'approved_final', {
-        note: '理쒖쥌 ?뱀씤',
+        note: '최종 승인',
         lock: true,
         currentApproverId,
         revision: getApprovalRevision(itemMetaData),
@@ -1829,7 +1829,7 @@ window.onload = () => window.print();
     } else {
       updateData.current_approver_id = nextApproverId;
       updateData.meta_data = buildNextApprovalMetaData(itemMetaData, 'approved_step', {
-        note: `${currentIndex + 1}李? ?뱀씤`,
+        note: `${currentIndex + 1}차 승인`,
         currentApproverId: nextApproverId,
         revision: getApprovalRevision(itemMetaData),
       });
@@ -2062,7 +2062,7 @@ window.onload = () => window.print();
     }
     const rejectMetaData = item.meta_data as Record<string, unknown> | null | undefined;
     const nextRejectedMetaData = buildNextApprovalMetaData(rejectMetaData, 'rejected', {
-      note: reason || '諛섎젮',
+      note: reason || '반려',
       lock: true,
       currentApproverId,
       revision: getApprovalRevision(rejectMetaData),
@@ -2072,7 +2072,7 @@ window.onload = () => window.print();
       .update({ status: '반려', meta_data: { ...nextRejectedMetaData, reject_reason: reason } })
       .eq('id', item.id);
     if (!rejectResult.error) {
-      toast("諛섎젮 泥섎━?섏뿀?듬땲??", 'success');
+      toast("반려 처리되었습니다.", 'success');
       fetchApprovals();
       return;
     }
@@ -2103,7 +2103,7 @@ window.onload = () => window.print();
       recalled_by: user?.id,
     };
     const recalledHistoryMetaData = appendApprovalHistory(recalledMetaData, {
-      ...buildApprovalHistoryEntry('recalled', '?뚯닔 ???섏젙'),
+      ...buildApprovalHistoryEntry('recalled', '회수 후 수정'),
       revision: getApprovalRevision(recalledMetaData),
     });
 
@@ -2218,7 +2218,7 @@ window.onload = () => window.print();
       status: '대기',
     };
     row.meta_data = appendApprovalHistory(row.meta_data as Record<string, unknown> | null | undefined, {
-      ...buildApprovalHistoryEntry(composeSeedApproval?.id ? 'resubmitted' : 'created', composeSeedApproval?.id ? '?뚯닔 ???곸떊' : '理쒖큹 ?곸떊'),
+      ...buildApprovalHistoryEntry(composeSeedApproval?.id ? 'resubmitted' : 'created', composeSeedApproval?.id ? '회수 후 재상신' : '최초 상신'),
       current_approver_id: initialApproverId || null,
       revision,
     });
