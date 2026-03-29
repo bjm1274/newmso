@@ -175,6 +175,23 @@ export async function POST(request: NextRequest) {
       await dedupeQuery;
     }
 
+    // 사용자당 구독 최대 10개 초과 시 오래된 것부터 정리
+    const MAX_SUBSCRIPTIONS_PER_USER = 10;
+    const { data: allSubs } = await supabase
+      .from('push_subscriptions')
+      .select('id, created_at')
+      .eq('staff_id', staffId)
+      .order('created_at', { ascending: true });
+
+    if (allSubs && allSubs.length > MAX_SUBSCRIPTIONS_PER_USER) {
+      const excessIds = allSubs
+        .slice(0, allSubs.length - MAX_SUBSCRIPTIONS_PER_USER)
+        .map((s: { id: string }) => s.id);
+      if (excessIds.length > 0) {
+        await supabase.from('push_subscriptions').delete().in('id', excessIds);
+      }
+    }
+
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: '구독 정보를 처리하는 중 오류가 발생했습니다.' }, { status: 500 });
