@@ -273,7 +273,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
     };
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+        <div data-testid="contract-signature-modal" className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
             <div className="bg-[var(--card)] w-full max-w-2xl border-2 border-[var(--border)] radius-toss-xl shadow-sm overflow-hidden flex flex-col max-h-[90vh]">
 
                 <div className="p-4 border-b border-[var(--border)] flex items-center justify-between bg-[var(--tab-bg)] shrink-0">
@@ -389,6 +389,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                     >
                                         <div className="pt-0.5">
                                             <input
+                                                data-testid={`contract-agreement-${item.id}`}
                                                 type="checkbox"
                                                 checked={!!agreements[item.id]}
                                                 onChange={(e) => setAgreements({ ...agreements, [item.id]: e.target.checked })}
@@ -425,7 +426,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                             </div>
 
                             <label className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-100 rounded-xl cursor-pointer hover:bg-emerald-100 transition-colors">
-                                <input type="checkbox" checked={agreements['confidentiality'] || false} onChange={e => setAgreements({ ...agreements, confidentiality: e.target.checked })} className="w-5 h-5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500" />
+                                <input data-testid="contract-confidentiality-checkbox" type="checkbox" checked={agreements['confidentiality'] || false} onChange={e => setAgreements({ ...agreements, confidentiality: e.target.checked })} className="w-5 h-5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500" />
                                 <span className="text-[12px] font-black text-emerald-800">비밀유지 내용을 이해하였으며 이에 서약합니다.</span>
                             </label>
                         </div>
@@ -439,7 +440,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                 <p className="text-[10px] text-[var(--toss-gray-4)] font-bold mt-1">본인의 성함을 정자로 기재해 주세요.</p>
                             </div>
 
-                            <div className="bg-[var(--card)] border-2 border-[var(--accent)] rounded-2xl p-2 relative shadow-inner overflow-hidden">
+                            <div data-testid="contract-signature-canvas" className="bg-[var(--card)] border-2 border-[var(--accent)] rounded-2xl p-2 relative shadow-inner overflow-hidden">
                                 <SignatureCanvas
                                     ref={sigCanvas}
                                     penColor="#1e293b"
@@ -469,17 +470,17 @@ export default function ContractSignatureModal({ contract, user, templateText, o
 
                 <div className="p-4 md:p-4 border-t border-[var(--border)] bg-[var(--card)] flex gap-3 shrink-0">
                     {step > 1 && (
-                        <button onClick={() => setStep(s => s - 1)} className="px-5 py-3.5 rounded-xl bg-[var(--tab-bg)] text-[var(--toss-gray-4)] font-bold text-[12px] hover:bg-[var(--tab-bg)]">
+                        <button data-testid="contract-signature-prev-button" onClick={() => setStep(s => s - 1)} className="px-5 py-3.5 rounded-xl bg-[var(--tab-bg)] text-[var(--toss-gray-4)] font-bold text-[12px] hover:bg-[var(--tab-bg)]">
                             이전
                         </button>
                     )}
 
                     {step < 4 ? (
-                        <button onClick={handleNext} className="flex-1 px-5 py-3.5 rounded-xl bg-[var(--accent)] text-white font-black text-[13px] shadow-md hover:bg-blue-600 transition-all flex items-center justify-center gap-2">
+                        <button data-testid="contract-signature-next-button" onClick={handleNext} className="flex-1 px-5 py-3.5 rounded-xl bg-[var(--accent)] text-white font-black text-[13px] shadow-md hover:bg-blue-600 transition-all flex items-center justify-center gap-2">
                             확인 및 다음 단계 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                         </button>
                     ) : (
-                        <button onClick={handleSubmit} disabled={isSigEmpty || isGenerating} className={`flex-1 px-5 py-3.5 rounded-xl text-white font-black text-[13px] shadow-sm transition-all flex items-center justify-center gap-2 ${isSigEmpty || isGenerating ? 'bg-slate-300 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98]'}`}>
+                        <button data-testid="contract-signature-submit-button" onClick={handleSubmit} disabled={isSigEmpty || isGenerating} className={`flex-1 px-5 py-3.5 rounded-xl text-white font-black text-[13px] shadow-sm transition-all flex items-center justify-center gap-2 ${isSigEmpty || isGenerating ? 'bg-slate-300 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98]'}`}>
                             {isGenerating ? '서류 생성 중...' : '최종 서명 및 저장'}
                         </button>
                     )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 type WorkShiftRow = {
@@ -195,6 +195,12 @@ export default function WorkStatus({ user }: { user?: any }) {
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [departmentFilter, setDepartmentFilter] = useState('전체');
+  const [showActiveOnly, setShowActiveOnly] = useState(false);
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null);
+
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const today = useMemo(() => new Date(), []);
   const todayKey = useMemo(() => toDateKey(today), [today]);
@@ -276,6 +282,7 @@ export default function WorkStatus({ user }: { user?: any }) {
         });
 
         setTodayAttendance(Array.from(mergedAttendance.values()));
+        setLastRefreshAt(new Date());
       } catch {
         if (cancelled) return;
         setWorkShifts([]);
@@ -291,7 +298,40 @@ export default function WorkStatus({ user }: { user?: any }) {
     return () => {
       cancelled = true;
     };
-  }, [queryRange.endKey, queryRange.startKey, todayKey]);
+  }, [queryRange.endKey, queryRange.startKey, refreshNonce, todayKey]);
+
+  useEffect(() => {
+    const scheduleRefresh = () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = setTimeout(() => setRefreshNonce((current) => current + 1), 250);
+    };
+
+    const channel = supabase
+      .channel(`work-status-live-${user?.id || 'guest'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendances' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_assignments' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_members' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'work_shifts' }, scheduleRefresh)
+      .subscribe();
+
+    const handleVisible = () => {
+      if (document.visibilityState === 'visible') scheduleRefresh();
+    };
+
+    window.addEventListener('focus', scheduleRefresh);
+    document.addEventListener('visibilitychange', handleVisible);
+
+    return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+      window.removeEventListener('focus', scheduleRefresh);
+      document.removeEventListener('visibilitychange', handleVisible);
+      void supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     if (!isDetailModalOpen) return;
@@ -312,8 +352,35 @@ export default function WorkStatus({ user }: { user?: any }) {
     [staffs],
   );
 
+  const departmentOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          activeStaffsOnly
+            .map((staff) => String(staff.department || '').trim())
+            .filter(Boolean),
+        ),
+      ).sort((left, right) => left.localeCompare(right, 'ko')),
+    [activeStaffsOnly],
+  );
+  const quickDepartmentOptions = useMemo(() => departmentOptions.slice(0, 8), [departmentOptions]);
+
+  const filteredStaffs = useMemo(() => {
+    if (departmentFilter === '전체') return activeStaffsOnly;
+    return activeStaffsOnly.filter(
+      (staff) => String(staff.department || '').trim() === departmentFilter,
+    );
+  }, [activeStaffsOnly, departmentFilter]);
+
+  useEffect(() => {
+    if (departmentFilter === '전체') return;
+    if (!departmentOptions.includes(departmentFilter)) {
+      setDepartmentFilter('전체');
+    }
+  }, [departmentFilter, departmentOptions]);
+
   const shiftMap = useMemo(() => new Map(workShifts.map((shift) => [shift.id, shift])), [workShifts]);
-  const staffMap = useMemo(() => new Map(activeStaffsOnly.map((staff) => [staff.id, staff])), [activeStaffsOnly]);
+  const staffMap = useMemo(() => new Map(filteredStaffs.map((staff) => [staff.id, staff])), [filteredStaffs]);
 
   const activeStaffs = useMemo(() => {
     const assignmentMap = new Map(
@@ -392,12 +459,13 @@ export default function WorkStatus({ user }: { user?: any }) {
     return grouped;
   }, [assignments, staffMap]);
 
-  const defaultStaffCount = useMemo(() => activeStaffsOnly.length, [activeStaffsOnly]);
+  const defaultStaffCount = useMemo(() => filteredStaffs.length, [filteredStaffs]);
 
   const selectedDateRows = useMemo(() => {
     const activeStaffIds = new Set(
       todayAttendance
         .filter((record) => (record.check_in || record.check_in_time) && !(record.check_out || record.check_out_time))
+        .filter((record) => staffMap.has(record.staff_id))
         .map((record) => record.staff_id),
     );
 
@@ -414,14 +482,14 @@ export default function WorkStatus({ user }: { user?: any }) {
         grouped.get(key)?.push(staff);
       });
     } else {
-      activeStaffsOnly.forEach((staff) => {
+      filteredStaffs.forEach((staff) => {
         const key = staff.shift_id || 'none';
         if (!grouped.has(key)) grouped.set(key, []);
         grouped.get(key)?.push(staff);
       });
     }
 
-    const rows: ShiftCardRow[] = Array.from(grouped.entries()).map(([shiftId, groupedStaffs]) => {
+    const baseRows: ShiftCardRow[] = Array.from(grouped.entries()).map(([shiftId, groupedStaffs]) => {
       const shift = shiftMap.get(shiftId);
       return {
         shiftId,
@@ -435,17 +503,27 @@ export default function WorkStatus({ user }: { user?: any }) {
       };
     });
 
-    rows.sort((left, right) => {
+    baseRows.sort((left, right) => {
       if (BAND_ORDER[left.band] !== BAND_ORDER[right.band]) {
         return BAND_ORDER[left.band] - BAND_ORDER[right.band];
       }
       return right.staffs.length - left.staffs.length;
     });
 
+    const rows =
+      showActiveOnly && selectedDateKey === todayKey
+        ? baseRows
+            .map((row) => ({
+              ...row,
+              staffs: row.staffs.filter((staff) => activeStaffIds.has(staff.id)),
+            }))
+            .filter((row) => row.staffs.length > 0)
+        : baseRows;
+
     const selectedCounts = assignmentCountsByDate.get(selectedDateKey);
     const fallbackCounts = hasExplicitAssignments
       ? selectedCounts || buildEmptyCounts()
-      : rows.reduce((acc, row) => {
+      : baseRows.reduce((acc, row) => {
           const next = cloneCounts(acc);
           next.total += row.staffs.length;
           if (row.band === 'D' || row.band === 'E' || row.band === 'N') next[row.band] += row.staffs.length;
@@ -453,12 +531,24 @@ export default function WorkStatus({ user }: { user?: any }) {
           return next;
         }, buildEmptyCounts());
 
+    const visibleCounts =
+      showActiveOnly && selectedDateKey === todayKey
+        ? rows.reduce((acc, row) => {
+            const next = cloneCounts(acc);
+            next.total += row.staffs.length;
+            if (row.band === 'D' || row.band === 'E' || row.band === 'N') next[row.band] += row.staffs.length;
+            else next.OTHER += row.staffs.length;
+            return next;
+          }, buildEmptyCounts())
+        : fallbackCounts;
+
     return {
       rows,
       hasExplicitAssignments,
-      counts: fallbackCounts,
+      counts: visibleCounts,
+      activeStaffCount: activeStaffIds.size,
     };
-  }, [activeStaffsOnly, assignmentCountsByDate, assignments, selectedDateKey, shiftMap, staffMap, todayAttendance]);
+  }, [assignmentCountsByDate, assignments, filteredStaffs, selectedDateKey, shiftMap, showActiveOnly, staffMap, todayAttendance, todayKey]);
 
   return (
     <div className="space-y-5" data-testid="work-status-view">
@@ -468,6 +558,34 @@ export default function WorkStatus({ user }: { user?: any }) {
             <h3 className="text-lg font-bold text-[var(--foreground)]">근무현황</h3>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={departmentFilter}
+              onChange={(event) => setDepartmentFilter(event.target.value)}
+              data-testid="work-status-department-filter"
+              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] outline-none transition focus:border-[var(--accent)]"
+            >
+              <option value="전체">전체 부서</option>
+              {departmentOptions.map((department) => (
+                <option key={department} value={department}>
+                  {department}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setShowActiveOnly((current) => !current)}
+              data-testid="work-status-active-only-toggle"
+              className={`rounded-[var(--radius-md)] border px-3 py-1 text-[11px] font-bold transition ${
+                showActiveOnly
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+              }`}
+            >
+              오늘 근무중만
+            </button>
+            <span className="rounded-[var(--radius-md)] bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700">
+              실시간 반영
+            </span>
             <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]">
               선택일 {formatDisplayDate(selectedDate)}
             </span>
@@ -481,6 +599,57 @@ export default function WorkStatus({ user }: { user?: any }) {
             </button>
           </div>
         </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-bold">
+          <span className="rounded-[var(--radius-md)] bg-[var(--page-bg)] px-2.5 py-1 text-[var(--toss-gray-3)]">
+            {departmentFilter === '전체' ? '전사 보기' : `${departmentFilter} 보기`}
+          </span>
+          {showActiveOnly ? (
+            <span className="rounded-[var(--radius-md)] bg-emerald-50 px-2.5 py-1 text-emerald-700">
+              오늘 근무중 {selectedDateRows.activeStaffCount}명
+            </span>
+          ) : null}
+          {lastRefreshAt ? (
+            <span
+              className="rounded-[var(--radius-md)] bg-[var(--card)] px-2.5 py-1 text-[var(--toss-gray-3)]"
+              data-testid="work-status-last-sync"
+            >
+              마지막 갱신 {lastRefreshAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
+          ) : null}
+        </div>
+
+        {departmentOptions.length > 0 ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-bold">
+            <button
+              type="button"
+              onClick={() => setDepartmentFilter('전체')}
+              data-testid="work-status-department-chip-all"
+              className={`rounded-full border px-3 py-1 transition ${
+                departmentFilter === '전체'
+                  ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
+                  : 'border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+              }`}
+            >
+              전체
+            </button>
+            {quickDepartmentOptions.map((department) => (
+              <button
+                key={department}
+                type="button"
+                onClick={() => setDepartmentFilter(department)}
+                data-testid={`work-status-department-chip-${department}`}
+                className={`rounded-full border px-3 py-1 transition ${
+                  departmentFilter === department
+                    ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
+                    : 'border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+                }`}
+              >
+                {department}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         <div className="mt-4 grid gap-3 lg:grid-cols-3">
           {activeStaffs.length === 0 ? (
@@ -619,6 +788,16 @@ export default function WorkStatus({ user }: { user?: any }) {
                 <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">{formatDisplayDate(selectedDate)}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold">
+                {departmentFilter !== '전체' ? (
+                  <span className="rounded-[var(--radius-md)] bg-[var(--page-bg)] px-2.5 py-1 text-[var(--toss-gray-3)]">
+                    {departmentFilter}
+                  </span>
+                ) : null}
+                {showActiveOnly && selectedDateKey === todayKey ? (
+                  <span className="rounded-[var(--radius-md)] bg-emerald-50 px-2.5 py-1 text-emerald-700">
+                    오늘 근무중만
+                  </span>
+                ) : null}
                 <span className="rounded-[var(--radius-md)] bg-sky-100 px-2.5 py-1 text-sky-700">Day {selectedDateRows.counts.D}명</span>
                 <span className="rounded-[var(--radius-md)] bg-amber-100 px-2.5 py-1 text-amber-700">Evening {selectedDateRows.counts.E}명</span>
                 <span className="rounded-[var(--radius-md)] bg-violet-100 px-2.5 py-1 text-violet-700">Night {selectedDateRows.counts.N}명</span>

@@ -210,6 +210,16 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
 
       setChatUnreadCount(totalUnread);
     } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'string'
+            ? error
+            : JSON.stringify(error);
+      if (errorMessage.includes('Failed to fetch')) {
+        setChatUnreadCount(0);
+        return;
+      }
       console.error('메인 메뉴 채팅 안읽음 계산 실패:', error);
       setChatUnreadCount(0);
     }

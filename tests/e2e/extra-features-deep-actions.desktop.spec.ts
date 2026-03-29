@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { dismissDialogs, fakeUser, mockSupabase, seedSession } from './helpers';
-import { buildRoomConfigNoteContent } from '../../lib/handover-notes';
+import { buildRoomConfigNoteContent, encodeHandoverContent } from '../../lib/handover-notes';
 
 function trackRuntimeErrors(page: Page) {
   const errors: string[] = [];
@@ -66,6 +66,17 @@ const supportNurse = {
   company_id: extraFeaturesUser.company_id,
 };
 
+const adminClerk = {
+  ...fakeUser,
+  id: '88888888-8888-8888-8888-888888888888',
+  employee_no: 'E2E-004',
+  name: '행정직원',
+  department: '행정팀',
+  position: '주임',
+  company: extraFeaturesUser.company,
+  company_id: extraFeaturesUser.company_id,
+};
+
 function getTodayKey() {
   return new Intl.DateTimeFormat('sv-SE', {
     timeZone: 'Asia/Seoul',
@@ -103,7 +114,7 @@ test('work status supports real month/day navigation flow', async ({ page }) => 
   await prepareExtraFeature(
     page,
     {
-      staffMembers: [extraFeaturesUser, targetNurse, supportNurse],
+      staffMembers: [extraFeaturesUser, targetNurse, supportNurse, adminClerk],
       workShifts: [
         { id: 'shift-day', name: 'Day', start_time: '07:00:00', end_time: '15:00:00', is_active: true },
         { id: 'shift-evening', name: 'Evening', start_time: '15:00:00', end_time: '23:00:00', is_active: true },
@@ -122,6 +133,12 @@ test('work status supports real month/day navigation flow', async ({ page }) => 
   );
 
   await expect(page.getByTestId('work-status-view')).toBeVisible();
+  await expect(page.getByTestId('work-status-last-sync')).toBeVisible();
+  await page.getByTestId('work-status-department-filter').selectOption('행정팀');
+  await expect(page.getByText('행정팀 보기')).toBeVisible();
+  await page.getByTestId('work-status-department-chip-all').click();
+  await expect(page.getByText('전사 보기')).toBeVisible();
+  await page.getByTestId('work-status-active-only-toggle').click();
   await page.getByTestId('work-status-next-month').click();
   await page.getByTestId('work-status-prev-month').click();
   await page.getByTestId('work-status-today').click();
@@ -129,6 +146,65 @@ test('work status supports real month/day navigation flow', async ({ page }) => 
   await expect(page.getByTestId('work-status-detail-modal')).toBeVisible();
   await page.getByTestId('work-status-detail-close').click();
   await expect(page.getByTestId('work-status-detail-modal')).toBeHidden();
+  await page.getByTestId('extra-back-button').click();
+  await expect(page.getByTestId('extra-features-list')).toBeVisible();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('handover template version history is visible and selectable', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await prepareExtraFeature(
+    page,
+    {
+      staffMembers: [extraFeaturesUser, targetNurse],
+      handoverNotes: [
+        {
+          id: 'handover-template-v2',
+          content: '최신 템플릿 버전',
+          author_id: extraFeaturesUser.id,
+          author_name: extraFeaturesUser.name,
+          shift: 'Day',
+          priority: 'Normal',
+          is_completed: false,
+          created_at: '2026-03-20T08:00:00.000Z',
+          handover_kind: 'template',
+          note_scope: 'general',
+          template_name: '병동 공통 인계',
+          template_version: 2,
+          handover_date: '2026-03-20',
+        },
+        {
+          id: 'handover-template-v1',
+          content: '이전 템플릿 버전',
+          author_id: extraFeaturesUser.id,
+          author_name: extraFeaturesUser.name,
+          shift: 'Evening',
+          priority: 'High',
+          is_completed: false,
+          created_at: '2026-03-18T08:00:00.000Z',
+          handover_kind: 'template',
+          note_scope: 'general',
+          template_name: '병동 공통 인계',
+          template_version: 1,
+          handover_date: '2026-03-18',
+        },
+      ],
+    },
+    'extra-card-handover-note'
+  );
+
+  await expect(page.getByTestId('handover-notes-view')).toBeVisible();
+  await expect(page.getByTestId('handover-template-version-history')).toBeVisible();
+  await expect(page.locator('[data-testid^="handover-template-version-card-"]')).toHaveCount(2);
+  await expect(
+    page.getByTestId('handover-template-version-card-handover-template-v2').getByText('최신')
+  ).toBeVisible();
+  await page.getByTestId('handover-template-version-card-handover-template-v1').click();
+  await expect(
+    page.getByTestId('handover-template-version-card-handover-template-v1').getByText('선택됨')
+  ).toBeVisible();
   await page.getByTestId('extra-back-button').click();
   await expect(page.getByTestId('extra-features-list')).toBeVisible();
 

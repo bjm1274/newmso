@@ -65,7 +65,26 @@ function BannedWordModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-type MasterTabId = '개요' | '변경이력' | '전체채팅' | '연차수동부여';
+type MasterTabId =
+  | '개요'
+  | '운영대시보드'
+  | '변경이력'
+  | '권한변경'
+  | '전체채팅'
+  | '정합성점검'
+  | '복구센터'
+  | '연차수동부여';
+
+const MASTER_TABS: MasterTabId[] = [
+  '개요',
+  '운영대시보드',
+  '변경이력',
+  '권한변경',
+  '전체채팅',
+  '정합성점검',
+  '복구센터',
+  '연차수동부여',
+];
 
 function formatCurrency(value: unknown) {
   const amount = Number(value || 0);
@@ -118,9 +137,12 @@ export default function SystemMasterCenter({
 }) {
   const [activeTab, setActiveTab] = useState<MasterTabId>('개요');
   const [overview, setOverview] = useState<Record<string, unknown> | null>(null);
+  const [operations, setOperations] = useState<Record<string, any> | null>(null);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [permissionDiffLogs, setPermissionDiffLogs] = useState<any[]>([]);
   const [chatRooms, setChatRooms] = useState<any[]>([]);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [integrityReport, setIntegrityReport] = useState<Record<string, any> | null>(null);
   const [auditCategory, setAuditCategory] = useState('all');
   const [auditKeyword, setAuditKeyword] = useState('');
   const [chatKeyword, setChatKeyword] = useState('');
@@ -133,6 +155,7 @@ export default function SystemMasterCenter({
   const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
   const [deletingMsgId, setDeletingMsgId] = useState<string | null>(null);
   const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null);
+  const [opsActionLoading, setOpsActionLoading] = useState<string>('');
 
   const isSystemMaster = hasSystemMasterPermission(user);
 
@@ -173,6 +196,54 @@ export default function SystemMasterCenter({
     }
   }, [auditCategory, auditKeyword]);
 
+  const loadOperations = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const query = new URLSearchParams({
+        scope: 'operations',
+        limit: '200',
+      });
+      const payload = await readJson(`/api/admin/system-master?${query.toString()}`);
+      setOperations(payload || null);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : '운영 대시보드를 불러오지 못했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadPermissionDiffs = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const query = new URLSearchParams({
+        scope: 'permission-diffs',
+        keyword: auditKeyword,
+        limit: '200',
+      });
+      const payload = await readJson(`/api/admin/system-master?${query.toString()}`);
+      setPermissionDiffLogs(payload.logs || []);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : '권한 변경 이력을 불러오지 못했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  }, [auditKeyword]);
+
+  const loadIntegrityReport = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const payload = await readJson('/api/admin/system-master?scope=integrity');
+      setIntegrityReport(payload || null);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : '정합성 점검 결과를 불러오지 못했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const loadChats = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -209,9 +280,24 @@ export default function SystemMasterCenter({
   }, [activeTab, isSystemMaster, loadAuditLogs]);
 
   useEffect(() => {
+    if (!isSystemMaster || activeTab !== '운영대시보드') return;
+    void loadOperations();
+  }, [activeTab, isSystemMaster, loadOperations]);
+
+  useEffect(() => {
+    if (!isSystemMaster || activeTab !== '권한변경') return;
+    void loadPermissionDiffs();
+  }, [activeTab, isSystemMaster, loadPermissionDiffs]);
+
+  useEffect(() => {
     if (!isSystemMaster || activeTab !== '전체채팅') return;
     void loadChats();
   }, [activeTab, isSystemMaster, loadChats]);
+
+  useEffect(() => {
+    if (!isSystemMaster || activeTab !== '정합성점검') return;
+    void loadIntegrityReport();
+  }, [activeTab, isSystemMaster, loadIntegrityReport]);
 
   useEffect(() => {
     if (chatRooms.length === 0) {
@@ -253,6 +339,36 @@ export default function SystemMasterCenter({
     }
   }, []);
 
+  const runOpsAction = useCallback(async (action: 'run_backup_full' | 'run_chat_push_dispatch' | 'cleanup_push_subscriptions') => {
+    setOpsActionLoading(action);
+    try {
+      const response = await fetch('/api/admin/system-master', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || '작업 실행에 실패했습니다.');
+      }
+
+      if (action === 'run_backup_full') {
+        toast('전체 백업을 실행했습니다.', 'success');
+      } else if (action === 'run_chat_push_dispatch') {
+        toast('채팅 푸시 큐 재처리를 실행했습니다.', 'success');
+      } else {
+        toast('푸시 구독 정리를 실행했습니다.', 'success');
+      }
+
+      await Promise.allSettled([loadOperations(), loadIntegrityReport()]);
+    } catch (actionError) {
+      const message = actionError instanceof Error ? actionError.message : '작업 실행에 실패했습니다.';
+      toast(message, 'error');
+    } finally {
+      setOpsActionLoading('');
+    }
+  }, [loadIntegrityReport, loadOperations]);
+
   const summaryCards = useMemo(() => {
     if (!overview?.summary) return [];
     const summary = overview.summary as Record<string, unknown>;
@@ -290,7 +406,7 @@ export default function SystemMasterCenter({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {(['개요', '변경이력', '전체채팅', '연차수동부여'] as MasterTabId[]).map((tab) => (
+            {MASTER_TABS.map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -308,8 +424,11 @@ export default function SystemMasterCenter({
               type="button"
               onClick={() => {
                 if (activeTab === '개요') void loadOverview();
+                if (activeTab === '운영대시보드') void loadOperations();
                 if (activeTab === '변경이력') void loadAuditLogs();
+                if (activeTab === '권한변경') void loadPermissionDiffs();
                 if (activeTab === '전체채팅') void loadChats();
+                if (activeTab === '정합성점검') void loadIntegrityReport();
                 onRefresh?.();
               }}
               className="rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2 text-[11px] font-bold text-[var(--foreground)] transition-all hover:bg-[var(--muted)]"
@@ -443,6 +562,130 @@ export default function SystemMasterCenter({
         </>
       )}
 
+      {activeTab === '운영대시보드' && operations && (
+        <section className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {[
+              { id: 'queue-pending', label: '대기 푸시 작업', value: operations.queue?.pending ?? 0 },
+              { id: 'queue-dead', label: 'Dead Letter', value: operations.queue?.deadLettered ?? 0 },
+              { id: 'push-total', label: '푸시 구독', value: operations.subscriptions?.total ?? 0 },
+              { id: 'backup-count', label: '최근 백업', value: (operations.recentBackups || []).length },
+            ].map((card) => (
+              <article key={card.id} className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">{card.label}</p>
+                <p className="mt-3 text-3xl font-black tracking-tight text-[var(--foreground)]">{Number(card.value || 0).toLocaleString('ko-KR')}</p>
+              </article>
+            ))}
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+            <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-bold text-[var(--foreground)]">실패/주의 작업 모니터</h3>
+                  <p className="mt-1 text-xs text-[var(--toss-gray-3)]">푸시 큐, 구독 정리, 백업 지연 같은 운영 이슈를 즉시 확인합니다.</p>
+                </div>
+              </div>
+              <div className="mt-4 space-y-3">
+                {((operations.failureItems as any[]) || []).length === 0 && (
+                  <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-4 py-8 text-center text-sm text-[var(--toss-gray-3)]">
+                    현재 감지된 실패/주의 작업이 없습니다.
+                  </div>
+                )}
+                {((operations.failureItems as any[]) || []).map((item: any) => (
+                  <div
+                    key={item.id}
+                    className={`rounded-[var(--radius-lg)] border px-4 py-3 ${
+                      item.severity === 'critical'
+                        ? 'border-red-200 bg-red-50'
+                        : item.severity === 'warning'
+                          ? 'border-amber-200 bg-amber-50'
+                          : 'border-[var(--border)] bg-[var(--page-bg)]'
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-bold text-[var(--foreground)]">{item.label}</p>
+                      <span className="rounded-[var(--radius-md)] bg-[var(--card)] px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-4)]">
+                        {Number(item.count || 0).toLocaleString('ko-KR')}건
+                      </span>
+                    </div>
+                    <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">{item.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
+              <h3 className="text-base font-bold text-[var(--foreground)]">푸시 큐 / 백업 / 크론 상태</h3>
+              <div className="mt-4 space-y-4">
+                <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] p-4">
+                  <p className="text-xs font-bold text-[var(--foreground)]">채팅 푸시 큐</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <p className="text-[11px] text-[var(--toss-gray-3)]">Ready <span className="font-bold text-[var(--foreground)]">{Number(operations.queue?.ready || 0).toLocaleString('ko-KR')}</span></p>
+                    <p className="text-[11px] text-[var(--toss-gray-3)]">Retrying <span className="font-bold text-[var(--foreground)]">{Number(operations.queue?.retrying || 0).toLocaleString('ko-KR')}</span></p>
+                    <p className="text-[11px] text-[var(--toss-gray-3)]">In Flight <span className="font-bold text-[var(--foreground)]">{Number(operations.queue?.inFlight || 0).toLocaleString('ko-KR')}</span></p>
+                    <p className="text-[11px] text-[var(--toss-gray-3)]">Migration Ready <span className="font-bold text-[var(--foreground)]">{operations.queue?.migrationReady ? '예' : '아니오'}</span></p>
+                  </div>
+                </div>
+
+                <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] p-4">
+                  <p className="text-xs font-bold text-[var(--foreground)]">푸시 구독 상태</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <p className="text-[11px] text-[var(--toss-gray-3)]">Null Staff <span className="font-bold text-[var(--foreground)]">{Number(operations.subscriptions?.nullStaff || 0).toLocaleString('ko-KR')}</span></p>
+                    <p className="text-[11px] text-[var(--toss-gray-3)]">Orphan <span className="font-bold text-[var(--foreground)]">{Number(operations.subscriptions?.orphan || 0).toLocaleString('ko-KR')}</span></p>
+                    <p className="text-[11px] text-[var(--toss-gray-3)]">중복 그룹 <span className="font-bold text-[var(--foreground)]">{Number(operations.subscriptions?.duplicateEndpointGroups || 0).toLocaleString('ko-KR')}</span></p>
+                    <p className="text-[11px] text-[var(--toss-gray-3)]">중복 행 <span className="font-bold text-[var(--foreground)]">{Number(operations.subscriptions?.duplicateRows || 0).toLocaleString('ko-KR')}</span></p>
+                  </div>
+                </div>
+
+                <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] p-4">
+                  <p className="text-xs font-bold text-[var(--foreground)]">크론 스케줄</p>
+                  <div className="mt-3 space-y-2">
+                    {((operations.cronJobs as any[]) || []).map((cron: any) => (
+                      <div key={cron.path} className="flex items-center justify-between gap-3 text-[11px]">
+                        <span className="font-semibold text-[var(--foreground)]">{cron.label}</span>
+                        <span className="text-[var(--toss-gray-3)]">{cron.schedule}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+            <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
+              <h3 className="text-base font-bold text-[var(--foreground)]">최근 백업</h3>
+              <div className="mt-4 space-y-3">
+                {((operations.recentBackups as any[]) || []).map((backup: any) => (
+                  <div key={backup.name} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
+                    <p className="text-sm font-bold text-[var(--foreground)]">{backup.name}</p>
+                    <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{new Date(backup.created_at).toLocaleString('ko-KR')}</p>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
+              <h3 className="text-base font-bold text-[var(--foreground)]">기능별 사용 로그</h3>
+              <div className="mt-4 space-y-3">
+                {((operations.usageSummary as any[]) || []).map((entry: any) => (
+                  <div key={entry.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-bold text-[var(--foreground)]">{entry.label}</p>
+                      <span className="rounded-[var(--radius-md)] bg-[var(--card)] px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-4)]">
+                        {Number(entry.count || 0).toLocaleString('ko-KR')}건
+                      </span>
+                    </div>
+                    <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">최근 액션 {entry.topAction || '-'} · {entry.latestAt ? new Date(entry.latestAt).toLocaleString('ko-KR') : '-'}</p>
+                  </div>
+                ))}
+              </div>
+            </article>
+          </div>
+        </section>
+      )}
+
       {activeTab === '변경이력' && (
         <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
           <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)_auto]">
@@ -505,6 +748,67 @@ export default function SystemMasterCenter({
                       </pre>
                     </details>
                   </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {activeTab === '권한변경' && (
+        <section className="space-y-4">
+          <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+              <input
+                value={auditKeyword}
+                onChange={(event) => setAuditKeyword(event.target.value)}
+                placeholder="직원명, 역할, 권한 키로 검색"
+                className="h-11 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 text-sm font-medium text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+              />
+              <button
+                type="button"
+                onClick={() => void loadPermissionDiffs()}
+                className="h-11 rounded-[var(--radius-lg)] bg-[var(--accent)] px-5 text-sm font-bold text-white"
+              >
+                조회
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {permissionDiffLogs.length === 0 && !loading && (
+              <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-4 py-10 text-center text-sm text-[var(--toss-gray-3)]">
+                조회된 권한 변경 이력이 없습니다.
+              </div>
+            )}
+
+            {permissionDiffLogs.map((log: any) => (
+              <article key={log.id} className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-2.5 py-1 text-[10px] font-bold text-[var(--accent)]">{log.target_label}</span>
+                      <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-4)]">{log.actor_label || '-'}</span>
+                    </div>
+                    <p className="mt-3 text-[11px] text-[var(--toss-gray-3)]">{new Date(log.created_at).toLocaleString('ko-KR')}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {(log.permission_summary?.enabled || []).map((key: string) => (
+                        <span key={`on-${key}`} className="rounded-full bg-green-100 px-2.5 py-1 text-[10px] font-bold text-green-700">+ {key}</span>
+                      ))}
+                      {(log.permission_summary?.disabled || []).map((key: string) => (
+                        <span key={`off-${key}`} className="rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-bold text-red-700">- {key}</span>
+                      ))}
+                    </div>
+                    {(log.permission_summary?.beforeRole || log.permission_summary?.afterRole) && (
+                      <p className="mt-3 text-[11px] text-[var(--toss-gray-3)]">
+                        역할: {log.permission_summary?.beforeRole || '-'} → {log.permission_summary?.afterRole || '-'}
+                      </p>
+                    )}
+                  </div>
+                  <details className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3 xl:max-w-[460px]">
+                    <summary className="cursor-pointer text-[11px] font-bold text-[var(--foreground)]">세부 diff 보기</summary>
+                    <pre className="mt-3 max-h-[260px] overflow-auto whitespace-pre-wrap break-all text-[11px] text-[var(--toss-gray-4)]">{prettyJson(log.details)}</pre>
+                  </details>
                 </div>
               </article>
             ))}
@@ -680,6 +984,109 @@ export default function SystemMasterCenter({
               </table>
             </div>
           </article>
+        </section>
+      )}
+
+      {activeTab === '정합성점검' && (
+        <section className="space-y-4">
+          <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-[var(--foreground)]">DB 정합성 점검 도구</h3>
+                <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
+                  마지막 점검 시각: {integrityReport?.checkedAt ? new Date(String(integrityReport.checkedAt)).toLocaleString('ko-KR') : '-'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void loadIntegrityReport()}
+                className="rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2 text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--muted)]"
+              >
+                다시 점검
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {((integrityReport?.issues as any[]) || []).map((issue: any) => (
+              <article
+                key={issue.id}
+                className={`rounded-[var(--radius-xl)] border p-5 shadow-sm ${
+                  issue.severity === 'critical'
+                    ? 'border-red-200 bg-red-50'
+                    : issue.severity === 'warning'
+                      ? 'border-amber-200 bg-amber-50'
+                      : 'border-[var(--border)] bg-[var(--card)]'
+                }`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-bold text-[var(--foreground)]">{issue.title}</h4>
+                    <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{issue.description}</p>
+                  </div>
+                  <span className="rounded-[var(--radius-md)] bg-[var(--card)] px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-4)]">
+                    {Number(issue.count || 0).toLocaleString('ko-KR')}건
+                  </span>
+                </div>
+                {Array.isArray(issue.samples) && issue.samples.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {issue.samples.map((sample: string, index: number) => (
+                      <span key={`${issue.id}-${index}`} className="rounded-full bg-[var(--page-bg)] px-2.5 py-1 text-[10px] font-semibold text-[var(--toss-gray-4)]">
+                        {sample}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {activeTab === '복구센터' && (
+        <section className="space-y-4">
+          <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
+            <h3 className="text-base font-bold text-[var(--foreground)]">운영자용 문제 복구 센터</h3>
+            <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
+              실패 작업 복구, 푸시 구독 정리, 수동 전체 백업을 운영자가 직접 실행할 수 있습니다.
+            </p>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-3">
+            {[
+              {
+                id: 'run_backup_full',
+                title: '정기 전체 백업 수동 실행',
+                description: '즉시 전체 백업을 만들어 최근 백업 목록을 갱신합니다.',
+                button: '전체 백업 실행',
+              },
+              {
+                id: 'run_chat_push_dispatch',
+                title: '채팅 푸시 큐 재처리',
+                description: '대기 중인 채팅 푸시 작업을 바로 다시 처리합니다.',
+                button: '푸시 큐 재처리',
+              },
+              {
+                id: 'cleanup_push_subscriptions',
+                title: '푸시 구독 정리',
+                description: 'null staff, orphan, 중복 endpoint 구독을 정리합니다.',
+                button: '푸시 구독 정리',
+              },
+            ].map((action) => (
+              <article key={action.id} className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
+                <h4 className="text-sm font-bold text-[var(--foreground)]">{action.title}</h4>
+                <p className="mt-2 text-[11px] leading-5 text-[var(--toss-gray-3)]">{action.description}</p>
+                <button
+                  type="button"
+                  onClick={() => void runOpsAction(action.id as 'run_backup_full' | 'run_chat_push_dispatch' | 'cleanup_push_subscriptions')}
+                  disabled={opsActionLoading === action.id}
+                  className="mt-4 h-10 rounded-[var(--radius-lg)] bg-[var(--foreground)] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {opsActionLoading === action.id ? '실행 중...' : action.button}
+                </button>
+              </article>
+            ))}
+          </div>
         </section>
       )}
 

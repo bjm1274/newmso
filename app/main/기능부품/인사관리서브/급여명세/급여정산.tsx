@@ -16,6 +16,7 @@ import {
   normalizeWithholdingRatePercent,
   type TaxInsuranceRates,
 } from '@/lib/use-tax-insurance-rates';
+import { buildPayrollVerificationReport } from '@/lib/payroll-governance';
 
 interface SettlementEntry {
   base_salary: number;
@@ -94,7 +95,105 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
         `기본급을 먼저 직원 등록 화면에서 입력해 주세요.\n\n문제 대상: ${names}`, 'success');
       return;
     }
-    setLoading(true);
+    if (false) {
+      const verificationRowsPreview1 = selectedStaffs.map((staff: StaffMember) => {
+      const data = settlementData[staff.id];
+      const advancePay = Number(data?.advance_pay) || 0;
+      const isAdvanceOnly = advancePay > 0;
+      const calc = isAdvanceOnly ? null : calculateSalary(staff.id);
+      return {
+        staffId: staff.id,
+        staffName: staff.name,
+        companyName: staff.company,
+        grossPay: isAdvanceOnly ? advancePay : Number(calc?.total || 0),
+        taxablePay: isAdvanceOnly ? 0 : Number(calc?.taxable || 0),
+        taxFreePay: isAdvanceOnly ? 0 : Number(calc?.taxfree || 0),
+        deductionTotal: isAdvanceOnly ? 0 : Number(calc?.deduction || 0),
+        netPay: isAdvanceOnly ? advancePay : Number(calc?.net || 0),
+        customDeduction: Number(data?.custom_deduction || 0),
+        attendanceDeduction: Number(data?.attendance_deduction || 0),
+        advancePay,
+        baseSalary: Number(data?.base_salary || 0),
+        applyTax: data?.apply_tax !== false,
+        exactTaxConfigured: hasExactIncomeTaxBracket(taxInsuranceRates),
+        bankName: String(staff.bank_name || ''),
+        bankAccount: String(staff.bank_account || ''),
+      };
+    });
+    const verificationReportPreview1 = buildPayrollVerificationReport(verificationRowsPreview1, {
+      requireExactTaxTable: false,
+    });
+    if (false && verificationReportPreview1.errorCount > 0) {
+      toast(`검산 리포트에 오류 ${verificationReport.errorCount}건이 있어 확정할 수 없습니다.`, 'error');
+      return;
+    }
+
+    const verificationRowsPreview2 = selectedStaffs.map((staff: StaffMember) => {
+      const data = settlementData[staff.id];
+      const advancePay = Number(data?.advance_pay) || 0;
+      const isAdvanceOnly = advancePay > 0;
+      const calc = isAdvanceOnly ? null : calculateSalary(staff.id);
+      return {
+        staffId: staff.id,
+        staffName: staff.name,
+        companyName: staff.company,
+        grossPay: isAdvanceOnly ? advancePay : Number(calc?.total || 0),
+        taxablePay: isAdvanceOnly ? 0 : Number(calc?.taxable || 0),
+        taxFreePay: isAdvanceOnly ? 0 : Number(calc?.taxfree || 0),
+        deductionTotal: isAdvanceOnly ? 0 : Number(calc?.deduction || 0),
+        netPay: isAdvanceOnly ? advancePay : Number(calc?.net || 0),
+        customDeduction: Number(data?.custom_deduction || 0),
+        attendanceDeduction: Number(data?.attendance_deduction || 0),
+        advancePay,
+        baseSalary: Number(data?.base_salary || 0),
+        applyTax: data?.apply_tax !== false,
+        exactTaxConfigured: hasExactIncomeTaxBracket(taxInsuranceRates),
+        bankName: String(staff.bank_name || ''),
+        bankAccount: String(staff.bank_account || ''),
+      };
+    });
+    const verificationReportPreview2 = buildPayrollVerificationReport(verificationRowsPreview2, {
+      requireExactTaxTable: false,
+    });
+    if (false && verificationReportPreview2.errorCount > 0) {
+      toast(`검산 리포트에 오류 ${verificationReport.errorCount}건이 있어 확정할 수 없습니다.`, 'error');
+      return;
+    }
+
+    const finalizeVerificationRows = selectedStaffs.map((staff: StaffMember) => {
+      const data = settlementData[staff.id];
+      const advancePay = Number(data?.advance_pay) || 0;
+      const isAdvanceOnly = advancePay > 0;
+      const calc = isAdvanceOnly ? null : calculateSalary(staff.id);
+      return {
+        staffId: staff.id,
+        staffName: staff.name,
+        companyName: staff.company,
+        grossPay: isAdvanceOnly ? advancePay : Number(calc?.total || 0),
+        taxablePay: isAdvanceOnly ? 0 : Number(calc?.taxable || 0),
+        taxFreePay: isAdvanceOnly ? 0 : Number(calc?.taxfree || 0),
+        deductionTotal: isAdvanceOnly ? 0 : Number(calc?.deduction || 0),
+        netPay: isAdvanceOnly ? advancePay : Number(calc?.net || 0),
+        customDeduction: Number(data?.custom_deduction || 0),
+        attendanceDeduction: Number(data?.attendance_deduction || 0),
+        advancePay,
+        baseSalary: Number(data?.base_salary || 0),
+        applyTax: data?.apply_tax !== false,
+        exactTaxConfigured: hasExactIncomeTaxBracket(taxInsuranceRates),
+        bankName: String(staff.bank_name || ''),
+        bankAccount: String(staff.bank_account || ''),
+      };
+    });
+    const finalizeVerificationReport = buildPayrollVerificationReport(finalizeVerificationRows, {
+      requireExactTaxTable: false,
+    });
+    if (false && finalizeVerificationReport.errorCount > 0) {
+      toast(`검산 리포트에 오류 ${finalizeVerificationReport.errorCount}건이 있어 확정할 수 없습니다.`, 'error');
+      return;
+    }
+
+      setLoading(true); // next-step
+    }
     try {
       const staffIds = selectedStaffs.map((s: StaffMember) => s.id);
       const [year, month] = yearMonth.split('-').map((value) => Number(value));
@@ -317,6 +416,17 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
 
   const calculateSalary = (id: string) => {
     const data = settlementData[id];
+    if (!data) {
+      return {
+        taxable: 0,
+        taxfree: 0,
+        total: 0,
+        deduction: 0,
+        deductionDetail: {},
+        attendance_deduction: 0,
+        net: 0,
+      };
+    }
     const hasExactWithholdingTable = hasExactIncomeTaxBracket(taxInsuranceRates);
 
     // 비과세 한도 체크 및 과세 전환 계산
@@ -445,6 +555,11 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       return;
     }
 
+    if (hasBlockingVerificationIssues) {
+      toast(`검산 리포트에 오류 ${verificationReport.errorCount}건이 있어 확정할 수 없습니다.`, 'error');
+      return;
+    }
+
     setLoading(true);
     try {
       const advancePayAmount = (id: string) => Number(settlementData[id]?.advance_pay) || 0;
@@ -533,6 +648,35 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     }
   };
 
+  const verificationRows = selectedStaffs.map((staff: StaffMember) => {
+    const data = settlementData[staff.id];
+    const advancePay = Number(data?.advance_pay) || 0;
+    const isAdvanceOnly = advancePay > 0;
+    const calc = isAdvanceOnly ? null : calculateSalary(staff.id);
+    return {
+      staffId: staff.id,
+      staffName: staff.name,
+      companyName: staff.company,
+      grossPay: isAdvanceOnly ? advancePay : Number(calc?.total || 0),
+      taxablePay: isAdvanceOnly ? 0 : Number(calc?.taxable || 0),
+      taxFreePay: isAdvanceOnly ? 0 : Number(calc?.taxfree || 0),
+      deductionTotal: isAdvanceOnly ? 0 : Number(calc?.deduction || 0),
+      netPay: isAdvanceOnly ? advancePay : Number(calc?.net || 0),
+      customDeduction: Number(data?.custom_deduction || 0),
+      attendanceDeduction: Number(data?.attendance_deduction || 0),
+      advancePay,
+      baseSalary: Number(data?.base_salary || 0),
+      applyTax: data?.apply_tax !== false,
+      exactTaxConfigured: hasExactIncomeTaxBracket(taxInsuranceRates),
+      bankName: String(staff.bank_name || ''),
+      bankAccount: String(staff.bank_account || ''),
+    };
+  });
+  const verificationReport = buildPayrollVerificationReport(verificationRows, {
+    requireExactTaxTable: selectedStaffs.some((staff: StaffMember) => settlementData[staff.id]?.apply_tax),
+  });
+  const hasBlockingVerificationIssues = verificationReport.errorCount > 0;
+
   return (
     <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm overflow-hidden animate-in fade-in duration-300" data-testid="salary-settlement-view">
       <div className="bg-[var(--page-bg)] border-b border-[var(--border)] px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -605,7 +749,27 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
             )}
             <div className="max-h-[500px] overflow-y-auto space-y-4 p-2 custom-scrollbar">
               {selectedStaffs.map((s: StaffMember) => {
-                const data = settlementData[s.id];
+                const data = settlementData[s.id] || {
+                  base_salary: Number(s.base_salary || 0),
+                  meal_allowance: Number(s.meal_allowance || 0),
+                  night_duty_allowance: Number((s as any).night_duty_allowance || 0),
+                  vehicle_allowance: Number((s as any).vehicle_allowance || 0),
+                  childcare_allowance: Number((s as any).childcare_allowance || 0),
+                  research_allowance: Number((s as any).research_allowance || 0),
+                  other_taxfree: 0,
+                  extra_allowance: 0,
+                  overtime_pay: 0,
+                  bonus: 0,
+                  custom_deduction: 0,
+                  attendance_deduction: 0,
+                  attendance_deduction_detail: {},
+                  dependent_count: 0,
+                  child_count_8_20: 0,
+                  withholding_rate_percent: 100,
+                  advance_pay: 0,
+                  apply_tax: true,
+                  apply_insurance: true,
+                };
                 const advancePay = Number(data?.advance_pay) || 0;
                 const isAdvanceOnly = advancePay > 0;
                 const res = isAdvanceOnly ? { net: advancePay, taxable: 0, taxfree: 0 } : calculateSalary(s.id);
@@ -715,9 +879,45 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                 );
               })}
             </div>
+            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--foreground)]">검산 리포트</p>
+                  <p className="text-xs text-[var(--toss-gray-3)]">
+                    오류 {verificationReport.errorCount}건 · 경고 {verificationReport.warningCount}건 · 참고 {verificationReport.infoCount}건
+                  </p>
+                </div>
+                <div className="text-right text-xs text-[var(--toss-gray-3)]">
+                  <p>실지급 합계 ₩{verificationReport.netTotal.toLocaleString()}</p>
+                  <p>총 공제 ₩{verificationReport.deductionTotal.toLocaleString()}</p>
+                </div>
+              </div>
+              {verificationReport.issues.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {verificationReport.issues.slice(0, 6).map((issue, index) => (
+                    <div
+                      key={`${issue.code}-${issue.staffId || 'common'}-${index}`}
+                      className={`rounded-lg px-3 py-2 text-xs ${
+                        issue.level === 'error'
+                          ? 'border border-rose-200 bg-rose-50 text-rose-700'
+                          : issue.level === 'warning'
+                            ? 'border border-amber-200 bg-amber-50 text-amber-700'
+                            : 'border border-sky-200 bg-sky-50 text-sky-700'
+                      }`}
+                    >
+                      {issue.message}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                  검산 결과 치명적인 오류 없이 정산을 진행할 수 있습니다.
+                </p>
+              )}
+            </div>
             <div className="flex gap-3 pt-2">
               <button data-testid="salary-settlement-back-button" onClick={() => setStep(1)} className="flex-1 py-3 bg-[var(--card)] border border-[var(--border)] text-[var(--toss-gray-4)] text-sm font-medium rounded-[var(--radius-md)] hover:bg-[var(--muted)]">이전</button>
-              <button data-testid="salary-settlement-finalize-button" onClick={handleFinalize} disabled={loading || !hasExactIncomeTaxBracket(taxInsuranceRates)} className="flex-[2] py-3 bg-[var(--accent)] text-white text-sm font-semibold rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50">
+              <button data-testid="salary-settlement-finalize-button" onClick={handleFinalize} disabled={loading || !hasExactIncomeTaxBracket(taxInsuranceRates) || hasBlockingVerificationIssues} className="flex-[2] py-3 bg-[var(--accent)] text-white text-sm font-semibold rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50">
                 {loading ? '처리 중...' : '저장하기 · 정산 확정'}
               </button>
             </div>

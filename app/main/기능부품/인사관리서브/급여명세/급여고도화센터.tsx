@@ -7,6 +7,20 @@ import { supabase } from '@/lib/supabase';
 import TaxInsuranceRatesPanel from './세율보험요율관리';
 import PayrollLockPanel from './급여월마감잠금';
 import InterimSettlement from './중간정산';
+import { fetchTaxFreeSettings, DEFAULT_SETTINGS, type TaxFreeSettings } from '@/lib/use-tax-free-settings';
+import {
+  fetchTaxInsuranceRates,
+  DEFAULT_TAX_INSURANCE_RATES,
+  hasExactIncomeTaxBracket,
+  type TaxInsuranceRates,
+} from '@/lib/use-tax-insurance-rates';
+import {
+  buildMonthlyPayrollComparison,
+  buildPayrollPolicySnapshot,
+  getPreviousYearMonth,
+  type PayrollMonthlyComparison,
+  type PayrollPolicySnapshot,
+} from '@/lib/payroll-governance';
 
 type BonusItem = {
   id: string;
@@ -86,6 +100,16 @@ type ApprovalLog = {
   action: string;
   comment: string;
   createdAt: string;
+};
+
+type PayrollPolicyVersionRow = {
+  id: string;
+  company_name: string;
+  effective_year: number;
+  version_label: string;
+  note: string | null;
+  created_at: string;
+  snapshot: PayrollPolicySnapshot | null;
 };
 
 const EMPTY_APPROVAL_STATE: ApprovalState = {
@@ -258,6 +282,11 @@ export default function PayrollAdvancedCenter({
   const [freelancerForm, setFreelancerForm] = useState({ vendorName: '', workType: '', paymentDate: `${yearMonth}-10`, supplyAmount: 0, taxRate: 3.3 });
   const [step1Comment, setStep1Comment] = useState('');
   const [step2Comment, setStep2Comment] = useState('');
+  const [taxFreeSettings, setTaxFreeSettings] = useState<TaxFreeSettings>(DEFAULT_SETTINGS);
+  const [taxInsuranceRates, setTaxInsuranceRates] = useState<TaxInsuranceRates>(DEFAULT_TAX_INSURANCE_RATES);
+  const [previousMonthRecords, setPreviousMonthRecords] = useState<Record<string, unknown>[]>([]);
+  const [policyVersions, setPolicyVersions] = useState<PayrollPolicyVersionRow[]>([]);
+  const [policyVersionNote, setPolicyVersionNote] = useState('');
 
   const companyScope = selectedCo && selectedCo.trim() ? selectedCo : '전체';
   const filteredStaffs = useMemo(
@@ -268,6 +297,23 @@ export default function PayrollAdvancedCenter({
   useEffect(() => {
     setViewer(readStoredUser());
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const effectiveYear = Number(String(yearMonth || '').slice(0, 4));
+      const [nextTaxFreeSettings, nextTaxInsuranceRates] = await Promise.all([
+        fetchTaxFreeSettings(companyScope, effectiveYear),
+        fetchTaxInsuranceRates(companyScope, effectiveYear),
+      ]);
+      if (!active) return;
+      setTaxFreeSettings(nextTaxFreeSettings);
+      setTaxInsuranceRates(nextTaxInsuranceRates);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [companyScope, yearMonth]);
 
   useEffect(() => {
     setRetroForm((prev) => ({ ...prev, startMonth: yearMonth, endMonth: yearMonth }));
@@ -289,7 +335,8 @@ export default function PayrollAdvancedCenter({
         freelancerQuery = freelancerQuery.eq('company_name', selectedCo);
       }
 
-      const [bonusRes, retroRes, deductionRes, freelancerRes, calendarRes, approvalRes, logRes] = await Promise.all([
+      const previousYearMonth = getPreviousYearMonth(yearMonth);
+      const [bonusRes, retroRes, deductionRes, freelancerRes, calendarRes, approvalRes, logRes, previousMonthRes, policyVersionRes] = await Promise.all([
         bonusQuery,
         retroQuery,
         deductionQuery,
@@ -297,6 +344,8 @@ export default function PayrollAdvancedCenter({
         supabase.from('payroll_calendar_items').select('*').eq('company_name', companyScope).eq('year_month', yearMonth).order('sort_order', { ascending: true }),
         supabase.from('payroll_approval_workflows').select('*').eq('company_name', companyScope).eq('year_month', yearMonth).maybeSingle(),
         supabase.from('payroll_approval_logs').select('*').eq('company_name', companyScope).eq('year_month', yearMonth).order('created_at', { ascending: false }).limit(20),
+        supabase.from('payroll_records').select('*').eq('year_month', previousYearMonth),
+        supabase.from('payroll_policy_versions').select('*').eq('company_name', companyScope).order('created_at', { ascending: false }).limit(12),
       ]);
 
       if (bonusRes.error) throw bonusRes.error;
@@ -306,6 +355,7 @@ export default function PayrollAdvancedCenter({
       if (calendarRes.error) throw calendarRes.error;
       if (approvalRes.error) throw approvalRes.error;
       if (logRes.error) throw logRes.error;
+      if (previousMonthRes.error) throw previousMonthRes.error;
 
       setBonusItems((bonusRes.data || []).map(mapBonusRow));
       setRetroItems((retroRes.data || []).map(mapRetroRow));
@@ -313,6 +363,8 @@ export default function PayrollAdvancedCenter({
       setFreelancerItems((freelancerRes.data || []).map(mapFreelancerRow));
       setApprovalState(approvalRes.data ? mapApprovalRow(approvalRes.data) : EMPTY_APPROVAL_STATE);
       setApprovalLogs((logRes.data || []).map(mapApprovalLogRow));
+      setPreviousMonthRecords((previousMonthRes.data || []) as Record<string, unknown>[]);
+      setPolicyVersions(policyVersionRes.error ? [] : ((policyVersionRes.data || []) as PayrollPolicyVersionRow[]));
 
       let nextCalendarItems = (calendarRes.data || []).map(mapCalendarRow);
       if (nextCalendarItems.length === 0) {
@@ -343,6 +395,8 @@ export default function PayrollAdvancedCenter({
       setCalendarItems([]);
       setApprovalState(EMPTY_APPROVAL_STATE);
       setApprovalLogs([]);
+      setPreviousMonthRecords([]);
+      setPolicyVersions([]);
     } finally {
       setLoading(false);
     }
@@ -383,6 +437,18 @@ export default function PayrollAdvancedCenter({
     return Array.from(summary.values()).sort((a, b) => b.net - a.net);
   }, [payrollRecords, selectedCo, staffs]);
 
+  const monthlyComparison = useMemo(
+    () =>
+      buildMonthlyPayrollComparison({
+        currentYearMonth: yearMonth,
+        currentRecords: payrollRecords as any[],
+        previousRecords: previousMonthRecords as any[],
+        staffs: staffs as StaffMember[],
+        selectedCompany: selectedCo,
+      }),
+    [payrollRecords, previousMonthRecords, selectedCo, staffs, yearMonth]
+  );
+
   const glRows = useMemo(() => {
     const payrollExpense = payrollRecords.reduce((sum: number, record: any) => sum + Number(record.total_taxable || 0) + Number(record.total_taxfree || 0), 0);
     const withholdingTax = payrollRecords.reduce((sum: number, record: any) => {
@@ -406,6 +472,47 @@ export default function PayrollAdvancedCenter({
 
   const monthCount = getMonthDiff(retroForm.startMonth, retroForm.endMonth);
   const retroPreviewTotal = Math.max(0, (retroForm.afterBase - retroForm.beforeBase) * monthCount);
+
+  const savePolicyVersion = async () => {
+    setSavingKey('policy-version');
+    try {
+      const snapshot = buildPayrollPolicySnapshot({
+        companyName: companyScope,
+        effectiveYear: Number(String(yearMonth || '').slice(0, 4)),
+        taxFreeSettings,
+        taxInsuranceRates,
+        officialMonthlyTaxTable: hasExactIncomeTaxBracket(taxInsuranceRates),
+      });
+      const { data, error } = await supabase
+        .from('payroll_policy_versions')
+        .insert({
+          company_name: companyScope,
+          effective_year: snapshot.effectiveYear,
+          version_label: `${yearMonth} 정책 스냅샷`,
+          note: policyVersionNote.trim() || null,
+          snapshot,
+          created_by: viewer?.id || null,
+        })
+        .select('*')
+        .single();
+      if (error) throw error;
+      if (data) {
+        setPolicyVersions((prev) => [data as PayrollPolicyVersionRow, ...prev].slice(0, 12));
+      }
+      setPolicyVersionNote('');
+      toast('급여 정책 버전을 저장했습니다.', 'success');
+    } catch (error) {
+      console.error('급여 정책 버전 저장 실패:', error);
+      const message = (error as { message?: string })?.message || '';
+      if (/payroll_policy_versions/i.test(message)) {
+        toast('급여 정책 버전 테이블이 아직 적용되지 않았습니다. 마이그레이션을 먼저 적용해 주세요.', 'error');
+      } else {
+        toast('급여 정책 버전 저장에 실패했습니다.', 'error');
+      }
+    } finally {
+      setSavingKey(null);
+    }
+  };
 
   const addApprovalLog = useCallback(async (action: string, comment: string) => {
     const payload = {
@@ -799,6 +906,114 @@ export default function PayrollAdvancedCenter({
                     <p className="mt-2 text-lg font-bold text-[var(--accent)]">{row.net.toLocaleString()}원</p>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-2">
+              <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-[var(--foreground)]">급여 정책 버전 관리</h3>
+                    <p className="text-[11px] text-[var(--toss-gray-3)]">비과세·보험·원천징수 기준을 스냅샷으로 보관합니다.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={savePolicyVersion}
+                    disabled={savingKey === 'policy-version'}
+                    className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                  >
+                    {savingKey === 'policy-version' ? '저장 중...' : '정책 버전 저장'}
+                  </button>
+                </div>
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-[var(--radius-lg)] bg-[var(--muted)] px-4 py-3">
+                    <p className="text-xs font-semibold text-[var(--toss-gray-3)]">현재 정책 기준</p>
+                    <p className="mt-2 text-sm font-bold text-[var(--foreground)]">
+                      {hasExactIncomeTaxBracket(taxInsuranceRates) ? '공식 월 원천징수표 확인됨' : '공식 월 원천징수표 미확인'}
+                    </p>
+                    <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                      식대 {Number(taxFreeSettings.meal_limit || 0).toLocaleString()}원 · 차량 {Number(taxFreeSettings.vehicle_limit || 0).toLocaleString()}원 · 육아 {Number(taxFreeSettings.childcare_limit || 0).toLocaleString()}원
+                    </p>
+                  </div>
+                  <textarea
+                    value={policyVersionNote}
+                    onChange={(event) => setPolicyVersionNote(event.target.value)}
+                    rows={3}
+                    placeholder="정책 변경 메모를 남겨 주세요."
+                    className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm outline-none"
+                  />
+                  <div className="space-y-2">
+                    {policyVersions.length > 0 ? (
+                      policyVersions.map((version) => (
+                        <div key={version.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] px-4 py-3">
+                          <p className="text-sm font-bold text-[var(--foreground)]">{version.version_label}</p>
+                          <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                            {version.created_at ? new Date(version.created_at).toLocaleString('ko-KR') : '-'}
+                            {version.note ? ` · ${version.note}` : ''}
+                          </p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-4 py-4 text-sm text-[var(--toss-gray-3)]">
+                        저장된 급여 정책 버전이 없습니다.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-[var(--foreground)]">월별 차이 분석</h3>
+                    <p className="text-[11px] text-[var(--toss-gray-3)]">
+                      {monthlyComparison.previousYearMonth} 대비 과세·공제·실지급 증감을 비교합니다.
+                    </p>
+                  </div>
+                  <div className="text-right text-[11px] text-[var(--toss-gray-3)]">
+                    <p>현재 {monthlyComparison.currentCount}명 · 이전 {monthlyComparison.previousCount}명</p>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-[var(--radius-lg)] bg-[var(--muted)] px-4 py-3">
+                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">과세 증감</p>
+                    <p className={`mt-2 text-lg font-bold ${monthlyComparison.taxableDelta >= 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      {monthlyComparison.taxableDelta >= 0 ? '+' : ''}{monthlyComparison.taxableDelta.toLocaleString()}원
+                    </p>
+                  </div>
+                  <div className="rounded-[var(--radius-lg)] bg-[var(--muted)] px-4 py-3">
+                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">공제 증감</p>
+                    <p className={`mt-2 text-lg font-bold ${monthlyComparison.deductionDelta >= 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                      {monthlyComparison.deductionDelta >= 0 ? '+' : ''}{monthlyComparison.deductionDelta.toLocaleString()}원
+                    </p>
+                  </div>
+                  <div className="rounded-[var(--radius-lg)] bg-[var(--muted)] px-4 py-3">
+                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">실지급 증감</p>
+                    <p className={`mt-2 text-lg font-bold ${monthlyComparison.netDelta >= 0 ? 'text-[var(--accent)]' : 'text-rose-600'}`}>
+                      {monthlyComparison.netDelta >= 0 ? '+' : ''}{monthlyComparison.netDelta.toLocaleString()}원
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 space-y-2">
+                  {monthlyComparison.employeeDeltas.slice(0, 5).map((delta) => (
+                    <div key={delta.staffId} className="rounded-[var(--radius-lg)] border border-[var(--border)] px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-bold text-[var(--foreground)]">{delta.staffName}</p>
+                          <p className="text-[11px] text-[var(--toss-gray-3)]">{delta.companyName || '미분류'}</p>
+                        </div>
+                        <p className={`text-sm font-bold ${delta.netDelta >= 0 ? 'text-[var(--accent)]' : 'text-rose-600'}`}>
+                          {delta.netDelta >= 0 ? '+' : ''}{delta.netDelta.toLocaleString()}원
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  {monthlyComparison.employeeDeltas.length === 0 && (
+                    <p className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-4 py-4 text-sm text-[var(--toss-gray-3)]">
+                      비교할 이전 월 급여 데이터가 없습니다.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
