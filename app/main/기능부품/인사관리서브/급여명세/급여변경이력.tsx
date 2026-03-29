@@ -1,21 +1,65 @@
 'use client';
-import { useState, useEffect } from 'react';
+
+import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { toast } from '@/lib/toast';
 
 const CHANGE_LABELS: Record<string, string> = {
-  base_salary: '기본급', meal: '식대', vehicle: '차량', childcare: '보육', research: '연구', position_allowance: '직책수당', other: '기타',
+  base_salary: '기본급',
+  meal: '식대',
+  vehicle: '차량',
+  childcare: '보육',
+  research: '연구',
+  position_allowance: '직책수당',
+  other: '기타',
 };
 
-export default function SalaryChangeHistory({ staffId, staffName }: { staffId?: string; staffName?: string }) {
-  const [list, setList] = useState<any[]>([]);
+type SalaryChangeHistoryRow = {
+  id: string;
+  staff_id: string;
+  change_type: string;
+  before_value: number | null;
+  after_value: number | null;
+  effective_date: string;
+};
+
+type Props = {
+  staffId?: string;
+  staffName?: string;
+};
+
+export default function SalaryChangeHistory({ staffId, staffName }: Props) {
+  const [list, setList] = useState<SalaryChangeHistoryRow[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
+
     (async () => {
-      let q = supabase.from('salary_change_history').select('*').order('effective_date', { ascending: false }).limit(20);
-      if (staffId) q = q.eq('staff_id', staffId);
-      const { data } = await q;
-      setList(data || []);
+      let query = supabase
+        .from('salary_change_history')
+        .select('id, staff_id, change_type, before_value, after_value, effective_date')
+        .order('effective_date', { ascending: false })
+        .limit(20);
+
+      if (staffId) query = query.eq('staff_id', staffId);
+
+      const { data, error } = await query;
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error('급여 변경 이력 조회 실패:', error);
+        toast('급여 변경 이력을 불러오지 못했습니다.', 'warning');
+        setList([]);
+        return;
+      }
+
+      setList((data ?? []) as SalaryChangeHistoryRow[]);
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [staffId]);
 
   if (list.length === 0) return null;
@@ -24,6 +68,9 @@ export default function SalaryChangeHistory({ staffId, staffName }: { staffId?: 
     <div className="border border-[var(--border)] p-4 bg-[var(--card)] rounded-[var(--radius-md)] shadow-sm">
       <div className="pb-2 border-b border-[var(--border)] mb-3">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">급여 변경 이력</h3>
+        {staffName ? (
+          <p className="mt-1 text-[11px] text-[var(--toss-gray-4)]">{staffName} 최근 변경 20건</p>
+        ) : null}
       </div>
       <div className="space-y-2 max-h-48 overflow-y-auto">
         {list.map((r) => (

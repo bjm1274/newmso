@@ -110,7 +110,7 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
       </div>
 
       {/* 요약 카드 */}
-      <div className="grid grid-cols-4 gap-2 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
         {[
           { label: '인원', val: filteredStaffs.length, unit: '명', color: 'text-[var(--foreground)]' },
           { label: '총 연차', val: filteredStaffs.reduce((acc: number, s: any) => acc + (s.annual_leave_total ?? 0), 0), unit: '일', color: 'text-[var(--accent)]' },

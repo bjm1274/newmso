@@ -126,7 +126,7 @@ export default function SalaryAutoTransfer() {
       </div>
 
       {/* 통계 */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-[var(--page-bg)] p-4 rounded-[var(--radius-md)] border border-[var(--border)]">
           <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-1">총 급여액</p>
           <p className="text-lg font-semibold text-[var(--foreground)]">

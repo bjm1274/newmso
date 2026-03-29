@@ -3,7 +3,12 @@ import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
+import { logAudit, readClientAuditActor } from '@/lib/audit';
 import AnnualLeavePromotion from './연차촉진시스템';
+import AnnualLeaveLedger from './연차원장';
+import AttendanceDeductionSimulator from './근태차감시뮬레이터';
+import AttendanceAnomalyPanel from './근태이상탐지';
+import HolidayWorkPolicySettings from './휴일근무규칙설정';
 import LeaveDashboard from '../급여명세/연차종합대시보드';
 import HolidayCalendar from '../공휴일달력';
 
@@ -23,7 +28,11 @@ type LeaveManagementTabId =
   | '연차 대시보드'
   | '연차사용촉진 자동화'
   | '연차 자동부여 설정'
-  | '공휴일 달력';
+  | '공휴일 달력'
+  | '연차 원장'
+  | '근태 차감 시뮬레이터'
+  | '근태 이상 탐지'
+  | '휴일/대체휴무 규칙';
 
 const LEAVE_TAB_DEFS: { id: LeaveManagementTabId; label: string }[] = [
   { id: '연차/휴가 신청내역', label: '연차/휴가 신청내역' },
@@ -31,6 +40,10 @@ const LEAVE_TAB_DEFS: { id: LeaveManagementTabId; label: string }[] = [
   { id: '연차사용촉진 자동화', label: '연차사용촉진 자동화' },
   { id: '연차 자동부여 설정', label: '연차 자동부여 설정' },
   { id: '공휴일 달력', label: '공휴일 달력' },
+  { id: '연차 원장', label: '연차 원장' },
+  { id: '근태 차감 시뮬레이터', label: '근태 차감 시뮬레이터' },
+  { id: '근태 이상 탐지', label: '근태 이상 탐지' },
+  { id: '휴일/대체휴무 규칙', label: '휴일/대체휴무 규칙' },
 ];
 
 export default function LeaveManagement({
@@ -116,22 +129,41 @@ export default function LeaveManagement({
 
   const handleStatusUpdate = async (id: string, status: '승인' | '반려') => {
     try {
+      const targetLeave = leaves.find((leave) => leave.id === id);
+      const previousStatus = targetLeave?.status;
       const { error } = await supabase
         .from('leave_requests')
         .update({
           status,
-          approved_at: new Date().toISOString(),
+          approved_at: status === '승인' ? new Date().toISOString() : null,
         })
         .eq('id', id);
 
       if (error) throw error;
       setLeaves((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
-      if (status === '승인') {
-        const leave = leaves.find((l) => l.id === id);
-        if (leave) {
-          await syncAnnualLeaveUsedForStaff(leave.staff_id);
-        }
+
+      let recalculatedUsedDays: number | null = null;
+      if (targetLeave?.staff_id) {
+        recalculatedUsedDays = await syncAnnualLeaveUsedForStaff(targetLeave.staff_id);
       }
+
+      const actor = readClientAuditActor();
+      await logAudit(
+        'leave_request_status_updated',
+        'leave_request',
+        id,
+        {
+          staff_id: targetLeave?.staff_id ?? null,
+          leave_type: targetLeave?.leave_type ?? null,
+          before_status: previousStatus ?? null,
+          after_status: status,
+          rollback_applied: previousStatus === '승인' && status !== '승인',
+          annual_leave_used_recalculated: recalculatedUsedDays,
+        },
+        actor.userId,
+        actor.userName
+      );
+
       toast(`신청이 ${status} 처리되었습니다.`, 'success');
       if (onRefresh) (onRefresh as () => void)();
     } catch (err) {
@@ -380,6 +412,18 @@ export default function LeaveManagement({
 
         {activeTab === '공휴일 달력' && (
           <HolidayCalendar staffs={staffList} selectedCo={selectedCo as string} user={user} />
+        )}
+        {activeTab === '연차 원장' && (
+          <AnnualLeaveLedger staffs={staffList as any[]} selectedCo={selectedCo as string} />
+        )}
+        {activeTab === '근태 차감 시뮬레이터' && (
+          <AttendanceDeductionSimulator staffs={staffList as any[]} selectedCo={selectedCo as string} />
+        )}
+        {activeTab === '근태 이상 탐지' && (
+          <AttendanceAnomalyPanel staffs={staffList as any[]} selectedCo={selectedCo as string} />
+        )}
+        {activeTab === '휴일/대체휴무 규칙' && (
+          <HolidayWorkPolicySettings selectedCo={selectedCo as string} />
         )}
       </div>
 

@@ -3657,7 +3657,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         <div
           ref={messageListRef}
           onScroll={updateScrollPositionState}
-          className="flex-1 min-h-0 overflow-y-auto px-3 py-1 pb-2 md:px-4 md:py-2 md:pb-2 space-y-0 custom-scrollbar"
+          className="flex-1 min-h-0 overflow-y-auto px-2 py-0.5 pb-1 md:px-4 md:py-2 md:pb-2 space-y-0 custom-scrollbar"
         >
           {!selectedRoomId ? (
             <div className="h-full flex flex-col items-center justify-center text-[var(--toss-gray-3)]">
@@ -3751,9 +3751,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 lastSenderId = String(msg.sender_id);
 
                 return (
-                  <div key={msg.id} className={isContinuous ? 'mt-0.5' : 'mt-1.5 md:mt-2'}>
+                  <div key={msg.id} className={isContinuous ? 'mt-0.5' : 'mt-1 md:mt-2'}>
                     {showDateDivider && (
-                      <div className="my-1 flex items-center justify-center gap-1.5 md:my-2 md:gap-2">
+                      <div className="my-0.5 flex items-center justify-center gap-1 md:my-2 md:gap-2">
                         <div className="flex-1 h-px bg-[var(--border)]" />
                         <span className="px-2.5 py-0.5 rounded-full bg-[var(--muted)] text-[10px] font-semibold text-[var(--toss-gray-3)] shrink-0">
                           {dateLabel}
@@ -3773,7 +3773,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
                       >
                         {!isMine && !isContinuous && (
-                          <span className="mb-0.5 px-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                          <span className="mb-0.5 px-1 text-[10px] font-semibold leading-none text-[var(--toss-gray-3)]">
                             {msg.staff?.name} {msg.staff?.position}
                           </span>
                         )}
@@ -3786,10 +3786,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           }}
                           className={`group relative ${
                             isDeletedMessage
-                              ? 'border border-dashed border-[var(--border)] bg-[var(--muted)] px-2.5 py-1.5 text-[var(--toss-gray-3)] italic md:px-3'
+                              ? 'border border-dashed border-[var(--border)] bg-[var(--muted)] px-2 py-1 text-[var(--toss-gray-3)] italic md:px-3'
                               : !msg.content
                                 ? 'p-0 bg-transparent shadow-none border-none'
-                                : 'border px-2.5 py-1.5 md:px-3'
+                                : 'border px-2 py-1 md:px-3'
                           } rounded-[var(--radius-md)] text-[13px] md:text-sm ${isDeletedMessage ? 'cursor-default' : 'cursor-pointer'} transition-all max-w-[78%] md:max-w-[72%] ${
                             isDeletedMessage
                               ? isMine
@@ -3813,7 +3813,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             const parent = messages.find(( m: ChatMessage) => m.id === msg.reply_to_id);
                             return parent ? (
                               <div
-                                className={`mb-1.5 p-1.5 rounded-[var(--radius-md)] text-[11px] border-l-2 cursor-pointer hover:opacity-80 transition-opacity ${isMine ? 'bg-white/10 border-white/40 text-white/90' : 'bg-[var(--muted)] border-[var(--accent)]/40 text-[var(--foreground)]'
+                                className={`mb-1 p-1.5 rounded-[var(--radius-md)] text-[11px] border-l-2 cursor-pointer hover:opacity-80 transition-opacity ${isMine ? 'bg-white/10 border-white/40 text-white/90' : 'bg-[var(--muted)] border-[var(--accent)]/40 text-[var(--foreground)]'
                                   }`}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -3936,7 +3936,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           </div>
                         )}
                         <div
-                          className={`flex items-center gap-1 mt-0.5 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity ${isMine ? 'flex-row-reverse' : ''}`}
+                          className={`mt-0.5 hidden items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 md:flex ${isMine ? 'flex-row-reverse' : ''}`}
                           onClick={e => e.stopPropagation()}
                         >
                           <button
@@ -3979,7 +3979,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
         <div
           data-testid="chat-upload-dropzone"
-          className={`relative z-10 shrink-0 bg-[var(--card)] px-1.5 py-1 pb-[calc(env(safe-area-inset-bottom)+6px)] md:px-2.5 md:py-1.5 md:pb-1.5 transition-all ${isDragging ? 'border-t-2 border-[var(--accent)] border-dashed bg-blue-50 dark:bg-blue-900/20' : 'border-t border-[var(--border)]'}`}
+          className={`relative z-10 shrink-0 bg-[var(--card)] px-1 py-0.5 pb-[calc(env(safe-area-inset-bottom)+4px)] md:px-2.5 md:py-1.5 md:pb-1.5 transition-all ${isDragging ? 'border-t-2 border-[var(--accent)] border-dashed bg-blue-50 dark:bg-blue-900/20' : 'border-t border-[var(--border)]'}`}
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
           onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
           onDrop={async (e) => {
@@ -3989,7 +3989,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           }}
         >
           {replyTo && (
-            <div className="mb-1.5 flex items-center justify-between rounded-[var(--radius-lg)] border border-[var(--toss-blue-light)] bg-[var(--toss-blue-light)] px-2.5 py-1.5 animate-in slide-in-from-bottom-2">
+            <div className="mb-1 flex items-center justify-between rounded-[var(--radius-lg)] border border-[var(--toss-blue-light)] bg-[var(--toss-blue-light)] px-2 py-1 animate-in slide-in-from-bottom-2">
               <p className="text-[11px] font-bold text-[var(--accent)]">@{(replyTo.staff as { name?: string } | null | undefined)?.name}님에게 답글 작성 중...</p>
               <button onClick={() => setReplyTo(null)} className="text-[var(--accent)] hover:text-[var(--accent)] font-semibold">닫기</button>
             </div>
@@ -3998,7 +3998,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           {pendingAttachmentFiles.length > 0 && (
             <div
               data-testid="chat-pending-upload-panel"
-              className="mb-1.5 flex flex-col gap-1.5 rounded-[var(--radius-lg)] border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[12px] text-blue-900"
+              className="mb-1 flex flex-col gap-1 rounded-[var(--radius-lg)] border border-blue-200 bg-blue-50 px-2 py-1 text-[12px] text-blue-900"
             >
               <p className="font-semibold">
                 선택한 파일 {pendingAttachmentFiles.length}개를 채팅방에 전송할까요?
@@ -4041,14 +4041,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
           <div
             aria-live="polite"
-            className="mb-0.5 min-h-[10px] px-1 text-[10px] font-medium"
+            className="mb-0.5 min-h-[8px] px-1 text-[10px] font-medium"
           >
             {typingNoticeText ? (
               <span className="text-blue-500">{typingNoticeText}</span>
             ) : null}
           </div>
 
-          <div className={`flex items-end gap-1.5 rounded-[var(--radius-lg)] border px-1.5 py-1.5 md:gap-2 md:px-2.5 md:py-2 transition-all ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
+          <div className={`flex items-end gap-1 rounded-[var(--radius-lg)] border px-1 py-1 md:gap-2 md:px-2.5 md:py-2 transition-all ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
             ? 'bg-[var(--muted)] border-[var(--border)] opacity-80 pointer-events-none'
             : 'bg-[var(--muted)] border-[var(--border)] focus-within:bg-[var(--card)] focus-within:ring-2 focus-within:ring-[var(--accent)]/50'
             }`}>
@@ -4066,7 +4066,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 ref={composerRef}
                 data-testid="chat-message-input"
                 rows={1}
-                className="block min-h-[32px] w-full min-w-0 resize-none bg-transparent px-1 py-1 text-[16px] font-bold leading-6 outline-none md:min-h-[22px] md:px-2 md:py-1 md:text-sm md:leading-5"
+                className="block min-h-[28px] w-full min-w-0 resize-none bg-transparent px-1 py-0.5 text-[16px] font-bold leading-5 outline-none md:min-h-[22px] md:px-2 md:py-1 md:text-sm md:leading-5"
                 style={{ fontSize: '16px' }}
                 placeholder={selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice ? "부서장 이상만 공지 작성 가능" : "메시지를 입력하세요... (@이름 멘션 가능)"}
                 value={inputMsg}
@@ -4119,7 +4119,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             <button
               data-testid="chat-send-button"
               onClick={() => handleSendMessage()}
-              className="flex h-8 min-w-[56px] shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)] px-2.5 text-[13px] font-bold text-white shadow-sm transition-all hover:scale-105 active:scale-95 md:h-8 md:min-w-[56px] md:px-3 md:text-sm"
+              className="flex h-7 min-w-[52px] shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)] px-2 text-[12px] font-bold text-white shadow-sm transition-all hover:scale-105 active:scale-95 md:h-8 md:min-w-[56px] md:px-3 md:text-sm"
             >
               전송
             </button>
