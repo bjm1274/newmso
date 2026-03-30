@@ -21,6 +21,7 @@ export default function ProductRegistration({ user: _user, suppliers: _suppliers
     supplier_name: '',
     expiry_date: '',
     lot_number: '',
+    serial_number: '',
     insurance_code: '',
     spec: '',
     is_udi: false,
@@ -67,6 +68,7 @@ export default function ProductRegistration({ user: _user, suppliers: _suppliers
         unit_price: productForm.unit_price || 0,
         expiry_date: productForm.expiry_date || null,
         lot_number: productForm.lot_number || null,
+        serial_number: productForm.serial_number || null,
         insurance_code: productForm.insurance_code || null,
         spec: productForm.spec || null,
         // 재고 테이블에서 stock 컬럼을 함께 사용하므로 초기 재고 = quantity 로 맞춤
@@ -103,6 +105,7 @@ export default function ProductRegistration({ user: _user, suppliers: _suppliers
         supplier_name: '',
         expiry_date: '',
         lot_number: '',
+        serial_number: '',
         insurance_code: '',
         spec: '',
         is_udi: false,
@@ -164,6 +167,15 @@ export default function ProductRegistration({ user: _user, suppliers: _suppliers
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">LOT 번호 (선택)</label>
             <input value={productForm.lot_number} onChange={e => setProductForm({ ...productForm, lot_number: e.target.value })} className="w-full p-4 bg-[var(--input-bg)] rounded-[var(--radius-md)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/20" placeholder="LOT-0000-00" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">시리얼 번호 (선택)</label>
+            <input
+              value={productForm.serial_number}
+              onChange={e => setProductForm({ ...productForm, serial_number: e.target.value })}
+              className="w-full p-4 bg-[var(--input-bg)] rounded-[var(--radius-md)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/20"
+              placeholder="SERIAL-0000"
+            />
           </div>
 
           {/* 기타 설정 */}

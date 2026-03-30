@@ -9,6 +9,9 @@ import SmartDatePicker from './공통/SmartDatePicker';
 import type { StaffMember, BoardPost, ScheduleItem, AttachmentItem } from '@/types';
 const CHAT_ROOM_KEY = 'erp_chat_last_room';
 const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
+const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
+// 공지사항·경조사 게시글 등록 시 공지 채팅방 자동 전송 대상 게시판
+const BOARD_AUTO_CHAT_TYPES = new Set(['공지사항', '경조사']);
 
 const BOARD_IDS = ['공지사항', '자유게시판', '익명소리함', '경조사', '수술일정', 'MRI일정', '직원제안함'];
 const BOARD_POST_OPTIONAL_COLUMNS = [
@@ -458,6 +461,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const [boardAudience, setBoardAudience] = useState<StaffSummary[]>([]);
   const [readStatusPost, setReadStatusPost] = useState<BoardPost | null>(null);
   const [readStatusLoading, setReadStatusLoading] = useState(false);
+  const [readStatusAudience, setReadStatusAudience] = useState<StaffSummary[]>([]);
   const [noticeVisibilityTick, setNoticeVisibilityTick] = useState(() => Date.now());
   const [effectiveBoardUserId, setEffectiveBoardUserId] = useState<string>(
     () => getStaffLikeId((user ?? null) as Record<string, unknown> | null) || String(user?.id ?? '').trim()
@@ -665,6 +669,16 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     setReadStatusPost(post);
     setReadStatusLoading(true);
     try {
+      // 현재 필터와 무관하게 게시글의 회사 기준으로 대상자 조회
+      const postCompany = typeof post.company === 'string' && post.company ? post.company : null;
+      let audienceQuery = supabase
+        .from('staff_members')
+        .select('id, name, company, company_id, department, position, status')
+        .neq('status', '퇴사')
+        .neq('status', '퇴직');
+      if (postCompany) audienceQuery = audienceQuery.eq('company', postCompany);
+      const { data: audienceData } = await audienceQuery.order('name', { ascending: true });
+      setReadStatusAudience((audienceData || []) as StaffSummary[]);
       await loadBoardReadState([String(post.id)]);
     } finally {
       setReadStatusLoading(false);
@@ -1131,14 +1145,27 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     if (!readStatusPost) return [];
     const postId = String(readStatusPost.id ?? '').trim();
     const readSet = postReadMap[postId] || new Set<string>();
-    return boardAudience.filter((member) => readSet.has(String(member.id ?? '').trim()));
-  }, [boardAudience, postReadMap, readStatusPost]);
+    const audience = readStatusAudience.length > 0 ? readStatusAudience : boardAudience;
+    // 작성자 자신은 대상자에서 제외
+    const authorId = String(readStatusPost.author_id ?? '').trim();
+    return audience.filter((member) => {
+      const memberId = String(member.id ?? '').trim();
+      if (authorId && memberId === authorId) return false;
+      return readSet.has(memberId);
+    });
+  }, [boardAudience, readStatusAudience, postReadMap, readStatusPost]);
   const readStatusPendingAudience = useMemo(() => {
     if (!readStatusPost) return [];
     const postId = String(readStatusPost.id ?? '').trim();
     const readSet = postReadMap[postId] || new Set<string>();
-    return boardAudience.filter((member) => !readSet.has(String(member.id ?? '').trim()));
-  }, [boardAudience, postReadMap, readStatusPost]);
+    const audience = readStatusAudience.length > 0 ? readStatusAudience : boardAudience;
+    const authorId = String(readStatusPost.author_id ?? '').trim();
+    return audience.filter((member) => {
+      const memberId = String(member.id ?? '').trim();
+      if (authorId && memberId === authorId) return false;
+      return !readSet.has(memberId);
+    });
+  }, [boardAudience, readStatusAudience, postReadMap, readStatusPost]);
 
   useEffect(() => {
     if (!selectedPost) return;
@@ -1611,6 +1638,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
           (activeBoard === '공지사항' &&
             (!normalizedScheduledPublishAt || new Date(normalizedScheduledPublishAt).getTime() <= Date.now()));
         if (shouldNotifyImmediately) {
+          // 1) 전 직원 알림 발송
           try {
             const { data: staffList } = await supabase.from('staff_members').select('id');
             const staffIds = (staffList || []).map((s: { id: string }) => s.id).filter(Boolean);
@@ -1627,6 +1655,38 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
             }
           } catch (e) {
             console.warn('게시판 전 직원 알림 발송 실패:', e);
+          }
+
+          // 2) 공지 채팅방 자동 메시지 전송 (공지사항·경조사)
+          if (BOARD_AUTO_CHAT_TYPES.has(activeBoard)) {
+            try {
+              const boardIcon = activeBoard === '공지사항' ? '📢' : '🎉';
+              const postTitle = (normalizedInsertedPost.title || '(제목 없음)').slice(0, 120);
+              const rawContent = typeof normalizedInsertedPost.content === 'string'
+                ? normalizedInsertedPost.content : '';
+              // 첨부 메타 제거 후 미리보기
+              const cleanContent = rawContent
+                .replace(/\[\[ATTACHMENTS_META\]\][\s\S]*?\[\[\/ATTACHMENTS_META\]\]/g, '')
+                .replace(/\[\[BOARD_META\]\][\s\S]*?\[\[\/BOARD_META\]\]/g, '')
+                .replace(/\[\[SCHEDULE_META\]\][\s\S]*?\[\[\/SCHEDULE_META\]\]/g, '')
+                .trim();
+              const preview = cleanContent.slice(0, 100).replace(/\n+/g, ' ').trim();
+              const chatContent = [
+                `${boardIcon} [${activeBoard}] ${postTitle}`,
+                preview || null,
+              ].filter(Boolean).join('\n');
+              const senderId = effectiveBoardUserId || String(user?.id || '').trim();
+              if (senderId) {
+                await supabase.from('messages').insert([{
+                  room_id: NOTICE_ROOM_ID,
+                  sender_id: senderId,
+                  sender_name: useAnonymous ? '관리자' : (user?.name || '관리자'),
+                  content: chatContent,
+                }]);
+              }
+            } catch (e) {
+              console.warn('공지 채팅방 자동 메시지 전송 실패:', e);
+            }
           }
         }
       } else {
@@ -2863,7 +2923,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                             <p className="text-[11px] font-bold text-[var(--toss-gray-4)] p-2 bg-[var(--page-bg)] truncate">{att.name}</p>
                           </div>
                         ) : (
-                          <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" download={att.name} className="inline-flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--muted)] border border-[var(--border)] text-sm font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]">
+                          <a key={i} href={`/api/download?url=${encodeURIComponent(att.url)}&name=${encodeURIComponent(att.name ?? '')}`} className="inline-flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--muted)] border border-[var(--border)] text-sm font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]">
                             📎 {att.name}
                           </a>
                         )

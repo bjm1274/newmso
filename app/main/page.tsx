@@ -889,16 +889,16 @@ function MainPageContent() {
         {/* 전역 알림 및 푸시 처리 (채팅 탭을 열지 않아도 작동) */}
         <NotificationSystem
           user={user as Parameters<typeof NotificationSystem>[0]['user']}
-          onOpenChatRoom={(roomId) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); }}
-          onOpenMessage={(roomId, messageId) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); setInitialOpenMessageId(messageId); }}
+          onOpenChatRoom={(roomId: string) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); }}
+          onOpenMessage={(roomId: string, messageId: string) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); setInitialOpenMessageId(messageId); }}
           onOpenApproval={() => setMainMenu('전자결재')}
-          onOpenInventory={(intent) => {
+          onOpenInventory={(intent: { view?: string | null; approvalId?: string | null } | undefined) => {
             setMainMenu('재고관리');
             setSubView(intent?.view || '현황');
             setInitialInventoryWorkflowApprovalId(intent?.approvalId || null);
           }}
-          onOpenBoard={(boardId) => { setMainMenu('게시판'); if (boardId) setInitialBoardView(boardId); }}
-          onOpenPost={(boardId, postId) => { setMainMenu('게시판'); if (boardId) setInitialBoardView(boardId); setInitialOpenPostId(postId); }}
+          onOpenBoard={(boardId?: string) => { setMainMenu('게시판'); if (boardId) setInitialBoardView(boardId); }}
+          onOpenPost={(boardId: string, postId: string) => { setMainMenu('게시판'); if (boardId) setInitialBoardView(boardId); setInitialOpenPostId(postId); }}
         />
 
         {loading && (

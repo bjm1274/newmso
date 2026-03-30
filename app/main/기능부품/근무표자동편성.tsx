@@ -25,6 +25,11 @@ import {
   type RosterGenerationRule,
   writeCachedGenerationRules,
 } from '@/lib/roster-generation-rules';
+import {
+  buildRosterSnapshotStorageKey,
+  normalizeStoredRosterSnapshot,
+  type StoredRosterSnapshot,
+} from '@/lib/roster-snapshot-history';
 import { isKoreanPublicHoliday } from '@/lib/korean-public-holidays';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
@@ -2514,6 +2519,17 @@ export default function AutoRosterPlanner({
   const [preferredOffDate, setPreferredOffDate] = useState('');
   const [selectedAiShiftIds, setSelectedAiShiftIds] = useState<string[]>([]);
   const [highlightedRosterTarget, setHighlightedRosterTarget] = useState('');
+  const [rosterSnapshots, setRosterSnapshots] = useState<StoredRosterSnapshot<GeminiRosterRecommendation>[]>([]);
+  const [selectedSnapshotId, setSelectedSnapshotId] = useState('');
+  const [pendingSnapshotMeta, setPendingSnapshotMeta] = useState<{
+    source: 'generated' | 'saved';
+    label: string;
+  } | null>(null);
+
+  const rosterSnapshotStorageKey = useMemo(
+    () => buildRosterSnapshotStorageKey(selectedCompany, selectedDepartment, selectedMonth),
+    [selectedCompany, selectedDepartment, selectedMonth]
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -2603,6 +2619,38 @@ export default function AutoRosterPlanner({
       console.error('근무규칙 저장 실패:', error);
     }
   }, [savedGenerationRules]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(rosterSnapshotStorageKey);
+      if (!raw) {
+        setRosterSnapshots([]);
+        setSelectedSnapshotId('');
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        setRosterSnapshots([]);
+        setSelectedSnapshotId('');
+        return;
+      }
+
+      const normalized = parsed
+        .map((item) => normalizeStoredRosterSnapshot<GeminiRosterRecommendation>(item))
+        .filter((item): item is StoredRosterSnapshot<GeminiRosterRecommendation> => item !== null);
+
+      setRosterSnapshots(normalized);
+      setSelectedSnapshotId((prev) =>
+        normalized.some((snapshot) => snapshot.id === prev) ? prev : normalized[0]?.id || ''
+      );
+    } catch (error) {
+      console.error('근무표 스냅샷 로드 실패:', error);
+      setRosterSnapshots([]);
+      setSelectedSnapshotId('');
+    }
+  }, [rosterSnapshotStorageKey]);
 
   useEffect(() => {
     if (!companyOptions.length) return;
@@ -3492,6 +3540,68 @@ export default function AutoRosterPlanner({
       .filter((row): row is PreviewRow => Boolean(row));
   }, [aiRecommendation, enabledTargetStaffs, manualAssignments, monthDates, workShifts, workingShifts]);
 
+  const serializePreviewRows = (rows: PreviewRow[]) =>
+    rows.map((row) => ({
+      staffId: String(row.staff.id),
+      staffName: String(row.staff.name || row.staff.employee_name || `직원 ${row.staff.id}`),
+      cells: row.cells.map((cell) => ({
+        date: cell.date,
+        shiftId: cell.shiftId,
+        shiftName: cell.shiftName,
+        code: cell.code,
+        isManual: cell.isManual,
+      })),
+    }));
+
+  const persistRosterSnapshots = (
+    nextSnapshots: StoredRosterSnapshot<GeminiRosterRecommendation>[],
+    nextSelectedSnapshotId?: string
+  ) => {
+    setRosterSnapshots(nextSnapshots);
+    setSelectedSnapshotId(nextSelectedSnapshotId || nextSnapshots[0]?.id || '');
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(rosterSnapshotStorageKey, JSON.stringify(nextSnapshots));
+    } catch (error) {
+      console.error('근무표 스냅샷 저장 실패:', error);
+    }
+  };
+
+  const captureRosterSnapshot = ({
+    source,
+    label,
+    warningCount,
+  }: {
+    source: 'generated' | 'saved';
+    label: string;
+    warningCount: number;
+  }) => {
+    if (!selectedCompany || !selectedDepartment || !selectedMonth || previewRows.length === 0) return null;
+
+    const snapshot: StoredRosterSnapshot<GeminiRosterRecommendation> = {
+      id: `${source}-${Date.now()}`,
+      label,
+      source,
+      createdAt: new Date().toISOString(),
+      month: selectedMonth,
+      company: selectedCompany,
+      department: selectedDepartment,
+      summary: {
+        staffCount: previewRows.length,
+        manualCount: Object.keys(manualAssignments).length,
+        warningCount,
+      },
+      recommendation: aiRecommendation,
+      manualAssignments: { ...manualAssignments },
+      rows: serializePreviewRows(previewRows),
+      leaveAppliedSummary,
+    };
+
+    const nextSnapshots = [snapshot, ...rosterSnapshots].slice(0, 12);
+    persistRosterSnapshots(nextSnapshots, snapshot.id);
+    return snapshot;
+  };
+
   const previewGenerationRule = useMemo(
     () =>
       applyWardCoverageDefaults(
@@ -3783,6 +3893,198 @@ export default function AutoRosterPlanner({
     previewRows,
     structuralStaffingGap,
   ]);
+
+  const selectedRosterSnapshot = useMemo(
+    () => rosterSnapshots.find((snapshot) => snapshot.id === selectedSnapshotId) || null,
+    [rosterSnapshots, selectedSnapshotId]
+  );
+
+  const rosterSnapshotComparison = useMemo(() => {
+    if (!selectedRosterSnapshot || previewRows.length === 0) return null;
+
+    const currentAssignments = new Map<string, string>();
+    const currentNames = new Map<string, string>();
+    previewRows.forEach((row) => {
+      currentNames.set(String(row.staff.id), String(row.staff.name || row.staff.employee_name || `직원 ${row.staff.id}`));
+      row.cells.forEach((cell) => {
+        currentAssignments.set(`${row.staff.id}:${cell.date}`, cell.shiftId);
+      });
+    });
+
+    const snapshotAssignments = new Map<string, string>();
+    const snapshotNames = new Map<string, string>();
+    selectedRosterSnapshot.rows.forEach((row) => {
+      snapshotNames.set(row.staffId, row.staffName);
+      row.cells.forEach((cell) => {
+        snapshotAssignments.set(`${row.staffId}:${cell.date}`, cell.shiftId);
+      });
+    });
+
+    const allKeys = new Set([...currentAssignments.keys(), ...snapshotAssignments.keys()]);
+    const changedStaffIds = new Set<string>();
+    const changedDates = new Set<string>();
+
+    allKeys.forEach((key) => {
+      if ((currentAssignments.get(key) || '') === (snapshotAssignments.get(key) || '')) return;
+      const [staffId, date] = key.split(':');
+      changedStaffIds.add(staffId);
+      changedDates.add(date);
+    });
+
+    const changedStaffPreview = Array.from(changedStaffIds)
+      .slice(0, 5)
+      .map((staffId) => currentNames.get(staffId) || snapshotNames.get(staffId) || staffId);
+
+    return {
+      changedCellCount: allKeys.size === 0 ? 0 : Array.from(allKeys).filter((key) => (currentAssignments.get(key) || '') !== (snapshotAssignments.get(key) || '')).length,
+      changedStaffCount: changedStaffIds.size,
+      changedDateCount: changedDates.size,
+      changedStaffPreview,
+    };
+  }, [previewRows, selectedRosterSnapshot]);
+
+  useEffect(() => {
+    if (!pendingSnapshotMeta) return;
+    if (previewRows.length === 0 || !aiRecommendation?.staffPlans?.length) return;
+    captureRosterSnapshot({
+      source: pendingSnapshotMeta.source,
+      label: pendingSnapshotMeta.label,
+      warningCount: rosterWarningReport.items.length,
+    });
+    setPendingSnapshotMeta(null);
+  }, [aiRecommendation, pendingSnapshotMeta, previewRows, rosterWarningReport.items.length]);
+
+  const restoreRosterSnapshot = (snapshot: StoredRosterSnapshot<GeminiRosterRecommendation>) => {
+    if (!snapshot.recommendation?.staffPlans?.length) {
+      toast('복원할 근무표 초안 데이터가 없습니다.', 'warning');
+      return;
+    }
+    setAiRecommendation(snapshot.recommendation);
+    setManualAssignments(snapshot.manualAssignments || {});
+    setManualEditMode(Object.keys(snapshot.manualAssignments || {}).length > 0);
+    setGeminiSummary(`${snapshot.label} 스냅샷을 복원했습니다.`);
+    setGeminiAppliedAt(snapshot.createdAt);
+    setLeaveAppliedSummary(snapshot.leaveAppliedSummary || '');
+    setSelectedSnapshotId(snapshot.id);
+    toast(`${snapshot.label} 스냅샷을 복원했습니다.`, 'success');
+  };
+
+  const renderRosterSnapshotPanel = () => {
+    if (!selectedCompany || !selectedDepartment) return null;
+
+    return (
+      <div className="mt-4 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h5 className="text-base font-bold text-[var(--foreground)]">생성 전후 비교 · 수정 이력</h5>
+            <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
+              최근 생성본과 저장본을 보관하고 현재 초안과 차이를 바로 비교할 수 있습니다.
+            </p>
+          </div>
+          <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-[11px] font-semibold text-[var(--toss-gray-4)]">
+            최근 스냅샷 {rosterSnapshots.length}건
+          </div>
+        </div>
+
+        {rosterSnapshots.length === 0 ? (
+          <div className="mt-4 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm text-[var(--toss-gray-3)]">
+            아직 저장된 근무표 스냅샷이 없습니다. 자동 생성 또는 저장 시 최근 기록이 여기에 남습니다.
+          </div>
+        ) : (
+          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(260px,0.9fr)_minmax(0,1.1fr)]">
+            <div className="space-y-2">
+              {rosterSnapshots.map((snapshot) => (
+                <button
+                  key={snapshot.id}
+                  type="button"
+                  onClick={() => setSelectedSnapshotId(snapshot.id)}
+                  className={`w-full rounded-[var(--radius-lg)] border px-4 py-3 text-left transition-colors ${
+                    snapshot.id === selectedSnapshotId
+                      ? 'border-[var(--accent)] bg-blue-50'
+                      : 'border-[var(--border)] bg-[var(--muted)] hover:border-[var(--accent)]/40'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-bold text-[var(--foreground)]">{snapshot.label}</div>
+                      <div className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                        {new Date(snapshot.createdAt).toLocaleString('ko-KR')}
+                      </div>
+                    </div>
+                    <span className="rounded-full border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-[10px] font-semibold text-[var(--toss-gray-4)]">
+                      {snapshot.source === 'saved' ? '저장본' : '생성본'}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-[var(--toss-gray-4)]">
+                    <span>{snapshot.summary.staffCount}명</span>
+                    <span>수동 {snapshot.summary.manualCount}건</span>
+                    <span>경고 {snapshot.summary.warningCount}건</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] p-4">
+              {!selectedRosterSnapshot ? (
+                <div className="text-sm text-[var(--toss-gray-3)]">비교할 스냅샷을 선택하세요.</div>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <div className="text-sm font-bold text-[var(--foreground)]">{selectedRosterSnapshot.label}</div>
+                      <div className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
+                        {selectedRosterSnapshot.month} · {selectedRosterSnapshot.department}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => restoreRosterSnapshot(selectedRosterSnapshot)}
+                      className="rounded-[var(--radius-md)] border border-[var(--accent)] bg-[var(--card)] px-3 py-2 text-xs font-bold text-[var(--accent)]"
+                    >
+                      이 스냅샷으로 되돌리기
+                    </button>
+                  </div>
+
+                  {rosterSnapshotComparison ? (
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3">
+                        <div className="text-[11px] font-semibold text-[var(--toss-gray-3)]">변경된 셀</div>
+                        <div className="mt-1 text-lg font-bold text-[var(--foreground)]">
+                          {rosterSnapshotComparison.changedCellCount}건
+                        </div>
+                      </div>
+                      <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3">
+                        <div className="text-[11px] font-semibold text-[var(--toss-gray-3)]">영향 직원</div>
+                        <div className="mt-1 text-lg font-bold text-[var(--foreground)]">
+                          {rosterSnapshotComparison.changedStaffCount}명
+                        </div>
+                      </div>
+                      <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3">
+                        <div className="text-[11px] font-semibold text-[var(--toss-gray-3)]">변경 날짜</div>
+                        <div className="mt-1 text-lg font-bold text-[var(--foreground)]">
+                          {rosterSnapshotComparison.changedDateCount}일
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {rosterSnapshotComparison?.changedStaffPreview?.length ? (
+                    <div className="mt-3 text-[12px] text-[var(--toss-gray-3)]">
+                      주요 변경 직원: {rosterSnapshotComparison.changedStaffPreview.join(', ')}
+                    </div>
+                  ) : (
+                    <div className="mt-3 text-[12px] text-[var(--toss-gray-3)]">
+                      현재 초안과 선택된 스냅샷이 동일하거나 아직 비교할 초안이 없습니다.
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const jumpToRosterWarningTarget = (targetTestId: string) => {
     if (typeof document === 'undefined') return;
@@ -4455,6 +4757,10 @@ export default function AutoRosterPlanner({
         );
       }
       setGeminiAppliedAt(new Date().toLocaleString('ko-KR'));
+      setPendingSnapshotMeta({
+        source: 'generated',
+        label: `${selectedMonth} ${selectedDepartment} 자동 생성본`,
+      });
       toast('Gemini가 팀 특성을 분석해 월간 근무표 초안을 만들었습니다. 아래 미리보기에서 확인하세요.', 'warning');
     } catch (error: unknown) {
       console.error('Gemini 팀 추천 실패:', error);
@@ -4778,6 +5084,10 @@ export default function AutoRosterPlanner({
         recommendation.summary?.trim() || `${selectedDepartment} 팀 패턴 기반 초안이 적용되었습니다.`
       );
       setGeminiAppliedAt(new Date().toLocaleString('ko-KR'));
+      setPendingSnapshotMeta({
+        source: 'generated',
+        label: `${selectedMonth} ${selectedDepartment} 패턴 생성본`,
+      });
       toast('저장된 교대방식 패턴과 선택한 근무유형을 기준으로 월간 초안을 생성했습니다. 아래 미리보기에서 확인하세요.', 'success');
     } catch (error: unknown) {
       console.error('패턴 기반 근무표 생성 실패:', error);
@@ -5420,6 +5730,11 @@ export default function AutoRosterPlanner({
         if (error) throw error;
       }
 
+      captureRosterSnapshot({
+        source: 'saved',
+        label: `${selectedMonth} ${selectedDepartment} 저장본`,
+        warningCount: rosterWarningReport.items.length,
+      });
       toast(`${selectedDepartment} 팀 ${enabledRows.length}명의 ${selectedMonth} 근무표를 저장했습니다.`, 'success');
     } catch (error: unknown) {
       console.error('근무표 저장 실패:', error);
@@ -6573,6 +6888,7 @@ export default function AutoRosterPlanner({
         )}
         {renderRosterWarningReport()}
         {renderRosterFairnessBoard()}
+        {renderRosterSnapshotPanel()}
 
         <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

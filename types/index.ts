@@ -232,6 +232,7 @@ export interface InventoryItem {
   category?: string | null;
   code?: string | null;
   barcode?: string | null;
+  serial_number?: string | null;
   unit?: string | null;
   quantity?: number | null;
   min_quantity?: number | null;

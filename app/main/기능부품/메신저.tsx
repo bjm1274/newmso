@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { toast } from '@/lib/toast';
 import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -27,6 +27,11 @@ const MOBILE_CHAT_MEDIA_QUERY = '(max-width: 767px), (hover: none) and (pointer:
 
 function isMobileChatViewport() {
   return typeof window !== 'undefined' && window.matchMedia(MOBILE_CHAT_MEDIA_QUERY).matches;
+}
+
+/** 원본 파일명으로 다운로드되도록 프록시 URL 생성 */
+function buildDownloadUrl(fileUrl: string, fileName: string): string {
+  return `/api/download?url=${encodeURIComponent(fileUrl)}&name=${encodeURIComponent(fileName)}`;
 }
 const CHAT_ROOM_PREFS_KEY = 'erp_chat_room_prefs';
 const CHAT_PINNED_KEY = 'erp_chat_pinned_messages';
@@ -309,10 +314,7 @@ function AttachmentQuickActions({
         공유
       </button>
       <a
-        href={url}
-        download={name}
-        target="_blank"
-        rel="noopener noreferrer"
+        href={buildDownloadUrl(url, name)}
         onClick={(event) => event.stopPropagation()}
         className={downloadClassByVariant[variant]}
       >
@@ -447,6 +449,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const pendingScrollMsgIdRef = useRef<string | null>(null);
   const pendingBottomAlignRoomIdRef = useRef<string | null>(null);
+  const timelineItemCountRef = useRef(0);
   const [omniSearch, setOmniSearch] = useState('');
   const [chatSearch, setChatSearch] = useState('');
   const deferredOmniSearch = useDeferredValue(omniSearch);
@@ -998,6 +1001,11 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     const tryAlign = () => {
       if (selectedRoomIdRef.current !== roomId) return;
 
+      const hasTimelineItems = timelineItemCountRef.current > 0;
+      if (!hasTimelineItems) {
+        return;
+      }
+
       scrollToBottom(attempts === 0 ? behavior : 'auto');
 
       const listEl = messageListRef.current;
@@ -1229,6 +1237,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const [showForwardModal, setShowForwardModal] = useState(false);
   const [forwardSourceMsg, setForwardSourceMsg] = useState<ChatMessage | null>(null);
+
+  useEffect(() => {
+    timelineItemCountRef.current = messages.length + polls.length + persistedPinnedMessages.length;
+  }, [messages.length, persistedPinnedMessages.length, polls.length]);
 
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [addMemberSearch, setAddMemberSearch] = useState('');
@@ -1477,22 +1489,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
     // 인앱 토스트 알림: 다른 방 메시지 or 앱이 백그라운드 상태일 때
     if (!isOwnMessage) {
-      const senderProfile = resolveStaffProfile(row.sender_id, row.sender_name);
-      const senderName = senderProfile?.name || row.sender_name || '알 수 없음';
-      const roomName = currentRoom ? getRoomDisplayName(currentRoom, [], effectiveChatUserId) : '채팅';
-      const preview = row.file_url
-        ? `📎 ${getAttachmentDisplayName(row.file_name, row.file_url)}`
-        : getMessageDisplayText(row.content, row.file_name, row.file_url, '새 메시지');
-      const toastId = String(row.id);
-      setInAppToasts((prev) => {
-        if (prev.some((t) => t.id === toastId)) return prev;
-        return [...prev.slice(-2), { id: toastId, senderName, roomName, preview, roomId: String(row.room_id) }];
-      });
-      if (inAppToastTimerRef.current[toastId]) clearTimeout(inAppToastTimerRef.current[toastId]);
-      inAppToastTimerRef.current[toastId] = setTimeout(() => {
-        setInAppToasts((prev) => prev.filter((t) => t.id !== toastId));
-        delete inAppToastTimerRef.current[toastId];
-      }, 4000);
+      setRoomUnreadCounts((prev) => ({
+        ...prev,
+        [roomId]: Math.max(1, (prev[roomId] || 0) + 1),
+      }));
     }
   }, [
     broadcastChatSync,
@@ -1501,7 +1501,6 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     isRoomAccessibleToCurrentUser,
     persistMessageReads,
     persistRoomReadCursor,
-    resolveStaffProfile,
     updateUnreadForRooms,
     user?.id,
     isRoomInSelectedConversation,
@@ -1776,40 +1775,23 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       console.error('반응/투표 데이터 불러오기 실패:', error);
     }
 
-    if (roomIdForFetch && msgs?.length) {
-      const unreadMsgIds = msgs
-        .filter(( m: ChatMessage) => String(m.sender_id) !== effectiveChatUserId)
-        .filter(( m: ChatMessage) => {
-          return true;
-        })
-        .map(( m: ChatMessage) => m.id);
-
-      if (unreadMsgIds.length > 0) {
-        try {
-          const readAt = new Date().toISOString();
-          await persistMessageReads(unreadMsgIds);
-          await persistRoomReadCursor(roomIdForFetch, readAt);
-          broadcastChatSync('message-read', roomIdForFetch);
-
-          setReadCounts(prev => {
-            const next = { ...prev };
-            unreadMsgIds.forEach(id => {
-              if (!next[id]) next[id] = 0;
-            });
-            return next;
-          });
-
-          setRoomUnreadCounts(prev => ({ ...prev, [roomIdForFetch]: 0 }));
-        } catch (e) {
-          console.error('자동 읽음 처리 실패:', e);
-        }
-      }
+    // 읽음 커서/message_reads 쓰기는 방 선택 시(setRoom)와 실시간 새 메시지 수신 시에만 수행.
+    // fetchData 내부에서 호출하면 realtime → fetchData 무한 루프 발생하므로 제거.
+    if (roomIdForFetch) {
+      setRoomUnreadCounts(prev => {
+        if (!prev[roomIdForFetch]) return prev;
+        return { ...prev, [roomIdForFetch]: 0 };
+      });
     }
 
     if (pendingBottomAlignRoomIdRef.current === roomIdForFetch) {
-      alignRoomToLatest(roomIdForFetch, 'auto');
+      if ((msgs?.length || 0) > 0) {
+        alignRoomToLatest(roomIdForFetch, 'auto');
+      } else {
+        pendingBottomAlignRoomIdRef.current = null;
+      }
     }
-  }, [selectedRoomId, user?.id, effectiveChatUserId, effectiveTodoUserId, repairDirectRooms, syncChatRoomsState, persistMessageReads, persistRoomReadCursor, broadcastChatSync, resolveStaffProfile, alignRoomToLatest, getEffectiveRoomMemberIds, isRoomAccessibleToCurrentUser]);
+  }, [selectedRoomId, user?.id, effectiveChatUserId, effectiveTodoUserId, repairDirectRooms, syncChatRoomsState, resolveStaffProfile, alignRoomToLatest, getEffectiveRoomMemberIds, isRoomAccessibleToCurrentUser]);
 
   const roomNotifyRef = useRef(true);
   useEffect(() => { roomNotifyRef.current = roomNotifyOn; }, [roomNotifyOn]);
@@ -3588,43 +3570,6 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   return (
     <div data-testid="chat-view" className="flex flex-1 min-h-0 overflow-hidden relative font-sans bg-[var(--background)] md:h-[100dvh] md:max-h-[100dvh] md:bg-[var(--card)]">
 
-      {/* 카카오톡 스타일 인앱 토스트 알림 (모바일) */}
-      {inAppToasts.length > 0 && (
-        <div className="fixed top-3 left-0 right-0 z-[9999] flex flex-col gap-2 px-3 md:hidden pointer-events-none">
-          {inAppToasts.map((toast) => (
-            <button
-              key={toast.id}
-              type="button"
-              onClick={() => {
-                setRoom(toast.roomId);
-                setInAppToasts((prev) => prev.filter((t) => t.id !== toast.id));
-              }}
-              className="pointer-events-auto w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-zinc-900/95 backdrop-blur-md shadow-lg text-left animate-in slide-in-from-top-2 duration-300"
-            >
-              <div className="w-9 h-9 rounded-xl bg-[var(--accent)] flex items-center justify-center text-white text-base shrink-0">
-                💬
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2 mb-0.5">
-                  <span className="text-[12px] font-bold text-white truncate">{toast.senderName}</span>
-                  <span className="text-[10px] text-zinc-400 shrink-0">{toast.roomName}</span>
-                </div>
-                <p className="text-[12px] text-zinc-300 truncate">{toast.preview}</p>
-              </div>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setInAppToasts((prev) => prev.filter((t) => t.id !== toast.id));
-                }}
-                className="shrink-0 text-zinc-500 hover:text-zinc-300 p-1"
-              >
-                ✕
-              </button>
-            </button>
-          ))}
-        </div>
-      )}
       <aside className={`${selectedRoomId ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-[var(--border)] dark:border-zinc-800 bg-[var(--card)] dark:bg-zinc-950 flex-col shrink-0 z-50 transition-all`}>
         <div className="p-3 md:p-3 space-y-3 flex flex-col min-h-0">
           <div className="flex items-center gap-1">
@@ -3940,6 +3885,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
         <div
           ref={messageListRef}
+          data-testid="chat-message-list"
           onScroll={updateScrollPositionState}
           className="flex-1 min-h-0 overflow-y-auto px-2 py-0.5 pb-1 md:px-4 md:py-2 md:pb-2 space-y-0 custom-scrollbar"
         >
@@ -4001,14 +3947,19 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   roomMembers.filter((member: StaffMember) => String(member.id) !== String(msg.sender_id || '')).length
                 );
                 const unreadRecipients = Math.max(0, totalRecipients - readersCount);
-                const deliveryState = deliveryStates[msg.id]?.status || (String(msg.id).startsWith('temp-') ? 'sending' : 'sent');
-                const readStatusSummary = isMine && deliveryState === 'sending'
-                    ? '전송중'
-                    : isMine && deliveryState === 'failed'
-                      ? '전송 실패'
-                      : totalRecipients > 0 && unreadRecipients > 0
-                        ? `${unreadRecipients}`
-                        : null;
+                const deliveryStateInfo = deliveryStates[msg.id];
+                const deliveryState = deliveryStateInfo?.status || (String(msg.id).startsWith('temp-') ? 'sending' : 'sent');
+                const deliveryStateLabel = isMine && deliveryState === 'sending'
+                  ? '전송 중'
+                  : isMine && deliveryState === 'failed'
+                    ? '전송 실패'
+                    : null;
+                const deliveryErrorText = isMine && deliveryState === 'failed'
+                  ? String(deliveryStateInfo?.error || '').trim()
+                  : '';
+                const readStatusSummary = totalRecipients > 0 && unreadRecipients > 0
+                  ? `${unreadRecipients}`
+                  : null;
                 const canOpenReadStatus = Boolean(
                   deliveryState === 'sent' &&
                   totalRecipients > 0
@@ -4191,7 +4142,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           )}
 
                           <div
-                            className={`absolute bottom-0 ${isMine ? 'right-full mr-2 items-end' : 'left-full ml-2 items-start'
+                            className={`absolute bottom-0 z-10 ${isMine ? 'right-full mr-2 items-end' : 'left-full ml-2 items-start'
                               } flex flex-col gap-0.5 whitespace-nowrap`}
                           >
                             {displayedReadStatusSummary && (
@@ -4217,19 +4168,35 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             </span>
                           </div>
                         </div>
-                        {isMine && deliveryState === 'failed' && (
-                          <div className="mt-0.5 flex justify-end">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                retryFailedMessage(String(msg.id));
-                              }}
-                              className="px-2.5 py-1 rounded-[var(--radius-md)] text-[10px] font-bold bg-red-50 text-red-500 hover:bg-red-100"
+                        {isMine && deliveryStateLabel && (
+                          <div className="mt-1 flex flex-wrap items-center justify-end gap-2">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                                deliveryState === 'failed'
+                                  ? 'bg-red-50 text-red-500'
+                                  : 'bg-emerald-50 text-emerald-600'
+                              }`}
                             >
-                              재전송
-                            </button>
+                              {deliveryStateLabel}
+                            </span>
+                            {deliveryState === 'failed' && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  retryFailedMessage(String(msg.id));
+                                }}
+                                className="px-2.5 py-1 rounded-[var(--radius-md)] text-[10px] font-bold bg-red-50 text-red-500 hover:bg-red-100"
+                              >
+                                다시 전송
+                              </button>
+                            )}
                           </div>
+                        )}
+                        {isMine && deliveryState === 'failed' && deliveryErrorText && (
+                          <p className="mt-1 max-w-[78%] text-right text-[10px] text-red-500 break-words">
+                            {deliveryErrorText}
+                          </p>
                         )}
                         <div
                           className={`mt-0.5 hidden items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 md:flex ${isMine ? 'flex-row-reverse' : ''}`}
@@ -5873,10 +5840,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             ×
           </button>
           <a
-            href={attachmentPreview.url}
-            download={attachmentPreview.name}
-            target="_blank"
-            rel="noopener noreferrer"
+            href={buildDownloadUrl(attachmentPreview.url, attachmentPreview.name ?? '')}
             onClick={(e) => e.stopPropagation()}
             className="absolute top-4 right-14 h-9 inline-flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 px-3 text-white text-xs font-semibold transition-colors z-10"
             aria-label="다운로드"
@@ -5925,10 +5889,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     새 창 열기
                   </a>
                   <a
-                    href={attachmentPreview.url}
-                    download={attachmentPreview.name}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={buildDownloadUrl(attachmentPreview.url, attachmentPreview.name ?? '')}
                     className="inline-flex items-center rounded-lg bg-[var(--tab-bg)] px-3 py-2 text-xs font-bold text-[var(--foreground)]"
                   >
                     다운로드
