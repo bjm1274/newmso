@@ -757,3 +757,102 @@ select.premium:focus {
   background: var(--zinc-100);
   color: var(--zinc-900);
 }
+
+/* ── Skeleton loading ────────────────────────────── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--muted) 25%,
+    var(--border) 50%,
+    var(--muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.4s ease infinite;
+  border-radius: var(--radius-md);
+}
+
+@keyframes skeletonShimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+.skeleton-text {
+  height: 13px;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-text-sm {
+  height: 11px;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-title {
+  height: 18px;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-avatar {
+  border-radius: 50%;
+}
+
+.skeleton-card {
+  border-radius: var(--radius-lg);
+}
+
+/* ── Loading state overlay ───────────────────────── */
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(var(--card), 0.7);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  z-index: 10;
+}
+
+/* ── Spinner ─────────────────────────────────────── */
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+.spinner-sm {
+  width: 14px;
+  height: 14px;
+}
+
+.spinner-lg {
+  width: 32px;
+  height: 32px;
+  border-width: 3px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── GPS pulse animation ─────────────────────────── */
+.gps-pulse {
+  position: relative;
+}
+
+.gps-pulse::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  animation: gpsPulseRing 1.5s ease-out infinite;
+  opacity: 0;
+}
+
+@keyframes gpsPulseRing {
+  0%   { transform: scale(0.8); opacity: 0.8; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
