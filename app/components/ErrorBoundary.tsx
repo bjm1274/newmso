@@ -1,5 +1,5 @@
 'use client';
-﻿import { Component, ReactNode } from 'react';
+import { Component, ReactNode } from 'react';
 
 type Props = { children: ReactNode };
 type State = { hasError: boolean; error?: Error };
