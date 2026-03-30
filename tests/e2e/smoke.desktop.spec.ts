@@ -284,15 +284,6 @@ test("mypage profile edits create an ESS approval request instead of updating st
     },
   });
 
-  page.removeAllListeners("dialog");
-  page.on("dialog", async (dialog) => {
-    if (dialog.type() === "prompt") {
-      await dialog.accept("password");
-      return;
-    }
-    await dialog.accept();
-  });
-
   await page.route("**/api/auth/verify-password", async (route) => {
     await route.fulfill({
       status: 200,
@@ -319,6 +310,10 @@ test("mypage profile edits create an ESS approval request instead of updating st
   await expect(page.getByTestId("mypage-profile-tab")).toBeVisible();
 
   await page.getByTestId("mypage-profile-edit-toggle").click();
+  const passwordDialog = page.getByRole("dialog");
+  await expect(passwordDialog).toBeVisible();
+  await passwordDialog.locator('input[type="password"]').fill("password");
+  await passwordDialog.locator("button").last().click();
   await page.getByTestId("mypage-profile-phone-input").fill("01099998888");
   await page.getByTestId("mypage-profile-extension-input").fill("7777");
   await page.getByTestId("mypage-profile-address-input").fill("서울시 송파구 테스트 9");
@@ -1647,7 +1642,8 @@ test("approval inbox can approve a pending document and refresh its status", asy
 
   const approveRequest = page.waitForRequest(
     (request) =>
-      request.url().includes("/approvals") && request.method() === "PATCH",
+      request.url().includes("/api/approvals/transition") &&
+      request.method() === "POST",
   );
 
   await approvalCard.locator("button").nth(1).click();

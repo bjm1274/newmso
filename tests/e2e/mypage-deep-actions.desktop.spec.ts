@@ -227,6 +227,103 @@ test('mypage commute marks check-in as late when the assigned shift start time h
   expect(runtimeErrors).toEqual([]);
 });
 
+test('mypage commute shows an early checkout as 조퇴 and keeps correction request available', async ({
+  page,
+}) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const workDate = '2026-03-30';
+  const shiftUser = {
+    ...fakeUser,
+    shift_id: 'shift-day-0830',
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [shiftUser],
+    attendance: [
+      {
+        id: 'attendance-early-leave-1',
+        staff_id: shiftUser.id,
+        date: workDate,
+        check_in: '2026-03-29T23:20:00.000Z',
+        check_out: '2026-03-30T07:05:00.000Z',
+        status: '정상',
+      },
+    ],
+    attendances: [
+      {
+        id: 'attendances-early-leave-1',
+        staff_id: shiftUser.id,
+        work_date: workDate,
+        check_in_time: '2026-03-29T23:20:00.000Z',
+        check_out_time: '2026-03-30T07:05:00.000Z',
+        status: 'present',
+      },
+    ],
+    shiftAssignments: [
+      {
+        id: 'shift-assignment-early-leave-1',
+        staff_id: shiftUser.id,
+        work_date: workDate,
+        shift_id: 'shift-day-0830',
+      },
+    ],
+    workShifts: [
+      {
+        id: 'shift-day-0830',
+        name: '외래/검사 월-금',
+        start_time: '08:30',
+        end_time: '17:30',
+        company_name: shiftUser.company,
+      },
+    ],
+    approvals: [],
+    attendanceCorrections: [],
+  });
+
+  await seedSession(page, {
+    user: shiftUser,
+    localStorage: {
+      erp_last_menu: '내정보',
+      erp_mypage_tab: 'commute',
+    },
+  });
+
+  await openMyPage(page);
+  await page.getByRole('button', { name: /출퇴근/ }).click();
+
+  const commuteView = page.getByTestId('commute-record-view');
+  await expect(commuteView.getByText('조퇴').first()).toBeVisible();
+  await expect(commuteView.getByRole('button', { name: '정정 요청' }).first()).toBeVisible();
+
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(async ({ staffId, targetDate }) => {
+          const [attendanceResponse, attendancesResponse] = await Promise.all([
+            fetch(`/rest/v1/attendance?staff_id=eq.${staffId}&date=eq.${targetDate}&select=*`),
+            fetch(`/rest/v1/attendances?staff_id=eq.${staffId}&work_date=eq.${targetDate}&select=*`),
+          ]);
+          const attendanceRows = await attendanceResponse.json();
+          const attendancesRows = await attendancesResponse.json();
+          return {
+            attendanceStatus: attendanceRows[0]?.status ?? null,
+            attendancesStatus: attendancesRows[0]?.status ?? null,
+          };
+        }, { staffId: shiftUser.id, targetDate: workDate }),
+      { timeout: 5000 }
+    )
+    .toEqual({
+      attendanceStatus: '조퇴',
+      attendancesStatus: 'early_leave',
+    });
+
+  await commuteView.getByRole('button', { name: '정정 요청' }).first().click();
+  await expect(page.getByTestId('approval-view')).toBeVisible();
+  await expect(page.getByTestId('attendance-correction-view')).toBeVisible();
+  await expect(page.getByText('선택한 날짜 1건 정정 신청')).toBeVisible();
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('mypage documents can upload a file and save it to the repository', async ({ page }) => {
   const runtimeErrors = trackRuntimeErrors(page);
 

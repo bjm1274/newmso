@@ -1749,7 +1749,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                   <button
                     data-testid="board-toggle-new-post"
                     onClick={() => setShowNewPost(!showNewPost)}
-                    className="px-4 md:px-4 py-2.5 md:py-3 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-[11px] md:text-xs font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
+                    className="px-4 md:px-4 py-2.5 md:py-3 bg-[var(--accent)] text-white rounded-full text-[11px] md:text-xs font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
                   >
                     {showNewPost ? '✕ 취소' : '+ 새 게시물'}
                   </button>
@@ -1770,7 +1770,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                       if (!VALID_BODY_IDS.has(selectedBodyPart)) setSelectedBodyPart('all');
                       setShowBodyPicker(true);
                     }}
-                    className="px-4 py-2 rounded-[var(--radius-md)] bg-[var(--card)] border border-[var(--border)] text-base font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)] shrink-0"
+                    className="px-4 py-2 rounded-full bg-[var(--card)] border border-[var(--border)] text-base font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)] shrink-0"
                   >
                     👤 사람 모형으로 선택
                   </button>
@@ -2441,7 +2441,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                 const { filteredPosts, eventsByDate, days, month, toKey } = scheduleCalendarData;
 
                 if (filteredPosts.length === 0) {
-                  return <div className="py-8 text-center text-xs text-[var(--toss-gray-3)] font-bold">등록된 일정이 없습니다.</div>;
+                  return <div className="empty-state rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)]/30 py-8 text-xs font-bold">등록된 일정이 없습니다.</div>;
                 }
 
                 return (
@@ -2641,7 +2641,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                   )
                 })
               ) : (
-                <div className="text-center py-20 text-[var(--toss-gray-3)]">
+                <div className="empty-state rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)]/30 py-20">
                   <p className="font-semibold text-sm italic">
                     {activeBoard === '익명소리함' && !(user?.permissions?.mso || user?.role === 'admin' || user?.permissions?.hr)
                       ? '🙌 작성된 소중한 의견은 인사팀 및 경영진에게만 안전하게 익명으로 전달됩니다.'

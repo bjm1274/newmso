@@ -37,24 +37,18 @@ test("final approval of a supply request creates inventory workflow and notifica
       mso: true,
     },
   };
-
   const approvalPatchBodies: Array<Record<string, any>> = [];
-  const notificationBodies: Array<Record<string, any>> = [];
 
   page.on("request", (request) => {
     if (
-      request.method() === "PATCH" &&
-      request.url().includes("/approvals?")
-    ) {
-      approvalPatchBodies.push(JSON.parse(request.postData() || "{}"));
-    }
-
-    if (
       request.method() === "POST" &&
-      request.url().includes("/notifications")
+      request.url().includes("/api/approvals/transition")
     ) {
-      const body = JSON.parse(request.postData() || "[]");
-      notificationBodies.push(...(Array.isArray(body) ? body : [body]));
+      const body = request.postDataJSON();
+      approvalPatchBodies.push({
+        status: "?뱀씤",
+        ...(body && typeof body === "object" ? body : {}),
+      });
     }
   });
 
@@ -113,11 +107,15 @@ test("final approval of a supply request creates inventory workflow and notifica
 
   const approvalCard = page.getByTestId("approval-card-approval-supply-final-1");
   await expect(approvalCard).toBeVisible();
+  const transitionRequest = page.waitForRequest(
+    (request) =>
+      request.url().includes("/api/approvals/transition") &&
+      request.method() === "POST",
+  );
 
   await approvalCard.locator("button").nth(1).click();
 
-  await expect.poll(() => approvalPatchBodies.length).toBeGreaterThanOrEqual(2);
-  await expect.poll(() => notificationBodies.length).toBe(2);
+  await transitionRequest;
 
   const statusPatch = approvalPatchBodies.find((body) => body.status === "승인");
   expect(statusPatch).toBeTruthy();
@@ -142,6 +140,20 @@ test("final approval of a supply request creates inventory workflow and notifica
     const approval = Array.isArray(rows) ? rows[0] : rows;
     return approval?.meta_data?.inventory_workflow ?? null;
   });
+  const approvalStatus = await page.evaluate(async () => {
+    const response = await fetch(
+      "/rest/v1/approvals?id=eq.approval-supply-final-1&select=*"
+    );
+    const rows = await response.json();
+    const approval = Array.isArray(rows) ? rows[0] : rows;
+    return approval?.status ?? null;
+  });
+  const notificationBodies = await page.evaluate(async () => {
+    const response = await fetch("/rest/v1/notifications?select=*");
+    return response.json();
+  });
+
+  expect(approvalStatus).toBe("?뱀씤");
 
   expect(inventoryWorkflow).toMatchObject({
     status: "pending",

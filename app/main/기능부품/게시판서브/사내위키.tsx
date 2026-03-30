@@ -487,11 +487,11 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">Company Wiki</p>
               <h2 className="mt-1 text-lg font-bold text-[var(--foreground)]">Wiki</h2>
             </div>
-            <button type="button" onClick={() => void createFolder()} className="rounded-[14px] bg-[var(--foreground)] px-3 py-2 text-[11px] font-bold text-white">+ Folder</button>
+            <button type="button" onClick={() => void createFolder()} className="rounded-full bg-[var(--foreground)] px-3.5 py-2 text-[11px] font-bold text-white">+ Folder</button>
           </div>
           <div className="flex gap-2">
             <input type="text" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search docs" className="h-11 flex-1 rounded-[16px] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]" />
-            <button type="button" onClick={() => void createDocument()} className="rounded-[16px] border border-[var(--border)] bg-[var(--card)] px-3 text-[11px] font-bold text-[var(--accent)]">+ Doc</button>
+            <button type="button" onClick={() => void createDocument()} className="rounded-full border border-[var(--border)] bg-[var(--card)] px-3.5 text-[11px] font-bold text-[var(--accent)]">+ Doc</button>
           </div>
         </div>
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 custom-scrollbar">
@@ -522,7 +522,7 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
                 <h3 className="mt-1 text-xl font-bold text-[var(--foreground)]">{title || selectedDocument.title}</h3>
                 <p className="mt-1 text-[12px] font-medium text-[var(--toss-gray-3)]">Updated {formatDate(selectedDocument.updated_at || selectedDocument.created_at) || 'now'}</p>
               </div>
-              <button type="button" onClick={() => void saveDocument()} disabled={saving || !dirty} className="rounded-[14px] bg-[var(--accent)] px-3 py-2 text-[11px] font-bold text-white disabled:opacity-50">{saving ? 'Saving...' : dirty ? 'Save' : 'Saved'}</button>
+              <button type="button" onClick={() => void saveDocument()} disabled={saving || !dirty} className="rounded-full bg-[var(--accent)] px-3.5 py-2 text-[11px] font-bold text-white disabled:opacity-50">{saving ? 'Saving...' : dirty ? 'Save' : 'Saved'}</button>
             </header>
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 custom-scrollbar">
               <div className="mx-auto grid max-w-6xl gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">

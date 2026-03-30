@@ -251,7 +251,7 @@ export default function MyDocuments(props: MyDocumentsProps) {
                                 type="button"
                                 data-testid="contract-sign-open-button"
                                 onClick={() => props.onOpenContractSignature?.(pendingContract)}
-                                className="rounded-[var(--radius-md)] bg-violet-600 px-4 py-2 text-[11px] font-black text-white shadow-sm hover:bg-violet-700"
+                                className="rounded-full bg-violet-600 px-4 py-2 text-[11px] font-black text-white shadow-sm hover:bg-violet-700"
                             >
                                 전자서명 진행
                             </button>
@@ -261,7 +261,7 @@ export default function MyDocuments(props: MyDocumentsProps) {
                                 type="button"
                                 data-testid="contract-document-view-button"
                                 onClick={() => openRepositoryDocument(latestContractDocument)}
-                                className="rounded-[var(--radius-md)] border border-violet-200 bg-white px-4 py-2 text-[11px] font-black text-violet-700 hover:bg-violet-50"
+                                className="rounded-full border border-violet-200 bg-white px-4 py-2 text-[11px] font-black text-violet-700 hover:bg-violet-50"
                             >
                                 서명본 보기
                             </button>

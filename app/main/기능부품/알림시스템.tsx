@@ -1384,6 +1384,38 @@ export default function NotificationSystem({
     };
   }, [syncBadge]);
 
+  useEffect(() => {
+    if (!effectiveUserId) return;
+    if (typeof window === 'undefined') return;
+
+    const dispatchUnreadRepush = async () => {
+      if (!hasPushSubscriptionActive(effectiveUserId)) return;
+      try {
+        await fetch('/api/notifications/repush-unread', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ limit: 20 }),
+        });
+      } catch {
+        // ignore repush probe failures
+      }
+    };
+
+    void dispatchUnreadRepush();
+    const handleWindowFocus = () => {
+      void dispatchUnreadRepush();
+    };
+    const interval = window.setInterval(() => {
+      void dispatchUnreadRepush();
+    }, 5 * 60 * 1000);
+    window.addEventListener('focus', handleWindowFocus);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', handleWindowFocus);
+    };
+  }, [effectiveUserId]);
+
   useEffect(() => () => { timersRef.current.forEach(t => clearTimeout(t)); timersRef.current.clear(); }, []);
 
   if (toasts.length === 0) return null;

@@ -88,6 +88,76 @@ test("chat renders incoming realtime messages immediately in the open conversati
   ).toBeVisible();
 });
 
+test("chat shows unread counters only on messages I sent", async ({ page }) => {
+  await mockSupabase(page, {
+    chatRooms: [
+      {
+        id: "00000000-0000-0000-0000-000000000000",
+        name: "Notice",
+        type: "notice",
+        members: [],
+        created_at: "2026-03-08T00:00:00.000Z",
+        last_message_at: "2026-03-08T00:00:00.000Z",
+      },
+      {
+        id: "room-1",
+        name: "Direct Room",
+        type: "direct",
+        members: [fakeUser.id, "peer-1"],
+        created_at: "2026-03-08T09:00:00.000Z",
+        last_message_at: "2026-03-08T10:01:00.000Z",
+        last_message_preview: "peer message",
+      },
+    ],
+    staffMembers: [
+      fakeUser,
+      {
+        ...fakeUser,
+        id: "peer-1",
+        name: "Chat Peer Realtime",
+        employee_no: "E2E-CHAT-099",
+      },
+    ],
+    messages: [
+      {
+        id: "msg-mine",
+        room_id: "room-1",
+        sender_id: fakeUser.id,
+        content: "my message",
+        created_at: "2026-03-08T10:00:00.000Z",
+        is_deleted: false,
+        staff: { name: fakeUser.name, photo_url: null },
+      },
+      {
+        id: "msg-peer",
+        room_id: "room-1",
+        sender_id: "peer-1",
+        content: "peer message",
+        created_at: "2026-03-08T10:01:00.000Z",
+        is_deleted: false,
+        staff: { name: "Chat Peer Realtime", photo_url: null },
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: "\uCC44\uD305",
+      erp_chat_last_room: "room-1",
+    },
+  });
+
+  await page.goto(
+    `/main?${new URLSearchParams({ open_menu: "\uCC44\uD305" }).toString()}`,
+  );
+  await expect(page.getByTestId("chat-view")).toBeVisible();
+  await page.getByTestId("chat-room-room-1").click();
+  await expect(page.getByTestId("chat-message-input")).toBeVisible();
+
+  await expect(page.getByTestId("chat-message-read-status-msg-mine")).toHaveText("1");
+  await expect(page.getByTestId("chat-message-read-status-msg-peer")).toHaveCount(0);
+});
+
 test("chat updates room preview and unread count immediately for messages from another room", async ({ page }) => {
   await mockSupabase(page, {
     chatRooms: [
@@ -356,6 +426,107 @@ test("chat opens a room already aligned to the latest messages", async ({ page }
       page.getByTestId("chat-message-list").evaluate((node) => {
         const el = node as HTMLDivElement;
         return Math.abs(el.scrollHeight - el.clientHeight - el.scrollTop) <= 24;
+      }),
+    )
+    .toBe(true);
+});
+
+test("chat global search jumps to the selected message and keeps the query highlighted", async ({ page }) => {
+  const longMessages = Array.from({ length: 60 }, (_, index) => ({
+    id: `msg-search-${index + 1}`,
+    room_id: "room-1",
+    sender_id: index % 2 === 0 ? fakeUser.id : "peer-1",
+    content:
+      index === 4
+        ? "needle keyword jumps to this target message"
+        : `filler message ${index + 1}`,
+    created_at: `2026-03-08T10:${String(index).padStart(2, "0")}:00.000Z`,
+    is_deleted: false,
+    staff: { name: index % 2 === 0 ? fakeUser.name : "Chat Peer Realtime", photo_url: null },
+  }));
+
+  await mockSupabase(page, {
+    chatRooms: [
+      {
+        id: "00000000-0000-0000-0000-000000000000",
+        name: "Notice",
+        type: "notice",
+        members: [],
+        created_at: "2026-03-08T00:00:00.000Z",
+        last_message_at: "2026-03-08T00:00:00.000Z",
+      },
+      {
+        id: "room-1",
+        name: "Search Room",
+        type: "group",
+        members: [fakeUser.id, "peer-1"],
+        created_at: "2026-03-08T09:00:00.000Z",
+        last_message_at: "2026-03-08T10:59:00.000Z",
+        last_message_preview: "filler message 60",
+      },
+    ],
+    staffMembers: [
+      fakeUser,
+      {
+        ...fakeUser,
+        id: "peer-1",
+        name: "Chat Peer Realtime",
+        employee_no: "E2E-CHAT-099",
+      },
+    ],
+    messages: longMessages,
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: "\uCC44\uD305",
+      erp_chat_last_room: "room-1",
+    },
+  });
+
+  await page.goto(
+    `/main?${new URLSearchParams({ open_menu: "\uCC44\uD305" }).toString()}`,
+  );
+  await expect(page.getByTestId("chat-view")).toBeVisible();
+  await page.getByTestId("chat-room-room-1").click();
+  await expect(page.getByTestId("chat-message-input")).toBeVisible();
+
+  const targetMessage = page.getByTestId("chat-message-msg-search-5");
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const list = document.querySelector('[data-testid="chat-message-list"]');
+        const target = document.querySelector('[data-testid="chat-message-msg-search-5"]');
+        if (!list || !target) return null;
+        const listRect = list.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        return targetRect.top >= listRect.top && targetRect.bottom <= listRect.bottom;
+      }),
+    )
+    .toBe(false);
+
+  await page.getByTestId("chat-open-global-search").click();
+  await expect(page.getByTestId("chat-global-search-modal")).toBeVisible();
+  await page.getByTestId("chat-global-search-input").fill("needle keyword");
+  await page.getByTestId("chat-global-search-modal").getByRole("button", { name: "메시지" }).click();
+  await expect(page.getByTestId("chat-global-search-result-msg-search-5")).toBeVisible();
+  await page.getByTestId("chat-global-search-result-msg-search-5").click();
+
+  await expect(page.getByTestId("chat-global-search-modal")).toHaveCount(0);
+  await expect(targetMessage).toBeVisible();
+  await expect(
+    targetMessage.locator("mark").filter({ hasText: "needle keyword" }),
+  ).toBeVisible();
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const list = document.querySelector('[data-testid="chat-message-list"]');
+        const target = document.querySelector('[data-testid="chat-message-msg-search-5"]');
+        if (!list || !target) return null;
+        const listRect = list.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        return targetRect.top >= listRect.top && targetRect.bottom <= listRect.bottom;
       }),
     )
     .toBe(true);

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { isMissingColumnError } from '@/lib/supabase-compat';
 
-type ProblemReason = '미체크' | '지각' | '결근' | '미출근';
+type ProblemReason = '미체크' | '지각' | '조퇴' | '결근' | '미출근';
 
 type ProblemDateItem = {
   date: string;
@@ -62,6 +62,7 @@ function getCorrectionStatus(correction: any) {
 const REASON_BADGE: Record<string, { bg: string; text: string; icon: string }> = {
   결근:   { bg: 'bg-red-100 dark:bg-red-900/30',    text: 'text-red-600 dark:text-red-400',    icon: '🚫' },
   지각:   { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-400', icon: '⏰' },
+  조퇴:   { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-300', icon: '🚶' },
   미체크: { bg: 'bg-slate-100 dark:bg-slate-800',    text: 'text-slate-600 dark:text-slate-400', icon: '❓' },
   미출근: { bg: 'bg-orange-100 dark:bg-orange-900/30',text: 'text-orange-600 dark:text-orange-400',icon: '⚠️' },
 };
@@ -245,6 +246,11 @@ export default function AttendanceCorrectionForm({
           continue;
         }
 
+        if (status === 'early_leave' || attendance?.status === '조퇴') {
+          nextProblemDates.set(dateStr, { date: dateStr, reason: '조퇴', label: '조퇴', checkIn: attendance?.check_in, checkOut: attendance?.check_out });
+          continue;
+        }
+
         if (!attendance) {
           nextProblemDates.set(dateStr, { date: dateStr, reason: '미체크', label: '출퇴근 미체크', checkIn: null, checkOut: null });
           continue;
@@ -411,7 +417,7 @@ export default function AttendanceCorrectionForm({
             출결 정정 신청
           </h2>
           <p className="mt-1 text-[11px] font-bold uppercase text-[var(--toss-gray-3)] md:text-xs">
-            지각 또는 미기록 사유 제출 및 신청 현황
+            지각·조퇴 또는 미기록 사유 제출 및 신청 현황
           </p>
         </header>
 
@@ -577,7 +583,7 @@ export default function AttendanceCorrectionForm({
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {[
-                      { value: '정상반영', label: '정상 반영', desc: '지각·결근 아님' },
+                      { value: '정상반영', label: '정상 반영', desc: '지각·조퇴·결근 아님' },
                       { value: '지각처리', label: '지각 처리', desc: '지각 인정' },
                       { value: '결근처리', label: '결근 처리', desc: '결근 인정' },
                     ].map(({ value, label, desc }) => (

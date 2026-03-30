@@ -704,6 +704,531 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
     );
   };
 
+  const dispatchMockNotificationInsert = async (rows: any[]) => {
+    if (!rows.length) return;
+    try {
+      await page.evaluate((insertedRows) => {
+        window.dispatchEvent(
+          new CustomEvent('erp-mock-notification-insert', {
+            detail: { rows: insertedRows },
+          })
+        );
+      }, rows);
+    } catch {
+      // ignore mock realtime dispatch failures in tests
+    }
+  };
+
+  const appendNotifications = async (rows: any[]) => {
+    if (!rows.length) return;
+    notifications = [...rows, ...notifications];
+    await dispatchMockNotificationInsert(rows);
+  };
+
+  const approvalStatus = {
+    pending: '\uB300\uAE30',
+    approved: '\uC2B9\uC778',
+    rejected: '\uBC18\uB824',
+  } as const;
+
+  const attendanceStatus = {
+    normal: '\uC815\uC0C1',
+    annualLeaveLegacy: '\uC5F0\uCC28\uD734\uAC00',
+    annualLeaveModern: 'annual_leave',
+    correctionApproved: '\uC2B9\uC778',
+    correctionNormalType: '\uC815\uC0C1\uBC18\uC601',
+  } as const;
+
+  const parseApproverLine = (approval: any) => {
+    const directLine = Array.isArray(approval?.approver_line) ? approval.approver_line : null;
+    if (directLine && directLine.length > 0) {
+      return directLine.map((value: unknown) => String(value));
+    }
+
+    const metaLine = approval?.meta_data?.approver_line;
+    if (Array.isArray(metaLine)) {
+      return metaLine.map((value: unknown) => String(value));
+    }
+
+    return approval?.current_approver_id ? [String(approval.current_approver_id)] : [];
+  };
+
+  const upsertLeaveRequestRow = (row: Record<string, unknown>) => {
+    const existingIndex = leaveRequests.findIndex(
+      (item: any) =>
+        String(item.staff_id || '') === String(row.staff_id || '') &&
+        String(item.start_date || '') === String(row.start_date || '') &&
+        String(item.end_date || '') === String(row.end_date || '')
+    );
+    if (existingIndex >= 0) {
+      leaveRequests[existingIndex] = { ...leaveRequests[existingIndex], ...row };
+      return leaveRequests[existingIndex];
+    }
+
+    const inserted = {
+      id: row.id || `leave-request-${leaveRequests.length + 1}`,
+      created_at: row.created_at || new Date().toISOString(),
+      ...row,
+    };
+    leaveRequests = [inserted, ...leaveRequests];
+    return inserted;
+  };
+
+  const upsertAttendanceRow = (row: Record<string, unknown>) => {
+    const existingIndex = attendance.findIndex(
+      (item: any) =>
+        String(item.staff_id || '') === String(row.staff_id || '') &&
+        String(item.date || '') === String(row.date || '')
+    );
+    if (existingIndex >= 0) {
+      attendance[existingIndex] = { ...attendance[existingIndex], ...row };
+      return attendance[existingIndex];
+    }
+
+    const inserted = {
+      id: row.id || `attendance-${attendance.length + 1}`,
+      created_at: row.created_at || new Date().toISOString(),
+      ...row,
+    };
+    attendance = [inserted, ...attendance];
+    return inserted;
+  };
+
+  const upsertAttendancesRow = (row: Record<string, unknown>) => {
+    const existingIndex = attendances.findIndex(
+      (item: any) =>
+        String(item.staff_id || '') === String(row.staff_id || '') &&
+        String(item.work_date || '') === String(row.work_date || '')
+    );
+    if (existingIndex >= 0) {
+      attendances[existingIndex] = { ...attendances[existingIndex], ...row };
+      return attendances[existingIndex];
+    }
+
+    const inserted = {
+      id: row.id || `attendances-${attendances.length + 1}`,
+      created_at: row.created_at || new Date().toISOString(),
+      ...row,
+    };
+    attendances = [inserted, ...attendances];
+    return inserted;
+  };
+
+  const upsertAttendanceCorrectionRow = (row: Record<string, unknown>) => {
+    const existingIndex = attendanceCorrections.findIndex(
+      (item: any) =>
+        String(item.staff_id || '') === String(row.staff_id || '') &&
+        String(item.original_date || item.attendance_date || '') ===
+          String(row.original_date || row.attendance_date || '')
+    );
+    if (existingIndex >= 0) {
+      attendanceCorrections[existingIndex] = { ...attendanceCorrections[existingIndex], ...row };
+      return attendanceCorrections[existingIndex];
+    }
+
+    const inserted = {
+      id: row.id || `attendance-correction-${attendanceCorrections.length + 1}`,
+      created_at: row.created_at || new Date().toISOString(),
+      status: approvalStatus.pending,
+      ...row,
+    };
+    attendanceCorrections = [inserted, ...attendanceCorrections];
+    return inserted;
+  };
+
+  const applyAnnualLeaveApprovalEffects = (approval: any) => {
+    const metaData = approval?.meta_data ?? {};
+    const staffId = String(approval?.sender_id || '');
+    const startDate = String(metaData.startDate || metaData.start || '');
+    const endDate = String(metaData.endDate || metaData.end || startDate);
+    const leaveType = String(metaData.leaveType || '\uC5F0\uCC28');
+
+    if (!staffId || !startDate) return;
+
+    upsertLeaveRequestRow({
+      staff_id: staffId,
+      leave_type: leaveType,
+      start_date: startDate,
+      end_date: endDate,
+      reason: String(metaData.reason || approval?.title || ''),
+      status: approvalStatus.approved,
+      approval_id: approval.id,
+    });
+
+    const start = new Date(startDate);
+    const end = new Date(endDate || startDate);
+    const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1);
+
+    for (let index = 0; index < days; index += 1) {
+      const cursor = new Date(start);
+      cursor.setDate(cursor.getDate() + index);
+      const date = cursor.toISOString().slice(0, 10);
+      upsertAttendanceRow({
+        staff_id: staffId,
+        date,
+        status: attendanceStatus.annualLeaveLegacy,
+      });
+      upsertAttendancesRow({
+        staff_id: staffId,
+        work_date: date,
+        status: attendanceStatus.annualLeaveModern,
+        check_in_time: null,
+        check_out_time: null,
+        work_hours_minutes: 0,
+      });
+    }
+  };
+
+  const applyAttendanceCorrectionApprovalEffects = (approval: any) => {
+    const metaData = approval?.meta_data ?? {};
+    const staffId = String(approval?.sender_id || '');
+    const correctionDates = Array.isArray(metaData.correction_dates)
+      ? metaData.correction_dates.map((value: unknown) => String(value))
+      : [];
+
+    if (!staffId || correctionDates.length === 0) return;
+
+    for (const date of correctionDates) {
+      upsertAttendanceCorrectionRow({
+        staff_id: staffId,
+        original_date: date,
+        attendance_date: date,
+        correction_type: String(metaData.correction_type || attendanceStatus.correctionNormalType),
+        reason: String(metaData.correction_reason || approval?.content || ''),
+        status: approvalStatus.approved,
+        approval_status: approvalStatus.approved,
+        approval_id: approval.id,
+      });
+      upsertAttendanceRow({
+        staff_id: staffId,
+        date,
+        status: attendanceStatus.normal,
+      });
+      upsertAttendancesRow({
+        staff_id: staffId,
+        work_date: date,
+        status: 'present',
+      });
+    }
+  };
+
+  const applySupplyApprovalEffects = async (approval: any) => {
+    const metaData = approval?.meta_data ?? {};
+    const requestedItems = Array.isArray(metaData.items) ? metaData.items : [];
+    if (requestedItems.length === 0) {
+      return null;
+    }
+
+    const workflowItems = requestedItems.map((item: any) => {
+      const qty = Number(item?.qty ?? item?.quantity ?? 0) || 0;
+      const sourceInventory = inventoryItems.find(
+        (inventoryItem: any) =>
+          String(inventoryItem.item_name || '') === String(item?.name || '') &&
+          String(inventoryItem.company || '') === 'SY INC.'
+      ) || inventoryItems.find((inventoryItem: any) => String(inventoryItem.item_name || '') === String(item?.name || ''));
+
+      const availableQty = Number(sourceInventory?.quantity ?? sourceInventory?.stock ?? 0) || 0;
+      const shortageQty = Math.max(0, qty - availableQty);
+      const recommendedAction = shortageQty > 0 ? 'order' : 'issue';
+      const status = shortageQty > 0 ? 'order_required' : 'issue_ready';
+
+      return {
+        name: String(item?.name || ''),
+        qty,
+        dept: String(item?.dept || item?.department || ''),
+        purpose: String(item?.purpose || ''),
+        recommended_action: recommendedAction,
+        status,
+        available_qty: availableQty,
+        shortage_qty: shortageQty,
+        source_inventory_id: sourceInventory?.id || null,
+      };
+    });
+
+    const summary = {
+      total_count: workflowItems.length,
+      issue_ready_count: workflowItems.filter((item: any) => item.status === 'issue_ready').length,
+      order_required_count: workflowItems.filter((item: any) => item.status === 'order_required').length,
+      issued_count: workflowItems.filter((item: any) => item.status === 'issued').length,
+      ordered_count: workflowItems.filter((item: any) => item.status === 'ordered').length,
+    };
+
+    const primarySource = workflowItems.find((item: any) => item.source_inventory_id);
+    const sourceInventory = inventoryItems.find((item: any) => item.id === primarySource?.source_inventory_id);
+    const sourceCompany = String(sourceInventory?.company || 'SY INC.');
+    const sourceDepartment = String(sourceInventory?.department || '\uACBD\uC601\uC9C0\uC6D0\uD300');
+    const workflow = {
+      status: 'pending',
+      source_company: sourceCompany,
+      source_department: sourceDepartment,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      items: workflowItems,
+      summary,
+    };
+
+    approvals = approvals.map((row: any) =>
+      String(row.id) === String(approval.id)
+        ? {
+            ...row,
+            meta_data: {
+              ...(row.meta_data || {}),
+              inventory_workflow: workflow,
+            },
+          }
+        : row
+    );
+
+    const managerNotifications = staffMembers
+      .filter(
+        (staff: any) =>
+          String(staff.company || '') === sourceCompany &&
+          String(staff.department || '') === sourceDepartment
+      )
+      .map((staff: any, index: number) => ({
+        id: `notification-inventory-${approval.id}-${index + 1}`,
+        user_id: staff.id,
+        type: 'inventory',
+        title: `[\uBB3C\uD488\uC694\uCCAD \uC2B9\uC778] ${String(approval.title || '\uC804\uC790\uACB0\uC7AC \uBB38\uC11C')}`,
+        body: `${String(approval.sender_name || '\uC694\uCCAD\uC790')} \uC694\uCCAD\uC774 \uC2B9\uC778\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uCD9C\uACE0 \uAC00\uB2A5 ${summary.issue_ready_count}\uAC74 / \uBC1C\uC8FC \uD544\uC694 ${summary.order_required_count}\uAC74\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.`,
+        created_at: new Date().toISOString(),
+        read_at: null,
+        metadata: {
+          approval_id: approval.id,
+          workflow_type: 'supply_request_fulfillment',
+          source_company: sourceCompany,
+          source_department: sourceDepartment,
+          summary,
+        },
+      }));
+
+    const requesterNotification = approval?.sender_id
+      ? [
+          {
+            id: `notification-approval-${approval.id}`,
+            user_id: approval.sender_id,
+            type: 'approval',
+            title: '\uBB3C\uD488\uC694\uCCAD\uC774 \uC2B9\uC778\uB418\uC5C8\uC2B5\uB2C8\uB2E4.',
+            body: '\uACBD\uC601\uC9C0\uC6D0\uD300\uC5D0\uC11C \uC7AC\uACE0\uB97C \uD655\uC778\uD558\uC5EC \uBD88\uCD9C \uB610\uB294 \uBC1C\uC8FC\uB97C \uC9C4\uD589\uD569\uB2C8\uB2E4.',
+            created_at: new Date().toISOString(),
+            read_at: null,
+            metadata: {
+              approval_id: approval.id,
+              workflow_type: 'supply_request_fulfillment',
+              summary,
+            },
+          },
+        ]
+      : [];
+
+    await appendNotifications([...managerNotifications, ...requesterNotification]);
+    return summary;
+  };
+
+  const processFinalApprovalEffects = async (approval: any) => {
+    const approvalType = String(approval?.type || '').trim();
+    const formSlug = String(approval?.meta_data?.form_slug || '').trim();
+    let warnings: string[] = [];
+    let supplySummary: Record<string, unknown> | null = null;
+
+    if (approvalType === '\uC5F0\uCC28/\uD734\uAC00' || formSlug === 'leave_request') {
+      applyAnnualLeaveApprovalEffects(approval);
+    }
+
+    if (approvalType === '\uCD9C\uACB0\uC815\uC815' || formSlug === 'attendance_fix') {
+      applyAttendanceCorrectionApprovalEffects(approval);
+    }
+
+    if (approvalType === '\uBB3C\uD488\uC694\uCCAD' && Array.isArray(approval?.meta_data?.items)) {
+      supplySummary = await applySupplyApprovalEffects(approval);
+    }
+
+    approvals = approvals.map((row: any) =>
+      String(row.id) === String(approval.id)
+        ? {
+            ...row,
+            meta_data: {
+              ...(row.meta_data || {}),
+              server_processing: {
+                status: 'completed',
+                processed_at: new Date().toISOString(),
+                started_by: approval?.current_approver_id || null,
+                errors: warnings,
+              },
+            },
+          }
+        : row
+    );
+
+    return {
+      alreadyProcessed: false,
+      warnings,
+      supplySummary,
+    };
+  };
+
+  await page.route('**/api/chat/upload', async (route) => {
+    const body = route.request().postDataJSON?.() as
+      | { fileName?: string; mimeType?: string; fileSize?: number }
+      | undefined;
+    const extension = String(body?.fileName || 'upload.bin').split('.').pop() || 'bin';
+    const path = `chat/mock-${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        bucket: 'pchos-files',
+        path,
+        token: 'mock-upload-token',
+        url: `http://127.0.0.1:3000/storage/v1/object/public/pchos-files/${path}`,
+      }),
+    });
+  });
+
+  await page.route('**/storage/v1/object/**', async (route) => {
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ Key: 'mock-upload-key' }),
+    });
+  });
+
+  await page.route('**/api/approvals/process-final', async (route) => {
+    const body = route.request().postDataJSON() as { approvalId?: string } | null;
+    const approval = approvals.find((row: any) => String(row.id) === String(body?.approvalId || ''));
+    if (!approval) {
+      return json(route, { ok: false, error: 'Approval not found' }, 404);
+    }
+
+    const result = await processFinalApprovalEffects(approval);
+    return json(route, {
+      ok: true,
+      alreadyProcessed: result.alreadyProcessed,
+      warnings: result.warnings,
+      supplySummary: result.supplySummary,
+    });
+  });
+
+  await page.route('**/api/approvals/transition', async (route) => {
+    const body = route.request().postDataJSON() as {
+      action?: 'approve' | 'reject';
+      approvalIds?: string[];
+      reason?: string | null;
+    } | null;
+    const action = body?.action;
+    const approvalIds = Array.isArray(body?.approvalIds) ? body!.approvalIds : [];
+    const reason = body?.reason ?? null;
+    const results: Array<Record<string, unknown>> = [];
+    let finalApprovalCount = 0;
+    let warningCount = 0;
+
+    for (const approvalId of approvalIds) {
+      const approval = approvals.find((row: any) => String(row.id) === String(approvalId));
+      if (!approval) {
+        results.push({
+          approvalId,
+          ok: false,
+          status: 'error',
+          finalApproval: false,
+          error: 'Approval not found',
+        });
+        continue;
+      }
+
+      const approverLine = parseApproverLine(approval);
+      const currentApproverId = approval?.current_approver_id ? String(approval.current_approver_id) : null;
+      const currentIndex = currentApproverId ? approverLine.indexOf(currentApproverId) : -1;
+      const nextApproverId =
+        currentIndex >= 0 && currentIndex < approverLine.length - 1 ? approverLine[currentIndex + 1] : null;
+
+      if (action === 'reject') {
+        const nextMetaData = {
+          ...(approval.meta_data || {}),
+          reject_reason: reason || '\uBC18\uB824',
+        };
+        approvals = approvals.map((row: any) =>
+          String(row.id) === String(approvalId)
+            ? {
+                ...row,
+                status: approvalStatus.rejected,
+                meta_data: nextMetaData,
+              }
+            : row
+        );
+        results.push({
+          approvalId,
+          ok: true,
+          status: approvalStatus.rejected,
+          finalApproval: false,
+          nextApproverId: null,
+          warnings: [],
+        });
+        continue;
+      }
+
+      if (nextApproverId) {
+        approvals = approvals.map((row: any) =>
+          String(row.id) === String(approvalId)
+            ? {
+                ...row,
+                status: approvalStatus.pending,
+                current_approver_id: nextApproverId,
+              }
+            : row
+        );
+        results.push({
+          approvalId,
+          ok: true,
+          status: approvalStatus.pending,
+          finalApproval: false,
+          nextApproverId,
+          warnings: [],
+        });
+        continue;
+      }
+
+      approvals = approvals.map((row: any) =>
+        String(row.id) === String(approvalId)
+          ? {
+              ...row,
+              status: approvalStatus.approved,
+              current_approver_id: null,
+            }
+          : row
+      );
+      const updatedApproval = approvals.find((row: any) => String(row.id) === String(approvalId));
+      const finalResult = await processFinalApprovalEffects(updatedApproval);
+      finalApprovalCount += 1;
+      warningCount += finalResult.warnings.length;
+      results.push({
+        approvalId,
+        ok: true,
+        status: approvalStatus.approved,
+        finalApproval: true,
+        nextApproverId: null,
+        warnings: finalResult.warnings,
+        supplySummary: finalResult.supplySummary,
+      });
+    }
+
+    const successCount = results.filter((result) => result.ok).length;
+    const failCount = results.length - successCount;
+
+    return json(route, {
+      ok: true,
+      action,
+      summary: {
+        total: results.length,
+        successCount,
+        failCount,
+        finalApprovalCount,
+        warningCount,
+      },
+      results,
+    });
+  });
+
   await page.route('**/api/notifications/chat-push', async (route) => {
     return route.fulfill({
       status: 200,
