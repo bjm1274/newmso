@@ -1,10 +1,9 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { WORKPLACE_LOCATION, ALLOWED_DISTANCE_M } from '@/lib/location';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
-import { isApprovedLeaveStatus } from '@/lib/annual-leave-ledger';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
 
 const HOSPITAL_LOCATION = WORKPLACE_LOCATION;
@@ -32,14 +31,6 @@ interface WeatherData {
   aqiColor: string;
 }
 
-interface LeaveRequestRow {
-  id: string;
-  leave_type: string | null;
-  start_date: string | null;
-  end_date: string | null;
-  status: string | null;
-  reason?: string | null;
-}
 
 type ShiftBoundary = {
   hour: number;
@@ -144,7 +135,6 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   const normalizedUser = normalizeStaffLike((user ?? {}) as Record<string, unknown>);
   const [resolvedUser, setResolvedUser] = useState<Record<string, unknown>>(normalizedUser);
   const [logs, setLogs] = useState<CommuteLog[]>([]);
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequestRow[]>([]);
   const [todayLog, setTodayLog] = useState<Record<string, unknown> | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -243,7 +233,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
   const initCommuteData = async () => {
     setLoading(true);
-    await Promise.all([fetchTodayLog(), fetchMonthlyLogs(), fetchMonthlyLeaveRequests()]);
+    await Promise.all([fetchTodayLog(), fetchMonthlyLogs()]);
     setLoading(false);
   };
 
@@ -407,27 +397,6 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     }
   };
 
-  const fetchMonthlyLeaveRequests = async () => {
-    const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).toLocaleDateString('en-CA');
-    const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).toLocaleDateString('en-CA');
-    const userId = effectiveUserId;
-    if (!userId) return;
-
-    const { data, error } = await supabase
-      .from('leave_requests')
-      .select('id, leave_type, start_date, end_date, status, reason')
-      .eq('staff_id', userId)
-      .lte('start_date', endOfMonth)
-      .or(`end_date.is.null,end_date.gte.${startOfMonth}`);
-
-    if (error) {
-      console.warn('월별 연차 캘린더 로드 실패:', error);
-      setLeaveRequests([]);
-      return;
-    }
-
-    setLeaveRequests(((data || []) as LeaveRequestRow[]).filter((row) => isApprovedLeaveStatus(row.status)));
-  };
 
   // 📍 [핵심 기능] 현재 위치 가져오기 및 거리 계산
   const getCurrentLocation = (): Promise<boolean> => {
@@ -854,59 +823,6 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     return `${hours}시간 ${minutes}분`;
   };
 
-  const calendarDays = useMemo(() => {
-    const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-    const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
-    const gridStart = new Date(monthStart);
-    gridStart.setDate(monthStart.getDate() - monthStart.getDay());
-    const gridEnd = new Date(monthEnd);
-    gridEnd.setDate(monthEnd.getDate() + (6 - monthEnd.getDay()));
-
-    const logMap = new Map<string, any>();
-    logs.forEach((log) => {
-      const key = String(log?.date || '').trim();
-      if (key) logMap.set(key, log);
-    });
-
-    const leaveMap = new Map<string, LeaveRequestRow>();
-    leaveRequests.forEach((leave) => {
-      const start = leave.start_date ? new Date(leave.start_date) : null;
-      const end = new Date(leave.end_date || leave.start_date || '');
-      if (!start || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
-      const cursor = new Date(start);
-      while (cursor <= end) {
-        const key = cursor.toLocaleDateString('en-CA');
-        leaveMap.set(key, leave);
-        cursor.setDate(cursor.getDate() + 1);
-      }
-    });
-
-    const items: Array<{
-      key: string;
-      date: Date;
-      inMonth: boolean;
-      isToday: boolean;
-      log: any | null;
-      leave: LeaveRequestRow | null;
-    }> = [];
-
-    const cursor = new Date(gridStart);
-    const todayKey = new Date().toLocaleDateString('en-CA');
-    while (cursor <= gridEnd) {
-      const key = cursor.toLocaleDateString('en-CA');
-      items.push({
-        key,
-        date: new Date(cursor),
-        inMonth: cursor.getMonth() === currentMonth.getMonth(),
-        isToday: key === todayKey,
-        log: logMap.get(key) || null,
-        leave: leaveMap.get(key) || null,
-      });
-      cursor.setDate(cursor.getDate() + 1);
-    }
-
-    return items;
-  }, [currentMonth, leaveRequests, logs]);
 
   return (
     <div data-testid="commute-record-view" className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-2xl px-4 py-5 sm:p-5 h-full flex flex-col space-y-7">
@@ -988,77 +904,6 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         <StatItem label="정상 출근" value={`${logs.filter((log) => getDisplayStatus(log) === '정상').length}회`} isSuccess />
       </div>
 
-      <section className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-[var(--foreground)]">월간 출퇴근 / 연차 캘린더</h3>
-            <p className="text-xs font-medium text-[var(--toss-gray-3)]">출근 기록과 승인된 연차를 한 달 단위로 같이 확인할 수 있습니다.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[var(--toss-gray-4)]">
-            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--muted)] px-2.5 py-1">
-              <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />
-              근무
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              연차
-            </span>
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-7 gap-2 text-center text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">
-          {['일', '월', '화', '수', '목', '금', '토'].map((label) => (
-            <div key={label} className="py-1">{label}</div>
-          ))}
-        </div>
-
-        <div className="mt-2 grid grid-cols-7 gap-2">
-          {calendarDays.map(({ key, date, inMonth, isToday, log, leave }) => {
-            const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-            const leaveType = String(leave?.leave_type || '').trim();
-            const leaveLabel = leaveType ? (leaveType.length > 6 ? `${leaveType.slice(0, 6)}…` : leaveType) : '';
-            const displayStatus = getDisplayStatus(log as CommuteLog | null);
-            const attendanceLabel = log ? (displayStatus || (log.check_out ? '근무완료' : '근무중')) : '';
-            return (
-              <div
-                key={key}
-                className={`min-h-[96px] rounded-2xl border px-2.5 py-2 text-left transition-colors ${
-                  inMonth
-                    ? 'border-[var(--border)] bg-[var(--background)]/40'
-                    : 'border-transparent bg-[var(--muted)]/50 text-[var(--toss-gray-3)]'
-                } ${isToday ? 'ring-2 ring-[var(--accent)]/25' : ''}`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className={`text-sm font-black ${isWeekend && inMonth ? 'text-rose-500' : 'text-[var(--foreground)]'}`}>
-                    {date.getDate()}
-                  </span>
-                  {isToday && (
-                    <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[9px] font-bold text-white">오늘</span>
-                  )}
-                </div>
-                <div className="mt-2 space-y-1.5">
-                  {leave && (
-                    <div className="rounded-xl bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
-                      {leaveLabel || '연차'}
-                    </div>
-                  )}
-                  {log && (
-                    <div className="rounded-xl bg-[var(--muted)] px-2 py-1 text-[10px] font-semibold text-[var(--foreground)]">
-                      <p className="truncate">{attendanceLabel}</p>
-                      <p className="mt-0.5 text-[var(--toss-gray-3)]">{formatTime(String(log.check_in || ''))}</p>
-                    </div>
-                  )}
-                  {!leave && !log && inMonth && (
-                    <div className="rounded-xl border border-dashed border-[var(--border)] px-2 py-2 text-[10px] font-medium text-[var(--toss-gray-3)]">
-                      일정 없음
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
 
       {/* 리스트 */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
