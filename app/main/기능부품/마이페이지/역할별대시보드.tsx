@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { resolveApprovalDelegateConfig } from '@/lib/approval-workflow';
+import { calculateApprovedAnnualLeaveUsage } from '@/lib/annual-leave-ledger';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
 
@@ -14,6 +15,7 @@ interface Props {
 type TodayAttendance = {
   in: string | null;
   out: string | null;
+  status: string | null;
 };
 
 type AnnualLeaveSummary = {
@@ -22,11 +24,26 @@ type AnnualLeaveSummary = {
 };
 
 const MANAGER_POSITIONS = ['과장', '간호과장', '실장', '수간호사', '파트장', '센터장', '부장', '본부장', '이사', '원장', '병원장', '대표'];
+function formatTodayAttendancePrimary(todayAttendance: TodayAttendance, formatTime: (value: string | null) => string) {
+  const normalizedStatus = String(todayAttendance.status ?? '').trim().toLowerCase();
+  if (normalizedStatus === 'annual_leave' || normalizedStatus === '연차휴가') return '연차';
+  if (normalizedStatus === 'half_leave' || normalizedStatus === '반차휴가') return '반차';
+  if (normalizedStatus === 'sick_leave' || normalizedStatus === '병가') return '병가';
+  return formatTime(todayAttendance.in);
+}
+
+function formatTodayAttendanceSecondary(todayAttendance: TodayAttendance, formatTime: (value: string | null) => string) {
+  const normalizedStatus = String(todayAttendance.status ?? '').trim().toLowerCase();
+  if (normalizedStatus === 'annual_leave' || normalizedStatus === '연차휴가') return '승인된 연차 일정';
+  if (normalizedStatus === 'half_leave' || normalizedStatus === '반차휴가') return '승인된 반차 일정';
+  if (normalizedStatus === 'sick_leave' || normalizedStatus === '병가') return '승인된 병가 일정';
+  return todayAttendance.out ? `퇴근 ${formatTime(todayAttendance.out)}` : null;
+}
 
 export default function RoleDashboard({ user, setMainMenu, onOpenApproval }: Props) {
   const [pendingApprovals, setPendingApprovals] = useState(0);
   const [lowStockCount, setLowStockCount] = useState(0);
-  const [todayAttendance, setTodayAttendance] = useState<TodayAttendance>({ in: null, out: null });
+  const [todayAttendance, setTodayAttendance] = useState<TodayAttendance>({ in: null, out: null, status: null });
   const [annualLeave, setAnnualLeave] = useState<AnnualLeaveSummary | null>(null);
   const [teamCount, setTeamCount] = useState(0);
 
@@ -112,7 +129,7 @@ export default function RoleDashboard({ user, setMainMenu, onOpenApproval }: Pro
       const today = new Date().toISOString().slice(0, 10);
       const { data } = await supabase
         .from('attendances')
-        .select('check_in_time, check_out_time')
+        .select('check_in_time, check_out_time, status')
         .eq('staff_id', user.id)
         .eq('work_date', today)
         .maybeSingle();
@@ -121,22 +138,47 @@ export default function RoleDashboard({ user, setMainMenu, onOpenApproval }: Pro
         setTodayAttendance({
           in: data.check_in_time,
           out: data.check_out_time,
+          status: data.status,
         });
+      } else {
+        setTodayAttendance({ in: null, out: null, status: null });
       }
     };
 
     const fetchLeave = async () => {
-      const { data } = await supabase
-        .from('staff_members')
-        .select('annual_leave_total, annual_leave_used')
-        .eq('id', user.id)
-        .maybeSingle();
+      const currentYear = new Date().getFullYear();
+      const yearStart = `${currentYear}-01-01`;
+      const yearEnd = `${currentYear}-12-31`;
+
+      const [{ data }, { data: approvedLeaves }] = await Promise.all([
+        supabase
+          .from('staff_members')
+          .select('annual_leave_total, annual_leave_used')
+          .eq('id', user.id)
+          .maybeSingle(),
+        supabase
+          .from('leave_requests')
+          .select('leave_type, start_date, end_date, status')
+          .eq('staff_id', user.id)
+          .lte('start_date', yearEnd)
+          .gte('end_date', yearStart),
+      ]);
 
       if (data) {
+        const used = Math.max(
+          Number(data.annual_leave_used || 0),
+          calculateApprovedAnnualLeaveUsage(
+            Array.isArray(approvedLeaves) ? (approvedLeaves as Record<string, unknown>[]) : [],
+            currentYear
+          )
+        );
+
         setAnnualLeave({
-          remaining: (data.annual_leave_total || 0) - (data.annual_leave_used || 0),
+          remaining: Math.max(0, (data.annual_leave_total || 0) - used),
           total: data.annual_leave_total || 0,
         });
+      } else {
+        setAnnualLeave(null);
       }
     };
 
@@ -285,7 +327,7 @@ function AdminActionCard({
   );
 }
 
-function UserDashboard({
+function _LegacyUserDashboard({
   todayAttendance,
   annualLeave,
   pendingApprovals,
@@ -304,8 +346,125 @@ function UserDashboard({
     <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
       <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
         <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">오늘 출근</p>
-        <p className="text-lg font-bold text-[var(--foreground)]">{formatTime(todayAttendance.in)}</p>
+        <p className="text-lg font-bold text-[var(--foreground)]">{formatTodayAttendancePrimary(todayAttendance, formatTime)}</p>
         {todayAttendance.out ? <p className="text-[11px] text-[var(--toss-gray-3)]">퇴근 {formatTime(todayAttendance.out)}</p> : null}
+      </div>
+
+      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
+        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">연차 잔여</p>
+        <p className="text-lg font-bold text-[var(--accent)]">{annualLeave?.remaining ?? '-'}일</p>
+        {annualLeave ? <p className="text-[11px] text-[var(--toss-gray-3)]">총 {annualLeave.total}일</p> : null}
+      </div>
+
+      <button
+        type="button"
+        className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 text-left transition-all hover:bg-[var(--toss-blue-light)]/30"
+        onClick={openApprovalInbox}
+      >
+        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">결재 대기</p>
+        <p className={`text-lg font-bold ${pendingApprovals > 0 ? 'text-orange-500' : 'text-[var(--foreground)]'}`}>{pendingApprovals}건</p>
+        <p className="text-[11px] text-[var(--accent)]">바로가기</p>
+      </button>
+
+      <button
+        type="button"
+        className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 text-left transition-all hover:bg-[var(--toss-blue-light)]/30"
+        onClick={() => setMainMenu?.('채팅')}
+      >
+        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">채팅</p>
+        <p className="text-lg font-bold text-[var(--foreground)]">열기</p>
+        <p className="text-[11px] text-[var(--accent)]">바로가기</p>
+      </button>
+    </div>
+  );
+}
+
+function _LegacyManagerDashboard({
+  teamCount,
+  department,
+  pendingApprovals,
+  todayAttendance,
+  lowStockCount,
+  setMainMenu,
+  openApprovalInbox,
+  formatTime,
+}: {
+  teamCount: number;
+  department?: string;
+  pendingApprovals: number;
+  todayAttendance: TodayAttendance;
+  lowStockCount: number;
+  setMainMenu?: (menu: string) => void;
+  openApprovalInbox: () => void;
+  formatTime: (value: string | null) => string;
+}) {
+  return (
+    <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
+        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">팀 인원</p>
+        <p className="text-lg font-bold text-[var(--foreground)]">{teamCount}명</p>
+        <p className="text-[11px] text-[var(--toss-gray-3)]">{department || '-'}</p>
+      </div>
+
+      <button
+        type="button"
+        className={`rounded-[var(--radius-lg)] border p-4 text-left transition-all ${
+          pendingApprovals > 0
+            ? 'border-orange-200 bg-orange-50 hover:bg-orange-100'
+            : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
+        }`}
+        onClick={openApprovalInbox}
+      >
+        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">결재 대기</p>
+        <p className={`text-lg font-bold ${pendingApprovals > 0 ? 'text-orange-600' : 'text-[var(--foreground)]'}`}>{pendingApprovals}건</p>
+        <p className="text-[11px] text-[var(--accent)]">바로가기</p>
+      </button>
+
+      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
+        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">오늘 출근</p>
+        <p className="text-lg font-bold text-[var(--foreground)]">{formatTime(todayAttendance.in)}</p>
+      </div>
+
+      <button
+        type="button"
+        className={`rounded-[var(--radius-lg)] border p-4 text-left transition-all ${
+          lowStockCount > 0
+            ? 'border-red-200 bg-red-50 hover:bg-red-100'
+            : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
+        }`}
+        onClick={() => setMainMenu?.('재고관리')}
+      >
+        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">재고 부족</p>
+        <p className={`text-lg font-bold ${lowStockCount > 0 ? 'text-red-600' : 'text-[var(--foreground)]'}`}>{lowStockCount}건</p>
+        <p className="text-[11px] text-[var(--accent)]">바로가기</p>
+      </button>
+    </div>
+  );
+}
+
+function UserDashboard({
+  todayAttendance,
+  annualLeave,
+  pendingApprovals,
+  setMainMenu,
+  openApprovalInbox,
+  formatTime,
+}: {
+  todayAttendance: TodayAttendance;
+  annualLeave: AnnualLeaveSummary | null;
+  pendingApprovals: number;
+  setMainMenu?: (menu: string) => void;
+  openApprovalInbox: () => void;
+  formatTime: (value: string | null) => string;
+}) {
+  return (
+    <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
+        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">오늘 근태</p>
+        <p className="text-lg font-bold text-[var(--foreground)]">{formatTodayAttendancePrimary(todayAttendance, formatTime)}</p>
+        {formatTodayAttendanceSecondary(todayAttendance, formatTime) ? (
+          <p className="text-[11px] text-[var(--toss-gray-3)]">{formatTodayAttendanceSecondary(todayAttendance, formatTime)}</p>
+        ) : null}
       </div>
 
       <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
@@ -379,8 +538,11 @@ function ManagerDashboard({
       </button>
 
       <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
-        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">오늘 출근</p>
-        <p className="text-lg font-bold text-[var(--foreground)]">{formatTime(todayAttendance.in)}</p>
+        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">오늘 근태</p>
+        <p className="text-lg font-bold text-[var(--foreground)]">{formatTodayAttendancePrimary(todayAttendance, formatTime)}</p>
+        {formatTodayAttendanceSecondary(todayAttendance, formatTime) ? (
+          <p className="text-[11px] text-[var(--toss-gray-3)]">{formatTodayAttendanceSecondary(todayAttendance, formatTime)}</p>
+        ) : null}
       </div>
 
       <button

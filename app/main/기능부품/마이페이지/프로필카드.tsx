@@ -11,7 +11,9 @@ import {
   normalizeProfileUser,
   withProfilePhotoMetadata,
 } from '@/lib/profile-photo';
+import { calculateApprovedAnnualLeaveUsage } from '@/lib/annual-leave-ledger';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
+import { useActionDialog } from '@/app/components/useActionDialog';
 
 export default function MyProfileCard({
   user: initialUser,
@@ -23,6 +25,7 @@ export default function MyProfileCard({
   isEditing: controlledIsEditing,
   setIsEditing: setControlledIsEditing,
 }: Record<string, unknown>) {
+  const { dialog, openConfirm, openPrompt } = useActionDialog();
   const MASKED_TEXT = '********';
   const _iu = normalizeStaffLike((initialUser ?? {}) as Record<string, unknown>);
   const [user, setUser] = useState<Record<string, unknown>>(normalizeProfileUser(_iu));
@@ -129,7 +132,14 @@ export default function MyProfileCard({
   };
 
   const handleLogout = async () => {
-    if (!confirm('로그아웃 하시겠습니까?')) return;
+    const shouldLogout = await openConfirm({
+      title: '로그아웃',
+      description: '현재 계정에서 로그아웃합니다. 계속할까요?',
+      confirmText: '로그아웃',
+      cancelText: '취소',
+      tone: 'danger',
+    });
+    if (!shouldLogout) return;
 
     try {
       await fetch('/api/auth/session', { method: 'DELETE' });
@@ -151,7 +161,15 @@ export default function MyProfileCard({
 
   const verifyPassword = async () => {
     try {
-      const input = window.prompt('본인 확인을 위해 현재 비밀번호를 입력해 주세요.');
+      const input = await openPrompt({
+        title: '본인 확인',
+        description: '현재 비밀번호를 입력해 주세요.',
+        confirmText: '확인',
+        cancelText: '취소',
+        inputType: 'password',
+        required: true,
+        placeholder: '현재 비밀번호',
+      });
       if (!input) return false;
 
       const response = await fetch('/api/auth/verify-password', {
@@ -571,6 +589,7 @@ export default function MyProfileCard({
 
   return (
     <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] p-3 sm:p-4 lg:p-5 flex flex-col">
+      {dialog}
 
       {/* 프로필 헤더 */}
       {!hideHeader ? (
@@ -750,6 +769,7 @@ export default function MyProfileCard({
               나의 근태 · 연차
             </h3>
             <LeaveAndCommuteSummary user={user} onOpenApproval={onOpenApproval} />
+            <ProfileChangeRequestHistory user={user} />
           </div>
         </div>
 
@@ -807,12 +827,200 @@ function EditableItem({ label, value, onChange, placeholder, testId }: { label?:
   );
 }
 
-function LeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record<string, unknown>) {
+const PROFILE_REQUEST_TARGET_TYPES = [
+  'ESS_PROFILE_UPDATE_PENDING',
+  'ESS_PROFILE_UPDATE_APPROVED',
+  'ESS_PROFILE_UPDATE_REJECTED',
+] as const;
+
+function formatProfileRequestDateTime(value: unknown) {
+  if (!value) return '-';
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return parsed.toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function getProfileRequestStatusMeta(targetType: unknown) {
+  const normalized = String(targetType ?? '').trim();
+  if (normalized === 'ESS_PROFILE_UPDATE_APPROVED') {
+    return {
+      label: '승인',
+      className: 'bg-emerald-50 text-emerald-600 border border-emerald-200',
+    };
+  }
+  if (normalized === 'ESS_PROFILE_UPDATE_REJECTED') {
+    return {
+      label: '반려',
+      className: 'bg-rose-50 text-rose-600 border border-rose-200',
+    };
+  }
+  return {
+    label: '대기',
+    className: 'bg-amber-50 text-amber-600 border border-amber-200',
+  };
+}
+
+function summarizeProfileRequestFields(details: unknown) {
+  const detailObject =
+    details && typeof details === 'object' && !Array.isArray(details)
+      ? (details as Record<string, unknown>)
+      : {};
+  const requestedChanges =
+    detailObject.requested_changes && typeof detailObject.requested_changes === 'object' && !Array.isArray(detailObject.requested_changes)
+      ? (detailObject.requested_changes as Record<string, unknown>)
+      : {};
+  const originalData =
+    detailObject.original_data && typeof detailObject.original_data === 'object' && !Array.isArray(detailObject.original_data)
+      ? (detailObject.original_data as Record<string, unknown>)
+      : {};
+  const requestedPermissions =
+    requestedChanges.permissions && typeof requestedChanges.permissions === 'object' && !Array.isArray(requestedChanges.permissions)
+      ? (requestedChanges.permissions as Record<string, unknown>)
+      : {};
+  const originalPermissions =
+    originalData.permissions && typeof originalData.permissions === 'object' && !Array.isArray(originalData.permissions)
+      ? (originalData.permissions as Record<string, unknown>)
+      : {};
+
+  const labels = new Map<string, string>([
+    ['email', '이메일'],
+    ['phone', '연락처'],
+    ['address', '거주지'],
+    ['bank_account', '계좌번호'],
+    ['bank_name', '은행명'],
+    ['extension', '내선번호'],
+  ]);
+
+  const changed = new Set<string>();
+  for (const [key, label] of labels.entries()) {
+    const beforeValue =
+      key === 'extension'
+        ? originalData.extension ?? originalPermissions.extension ?? null
+        : key === 'bank_name'
+          ? originalData.bank_name ?? originalPermissions.bank_name ?? null
+          : originalData[key] ?? null;
+    const afterValue =
+      key === 'extension'
+        ? requestedChanges.extension ?? requestedPermissions.extension ?? null
+        : key === 'bank_name'
+          ? requestedChanges.bank_name ?? requestedPermissions.bank_name ?? null
+          : requestedChanges[key] ?? null;
+    if (String(beforeValue ?? '') !== String(afterValue ?? '')) {
+      changed.add(label);
+    }
+  }
+
+  return Array.from(changed);
+}
+
+function ProfileChangeRequestHistory({ user: rawUser }: { user: Record<string, unknown> }) {
+  const [requests, setRequests] = useState<Record<string, unknown>[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      const resolvedUser = await resolveStaffLike(rawUser);
+      const staffId = getStaffLikeId(resolvedUser);
+      if (!staffId) {
+        if (!cancelled) setRequests([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('id, target_type, created_at, details')
+        .in('target_type', [...PROFILE_REQUEST_TARGET_TYPES])
+        .eq('target_id', String(staffId))
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (error) {
+        console.error('프로필 변경 요청 이력 로드 실패:', error);
+        if (!cancelled) setRequests([]);
+        return;
+      }
+
+      if (!cancelled) {
+        setRequests(Array.isArray(data) ? (data as Record<string, unknown>[]) : []);
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [rawUser]);
+
+  if (requests === null) {
+    return (
+      <div className="bg-[var(--muted)] border border-[var(--border)] rounded-[var(--radius-lg)] p-3.5 text-[12px] text-[var(--toss-gray-3)] font-semibold">
+        변경 요청 이력을 불러오는 중입니다...
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-[var(--muted)] border border-[var(--border)] rounded-[var(--radius-lg)] p-3.5 sm:p-4 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">
+            내정보 변경 요청
+          </p>
+          <p className="text-[13px] font-bold text-[var(--foreground)] mt-1">
+            최근 요청 상태를 확인할 수 있습니다.
+          </p>
+        </div>
+        <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
+          최근 {requests.length}건
+        </span>
+      </div>
+
+      {requests.length === 0 ? (
+        <p className="text-[12px] text-[var(--toss-gray-4)]">최근 내정보 변경 요청이 없습니다.</p>
+      ) : (
+        <div className="space-y-2.5">
+          {requests.map((request) => {
+            const statusMeta = getProfileRequestStatusMeta(request.target_type);
+            const changedFields = summarizeProfileRequestFields(request.details);
+            return (
+              <div
+                key={String(request.id)}
+                className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 space-y-1.5"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${statusMeta.className}`}>
+                    {statusMeta.label}
+                  </span>
+                  <span className="text-[11px] text-[var(--toss-gray-4)]">
+                    {formatProfileRequestDateTime(request.created_at)}
+                  </span>
+                </div>
+                <p className="text-[12px] font-semibold text-[var(--foreground)]">
+                  {changedFields.length > 0 ? changedFields.join(', ') : '변경 항목 확인'}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LegacyLeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record<string, unknown>) {
   const user = (_rawUser ?? {}) as Record<string, unknown>;
   const [summary, setSummary] = useState<{
     total: number;
     used: number;
     remaining: number;
+    todayStatusLabel: string | null;
     lateDays: { date: string; status: string }[];
     overworkDays: { date: string; status: string }[];
   } | null>(null);
@@ -844,9 +1052,28 @@ function LeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record<strin
       }
 
       const total = Number(staff?.annual_leave_total ?? resolvedUser?.annual_leave_total ?? user?.annual_leave_total ?? 0);
-      const used = Number(staff?.annual_leave_used ?? resolvedUser?.annual_leave_used ?? user?.annual_leave_used ?? 0);
-      const remaining = Math.max(0, total - used);
       const staffId = staff?.id ?? resolvedStaffId;
+      const currentYear = new Date().getFullYear();
+      const yearStart = `${currentYear}-01-01`;
+      const yearEnd = `${currentYear}-12-31`;
+
+      const { data: approvedLeaves } = staffId
+        ? await supabase
+          .from('leave_requests')
+          .select('leave_type,start_date,end_date,status')
+          .eq('staff_id', staffId)
+          .lte('start_date', yearEnd)
+          .gte('end_date', yearStart)
+        : { data: null as any };
+
+      const used = Math.max(
+        Number(staff?.annual_leave_used ?? resolvedUser?.annual_leave_used ?? user?.annual_leave_used ?? 0),
+        calculateApprovedAnnualLeaveUsage(
+          Array.isArray(approvedLeaves) ? (approvedLeaves as Record<string, unknown>[]) : [],
+          currentYear
+        )
+      );
+      const remaining = Math.max(0, total - used);
 
       const { data: commute } = staffId
         ? await supabase
@@ -856,6 +1083,26 @@ function LeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record<strin
           .order('date', { ascending: false })
           .limit(60)
         : { data: null as any };
+
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: todayAttendance } = staffId
+        ? await supabase
+          .from('attendances')
+          .select('status')
+          .eq('staff_id', staffId)
+          .eq('work_date', today)
+          .maybeSingle()
+        : { data: null as any };
+
+      const normalizedTodayStatus = String(todayAttendance?.status ?? '').trim().toLowerCase();
+      const todayStatusLabel =
+        normalizedTodayStatus === 'annual_leave' || normalizedTodayStatus === '연차휴가'
+          ? '오늘 연차 승인 반영'
+          : normalizedTodayStatus === 'half_leave' || normalizedTodayStatus === '반차휴가'
+            ? '오늘 반차 승인 반영'
+            : normalizedTodayStatus === 'sick_leave' || normalizedTodayStatus === '병가'
+              ? '오늘 병가 승인 반영'
+              : null;
 
       const lateDays =
         commute
@@ -876,7 +1123,7 @@ function LeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record<strin
             status: c.status,
           })) ?? [];
 
-      setSummary({ total, used, remaining, lateDays, overworkDays });
+      setSummary({ total, used, remaining, todayStatusLabel, lateDays, overworkDays });
     };
 
     load();
@@ -940,6 +1187,197 @@ function LeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record<strin
             {summary.overworkDays.slice(0, 3).map((d) => (
               <li key={`${d.date}-${d.status}`}>
                 {new Date(d.date).toLocaleDateString('ko-KR')} · {d.status}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record<string, unknown>) {
+  const user = (_rawUser ?? {}) as Record<string, unknown>;
+  const [summary, setSummary] = useState<{
+    total: number;
+    used: number;
+    remaining: number;
+    todayStatusLabel: string | null;
+    lateDays: { date: string; status: string }[];
+    overworkDays: { date: string; status: string }[];
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      if (!user?.id && !user?.name && !user?.employee_no && !user?.auth_user_id) return;
+
+      const resolvedUser = await resolveStaffLike(user as Record<string, unknown>);
+      const resolvedStaffId = getStaffLikeId(resolvedUser);
+
+      let staff: { id?: string; annual_leave_total?: number; annual_leave_used?: number } | null = null;
+      if (resolvedStaffId) {
+        const res = await supabase
+          .from('staff_members')
+          .select('id, annual_leave_total, annual_leave_used')
+          .eq('id', resolvedStaffId)
+          .maybeSingle();
+        staff = res.data;
+      }
+
+      if (!staff && resolvedUser?.name) {
+        const res = await supabase
+          .from('staff_members')
+          .select('id, annual_leave_total, annual_leave_used')
+          .eq('name', resolvedUser.name)
+          .maybeSingle();
+        staff = res.data;
+      }
+
+      const total = Number(staff?.annual_leave_total ?? resolvedUser?.annual_leave_total ?? user?.annual_leave_total ?? 0);
+      const staffId = staff?.id ?? resolvedStaffId;
+      const currentYear = new Date().getFullYear();
+      const yearStart = `${currentYear}-01-01`;
+      const yearEnd = `${currentYear}-12-31`;
+
+      const { data: approvedLeaves } = staffId
+        ? await supabase
+            .from('leave_requests')
+            .select('leave_type,start_date,end_date,status')
+            .eq('staff_id', staffId)
+            .lte('start_date', yearEnd)
+            .gte('end_date', yearStart)
+        : { data: null as any };
+
+      const used = Math.max(
+        Number(staff?.annual_leave_used ?? resolvedUser?.annual_leave_used ?? user?.annual_leave_used ?? 0),
+        calculateApprovedAnnualLeaveUsage(
+          Array.isArray(approvedLeaves) ? (approvedLeaves as Record<string, unknown>[]) : [],
+          currentYear
+        )
+      );
+      const remaining = Math.max(0, total - used);
+
+      const { data: commute } = staffId
+        ? await supabase
+            .from('attendance')
+            .select('date,status')
+            .eq('staff_id', staffId)
+            .order('date', { ascending: false })
+            .limit(60)
+        : { data: null as any };
+
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: todayAttendance } = staffId
+        ? await supabase
+            .from('attendances')
+            .select('status')
+            .eq('staff_id', staffId)
+            .eq('work_date', today)
+            .maybeSingle()
+        : { data: null as any };
+
+      const normalizedTodayStatus = String(todayAttendance?.status ?? '').trim().toLowerCase();
+      const todayStatusLabel =
+        normalizedTodayStatus === 'annual_leave' || normalizedTodayStatus === '연차휴가'
+          ? '오늘 연차 승인 반영'
+          : normalizedTodayStatus === 'half_leave' || normalizedTodayStatus === '반차휴가'
+            ? '오늘 반차 승인 반영'
+            : normalizedTodayStatus === 'sick_leave' || normalizedTodayStatus === '병가'
+              ? '오늘 병가 승인 반영'
+              : null;
+
+      const lateDays =
+        commute
+          ?.filter((entry: any) => entry.status === '지각')
+          .map((entry: any) => ({
+            date: entry.date,
+            status: entry.status,
+          })) ?? [];
+
+      const overworkDays =
+        commute
+          ?.filter((entry: any) => ['추가근무', '연장근무', '특근'].includes(String(entry.status ?? '')))
+          .map((entry: any) => ({
+            date: entry.date,
+            status: entry.status,
+          })) ?? [];
+
+      if (!cancelled) {
+        setSummary({ total, used, remaining, todayStatusLabel, lateDays, overworkDays });
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.name, user?.employee_no, user?.auth_user_id]);
+
+  if (!summary) {
+    return (
+      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] p-3.5 text-[12px] font-semibold text-[var(--toss-gray-3)] sm:p-4">
+        근태와 연차 요약 정보를 불러오는 중입니다...
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] p-3.5 text-[12px] sm:p-4">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">
+            연차 현황
+          </p>
+          <p className="text-[14px] font-bold leading-snug text-[var(--foreground)]">
+            잔여 연차 <span className="text-emerald-600">{summary.remaining.toFixed(1)}일</span>
+          </p>
+          <p className="mt-0.5 text-[11px] text-[var(--toss-gray-4)]">
+            총 {summary.total.toFixed(1)}일 중 {summary.used.toFixed(1)}일 사용
+          </p>
+          {summary.todayStatusLabel ? (
+            <p className="mt-1.5 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-600">
+              {summary.todayStatusLabel}
+            </p>
+          ) : null}
+        </div>
+        <button
+          onClick={() => (onOpenApproval as ((v: unknown) => void) | undefined)?.({ type: '연차/휴가' })}
+          className="rounded-[var(--radius-md)] border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-600 transition-colors hover:bg-emerald-100"
+        >
+          휴가 결재 열기
+        </button>
+      </div>
+
+      <div className="space-y-1.5 border-t border-[var(--border)] pt-3">
+        <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">
+          최근 지각
+        </p>
+        {summary.lateDays.length === 0 ? (
+          <p className="text-[11px] text-[var(--toss-gray-4)]">최근 60일 내 지각 기록이 없습니다.</p>
+        ) : (
+          <ul className="space-y-1 text-[11px] text-[var(--toss-gray-4)]">
+            {summary.lateDays.slice(0, 3).map((entry) => (
+              <li key={`${entry.date}-${entry.status}`}>
+                {new Date(entry.date).toLocaleDateString('ko-KR')} · {entry.status}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="space-y-1.5 border-t border-[var(--border)] pt-3">
+        <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">
+          최근 추가 근무
+        </p>
+        {summary.overworkDays.length === 0 ? (
+          <p className="text-[11px] text-[var(--toss-gray-4)]">최근 60일 내 추가 근무 기록이 없습니다.</p>
+        ) : (
+          <ul className="space-y-1 text-[11px] text-[var(--toss-gray-4)]">
+            {summary.overworkDays.slice(0, 3).map((entry) => (
+              <li key={`${entry.date}-${entry.status}`}>
+                {new Date(entry.date).toLocaleDateString('ko-KR')} · {entry.status}
               </li>
             ))}
           </ul>

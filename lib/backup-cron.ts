@@ -5,58 +5,7 @@
  * Supabase Storage 버킷 'mso-backups'에 JSON 저장.
  */
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-
-const SIX_HOUR_TABLES = [
-  'staff_members',
-  'payroll_records',
-  'leave_requests',
-  'attendances',
-  'approvals',
-  'audit_logs',
-];
-
-const FULL_BACKUP_TABLES = [
-  'staff_members',
-  'companies',
-  'chat_rooms',
-  'push_subscriptions',
-  'messages',
-  'board_posts',
-  'posts',
-  'approvals',
-  'inventory',
-  'tasks',
-  'notifications',
-  'attendance',
-  'work_shifts',
-  'attendances',
-  'leave_requests',
-  'payroll_records',
-  'attendance_deduction_rules',
-  'audit_logs',
-  'approval_history',
-  'approval_templates',
-  'message_reads',
-  'room_read_cursors',
-  'room_notification_settings',
-  'polls',
-  'poll_votes',
-  'message_reactions',
-  'pinned_messages',
-  'board_post_likes',
-  'board_post_comments',
-  'suppliers',
-  'purchase_orders',
-  'inventory_logs',
-  'employment_contracts',
-  'attendance_corrections',
-  'popups',
-  'payroll_locks',
-  'approval_form_types',
-  'certificate_issuances',
-  'corporate_cards',
-  'corporate_card_transactions',
-];
+import { FULL_BACKUP_TABLES, SIX_HOUR_BACKUP_TABLES } from '@/lib/backup-config';
 
 const BUCKET = 'mso-backups';
 
@@ -83,7 +32,7 @@ export async function runBackup(type: BackupType): Promise<BackupResult> {
   }
 
   const supabase: SupabaseClient = createClient(supabaseUrl, serviceKey);
-  const tables = type === '24h' ? FULL_BACKUP_TABLES : SIX_HOUR_TABLES;
+  const tables = type === '24h' ? FULL_BACKUP_TABLES : SIX_HOUR_BACKUP_TABLES;
   const data: Record<string, unknown[]> = {};
   const now = new Date();
   const iso = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);

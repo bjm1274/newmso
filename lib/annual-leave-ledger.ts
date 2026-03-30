@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
 const APPROVED_STATUS_LABELS = new Set(['\uc2b9\uc778', 'approved']);
@@ -12,6 +13,18 @@ export function isAnnualLeaveType(value: unknown): boolean {
     normalized === '\uc5f0\ucc28' ||
     normalized === '\uc5f0\ucc28/\ud734\uac00' ||
     normalized.includes('\uc5f0\ucc28')
+  );
+}
+
+export function isHalfLeaveType(value: unknown): boolean {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (!normalized) return false;
+
+  return (
+    normalized === 'half_leave' ||
+    normalized === 'half-day' ||
+    normalized === '\ubc18\ucc28' ||
+    normalized.includes('\ubc18\ucc28')
   );
 }
 
@@ -34,16 +47,76 @@ export function calculateLeaveDays(startDate: string | null | undefined, endDate
   return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1);
 }
 
+function clipDateRangeToYear(
+  startDate: string | null | undefined,
+  endDate: string | null | undefined,
+  year: number
+) {
+  if (!startDate) return null;
+
+  const start = new Date(startDate);
+  const end = new Date(endDate || startDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return null;
+  }
+
+  const rangeStart = new Date(Math.max(start.getTime(), new Date(`${year}-01-01T00:00:00`).getTime()));
+  const rangeEnd = new Date(Math.min(end.getTime(), new Date(`${year}-12-31T23:59:59`).getTime()));
+
+  if (rangeStart.getTime() > rangeEnd.getTime()) {
+    return null;
+  }
+
+  return { start: rangeStart, end: rangeEnd };
+}
+
+export function calculateApprovedAnnualLeaveUsage(
+  rows: Array<Record<string, unknown>> | null | undefined,
+  year = new Date().getFullYear()
+) {
+  return (rows || []).reduce((sum, row) => {
+    if (!isApprovedLeaveStatus(row?.status)) {
+      return sum;
+    }
+
+    if (isHalfLeaveType(row?.leave_type)) {
+      return sum + 0.5;
+    }
+
+    if (!isAnnualLeaveType(row?.leave_type)) {
+      return sum;
+    }
+
+    const clippedRange = clipDateRangeToYear(
+      row?.start_date as string | null | undefined,
+      row?.end_date as string | null | undefined,
+      year
+    );
+
+    if (!clippedRange) {
+      return sum;
+    }
+
+    return (
+      sum +
+      calculateLeaveDays(
+        clippedRange.start.toISOString().slice(0, 10),
+        clippedRange.end.toISOString().slice(0, 10)
+      )
+    );
+  }, 0);
+}
+
 export async function ensureApprovedAnnualLeaveRequest(params: {
   staffId: string;
   leaveType: string;
   startDate: string;
   endDate: string;
   reason: string;
-}) {
+}, client: SupabaseClient = supabase) {
   const { staffId, leaveType, startDate, endDate, reason } = params;
 
-  const { data: existing, error: existingError } = await supabase
+  const { data: existing, error: existingError } = await client
     .from('leave_requests')
     .select('id, status')
     .eq('staff_id', staffId)
@@ -61,7 +134,7 @@ export async function ensureApprovedAnnualLeaveRequest(params: {
 
   if (matched?.id) {
     if (!isApprovedLeaveStatus(matched.status)) {
-      const { error: approveError } = await supabase
+      const { error: approveError } = await client
         .from('leave_requests')
         .update({
           status: '\uc2b9\uc778',
@@ -75,7 +148,7 @@ export async function ensureApprovedAnnualLeaveRequest(params: {
     return matched.id;
   }
 
-  const { data: inserted, error: insertError } = await supabase
+  const { data: inserted, error: insertError } = await client
     .from('leave_requests')
     .insert({
       staff_id: staffId,
@@ -93,8 +166,8 @@ export async function ensureApprovedAnnualLeaveRequest(params: {
   return inserted?.id ?? null;
 }
 
-export async function syncAnnualLeaveUsedForStaff(staffId: string) {
-  const { data, error } = await supabase
+export async function syncAnnualLeaveUsedForStaff(staffId: string, client: SupabaseClient = supabase) {
+  const { data, error } = await client
     .from('leave_requests')
     .select('leave_type, start_date, end_date, status')
     .eq('staff_id', staffId);
@@ -108,7 +181,7 @@ export async function syncAnnualLeaveUsedForStaff(staffId: string) {
     return sum + calculateLeaveDays(row?.start_date, row?.end_date);
   }, 0);
 
-  const { error: updateError } = await supabase
+  const { error: updateError } = await client
     .from('staff_members')
     .update({ annual_leave_used: approvedAnnualLeaveDays })
     .eq('id', staffId);

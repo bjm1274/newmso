@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { sound } from '@/lib/sounds';
 import { isNamedSystemMasterAccount } from '@/lib/system-master';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
+import { bindChannelHealthcheck, bindPageRefresh } from '@/lib/realtime-maintenance';
 
 /**
  * [실시간 알림 엔진 + KakaoTalk 스타일 Toast UI]
@@ -1116,29 +1117,26 @@ export default function NotificationSystem({
     void fetchUnreadNotificationsSince(mountedAt);
 
     let quickCatchupPolledAt = mountedAt;
-    const quickCatchupPoll = setInterval(() => {
+    const unbindQuickCatchup = bindPageRefresh(() => {
       const since = quickCatchupPolledAt;
       quickCatchupPolledAt = new Date().toISOString();
       void fetchUnreadNotificationsSince(since);
-    }, 10_000);
+    }, { intervalMs: 10_000 });
 
     // fallbackPoll: Realtime 누락 보완용. 마지막 폴링 이후 생성된 것만 조회하여 이중 알림 방지
     let lastPolledAt = mountedAt;
-    const fallbackPoll = setInterval(() => {
+    const unbindFallbackPoll = bindPageRefresh(() => {
       const since = lastPolledAt;
       lastPolledAt = new Date().toISOString();
       void fetchUnreadNotificationsSince(since);
-    }, 30_000); // 5초 → 30초, Realtime이 주 경로이므로 보완용으로만
+    }, { intervalMs: 30_000 }); // 5초 → 30초, Realtime이 주 경로이므로 보완용으로만
 
-    // 30초 헬스체크
-    const hc = setInterval(() => {
-      channels.forEach(ch => { try { const s = (ch as any).state; if (s === 'closed' || s === 'errored') ch.subscribe(); } catch { /* ignore */ } });
-    }, 30_000);
+    const unbindHealthcheck = bindChannelHealthcheck(channels, 30_000);
 
     return () => {
-      clearInterval(hc);
-      clearInterval(quickCatchupPoll);
-      clearInterval(fallbackPoll);
+      unbindHealthcheck();
+      unbindQuickCatchup();
+      unbindFallbackPoll();
       channels.forEach(ch => supabase.removeChannel(ch));
     };
   }, [user?.department, user?.name, user?.permissions?.inventory, claimCrossTabNotificationAsync, effectiveUserId, emitIncomingNotification, syncBadge]);

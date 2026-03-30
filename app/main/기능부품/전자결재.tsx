@@ -38,6 +38,8 @@ import AttendanceCorrectionForm from './전자결재서브/출결정정양식';
 import RepairRequestForm from './전자결재서브/수리요청서양식';
 import AnnualLeavePlanForm from './전자결재서브/연차사용계획서양식';
 
+import { useActionDialog } from '@/app/components/useActionDialog';
+
 const APPROVAL_VIEW_KEY = 'erp_approval_view';
 const DRAFT_STORAGE_KEY = 'erp_draft_approval';
 const LOCAL_APPROVAL_FORM_TYPES_KEY = 'erp_approval_form_types_custom';
@@ -366,6 +368,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const autoSaveMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHydratingComposeRef = useRef(false);
   const fetchApprovalsRef = useRef<() => void>(() => {});
+  const { dialog, openConfirm, openPrompt } = useActionDialog();
   const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
   const visibleApprovalViews = useMemo(
     () => APPROVAL_VIEWS.filter((view) => canAccessApprovalSection(user, view)),
@@ -1814,11 +1817,43 @@ window.onload = () => window.print();
     try { window.localStorage.removeItem(DRAFT_STORAGE_KEY); } catch { /* ignore */ }
   }, []);
 
+  const processFinalApprovalOnServer = useCallback(async (approvalId: string) => {
+    const response = await fetch('/api/approvals/process-final', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ approvalId }),
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.ok) {
+      throw new Error(String(payload?.error || response.statusText || 'Failed to process final approval'));
+    }
+
+    return payload as {
+      ok: true;
+      alreadyProcessed?: boolean;
+      warnings?: string[];
+      supplySummary?: {
+        issue_ready_count?: number;
+        order_required_count?: number;
+      } | null;
+    };
+  }, []);
+
   // 결재함 일괄 승인 처리
   const handleBulkApprove = async () => {
     const count = selectedApprovalIds.length;
     if (count === 0) return;
-    if (!confirm(`선택된 ${count}건을 일괄 승인하시겠습니까?`)) return;
+    const confirmed = await openConfirm({
+      title: '일괄 승인',
+      description: `선택한 ${count}건을 승인할까요?`,
+      confirmText: '승인',
+      cancelText: '취소',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
     let successCount = 0;
     let failCount = 0;
     for (const id of selectedApprovalIds) {
@@ -1844,7 +1879,16 @@ window.onload = () => window.print();
   const handleBulkReject = async () => {
     const count = selectedApprovalIds.length;
     if (count === 0) return;
-    const reason = window.prompt(`선택된 ${count}건을 일괄 반려합니다.\n반려 사유를 입력해 주세요. (선택)`);
+    const reason = await openPrompt({
+      title: '일괄 반려',
+      description: `선택한 ${count}건을 반려합니다. 사유는 선택 입력입니다.`,
+      confirmText: '반려',
+      cancelText: '취소',
+      tone: 'danger',
+      inputType: 'textarea',
+      placeholder: '반려 사유를 입력해 주세요.',
+      helperText: '비워 두면 기본 반려 문구로 저장됩니다.',
+    });
     if (reason === null) return;
     const results = await Promise.all(selectedApprovalIds.map(async (id) => {
       const item = approvals.find((a) => a.id === id);
@@ -1888,7 +1932,14 @@ window.onload = () => window.print();
   }, []);
 
   const handleApproveAction = async (item: Record<string, unknown>) => {
-    if (!confirm("승인하시겠습니까? 관련 데이터가 즉시 업데이트됩니다.")) return;
+    const confirmed = await openConfirm({
+      title: '결재 승인',
+      description: '승인 후 관련 데이터가 즉시 반영됩니다.',
+      confirmText: '승인',
+      cancelText: '취소',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
 
     const originalCurrentApproverId = resolveStoredCurrentApproverId(item);
     const currentApproverId = resolveEffectiveApproverId(originalCurrentApproverId);
@@ -1954,6 +2005,28 @@ window.onload = () => window.print();
 
     if (!appError) {
       if (isFinalApproval) {
+        let serverProcessed = false;
+        try {
+          const result = await processFinalApprovalOnServer(String(item.id || ''));
+          serverProcessed = true;
+          if (result.supplySummary) {
+            toast(
+              `최종 승인되었습니다. 출고 가능 ${result.supplySummary.issue_ready_count || 0}건, 발주 필요 ${result.supplySummary.order_required_count || 0}건을 확인해 주세요.`,
+              'success'
+            );
+          } else if (result.alreadyProcessed) {
+            toast('최종 승인 후처리가 이미 완료되어 동기화만 다시 확인했습니다.', 'success');
+          } else {
+            toast('최종 승인 처리가 완료되었습니다.', 'success');
+          }
+          if (Array.isArray(result.warnings) && result.warnings.length > 0) {
+            toast(`일부 후처리에 확인이 필요합니다.\n${result.warnings[0]}`, 'warning');
+          }
+        } catch (serverProcessingError) {
+          console.error('최종 승인 서버 후처리 실패, 클라이언트 fallback 실행:', serverProcessingError);
+        }
+
+        if (!serverProcessed) {
         let supplyApprovalSummary: ReturnType<typeof summarizeSupplyRequestWorkflow> | null = null;
         const itemMetaData = item.meta_data as Record<string, unknown> | null | undefined;
         if (item.type === '물품신청' && itemMetaData?.items) {
@@ -2157,6 +2230,7 @@ window.onload = () => window.print();
         } else {
           toast("최종 승인 처리가 완료되었습니다.", 'success');
         }
+        }
       } else {
         toast("승인되어 다음 결재자에게 진행되었습니다.");
       }
@@ -2177,7 +2251,16 @@ window.onload = () => window.print();
       toast("현재 결재자만 반려할 수 있습니다.");
       return;
     }
-    const reason = window.prompt("반려 사유를 입력해 주세요. (선택)");
+    const reason = await openPrompt({
+      title: '결재 반려',
+      description: '반려 사유는 선택 입력입니다.',
+      confirmText: '반려',
+      cancelText: '취소',
+      tone: 'danger',
+      inputType: 'textarea',
+      placeholder: '반려 사유를 입력해 주세요.',
+      helperText: '비워 두면 기본 반려 문구로 저장됩니다.',
+    });
     if (reason === null) return;
     const routingError = await syncDelegatedApprovalRouting(item, originalCurrentApproverId);
     if (routingError) {
@@ -2217,7 +2300,14 @@ window.onload = () => window.print();
       toast('대기 중인 내 기안만 회수할 수 있습니다.', 'warning');
       return;
     }
-    if (!window.confirm('이 기안을 회수하고 수정 화면으로 가져오시겠습니까?')) {
+    const confirmed = await openConfirm({
+      title: '기안 회수',
+      description: '회수 후 수정 화면으로 바로 이동합니다.',
+      confirmText: '회수',
+      cancelText: '취소',
+      tone: 'danger',
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -2429,6 +2519,7 @@ window.onload = () => window.print();
   const buildApprovalSearchText = useCallback((item: Record<string, unknown>) => {
     const metaData = item.meta_data as Record<string, unknown> | null | undefined;
     const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, staffs);
+    const leaveSummary = getLeaveRequestSummary(metaData);
     return [
       item.title,
       item.content,
@@ -2437,12 +2528,17 @@ window.onload = () => window.print();
       item.doc_number,
       metaData?.form_name,
       metaData?.form_slug,
+      leaveSummary?.dateLabel,
+      leaveSummary?.startDate,
+      leaveSummary?.endDate,
+      leaveSummary?.leaveType,
+      leaveSummary?.reason,
       ccUsers.map((ccUser) => `${ccUser.name} ${ccUser.position || ''}`).join(' '),
     ]
       .map((value) => String(value ?? '').trim().toLocaleLowerCase('ko-KR'))
       .filter(Boolean)
       .join(' ');
-  }, [staffs]);
+  }, [getLeaveRequestSummary, staffs]);
 
   const effectiveApprovalDateRange = useMemo(() => {
     return approvalDateMode === 'month'
@@ -2560,6 +2656,7 @@ window.onload = () => window.print();
       className="flex h-full min-h-0 flex-col overflow-x-hidden app-page"
       data-testid="approval-view"
     >
+      {dialog}
       {/* 상세 메뉴(기안함·결재함·작성하기)는 메인 좌측 사이드바에서 전자결재 호버/클릭 시 플라이아웃으로 선택 */}
       {/* 메인 콘텐츠 */}
       <main className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-4 md:p-5 bg-[var(--page-bg)] custom-scrollbar">

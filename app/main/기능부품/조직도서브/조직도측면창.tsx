@@ -41,6 +41,7 @@ export const SUB_MENUS: Record<string, SubMenuItem[]> = {
     { id: '경조사', label: '경조사', icon: '🎊' },
     { id: '수술일정', label: '수술일정', icon: '🏥' },
     { id: 'MRI일정', label: 'MRI일정', icon: '🧠' },
+    { id: '사내위키', label: '사내위키', icon: '📚' },
   ],
   전자결재: [
     { id: '기안함', label: '기안함', icon: '📝' },

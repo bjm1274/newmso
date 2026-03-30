@@ -4,6 +4,7 @@ import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
+import { bindPageRefresh } from '@/lib/realtime-maintenance';
 import SmartDatePicker from './공통/SmartDatePicker';
 import type { StaffMember, ChatRoom, ChatMessage } from '@/types';
 
@@ -239,6 +240,13 @@ function getConversationUnreadCountForRoom(
   return rooms
     .filter((candidate: ChatRoom) => getDirectRoomMembersKey(candidate) === directRoomKey)
     .reduce((sum, candidate: ChatRoom) => sum + (unreadCounts[String(candidate.id)] || 0), 0);
+}
+
+function getConversationRoomIdSet(
+  roomId: string | null | undefined,
+  rooms: ChatRoom[]
+): Set<string> {
+  return new Set(getConversationRoomIdsByRoomId(roomId, rooms));
 }
 
 type RoomPreference = {
@@ -1730,6 +1738,20 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           })
         );
         const counts = Object.fromEntries(countEntries);
+        const openConversationRoomIds = getConversationRoomIdSet(
+          selectedRoomIdRef.current,
+          myRooms as ChatRoom[]
+        );
+        if (
+          openConversationRoomIds.size > 0 &&
+          typeof document !== 'undefined' &&
+          document.visibilityState === 'visible' &&
+          isFocusedRef.current
+        ) {
+          openConversationRoomIds.forEach((roomId) => {
+            counts[roomId] = 0;
+          });
+        }
         setRoomUnreadCounts(counts);
       } catch (e) {
         console.error('채팅방별 안읽은 메시지 계산 실패:', e);
@@ -1989,9 +2011,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             changed = true;
           });
           return changed ? next : prev;
-        });
+          });
       }
-      void fetchDataRef.current?.();
       return;
     }
 
@@ -2013,6 +2034,30 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     user?.id,
     isRoomInSelectedConversation,
   ]);
+
+  const fetchMessageByIdWithRetry = useCallback(async (messageId: string, attempts = 3) => {
+    const targetMessageId = String(messageId || '').trim();
+    if (!targetMessageId) return null;
+
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      try {
+        const { data } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('id', targetMessageId)
+          .maybeSingle();
+        if (data) return data as ChatMessage;
+      } catch {
+        // ignore and retry below
+      }
+
+      if (attempt < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 180 * (attempt + 1)));
+      }
+    }
+
+    return null;
+  }, []);
 
   const syncNoticeRoomMembers = useCallback(async (rooms?: ChatRoom[]) => {
     const sourceRooms = Array.isArray(rooms) ? rooms : chatRoomsRef.current;
@@ -2670,17 +2715,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       if (!messageId || !knownRoom) return;
 
       void (async () => {
-        try {
-          const { data } = await supabase
-            .from('messages')
-            .select('*')
-            .eq('id', messageId)
-            .maybeSingle();
-          if (!data) return;
-          await handleIncomingRealtimeMessage(data as ChatMessage);
-        } catch {
-          // ignore
-        }
+        const data = await fetchMessageByIdWithRetry(messageId);
+        if (!data) return;
+        await handleIncomingRealtimeMessage(data);
       })();
     };
 
@@ -2688,7 +2725,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     return () => {
       window.removeEventListener('erp-chat-notification', handleChatNotification as EventListener);
     };
-  }, [handleIncomingRealtimeMessage]);
+  }, [fetchMessageByIdWithRetry, handleIncomingRealtimeMessage]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -2701,14 +2738,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       }
     };
 
-    const interval = setInterval(refreshRealtimeFallback, 15000);
-    window.addEventListener('focus', refreshRealtimeFallback);
-    document.addEventListener('visibilitychange', refreshRealtimeFallback);
+    const unbindRealtimeFallback = bindPageRefresh(refreshRealtimeFallback, { intervalMs: 15_000 });
 
     return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', refreshRealtimeFallback);
-      document.removeEventListener('visibilitychange', refreshRealtimeFallback);
+      unbindRealtimeFallback();
     };
   }, [selectedRoomId, user?.id, fetchData, updateUnreadForRooms]);
 

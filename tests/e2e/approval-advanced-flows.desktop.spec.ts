@@ -494,6 +494,11 @@ test('annual leave approvals show the requested date range and sync leave record
   await expect(approvalCard).toContainText('연차');
   await expect(approvalCard).toContainText(/2026\. 3\. 20/);
   await expect(approvalCard).toContainText(/2026\. 3\. 21/);
+  await page.getByTestId('approval-keyword-filter').fill('2026. 3. 20');
+  await expect(approvalCard).toBeVisible();
+  await page.getByTestId('approval-keyword-filter').fill('개인 일정');
+  await expect(approvalCard).toBeVisible();
+  await page.getByTestId('approval-keyword-filter').fill('');
 
   await approvalCard.click();
   await expect(page.getByText('휴가 정보')).toBeVisible();
