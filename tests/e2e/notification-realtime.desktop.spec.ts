@@ -5,6 +5,7 @@ import { dismissDialogs, mockSupabase, seedSession } from './helpers';
 async function installNotificationStubs(page: Page) {
   await page.addInitScript(() => {
     const nativeNotifications: Array<{ title?: string; options?: NotificationOptions }> = [];
+    const swMessageListeners = new Set<(event: MessageEvent) => void>();
     const fakeRegistration = {
       pushManager: {
         getSubscription: async () => null,
@@ -37,12 +38,40 @@ async function installNotificationStubs(page: Page) {
       value: FakeNotification,
     });
 
+    const fakeServiceWorkerContainer = {
+      register: async () => fakeRegistration,
+      ready: Promise.resolve(fakeRegistration),
+      addEventListener: (_type: string, listener: EventListenerOrEventListenerObject) => {
+        if (typeof listener === 'function') {
+          swMessageListeners.add(listener as (event: MessageEvent) => void);
+          return;
+        }
+        if (listener && typeof (listener as EventListenerObject).handleEvent === 'function') {
+          swMessageListeners.add(
+            (listener as EventListenerObject).handleEvent.bind(listener) as (event: MessageEvent) => void
+          );
+        }
+      },
+      removeEventListener: (_type: string, listener: EventListenerOrEventListenerObject) => {
+        if (typeof listener === 'function') {
+          swMessageListeners.delete(listener as (event: MessageEvent) => void);
+          return;
+        }
+        if (listener && typeof (listener as EventListenerObject).handleEvent === 'function') {
+          swMessageListeners.delete(
+            (listener as EventListenerObject).handleEvent.bind(listener) as (event: MessageEvent) => void
+          );
+        }
+      },
+      dispatchMockMessage: (data: unknown) => {
+        const event = { data } as MessageEvent;
+        swMessageListeners.forEach((listener) => listener(event));
+      },
+    };
+
     Object.defineProperty(navigator, 'serviceWorker', {
       configurable: true,
-      value: {
-        register: async () => fakeRegistration,
-        ready: Promise.resolve(fakeRegistration),
-      },
+      value: fakeServiceWorkerContainer,
     });
   });
 }
