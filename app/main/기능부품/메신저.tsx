@@ -2674,7 +2674,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   };
 
 
-  const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
+  const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;   // 일반 파일: 20MB
+  const MAX_VIDEO_SIZE_BYTES = 200 * 1024 * 1024; // 동영상: 200MB
   const insertChatMessage = useCallback(
     <TData extends Record<string, unknown> = Record<string, unknown>>(
       payload: Record<string, unknown>,
@@ -2903,13 +2904,18 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const [isDragging, setIsDragging] = useState(false);
 
   const processFileUpload = async (file: File) => {
-    if (file.type.startsWith('video/')) {
-      toast('동영상 파일은 업로드할 수 없습니다.\n(사진, 문서, 일반 파일만 가능합니다.)');
-      return;
-    }
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      toast('파일 크기는 20MB 이하여야 합니다.');
-      return;
+    if (file.type.startsWith('image/')) {
+      // 이미지: 크기 제한 없음
+    } else if (file.type.startsWith('video/')) {
+      if (file.size > MAX_VIDEO_SIZE_BYTES) {
+        toast('동영상 크기는 200MB 이하여야 합니다.');
+        return;
+      }
+    } else {
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        toast('파일 크기는 20MB 이하여야 합니다.');
+        return;
+      }
     }
     setFileUploading(true);
     try {
@@ -4187,8 +4193,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                   retryFailedMessage(String(msg.id));
                                 }}
                                 className="px-2.5 py-1 rounded-[var(--radius-md)] text-[10px] font-bold bg-red-50 text-red-500 hover:bg-red-100"
+                                aria-label="재전송"
                               >
-                                다시 전송
+                                재전송
                               </button>
                             )}
                           </div>

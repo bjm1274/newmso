@@ -5,7 +5,8 @@ import { readSessionFromRequest } from '@/lib/server-session';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
+const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;   // 일반 파일: 20MB
+const MAX_VIDEO_SIZE_BYTES = 200 * 1024 * 1024; // 동영상: 200MB
 const CHAT_BUCKET_CANDIDATES = ['pchos-files', 'board-attachments'] as const;
 
 function getAdminClient() {
@@ -66,15 +67,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '업로드할 파일이 없습니다.' }, { status: 400 });
     }
 
-    if (file.type.startsWith('video/')) {
-      return NextResponse.json(
-        { error: '동영상 파일은 업로드할 수 없습니다. 사진, 문서, 일반 파일만 가능합니다.' },
-        { status: 400 }
-      );
-    }
-
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      return NextResponse.json({ error: '파일 크기는 20MB 이하여야 합니다.' }, { status: 400 });
+    if (file.type.startsWith('image/')) {
+      // 이미지: 크기 제한 없음
+    } else if (file.type.startsWith('video/')) {
+      if (file.size > MAX_VIDEO_SIZE_BYTES) {
+        return NextResponse.json({ error: '동영상 크기는 200MB 이하여야 합니다.' }, { status: 400 });
+      }
+    } else {
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        return NextResponse.json({ error: '파일 크기는 20MB 이하여야 합니다.' }, { status: 400 });
+      }
     }
 
     const supabase = getAdminClient();
