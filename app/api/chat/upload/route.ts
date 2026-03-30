@@ -42,8 +42,8 @@ function buildSafeFilePath(fileName: string, mimeType: string) {
 function isMissingBucketError(error: unknown, bucketName: string) {
   const message = String(
     (error as { message?: string; details?: string })?.message ||
-    (error as { message?: string; details?: string })?.details ||
-    ''
+      (error as { message?: string; details?: string })?.details ||
+      '',
   ).toLowerCase();
 
   return (
@@ -110,8 +110,7 @@ export async function POST(request: NextRequest) {
     }
 
     const message =
-      (lastError as { message?: string })?.message ||
-      '채팅 첨부 업로드용 Storage 버킷을 찾지 못했습니다.';
+      (lastError as { message?: string })?.message || '채팅 첨부 업로드용 Storage 버킷을 찾지 못했습니다.';
     return NextResponse.json({ error: message }, { status: 500 });
   } catch (error) {
     const message =

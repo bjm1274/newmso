@@ -277,6 +277,9 @@ type MessageRetryPayload = {
   fileSizeBytes: number | null;
   fileKind: 'image' | 'video' | 'file' | null;
   replyToId: string | null;
+  albumId?: string | null;
+  albumIndex?: number | null;
+  albumTotal?: number | null;
 };
 
 type SendMessageOptions = {
@@ -287,6 +290,9 @@ type SendMessageOptions = {
   fileName?: string;
   contentOverride?: string;
   clearComposerIfUnchangedFrom?: string;
+  albumId?: string | null;
+  albumIndex?: number | null;
+  albumTotal?: number | null;
 };
 
 type DeliveryState = {
@@ -3294,24 +3300,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           });
           return supabase.from('messages').insert([fallbackPayload]).select(selectClause).single();
         },
-        ['file_name', 'file_size_bytes', 'file_kind', 'reply_to_id'],
-      ),
-    [],
-  );
-  const insertAlbumChatMessage = useCallback(
-    <TData extends Record<string, unknown> = Record<string, unknown>>(
-      payload: Record<string, unknown>,
-      selectClause = '*',
-    ) =>
-      withMissingColumnsFallback<TData>(
-        (omittedColumns) => {
-          const fallbackPayload = { ...payload };
-          omittedColumns.forEach((column) => {
-            delete fallbackPayload[column];
-          });
-          return supabase.from('messages').insert([fallbackPayload]).select(selectClause).single();
-        },
-        ['album_id', 'album_index', 'album_total', 'file_name', 'file_size_bytes', 'file_kind'],
+        ['file_name', 'file_size_bytes', 'file_kind', 'reply_to_id', 'album_id', 'album_index', 'album_total'],
       ),
     [],
   );
@@ -3323,7 +3312,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     fileName,
     contentOverride,
     clearComposerIfUnchangedFrom,
-  }: SendMessageOptions = {}) => {
+    albumId,
+    albumIndex,
+    albumTotal,
+  }: SendMessageOptions = {}): Promise<boolean> => {
     const retryPayload = retryMessageId
       ? deliveryStatesRef.current[retryMessageId]?.retryPayload || null
       : null;
@@ -3341,44 +3333,47 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     const resolvedFileSizeBytes = retryPayload?.fileSizeBytes ?? fileSizeBytes ?? null;
     const resolvedFileKind = retryPayload?.fileKind ?? fileKind ?? null;
     const resolvedReplyToId = retryPayload?.replyToId ?? replyTo?.id ?? null;
-    if (!content && !resolvedFileUrl) return;
-    if (!roomId) return;
+    const resolvedAlbumId = retryPayload?.albumId ?? albumId ?? null;
+    const resolvedAlbumIndex = retryPayload?.albumIndex ?? albumIndex ?? null;
+    const resolvedAlbumTotal = retryPayload?.albumTotal ?? albumTotal ?? null;
+    if (!content && !resolvedFileUrl) return false;
+    if (!roomId) return false;
     if (roomId !== NOTICE_ROOM_ID && !visibleRoomIds.includes(String(roomId))) {
       toast('참여 중인 채팅방에서만 메시지를 보낼 수 있습니다.', 'warning');
       setRoom(selectedRoom ? String(selectedRoom.id) : NOTICE_ROOM_ID);
-      return;
+      return false;
     }
 
     if (!resolvedFileUrl && content.startsWith('/')) {
       if (content.startsWith('/연차')) {
         setSlashCommand('annual_leave');
-        setSlashForm({
-          startDate: '',
-          endDate: '',
-          reason: content.replace('/연차', '').trim(),
-          itemName: '',
-          quantity: 1,
-        });
-        setShowSlashModal(true);
-        return;
-      }
-      if (content.startsWith('/발주')) {
+          setSlashForm({
+            startDate: '',
+            endDate: '',
+            reason: content.replace('/연차', '').trim(),
+            itemName: '',
+            quantity: 1,
+          });
+          setShowSlashModal(true);
+          return false;
+        }
+        if (content.startsWith('/발주')) {
         setSlashCommand('purchase');
-        setSlashForm({
-          startDate: '',
-          endDate: '',
-          reason: '',
-          itemName: content.replace('/발주', '').trim(),
-          quantity: 1,
-        });
-        setShowSlashModal(true);
-        return;
+          setSlashForm({
+            startDate: '',
+            endDate: '',
+            reason: '',
+            itemName: content.replace('/발주', '').trim(),
+            quantity: 1,
+          });
+          setShowSlashModal(true);
+          return false;
+        }
       }
-    }
     if (roomId === NOTICE_ROOM_ID) {
       if (!canWriteNotice) {
         toast('공지 메시지 방에는 부서장 이상만 작성할 수 있습니다.');
-        return;
+        return false;
       }
     }
 
@@ -3390,6 +3385,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       fileSizeBytes: resolvedFileSizeBytes,
       fileKind: resolvedFileKind,
       replyToId: resolvedReplyToId,
+      albumId: resolvedAlbumId,
+      albumIndex: resolvedAlbumIndex,
+      albumTotal: resolvedAlbumTotal,
     };
 
     const optimisticId = retryMessageId || `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -3403,6 +3401,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       file_size_bytes: resolvedFileSizeBytes,
       file_kind: resolvedFileKind,
       reply_to_id: resolvedReplyToId,
+      album_id: resolvedAlbumId,
+      album_index: resolvedAlbumIndex,
+      album_total: resolvedAlbumTotal,
       created_at: new Date().toISOString(),
       is_deleted: false,
       staff: { name: user!.name, photo_url: getProfilePhotoUrl(user!) },
@@ -3463,6 +3464,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       file_size_bytes: resolvedFileSizeBytes,
       file_kind: resolvedFileKind,
       reply_to_id: resolvedReplyToId,
+      album_id: resolvedAlbumId,
+      album_index: resolvedAlbumIndex,
+      album_total: resolvedAlbumTotal,
     };
     const { data: inserted, error } = await insertChatMessage<ChatMessage>(payload);
     if (!error && inserted) {
@@ -3519,6 +3523,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       );
       broadcastChatSync('message-sent', roomId);
       void triggerChatPush(String(inserted.room_id), String(inserted.id));
+      return true;
     } else {
       setDeliveryStates((prev) => ({
         ...prev,
@@ -3529,6 +3534,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         },
       }));
       console.error('message send failed', error);
+      return false;
     }
   }, [selectedRoomId, user?.id, user?.name, user?.avatar_url, replyTo, canWriteNotice, scrollToBottom, broadcastChatSync, emitTypingState, triggerChatPush, selectedRoom, visibleRoomIds, insertChatMessage]);
 
@@ -3603,6 +3609,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     options?: {
       contentSnapshot?: string;
       shouldClearSnapshot?: boolean;
+      albumId?: string | null;
+      albumIndex?: number | null;
+      albumTotal?: number | null;
     }
   ) => {
     if (file.type.startsWith('image/')) {
@@ -3610,12 +3619,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     } else if (file.type.startsWith('video/')) {
       if (file.size > MAX_VIDEO_SIZE_BYTES) {
         toast('동영상 크기는 200MB 이하여야 합니다.');
-        return;
+        return false;
       }
     } else {
       if (file.size > MAX_FILE_SIZE_BYTES) {
         toast('파일 크기는 20MB 이하여야 합니다.');
-        return;
+        return false;
       }
     }
     const contentSnapshot = options?.contentSnapshot ?? inputMsgRef.current;
@@ -3637,13 +3646,16 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
       const publicUrl = payload.url;
       const fileKind = getFileKind(file.type || '');
-      await handleSendMessage({
+      return await handleSendMessage({
         fileUrl: publicUrl,
         fileSizeBytes: file.size,
         fileKind,
         fileName: getPendingAttachmentDisplayName(file),
         contentOverride: contentSnapshot.trim(),
         clearComposerIfUnchangedFrom: options?.shouldClearSnapshot === false ? undefined : contentSnapshot,
+        albumId: options?.albumId ?? null,
+        albumIndex: options?.albumIndex ?? null,
+        albumTotal: options?.albumTotal ?? null,
       });
     } catch (err: unknown) {
       console.error('파일 업로드 실패:', err);
@@ -3654,6 +3666,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           ? 'Supabase Storage에 pchos-files 또는 board-attachments 버킷이 실제로 생성되어 있는지 확인해 주세요.'
           : msg;
       toast(`파일 업로드에 실패했습니다.\n\n${hint}`, 'error');
+      return false;
     } finally {
       setFileUploading(false);
     }
@@ -3705,74 +3718,50 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const sendAlbum = useCallback(async () => {
     if (pendingAlbumFiles.length === 0 || !selectedRoomId) return;
     const files = [...pendingAlbumFiles];
+    const composerSnapshot = inputMsgRef.current;
     cancelAlbumUpload();
 
     // 1장이면 일반 전송
     if (files.length === 1) {
-      await processFileUpload(files[0], { contentSnapshot: inputMsgRef.current });
+      await processFileUpload(files[0], { contentSnapshot: composerSnapshot });
       return;
     }
 
     // 2장 이상: 공통 album_id 생성 후 순서대로 전송
     const albumId = crypto.randomUUID();
-    setFileUploading(true);
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const formData = new FormData();
-        formData.append('file', file);
-        const response = await fetch('/api/chat/upload', { method: 'POST', body: formData });
-        const payload = await response.json().catch(() => null) as { url?: string; error?: string } | null;
-        if (!response.ok || !payload?.url) throw new Error(payload?.error || '업로드 실패');
+    let successCount = 0;
+    let failedCount = 0;
+    let captionConsumed = false;
 
-        const roomId = selectedRoomId;
-        const senderId = effectiveChatUserId || user!.id;
-        const optimisticId = `temp-album-${albumId}-${i}-${Date.now()}`;
-        const optimisticMsg = {
-          id: optimisticId,
-          room_id: roomId,
-          sender_id: senderId,
-          content: '',
-          file_url: payload.url,
-          file_name: file.name,
-          file_size_bytes: file.size,
-          file_kind: 'image' as const,
-          album_id: albumId,
-          album_index: i,
-          album_total: files.length,
-          created_at: new Date(Date.now() + i).toISOString(),
-          is_deleted: false,
-          staff: { name: user!.name, photo_url: getProfilePhotoUrl(user!) },
-        };
-        setMessages(prev => [...prev, optimisticMsg]);
-
-        const dbPayload: Record<string, unknown> = {
-          room_id: roomId,
-          sender_id: senderId,
-          content: '',
-          file_url: payload.url,
-          file_name: file.name,
-          file_size_bytes: file.size,
-          file_kind: 'image',
-          album_id: albumId,
-          album_index: i,
-          album_total: files.length,
-        };
-        const { data: inserted, error } = await insertAlbumChatMessage<ChatMessage>(dbPayload);
-        if (error) {
-          throw error;
-        }
-        if (inserted) {
-          setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, ...inserted } : m));
-        }
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const sent = await processFileUpload(file, {
+        contentSnapshot: captionConsumed ? '' : composerSnapshot,
+        shouldClearSnapshot: !captionConsumed,
+        albumId,
+        albumIndex: i,
+        albumTotal: files.length,
+      });
+      if (sent) {
+        successCount += 1;
+        captionConsumed = true;
+      } else {
+        failedCount += 1;
       }
-      requestAnimationFrame(() => scrollToBottom('smooth'));
-    } catch (err) {
-      toast(`앨범 전송 실패: ${(err as Error)?.message || err}`, 'error');
-    } finally {
-      setFileUploading(false);
     }
-  }, [pendingAlbumFiles, selectedRoomId, effectiveChatUserId, user, cancelAlbumUpload, processFileUpload, insertAlbumChatMessage]);
+
+    if (successCount > 0) {
+      requestAnimationFrame(() => scrollToBottom('smooth'));
+    }
+
+    if (failedCount > 0) {
+      if (successCount > 0) {
+        toast(`사진 ${successCount}장은 전송했고 ${failedCount}장은 실패했습니다.`, 'warning');
+      } else {
+        toast('선택한 사진 업로드에 모두 실패했습니다.', 'error');
+      }
+    }
+  }, [pendingAlbumFiles, selectedRoomId, cancelAlbumUpload, processFileUpload]);
 
   const handleComposerPaste = useCallback(async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const clipboardItems = Array.from(e.clipboardData?.items || []);

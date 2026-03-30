@@ -78,6 +78,16 @@ function normalizeBackupPayload(raw: unknown) {
   };
 }
 
+function downloadJsonFile(fileName: string, payload: unknown) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 async function readAllRows(table: string) {
   const rows: any[] = [];
   let offset = 0;
@@ -333,13 +343,7 @@ export default function DataBackup({ user }: Props) {
         tables: backupTables,
       };
 
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `mso-backup-${exportedAt.slice(0, 19).replace(/[:T]/g, '-')}.json`;
-      anchor.click();
-      URL.revokeObjectURL(url);
+      downloadJsonFile(`mso-backup-${exportedAt.slice(0, 19).replace(/[:T]/g, '-')}.json`, payload);
 
       setLastExport(new Date().toLocaleString());
       setExportSummary({
@@ -360,7 +364,7 @@ export default function DataBackup({ user }: Props) {
   const createRestoreRun = async (preview: RestorePreview) => {
     const payload = {
       file_name: restoreFile?.name || 'restore.json',
-      meta: restorePreview?.meta || {},
+      meta: preview.meta || {},
       preview: preview.tables,
       total_tables: preview.tables.length,
       total_rows: preview.totalRows,
@@ -423,6 +427,7 @@ export default function DataBackup({ user }: Props) {
     setRestoreLogs([]);
 
     let runId = '';
+    let latestLogs: string[] = [];
     try {
       runId = await createRestoreRun(restorePreview);
 
@@ -437,13 +442,54 @@ export default function DataBackup({ user }: Props) {
       const nextLogs: string[] = [];
       const failedTables: Array<{ table: string; error: string }> = [];
       let completedTables = 0;
+      const rollbackTables: Record<string, any[]> = {};
+
+      nextLogs.push(`롤백 스냅샷 생성 시작: ${restoreOrder.length.toLocaleString()}개 테이블`);
+      latestLogs = [...nextLogs];
+      setRestoreLogs(latestLogs);
+
+      for (const table of restoreOrder) {
+        const snapshot = await readAllRows(table);
+        if (snapshot.error) {
+          const message = String(snapshot.error.message || snapshot.error.details || 'snapshot failed');
+          nextLogs.push(`${table}: 롤백 스냅샷 실패 - ${message}`);
+          latestLogs = [...nextLogs];
+          setRestoreLogs(latestLogs);
+          throw new Error(`롤백 스냅샷 생성 실패 (${table}): ${message}`);
+        }
+        rollbackTables[table] = snapshot.rows;
+        nextLogs.push(`${table}: 롤백 스냅샷 ${snapshot.rows.length.toLocaleString()}건 저장`);
+        latestLogs = [...nextLogs];
+        setRestoreLogs(latestLogs);
+      }
+
+      const rollbackExportedAt = new Date().toISOString();
+      const restoreBaseName = (restoreFile.name || 'restore').replace(/\.json$/i, '');
+      const rollbackFileName = `rollback-before-${restoreBaseName}-${rollbackExportedAt.slice(0, 19).replace(/[:T]/g, '-')}.json`;
+      const rollbackPayload = {
+        __meta: {
+          version: 1,
+          exported_at: rollbackExportedAt,
+          type: 'rollback-before-restore',
+          source_restore_file: restoreFile.name,
+          total_tables: restoreOrder.length,
+          total_rows: Object.values(rollbackTables).reduce((sum, rows) => sum + rows.length, 0),
+        },
+        tables: rollbackTables,
+      };
+
+      downloadJsonFile(rollbackFileName, rollbackPayload);
+      nextLogs.push(`롤백 스냅샷 다운로드 완료: ${rollbackFileName}`);
+      latestLogs = [...nextLogs];
+      setRestoreLogs(latestLogs);
 
       for (const table of restoreOrder) {
         const rows = parsed.tables[table];
         if (!Array.isArray(rows) || rows.length === 0) continue;
 
         nextLogs.push(`${table}: ${rows.length.toLocaleString()}건 복원 시작`);
-        setRestoreLogs([...nextLogs]);
+        latestLogs = [...nextLogs];
+        setRestoreLogs(latestLogs);
 
         let failed = false;
         for (const batch of chunkRows(rows, RESTORE_BATCH_SIZE)) {
@@ -456,7 +502,8 @@ export default function DataBackup({ user }: Props) {
             const message = String(error.message || error.details || 'unknown error');
             failedTables.push({ table, error: message });
             nextLogs.push(`${table}: 실패 - ${message}`);
-            setRestoreLogs([...nextLogs]);
+            latestLogs = [...nextLogs];
+            setRestoreLogs(latestLogs);
             break;
           }
         }
@@ -464,11 +511,13 @@ export default function DataBackup({ user }: Props) {
         if (!failed) {
           completedTables += 1;
           nextLogs.push(`${table}: 완료`);
-          setRestoreLogs([...nextLogs]);
+          latestLogs = [...nextLogs];
+          setRestoreLogs(latestLogs);
         }
       }
 
       const status = failedTables.length > 0 ? 'failed' : 'completed';
+      const rollbackTotalRows = Object.values(rollbackTables).reduce((sum, rows) => sum + rows.length, 0);
       await updateRestoreRun(runId, {
         status,
         finished_at: new Date().toISOString(),
@@ -478,6 +527,9 @@ export default function DataBackup({ user }: Props) {
           failed_tables: failedTables,
           preview_total_rows: restorePreview.totalRows,
           preview_current_rows: restorePreview.currentTotalRows,
+          rollback_file_name: rollbackFileName,
+          rollback_total_tables: restoreOrder.length,
+          rollback_total_rows: rollbackTotalRows,
         },
       });
 
@@ -498,7 +550,7 @@ export default function DataBackup({ user }: Props) {
           await updateRestoreRun(runId, {
             status: 'failed',
             finished_at: new Date().toISOString(),
-            log_lines: restoreLogs,
+            log_lines: latestLogs,
             result_summary: {
               error: String((error as Error)?.message || error),
             },
@@ -719,6 +771,8 @@ export default function DataBackup({ user }: Props) {
               const failedTables = Array.isArray(run.result_summary?.failed_tables)
                 ? (run.result_summary?.failed_tables as Array<Record<string, unknown>>)
                 : [];
+              const rollbackFileName = String(run.result_summary?.rollback_file_name || '').trim();
+              const rollbackRows = Number(run.result_summary?.rollback_total_rows || 0);
               return (
                 <article key={run.id} className="rounded-[18px] border border-[var(--border)] bg-[var(--card)] p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -743,6 +797,11 @@ export default function DataBackup({ user }: Props) {
                       종료 {run.finished_at ? new Date(run.finished_at).toLocaleString('ko-KR') : '진행 중'}
                     </span>
                   </div>
+                  {rollbackFileName ? (
+                    <p className="mt-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                      롤백 스냅샷: {rollbackFileName} · {rollbackRows.toLocaleString('ko-KR')}건
+                    </p>
+                  ) : null}
                 </article>
               );
             })}

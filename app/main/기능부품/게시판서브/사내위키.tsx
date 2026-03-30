@@ -75,6 +75,31 @@ function formatDate(value: unknown) {
   });
 }
 
+function buildDiffSummary(currentValue: string, targetValue: string) {
+  const currentText = String(currentValue || '');
+  const targetText = String(targetValue || '');
+  const currentLines = currentText.split(/\r?\n/);
+  const targetLines = targetText.split(/\r?\n/);
+  const currentSet = new Set(currentLines.filter(Boolean));
+  const targetSet = new Set(targetLines.filter(Boolean));
+  const onlyCurrent = currentLines.filter((line) => line && !targetSet.has(line)).length;
+  const onlyTarget = targetLines.filter((line) => line && !currentSet.has(line)).length;
+
+  return {
+    changed: currentText !== targetText,
+    currentLength: currentText.length,
+    targetLength: targetText.length,
+    currentLines: currentLines.filter(Boolean).length,
+    targetLines: targetLines.filter(Boolean).length,
+    onlyCurrent,
+    onlyTarget,
+  };
+}
+
+function formatPreviewText(value: string) {
+  return String(value || '').trim() || '(empty)';
+}
+
 export default function WikiDashboard({ user: initialUser, selectedCo, selectedCompanyId }: Props) {
   const normalizedUser = useMemo(
     () => normalizeStaffLike((initialUser ?? {}) as Record<string, unknown>),
@@ -92,6 +117,7 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [schemaReady, setSchemaReady] = useState(true);
   const [versionSchemaReady, setVersionSchemaReady] = useState(true);
+  const [compareVersionId, setCompareVersionId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [summary, setSummary] = useState('');
   const [content, setContent] = useState('');
@@ -252,6 +278,26 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
     () => folders.find((folder) => folder.id === (selectedDocument?.folder_id || selectedFolderId)) || null,
     [folders, selectedDocument?.folder_id, selectedFolderId]
   );
+  const compareVersion = useMemo(
+    () => versions.find((version) => version.id === compareVersionId) || null,
+    [compareVersionId, versions]
+  );
+  const titleDiff = useMemo(
+    () => buildDiffSummary(title, compareVersion?.title || ''),
+    [compareVersion?.title, title]
+  );
+  const summaryDiff = useMemo(
+    () => buildDiffSummary(summary, compareVersion?.summary || ''),
+    [compareVersion?.summary, summary]
+  );
+  const tagDiff = useMemo(
+    () => buildDiffSummary(tags, Array.isArray(compareVersion?.tags) ? compareVersion.tags.join(', ') : ''),
+    [compareVersion?.tags, tags]
+  );
+  const contentDiff = useMemo(
+    () => buildDiffSummary(content, compareVersion?.content || ''),
+    [compareVersion?.content, content]
+  );
 
   useEffect(() => {
     if (!selectedDocument) {
@@ -261,6 +307,7 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
       setTags('');
       setDirty(false);
       setVersions([]);
+      setCompareVersionId(null);
       return;
     }
     setTitle(selectedDocument.title || '');
@@ -268,8 +315,15 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
     setContent(selectedDocument.content || '');
     setTags(Array.isArray(selectedDocument.tags) ? selectedDocument.tags.join(', ') : '');
     setDirty(false);
+    setCompareVersionId(null);
     void loadVersions(selectedDocument.id);
   }, [loadVersions, selectedDocument?.id, selectedDocument?.updated_at]);
+
+  useEffect(() => {
+    if (compareVersionId && !versions.some((version) => version.id === compareVersionId)) {
+      setCompareVersionId(null);
+    }
+  }, [compareVersionId, versions]);
 
   const createFolder = useCallback(async () => {
     const name = await openPrompt({ title: 'New Folder', description: 'Enter folder name.', confirmText: 'Create', cancelText: 'Cancel', required: true, placeholder: 'Folder name' });
@@ -486,7 +540,44 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
                     </div>
                     <span className="rounded-full bg-[var(--card)] px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-4)]">{versions.length}</span>
                   </div>
-                  {!versionSchemaReady ? <div className="mt-4 rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] font-semibold text-amber-700">Advanced wiki migration required.</div> : loadingVersions ? <div className="mt-6 flex justify-center"><div className="h-7 w-7 animate-spin rounded-full border-4 border-[var(--border)] border-t-[var(--accent)]" /></div> : versions.length > 0 ? <div className="mt-4 space-y-2">{versions.map((version) => <article key={version.id} className="rounded-[16px] border border-[var(--border)] bg-[var(--card)] p-3"><div className="flex items-start justify-between gap-2"><div><p className="text-[12px] font-black text-[var(--foreground)]">v{version.version_no}</p><p className="mt-1 text-[11px] font-medium text-[var(--toss-gray-3)]">{formatDate(version.created_at) || 'now'}</p></div><button type="button" onClick={() => void restoreVersion(version)} className="rounded-[10px] border border-[var(--border)] px-2 py-1 text-[10px] font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]">Restore</button></div><p className="mt-2 truncate text-[12px] font-semibold text-[var(--foreground)]">{version.title}</p><p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{version.change_summary || 'Saved snapshot'}</p></article>)}</div> : <div className="mt-4 rounded-[16px] border border-dashed border-[var(--border)] px-4 py-8 text-center text-[12px] font-medium text-[var(--toss-gray-3)]">No saved versions yet.</div>}
+                  {!versionSchemaReady ? <div className="mt-4 rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] font-semibold text-amber-700">Advanced wiki migration required.</div> : loadingVersions ? <div className="mt-6 flex justify-center"><div className="h-7 w-7 animate-spin rounded-full border-4 border-[var(--border)] border-t-[var(--accent)]" /></div> : versions.length > 0 ? <div className="mt-4 space-y-2">{versions.map((version) => <article key={version.id} className={`rounded-[16px] border p-3 ${compareVersionId === version.id ? 'border-[var(--accent)] bg-[var(--accent)]/5' : 'border-[var(--border)] bg-[var(--card)]'}`}><div className="flex items-start justify-between gap-2"><div><p className="text-[12px] font-black text-[var(--foreground)]">v{version.version_no}</p><p className="mt-1 text-[11px] font-medium text-[var(--toss-gray-3)]">{formatDate(version.created_at) || 'now'}</p></div><div className="flex gap-1"><button type="button" onClick={() => setCompareVersionId((current) => current === version.id ? null : version.id)} className="rounded-[10px] border border-[var(--border)] px-2 py-1 text-[10px] font-bold text-[var(--foreground)] hover:bg-[var(--muted)]">{compareVersionId === version.id ? 'Close' : 'Compare'}</button><button type="button" onClick={() => void restoreVersion(version)} className="rounded-[10px] border border-[var(--border)] px-2 py-1 text-[10px] font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]">Restore</button></div></div><p className="mt-2 truncate text-[12px] font-semibold text-[var(--foreground)]">{version.title}</p><p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{version.change_summary || 'Saved snapshot'}</p></article>)}</div> : <div className="mt-4 rounded-[16px] border border-dashed border-[var(--border)] px-4 py-8 text-center text-[12px] font-medium text-[var(--toss-gray-3)]">No saved versions yet.</div>}
+                  {compareVersion ? (
+                    <div className="mt-4 rounded-[18px] border border-[var(--border)] bg-[var(--card)] p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">Compare</p>
+                          <h5 className="mt-1 text-sm font-black text-[var(--foreground)]">Current vs v{compareVersion.version_no}</h5>
+                        </div>
+                        <span className="rounded-full bg-[var(--page-bg)] px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-4)]">
+                          {contentDiff.changed || titleDiff.changed || summaryDiff.changed || tagDiff.changed ? 'Changed' : 'Same'}
+                        </span>
+                      </div>
+                      <div className="mt-3 grid gap-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                        <p>Title {titleDiff.changed ? 'changed' : 'same'} · {titleDiff.currentLength} / {titleDiff.targetLength} chars</p>
+                        <p>Summary {summaryDiff.changed ? 'changed' : 'same'} · {summaryDiff.currentLength} / {summaryDiff.targetLength} chars</p>
+                        <p>Tags {tagDiff.changed ? 'changed' : 'same'} · {tagDiff.currentLines} / {tagDiff.targetLines} entries</p>
+                        <p>Content lines {contentDiff.currentLines} / {contentDiff.targetLines} · current only {contentDiff.onlyCurrent} · version only {contentDiff.onlyTarget}</p>
+                      </div>
+                      <div className="mt-4 grid gap-3">
+                        <div className="grid gap-3 xl:grid-cols-2">
+                          <div className="rounded-[16px] border border-[var(--border)] bg-[var(--background)]/40 p-3">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--toss-gray-3)]">Current</p>
+                            <p className="mt-2 text-[12px] font-bold text-[var(--foreground)]">{title || '(empty title)'}</p>
+                            <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">{summary || '(empty summary)'}</p>
+                            <p className="mt-2 text-[11px] text-[var(--accent)]">{tags || '(no tags)'}</p>
+                            <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-[14px] bg-[var(--card)] p-3 text-[11px] font-medium leading-6 text-[var(--foreground)]">{formatPreviewText(content)}</pre>
+                          </div>
+                          <div className="rounded-[16px] border border-[var(--border)] bg-[var(--background)]/40 p-3">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--toss-gray-3)]">Version v{compareVersion.version_no}</p>
+                            <p className="mt-2 text-[12px] font-bold text-[var(--foreground)]">{compareVersion.title || '(empty title)'}</p>
+                            <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">{compareVersion.summary || '(empty summary)'}</p>
+                            <p className="mt-2 text-[11px] text-[var(--accent)]">{Array.isArray(compareVersion.tags) && compareVersion.tags.length > 0 ? compareVersion.tags.join(', ') : '(no tags)'}</p>
+                            <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-[14px] bg-[var(--card)] p-3 text-[11px] font-medium leading-6 text-[var(--foreground)]">{formatPreviewText(compareVersion.content)}</pre>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                 </aside>
               </div>
             </div>

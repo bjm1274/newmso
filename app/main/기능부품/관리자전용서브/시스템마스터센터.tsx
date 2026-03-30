@@ -196,9 +196,9 @@ export default function SystemMasterCenter({
     }
   }, [auditCategory, auditKeyword]);
 
-  const loadOperations = useCallback(async () => {
-    setLoading(true);
-    setError('');
+  const loadOperations = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    if (!silent) setError('');
     try {
       const query = new URLSearchParams({
         scope: 'operations',
@@ -209,7 +209,7 @@ export default function SystemMasterCenter({
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : '운영 대시보드를 불러오지 못했습니다.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -285,6 +285,28 @@ export default function SystemMasterCenter({
   }, [activeTab, isSystemMaster, loadOperations]);
 
   useEffect(() => {
+    if (!isSystemMaster || activeTab !== '운영대시보드') return;
+
+    const intervalId = window.setInterval(() => {
+      void loadOperations(true);
+    }, 30000);
+
+    const handleFocus = () => {
+      if (document.visibilityState === 'hidden') return;
+      void loadOperations(true);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
+  }, [activeTab, isSystemMaster, loadOperations]);
+
+  useEffect(() => {
     if (!isSystemMaster || activeTab !== '권한변경') return;
     void loadPermissionDiffs();
   }, [activeTab, isSystemMaster, loadPermissionDiffs]);
@@ -339,7 +361,7 @@ export default function SystemMasterCenter({
     }
   }, []);
 
-  const runOpsAction = useCallback(async (action: 'run_backup_full' | 'run_chat_push_dispatch' | 'cleanup_push_subscriptions') => {
+  const runOpsAction = useCallback(async (action: 'run_backup_full' | 'run_chat_push_dispatch' | 'run_todo_reminders' | 'cleanup_push_subscriptions') => {
     setOpsActionLoading(action);
     try {
       const response = await fetch('/api/admin/system-master', {
@@ -356,6 +378,12 @@ export default function SystemMasterCenter({
         toast('전체 백업을 실행했습니다.', 'success');
       } else if (action === 'run_chat_push_dispatch') {
         toast('채팅 푸시 큐 재처리를 실행했습니다.', 'success');
+      } else if (action === 'run_todo_reminders') {
+        const result = payload?.result || {};
+        toast(
+          `할일 리마인더를 실행했습니다. 신규 ${Number(result.created || 0).toLocaleString('ko-KR')}건`,
+          'success'
+        );
       } else {
         toast('푸시 구독 정리를 실행했습니다.', 'success');
       }
@@ -588,6 +616,9 @@ export default function SystemMasterCenter({
                   <h3 className="text-base font-bold text-[var(--foreground)]">실패/주의 작업 모니터</h3>
                   <p className="mt-1 text-xs text-[var(--toss-gray-3)]">푸시 큐, 구독 정리, 백업 지연 같은 운영 이슈를 즉시 확인합니다.</p>
                 </div>
+                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                  마지막 갱신 {operations.checkedAt ? new Date(String(operations.checkedAt)).toLocaleString('ko-KR') : '-'}
+                </p>
               </div>
               <div className="mt-4 space-y-3">
                 {((operations.failureItems as any[]) || []).length === 0 && (
@@ -1095,6 +1126,12 @@ export default function SystemMasterCenter({
                 button: '푸시 큐 재처리',
               },
               {
+                id: 'run_todo_reminders',
+                title: '할일 리마인더 수동 실행',
+                description: '지금 시점까지 도달한 할일 리마인더를 즉시 발송합니다.',
+                button: '리마인더 실행',
+              },
+              {
                 id: 'cleanup_push_subscriptions',
                 title: '푸시 구독 정리',
                 description: 'null staff, orphan, 중복 endpoint 구독을 정리합니다.',
@@ -1106,7 +1143,7 @@ export default function SystemMasterCenter({
                 <p className="mt-2 text-[11px] leading-5 text-[var(--toss-gray-3)]">{action.description}</p>
                 <button
                   type="button"
-                  onClick={() => void runOpsAction(action.id as 'run_backup_full' | 'run_chat_push_dispatch' | 'cleanup_push_subscriptions')}
+                  onClick={() => void runOpsAction(action.id as 'run_backup_full' | 'run_chat_push_dispatch' | 'run_todo_reminders' | 'cleanup_push_subscriptions')}
                   disabled={opsActionLoading === action.id}
                   className="mt-4 h-10 rounded-[var(--radius-lg)] bg-[var(--foreground)] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
                 >
