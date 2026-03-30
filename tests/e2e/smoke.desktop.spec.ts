@@ -49,12 +49,12 @@ async function loginWithSession(
     inventory: false,
     admin: false,
     mso: false,
-    menu_異붽?湲곕뒫: false,
-    menu_寃뚯떆?? false,
-    menu_?꾩옄寃곗옱: false,
-    menu_?몄궗愿由? false,
-    menu_?ш퀬愿由? false,
-    menu_愿由ъ옄: false,
+    menu_추가기능: false,
+    menu_게시판: false,
+    menu_전자결재: false,
+    menu_인사관리: false,
+    menu_재고관리: false,
+    menu_관리자: false,
   },
 }; */
 
@@ -257,7 +257,7 @@ test("mypage tabs switch across profile, commute, todo, certificates, salary, do
   await expect(page.getByRole("heading", { name: "알림" })).toBeVisible();
 });
 
-test("mypage profile edits save immediately and do not create an ESS approval request", async ({
+test("mypage profile edits create an ESS approval request instead of updating staff immediately", async ({
   page,
 }) => {
   const profileUser = {
@@ -271,7 +271,6 @@ test("mypage profile edits save immediately and do not create an ESS approval re
     },
   };
 
-  let staffPatchCount = 0;
   let essApprovalRequestCreated = false;
 
   await mockSupabase(page, {
@@ -303,11 +302,6 @@ test("mypage profile edits save immediately and do not create an ESS approval re
   });
 
   page.on("request", (request) => {
-    if (request.url().includes("/rest/v1/staff_members") && request.method() === "PATCH") {
-      staffPatchCount += 1;
-      return;
-    }
-
     if (request.url().includes("/rest/v1/audit_logs") && request.method() === "POST") {
       try {
         const payload = request.postDataJSON();
@@ -337,26 +331,9 @@ test("mypage profile edits save immediately and do not create an ESS approval re
     .poll(() =>
       page.evaluate(() => JSON.parse(window.localStorage.getItem("erp_user") || "{}").phone || null)
     )
-    .toBe("01099998888");
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const user = JSON.parse(window.localStorage.getItem("erp_user") || "{}");
-        return user.extension || user.permissions?.extension || null;
-      })
-    )
-    .toBe("7777");
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const user = JSON.parse(window.localStorage.getItem("erp_user") || "{}");
-        return user.bank_name || user.permissions?.bank_name || null;
-      })
-    )
-    .toBe("국민은행");
+    .toBe("01011112222");
 
-  expect(staffPatchCount).toBeGreaterThan(0);
-  expect(essApprovalRequestCreated).toBeFalsy();
+  expect(essApprovalRequestCreated).toBeTruthy();
 });
 
 test("chat view opens from the main menu routing state", async ({ page }) => {
@@ -447,7 +424,7 @@ test("chat uses Shift+Enter for a newline and Enter for send on desktop", async 
     chatRooms: [
       {
         id: "00000000-0000-0000-0000-000000000000",
-        name: "怨듭?硫붿떆吏",
+        name: "공지메시지",
         type: "notice",
         members: [],
         created_at: "2026-03-08T00:00:00.000Z",
@@ -455,7 +432,7 @@ test("chat uses Shift+Enter for a newline and Enter for send on desktop", async 
       },
       {
         id: "room-1",
-        name: "?뚯뒪??梨꾪똿諛?",
+        name: "테스트 채팅방",
         type: "group",
         members: [fakeUser.id],
         created_at: "2026-03-08T09:00:00.000Z",

@@ -162,7 +162,7 @@ test('multi-step approval advances to the next approver and finalizes on second 
   await openApprovalInbox(page);
   const approvalCard = page.getByTestId('approval-card-approval-multistep-1');
   await expect(approvalCard).toBeVisible();
-  await approvalCard.getByRole('button', { name: '승인' }).click();
+  await page.getByRole('button', { name: '승인' }).last().click();
 
   let approvals = await readApprovals(page);
   let updatedRow = approvals.find((item: any) => item.id === 'approval-multistep-1');
@@ -389,7 +389,7 @@ test('final approval for an attendance correction syncs attendance records', asy
   await openApprovalInbox(page);
   const approvalCard = page.getByTestId('approval-card-approval-attendance-fix-1');
   await expect(approvalCard).toBeVisible();
-  await approvalCard.getByRole('button', { name: '승인' }).click();
+  await page.getByRole('button', { name: '승인' }).last().click();
 
   await expect
     .poll(async () => {
@@ -428,6 +428,136 @@ test('final approval for an attendance correction syncs attendance records', asy
       correctionStatus: '승인',
       attendanceStatus: '정상',
       attendancesStatus: 'present',
+    });
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('annual leave approvals show the requested date range and sync leave records into attendance tables', async ({
+  page,
+}) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const leaveStartDate = '2026-03-20';
+  const leaveEndDate = '2026-03-21';
+
+  await page.addInitScript(() => {
+    window.confirm = () => true;
+  });
+
+  await mockSupabase(page, {
+    staffMembers: [requester, firstApprover],
+    approvals: [
+      {
+        id: 'approval-annual-leave-1',
+        type: '연차/휴가',
+        title: '연차 사용 신청',
+        content: '개인 일정으로 연차를 사용합니다.',
+        sender_id: requester.id,
+        sender_name: requester.name,
+        sender_company: requester.company,
+        company_id: requester.company_id,
+        current_approver_id: firstApprover.id,
+        approver_line: [firstApprover.id],
+        status: '대기',
+        created_at: '2026-03-19T09:00:00.000Z',
+        meta_data: {
+          form_slug: 'leave_request',
+          form_name: '연차/휴가',
+          leaveType: '연차',
+          startDate: leaveStartDate,
+          endDate: leaveEndDate,
+          reason: '개인 일정',
+        },
+      },
+    ],
+    leaveRequests: [],
+    attendance: [],
+    attendances: [],
+    companies: [
+      { id: 'hospital-1', name: '테스트병원', type: 'HOSPITAL', is_active: true },
+      { id: 'mso-company-id', name: 'SY INC.', type: 'MSO', is_active: true },
+    ],
+  });
+
+  await seedSession(page, {
+    user: firstApprover,
+    localStorage: {
+      erp_last_menu: '전자결재',
+      erp_last_subview: '결재함',
+      erp_permission_prompt_shown: '1',
+    },
+  });
+
+  await openApprovalInbox(page);
+  const approvalCard = page.getByTestId('approval-card-approval-annual-leave-1');
+  await expect(approvalCard).toBeVisible();
+  await expect(approvalCard).toContainText('연차');
+  await expect(approvalCard).toContainText(/2026\. 3\. 20/);
+  await expect(approvalCard).toContainText(/2026\. 3\. 21/);
+
+  await approvalCard.click();
+  await expect(page.getByText('휴가 정보')).toBeVisible();
+  await expect(page.getByText(/2026\. 3\. 20\..*2026\. 3\. 21\./).nth(1)).toBeVisible();
+  await expect(page.getByText('개인 일정', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: '승인' }).last().click();
+
+  await expect
+    .poll(async () => {
+      return page.evaluate(async ({ approvalId, staffId, leaveStartDate, leaveEndDate }) => {
+        const headers = { Accept: 'application/json' };
+        const [approvalResponse, leaveResponse, attendanceResponse, attendancesResponse] = await Promise.all([
+          fetch(`/rest/v1/approvals?id=eq.${approvalId}&select=*`, { headers }),
+          fetch(`/rest/v1/leave_requests?staff_id=eq.${staffId}&select=*`, { headers }),
+          fetch(`/rest/v1/attendance?staff_id=eq.${staffId}&select=*`, { headers }),
+          fetch(`/rest/v1/attendances?staff_id=eq.${staffId}&select=*`, { headers }),
+        ]);
+
+        const approvals = await approvalResponse.json();
+        const leaveRequests = await leaveResponse.json();
+        const attendance = await attendanceResponse.json();
+        const attendances = await attendancesResponse.json();
+
+        const approvedRow = (Array.isArray(leaveRequests) ? leaveRequests : []).find(
+          (row: any) => row.start_date === leaveStartDate && row.end_date === leaveEndDate,
+        );
+        const legacyStart = (Array.isArray(attendance) ? attendance : []).find(
+          (row: any) => row.date === leaveStartDate,
+        );
+        const legacyEnd = (Array.isArray(attendance) ? attendance : []).find(
+          (row: any) => row.date === leaveEndDate,
+        );
+        const modernStart = (Array.isArray(attendances) ? attendances : []).find(
+          (row: any) => row.work_date === leaveStartDate,
+        );
+        const modernEnd = (Array.isArray(attendances) ? attendances : []).find(
+          (row: any) => row.work_date === leaveEndDate,
+        );
+
+        return {
+          approvalStatus: approvals?.[0]?.status ?? null,
+          leaveApproved: approvedRow?.status === '승인',
+          leaveType: approvedRow?.leave_type ?? null,
+          legacyStartStatus: legacyStart?.status ?? null,
+          legacyEndStatus: legacyEnd?.status ?? null,
+          modernStartStatus: modernStart?.status ?? null,
+          modernEndStatus: modernEnd?.status ?? null,
+        };
+      }, {
+        approvalId: 'approval-annual-leave-1',
+        staffId: requester.id,
+        leaveStartDate,
+        leaveEndDate,
+      });
+    })
+    .toMatchObject({
+      approvalStatus: '승인',
+      leaveApproved: true,
+      leaveType: '연차',
+      legacyStartStatus: '연차휴가',
+      legacyEndStatus: '연차휴가',
+      modernStartStatus: 'annual_leave',
+      modernEndStatus: 'annual_leave',
     });
 
   expect(runtimeErrors).toEqual([]);

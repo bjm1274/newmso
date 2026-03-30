@@ -1,0 +1,25 @@
+{
+  "packageId": "kr.co.pchos.erp",
+  "host": "erp.pchos.kr",
+  "name": "SY INC. MSO ERP",
+  "launcherName": "SY INC. ERP",
+  "display": "standalone",
+  "themeColor": "#2563eb",
+  "backgroundColor": "#ffffff",
+  "navigationColor": "#2563eb",
+  "startUrl": "/main",
+  "iconUrl": "https://erp.pchos.kr/icon-512x512.png",
+  "maskableIconUrl": "https://erp.pchos.kr/icon-512x512.png",
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "fallbackType": "customtabs",
+  "enableNotifications": true,
+  "features": {
+    "locationDelegation": false,
+    "playBilling": false
+  },
+  "signingKey": {
+    "path": "REPLACE_WITH_KEYSTORE_PATH",
+    "alias": "REPLACE_WITH_KEY_ALIAS"
+  }
+}

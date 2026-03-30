@@ -1,14 +1,20 @@
 'use client';
 import { toast } from '@/lib/toast';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from './공통/SmartDatePicker';
 import {
     analyzeDischargeReviewRules,
     type DischargeRuleAnalysis,
 } from '@/lib/discharge-review-rules';
+import {
+    loadDischargeCustomRules,
+    saveDischargeCustomRules,
+    type DischargeCustomRule,
+} from '@/lib/discharge-custom-rules';
 import DischargeRuleAnalysisPanel from './퇴원심사규정패널';
+import DischargeRuleBuilder from './퇴원심사규정빌더';
 
 interface ChartLine {
     code: string;
@@ -87,6 +93,8 @@ export default function DischargeReviewPage({ user }: { user: any }) {
     const [templates, setTemplates] = useState<Template[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedReview, setSelectedReview] = useState<DischargeReview | null>(null);
+    const dischargeRuleScope = useMemo(() => String(user?.company_id || user?.company || 'global').trim() || 'global', [user?.company_id, user?.company]);
+    const [customRules, setCustomRules] = useState<DischargeCustomRule[]>([]);
 
     // 템플릿 편집
     const [editTmplId, setEditTmplId] = useState<string | null>(null);
@@ -147,10 +155,35 @@ export default function DischargeReviewPage({ user }: { user: any }) {
             templateData: selectedReviewTemplate?.data || '',
             allItems: selectedReview.items,
             checkedItems: selectedReview.items.filter(i => i.checked),
+            customRules,
         });
-    }, [selectedReview, selectedReviewTemplate]);
+    }, [customRules, selectedReview, selectedReviewTemplate]);
 
     useEffect(() => { loadData(); }, []);
+    useEffect(() => {
+        const loadRules = () => {
+            setCustomRules(loadDischargeCustomRules(dischargeRuleScope));
+        };
+        loadRules();
+
+        const handleRuleUpdate = (event: Event) => {
+            const detail = (event as CustomEvent<{ scope?: string }>).detail;
+            const nextScope = String(detail?.scope || 'global').trim() || 'global';
+            if (nextScope === dischargeRuleScope) {
+                loadRules();
+            }
+        };
+
+        window.addEventListener('erp-discharge-custom-rules-updated', handleRuleUpdate as EventListener);
+        return () => {
+            window.removeEventListener('erp-discharge-custom-rules-updated', handleRuleUpdate as EventListener);
+        };
+    }, [dischargeRuleScope]);
+
+    const handleCustomRulesChange = useCallback((nextRules: DischargeCustomRule[]) => {
+        setCustomRules(nextRules);
+        saveDischargeCustomRules(nextRules, dischargeRuleScope);
+    }, [dischargeRuleScope]);
 
     const loadData = async () => {
         setLoading(true);
@@ -424,6 +457,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                     allItems: selectedReview.items,
                     chartData: selectedReview.chart_data || '',
                     templateData: tmpl?.data || '',
+                    customRules,
                 }),
             });
             const data = await res.json();
@@ -461,6 +495,8 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                 {/* ===== 기본 항목 설정 탭 ===== */}
                 {tab === 'template' && (
                     <div className="max-w-4xl mx-auto space-y-4">
+                        <DischargeRuleBuilder rules={customRules} onChange={handleCustomRulesChange} />
+
                         {/* 템플릿 목록 */}
                         {false && selectedRuleAnalysis && (
                             <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm space-y-4" data-testid="discharge-rule-analysis">

@@ -204,6 +204,43 @@ function getDirectRoomMembersKey(room: ChatRoom | null | undefined): string | nu
   return [...members].sort().join('::');
 }
 
+function getConversationRoomIdsByRoomId(
+  roomId: string | null | undefined,
+  rooms: ChatRoom[]
+): string[] {
+  const targetRoomId = String(roomId || '').trim();
+  if (!targetRoomId) return [];
+
+  const targetRoom = rooms.find((room: ChatRoom) => String(room.id) === targetRoomId) || null;
+  const directRoomKey = getDirectRoomMembersKey(targetRoom);
+  if (!directRoomKey) return [targetRoomId];
+
+  const relatedRoomIds = rooms
+    .filter((room: ChatRoom) => getDirectRoomMembersKey(room) === directRoomKey)
+    .map((room: ChatRoom) => String(room.id))
+    .filter(Boolean);
+
+  return relatedRoomIds.length > 0 ? Array.from(new Set(relatedRoomIds)) : [targetRoomId];
+}
+
+function getConversationUnreadCountForRoom(
+  room: ChatRoom | null | undefined,
+  unreadCounts: Record<string, number>,
+  rooms: ChatRoom[]
+): number {
+  const roomId = String(room?.id || '').trim();
+  if (!roomId) return 0;
+
+  const directRoomKey = getDirectRoomMembersKey(room);
+  if (!directRoomKey) {
+    return unreadCounts[roomId] || 0;
+  }
+
+  return rooms
+    .filter((candidate: ChatRoom) => getDirectRoomMembersKey(candidate) === directRoomKey)
+    .reduce((sum, candidate: ChatRoom) => sum + (unreadCounts[String(candidate.id)] || 0), 0);
+}
+
 type RoomPreference = {
   pinned?: boolean;
   hidden?: boolean;
@@ -234,6 +271,16 @@ type MessageRetryPayload = {
   replyToId: string | null;
 };
 
+type SendMessageOptions = {
+  fileUrl?: string;
+  fileSizeBytes?: number;
+  fileKind?: 'image' | 'video' | 'file';
+  retryMessageId?: string;
+  fileName?: string;
+  contentOverride?: string;
+  clearComposerIfUnchangedFrom?: string;
+};
+
 type DeliveryState = {
   status: 'sending' | 'failed' | 'sent';
   retryPayload?: MessageRetryPayload;
@@ -243,6 +290,7 @@ type DeliveryState = {
 type ChatRealtimeState = 'idle' | 'connecting' | 'connected' | 'reconnecting';
 
 type GlobalSearchTab = 'all' | 'member' | 'room' | 'message' | 'file';
+type MediaFilter = 'all' | 'media' | 'image' | 'video' | 'file';
 
 type AttachmentQuickActionsVariant = 'pill' | 'subtle' | 'overlay';
 
@@ -334,6 +382,8 @@ type AttachmentListCardProps = {
   onPreview: () => void;
   onActivate?: (() => void) | null;
   actionVariant?: AttachmentQuickActionsVariant;
+  layout?: 'list' | 'bubble';
+  tone?: 'default' | 'accent';
   className?: string;
 };
 
@@ -347,9 +397,89 @@ function AttachmentListCard({
   onPreview,
   onActivate,
   actionVariant = 'subtle',
+  layout = 'list',
+  tone = 'default',
   className = '',
 }: AttachmentListCardProps) {
   const isClickable = typeof onActivate === 'function';
+
+  if (layout === 'bubble') {
+    if (kind === 'image') {
+      return (
+        <div className={`space-y-1 ${className}`}>
+          <div className="relative group inline-block">
+            <button type="button" className="block" onClick={onPreview}>
+              <img
+                src={url}
+                alt={name}
+                className="max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] object-cover cursor-zoom-in border border-[var(--border)]"
+              />
+            </button>
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity bg-black/40 flex items-center justify-center rounded-[var(--radius-md)] pointer-events-none px-2">
+              <AttachmentQuickActions
+                url={url}
+                name={name}
+                onPreview={onPreview}
+                variant="overlay"
+              />
+            </div>
+          </div>
+          <p className={`max-w-[200px] md:max-w-[240px] truncate text-[10px] font-semibold ${tone === 'accent' ? 'text-white/85' : 'text-[var(--toss-gray-4)]'}`}>
+            {name}
+          </p>
+        </div>
+      );
+    }
+
+    if (kind === 'video') {
+      return (
+        <div className={`space-y-1 ${className}`}>
+          <video controls className="max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] bg-black border border-[var(--border)]">
+            <source src={url} />
+          </video>
+          <AttachmentQuickActions
+            url={url}
+            name={name}
+            onPreview={onPreview}
+            variant={tone === 'accent' ? 'overlay' : 'subtle'}
+            className="mt-2"
+          />
+          <p className={`max-w-[200px] md:max-w-[240px] truncate text-[10px] font-semibold ${tone === 'accent' ? 'text-white/85' : 'text-[var(--toss-gray-4)]'}`}>
+            {name}
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        className={`p-3 rounded-[var(--radius-md)] border shadow-sm min-w-0 sm:min-w-[200px] ${
+          tone === 'accent'
+            ? 'bg-white/95 border-white/40 text-slate-900'
+            : 'bg-[var(--toss-gray-0)] border-[var(--border)] text-[var(--foreground)]'
+        } ${className}`}
+      >
+        <div className="flex items-start gap-3">
+          <div className="text-3xl">📎</div>
+          <div className="flex-1 min-w-0 pt-0.5">
+            <p className="font-bold text-[12px] truncate mb-1 text-[var(--foreground)]">{name}</p>
+            {summary ? (
+              <p className="text-[10px] text-[var(--toss-gray-4)] leading-relaxed mb-1 line-clamp-2 break-words">
+                {summary}
+              </p>
+            ) : null}
+            <AttachmentQuickActions
+              url={url}
+              name={name}
+              onPreview={onPreview}
+              variant="pill"
+              className="mt-2"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -538,8 +668,10 @@ interface ChatViewProps {
   initialOpenChatRoomId?: string | null;
   initialOpenMessageId?: string | null;
   onConsumeOpenChatRoomId?: () => void;
+  shareTarget?: { id: string; fileCount: number; text: string | null; url: string | null; title: string | null } | null;
+  onConsumeShareTarget?: () => void;
 }
-export default function ChatView({ user, onRefresh, staffs = [], initialOpenChatRoomId, initialOpenMessageId, onConsumeOpenChatRoomId }: ChatViewProps) {
+export default function ChatView({ user, onRefresh, staffs = [], initialOpenChatRoomId, initialOpenMessageId, onConsumeOpenChatRoomId, shareTarget, onConsumeShareTarget }: ChatViewProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const pendingScrollMsgIdRef = useRef<string | null>(null);
   const pendingBottomAlignRoomIdRef = useRef<string | null>(null);
@@ -612,6 +744,10 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const [readCounts, setReadCounts] = useState<Record<string, number>>({});
   const [roomReadCursorMap, setRoomReadCursorMap] = useState<Record<string, string>>({});
   const [roomUnreadCounts, setRoomUnreadCounts] = useState<Record<string, number>>({});
+  // 앨범: 이미지 여러 장 묶어서 보내기
+  const [pendingAlbumFiles, setPendingAlbumFiles] = useState<File[]>([]);
+  const albumFileInputRef = useRef<HTMLInputElement>(null);
+  const [albumPreviewUrls, setAlbumPreviewUrls] = useState<string[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [showDrawer, setShowDrawer] = useState(false);
 
@@ -916,6 +1052,9 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   }, []);
 
   const setRoom = (roomId: string | null) => {
+    const conversationRoomIds = roomId
+      ? getConversationRoomIdsByRoomId(roomId, chatRoomsRef.current as ChatRoom[])
+      : [];
     // 현재 방의 입력 draft 저장
     if (selectedRoomIdRef.current && selectedRoomIdRef.current !== roomId) {
       draftMapRef.current.set(selectedRoomIdRef.current, inputMsgRef.current);
@@ -951,21 +1090,38 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     // 채팅방 열 때 해당 방 관련 미읽 알림/안읽음 개수 즉시 정리
     if (roomId && effectiveChatUserId) {
       const readAt = new Date().toISOString();
+      const targetRoomIds = conversationRoomIds.length > 0 ? conversationRoomIds : [String(roomId)];
       setRoomUnreadCounts((prev) => {
-        if (!prev[roomId]) return prev;
-        return { ...prev, [roomId]: 0 };
+        let changed = false;
+        const next = { ...prev };
+        targetRoomIds.forEach((targetRoomId) => {
+          if (!next[targetRoomId]) return;
+          next[targetRoomId] = 0;
+          changed = true;
+        });
+        return changed ? next : prev;
       });
       void (async () => {
         try {
-          await Promise.allSettled([
+          const notificationTasks = targetRoomIds.map((targetRoomId) =>
             supabase
               .from('notifications')
               .update({ read_at: readAt })
               .eq('user_id', effectiveChatUserId)
               .in('type', ['message', 'mention'])
               .is('read_at', null)
-              .filter('metadata->>room_id', 'eq', roomId),
-            persistRoomReadCursor(roomId, readAt),
+              .filter('metadata->>room_id', 'eq', targetRoomId)
+          );
+          await Promise.allSettled([
+            ...notificationTasks,
+            supabase.from('room_read_cursors').upsert(
+              targetRoomIds.map((targetRoomId) => ({
+                user_id: effectiveChatUserId,
+                room_id: targetRoomId,
+                last_read_at: readAt,
+              })),
+              { onConflict: 'user_id,room_id' }
+            ),
           ]);
           broadcastChatSync('message-read', roomId);
           if (typeof window !== 'undefined') {
@@ -1200,6 +1356,32 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     }
   }, [effectiveChatUserId]);
 
+  // 채팅 전체 unread 합계가 0이 되면 message/mention 알림 레코드 일괄 read 처리 → 앱 아이콘 뱃지 클리어
+  const prevTotalUnreadRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!effectiveChatUserId) return;
+    const total = Object.values(roomUnreadCounts).reduce((sum, n) => sum + (n || 0), 0);
+    const roomCount = Object.keys(roomUnreadCounts).length;
+    if (roomCount === 0) return; // 아직 방 목록 로드 전
+    if (total === 0 && prevTotalUnreadRef.current !== 0) {
+      prevTotalUnreadRef.current = 0;
+      // 모든 message/mention 알림을 read 처리
+      void supabase
+        .from('notifications')
+        .update({ read_at: new Date().toISOString() })
+        .eq('user_id', effectiveChatUserId)
+        .in('type', ['message', 'mention'])
+        .is('read_at', null)
+        .then(() => {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('erp-notification-read'));
+          }
+        });
+    } else {
+      prevTotalUnreadRef.current = total;
+    }
+  }, [roomUnreadCounts, effectiveChatUserId]);
+
   const updateScrollPositionState = useCallback(() => {
     const listEl = messageListRef.current;
     if (!listEl) return;
@@ -1327,7 +1509,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
 const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
   const [showMediaPanel, setShowMediaPanel] = useState(false);
-  const [mediaFilter, setMediaFilter] = useState<'all' | 'image' | 'video' | 'file'>('all');
+  const [mediaFilter, setMediaFilter] = useState<MediaFilter>('all');
 
   const [showForwardModal, setShowForwardModal] = useState(false);
   const [forwardSourceMsg, setForwardSourceMsg] = useState<ChatMessage | null>(null);
@@ -1339,6 +1521,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [addMemberSearch, setAddMemberSearch] = useState('');
   const [attachmentPreview, setAttachmentPreview] = useState<AttachmentPreview | null>(null);
+  const [attachmentZoom, setAttachmentZoom] = useState(1);
+  const [attachmentOffset, setAttachmentOffset] = useState({ x: 0, y: 0 });
+  const attachmentZoomRef = useRef(1);
+  const attachmentOffsetRef = useRef({ x: 0, y: 0 });
+  const attachmentDragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+  } | null>(null);
   const deferredAddMemberSearch = useDeferredValue(addMemberSearch);
   const [addMemberSelectingIds, setAddMemberSelectingIds] = useState<string[]>([]);
   // 기본 접힌 상태 — 펼쳐진 팀만 별도 추적
@@ -1353,6 +1546,20 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const closeAttachmentPreview = useCallback(() => {
     setAttachmentPreview(null);
+  }, []);
+
+  useEffect(() => {
+    attachmentZoomRef.current = attachmentZoom;
+  }, [attachmentZoom]);
+
+  useEffect(() => {
+    attachmentOffsetRef.current = attachmentOffset;
+  }, [attachmentOffset]);
+
+  const resetAttachmentImageTransform = useCallback(() => {
+    attachmentDragRef.current = null;
+    setAttachmentZoom(1);
+    setAttachmentOffset({ x: 0, y: 0 });
   }, []);
 
   const openAttachmentPreview = useCallback(
@@ -1371,6 +1578,105 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     },
     []
   );
+
+  useEffect(() => {
+    resetAttachmentImageTransform();
+  }, [attachmentPreview?.kind, attachmentPreview?.url, resetAttachmentImageTransform]);
+
+  const applyAttachmentZoom = useCallback(
+    (nextZoom: number) => {
+      const clamped = Math.max(1, Math.min(4, Number(nextZoom.toFixed(2))));
+      setAttachmentZoom(clamped);
+      if (clamped <= 1) {
+        attachmentDragRef.current = null;
+        setAttachmentOffset({ x: 0, y: 0 });
+      }
+    },
+    []
+  );
+
+  const nudgeAttachmentZoom = useCallback(
+    (delta: number) => {
+      applyAttachmentZoom(attachmentZoomRef.current + delta);
+    },
+    [applyAttachmentZoom]
+  );
+
+  const handleAttachmentImageWheel = useCallback(
+    (event: React.WheelEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      nudgeAttachmentZoom(event.deltaY < 0 ? 0.25 : -0.25);
+    },
+    [nudgeAttachmentZoom]
+  );
+
+  const handleAttachmentImagePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (attachmentZoomRef.current <= 1) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    attachmentDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: attachmentOffsetRef.current.x,
+      originY: attachmentOffsetRef.current.y,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }, []);
+
+  const handleAttachmentImagePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = attachmentDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    setAttachmentOffset({
+      x: drag.originX + (event.clientX - drag.startX),
+      y: drag.originY + (event.clientY - drag.startY),
+    });
+  }, []);
+
+  const handleAttachmentImagePointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = attachmentDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    attachmentDragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }, []);
+
+  const handleAttachmentImageDoubleClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      applyAttachmentZoom(attachmentZoomRef.current > 1 ? 1 : 2);
+    },
+    [applyAttachmentZoom]
+  );
+
+  useEffect(() => {
+    if (!attachmentPreview) return;
+    const handleWindowKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeAttachmentPreview();
+        return;
+      }
+      if (attachmentPreview.kind !== 'image') return;
+      if (event.key === '+' || event.key === '=') {
+        event.preventDefault();
+        nudgeAttachmentZoom(0.25);
+      } else if (event.key === '-') {
+        event.preventDefault();
+        nudgeAttachmentZoom(-0.25);
+      } else if (event.key === '0') {
+        event.preventDefault();
+        applyAttachmentZoom(1);
+      }
+    };
+
+    window.addEventListener('keydown', handleWindowKeyDown);
+    return () => window.removeEventListener('keydown', handleWindowKeyDown);
+  }, [applyAttachmentZoom, attachmentPreview, closeAttachmentPreview, nudgeAttachmentZoom]);
 
   const [threadRoot, setThreadRoot] = useState<any | null>(null);
 
@@ -1409,19 +1715,21 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           cursorMap[c.room_id as string] = c.last_read_at as string | null;
         });
 
-        const counts: Record<string, number> = {};
-        for (const roomId of roomIds) {
-          const last = cursorMap[roomId];
-          let query = supabase
-            .from('messages')
-            .select('id', { count: 'exact', head: true })
-            .eq('room_id', roomId)
-            .neq('sender_id', effectiveChatUserId)
-            .eq('is_deleted', false);
-          if (last) query = query.gt('created_at', last);
-          const { count } = await query;
-          counts[roomId] = count || 0;
-        }
+        const countEntries = await Promise.all(
+          roomIds.map(async (roomId) => {
+            const last = cursorMap[roomId];
+            let query = supabase
+              .from('messages')
+              .select('id', { count: 'exact', head: true })
+              .eq('room_id', roomId)
+              .neq('sender_id', effectiveChatUserId)
+              .eq('is_deleted', false);
+            if (last) query = query.gt('created_at', last);
+            const { count } = await query;
+            return [roomId, count || 0] as const;
+          })
+        );
+        const counts = Object.fromEntries(countEntries);
         setRoomUnreadCounts(counts);
       } catch (e) {
         console.error('채팅방별 안읽은 메시지 계산 실패:', e);
@@ -1437,6 +1745,108 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     await updateUnreadForRooms(list);
     return list;
   }, [repairDirectRooms, updateUnreadForRooms]);
+
+  const buildRoomSummaryFromMessages = useCallback((roomId: string | null | undefined, sourceMessages: ChatMessage[]) => {
+    const targetRoomId = String(roomId || '').trim();
+    if (!targetRoomId) {
+      return {
+        last_message: null,
+        last_message_preview: null,
+        last_message_at: null,
+      };
+    }
+
+    let latestVisibleMessage: ChatMessage | undefined;
+    let latestVisibleTime = Number.NEGATIVE_INFINITY;
+    sourceMessages.forEach((message: ChatMessage) => {
+      if (String(message.room_id || '') !== targetRoomId || message.is_deleted) return;
+      const createdAt = new Date(message.created_at || 0).getTime();
+      if (!Number.isFinite(createdAt)) return;
+      if (createdAt >= latestVisibleTime) {
+        latestVisibleTime = createdAt;
+        latestVisibleMessage = message;
+      }
+    });
+
+    if (!latestVisibleMessage) {
+      return {
+        last_message: null,
+        last_message_preview: null,
+        last_message_at: null,
+      };
+    }
+
+    const resolvedLatestVisibleMessage = latestVisibleMessage as ChatMessage;
+    const previewText = getMessageDisplayText(
+      resolvedLatestVisibleMessage.content,
+      resolvedLatestVisibleMessage.file_name,
+      resolvedLatestVisibleMessage.file_url,
+      ''
+    ) || null;
+
+    return {
+      last_message: previewText,
+      last_message_preview: previewText,
+      last_message_at: resolvedLatestVisibleMessage.created_at || null,
+    };
+  }, []);
+
+  const applyRoomSummaryToState = useCallback(
+    (
+      roomId: string | null | undefined,
+      summary: { last_message: string | null; last_message_preview: string | null; last_message_at: string | null }
+    ) => {
+      const targetRoomId = String(roomId || '').trim();
+      if (!targetRoomId) return;
+      setChatRooms((prev) => {
+        if (!prev.some((room: ChatRoom) => String(room.id) === targetRoomId)) return prev;
+        return sortChatRoomsWithNoticeFirst(
+          prev.map((room: ChatRoom) =>
+            String(room.id) === targetRoomId
+              ? {
+                  ...room,
+                  last_message: summary.last_message,
+                  last_message_preview: summary.last_message_preview,
+                  last_message_at: summary.last_message_at,
+                }
+              : room
+          )
+        );
+      });
+    },
+    []
+  );
+
+  const persistRoomSummary = useCallback(
+    async (
+      roomId: string | null | undefined,
+      summary: { last_message_preview: string | null; last_message_at: string | null }
+    ) => {
+      const targetRoomId = String(roomId || '').trim();
+      if (!targetRoomId) return;
+      const { error } = await supabase
+        .from('chat_rooms')
+        .update({
+          last_message_preview: summary.last_message_preview,
+          last_message_at: summary.last_message_at,
+        })
+        .eq('id', targetRoomId);
+      if (error) {
+        console.error('채팅방 미리보기 갱신 실패:', error);
+      }
+    },
+    []
+  );
+
+  const syncRoomSummaryFromMessages = useCallback(
+    (roomId: string | null | undefined, sourceMessages: ChatMessage[]) => {
+      const summary = buildRoomSummaryFromMessages(roomId, sourceMessages);
+      applyRoomSummaryToState(roomId, summary);
+      void persistRoomSummary(roomId, summary);
+      return summary;
+    },
+    [applyRoomSummaryToState, buildRoomSummaryFromMessages, persistRoomSummary]
+  );
 
   const claimIncomingRealtimeMessage = useCallback((messageId: string | null | undefined) => {
     const nextId = String(messageId || '').trim();
@@ -1496,6 +1906,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     const roomId = String(row.room_id);
     const currentRooms = chatRoomsRef.current;
     const currentRoom = currentRooms.find((room: ChatRoom) => String(room.id) === roomId) || null;
+    const conversationRoomIds = getConversationRoomIdsByRoomId(roomId, currentRooms as ChatRoom[]);
     if (currentRoom && !isRoomAccessibleToCurrentUser(currentRoom)) return;
 
     const currentConversationRoomId = String(selectedRoomIdRef.current || roomId);
@@ -1553,16 +1964,31 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         const readAt = new Date().toISOString();
         void persistMessageReads([String(row.id)])
           .then(async () => {
-            await persistRoomReadCursor(roomId, readAt);
+            await Promise.allSettled(
+              (conversationRoomIds.length > 0 ? conversationRoomIds : [roomId]).map((targetRoomId) =>
+                persistRoomReadCursor(targetRoomId, readAt)
+              )
+            );
             broadcastChatSync('message-read', roomId);
           })
           .catch(() => {});
         setRoomUnreadCounts((prev) => {
-          const next = { ...prev, [roomId]: 0 };
-          if (currentConversationRoomId && currentConversationRoomId !== roomId) {
-            next[currentConversationRoomId] = 0;
-          }
-          return next;
+          let changed = false;
+          const next = { ...prev };
+          const targetRoomIds = Array.from(
+            new Set(
+              [
+                ...(conversationRoomIds.length > 0 ? conversationRoomIds : [roomId]),
+                currentConversationRoomId,
+              ].filter(Boolean)
+            )
+          );
+          targetRoomIds.forEach((targetRoomId) => {
+            if (!next[targetRoomId]) return;
+            next[targetRoomId] = 0;
+            changed = true;
+          });
+          return changed ? next : prev;
         });
       }
       void fetchDataRef.current?.();
@@ -1860,9 +2286,16 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     // 읽음 커서/message_reads 쓰기는 방 선택 시(setRoom)와 실시간 새 메시지 수신 시에만 수행.
     // fetchData 내부에서 호출하면 realtime → fetchData 무한 루프 발생하므로 제거.
     if (roomIdForFetch) {
+      const targetRoomIds = roomIdsToLoad.length > 0 ? roomIdsToLoad : [roomIdForFetch];
       setRoomUnreadCounts(prev => {
-        if (!prev[roomIdForFetch]) return prev;
-        return { ...prev, [roomIdForFetch]: 0 };
+        let changed = false;
+        const next = { ...prev };
+        targetRoomIds.forEach((targetRoomId) => {
+          if (!next[targetRoomId]) return;
+          next[targetRoomId] = 0;
+          changed = true;
+        });
+        return changed ? next : prev;
       });
     }
 
@@ -2202,6 +2635,62 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   }, [handleIncomingRealtimeMessage]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleChatNotification = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        room_id?: string;
+        message_id?: string;
+        body?: string;
+        data?: Record<string, unknown>;
+      }>).detail;
+      const roomId = String(detail?.room_id || detail?.data?.room_id || '').trim();
+      if (!roomId) return;
+
+      const knownRoom = chatRoomsRef.current.some((room: ChatRoom) => String(room.id) === roomId);
+      const previewText = String(detail?.body || '').trim();
+      if (knownRoom && previewText) {
+        setChatRooms((prev) => {
+          if (!prev.some((room: ChatRoom) => String(room.id) === roomId)) return prev;
+          return sortChatRoomsWithNoticeFirst(
+            prev.map((room: ChatRoom) =>
+              String(room.id) === roomId
+                ? {
+                    ...room,
+                    last_message: previewText || room.last_message,
+                    last_message_preview: previewText || room.last_message_preview,
+                    last_message_at: new Date().toISOString(),
+                  }
+                : room
+            )
+          );
+        });
+      }
+
+      const messageId = String(detail?.message_id || detail?.data?.message_id || detail?.data?.id || '').trim();
+      if (!messageId || !knownRoom) return;
+
+      void (async () => {
+        try {
+          const { data } = await supabase
+            .from('messages')
+            .select('*')
+            .eq('id', messageId)
+            .maybeSingle();
+          if (!data) return;
+          await handleIncomingRealtimeMessage(data as ChatMessage);
+        } catch {
+          // ignore
+        }
+      })();
+    };
+
+    window.addEventListener('erp-chat-notification', handleChatNotification as EventListener);
+    return () => {
+      window.removeEventListener('erp-chat-notification', handleChatNotification as EventListener);
+    };
+  }, [handleIncomingRealtimeMessage]);
+
+  useEffect(() => {
     if (!user?.id) return;
     const refreshRealtimeFallback = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
@@ -2428,7 +2917,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       return {
         room,
         roomId,
-        unread: roomUnreadCounts[room.id] || 0,
+        unread: getConversationUnreadCountForRoom(room, roomUnreadCounts, chatRooms),
         isSelected: selectedRoomId === room.id,
         isNoticeChannel: room.id === NOTICE_ROOM_ID,
         label: roomLabelMap.get(roomId) || '',
@@ -2447,6 +2936,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     isStaffCurrentlyOnline,
     roomLabelMap,
     roomPrefs,
+    chatRooms,
     roomUnreadCounts,
     selectedRoomId,
     sidebarRooms,
@@ -2532,7 +3022,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     closeGlobalSearch();
     setShowGroupModal(true);
   }, [closeGlobalSearch]);
-  const openRoomFromGlobalSearch = useCallback((roomId: string) => {
+  const openRoomFromGlobalSearch = useCallback((roomId: string, messageId?: string) => {
+    if (messageId) pendingScrollMsgIdRef.current = messageId;
     setRoom(roomId);
     closeGlobalSearch();
   }, [closeGlobalSearch]);
@@ -2774,19 +3265,27 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       ),
     [],
   );
-  const handleSendMessage = useCallback(async (
-    fileUrl?: string,
-    fileSizeBytes?: number,
-    fileKind?: 'image' | 'video' | 'file',
-    retryMessageId?: string,
-    fileName?: string,
-  ) => {
+  const handleSendMessage = useCallback(async ({
+    fileUrl,
+    fileSizeBytes,
+    fileKind,
+    retryMessageId,
+    fileName,
+    contentOverride,
+    clearComposerIfUnchangedFrom,
+  }: SendMessageOptions = {}) => {
     const retryPayload = retryMessageId
       ? deliveryStatesRef.current[retryMessageId]?.retryPayload || null
       : null;
-    const trimmed = inputMsg.trim();
+    const liveInput = inputMsgRef.current;
+    const trimmed = liveInput.trim();
+    const composerSnapshot = clearComposerIfUnchangedFrom ?? liveInput;
     const roomId = retryPayload?.roomId || selectedRoomId;
-    const content = retryPayload ? retryPayload.content : trimmed;
+    const content = retryPayload
+      ? retryPayload.content
+      : typeof contentOverride === 'string'
+        ? contentOverride
+        : trimmed;
     const resolvedFileUrl = retryPayload?.fileUrl ?? fileUrl ?? null;
     const resolvedFileName = retryPayload?.fileName ?? fileName ?? null;
     const resolvedFileSizeBytes = retryPayload?.fileSizeBytes ?? fileSizeBytes ?? null;
@@ -2861,7 +3360,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
     if (retryMessageId) {
       setMessages((prev) =>
-        prev.map(( message: ChatMessage) =>
+        prev.map((message: ChatMessage) =>
           message.id === retryMessageId
             ? { ...message, created_at: optimisticMessage.created_at }
             : message
@@ -2879,11 +3378,23 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         error: null,
       },
     }));
-    inputMsgRef.current = '';
-    setInputMsg('');
-    if (selectedRoomIdRef.current) {
-      draftMapRef.current.delete(selectedRoomIdRef.current);
+
+    if (!retryMessageId) {
+      const activeRoomId = String(selectedRoomIdRef.current || '');
+      const shouldClearComposer =
+        activeRoomId === String(roomId) &&
+        inputMsgRef.current === composerSnapshot;
+      if (shouldClearComposer) {
+        inputMsgRef.current = '';
+        setInputMsg('');
+        if (selectedRoomIdRef.current) {
+          draftMapRef.current.delete(selectedRoomIdRef.current);
+        }
+      } else if (selectedRoomIdRef.current) {
+        draftMapRef.current.set(selectedRoomIdRef.current, inputMsgRef.current);
+      }
     }
+
     setReplyTo(null);
     requestAnimationFrame(() => scrollToBottom('smooth'));
 
@@ -2912,10 +3423,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       setMessages((prev) => {
         const seenIds = new Set<string>();
         return prev
-          .map(( message: ChatMessage) =>
+          .map((message: ChatMessage) =>
             message.id === optimisticId ? optimisticMsg : message
           )
-          .filter(( message: ChatMessage) => {
+          .filter((message: ChatMessage) => {
             const normalizedId = String(message.id || '');
             if (seenIds.has(normalizedId)) return false;
             seenIds.add(normalizedId);
@@ -2934,7 +3445,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       });
       setChatRooms((prev) =>
         sortChatRoomsWithNoticeFirst(
-          prev.map(( room: ChatRoom) =>
+          prev.map((room: ChatRoom) =>
             room.id === roomId
               ? {
                   ...room,
@@ -2969,14 +3480,58 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       }));
       console.error('message send failed', error);
     }
-  }, [selectedRoomId, user?.id, user?.name, user?.avatar_url, replyTo, inputMsg, canWriteNotice, scrollToBottom, broadcastChatSync, emitTypingState, triggerChatPush, selectedRoom, visibleRoomIds, insertChatMessage]);
+  }, [selectedRoomId, user?.id, user?.name, user?.avatar_url, replyTo, canWriteNotice, scrollToBottom, broadcastChatSync, emitTypingState, triggerChatPush, selectedRoom, visibleRoomIds, insertChatMessage]);
 
   const retryFailedMessage = useCallback(async (messageId: string) => {
-    await handleSendMessage(undefined, undefined, undefined, messageId);
+    await handleSendMessage({ retryMessageId: messageId });
   }, [handleSendMessage]);
 
   const [fileUploading, setFileUploading] = useState(false);
   const [pendingAttachmentFiles, setPendingAttachmentFiles] = useState<File[]>([]);
+
+  // Web Share Target: 공유된 파일/텍스트를 캐시에서 꺼내 채팅창에 준비
+  useEffect(() => {
+    if (!shareTarget) return;
+    onConsumeShareTarget?.();
+
+    void (async () => {
+      try {
+        // 텍스트/URL을 입력창에 설정
+        const parts: string[] = [];
+        if (shareTarget.title) parts.push(shareTarget.title);
+        if (shareTarget.text && shareTarget.text !== shareTarget.url) parts.push(shareTarget.text);
+        if (shareTarget.url) parts.push(shareTarget.url);
+        if (parts.length > 0) {
+          const msg = parts.join('\n');
+          setInputMsg(msg);
+          inputMsgRef.current = msg;
+        }
+
+        // 공유된 파일을 SW 캐시에서 꺼내 pendingAttachmentFiles에 추가
+        if (shareTarget.fileCount > 0 && 'caches' in window) {
+          const cache = await caches.open('erp-share-target-v1');
+          const keys = await cache.keys();
+          const shareKeys = keys.filter((req) => req.url.includes(`/share-target-file/${shareTarget.id}/`));
+          const files: File[] = [];
+          for (const req of shareKeys) {
+            const res = await cache.match(req);
+            if (!res) continue;
+            const buf = await res.arrayBuffer();
+            const contentType = res.headers.get('Content-Type') || 'application/octet-stream';
+            const fileName = res.headers.get('X-File-Name') ||
+              decodeURIComponent(new URL(req.url).searchParams.get('name') || 'file');
+            files.push(new File([buf], fileName, { type: contentType }));
+            await cache.delete(req);
+          }
+          if (files.length > 0) {
+            setPendingAttachmentFiles((prev) => [...prev, ...files]);
+          }
+        }
+      } catch (err) {
+        console.warn('[Share Target] 파일 복원 실패:', err);
+      }
+    })();
+  }, [shareTarget]);
   const getFileKind = (mime: string): 'image' | 'video' | 'file' => {
     if (!mime) return 'file';
     if (mime.startsWith('image/')) return 'image';
@@ -2985,7 +3540,21 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   };
   const [isDragging, setIsDragging] = useState(false);
 
-  const processFileUpload = async (file: File) => {
+  const appendPendingAlbumFiles = useCallback((files: File[]) => {
+    const imageFiles = files.filter((file) => file.type.startsWith('image/'));
+    if (imageFiles.length === 0) return;
+    const previewUrls = imageFiles.map((file) => URL.createObjectURL(file));
+    setPendingAlbumFiles((prev) => [...prev, ...imageFiles]);
+    setAlbumPreviewUrls((prev) => [...prev, ...previewUrls]);
+  }, []);
+
+  const processFileUpload = async (
+    file: File,
+    options?: {
+      contentSnapshot?: string;
+      shouldClearSnapshot?: boolean;
+    }
+  ) => {
     if (file.type.startsWith('image/')) {
       // 이미지: 크기 제한 없음
     } else if (file.type.startsWith('video/')) {
@@ -2999,6 +3568,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         return;
       }
     }
+    const contentSnapshot = options?.contentSnapshot ?? inputMsgRef.current;
     setFileUploading(true);
     try {
       const formData = new FormData();
@@ -3017,7 +3587,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
       const publicUrl = payload.url;
       const fileKind = getFileKind(file.type || '');
-      await handleSendMessage(publicUrl, file.size, fileKind, undefined, getPendingAttachmentDisplayName(file));
+      await handleSendMessage({
+        fileUrl: publicUrl,
+        fileSizeBytes: file.size,
+        fileKind,
+        fileName: getPendingAttachmentDisplayName(file),
+        contentOverride: contentSnapshot.trim(),
+        clearComposerIfUnchangedFrom: options?.shouldClearSnapshot === false ? undefined : contentSnapshot,
+      });
     } catch (err: unknown) {
       console.error('파일 업로드 실패:', err);
       const msg = (err as Error)?.message || String(err);
@@ -3035,22 +3612,123 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    await processFileUpload(file);
+    await processFileUpload(file, { contentSnapshot: inputMsgRef.current });
     e.target.value = '';
   };
 
   const confirmPendingAttachmentUpload = useCallback(async () => {
     if (pendingAttachmentFiles.length === 0) return;
     const queuedFiles = [...pendingAttachmentFiles];
+    const contentSnapshot = inputMsgRef.current;
     setPendingAttachmentFiles([]);
-    for (const attachmentFile of queuedFiles) {
-      await processFileUpload(attachmentFile);
+    for (const [index, attachmentFile] of queuedFiles.entries()) {
+      await processFileUpload(attachmentFile, {
+        contentSnapshot: index === 0 ? contentSnapshot : '',
+      });
     }
   }, [pendingAttachmentFiles, processFileUpload]);
 
   const cancelPendingAttachmentUpload = useCallback(() => {
     setPendingAttachmentFiles([]);
   }, []);
+
+  // ── 앨범 처리 함수 ──
+  const handleAlbumFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).filter(f => f.type.startsWith('image/'));
+    if (files.length === 0) return;
+    appendPendingAlbumFiles(files);
+    e.target.value = '';
+  }, [appendPendingAlbumFiles]);
+
+  const removeAlbumFile = useCallback((index: number) => {
+    URL.revokeObjectURL(albumPreviewUrls[index]);
+    setPendingAlbumFiles(prev => prev.filter((_, i) => i !== index));
+    setAlbumPreviewUrls(prev => prev.filter((_, i) => i !== index));
+  }, [albumPreviewUrls]);
+
+  const cancelAlbumUpload = useCallback(() => {
+    albumPreviewUrls.forEach(u => URL.revokeObjectURL(u));
+    setPendingAlbumFiles([]);
+    setAlbumPreviewUrls([]);
+  }, [albumPreviewUrls]);
+
+  const sendAlbum = useCallback(async () => {
+    if (pendingAlbumFiles.length === 0 || !selectedRoomId) return;
+    const files = [...pendingAlbumFiles];
+    cancelAlbumUpload();
+
+    // 1장이면 일반 전송
+    if (files.length === 1) {
+      await processFileUpload(files[0], { contentSnapshot: inputMsgRef.current });
+      return;
+    }
+
+    // 2장 이상: 공통 album_id 생성 후 순서대로 전송
+    const albumId = crypto.randomUUID();
+    setFileUploading(true);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await fetch('/api/chat/upload', { method: 'POST', body: formData });
+        const payload = await response.json().catch(() => null) as { url?: string; error?: string } | null;
+        if (!response.ok || !payload?.url) throw new Error(payload?.error || '업로드 실패');
+
+        const roomId = selectedRoomId;
+        const senderId = effectiveChatUserId || user!.id;
+        const optimisticId = `temp-album-${albumId}-${i}-${Date.now()}`;
+        const optimisticMsg = {
+          id: optimisticId,
+          room_id: roomId,
+          sender_id: senderId,
+          content: '',
+          file_url: payload.url,
+          file_name: file.name,
+          file_size_bytes: file.size,
+          file_kind: 'image' as const,
+          album_id: albumId,
+          album_index: i,
+          album_total: files.length,
+          created_at: new Date(Date.now() + i).toISOString(),
+          is_deleted: false,
+          staff: { name: user!.name, photo_url: getProfilePhotoUrl(user!) },
+        };
+        setMessages(prev => [...prev, optimisticMsg]);
+
+        const dbPayload: Record<string, unknown> = {
+          room_id: roomId,
+          sender_id: senderId,
+          content: '',
+          file_url: payload.url,
+          file_name: file.name,
+          file_size_bytes: file.size,
+          file_kind: 'image',
+          album_id: albumId,
+          album_index: i,
+          album_total: files.length,
+        };
+        try {
+          const { data: inserted } = await supabase.from('messages').insert([dbPayload]).select('*').single();
+          if (inserted) {
+            setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, ...inserted } : m));
+          }
+        } catch {
+          // album_id 컬럼 없을 경우 일반 전송으로 폴백
+          const { data: inserted2 } = await supabase.from('messages').insert([{
+            room_id: roomId, sender_id: senderId, content: '',
+            file_url: payload.url, file_name: file.name, file_size_bytes: file.size, file_kind: 'image',
+          }]).select('*').single();
+          if (inserted2) setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, ...inserted2 } : m));
+        }
+      }
+      requestAnimationFrame(() => scrollToBottom('smooth'));
+    } catch (err) {
+      toast(`앨범 전송 실패: ${(err as Error)?.message || err}`, 'error');
+    } finally {
+      setFileUploading(false);
+    }
+  }, [pendingAlbumFiles, selectedRoomId, effectiveChatUserId, user, cancelAlbumUpload, processFileUpload]);
 
   const handleComposerPaste = useCallback(async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const clipboardItems = Array.from(e.clipboardData?.items || []);
@@ -3064,16 +3742,37 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     if (imageFiles.length === 0) return;
 
     e.preventDefault();
+    if (imageFiles.length > 1 || pendingAlbumFiles.length > 0) {
+      appendPendingAlbumFiles(imageFiles);
+      return;
+    }
     setPendingAttachmentFiles((prev) => [...prev, ...imageFiles]);
-  }, []);
+  }, [appendPendingAlbumFiles, pendingAlbumFiles.length]);
 
   const queueDroppedFiles = useCallback((files: File[]) => {
     if (!files.length) return;
+    const imageFiles = files.filter((file) => file.type.startsWith('image/'));
+    const otherFiles = files.filter((file) => !file.type.startsWith('image/'));
+    const shouldBundleImages = imageFiles.length > 1 || (pendingAlbumFiles.length > 0 && imageFiles.length > 0);
+
+    if (shouldBundleImages) {
+      appendPendingAlbumFiles(imageFiles);
+      if (otherFiles.length > 0) {
+        setPendingAttachmentFiles((prev) => [...prev, ...otherFiles]);
+      }
+      return;
+    }
+
     setPendingAttachmentFiles((prev) => [...prev, ...files]);
-  }, []);
+  }, [appendPendingAlbumFiles, pendingAlbumFiles.length]);
 
   useEffect(() => {
     setPendingAttachmentFiles([]);
+    setPendingAlbumFiles([]);
+    setAlbumPreviewUrls((prev) => {
+      prev.forEach((url) => URL.revokeObjectURL(url));
+      return [];
+    });
   }, [selectedRoomId]);
 
   const handleAction = async (type: 'task') => {
@@ -3220,11 +3919,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   }, [closeGlobalSearch, openDirectChat]);
 
   const mediaMessages = useMemo(() => {
-    return messages.filter(( m: ChatMessage) => m.file_url);
+    return messages.filter((m: ChatMessage) => m.file_url && !m.is_deleted);
   }, [messages]);
 
   const filteredMediaMessages = useMemo(() => {
     if (mediaFilter === 'all') return mediaMessages;
+    if (mediaFilter === 'media') {
+      return mediaMessages.filter((m: ChatMessage) => isImageUrl(m.file_url || '') || isVideoUrl(m.file_url || ''));
+    }
     return mediaMessages.filter(( m: ChatMessage) => {
       if (mediaFilter === 'image') return isImageUrl(m.file_url || '');
       if (mediaFilter === 'video') return isVideoUrl(m.file_url || '');
@@ -3233,13 +3935,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   }, [mediaMessages, mediaFilter]);
 
   const sharedMediaPreviewMessages = useMemo(
-    () => messages.filter((message) => message.file_kind === 'image' || message.file_kind === 'video').slice(-6),
-    [messages]
+    () => mediaMessages.filter((message) => message.file_kind === 'image' || message.file_kind === 'video').slice(-6),
+    [mediaMessages]
   );
 
   const sharedFilePreviewMessages = useMemo(
     () =>
-      messages
+      mediaMessages
         .filter((message) => {
           const fileUrl = String(message.file_url || '');
           if (!fileUrl) return false;
@@ -3247,8 +3949,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           return !isImageUrl(fileUrl) && !isVideoUrl(fileUrl);
         })
         .slice(-6),
-    [messages]
+    [mediaMessages]
   );
+
+  const openMediaArchive = useCallback((nextFilter: MediaFilter) => {
+    setMediaFilter(nextFilter);
+    setShowDrawer(false);
+    setShowMediaPanel(true);
+  }, []);
 
   const sharedLinkPreviewMessages = useMemo(
     () => messages.filter((message) => message.content && message.content.includes('http')).slice(-3),
@@ -3409,8 +4117,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const markMessageRead = async (msg: ChatMessage) => {
     if (String(msg.sender_id) === effectiveChatUserId) return;
     try {
+        const targetRoomIds = getConversationRoomIdsByRoomId(msg.room_id, chatRoomsRef.current as ChatRoom[]);
+        const readAt = new Date().toISOString();
         await persistMessageReads([msg.id]);
-        await persistRoomReadCursor(msg.room_id, new Date().toISOString());
+        await Promise.allSettled(
+          (targetRoomIds.length > 0 ? targetRoomIds : [String(msg.room_id)]).map((roomId) =>
+            persistRoomReadCursor(roomId, readAt)
+          )
+        );
         broadcastChatSync('message-read', msg.room_id);
         fetchData();
     } catch (_) { }
@@ -3434,6 +4148,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         .from('messages')
         .select('*')
         .in('room_id', visibleRoomIds)
+        .eq('is_deleted', false)
         .or(`content.ilike.%${q}%,file_url.ilike.%${q}%`)
         .order('created_at', { ascending: false })
         .limit(100);
@@ -3504,7 +4219,41 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const combinedTimeline = useMemo(() => {
     const ms = visibleTimelineMessages.map(m => ({ ...m, type: 'message' }));
     const ps = selectedRoomPollTimelineItems;
-    return [...ms, ...ps].sort((a, b) => new Date((a as Record<string,unknown>).created_at as string || 0).getTime() - new Date((b as Record<string,unknown>).created_at as string || 0).getTime());
+    const sorted = [...ms, ...ps].sort((a, b) => new Date((a as Record<string,unknown>).created_at as string || 0).getTime() - new Date((b as Record<string,unknown>).created_at as string || 0).getTime());
+
+    // album_id 있는 이미지 메시지를 하나의 'album' 아이템으로 합침
+    const grouped: typeof sorted = [];
+    const albumMap = new Map<string, ChatMessage[]>();
+    const albumOrder: string[] = [];
+
+    for (const item of sorted) {
+      const msg = item as unknown as ChatMessage & { album_id?: string };
+      if (msg.type === 'message' && msg.album_id && msg.file_kind === 'image' && !msg.is_deleted) {
+        const aid = msg.album_id;
+        if (!albumMap.has(aid)) {
+          albumMap.set(aid, []);
+          albumOrder.push(aid);
+        }
+        albumMap.get(aid)!.push(msg);
+      } else {
+        grouped.push(item);
+      }
+    }
+
+    // album 아이템을 첫 번째 메시지 위치에 삽입
+    for (const aid of albumOrder) {
+      const msgs = albumMap.get(aid)!;
+      msgs.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+      const representative = msgs[0];
+      const albumItem = {
+        ...representative,
+        type: 'album',
+        albumMessages: msgs,
+      };
+      grouped.push(albumItem);
+    }
+
+    return grouped.sort((a, b) => new Date((a as Record<string,unknown>).created_at as string || 0).getTime() - new Date((b as Record<string,unknown>).created_at as string || 0).getTime());
   }, [selectedRoomPollTimelineItems, visibleTimelineMessages]);
 
   useEffect(() => {
@@ -3540,7 +4289,19 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     }
     if (String(msg.sender_id) !== String(effectiveChatUserId || user?.id || '') && !isMso) return;
     if (!confirm('이 메시지를 삭제하시겠습니까?')) return;
-    setMessages((prev) =>
+    let nextMessagesSnapshot: ChatMessage[] = [];
+    setMessages((prev) => {
+      nextMessagesSnapshot = prev.map((message: ChatMessage) =>
+        String(message.id) === String(msg.id)
+          ? {
+              ...message,
+              is_deleted: true,
+            }
+          : message
+      );
+      return nextMessagesSnapshot;
+    });
+    setPersistedPinnedMessages((prev) =>
       prev.map((message: ChatMessage) =>
         String(message.id) === String(msg.id)
           ? {
@@ -3550,6 +4311,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           : message
       )
     );
+    syncRoomSummaryFromMessages(msg.room_id, nextMessagesSnapshot);
     await supabase.from('messages').update({ is_deleted: true }).eq('id', msg.id);
     // 감사 로그 기록
     try {
@@ -3566,8 +4328,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           },
         },
       ]);
-    } catch {
-    }
+      } catch {
+      }
     fetchData();
     setActiveActionMsg(null);
   };
@@ -3628,13 +4390,15 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     const messageId = String(targetMessage.id);
     setEditingMessage(null);
     setEditingMessageDraft('');
-    setMessages((prev) =>
-      prev.map((message: ChatMessage) =>
+    let nextMessagesSnapshot: ChatMessage[] = [];
+    setMessages((prev) => {
+      nextMessagesSnapshot = prev.map((message: ChatMessage) =>
         String(message.id) === messageId
           ? { ...message, content: nextContent }
           : message
-      )
-    );
+      );
+      return nextMessagesSnapshot;
+    });
     setPersistedPinnedMessages((prev) =>
       prev.map((message: ChatMessage) =>
         String(message.id) === messageId
@@ -3642,6 +4406,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           : message
       )
     );
+    syncRoomSummaryFromMessages(targetMessage.room_id, nextMessagesSnapshot);
 
     const { error } = await supabase
       .from('messages')
@@ -3653,7 +4418,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       fetchData();
       return;
     }
-  }, [editingMessage, editingMessageDraft, fetchData]);
+  }, [editingMessage, editingMessageDraft, fetchData, syncRoomSummaryFromMessages]);
 
   return (
     <div data-testid="chat-view" className="flex flex-1 min-h-0 overflow-hidden relative font-sans bg-[var(--background)] md:h-[100dvh] md:max-h-[100dvh] md:bg-[var(--card)]">
@@ -3739,20 +4504,21 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       {isSelected && (
                         <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></div>
                       )}
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="flex items-start gap-3 min-w-0 flex-1">
                         <div className={`relative w-8 h-8 rounded-lg flex items-center justify-center text-sm ${isNoticeChannel ? 'bg-blue-100 text-blue-600' : 'bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)]'}`}>
                           {isNoticeChannel ? '📢' : '💬'}
                           {!isNoticeChannel && isPeerOnline && (
                             <span className="absolute -right-0.5 -bottom-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-white dark:border-zinc-900" />
                           )}
-                        </div>                        <div className="flex flex-col min-w-0">
-                          <div className="flex items-center gap-1.5 min-w-0">
+                        </div>
+                        <div className="flex flex-col min-w-0 py-0.5">
+                          <div className="flex items-start gap-1.5 min-w-0">
                             {unread > 0 && (
                               <span className="shrink-0 min-w-[18px] h-[18px] px-1.5 inline-flex items-center justify-center rounded-[var(--radius-md)] bg-blue-600 text-white text-[9px] font-bold shadow-soft">
                                 {unread > 99 ? '99+' : unread}
                               </span>
                             )}
-                            <p className={`text-[12px] font-bold truncate ${isSelected ? 'text-white' : 'text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]'}`}>
+                            <p className={`text-[12px] font-bold ${room.type === 'group' ? 'line-clamp-2 break-words whitespace-normal leading-4' : 'truncate'} ${isSelected ? 'text-white' : 'text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]'}`}>
                               {label}
                             </p>
                             {isPinned && <span className="text-[9px] font-bold text-amber-400">PIN</span>}
@@ -3899,7 +4665,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 {selectedRoom.id === NOTICE_ROOM_ID ? '📢' : '💬'}
               </div>
               <div className="min-w-0">
-                <h3 className="text-[13px] font-bold text-foreground truncate">
+                <h3 className={`text-[13px] font-bold text-foreground ${selectedRoom.type === 'group' ? 'line-clamp-2 break-words whitespace-normal leading-4' : 'truncate'}`}>
                   {selectedRoomLabel}
                 </h3>
                 <div className="flex items-center gap-1.5 text-[10px] font-medium">
@@ -4017,6 +4783,76 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             </span>
                           </button>
                         ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // ── 앨범 그룹 렌더링 ──
+                if (item.type === 'album') {
+                  type AlbumItem = ChatMessage & { albumMessages: ChatMessage[]; staff?: { name?: string; photo_url?: string | null } | null };
+                  const albumItem = item as unknown as AlbumItem;
+                  const albumMsgs = albumItem.albumMessages || [];
+                  const isMineAlbum = String(albumItem.sender_id) === effectiveChatUserId;
+                  const senderName = (albumItem.staff as { name?: string } | null)?.name || albumItem.sender_name || '알 수 없음';
+                  const created = new Date(albumItem.created_at || 0);
+                  const dateLabel = created.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+                  const showDateDivider = dateLabel !== lastDateLabel;
+                  if (showDateDivider) lastDateLabel = dateLabel;
+                  lastSenderId = String(albumItem.sender_id);
+                  const count = albumMsgs.length;
+                  // 그리드 레이아웃: 1장=1열, 2장=2열, 3장=2+1, 4장=2+2, 5+장=3열
+                  const gridCols = count === 1 ? 'grid-cols-1' : count <= 4 ? 'grid-cols-2' : 'grid-cols-3';
+                  const timeStr = created.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+
+                  return (
+                    <div key={`album-${albumItem.album_id || albumItem.id}`} className={showDateDivider ? 'mt-1 md:mt-2' : 'mt-0.5'}>
+                      {showDateDivider && (
+                        <div className="my-0.5 flex items-center justify-center gap-1 md:my-2 md:gap-2">
+                          <div className="flex-1 h-px bg-[var(--border)]" />
+                          <span className="px-2.5 py-0.5 rounded-full bg-[var(--muted)] text-[10px] font-semibold text-[var(--toss-gray-3)] shrink-0">{dateLabel}</span>
+                          <div className="flex-1 h-px bg-[var(--border)]" />
+                        </div>
+                      )}
+                      <div className={`flex items-end gap-2 ${isMineAlbum ? 'flex-row-reverse' : 'flex-row'}`}>
+                        {/* 아바타 */}
+                        {!isMineAlbum && (
+                          <div className="w-8 h-8 shrink-0 rounded-full overflow-hidden bg-[var(--muted)] flex items-center justify-center text-[11px] font-bold text-[var(--toss-gray-4)] mb-1">
+                            {(albumItem.staff as { photo_url?: string | null } | null)?.photo_url
+                              ? <img src={(albumItem.staff as { photo_url?: string | null }).photo_url!} alt="" className="w-full h-full object-cover" />
+                              : senderName.slice(0, 1)}
+                          </div>
+                        )}
+                        <div className={`flex flex-col gap-1 max-w-[75%] ${isMineAlbum ? 'items-end' : 'items-start'}`}>
+                          {!isMineAlbum && (
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">{senderName}</span>
+                          )}
+                          {/* 앨범 그리드 */}
+                          <div className={`grid ${gridCols} gap-0.5 rounded-[var(--radius-lg)] overflow-hidden`}
+                            style={{ maxWidth: count === 1 ? 200 : count <= 4 ? 260 : 300 }}>
+                            {albumMsgs.map((m, idx) => (
+                              <button
+                                key={m.id}
+                                className={`relative overflow-hidden bg-[var(--muted)] ${count === 3 && idx === 2 ? 'col-span-2' : ''} ${count === 5 && idx === 3 ? 'col-span-1' : ''}`}
+                                style={{ aspectRatio: count === 1 ? '4/3' : '1/1' }}
+                                onClick={() => openAttachmentPreview(m.file_url, m.file_name, 'image')}
+                              >
+                                <img
+                                  src={m.file_url || ''}
+                                  alt={m.file_name || '사진'}
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                />
+                                {idx === 4 && count > 5 && (
+                                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                    <span className="text-white font-bold text-lg">+{count - 5}</span>
+                                  </div>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                          <span className="text-[10px] text-[var(--toss-gray-3)] mx-1">{timeStr} · 사진 {count}장</span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -4158,58 +4994,24 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           <div className={`leading-relaxed ${(msg.content && !isDeletedMessage) ? 'mb-0.5' : ''}`}>
                             {isDeletedMessage ? '삭제된 메시지입니다.' : renderMessageContent(msg.content || '', isMine)}
                           </div>
-                          {!isDeletedMessage && msg.file_url && (() => { const furl = msg.file_url!; const attachmentName = getAttachmentDisplayName(msg.file_name, furl); return (
-                            <div className="space-y-1 mt-2" onClick={(e) => e.stopPropagation()}>
-                              {isImageUrl(furl) ? (
-                                <div className="relative group inline-block">
-                                  <button type="button" className="block" onClick={() => openAttachmentPreview(furl, attachmentName, 'image')}>
-                                    <img
-                                      src={furl}
-                                      alt="첨부 이미지"
-                                      className={`max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] object-cover cursor-zoom-in ${msg.content ? 'border border-[var(--border)]' : 'shadow-sm'}`}
-                                    />
-                                  </button>
-                                  <div className="absolute opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity inset-0 flex items-center justify-center bg-black/40 rounded-[var(--radius-md)] gap-2 pointer-events-none">
-                                    <AttachmentQuickActions
-                                      url={furl}
-                                      name={attachmentName}
-                                      onPreview={() => openAttachmentPreview(furl, attachmentName, 'image')}
-                                      variant="overlay"
-                                    />
-                                  </div>
-                                  <p className={`mt-1 max-w-[200px] md:max-w-[240px] truncate text-[10px] font-semibold ${isMine ? 'text-white/85' : 'text-[var(--toss-gray-4)]'}`}>{attachmentName}</p>
-                                </div>
-                              ) : isVideoUrl(furl) ? (
-                                <div className="block">
-                                  <video controls className={`max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] bg-black ${msg.content ? 'border border-[var(--border)]' : 'shadow-sm'}`}>
-                                    <source src={furl} />
-                                  </video>
-                                  <AttachmentQuickActions
-                                    url={furl}
-                                    name={attachmentName}
-                                    onPreview={() => openAttachmentPreview(furl, attachmentName, 'video')}
-                                    variant="subtle"
-                                    className="mt-2"
-                                  />
-                                  <p className={`mt-1 max-w-[200px] md:max-w-[240px] truncate text-[10px] font-semibold ${isMine ? 'text-white/85' : 'text-[var(--toss-gray-4)]'}`}>{attachmentName}</p>
-                                </div>
-                              ) : (
-                                <div className={`p-3 rounded-[var(--radius-md)] border ${isMine ? 'bg-white/95 border-white/40 text-slate-900' : 'bg-[var(--toss-gray-0)] border-[var(--border)] text-[var(--foreground)]'} flex items-start gap-3 shadow-sm min-w-0 sm:min-w-[200px]`}>
-                                  <div className="text-3xl">📎</div>
-                                  <div className="flex-1 min-w-0 pt-0.5">
-                                    <p className="font-bold text-[12px] truncate mb-1 text-[var(--foreground)]">{attachmentName}</p>
-                                    <AttachmentQuickActions
-                                      url={furl}
-                                      name={attachmentName}
-                                      onPreview={() => openAttachmentPreview(furl, attachmentName, 'file')}
-                                      variant="pill"
-                                      className="mt-2"
-                                    />
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          ); })()}
+                          {!isDeletedMessage && msg.file_url && (() => {
+                            const furl = msg.file_url!;
+                            const attachmentName = getAttachmentDisplayName(msg.file_name, furl);
+                            const attachmentKind: AttachmentPreviewKind =
+                              isImageUrl(furl) ? 'image' : isVideoUrl(furl) ? 'video' : 'file';
+                            return (
+                              <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                                <AttachmentListCard
+                                  url={furl}
+                                  name={attachmentName}
+                                  kind={attachmentKind}
+                                  onPreview={() => openAttachmentPreview(furl, attachmentName, attachmentKind)}
+                                  layout="bubble"
+                                  tone={isMine ? 'accent' : 'default'}
+                                />
+                              </div>
+                            );
+                          })()}
 
                           {!isDeletedMessage && hasReacts && (
                             <div className="mt-2 flex items-center gap-2 text-[11px] flex-wrap">
@@ -4347,6 +5149,44 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             </div>
           )}
 
+          {/* 앨범(다중 이미지) 미리보기 패널 */}
+          {pendingAlbumFiles.length > 0 && (
+            <div className="mb-1 flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--accent)]/30 bg-blue-50 dark:bg-blue-950/20 px-3 py-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[12px] font-bold text-[var(--accent)]">📷 사진 {pendingAlbumFiles.length}장 묶어 보내기</span>
+                <button onClick={cancelAlbumUpload} className="text-[11px] text-[var(--toss-gray-3)] hover:text-red-500 font-semibold">취소</button>
+              </div>
+              {/* 썸네일 그리드 */}
+              <div className="flex gap-1.5 flex-wrap">
+                {albumPreviewUrls.map((url, i) => (
+                  <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden shrink-0">
+                    <img src={url} alt="" className="w-full h-full object-cover" />
+                    <button
+                      onClick={() => removeAlbumFile(i)}
+                      className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/60 rounded-full flex items-center justify-center text-white text-[9px] font-bold hover:bg-red-600 transition-colors"
+                    >✕</button>
+                  </div>
+                ))}
+                {/* 추가 버튼 */}
+                <button
+                  onClick={() => albumFileInputRef.current?.click()}
+                  className="w-16 h-16 rounded-lg border-2 border-dashed border-[var(--border)] flex items-center justify-center text-[var(--toss-gray-3)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors text-xl shrink-0"
+                  title="사진 추가"
+                >+</button>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void sendAlbum()}
+                  disabled={fileUploading}
+                  className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50 flex items-center gap-1"
+                >
+                  {fileUploading ? <span className="animate-pulse">전송 중...</span> : `📤 묶어서 전송`}
+                </button>
+              </div>
+            </div>
+          )}
+
           {pendingAttachmentFiles.length > 0 && (
             <div
               data-testid="chat-pending-upload-panel"
@@ -4405,6 +5245,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             : 'bg-[var(--muted)] border-[var(--border)] focus-within:bg-[var(--card)] focus-within:ring-2 focus-within:ring-[var(--accent)]/50'
             }`}>
             <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.hwp" />
+            <input type="file" ref={albumFileInputRef} className="hidden" onChange={handleAlbumFileSelect} accept="image/*" multiple />
+            {/* 파일 첨부 버튼 */}
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={fileUploading}
@@ -4412,6 +5254,15 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] transition-colors hover:text-[var(--accent)] disabled:opacity-50 md:h-8 md:w-8"
             >
               {fileUploading ? <span className="animate-pulse text-xs">...</span> : <span className="text-[11px] font-bold md:text-xs">첨부</span>}
+            </button>
+            {/* 사진 묶어 보내기 버튼 */}
+            <button
+              onClick={() => albumFileInputRef.current?.click()}
+              disabled={fileUploading}
+              title="사진 여러 장 묶어 보내기"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] transition-colors hover:text-[var(--accent)] disabled:opacity-50"
+            >
+              <span className="text-base leading-none">🖼️</span>
             </button>
             <div className="relative flex-1">
               <textarea
@@ -4518,8 +5369,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
                 <div className="space-y-3">
                   <div className="flex justify-between items-center px-1">
-                <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">사진 및 동영상</p>
-                    <button onClick={() => { setMediaFilter('all'); setShowMediaPanel(true); }} className="text-[10px] font-bold text-[var(--accent)]">전체보기</button>
+                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">사진 및 동영상</p>
+                    <button
+                      type="button"
+                      onClick={() => openMediaArchive('media')}
+                      className="inline-flex items-center rounded-full bg-[var(--accent)]/10 px-2.5 py-1 text-[10px] font-bold text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/15"
+                    >
+                      전체보기
+                    </button>
                   </div>
                   <div className="grid grid-cols-3 gap-1 rounded-2xl overflow-hidden">
                     {sharedMediaPreviewMessages.map((m) => (
@@ -4552,7 +5409,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 <div className="space-y-3">
                   <div className="flex justify-between items-center px-1">
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">파일</p>
-                    <button onClick={() => { setMediaFilter('file'); setShowMediaPanel(true); }} className="text-[10px] font-bold text-[var(--accent)]">전체보기</button>
+                    <button
+                      type="button"
+                      onClick={() => openMediaArchive('file')}
+                      className="inline-flex items-center rounded-full bg-[var(--accent)]/10 px-2.5 py-1 text-[10px] font-bold text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/15"
+                    >
+                      전체보기
+                    </button>
                   </div>
                   <div className="space-y-2">
                     {sharedFilePreviewMessages.map((m) => {
@@ -5184,12 +6047,20 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       </p>
                       {m.file_url && (() => {
                         const attachmentUrl = String(m.file_url);
+                        const attachmentName = getAttachmentDisplayName(m.file_name, attachmentUrl);
+                        const attachmentKind: AttachmentPreviewKind =
+                          isImageUrl(attachmentUrl) ? 'image' : isVideoUrl(attachmentUrl) ? 'video' : 'file';
                         return (
-                          <AttachmentQuickActions
+                          <AttachmentListCard
                             url={attachmentUrl}
-                            name={getAttachmentDisplayName(m.file_name, attachmentUrl)}
-                            onPreview={() => openAttachmentPreview(attachmentUrl, m.file_name, isImageUrl(attachmentUrl) ? 'image' : isVideoUrl(attachmentUrl) ? 'video' : 'file')}
-                            variant="subtle"
+                            name={attachmentName}
+                            kind={attachmentKind}
+                            meta={`${staff?.name || '이름 없음'} · ${createdAt.toLocaleDateString('ko-KR')} ${createdAt.toLocaleTimeString('ko-KR', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}`}
+                            onPreview={() => openAttachmentPreview(attachmentUrl, attachmentName, attachmentKind)}
+                            actionVariant="subtle"
                             className="mt-2"
                           />
                         );
@@ -5343,7 +6214,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       {room.name || '채팅방'}
                     </span>
                     <span className="text-[11px] text-[var(--toss-gray-3)]">
-                      {roomUnreadCounts[room.id] ? String(roomUnreadCounts[room.id]) : ''}
+                      {getConversationUnreadCountForRoom(room, roomUnreadCounts, chatRooms)
+                        ? String(getConversationUnreadCountForRoom(room, roomUnreadCounts, chatRooms))
+                        : ''}
                     </span>
                   </button>
                 ))
@@ -5517,18 +6390,18 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           <div className="fixed inset-0 bg-black/5 z-[100] md:z-30 animate-in fade-in" onClick={() => setShowMediaPanel(false)} />
           <aside className="fixed top-0 right-0 bottom-0 w-80 bg-[var(--card)] border-l border-[var(--border)] shadow-sm z-[101] md:z-40 flex flex-col animate-in slide-in-from-right duration-300">
             <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
-              <span className="text-xs font-black text-[var(--toss-gray-4)] uppercase tracking-widest">파일/링크 내역</span>
-            <button onClick={() => setShowMediaPanel(false)} className="p-2 text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-xl">닫기</button>
+              <span className="text-xs font-black text-[var(--toss-gray-4)] uppercase tracking-widest">첨부 내역</span>
+              <button onClick={() => setShowMediaPanel(false)} className="p-2 text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-xl">닫기</button>
             </div>
 
             <div className="flex p-2 gap-1 bg-[var(--tab-bg)] dark:bg-zinc-900 border-b border-[var(--border)]">
-              {(['all', 'image', 'video', 'file'] as const).map(f => (
+              {(['all', 'media', 'image', 'video', 'file'] as const).map(f => (
                 <button
                   key={f}
                   onClick={() => setMediaFilter(f)}
                   className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${mediaFilter === f ? 'bg-[var(--card)] dark:bg-zinc-800 text-blue-600 shadow-soft' : 'text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)]'}`}
                 >
-                  {f === 'all' ? '전체' : f === 'image' ? '이미지' : f === 'video' ? '동영상' : '파일'}
+                  {f === 'all' ? '전체' : f === 'media' ? '사진/동영상' : f === 'image' ? '이미지' : f === 'video' ? '동영상' : '파일'}
                 </button>
               ))}
             </div>
@@ -5729,11 +6602,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                               key={msg.id}
                               role="button"
                               tabIndex={0}
-                              onClick={() => openRoomFromGlobalSearch(String(msg.room_id))}
+                              onClick={() => openRoomFromGlobalSearch(String(msg.room_id), String(msg.id))}
                               onKeyDown={(event) => {
                                 if (event.key === 'Enter' || event.key === ' ') {
                                   event.preventDefault();
-                                  openRoomFromGlobalSearch(String(msg.room_id));
+                                  openRoomFromGlobalSearch(String(msg.room_id), String(msg.id));
                                 }
                               }}
                               className="w-full text-left p-3 bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-xl hover:border-[var(--accent)] hover:shadow-sm transition-all cursor-pointer"
@@ -5747,7 +6620,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                   meta={`${roomName} · ${(msg.staff as { name?: string } | null | undefined)?.name || '이름 없음'} · ${new Date(msg.created_at || 0).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} ${new Date(msg.created_at || 0).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`}
                                   badgeLabel={isImage ? '이미지' : isFile ? '파일' : '동영상'}
                                   onPreview={() => openAttachmentPreview(fileUrl, fileName, isImage ? 'image' : isVideoUrl(fileUrl) ? 'video' : 'file')}
-                                  onActivate={() => openRoomFromGlobalSearch(String(msg.room_id))}
+                                  onActivate={() => openRoomFromGlobalSearch(String(msg.room_id), String(msg.id))}
                                   actionVariant="subtle"
                                   className="border-0 bg-transparent p-0 shadow-none"
                                 />
@@ -5909,6 +6782,33 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             style={{ paddingTop: 'calc(env(safe-area-inset-top, 12px) + 12px)' }}
             onClick={(e) => e.stopPropagation()}
           >
+            {attachmentPreview.kind === 'image' && (
+              <div className="mr-auto inline-flex items-center gap-1 rounded-full bg-white/15 p-1 text-white shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => nudgeAttachmentZoom(-0.25)}
+                  className="h-9 min-w-9 rounded-full px-2 text-sm font-bold transition-colors hover:bg-white/15"
+                  aria-label="축소"
+                >
+                  -
+                </button>
+                <button
+                  type="button"
+                  onClick={resetAttachmentImageTransform}
+                  className="h-9 min-w-[68px] rounded-full px-3 text-[11px] font-bold transition-colors hover:bg-white/15"
+                >
+                  {Math.round(attachmentZoom * 100)}%
+                </button>
+                <button
+                  type="button"
+                  onClick={() => nudgeAttachmentZoom(0.25)}
+                  className="h-9 min-w-9 rounded-full px-2 text-sm font-bold transition-colors hover:bg-white/15"
+                  aria-label="확대"
+                >
+                  +
+                </button>
+              </div>
+            )}
             <a
               href={attachmentPreview.url}
               target="_blank"
@@ -5939,12 +6839,28 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             onClick={(e) => e.stopPropagation()}
           >
             {attachmentPreview.kind === 'image' ? (
-              <img
-                src={attachmentPreview.url}
-                alt={attachmentPreview.name || '미리보기'}
-                className="max-w-[92vw] max-h-[80vh] rounded-xl object-contain shadow-2xl select-none"
-                draggable={false}
-              />
+              <div
+                className={`flex max-w-[92vw] max-h-[80vh] items-center justify-center overflow-hidden rounded-xl ${attachmentZoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'}`}
+                style={{ touchAction: attachmentZoom > 1 ? 'none' : 'manipulation' }}
+                onWheel={handleAttachmentImageWheel}
+                onPointerDown={handleAttachmentImagePointerDown}
+                onPointerMove={handleAttachmentImagePointerMove}
+                onPointerUp={handleAttachmentImagePointerUp}
+                onPointerCancel={handleAttachmentImagePointerUp}
+                onDoubleClick={handleAttachmentImageDoubleClick}
+              >
+                <img
+                  src={attachmentPreview.url}
+                  alt={attachmentPreview.name || '미리보기'}
+                  className="max-w-[92vw] max-h-[80vh] rounded-xl object-contain shadow-2xl select-none"
+                  style={{
+                    transform: `translate3d(${attachmentOffset.x}px, ${attachmentOffset.y}px, 0) scale(${attachmentZoom})`,
+                    transformOrigin: 'center center',
+                    transition: attachmentDragRef.current ? 'none' : 'transform 160ms ease',
+                  }}
+                  draggable={false}
+                />
+              </div>
             ) : attachmentPreview.kind === 'video' ? (
               <video
                 src={attachmentPreview.url}

@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
     "unit_price": 5000,
     "supplier_name": "업체명 (문서 전체에서 파악 가능하면 추론)",
     "lot_number": "LOT 번호 (있으면 기재, 없으면 null)",
-    "expiry_date": "YYYY-MM-DD 형식 (유효기간があれば 기재, 없으면 null)"
+    "expiry_date": "YYYY-MM-DD 형식 (유효기간이 있으면 기재, 없으면 null)"
   }
 ]
 `;

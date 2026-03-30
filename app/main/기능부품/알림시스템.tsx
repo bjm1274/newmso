@@ -214,6 +214,30 @@ function getPushClientPlatform() {
   return 'web';
 }
 
+async function cleanupLegacyMessagingServiceWorkers() {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+  try {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(
+      registrations.map(async (registration) => {
+        const scriptUrl =
+          registration.active?.scriptURL ||
+          registration.waiting?.scriptURL ||
+          registration.installing?.scriptURL ||
+          '';
+        const scope = registration.scope || '';
+        const isLegacyFirebaseWorker =
+          scriptUrl.includes('/firebase-messaging-sw.js') ||
+          scope.includes('/firebase-cloud-messaging-push-scope');
+        if (!isLegacyFirebaseWorker) return;
+        await registration.unregister();
+      })
+    );
+  } catch (error) {
+    console.warn('레거시 메시징 서비스워커 정리 실패:', error);
+  }
+}
+
 function getVisibleActiveChatRoomId() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return null;
   if (document.visibilityState === 'hidden') return null;
@@ -399,6 +423,7 @@ export async function initNotificationService(options?: InitNotificationServiceO
   if (!('serviceWorker' in navigator) || !('Notification' in window)) return;
   if (!window.isSecureContext) return;
   try {
+    await cleanupLegacyMessagingServiceWorkers();
     const reg = await navigator.serviceWorker.register('/sw.js');
     if (!reg || typeof reg !== 'object' || !('pushManager' in reg) || !reg.pushManager) {
       return;
