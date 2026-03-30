@@ -2772,18 +2772,18 @@ window.onload = () => window.print();
             {draftBanner && (
               <div className="flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--accent)]/30 rounded-[var(--radius-md)] shadow-sm animate-in fade-in duration-300">
                 <span className="text-[13px] font-bold text-[var(--foreground)] flex-1">저장된 임시저장이 있습니다.</span>
-                <button
-                  type="button"
-                  onClick={loadDraftFromStorage}
-                  className="px-4 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-[11px] font-bold hover:opacity-90 transition-all shrink-0"
-                >
+                  <button
+                    type="button"
+                    onClick={loadDraftFromStorage}
+                    className="px-4 py-2 bg-[var(--accent)] text-white rounded-full text-[11px] font-bold hover:opacity-90 transition-all shrink-0"
+                  >
                   불러오기
                 </button>
-                <button
-                  type="button"
-                  onClick={() => { clearDraftFromStorage(); setDraftBanner(false); }}
-                  className="px-4 py-2 bg-[var(--muted)] text-[var(--toss-gray-3)] border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold hover:bg-[var(--toss-gray-2)] transition-all shrink-0"
-                >
+                  <button
+                    type="button"
+                    onClick={() => { clearDraftFromStorage(); setDraftBanner(false); }}
+                    className="px-4 py-2 bg-[var(--muted)] text-[var(--toss-gray-3)] border border-[var(--border)] rounded-full text-[11px] font-bold hover:bg-[var(--toss-gray-2)] transition-all shrink-0"
+                  >
                   무시
                 </button>
               </div>
@@ -3140,7 +3140,7 @@ window.onload = () => window.print();
                     type="button"
                     disabled={selectedApprovalIds.length === 0}
                     onClick={handleBulkApprove}
-                    className="px-5 py-2.5 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-xs font-bold shadow-sm hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="px-5 py-2.5 bg-[var(--accent)] text-white rounded-full text-xs font-bold shadow-sm hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     일괄 승인
                   </button>
@@ -3148,7 +3148,7 @@ window.onload = () => window.print();
                     type="button"
                     disabled={selectedApprovalIds.length === 0}
                     onClick={handleBulkReject}
-                    className="px-5 py-2.5 bg-red-50 text-red-600 border border-red-200 rounded-[var(--radius-md)] text-xs font-bold shadow-sm hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="px-5 py-2.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-xs font-bold shadow-sm hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     일괄 반려
                   </button>
@@ -3157,7 +3157,7 @@ window.onload = () => window.print();
             )}
 
             {listForView.length === 0 ? (
-              <div className="h-96 flex flex-col items-center justify-center opacity-20">
+              <div className="empty-state h-96 border border-dashed border-[var(--border)] rounded-[var(--radius-xl)] bg-[var(--muted)]/35">
                 <span className="text-6xl mb-4">📄</span>
                 <p className="font-semibold text-base">
                   {approvalKeyword

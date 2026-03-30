@@ -1,9 +1,11 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { WORKPLACE_LOCATION, ALLOWED_DISTANCE_M } from '@/lib/location';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
+import { isApprovedLeaveStatus } from '@/lib/annual-leave-ledger';
+import { withMissingColumnFallback } from '@/lib/supabase-compat';
 
 const HOSPITAL_LOCATION = WORKPLACE_LOCATION;
 const ALLOWED_RADIUS_METER = ALLOWED_DISTANCE_M;
@@ -30,10 +32,119 @@ interface WeatherData {
   aqiColor: string;
 }
 
+interface LeaveRequestRow {
+  id: string;
+  leave_type: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  status: string | null;
+  reason?: string | null;
+}
+
+type ShiftBoundary = {
+  hour: number;
+  minute: number;
+  label: string;
+  endHour: number | null;
+  endMinute: number | null;
+  shiftKnown: boolean;
+};
+
+type CommuteLog = {
+  id?: string | number;
+  date?: string | null;
+  check_in?: string | null;
+  check_out?: string | null;
+  status?: string | null;
+  displayStatus?: string;
+  displayEarlyLeaveMinutes?: number | null;
+} & Record<string, unknown>;
+
+function buildFallbackShiftBoundary(department?: string): ShiftBoundary {
+  if (department === '의료진') {
+    return {
+      hour: 8,
+      minute: 30,
+      label: '08:30',
+      endHour: null,
+      endMinute: null,
+      shiftKnown: false,
+    };
+  }
+  return {
+    hour: 9,
+    minute: 10,
+    label: '09:10',
+    endHour: null,
+    endMinute: null,
+    shiftKnown: false,
+  };
+}
+
+function parseShiftTime(value: string) {
+  const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+  return { hour, minute };
+}
+
+function buildShiftBoundary(startTime: string, endTime: string, fallbackDepartment?: string): ShiftBoundary {
+  const start = parseShiftTime(startTime);
+  if (!start) {
+    return buildFallbackShiftBoundary(fallbackDepartment);
+  }
+
+  const end = parseShiftTime(endTime);
+  return {
+    hour: start.hour,
+    minute: start.minute,
+    label: `${String(start.hour).padStart(2, '0')}:${String(start.minute).padStart(2, '0')}`,
+    endHour: end?.hour ?? null,
+    endMinute: end?.minute ?? null,
+    shiftKnown: true,
+  };
+}
+
+function buildDateWithTime(dateStr: string, hour: number, minute: number) {
+  const [year, month, day] = String(dateStr).slice(0, 10).split('-').map(Number);
+  return new Date(year, (month || 1) - 1, day || 1, hour, minute, 0, 0);
+}
+
+function calculateEarlyLeaveMinutes(
+  workDate: string,
+  checkOutIso: string | null | undefined,
+  boundary: ShiftBoundary
+) {
+  if (!workDate || !checkOutIso || boundary.endHour === null || boundary.endMinute === null) {
+    return 0;
+  }
+
+  const actualCheckOut = new Date(checkOutIso);
+  if (Number.isNaN(actualCheckOut.getTime())) {
+    return 0;
+  }
+
+  const scheduledStart = buildDateWithTime(workDate, boundary.hour, boundary.minute);
+  const scheduledEnd = buildDateWithTime(workDate, boundary.endHour, boundary.endMinute);
+
+  if (scheduledEnd.getTime() <= scheduledStart.getTime()) {
+    scheduledEnd.setDate(scheduledEnd.getDate() + 1);
+  }
+
+  return Math.max(0, Math.round((scheduledEnd.getTime() - actualCheckOut.getTime()) / 60000));
+}
+
+function getDisplayStatus(log: CommuteLog | null | undefined) {
+  return String(log?.displayStatus || log?.status || '').trim();
+}
+
 export default function CommuteRecord({ user, onRequestCorrection }: CommuteRecordProps) {
   const normalizedUser = normalizeStaffLike((user ?? {}) as Record<string, unknown>);
   const [resolvedUser, setResolvedUser] = useState<Record<string, unknown>>(normalizedUser);
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<CommuteLog[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequestRow[]>([]);
   const [todayLog, setTodayLog] = useState<Record<string, unknown> | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -52,12 +163,26 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   const [showCheckInSuccess, setShowCheckInSuccess] = useState(false);
   const [checkInTime, setCheckInTime] = useState<Date | null>(null);
   const checkInSuccessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showCheckOutSuccess, setShowCheckOutSuccess] = useState(false);
+  const [checkOutSummary, setCheckOutSummary] = useState<{
+    checkInTime: string;
+    checkOutTime: string;
+    workedMinutes: number;
+  } | null>(null);
+  const checkOutSuccessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     // 컴포넌트 로드 시 위치 권한 요청 및 거리 계산 미리 해보기
     void resolveCurrentLocation({ showErrors: false, preferCached: false });
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (checkInSuccessTimerRef.current) clearTimeout(checkInSuccessTimerRef.current);
+      if (checkOutSuccessTimerRef.current) clearTimeout(checkOutSuccessTimerRef.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -118,8 +243,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
   const initCommuteData = async () => {
     setLoading(true);
-    await fetchTodayLog();
-    await fetchMonthlyLogs();
+    await Promise.all([fetchTodayLog(), fetchMonthlyLogs(), fetchMonthlyLeaveRequests()]);
     setLoading(false);
   };
 
@@ -150,7 +274,159 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       .lte('date', endOfMonth)
       .order('date', { ascending: false });
 
-    setLogs(data || []);
+    const monthlyLogs = ((data || []) as CommuteLog[]).map((log) => ({ ...log }));
+    if (monthlyLogs.length === 0) {
+      setLogs([]);
+      return;
+    }
+
+    const currentShiftId = String((resolvedUser as Record<string, unknown>)?.shift_id || '').trim();
+    const currentDepartment = String((resolvedUser as Record<string, unknown>)?.department || '').trim() || undefined;
+    const needsStaffLookup = !currentShiftId || !currentDepartment;
+
+    const [assignmentResult, staffResult] = await Promise.all([
+      supabase
+        .from('shift_assignments')
+        .select('work_date, shift_id')
+        .eq('staff_id', userId)
+        .gte('work_date', startOfMonth)
+        .lte('work_date', endOfMonth),
+      needsStaffLookup
+        ? supabase
+            .from('staff_members')
+            .select('shift_id, department')
+            .eq('id', userId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+
+    const assignmentByDate = new Map<string, string>(
+      ((assignmentResult.data || []) as Array<{ work_date: string; shift_id: string | null }>)
+        .filter((item) => item.shift_id)
+        .map((item) => [String(item.work_date).slice(0, 10), String(item.shift_id)])
+    );
+
+    const effectiveDepartment =
+      currentDepartment ||
+      (staffResult?.data as Record<string, unknown> | null | undefined)?.department?.toString() ||
+      undefined;
+
+    const defaultShiftId = String(
+      (staffResult?.data as Record<string, unknown> | null | undefined)?.shift_id ||
+      currentShiftId ||
+      ''
+    ).trim();
+
+    const shiftIds = Array.from(
+      new Set(
+        [...assignmentByDate.values(), defaultShiftId].filter(Boolean)
+      )
+    );
+
+    const shiftsMap = new Map<string, { start_time?: string | null; end_time?: string | null }>();
+    if (shiftIds.length > 0) {
+      const { data: shiftRows } = await supabase
+        .from('work_shifts')
+        .select('id, start_time, end_time')
+        .in('id', shiftIds);
+
+      ((shiftRows || []) as Array<{ id: string; start_time?: string | null; end_time?: string | null }>).forEach((row) => {
+        shiftsMap.set(String(row.id), row);
+      });
+    }
+
+    const boundaryByDate = new Map<string, ShiftBoundary>();
+    const resolveBoundaryForDate = (dateStr: string) => {
+      const cached = boundaryByDate.get(dateStr);
+      if (cached) return cached;
+
+      const shiftId = assignmentByDate.get(dateStr) || defaultShiftId;
+      const shiftRow = shiftId ? shiftsMap.get(shiftId) : null;
+      const boundary = shiftRow
+        ? buildShiftBoundary(
+            String(shiftRow.start_time || ''),
+            String(shiftRow.end_time || ''),
+            effectiveDepartment
+          )
+        : buildFallbackShiftBoundary(effectiveDepartment);
+
+      boundaryByDate.set(dateStr, boundary);
+      return boundary;
+    };
+
+    const decoratedLogs: CommuteLog[] = monthlyLogs.map((log) => {
+      const workDate = String(log.date || '').slice(0, 10);
+      const boundary = resolveBoundaryForDate(workDate);
+      const earlyLeaveMinutes = calculateEarlyLeaveMinutes(
+        workDate,
+        (log.check_out as string | null | undefined) || null,
+        boundary
+      );
+
+      return {
+        ...log,
+        displayStatus: earlyLeaveMinutes > 0 ? '조퇴' : String(log.status || ''),
+        displayEarlyLeaveMinutes: earlyLeaveMinutes > 0 ? earlyLeaveMinutes : null,
+      };
+    });
+
+    setLogs(decoratedLogs);
+
+    const logsNeedingSync = decoratedLogs.filter((log) => {
+      const originalStatus = String(log.status || '').trim();
+      return (
+        getDisplayStatus(log) === '조퇴' &&
+        (originalStatus === '정상' || originalStatus === 'present') &&
+        log.check_out
+      );
+    });
+
+    if (logsNeedingSync.length > 0) {
+      void Promise.all(
+        logsNeedingSync.map(async (log) => {
+          const workDate = String(log.date || '').slice(0, 10);
+          const checkIn = (log.check_in as string | null | undefined) || null;
+          const checkOut = (log.check_out as string | null | undefined) || null;
+          const earlyLeaveMinutes = Number(log.displayEarlyLeaveMinutes || 0);
+
+          if (!workDate || !checkOut || earlyLeaveMinutes <= 0) {
+            return;
+          }
+
+          await supabase
+            .from('attendance')
+            .update({ status: '조퇴' })
+            .eq('staff_id', userId)
+            .eq('date', workDate);
+
+          await syncToAttendances(workDate, checkIn, checkOut, '조퇴', { earlyLeaveMinutes });
+        })
+      ).catch((error) => {
+        console.warn('기존 조퇴 기록 보정 실패:', error);
+      });
+    }
+  };
+
+  const fetchMonthlyLeaveRequests = async () => {
+    const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).toLocaleDateString('en-CA');
+    const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).toLocaleDateString('en-CA');
+    const userId = effectiveUserId;
+    if (!userId) return;
+
+    const { data, error } = await supabase
+      .from('leave_requests')
+      .select('id, leave_type, start_date, end_date, status, reason')
+      .eq('staff_id', userId)
+      .lte('start_date', endOfMonth)
+      .or(`end_date.is.null,end_date.gte.${startOfMonth}`);
+
+    if (error) {
+      console.warn('월별 연차 캘린더 로드 실패:', error);
+      setLeaveRequests([]);
+      return;
+    }
+
+    setLeaveRequests(((data || []) as LeaveRequestRow[]).filter((row) => isApprovedLeaveStatus(row.status)));
   };
 
   // 📍 [핵심 기능] 현재 위치 가져오기 및 거리 계산
@@ -329,23 +605,47 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   };
 
   // attendance → attendances 동기화 (근태관리메인·급여정산과 연계)
-  const syncToAttendances = async (workDate: string, checkIn: string | null, checkOut: string | null, status: string) => {
+  const syncToAttendances = async (
+    workDate: string,
+    checkIn: string | null,
+    checkOut: string | null,
+    status: string,
+    options?: { earlyLeaveMinutes?: number | null }
+  ) => {
     try {
-      const statusMap: Record<string, string> = { '정상': 'present', '지각': 'late' };
+      const statusMap: Record<string, string> = { '정상': 'present', '지각': 'late', '조퇴': 'early_leave' };
       const attStatus = statusMap[status] || 'present';
       const mins = checkIn && checkOut
         ? Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 60000)
         : null;
       const userId = effectiveUserId;
       if (!userId) return;
-      await supabase.from('attendances').upsert({
+
+      const basePayload = {
         staff_id: userId,
         work_date: workDate,
         check_in_time: checkIn,
         check_out_time: checkOut,
         status: attStatus,
         work_hours_minutes: mins ?? undefined,
-      }, { onConflict: 'staff_id,work_date' });
+      };
+
+      const earlyLeaveMinutes = attStatus === 'early_leave'
+        ? Math.max(0, Number(options?.earlyLeaveMinutes || 0))
+        : 0;
+
+      const result = await withMissingColumnFallback(
+        () => supabase.from('attendances').upsert({
+          ...basePayload,
+          early_leave_minutes: earlyLeaveMinutes,
+        }, { onConflict: 'staff_id,work_date' }),
+        () => supabase.from('attendances').upsert(basePayload, { onConflict: 'staff_id,work_date' }),
+        'early_leave_minutes'
+      );
+
+      if (result.error) {
+        throw result.error;
+      }
     } catch (syncErr) {
       console.error('출퇴근 동기화 실패:', syncErr);
     }
@@ -354,16 +654,9 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   const resolveLateThreshold = async (
     workDate: string,
     fallbackDepartment?: string
-  ) => {
-    const buildFallback = (department?: string) => {
-      if (department === '의료진') {
-        return { hour: 8, minute: 30, label: '08:30', endHour: null as number | null, endMinute: null as number | null, shiftKnown: false };
-      }
-      return { hour: 9, minute: 10, label: '09:10', endHour: null as number | null, endMinute: null as number | null, shiftKnown: false };
-    };
-
+  ): Promise<ShiftBoundary> => {
     const userId = effectiveUserId;
-    if (!userId) return buildFallback(fallbackDepartment);
+    if (!userId) return buildFallbackShiftBoundary(fallbackDepartment);
 
     try {
       const currentShiftId = String((resolvedUser as Record<string, unknown>)?.shift_id || '').trim();
@@ -398,7 +691,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         ).trim();
 
       if (!shiftId) {
-        return buildFallback(effectiveDepartment);
+        return buildFallbackShiftBoundary(effectiveDepartment);
       }
 
       const { data: shiftRow } = await supabase
@@ -409,34 +702,10 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
       const startTime = String((shiftRow as Record<string, unknown> | null | undefined)?.start_time || '').trim();
       const endTime = String((shiftRow as Record<string, unknown> | null | undefined)?.end_time || '').trim();
-      const match = startTime.match(/^(\d{1,2}):(\d{2})/);
-
-      if (!match) {
-        return buildFallback(effectiveDepartment);
-      }
-
-      const hour = Number(match[1]);
-      const minute = Number(match[2]);
-
-      if (Number.isNaN(hour) || Number.isNaN(minute)) {
-        return buildFallback(effectiveDepartment);
-      }
-
-      const endMatch = endTime.match(/^(\d{1,2}):(\d{2})/);
-      const endHour = endMatch ? Number(endMatch[1]) : null;
-      const endMinute = endMatch ? Number(endMatch[2]) : null;
-
-      return {
-        hour,
-        minute,
-        label: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
-        endHour: (endHour !== null && !Number.isNaN(endHour)) ? endHour : null,
-        endMinute: (endMinute !== null && !Number.isNaN(endMinute)) ? endMinute : null,
-        shiftKnown: true,
-      };
+      return buildShiftBoundary(startTime, endTime, effectiveDepartment);
     } catch (error) {
       console.warn('지각 기준 시간 조회 실패:', error);
-      return buildFallback(fallbackDepartment);
+      return buildFallbackShiftBoundary(fallbackDepartment);
     }
   };
 
@@ -527,9 +796,13 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
       } else {
         if (!todayLog) return;
+        const checkInIso = todayLog.check_in as string | null;
+        const lateThreshold = await resolveLateThreshold(today, userDepartment);
+        const earlyLeaveMinutes = calculateEarlyLeaveMinutes(today, timeString, lateThreshold);
+        const finalStatus = earlyLeaveMinutes > 0 ? '조퇴' : ((todayLog.status as string) || '정상');
         const { data, error } = await supabase
           .from('attendance')
-          .update({ check_out: timeString })
+          .update({ check_out: timeString, status: finalStatus })
           .eq('staff_id', userId)
           .eq('date', today)
           .is('check_out', null)
@@ -538,11 +811,28 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
         if (error) throw error;
         if (!data) throw new Error('이미 퇴근 처리되었거나 출근 기록이 없습니다.');
-        await syncToAttendances(today, todayLog.check_in as string | null, timeString, (todayLog.status as string) || '정상');
-        setTodayLog(data);
-        toast('퇴근 처리되었습니다. 고생하셨습니다!', 'success');
+        await syncToAttendances(today, checkInIso, timeString, finalStatus, { earlyLeaveMinutes });
+        setTodayLog({ ...data, status: finalStatus });
+        toast(
+          earlyLeaveMinutes > 0
+            ? `조퇴로 처리되었습니다. 정해진 퇴근 시간보다 ${earlyLeaveMinutes}분 일찍 퇴근하셨습니다.`
+            : '퇴근 처리되었습니다. 고생하셨습니다!',
+          earlyLeaveMinutes > 0 ? 'warning' : 'success'
+        );
+
+        const workedMinutes = checkInIso
+          ? Math.max(0, Math.round((new Date(timeString).getTime() - new Date(checkInIso).getTime()) / 60000))
+          : 0;
+        setCheckOutSummary({
+          checkInTime: formatTime(checkInIso || ''),
+          checkOutTime: formatTime(timeString),
+          workedMinutes,
+        });
+        setShowCheckOutSuccess(true);
+        if (checkOutSuccessTimerRef.current) clearTimeout(checkOutSuccessTimerRef.current);
+        checkOutSuccessTimerRef.current = setTimeout(() => setShowCheckOutSuccess(false), 10000);
       }
-      fetchMonthlyLogs();
+      await fetchMonthlyLogs();
     } catch (error: unknown) {
       toast('오류 발생: ' + ((error as Error)?.message ?? String(error)), 'error');
     } finally {
@@ -554,6 +844,69 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     if (!isoString) return '-';
     return new Date(isoString).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
   };
+
+  const formatWorkedDuration = (workedMinutes: number) => {
+    const safeMinutes = Math.max(0, workedMinutes);
+    const hours = Math.floor(safeMinutes / 60);
+    const minutes = safeMinutes % 60;
+    if (!hours) return `${minutes}분`;
+    if (!minutes) return `${hours}시간`;
+    return `${hours}시간 ${minutes}분`;
+  };
+
+  const calendarDays = useMemo(() => {
+    const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+    const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+    const gridStart = new Date(monthStart);
+    gridStart.setDate(monthStart.getDate() - monthStart.getDay());
+    const gridEnd = new Date(monthEnd);
+    gridEnd.setDate(monthEnd.getDate() + (6 - monthEnd.getDay()));
+
+    const logMap = new Map<string, any>();
+    logs.forEach((log) => {
+      const key = String(log?.date || '').trim();
+      if (key) logMap.set(key, log);
+    });
+
+    const leaveMap = new Map<string, LeaveRequestRow>();
+    leaveRequests.forEach((leave) => {
+      const start = leave.start_date ? new Date(leave.start_date) : null;
+      const end = new Date(leave.end_date || leave.start_date || '');
+      if (!start || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
+      const cursor = new Date(start);
+      while (cursor <= end) {
+        const key = cursor.toLocaleDateString('en-CA');
+        leaveMap.set(key, leave);
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    });
+
+    const items: Array<{
+      key: string;
+      date: Date;
+      inMonth: boolean;
+      isToday: boolean;
+      log: any | null;
+      leave: LeaveRequestRow | null;
+    }> = [];
+
+    const cursor = new Date(gridStart);
+    const todayKey = new Date().toLocaleDateString('en-CA');
+    while (cursor <= gridEnd) {
+      const key = cursor.toLocaleDateString('en-CA');
+      items.push({
+        key,
+        date: new Date(cursor),
+        inMonth: cursor.getMonth() === currentMonth.getMonth(),
+        isToday: key === todayKey,
+        log: logMap.get(key) || null,
+        leave: leaveMap.get(key) || null,
+      });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return items;
+  }, [currentMonth, leaveRequests, logs]);
 
   return (
     <div data-testid="commute-record-view" className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-2xl px-4 py-5 sm:p-5 h-full flex flex-col space-y-7">
@@ -617,13 +970,95 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
           }}
         />
       )}
+      {showCheckOutSuccess && checkOutSummary && (
+        <CheckOutSuccessModal
+          summary={checkOutSummary}
+          formatWorkedDuration={formatWorkedDuration}
+          onClose={() => {
+            setShowCheckOutSuccess(false);
+            if (checkOutSuccessTimerRef.current) clearTimeout(checkOutSuccessTimerRef.current);
+          }}
+        />
+      )}
 
       {/* 통계 */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <StatItem label="이번 달 근무" value={`${logs.length}일`} />
-        <StatItem label="지각" value={`${logs.filter(l => l.status === '지각').length}회`} isWarning />
-        <StatItem label="정상 출근" value={`${logs.filter(l => l.status === '정상').length}회`} isSuccess />
+        <StatItem label="지각" value={`${logs.filter((log) => getDisplayStatus(log) === '지각').length}회`} isWarning />
+        <StatItem label="정상 출근" value={`${logs.filter((log) => getDisplayStatus(log) === '정상').length}회`} isSuccess />
       </div>
+
+      <section className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-[var(--foreground)]">월간 출퇴근 / 연차 캘린더</h3>
+            <p className="text-xs font-medium text-[var(--toss-gray-3)]">출근 기록과 승인된 연차를 한 달 단위로 같이 확인할 수 있습니다.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[var(--toss-gray-4)]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--muted)] px-2.5 py-1">
+              <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />
+              근무
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              연차
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-7 gap-2 text-center text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">
+          {['일', '월', '화', '수', '목', '금', '토'].map((label) => (
+            <div key={label} className="py-1">{label}</div>
+          ))}
+        </div>
+
+        <div className="mt-2 grid grid-cols-7 gap-2">
+          {calendarDays.map(({ key, date, inMonth, isToday, log, leave }) => {
+            const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+            const leaveType = String(leave?.leave_type || '').trim();
+            const leaveLabel = leaveType ? (leaveType.length > 6 ? `${leaveType.slice(0, 6)}…` : leaveType) : '';
+            const displayStatus = getDisplayStatus(log as CommuteLog | null);
+            const attendanceLabel = log ? (displayStatus || (log.check_out ? '근무완료' : '근무중')) : '';
+            return (
+              <div
+                key={key}
+                className={`min-h-[96px] rounded-2xl border px-2.5 py-2 text-left transition-colors ${
+                  inMonth
+                    ? 'border-[var(--border)] bg-[var(--background)]/40'
+                    : 'border-transparent bg-[var(--muted)]/50 text-[var(--toss-gray-3)]'
+                } ${isToday ? 'ring-2 ring-[var(--accent)]/25' : ''}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`text-sm font-black ${isWeekend && inMonth ? 'text-rose-500' : 'text-[var(--foreground)]'}`}>
+                    {date.getDate()}
+                  </span>
+                  {isToday && (
+                    <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[9px] font-bold text-white">오늘</span>
+                  )}
+                </div>
+                <div className="mt-2 space-y-1.5">
+                  {leave && (
+                    <div className="rounded-xl bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
+                      {leaveLabel || '연차'}
+                    </div>
+                  )}
+                  {log && (
+                    <div className="rounded-xl bg-[var(--muted)] px-2 py-1 text-[10px] font-semibold text-[var(--foreground)]">
+                      <p className="truncate">{attendanceLabel}</p>
+                      <p className="mt-0.5 text-[var(--toss-gray-3)]">{formatTime(String(log.check_in || ''))}</p>
+                    </div>
+                  )}
+                  {!leave && !log && inMonth && (
+                    <div className="rounded-xl border border-dashed border-[var(--border)] px-2 py-2 text-[10px] font-medium text-[var(--toss-gray-3)]">
+                      일정 없음
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       {/* 리스트 */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
@@ -638,7 +1073,8 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
         <div className="space-y-4">
           {logs.map((log) => {
-            const workDate = new Date(log.date);
+            const workDate = new Date(log.date || '');
+            const displayStatus = getDisplayStatus(log);
             return (
               <div
                 key={log.id}
@@ -646,8 +1082,13 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
               >
                 <div className="flex items-center gap-4">
                   <div
-                    className={`w-14 h-14 rounded-[var(--radius-md)] flex flex-col items-center justify-center font-semibold ${log.status === '지각' ? 'bg-red-100 text-red-600' : 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
-                      }`}
+                    className={`w-14 h-14 rounded-[var(--radius-md)] flex flex-col items-center justify-center font-semibold ${
+                      displayStatus === '지각'
+                        ? 'bg-red-100 text-red-600'
+                        : displayStatus === '조퇴'
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
+                    }`}
                   >
                     <span className="text-[11px] opacity-60">{workDate.getMonth() + 1}월</span>
                     <span className="text-lg leading-tight">{workDate.getDate()}일</span>
@@ -656,7 +1097,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
                     <p className="text-xs font-bold text-[var(--toss-gray-3)]">
                       {workDate.toLocaleDateString('ko-KR', { weekday: 'long' })}
                     </p>
-                    <p className="font-semibold text-[var(--foreground)]">{log.status as string}</p>
+                    <p className="font-semibold text-[var(--foreground)]">{displayStatus || '-'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 md:gap-5 justify-between md:justify-end w-full">
@@ -665,7 +1106,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
                     <TimeBox label="퇴근" time={formatTime(log.check_out as string)} />
                   </div>
                   {onRequestCorrection && !(
-                    (log.status === '정상' || log.status === 'present') &&
+                    (displayStatus === '정상' || displayStatus === 'present') &&
                     log.check_in &&
                     log.check_out
                   ) && (
@@ -841,6 +1282,66 @@ function CheckInSuccessModal({ checkInTime, weather, onClose }: CheckInSuccessMo
                 </p>
               </div>
             )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface CheckOutSuccessModalProps {
+  summary: {
+    checkInTime: string;
+    checkOutTime: string;
+    workedMinutes: number;
+  };
+  formatWorkedDuration: (workedMinutes: number) => string;
+  onClose: () => void;
+}
+
+function CheckOutSuccessModal({ summary, formatWorkedDuration, onClose }: CheckOutSuccessModalProps) {
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-end justify-center sm:items-center p-4 pointer-events-none">
+      <div
+        className="w-full max-w-sm pointer-events-auto animate-slide-up"
+        style={{ animation: 'slide-up 0.35s cubic-bezier(.22,1,.36,1) both' }}
+      >
+        <div className="overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow-lg)]">
+          <div className="flex items-center justify-between bg-slate-900 px-5 py-4 text-white">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🌙</span>
+              <div>
+                <p className="text-[15px] font-bold leading-tight">퇴근 완료</p>
+                <p className="text-[12px] font-medium text-white/75">수고하셨습니다. 오늘 근무가 안전하게 저장됐습니다.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] text-base text-white/70 transition-colors hover:bg-white/15 hover:text-white"
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="space-y-3 px-5 py-4">
+            <div className="rounded-[var(--radius-lg)] bg-[var(--muted)] p-4">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">총 근무시간</p>
+              <p className="mt-2 text-2xl font-black text-[var(--foreground)]">{formatWorkedDuration(summary.workedMinutes)}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-3">
+                <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">출근</p>
+                <p className="mt-1 text-lg font-semibold text-[var(--foreground)]">{summary.checkInTime}</p>
+              </div>
+              <div className="rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-3">
+                <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">퇴근</p>
+                <p className="mt-1 text-lg font-semibold text-[var(--foreground)]">{summary.checkOutTime}</p>
+              </div>
+            </div>
+
+            <p className="text-right text-[11px] font-medium text-[var(--toss-gray-4)]">휴식 잘 챙기시고 내일도 좋은 하루 보내세요.</p>
           </div>
         </div>
       </div>

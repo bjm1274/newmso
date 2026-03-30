@@ -1304,7 +1304,7 @@ export default function IntegratedInventoryManagement({
                                           type="button"
                                           onClick={() => void handleSupplyIssue(approval, workflowItem)}
                                           disabled={isBusy}
-                                          className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-2 text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                          className="rounded-full bg-[var(--accent)] px-3 py-2 text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
                                           data-testid={`inventory-supply-issue-${approval.id}-${workflowItem.request_index}`}
                                         >
                                           {isBusy ? '처리 중...' : '불출 처리'}
@@ -1315,7 +1315,7 @@ export default function IntegratedInventoryManagement({
                                           type="button"
                                           onClick={() => void handleSupplyOrder(approval, workflowItem)}
                                           disabled={isBusy}
-                                          className="rounded-[var(--radius-md)] bg-orange-600 px-3 py-2 text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                          className="rounded-full bg-orange-600 px-3 py-2 text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
                                           data-testid={`inventory-supply-order-${approval.id}-${workflowItem.request_index}`}
                                         >
                                           {isBusy ? '처리 중...' : '발주 처리'}
@@ -1439,7 +1439,7 @@ export default function IntegratedInventoryManagement({
                                         <button
                                           type="button"
                                           onClick={() => openLinkedSupplyOrder(approval.id ?? '', workflowItem.request_index as number)}
-                                          className="rounded-[var(--radius-md)] bg-[var(--foreground)] px-3 py-2 text-[11px] font-bold text-white"
+                                          className="rounded-full bg-[var(--foreground)] px-3 py-2 text-[11px] font-bold text-white"
                                           data-testid={`inventory-supply-history-open-order-${approval.id}-${String(workflowItem.request_index ?? '')}`}
                                         >
                                           발주 보기
@@ -1523,7 +1523,7 @@ export default function IntegratedInventoryManagement({
 
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
                       {urgentActionItems.length === 0 && (
-                        <div className="col-span-full rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-4 py-4 text-center text-sm text-[var(--toss-gray-3)]">
+                        <div className="empty-state col-span-full rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)]/30 px-4 py-4 text-sm">
                           긴급 조치가 필요한 품목이 없습니다.
                         </div>
                       )}
@@ -1709,7 +1709,7 @@ export default function IntegratedInventoryManagement({
               </div>
               <div className="overflow-x-auto">
                 {logs.length === 0 ? (
-                  <div className="px-4 py-10 text-center text-sm font-semibold text-[var(--toss-gray-3)]">이력이 없습니다.</div>
+                  <div className="empty-state rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)]/30 px-4 py-10 text-sm font-semibold">이력이 없습니다.</div>
                 ) : (
                   <table className="min-w-[860px] w-full text-left text-xs">
                     <thead className="bg-[var(--muted)]/50 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">
