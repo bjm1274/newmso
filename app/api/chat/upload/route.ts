@@ -9,6 +9,12 @@ const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
 const MAX_VIDEO_SIZE_BYTES = 200 * 1024 * 1024;
 const CHAT_BUCKET_CANDIDATES = ['pchos-files', 'board-attachments'] as const;
 
+type UploadPlanRequest = {
+  fileName?: string;
+  mimeType?: string;
+  fileSize?: number;
+};
+
 function getAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -53,11 +59,83 @@ function isMissingBucketError(error: unknown, bucketName: string) {
   );
 }
 
+function validateUploadTarget(fileName: string, mimeType: string, fileSize: number) {
+  if (!fileName.trim()) {
+    throw new Error('업로드할 파일 이름이 없습니다.');
+  }
+
+  if (mimeType.startsWith('image/')) {
+    return;
+  }
+
+  if (mimeType.startsWith('video/')) {
+    if (fileSize > MAX_VIDEO_SIZE_BYTES) {
+      throw new Error('동영상 크기는 200MB 이하여야 합니다.');
+    }
+    return;
+  }
+
+  if (fileSize > MAX_FILE_SIZE_BYTES) {
+    throw new Error('파일 크기는 20MB 이하여야 합니다.');
+  }
+}
+
+async function createSignedUploadPlan(
+  supabase: any,
+  payload: UploadPlanRequest,
+) {
+  const fileName = String(payload.fileName || '').trim();
+  const mimeType = String(payload.mimeType || 'application/octet-stream').trim() || 'application/octet-stream';
+  const fileSize = Number(payload.fileSize || 0);
+
+  validateUploadTarget(fileName, mimeType, fileSize);
+
+  let lastError: unknown = null;
+  const filePath = buildSafeFilePath(fileName, mimeType);
+
+  for (const bucket of CHAT_BUCKET_CANDIDATES) {
+    const { data, error } = await supabase.storage.from(bucket).createSignedUploadUrl(filePath);
+
+    if (!error && data?.token) {
+      const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
+      return NextResponse.json({
+        success: true,
+        bucket,
+        path: filePath,
+        token: data.token,
+        signedUrl: data.signedUrl,
+        fileName,
+        url: publicUrlData.publicUrl,
+      });
+    }
+
+    lastError = error;
+    if (!isMissingBucketError(error, bucket)) {
+      return NextResponse.json(
+        { error: error?.message || '파일 업로드 준비에 실패했습니다.' },
+        { status: 500 },
+      );
+    }
+  }
+
+  const message =
+    (lastError as { message?: string })?.message || '채팅 첨부 업로드용 Storage 버킷을 찾지 못했습니다.';
+  return NextResponse.json({ error: message }, { status: 500 });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await readSessionFromRequest(request);
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const supabase = getAdminClient();
+    const contentType = request.headers.get('content-type') || '';
+
+    if (contentType.includes('application/json')) {
+      const payload = (await request.json().catch(() => ({}))) as UploadPlanRequest;
+      return await createSignedUploadPlan(supabase, payload);
     }
 
     const formData = await request.formData();
@@ -67,20 +145,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '업로드할 파일이 없습니다.' }, { status: 400 });
     }
 
-    if (file.type.startsWith('image/')) {
-      // 사진: 용량 제한 없음
-    } else if (file.type.startsWith('video/')) {
-      if (file.size > MAX_VIDEO_SIZE_BYTES) {
-        return NextResponse.json({ error: '동영상 크기는 200MB 이하여야 합니다.' }, { status: 400 });
-      }
-    } else if (file.size > MAX_FILE_SIZE_BYTES) {
-      return NextResponse.json({ error: '파일 크기는 20MB 이하여야 합니다.' }, { status: 400 });
-    }
+    validateUploadTarget(
+      String(file.name || '').trim(),
+      file.type || 'application/octet-stream',
+      file.size,
+    );
 
-    const supabase = getAdminClient();
     const filePath = buildSafeFilePath(file.name, file.type || 'application/octet-stream');
     const arrayBuffer = await file.arrayBuffer();
-
     let lastError: unknown = null;
 
     for (const bucket of CHAT_BUCKET_CANDIDATES) {

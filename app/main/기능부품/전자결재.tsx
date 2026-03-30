@@ -1842,6 +1842,51 @@ window.onload = () => window.print();
     };
   }, []);
 
+  const transitionApprovalsOnServer = useCallback(async (params: {
+    action: 'approve' | 'reject';
+    approvalIds: string[];
+    reason?: string | null;
+  }) => {
+    const response = await fetch('/api/approvals/transition', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.ok) {
+      throw new Error(String(payload?.error || response.statusText || 'Failed to transition approvals'));
+    }
+
+    return payload as {
+      ok: true;
+      action: 'approve' | 'reject';
+      summary: {
+        total: number;
+        successCount: number;
+        failCount: number;
+        finalApprovalCount: number;
+        warningCount: number;
+      };
+      results: Array<{
+        approvalId: string;
+        ok: boolean;
+        status: string;
+        finalApproval: boolean;
+        nextApproverId?: string | null;
+        alreadyProcessed?: boolean;
+        warnings?: string[];
+        supplySummary?: {
+          issue_ready_count?: number;
+          order_required_count?: number;
+        } | null;
+        error?: string;
+      }>;
+    };
+  }, []);
+
   // 결재함 일괄 승인 처리
   const handleBulkApprove = async () => {
     const count = selectedApprovalIds.length;
@@ -1854,25 +1899,35 @@ window.onload = () => window.print();
       tone: 'accent',
     });
     if (!confirmed) return;
-    let successCount = 0;
-    let failCount = 0;
-    for (const id of selectedApprovalIds) {
-      const item = approvals.find((a) => a.id === id);
-      if (!item) { failCount++; continue; }
-      try {
-        await handleApproveAction(item);
-        successCount++;
-      } catch {
-        failCount++;
+    try {
+      const payload = await transitionApprovalsOnServer({
+        action: 'approve',
+        approvalIds: selectedApprovalIds,
+      });
+
+      setSelectedApprovalIds([]);
+      if (payload.summary.failCount > 0) {
+        const firstError = payload.results.find((result) => !result.ok)?.error;
+        toast(
+          `${payload.summary.successCount}건 승인 완료, ${payload.summary.failCount}건 실패했습니다.${firstError ? `\n${firstError}` : ''}`,
+          'error'
+        );
+      } else {
+        toast(
+          `${payload.summary.successCount}건 승인 처리되었습니다. 최종 승인 ${payload.summary.finalApprovalCount}건`,
+          'success'
+        );
       }
+      if (payload.summary.warningCount > 0) {
+        toast(`일부 후처리에 확인이 필요합니다. 경고 ${payload.summary.warningCount}건`, 'warning');
+      }
+      fetchApprovals();
+    } catch (error) {
+      toast(
+        error instanceof Error ? error.message : '일괄 승인 처리에 실패했습니다.',
+        'error'
+      );
     }
-    setSelectedApprovalIds([]);
-    if (failCount > 0) {
-      toast(`${successCount}건 승인 완료, ${failCount}건 실패했습니다.`, 'error');
-    } else {
-      toast(`${count}건이 일괄 승인 처리되었습니다.`, 'success');
-    }
-    fetchApprovals();
   };
 
   // 결재함 일괄 반려 처리
@@ -1890,35 +1945,30 @@ window.onload = () => window.print();
       helperText: '비워 두면 기본 반려 문구로 저장됩니다.',
     });
     if (reason === null) return;
-    const results = await Promise.all(selectedApprovalIds.map(async (id) => {
-      const item = approvals.find((a) => a.id === id);
-      if (!item) return null;
-      const originalCurrentApproverId = resolveStoredCurrentApproverId(item);
-      const currentApproverId = resolveEffectiveApproverId(originalCurrentApproverId);
-      if (!currentApproverId || String(currentApproverId) !== String(user?.id)) return id;
-      const routingError = await syncDelegatedApprovalRouting(item, originalCurrentApproverId);
-      if (routingError) return id;
-      const itemMetaData = item.meta_data as Record<string, unknown> | null | undefined;
-      const nextMetaData = buildNextApprovalMetaData(itemMetaData, 'rejected', {
-        note: reason || '일괄 반려',
-        lock: true,
-        currentApproverId,
-        revision: getApprovalRevision(itemMetaData),
+    try {
+      const payload = await transitionApprovalsOnServer({
+        action: 'reject',
+        approvalIds: selectedApprovalIds,
+        reason,
       });
-      const { error } = await supabase.from('approvals').update({
-        status: '반려',
-        meta_data: { ...nextMetaData, reject_reason: reason },
-      }).eq('id', id);
-      return error ? id : null;
-    }));
-    const failedCount = results.filter(Boolean).length;
-    setSelectedApprovalIds([]);
-    if (failedCount > 0) {
-      toast(`${count - failedCount}건 반려 완료, ${failedCount}건 실패했습니다.`, 'error');
-    } else {
-      toast(`${count}건이 일괄 반려 처리되었습니다.`, 'success');
+
+      setSelectedApprovalIds([]);
+      if (payload.summary.failCount > 0) {
+        const firstError = payload.results.find((result) => !result.ok)?.error;
+        toast(
+          `${payload.summary.successCount}건 반려 완료, ${payload.summary.failCount}건 실패했습니다.${firstError ? `\n${firstError}` : ''}`,
+          'error'
+        );
+      } else {
+        toast(`${payload.summary.successCount}건이 일괄 반려 처리되었습니다.`, 'success');
+      }
+      fetchApprovals();
+    } catch (error) {
+      toast(
+        error instanceof Error ? error.message : '일괄 반려 처리에 실패했습니다.',
+        'error'
+      );
     }
-    fetchApprovals();
   };
 
   useEffect(() => {
@@ -1940,6 +1990,41 @@ window.onload = () => window.print();
       tone: 'accent',
     });
     if (!confirmed) return;
+
+    try {
+      const payload = await transitionApprovalsOnServer({
+        action: 'approve',
+        approvalIds: [String(item.id || '')],
+      });
+      const result = payload.results[0];
+      if (result?.ok) {
+        if (result.finalApproval) {
+          if (result.supplySummary) {
+            toast(
+              `최종 승인되었습니다. 출고 가능 ${result.supplySummary.issue_ready_count || 0}건, 발주 필요 ${result.supplySummary.order_required_count || 0}건을 확인해 주세요.`,
+              'success'
+            );
+          } else if (result.alreadyProcessed) {
+            toast('최종 승인 후처리가 이미 완료되어 동기화만 다시 확인했습니다.', 'success');
+          } else {
+            toast('최종 승인 처리가 완료되었습니다.', 'success');
+          }
+          if (Array.isArray(result.warnings) && result.warnings.length > 0) {
+            toast(`일부 후처리에 확인이 필요합니다.\n${result.warnings[0]}`, 'warning');
+          }
+        } else {
+          toast('승인되어 다음 결재자에게 진행되었습니다.');
+        }
+        fetchApprovals();
+        return;
+      }
+      if (result?.error) {
+        toast(result.error, 'error');
+        return;
+      }
+    } catch (serverTransitionError) {
+      console.error('승인 서버 처리 실패, 클라이언트 fallback 실행:', serverTransitionError);
+    }
 
     const originalCurrentApproverId = resolveStoredCurrentApproverId(item);
     const currentApproverId = resolveEffectiveApproverId(originalCurrentApproverId);
@@ -2262,6 +2347,27 @@ window.onload = () => window.print();
       helperText: '비워 두면 기본 반려 문구로 저장됩니다.',
     });
     if (reason === null) return;
+
+    try {
+      const payload = await transitionApprovalsOnServer({
+        action: 'reject',
+        approvalIds: [String(item.id || '')],
+        reason,
+      });
+      const result = payload.results[0];
+      if (result?.ok) {
+        toast('반려 처리되었습니다.', 'success');
+        fetchApprovals();
+        return;
+      }
+      if (result?.error) {
+        toast(result.error, 'error');
+        return;
+      }
+    } catch (serverTransitionError) {
+      console.error('반려 서버 처리 실패, 클라이언트 fallback 실행:', serverTransitionError);
+    }
+
     const routingError = await syncDelegatedApprovalRouting(item, originalCurrentApproverId);
     if (routingError) {
       toast("결재선을 초기화하지 못했습니다. 잠시 후 다시 시도해 주세요.");
