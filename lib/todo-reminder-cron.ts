@@ -42,15 +42,24 @@ function buildDeterministicNotificationId(userId: string, dedupeKey: string) {
 }
 
 function buildReminderBody(todo: DueTodoRow) {
-  const content = String(todo.content || '').trim() || '할일';
+  const content = String(todo.content || '').trim() || '할 일';
   return todo.task_date ? `${content} · ${todo.task_date}` : content;
 }
 
-export async function processDueTodoRemindersServer(limit = 100): Promise<TodoReminderDispatchResult> {
+function normalizeScopedUserIds(userIds?: string[] | null) {
+  if (!Array.isArray(userIds) || userIds.length === 0) return [];
+  return Array.from(new Set(userIds.map((id) => String(id || '').trim()).filter(Boolean)));
+}
+
+export async function processDueTodoRemindersServer(
+  limit = 100,
+  userIds?: string[] | null
+): Promise<TodoReminderDispatchResult> {
   const supabase = getAdminClient();
   const nowIso = new Date().toISOString();
+  const scopedUserIds = normalizeScopedUserIds(userIds);
 
-  const { data: dueRows, error: dueError } = await supabase
+  let dueQuery = supabase
     .from('todos')
     .select('id,user_id,content,task_date,reminder_at')
     .eq('is_complete', false)
@@ -59,6 +68,11 @@ export async function processDueTodoRemindersServer(limit = 100): Promise<TodoRe
     .order('reminder_at', { ascending: true })
     .limit(limit);
 
+  if (scopedUserIds.length > 0) {
+    dueQuery = dueQuery.in('user_id', scopedUserIds);
+  }
+
+  const { data: dueRows, error: dueError } = await dueQuery;
   if (dueError) {
     throw dueError;
   }
@@ -121,7 +135,7 @@ export async function processDueTodoRemindersServer(limit = 100): Promise<TodoRe
         id: notificationId,
         user_id: userId,
         type: 'todo',
-        title: '할일 리마인더',
+        title: '할 일 리마인더',
         body,
         metadata: {
           type: 'todo',
@@ -153,8 +167,8 @@ export async function processDueTodoRemindersServer(limit = 100): Promise<TodoRe
             reminder_at: reminderAt,
             notification_id: null,
             status: 'failed',
-            title: '할일 리마인더',
-            body: String(todo.content || '할일'),
+            title: '할 일 리마인더',
+            body: String(todo.content || '할 일'),
           },
         ],
         { onConflict: 'user_id,todo_id,reminder_at' }
@@ -170,8 +184,8 @@ export async function processDueTodoRemindersServer(limit = 100): Promise<TodoRe
           reminder_at: reminderAt,
           notification_id: notificationId,
           status: duplicateNotification ? 'duplicate' : 'sent',
-          title: '할일 리마인더',
-          body: String(todo.content || '할일'),
+          title: '할 일 리마인더',
+          body: String(todo.content || '할 일'),
         },
       ],
       { onConflict: 'user_id,todo_id,reminder_at' }

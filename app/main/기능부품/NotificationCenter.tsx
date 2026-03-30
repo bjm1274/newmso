@@ -301,17 +301,17 @@ export default function NotificationCenter({
           if (!isOpen) void fetchNotifications();
           if (!isOpen) sound.playSystem();
         }}
-        className="relative p-2.5 rounded-[var(--radius-lg)] hover:bg-[var(--muted)] transition-all group touch-manipulation"
+        className="relative p-2.5 rounded-[var(--radius-lg)] hover:bg-[var(--muted)] transition-colors duration-150 touch-manipulation"
         aria-label="알림"
       >
         <span
-          className={`text-2xl block ${bellShaking ? 'animate-bell-shake' : ''}`}
+          className={`text-[22px] block leading-none ${bellShaking ? 'animate-bell-shake' : ''}`}
           style={{ transformOrigin: 'top center' }}
         >
           🔔
         </span>
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-red-500 text-white text-[9px] font-black rounded-[var(--radius-md)] border-2 border-[var(--card)]">
+          <span className="absolute top-1 right-1 min-w-[17px] h-[17px] px-1 flex items-center justify-center bg-red-500 text-white text-[9px] font-black rounded-full border-[2px] border-[var(--card)] leading-none">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
@@ -319,14 +319,16 @@ export default function NotificationCenter({
 
       {isOpen && (
         <div
-          className="absolute bottom-[calc(100%+12px)] right-0 w-[min(20rem,calc(100vw-16px))] max-w-[calc(100vw-16px)] bg-[var(--card)]/95 backdrop-blur-xl border border-[var(--border)] rounded-[var(--radius-xl)] shadow-sm z-[320] overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-bottom-right md:bottom-auto md:top-0 md:left-[calc(100%+12px)] md:right-auto md:w-80 md:max-w-none md:origin-top-left"
+          className="absolute bottom-[calc(100%+8px)] right-0 w-[min(20rem,calc(100vw-16px))] max-w-[calc(100vw-16px)] bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] z-[320] overflow-hidden animate-scale-in origin-bottom-right md:bottom-auto md:top-0 md:left-[calc(100%+8px)] md:right-auto md:w-[320px] md:max-w-none md:origin-top-left"
+          style={{ boxShadow: 'var(--shadow-dropdown)' }}
           data-testid="notification-dropdown"
         >
-          <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
+          {/* 헤더 */}
+          <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between bg-[var(--card)]">
             <div className="flex items-center gap-2">
-              <h3 className="font-bold text-[13px] text-[var(--foreground)]">알림</h3>
+              <h3 className="font-bold text-[13px] text-[var(--foreground)] tracking-tight">알림</h3>
               {unreadCount > 0 && (
-                <span className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-[var(--radius-md)]">
+                <span className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none">
                   {unreadCount}
                 </span>
               )}
@@ -335,25 +337,25 @@ export default function NotificationCenter({
               <button
                 type="button"
                 onClick={markAllAsRead}
-                className="text-[11px] font-bold text-[var(--accent)] hover:underline"
+                className="text-[11px] font-semibold text-[var(--accent)] hover:text-[var(--accent-hover)] px-2 py-1 rounded-[var(--radius-sm)] hover:bg-[var(--accent-light)] transition-colors"
               >
                 모두 읽음
               </button>
             )}
           </div>
 
-          <div className="max-h-[380px] overflow-y-auto custom-scrollbar">
+          <div className="max-h-[360px] overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="py-10 text-center">
                 <p className="text-3xl mb-2 opacity-20">🔕</p>
-                <p className="text-xs text-[var(--toss-gray-3)] font-medium">받은 알림이 없습니다.</p>
+                <p className="text-[12px] text-[var(--toss-gray-3)] font-medium">받은 알림이 없습니다.</p>
               </div>
             ) : (
               <>
                 {unread.length > 0 && (
                   <div>
-                    <div className="px-4 py-1.5 bg-[var(--muted)]/60 sticky top-0">
-                      <span className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-wider">
+                    <div className="px-4 py-1.5 bg-[var(--muted)] sticky top-0 z-10 border-b border-[var(--border-subtle)]">
+                      <span className="text-[10px] font-bold text-[var(--zinc-400)] uppercase tracking-widest">
                         새 알림 {unread.length}건
                       </span>
                     </div>
@@ -365,19 +367,20 @@ export default function NotificationCenter({
                           type="button"
                           data-testid={`notification-item-${notification.id}`}
                           onClick={() => handleNotiClick(notification)}
-                          className="w-full text-left px-4 py-3 flex gap-3 hover:bg-[var(--muted)] transition-colors border-b border-[var(--border)]/50 bg-[var(--toss-blue-light)]/20 last:border-0 group"
+                          className="w-full text-left px-4 py-2.5 flex gap-3 hover:bg-[var(--muted)] transition-colors duration-100 border-b border-[var(--border-subtle)] last:border-0"
+                          style={{ background: 'rgba(37,99,235,0.03)' }}
                         >
-                          <span className={`text-xl shrink-0 mt-0.5 ${cfg.color}`}>{cfg.icon}</span>
+                          <span className={`text-[18px] shrink-0 mt-0.5 leading-none ${cfg.color}`}>{cfg.icon}</span>
                           <div className="min-w-0 flex-1">
                             <div className="flex justify-between items-start gap-1">
-                              <p className="text-[12px] font-bold text-[var(--foreground)] truncate flex-1">
+                              <p className="text-[12px] font-semibold text-[var(--foreground)] truncate flex-1 leading-snug">
                                 {toNotificationText(notification.title, '알림')}
                               </p>
-                              <span className="text-[9px] text-[var(--toss-gray-3)] shrink-0 mt-0.5">
+                              <span className="text-[10px] text-[var(--zinc-400)] shrink-0 mt-0.5 font-medium">
                                 {timeAgo(notification.created_at)}
                               </span>
                             </div>
-                            <p className="text-[10px] text-[var(--toss-gray-3)] font-bold mt-0.5">
+                            <p className="text-[10px] font-semibold mt-0.5" style={{ color: 'var(--zinc-400)' }}>
                               {cfg.label}
                             </p>
                             {toNotificationText(notification.body, '') && (
@@ -386,7 +389,7 @@ export default function NotificationCenter({
                               </p>
                             )}
                           </div>
-                          <span className="w-2 h-2 bg-[var(--accent)] rounded-full shrink-0 mt-2 animate-pulse" />
+                          <span className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full shrink-0 mt-1.5" />
                         </button>
                       );
                     })}
@@ -396,8 +399,8 @@ export default function NotificationCenter({
                 {read.length > 0 && (
                   <div>
                     {unread.length > 0 && (
-                      <div className="px-4 py-1.5 bg-[var(--muted)]/60 sticky top-0">
-                        <span className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-wider">
+                      <div className="px-4 py-1.5 bg-[var(--muted)] sticky top-0 z-10 border-b border-[var(--border-subtle)]">
+                        <span className="text-[10px] font-bold text-[var(--zinc-400)] uppercase tracking-widest">
                           읽은 알림
                         </span>
                       </div>
@@ -410,21 +413,18 @@ export default function NotificationCenter({
                           type="button"
                           data-testid={`notification-item-${notification.id}`}
                           onClick={() => handleNotiClick(notification)}
-                          className="w-full text-left px-4 py-3 flex gap-3 hover:bg-[var(--muted)] transition-colors border-b border-[var(--border)]/50 opacity-60 last:border-0"
+                          className="w-full text-left px-4 py-2.5 flex gap-3 hover:bg-[var(--muted)] transition-colors duration-100 border-b border-[var(--border-subtle)] opacity-55 last:border-0"
                         >
-                          <span className={`text-lg shrink-0 mt-0.5 ${cfg.color}`}>{cfg.icon}</span>
+                          <span className={`text-[16px] shrink-0 mt-0.5 leading-none ${cfg.color}`}>{cfg.icon}</span>
                           <div className="min-w-0 flex-1">
                             <div className="flex justify-between items-start gap-1">
-                              <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] truncate flex-1">
+                              <p className="text-[11px] font-medium text-[var(--toss-gray-3)] truncate flex-1 leading-snug">
                                 {toNotificationText(notification.title, '알림')}
                               </p>
-                              <span className="text-[9px] text-[var(--toss-gray-3)] shrink-0 mt-0.5">
+                              <span className="text-[10px] text-[var(--zinc-400)] shrink-0 mt-0.5">
                                 {timeAgo(notification.created_at)}
                               </span>
                             </div>
-                            <p className="text-[10px] text-[var(--toss-gray-3)] font-bold mt-0.5">
-                              {cfg.label}
-                            </p>
                             {toNotificationText(notification.body, '') && (
                               <p className="text-[10px] text-[var(--toss-gray-3)] line-clamp-1 mt-0.5">
                                 {toNotificationText(notification.body, '')}
@@ -440,16 +440,17 @@ export default function NotificationCenter({
             )}
           </div>
 
-          <div className="px-4 py-2.5 border-t border-[var(--border)] bg-[var(--muted)]/40 flex justify-center">
+          {/* 푸터 */}
+          <div className="px-4 py-2.5 border-t border-[var(--border)] bg-[var(--muted)] flex justify-center">
             <button
               type="button"
               onClick={() => {
                 setIsOpen(false);
                 openMyNotifications();
               }}
-              className="text-[11px] font-bold text-[var(--accent)] hover:underline"
+              className="text-[11px] font-semibold text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
             >
-              전체 알림 보기
+              전체 알림 보기 →
             </button>
           </div>
         </div>
