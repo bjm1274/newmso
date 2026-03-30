@@ -6,6 +6,7 @@ import { readSessionFromRequest } from '@/lib/server-session';
 import { isNamedSystemMasterAccount } from '@/lib/system-master';
 import { runBackup } from '@/lib/backup-cron';
 import { processPendingChatPushJobs } from '@/lib/chat-push-dispatch';
+import { processDueTodoRemindersServer } from '@/lib/todo-reminder-cron';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,7 @@ const OPERATION_CRONS = [
   { path: '/api/cron/chat-retention', schedule: '매일 02:00', label: '채팅 보관정책 정리' },
   { path: '/api/cron/push-subscription-cleanup', schedule: '매일 12:00', label: '푸시 구독 정리' },
   { path: '/api/cron/chat-push-dispatch', schedule: '매일 04:00', label: '채팅 푸시 큐 백업 처리' },
+  { path: '/api/cron/todo-reminders', schedule: '매시간', label: '할일 리마인더 처리' },
 ] as const;
 
 type PushSubscriptionRow = {
@@ -838,6 +840,7 @@ export async function GET(request: NextRequest) {
       ].filter(Boolean);
 
       return NextResponse.json({
+        checkedAt: new Date().toISOString(),
         queue: queueSummary,
         subscriptions: {
           total: subscriptionRows.length,
@@ -1035,6 +1038,11 @@ export async function POST(request: NextRequest) {
 
     if (action === 'run_chat_push_dispatch') {
       const result = await processPendingChatPushJobs(50);
+      return NextResponse.json({ ok: true, action, result });
+    }
+
+    if (action === 'run_todo_reminders') {
+      const result = await processDueTodoRemindersServer(150);
       return NextResponse.json({ ok: true, action, result });
     }
 
