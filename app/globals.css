@@ -19,6 +19,11 @@
   --accent: #2563EB;
   --accent-light: #EFF6FF;
   --accent-hover: #1D4ED8;
+  --accent-subtle: rgba(37,99,235,0.08);
+
+  /* ── Muted (was missing — caused 760+ broken hover states) ── */
+  --muted: #F1F1F3;
+  --muted-foreground: #71717A;
 
   --zinc-50: #FAFAFA;
   --zinc-100: #F4F4F5;
@@ -36,6 +41,7 @@
   --card: #FFFFFF;
   --danger: #EF4444;
   --danger-light: #FEF2F2;
+  --danger-hover: #DC2626;
   --success: #10B981;
   --success-light: #F0FDF4;
   --warning: #F59E0B;
@@ -46,12 +52,19 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
+  --radius-2xl: 20px;
 
   --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
   --shadow-md: 0 4px 8px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
   --shadow-lg: 0 8px 24px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
   --shadow-premium: 0 0 0 1px rgba(0,0,0,0.04), 0 2px 4px rgba(0,0,0,0.04), 0 8px 20px rgba(0,0,0,0.05);
+  --shadow-dropdown: 0 4px 6px -1px rgba(0,0,0,0.07), 0 10px 24px -4px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04);
+
+  /* ── Transition timing ── */
+  --transition-fast: 100ms ease;
+  --transition-base: 150ms ease;
+  --transition-slow: 220ms ease;
 
   /* Toss System Colors (호환성 유지) */
   --toss-blue: #2563EB;
@@ -67,7 +80,7 @@
   /* Sidebar */
   --sidebar-width: 64px;
   --sidebar-bg: #FFFFFF;
-  --submenu-width: 156px;
+  --submenu-width: 160px;
 }
 
 :root.dark {
@@ -80,11 +93,17 @@
   --primary: #F4F4F5;
   --primary-foreground: #09090B;
 
+  --muted: #18181B;
+  --muted-foreground: #A1A1AA;
+
+  --accent-subtle: rgba(59,130,246,0.12);
+
   --border: #27272A;
   --border-subtle: #1F1F22;
   --card: #111113;
   --danger: #F87171;
   --danger-light: rgba(239,68,68,0.1);
+  --danger-hover: #EF4444;
   --success: #34D399;
   --success-light: rgba(16,185,129,0.1);
   --warning: #FBBF24;
@@ -95,6 +114,7 @@
   --shadow-md: 0 4px 8px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.2);
   --shadow-lg: 0 8px 24px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2);
   --shadow-premium: 0 0 0 1px rgba(255,255,255,0.05), 0 8px 24px rgba(0,0,0,0.5);
+  --shadow-dropdown: 0 4px 6px -1px rgba(0,0,0,0.3), 0 10px 24px -4px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.04);
 
   --toss-blue: #3B82F6;
   --toss-blue-light: rgba(59,130,246,0.12);
@@ -114,10 +134,14 @@
   --color-foreground: var(--foreground);
   --color-page-bg: var(--page-bg);
   --color-tab-bg: var(--tab-bg);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
   --color-card: var(--card);
   --color-border: var(--border);
   --color-primary: var(--primary);
   --color-accent: var(--accent);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
   --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
@@ -230,20 +254,30 @@ body {
   font-weight: 600;
   padding: 7px 14px;
   border-radius: var(--radius-md);
-  transition: background 0.15s ease, transform 0.1s ease;
+  transition: background var(--transition-base), box-shadow var(--transition-base), transform var(--transition-fast);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   white-space: nowrap;
+  border: none;
+  cursor: pointer;
+  letter-spacing: -0.01em;
 }
 
 .btn-premium-primary:hover {
   background: var(--accent-hover);
+  box-shadow: 0 2px 8px rgba(37,99,235,0.28);
 }
 
 .btn-premium-primary:active {
-  transform: scale(0.98);
+  transform: scale(0.975);
+  box-shadow: none;
+}
+
+.btn-premium-primary:disabled {
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 .btn-premium-secondary {
@@ -254,17 +288,54 @@ body {
   padding: 7px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base), transform var(--transition-fast);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   white-space: nowrap;
+  cursor: pointer;
+  letter-spacing: -0.01em;
 }
 
 .btn-premium-secondary:hover {
-  background: var(--tab-bg);
+  background: var(--muted);
   border-color: var(--zinc-300);
+}
+
+.btn-premium-secondary:active {
+  transform: scale(0.975);
+}
+
+.btn-premium-secondary:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.btn-premium-danger {
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: var(--radius-md);
+  transition: background var(--transition-base), box-shadow var(--transition-base), transform var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-premium-danger:hover {
+  background: var(--danger-hover);
+  box-shadow: 0 2px 8px rgba(239,68,68,0.28);
+}
+
+.btn-premium-danger:active {
+  transform: scale(0.975);
 }
 
 /* ── Tab bar ─────────────────────────────────────── */
@@ -272,36 +343,43 @@ body {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 8px 12px;
+  padding: 7px 12px;
   background: var(--card);
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
+  scrollbar-width: none;
 }
+.tab-bar::-webkit-scrollbar { display: none; }
 
 .tab-item {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 5px 12px;
+  padding: 5px 11px;
   border-radius: var(--radius-md);
   font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
-  transition: all 0.15s ease;
+  transition: background var(--transition-base), color var(--transition-base);
   color: var(--toss-gray-4);
   cursor: pointer;
   border: none;
   background: transparent;
+  letter-spacing: -0.01em;
 }
 
 .tab-item:hover {
-  background: var(--tab-bg);
+  background: var(--muted);
   color: var(--foreground);
 }
 
 .tab-item.active {
   background: var(--accent);
   color: #fff;
+}
+
+.tab-item:active {
+  transform: scale(0.97);
 }
 
 /* ── Menu items (sidebar, nav) ───────────────────── */
@@ -313,7 +391,7 @@ body {
   border-radius: var(--radius-md);
   font-size: 0.75rem;
   font-weight: 500;
-  transition: all 0.12s ease;
+  transition: background var(--transition-base), color var(--transition-base);
   color: var(--toss-gray-4);
   cursor: pointer;
   border: none;
@@ -324,12 +402,12 @@ body {
 }
 
 .menu-item:hover {
-  background: var(--toss-gray-1);
+  background: var(--muted);
   color: var(--foreground);
 }
 
 .menu-item.active {
-  background: var(--foreground);
+  background: var(--accent);
   color: #fff;
   font-weight: 600;
 }
@@ -344,8 +422,14 @@ select:not(.no-style) {
   padding: 6px 10px;
   font-size: 0.8125rem;
   color: var(--foreground);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
   font-family: inherit;
+  line-height: 1.5;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not(.no-style)::placeholder,
+textarea:not(.no-style)::placeholder {
+  color: var(--zinc-400);
 }
 
 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not(.no-style):focus,
@@ -353,7 +437,7 @@ textarea:not(.no-style):focus,
 select:not(.no-style):focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-light);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
 }
 
 input.premium,
@@ -365,8 +449,14 @@ select.premium {
   padding: 8px 12px;
   font-size: 0.8125rem;
   color: var(--foreground);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
   font-family: inherit;
+  line-height: 1.5;
+}
+
+input.premium::placeholder,
+textarea.premium::placeholder {
+  color: var(--zinc-400);
 }
 
 input.premium:focus,
@@ -374,7 +464,7 @@ textarea.premium:focus,
 select.premium:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-light);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
 }
 
 /* ── Glassmorphism ───────────────────────────────── */
@@ -392,8 +482,8 @@ select.premium:focus {
 
 /* ── Scrollbar ───────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 3px;
-  height: 3px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
@@ -413,14 +503,62 @@ select.premium:focus {
   background: var(--zinc-300);
 }
 
+:root.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--zinc-600);
+}
+
 /* ── Animations ──────────────────────────────────── */
 .animate-premium-fade {
-  animation: premiumFade 0.25s ease-out both;
+  animation: premiumFade 0.22s ease-out both;
 }
 
 @keyframes premiumFade {
-  from { opacity: 0; transform: translateY(3px); }
+  from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.2s ease-out both;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-down {
+  animation: slideDown 0.2s ease-out both;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.18s ease-out both;
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* 알림 벨 흔들림 */
+.animate-bell-shake {
+  animation: bellShake 0.7s ease-in-out;
+}
+
+@keyframes bellShake {
+  0%   { transform: rotate(0deg); }
+  12%  { transform: rotate(14deg); }
+  25%  { transform: rotate(-11deg); }
+  37%  { transform: rotate(8deg); }
+  50%  { transform: rotate(-5deg); }
+  62%  { transform: rotate(3deg); }
+  75%  { transform: rotate(-2deg); }
+  87%  { transform: rotate(1deg); }
+  100% { transform: rotate(0deg); }
 }
 
 /* ── Safe area ───────────────────────────────────── */
@@ -527,6 +665,14 @@ select.premium:focus {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 16px;
+  transition: box-shadow var(--transition-base), border-color var(--transition-base);
+}
+.stat-card:hover {
+  box-shadow: var(--shadow-sm);
+  border-color: var(--zinc-300);
+}
+:root.dark .stat-card:hover {
+  border-color: var(--zinc-700);
 }
 .stat-card-value {
   font-size: 1.5rem;
@@ -534,10 +680,80 @@ select.premium:focus {
   letter-spacing: -0.03em;
   color: var(--foreground);
   line-height: 1;
+  font-feature-settings: "tnum";
 }
 .stat-card-label {
   font-size: 0.75rem;
   font-weight: 500;
   color: var(--zinc-500);
   margin-top: 4px;
+}
+
+/* ── Divider ─────────────────────────────────────── */
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0;
+}
+
+.divider-v {
+  width: 1px;
+  background: var(--border);
+  align-self: stretch;
+}
+
+/* ── Icon button ─────────────────────────────────── */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--toss-gray-4);
+  cursor: pointer;
+  transition: background var(--transition-base), color var(--transition-base);
+  padding: 6px;
+  line-height: 1;
+}
+
+.icon-btn:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.icon-btn:active {
+  transform: scale(0.93);
+}
+
+/* ── Focus ring ──────────────────────────────────── */
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-subtle), 0 0 0 1px var(--accent);
+}
+
+/* ── Number tabular ──────────────────────────────── */
+.tabular-nums {
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Tooltip ─────────────────────────────────────── */
+.tooltip {
+  position: absolute;
+  z-index: 9999;
+  padding: 4px 8px;
+  background: var(--zinc-900);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: var(--shadow-md);
+}
+
+:root.dark .tooltip {
+  background: var(--zinc-100);
+  color: var(--zinc-900);
 }

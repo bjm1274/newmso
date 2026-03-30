@@ -288,58 +288,65 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
         </div>
 
         <div className="no-scrollbar flex w-full flex-1 flex-col gap-0.5 overflow-y-auto px-1.5">
-          {visibleMenus.map((menu) => (
-            <button
-              key={menu.id}
-              type="button"
-              data-testid={menu.testId}
-              onClick={() => handleMenuClick(menu.id)}
-              className={`flex w-full flex-col items-center justify-center rounded-[var(--radius-md)] py-2 transition-all ${
-                mainMenu === menu.id
-                  ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
-                  : 'text-[var(--toss-gray-3)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
-              }`}
-            >
-              <span className="relative text-[17px] leading-none">
-                {menu.icon}
-                {menu.id === '채팅' && chatUnreadCount > 0 && (
-                  <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-[16px] px-1 rounded-[var(--radius-md)] bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
-                    {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
-                  </span>
-                )}
-              </span>
-              <span className="mt-1 text-[10px] font-semibold">{menu.label}</span>
-            </button>
-          ))}
+          {visibleMenus.map((menu) => {
+            const isActive = mainMenu === menu.id;
+            return (
+              <button
+                key={menu.id}
+                type="button"
+                data-testid={menu.testId}
+                onClick={() => handleMenuClick(menu.id)}
+                className={`relative flex w-full flex-col items-center justify-center rounded-[var(--radius-md)] py-2 transition-all duration-150 ${
+                  isActive
+                    ? 'bg-[var(--accent)] text-white'
+                    : 'text-[var(--toss-gray-3)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                <span className="relative text-[17px] leading-none">
+                  {menu.icon}
+                  {menu.id === '채팅' && chatUnreadCount > 0 && (
+                    <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                      {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                    </span>
+                  )}
+                </span>
+                <span className="mt-1 text-[10px] font-semibold">{menu.label}</span>
+              </button>
+            );
+          })}
         </div>
       </aside>
 
       {/* 모바일 하단 탭바 */}
       <nav
-        className="safe-area-pb no-scrollbar fixed bottom-0 left-0 right-0 z-[100] flex items-center gap-0.5 overflow-x-auto border-t border-[var(--border)] bg-[var(--card)] px-1.5 py-1 shadow-[0_-1px_0_var(--border)] md:hidden"
+        className="safe-area-pb no-scrollbar fixed bottom-0 left-0 right-0 z-[100] flex items-center gap-0.5 overflow-x-auto border-t border-[var(--border)] bg-[var(--card)] px-1.5 py-1 md:hidden"
+        style={{ boxShadow: '0 -1px 0 var(--border)' }}
         data-testid="mobile-tabbar"
       >
-        {visibleMenus.map((menu) => (
-          <button
-            key={menu.id}
-            type="button"
-            data-testid={`${menu.testId}-mobile`}
-            onClick={() => handleMenuClick(menu.id)}
-            className={`flex min-h-[56px] flex-1 touch-manipulation flex-col items-center justify-center rounded-[var(--radius-md)] px-2 py-1.5 transition-all ${
-              mainMenu === menu.id ? 'text-[var(--accent)]' : 'text-[var(--toss-gray-3)]'
-            }`}
-          >
-            <span className="relative text-[22px] leading-none">
-              {menu.icon}
-              {menu.id === '채팅' && chatUnreadCount > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 min-w-[15px] h-[15px] px-0.5 rounded-[var(--radius-md)] bg-red-500 text-white text-[8px] font-bold flex items-center justify-center">
-                  {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
-                </span>
-              )}
-            </span>
-            <span className="mt-0.5 w-full truncate text-center text-[11px] font-bold">{menu.label}</span>
-          </button>
-        ))}
+        {visibleMenus.map((menu) => {
+          const isActive = mainMenu === menu.id;
+          return (
+            <button
+              key={menu.id}
+              type="button"
+              data-testid={`${menu.testId}-mobile`}
+              onClick={() => handleMenuClick(menu.id)}
+              className={`flex min-h-[56px] flex-1 touch-manipulation flex-col items-center justify-center rounded-[var(--radius-md)] px-1 py-1.5 transition-all duration-150 ${
+                isActive ? 'text-[var(--accent)]' : 'text-[var(--toss-gray-3)]'
+              }`}
+            >
+              <span className="relative text-[22px] leading-none">
+                {menu.icon}
+                {menu.id === '채팅' && chatUnreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-[16px] px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                    {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                  </span>
+                )}
+              </span>
+              <span className="mt-0.5 w-full truncate text-center text-[11px] font-bold">{menu.label}</span>
+            </button>
+          );
+        })}
         {/* 알림 버튼 자리 확보 */}
         <div className="min-h-[56px] w-[56px] flex-none" />
       </nav>

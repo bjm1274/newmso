@@ -958,6 +958,27 @@ export default function NotificationSystem({
 
     const processDueTodoReminders = async () => {
       try {
+        const response = await fetch('/api/todos/reminders/dispatch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (response.ok) {
+          return;
+        }
+
+        const payload = await response.json().catch(() => null);
+        const serverError = payload?.error
+          ? new Error(String(payload.error))
+          : new Error(`todo reminder dispatch failed (${response.status})`);
+        if (isMissingTodoReminderSchema(serverError)) return;
+        throw serverError;
+      } catch (serverError) {
+        if (isMissingTodoReminderSchema(serverError)) return;
+        console.warn('todo reminder server dispatch failed, using local fallback:', serverError);
+      }
+
+      try {
         const nowIso = new Date().toISOString();
         const { data: dueRows, error: dueError } = await supabase
           .from('todos')

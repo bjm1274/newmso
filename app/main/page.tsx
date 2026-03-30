@@ -850,14 +850,14 @@ function MainPageContent() {
       />
 
       {currentSubMenus.length > 0 && (
-        <aside className="no-scrollbar flex w-full shrink-0 flex-row overflow-x-auto border-b border-[var(--border)] bg-[var(--card)] px-2 py-1.5 md:sticky md:top-0 md:max-h-[100dvh] md:w-[var(--submenu-width)] md:flex-col md:overflow-x-visible md:overflow-y-auto md:border-r md:border-b-0 md:px-2 md:py-3">
+        <aside className="no-scrollbar flex w-full shrink-0 flex-row overflow-x-auto border-b border-[var(--border)] bg-[var(--card)] px-2 py-1.5 md:sticky md:top-0 md:max-h-[100dvh] md:w-[var(--submenu-width)] md:flex-col md:overflow-x-visible md:overflow-y-auto md:border-r md:border-b-0 md:px-2 md:py-3 md:gap-0.5">
           {(() => {
             if (mainMenu === '관리자' || mainMenu === '재고관리') {
               const groups = currentSubMenuGroups;
 
               return groups.map(groupName => (
-                <div key={groupName!} className="flex flex-row md:flex-col gap-0.5 mb-0 md:mb-3 shrink-0">
-                  <div className="hidden md:block px-2.5 pt-1 pb-0.5 text-[9px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">
+                <div key={groupName!} className="flex flex-row md:flex-col gap-0.5 mb-0 md:mb-2 shrink-0">
+                  <div className="hidden md:block px-2 pt-2 pb-0.5 text-[9px] font-bold text-[var(--zinc-400)] uppercase tracking-widest select-none">
                     {(subgroupLabels[groupName!] || groupName)?.replace(/^[^\s]+ /, '')}
                   </div>
                   {currentSubMenus.filter(s => s.group === groupName).map(sub => (
@@ -865,12 +865,12 @@ function MainPageContent() {
                       key={sub.id}
                       onClick={() => handleSubViewChange(sub.id)}
                       data-testid={buildSubMenuTestId(mainMenu, sub.id)}
-                      className={`flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all whitespace-nowrap md:flex md:items-center md:gap-1.5 ${subView === sub.id
-                        ? 'bg-[var(--foreground)] text-white'
-                        : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
+                      className={`flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all duration-150 whitespace-nowrap md:flex md:items-center md:gap-1.5 ${subView === sub.id
+                        ? 'bg-[var(--accent)] text-white shadow-sm'
+                        : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]'
                       }`}
                     >
-                      <span className="hidden md:inline text-[12px] shrink-0 opacity-80">{sub.icon || '·'}</span>
+                      <span className="hidden md:inline text-[12px] shrink-0" style={{ opacity: subView === sub.id ? 1 : 0.65 }}>{sub.icon || '·'}</span>
                       <span className="truncate">{sub.label}</span>
                     </button>
                   ))}
@@ -883,12 +883,12 @@ function MainPageContent() {
                 key={sub.id}
                 onClick={() => handleSubViewChange(sub.id)}
                 data-testid={buildSubMenuTestId(mainMenu, sub.id)}
-                className={`flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all whitespace-nowrap md:flex md:items-center md:gap-1.5 ${subView === sub.id
-                  ? 'bg-[var(--accent)] text-white'
-                  : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
+                className={`flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all duration-150 whitespace-nowrap md:flex md:items-center md:gap-1.5 ${subView === sub.id
+                  ? 'bg-[var(--accent)] text-white shadow-sm'
+                  : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]'
                 }`}
               >
-                <span className="hidden md:inline text-[12px] shrink-0 opacity-80">{sub.icon || '·'}</span>
+                <span className="hidden md:inline text-[12px] shrink-0" style={{ opacity: subView === sub.id ? 1 : 0.65 }}>{sub.icon || '·'}</span>
                 <span className="truncate">{sub.label}</span>
               </button>
             ));
