@@ -6,6 +6,7 @@ import { getStaffLikeId, resolveStaffLike } from '@/lib/staff-identity';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import SmartDatePicker from './공통/SmartDatePicker';
+import WikiDashboard from './게시판서브/사내위키';
 import type { StaffMember, BoardPost, ScheduleItem, AttachmentItem } from '@/types';
 const CHAT_ROOM_KEY = 'erp_chat_last_room';
 const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
@@ -13,7 +14,7 @@ const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
 // 공지사항·경조사 게시글 등록 시 공지 채팅방 자동 전송 대상 게시판
 const BOARD_AUTO_CHAT_TYPES = new Set(['공지사항', '경조사']);
 
-const BOARD_IDS = ['공지사항', '자유게시판', '익명소리함', '경조사', '수술일정', 'MRI일정', '직원제안함'];
+const BOARD_IDS = ['공지사항', '자유게시판', '익명소리함', '경조사', '수술일정', 'MRI일정', '직원제안함', '사내위키'];
 const BOARD_POST_OPTIONAL_COLUMNS = [
   'company_id',
   'tags',
@@ -537,7 +538,8 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     { id: '경조사', label: '🎉 경조사', icon: '🎉' },
     { id: '수술일정', label: '🏥 수술일정표', icon: '🏥' },
     { id: 'MRI일정', label: '🔬 MRI일정표', icon: '🔬' },
-    { id: '직원제안함', label: '💡 직원 제안함', icon: '💡' }
+    { id: '직원제안함', label: '💡 직원 제안함', icon: '💡' },
+    { id: '사내위키', label: '📚 사내위키', icon: '📚' }
   ];
   const visibleBoards = useMemo(
     () => boards.filter((board) => canAccessBoard(user, board.id, 'read')),
@@ -552,6 +554,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     수술일정: { title: '수술일정', description: '' },
     MRI일정: { title: 'MRI일정', description: '' },
     직원제안함: { title: '직원 제안함', description: '' },
+    사내위키: { title: '사내위키', description: '업무 지식과 운영 문서를 팀 단위로 정리합니다.' },
   };
   const currentBoardMeta = boardMetaMap[activeBoard] || {
     title: activeBoard || '게시판',
@@ -1725,7 +1728,15 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       data-testid="board-view"
     >
       {/* 상세 메뉴(공지사항·자유게시판 등)는 메인 좌측 사이드바에서 게시판 호버/클릭 시 플라이아웃으로 선택 */}
-      {activeBoard !== '사내위키' && (
+      {activeBoard === '사내위키' ? (
+        <div className="flex-1 min-h-0">
+          <WikiDashboard
+            user={user}
+            selectedCo={selectedCo}
+            selectedCompanyId={selectedCompanyId}
+          />
+        </div>
+      ) : (
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto custom-scrollbar p-4 md:p-4 space-y-4 md:space-y-4 pb-24 md:pb-8">
           <header className="shrink-0">
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">

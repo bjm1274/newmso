@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 
 type ApprovalArchiveSource = Record<string, unknown>;
@@ -93,7 +94,10 @@ export function mapApprovalToDocumentRepositoryEntry(item: ApprovalArchiveSource
   };
 }
 
-export async function syncApprovalToDocumentRepository(item: ApprovalArchiveSource) {
+export async function syncApprovalToDocumentRepository(
+  item: ApprovalArchiveSource,
+  client: SupabaseClient = supabase
+) {
   const title = String(item.title || '').trim();
   if (!title) return;
 
@@ -109,7 +113,7 @@ export async function syncApprovalToDocumentRepository(item: ApprovalArchiveSour
 
   const docNumber = resolveApprovalDocNumber(item);
   const companyName = nextRow.company_name;
-  let query = supabase.from('document_repository').select('*').order('updated_at', { ascending: false }).limit(300);
+  let query = client.from('document_repository').select('*').order('updated_at', { ascending: false }).limit(300);
   if (companyName && companyName !== '전체') {
     query = query.eq('company_name', companyName);
   }
@@ -127,7 +131,7 @@ export async function syncApprovalToDocumentRepository(item: ApprovalArchiveSour
 
   if (matchedDoc?.id) {
     const currentVersion = Number(matchedDoc.version) || 1;
-    const { error } = await supabase
+    const { error } = await client
       .from('document_repository')
       .update({
         ...nextRow,
@@ -140,7 +144,7 @@ export async function syncApprovalToDocumentRepository(item: ApprovalArchiveSour
     return matchedDoc.id;
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from('document_repository')
     .insert(nextRow)
     .select('id')

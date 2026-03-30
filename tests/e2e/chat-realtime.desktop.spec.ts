@@ -192,6 +192,108 @@ test("chat updates room preview and unread count immediately for messages from a
   await expect(backgroundRoom).toContainText("1");
 });
 
+test("chat clears unread badges across the whole 1:1 conversation when one direct room is opened", async ({ page }) => {
+  await mockSupabase(page, {
+    chatRooms: [
+      {
+        id: "00000000-0000-0000-0000-000000000000",
+        name: "Notice",
+        type: "notice",
+        members: [],
+        created_at: "2026-03-08T00:00:00.000Z",
+        last_message_at: "2026-03-08T00:00:00.000Z",
+      },
+      {
+        id: "room-direct-a",
+        name: "Direct Room A",
+        type: "direct",
+        members: [fakeUser.id, "peer-1"],
+        created_at: "2026-03-08T09:00:00.000Z",
+        last_message_at: "2026-03-08T10:00:00.000Z",
+        last_message_preview: "my own older direct",
+      },
+      {
+        id: "room-direct-b",
+        name: "Direct Room B",
+        type: "direct",
+        members: ["peer-1", fakeUser.id],
+        created_at: "2026-03-08T09:30:00.000Z",
+        last_message_at: "2026-03-08T10:10:00.000Z",
+        last_message_preview: "latest direct preview",
+      },
+    ],
+    staffMembers: [
+      fakeUser,
+      {
+        ...fakeUser,
+        id: "peer-1",
+        name: "Unread Peer",
+        employee_no: "E2E-CHAT-777",
+      },
+    ],
+    messages: [
+      {
+        id: "msg-own-direct",
+        room_id: "room-direct-a",
+        sender_id: fakeUser.id,
+        content: "my own older direct",
+        created_at: "2026-03-08T10:00:00.000Z",
+        is_deleted: false,
+        staff: { name: fakeUser.name, photo_url: null },
+      },
+      {
+        id: "msg-peer-direct-old",
+        room_id: "room-direct-b",
+        sender_id: "peer-1",
+        content: "older direct message",
+        created_at: "2026-03-08T10:10:00.000Z",
+        is_deleted: false,
+        staff: { name: "Unread Peer", photo_url: null },
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: "\uCC44\uD305",
+    },
+  });
+
+  await page.goto(
+    `/main?${new URLSearchParams({ open_menu: "\uCC44\uD305" }).toString()}`,
+  );
+
+  const directRoom = page.getByTestId("chat-room-room-direct-b");
+
+  await page.evaluate(() => {
+    window.dispatchEvent(
+      new CustomEvent("erp-mock-chat-message-insert", {
+        detail: {
+          row: {
+            id: "msg-peer-direct-unread",
+            room_id: "room-direct-b",
+            sender_id: "peer-1",
+            sender_name: "Unread Peer",
+            content: "fresh direct unread",
+            created_at: "2026-03-08T10:11:00.000Z",
+            is_deleted: false,
+          },
+        },
+      }),
+    );
+  });
+
+  await directRoom.click();
+  await expect(page.getByTestId("chat-message-input")).toBeVisible();
+
+  await expect
+    .poll(async () => {
+      const text = (await directRoom.textContent()) || "";
+      return /\b1\b/.test(text);
+    })
+    .toBe(false);
+});
+
 test("chat opens a room already aligned to the latest messages", async ({ page }) => {
   const longMessages = Array.from({ length: 40 }, (_, index) => ({
     id: `msg-long-${index + 1}`,

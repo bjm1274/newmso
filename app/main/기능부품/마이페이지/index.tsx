@@ -15,6 +15,7 @@ import ContractSignatureModal from '../인사관리서브/계약문서/전자서
 import RoleDashboard from './역할별대시보드';
 import { supabase } from '@/lib/supabase';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
+import { useActionDialog } from '@/app/components/useActionDialog';
 
 const MYPAGE_TAB_KEY = 'erp_mypage_tab';
 const MYPAGE_RECORDS_VIEW_KEY = 'erp_mypage_records_view';
@@ -87,6 +88,7 @@ type EmploymentContractRecord = {
 };
 
 export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInitialTab, onOpenApproval, setMainMenu, onOpenChatMessage }: MyPageMainProps) {
+  const { dialog, openPrompt } = useActionDialog();
   const isRetired = user?.status === '퇴사';
   const [activeTab, setActiveTab] = useState<'profile' | 'records' | 'todo' | 'commute' | 'documents' | 'notifications'>('profile');
   const [recordsView, setRecordsView] = useState<'salary' | 'certificates'>('salary');
@@ -404,7 +406,15 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
 
   const verifyProfilePassword = async () => {
     try {
-      const input = window.prompt('본인 확인을 위해 현재 비밀번호를 입력해 주세요.');
+      const input = await openPrompt({
+        title: '본인 확인',
+        description: '현재 비밀번호를 입력해 주세요.',
+        confirmText: '확인',
+        cancelText: '취소',
+        inputType: 'password',
+        required: true,
+        placeholder: '현재 비밀번호',
+      });
       if (!input) return false;
 
       const response = await fetch('/api/auth/verify-password', {
@@ -464,6 +474,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
 
   return (
     <div className="relative h-full min-h-0 flex flex-col overflow-x-hidden app-page px-3 py-2.5 md:px-4 md:py-3">
+      {dialog}
 
       {/* 전자 서명 전용 신규 모달 */}
       {pendingContract && showSignaturePad && (
