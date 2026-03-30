@@ -189,6 +189,17 @@ function isStandaloneWebApp() {
   return Boolean(nav.standalone || window.matchMedia?.('(display-mode: standalone)')?.matches);
 }
 
+function isMobileClientDevice() {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  if (/android|iphone|ipad|ipod/i.test(ua)) return true;
+  try {
+    return Boolean(window.matchMedia?.('(max-width: 768px)')?.matches);
+  } catch {
+    return false;
+  }
+}
+
 function requiresUserGestureForPushPermission() {
   if (typeof window === 'undefined' || typeof Notification === 'undefined') return false;
   return isAppleMobileDevice() && Notification.permission === 'default';
@@ -450,16 +461,9 @@ export async function initNotificationService(options?: InitNotificationServiceO
               };
               const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
               const messaging = getMessaging(app);
-              // FCM 전용 SW 별도 등록 (sw.js와 분리해야 토큰 발급 정상 작동)
-              let fcmSwReg: ServiceWorkerRegistration = reg;
-              try {
-                fcmSwReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-              } catch {
-                fcmSwReg = reg;
-              }
               fcmToken = await getToken(messaging, {
                 vapidKey: fcmVapidKey,
-                serviceWorkerRegistration: fcmSwReg,
+                serviceWorkerRegistration: reg,
               });
             }
           } catch (fcmErr) {
@@ -789,7 +793,10 @@ export default function NotificationSystem({
 
     void (async () => {
       const canShowNativeNotification = await claimCrossTabDisplayNotificationAsync(displayKey, 5000);
-      if (canShowNativeNotification && (!isChatType || !hasPushSubscriptionActive(effectiveUserId))) {
+      const shouldShowSystemNotification =
+        !isMobileClientDevice() &&
+        (!isChatType || !hasPushSubscriptionActive(effectiveUserId));
+      if (canShowNativeNotification && shouldShowSystemNotification) {
         sendNotification(title, {
           body,
           tag: displayKey || type,

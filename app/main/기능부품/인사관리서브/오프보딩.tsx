@@ -28,6 +28,8 @@ type ChecklistRow = {
   items: ChecklistItem[];
 };
 
+type TabKey = 'active' | 'history';
+
 function getOriginalStatus(staff: StaffMember) {
   const saved = staff.permissions?.offboarding_original_status;
   if (typeof saved === 'string' && saved.trim()) return saved.trim();
@@ -53,7 +55,7 @@ export default function OffboardingView({
   selectedCo = '전체',
   onRefresh,
 }: Props) {
-  const [activeTab, setActiveTab] = useState<'진행중' | '과거이력'>('진행중');
+  const [activeTab, setActiveTab] = useState<TabKey>('active');
   const [selectedStaff, setSelectedStaff] = useState('');
   const [exitDate, setExitDate] = useState('');
   const [reason, setReason] = useState('개인 사유');
@@ -165,22 +167,27 @@ export default function OffboardingView({
       setChecklistsByStaff(nextChecklists);
     };
 
-    loadChecklists();
+    void loadChecklists();
 
     return () => {
       cancelled = true;
     };
   }, [pendingList]);
 
-  const persistChecklist = async (staffId: string, items: ChecklistItem[]) => {
-    const { error } = await supabase.from('onboarding_checklists').upsert(
-      {
-        staff_id: staffId,
-        checklist_type: '퇴사',
-        items,
-      },
-      { onConflict: 'staff_id,checklist_type' },
-    );
+  const persistChecklist = async (staffId: string, items: ChecklistItem[], targetDate?: string | null) => {
+    const payload: Record<string, unknown> = {
+      staff_id: staffId,
+      checklist_type: '퇴사',
+      items,
+    };
+
+    if (targetDate) {
+      payload.target_date = targetDate;
+    }
+
+    const { error } = await supabase
+      .from('onboarding_checklists')
+      .upsert(payload, { onConflict: 'staff_id,checklist_type' });
 
     if (error) throw error;
     setExistingChecklistRows((prev) => ({ ...prev, [staffId]: true }));
@@ -202,13 +209,13 @@ export default function OffboardingView({
 
   const handleStartOffboarding = async () => {
     if (!selectedStaff || !exitDate) {
-      toast('대상자와 퇴사 예정일을 선택해주세요.', 'warning');
+      toast('대상자와 퇴사 예정일을 선택해 주세요.', 'warning');
       return;
     }
 
     const staff = staffs.find((item) => String(item.id) === selectedStaff);
     if (!staff) {
-      toast('선택한 직원을 찾지 못했습니다.', 'error');
+      toast('선택한 직원을 찾을 수 없습니다.', 'error');
       return;
     }
 
@@ -244,7 +251,7 @@ export default function OffboardingView({
       if (error) throw error;
 
       const checklistItems = getDefaultChecklist('퇴사');
-      await persistChecklist(selectedStaff, checklistItems);
+      await persistChecklist(selectedStaff, checklistItems, getChecklistTargetDate('퇴사', exitDate));
 
       await logAudit(
         '오프보딩시작',
@@ -270,7 +277,7 @@ export default function OffboardingView({
         actor.userName,
       );
 
-      toast(`${staff.name}님의 오프보딩 파이프라인을 시작했습니다.`, 'success');
+      toast(`${staff.name}님의 오프보딩 타임라인을 시작했습니다.`, 'success');
       setSelectedStaff('');
       setExitDate('');
       setReason('개인 사유');
@@ -365,7 +372,7 @@ export default function OffboardingView({
     const hasChecklist = Boolean(existingChecklistRows[staffId]);
 
     if (hasChecklist && !isChecklistComplete(checklistItems)) {
-      toast('퇴사 체크리스트를 모두 완료해주세요.', 'warning');
+      toast('퇴사 체크리스트를 모두 완료해 주세요.', 'warning');
       return;
     }
 
@@ -401,7 +408,11 @@ export default function OffboardingView({
 
       await supabase.from('push_subscriptions').delete().eq('staff_id', staffId);
       await supabase.from('push_subscriptions').delete().eq('user_id', staffId);
-      await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('user_id', staffId).is('read_at', null);
+      await supabase
+        .from('notifications')
+        .update({ read_at: new Date().toISOString() })
+        .eq('user_id', staffId)
+        .is('read_at', null);
 
       await logAudit(
         '오프보딩완료',
@@ -440,13 +451,16 @@ export default function OffboardingView({
     <div className="max-w-6xl space-y-4" data-testid="offboarding-view">
       <div className="flex flex-col gap-3 border-b border-[var(--border)] pb-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-[var(--foreground)]">원클릭 오프보딩 파이프라인</h2>
+          <h2 className="text-2xl font-bold text-[var(--foreground)]">인력 오프보딩 타임라인</h2>
           <p className="text-sm text-[var(--toss-gray-3)]">
             퇴사 예정, 체크리스트, 최종 퇴사 처리를 한 화면에서 관리합니다.
           </p>
         </div>
         <div className="flex gap-2">
-          {(['진행중', '과거이력'] as const).map((tab) => (
+          {([
+            ['active', '진행 중인 퇴사'],
+            ['history', '과거 이력'],
+          ] as const).map(([tab, label]) => (
             <button
               key={tab}
               type="button"
@@ -457,21 +471,21 @@ export default function OffboardingView({
                   : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'
               }`}
             >
-              {tab === '진행중' ? '진행 중인 퇴사자' : '과거 이력'}
+              {label}
             </button>
           ))}
         </div>
       </div>
 
-      {activeTab === '진행중' && (
+      {activeTab === 'active' && (
         <div className="space-y-5">
           <div className="relative overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-sm">
             <div className="absolute right-0 top-0 translate-x-1/4 -translate-y-1/4 text-[120px] opacity-5">
-              🚪
+              ⏳
             </div>
             <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-end">
               <div className="flex-1 space-y-2">
-                <h3 className="text-xl font-black text-white">새 오프보딩 시작</h3>
+                <h3 className="text-xl font-black text-white">퇴사 오프보딩 시작</h3>
                 <p className="text-xs text-slate-300">
                   퇴사 예정일을 설정하면 계정 회수와 정산 체크리스트가 함께 열립니다.
                 </p>
@@ -515,7 +529,7 @@ export default function OffboardingView({
                 disabled={loading}
                 className="rounded-xl bg-[var(--accent)] px-5 py-4 text-sm font-black text-white shadow-md transition-transform hover:scale-[1.01] disabled:opacity-50"
               >
-                {loading ? '처리 중...' : '파이프라인 가동'}
+                {loading ? '처리 중...' : '타임라인 가동'}
               </button>
             </div>
           </div>
@@ -523,9 +537,9 @@ export default function OffboardingView({
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             {pendingList.length === 0 ? (
               <div className="col-span-full rounded-2xl border border-[var(--border)] bg-[var(--card)] py-20 text-center shadow-sm">
-                <p className="mb-4 text-4xl opacity-50">🏃</p>
+                <p className="mb-4 text-4xl opacity-50">📂</p>
                 <p className="text-sm font-bold text-[var(--toss-gray-3)]">
-                  현재 퇴사 수속을 밟고 있는 직원이 없습니다.
+                  현재 퇴사 프로세스를 밟고 있는 직원이 없습니다.
                 </p>
               </div>
             ) : (
@@ -563,7 +577,7 @@ export default function OffboardingView({
                         체크리스트 {doneCount}/{checklistItems.length}
                       </span>
                       <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">
-                        {hasChecklist ? (completed ? '완료' : '진행 중') : '레거시 데이터'}
+                        {hasChecklist ? (completed ? '완료' : '진행 중') : '과거 데이터'}
                       </span>
                     </div>
 
@@ -626,7 +640,7 @@ export default function OffboardingView({
         </div>
       )}
 
-      {activeTab === '과거이력' && (
+      {activeTab === 'history' && (
         <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">

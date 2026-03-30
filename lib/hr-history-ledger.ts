@@ -37,8 +37,7 @@ async function safeQuery<T>(
 }
 
 function normalizeDate(value: string | null | undefined) {
-  if (!value) return '';
-  return value;
+  return typeof value === 'string' ? value : '';
 }
 
 function sortDescByDate<T extends { occurredAt: string }>(items: T[]) {
@@ -47,21 +46,32 @@ function sortDescByDate<T extends { occurredAt: string }>(items: T[]) {
   );
 }
 
+function asTrimmedString(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function asNumber(value: unknown) {
+  const normalized = typeof value === 'string' ? Number(value.replace(/,/g, '')) : Number(value);
+  return Number.isFinite(normalized) ? normalized : null;
+}
+
+function formatWon(value: number) {
+  return `${value.toLocaleString()}원`;
+}
+
 function formatAppointmentDescription(record: Record<string, unknown>) {
   const pieces: string[] = [];
-  const beforeDept = typeof record.before_dept === 'string' ? record.before_dept.trim() : '';
-  const afterDept = typeof record.after_dept === 'string' ? record.after_dept.trim() : '';
-  const beforePosition =
-    typeof record.before_position === 'string' ? record.before_position.trim() : '';
-  const afterPosition =
-    typeof record.after_position === 'string' ? record.after_position.trim() : '';
-  const reason = typeof record.reason === 'string' ? record.reason.trim() : '';
+  const beforeDept = asTrimmedString(record.before_dept);
+  const afterDept = asTrimmedString(record.after_dept);
+  const beforePosition = asTrimmedString(record.before_position);
+  const afterPosition = asTrimmedString(record.after_position);
+  const reason = asTrimmedString(record.reason);
 
   if (beforeDept || afterDept) {
-    pieces.push(`부서 ${beforeDept || '-'} → ${afterDept || beforeDept || '-'}`);
+    pieces.push(`부서 ${beforeDept || '-'} -> ${afterDept || beforeDept || '-'}`);
   }
   if (beforePosition || afterPosition) {
-    pieces.push(`직급 ${beforePosition || '-'} → ${afterPosition || beforePosition || '-'}`);
+    pieces.push(`직급 ${beforePosition || '-'} -> ${afterPosition || beforePosition || '-'}`);
   }
   if (reason) {
     pieces.push(`사유: ${reason}`);
@@ -71,9 +81,9 @@ function formatAppointmentDescription(record: Record<string, unknown>) {
 }
 
 function formatSalaryDescription(record: Record<string, unknown>) {
-  const before = Number(record.before_value || 0).toLocaleString();
-  const after = Number(record.after_value || 0).toLocaleString();
-  const changeType = typeof record.change_type === 'string' ? record.change_type : '급여';
+  const beforeValue = asNumber(record.before_value);
+  const afterValue = asNumber(record.after_value);
+  const changeType = asTrimmedString(record.change_type) || '급여';
   const labels: Record<string, string> = {
     base_salary: '기본급',
     meal: '식대',
@@ -84,23 +94,23 @@ function formatSalaryDescription(record: Record<string, unknown>) {
     other: '기타수당',
   };
 
-  return `${labels[changeType] || changeType} ${before}원 → ${after}원`;
+  return `${labels[changeType] || changeType} ${formatWon(beforeValue ?? 0)} -> ${formatWon(afterValue ?? 0)}`;
 }
 
 function formatWorkTypeDescription(record: Record<string, unknown>) {
-  const prevType = typeof record.prev_type === 'string' ? record.prev_type : '';
-  const nextType = typeof record.new_type === 'string' ? record.new_type : '';
-  const reason = typeof record.reason === 'string' ? record.reason.trim() : '';
-  const pieces = [`${prevType || '이전 근무형태 미설정'} → ${nextType || '미설정'}`];
+  const prevType = asTrimmedString(record.prev_type);
+  const nextType = asTrimmedString(record.new_type);
+  const reason = asTrimmedString(record.reason);
+  const pieces = [`${prevType || '이전 근무형태 미설정'} -> ${nextType || '미설정'}`];
   if (reason) pieces.push(`사유: ${reason}`);
   return pieces.join(' · ');
 }
 
 function formatLeaveDescription(record: Record<string, unknown>) {
-  const leaveType = typeof record.leave_type === 'string' ? record.leave_type : '휴가';
-  const startDate = typeof record.start_date === 'string' ? record.start_date : '';
-  const endDate = typeof record.end_date === 'string' ? record.end_date : '';
-  const days = Number(record.days || record.used_days || 0);
+  const leaveType = asTrimmedString(record.leave_type) || '휴가';
+  const startDate = asTrimmedString(record.start_date);
+  const endDate = asTrimmedString(record.end_date);
+  const days = asNumber(record.days) ?? asNumber(record.used_days) ?? 0;
   const range = startDate && endDate ? `${startDate} ~ ${endDate}` : startDate || endDate;
   return `${leaveType}${days > 0 ? ` ${days}일` : ''}${range ? ` · ${range}` : ''}`;
 }
@@ -167,7 +177,7 @@ export async function fetchHrHistoryLedger(staffId: string) {
   const events: HrLedgerEvent[] = [];
 
   appointments.forEach((record) => {
-    const orderType = typeof record.order_type === 'string' ? record.order_type : '인사발령';
+    const orderType = asTrimmedString(record.order_type) || '인사발령';
     events.push({
       id: `appointment-${record.id}`,
       type: 'appointment',
@@ -175,17 +185,14 @@ export async function fetchHrHistoryLedger(staffId: string) {
       title: `${orderType} 발령`,
       description: formatAppointmentDescription(record),
       badge: '인사발령',
-      status: typeof record.status === 'string' ? record.status : null,
+      status: asTrimmedString(record.status) || null,
       accentClass: 'bg-blue-50 text-blue-700 border-blue-200',
     });
   });
 
   contracts.forEach((record) => {
-    const contractType =
-      typeof record.contract_type === 'string' && record.contract_type.trim()
-        ? record.contract_type
-        : '근로계약';
-    const status = typeof record.status === 'string' ? record.status : '';
+    const contractType = asTrimmedString(record.contract_type) || '근로계약';
+    const status = asTrimmedString(record.status);
     const requestedAt = normalizeDate(
       (record.signed_at as string) ||
         (record.requested_at as string) ||
@@ -193,11 +200,11 @@ export async function fetchHrHistoryLedger(staffId: string) {
         (record.created_at as string),
     );
     const lines = [
-      typeof record.effective_date === 'string' && record.effective_date
-        ? `적용일: ${record.effective_date}`
+      asTrimmedString(record.effective_date)
+        ? `적용일 ${asTrimmedString(record.effective_date)}`
         : null,
-      typeof record.base_salary === 'number'
-        ? `기본급: ${record.base_salary.toLocaleString()}원`
+      asNumber(record.base_salary) !== null
+        ? `기본급 ${formatWon(asNumber(record.base_salary) ?? 0)}`
         : null,
     ].filter(Boolean);
 
@@ -205,7 +212,7 @@ export async function fetchHrHistoryLedger(staffId: string) {
       id: `contract-${record.id}`,
       type: 'contract',
       occurredAt: requestedAt,
-      title: `${contractType} ${status || ''}`.trim(),
+      title: `${contractType} ${status}`.trim(),
       description: lines.join(' · ') || '근로계약 문서가 등록되었습니다.',
       badge: '계약',
       status: status || null,
@@ -240,22 +247,26 @@ export async function fetchHrHistoryLedger(staffId: string) {
   });
 
   leaveRequests.forEach((record) => {
+    const leaveType = asTrimmedString(record.leave_type) || '휴가';
+    const status = asTrimmedString(record.status);
     events.push({
       id: `leave-${record.id}`,
       type: 'leave',
       occurredAt: normalizeDate(
-        (record.start_date as string) || (record.created_at as string) || (record.updated_at as string),
+        (record.start_date as string) ||
+          (record.created_at as string) ||
+          (record.updated_at as string),
       ),
-      title: `${(record.leave_type as string) || '휴가'} ${((record.status as string) || '').trim()}`.trim(),
+      title: `${leaveType} ${status}`.trim(),
       description: formatLeaveDescription(record),
       badge: '휴가',
-      status: typeof record.status === 'string' ? record.status : null,
+      status: status || null,
       accentClass: 'bg-sky-50 text-sky-700 border-sky-200',
     });
   });
 
   audits.forEach((record) => {
-    const action = typeof record.action === 'string' ? record.action : '감사 로그';
+    const action = asTrimmedString(record.action) || '감사 로그';
     const details =
       record.details && typeof record.details === 'object'
         ? JSON.stringify(record.details).slice(0, 120)

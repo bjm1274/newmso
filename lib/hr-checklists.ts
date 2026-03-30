@@ -17,7 +17,7 @@ const ENTRY_DEFAULTS: ChecklistItem[] = [
   { key: 'contract_signature', label: '근로계약서 전송 및 전자서명 요청', done: false, doneAt: null },
   { key: 'profile_card', label: '인사카드 및 기본 인적사항 확인', done: false, doneAt: null },
   { key: 'account_setup', label: '사내 계정과 권한 기본 세팅', done: false, doneAt: null },
-  { key: 'device_setup', label: 'PC·모바일·장비 지급 확인', done: false, doneAt: null },
+  { key: 'device_setup', label: 'PC·모바일·업무장비 지급 확인', done: false, doneAt: null },
   { key: 'orientation', label: '신규입사 오리엔테이션 및 업무 안내', done: false, doneAt: null },
   { key: 'first_day_ready', label: '첫 출근 준비 사항 최종 점검', done: false, doneAt: null },
 ];
@@ -25,10 +25,10 @@ const ENTRY_DEFAULTS: ChecklistItem[] = [
 const EXIT_DEFAULTS: ChecklistItem[] = [
   { key: 'handover', label: '업무 인수인계 완료', done: false, doneAt: null },
   { key: 'account_disable', label: '사내 계정 및 권한 회수', done: false, doneAt: null },
-  { key: 'asset_return', label: 'PC·장비·비품 반납 확인', done: false, doneAt: null },
+  { key: 'asset_return', label: 'PC·노트북·비품 반납 확인', done: false, doneAt: null },
   { key: 'card_security_return', label: '카드·보안매체·출입 권한 회수', done: false, doneAt: null },
   { key: 'payroll_settlement', label: '최종 급여 및 정산 확인', done: false, doneAt: null },
-  { key: 'document_close', label: '문서·전자서명·필수 기록 마감', done: false, doneAt: null },
+  { key: 'document_close', label: '문서·전자서명·인수 기록 마감', done: false, doneAt: null },
 ];
 
 function toChecklistItem(raw: unknown): ChecklistItem | null {
@@ -36,6 +36,7 @@ function toChecklistItem(raw: unknown): ChecklistItem | null {
   const record = raw as Record<string, unknown>;
   const label = typeof record.label === 'string' ? record.label.trim() : '';
   if (!label) return null;
+
   const key =
     typeof record.key === 'string' && record.key.trim()
       ? record.key.trim()
@@ -72,11 +73,15 @@ export function getChecklistTargetDate(type: ChecklistType, baseDateValue?: stri
 
 export function normalizeChecklistItems(rawItems: unknown, type: ChecklistType): ChecklistItem[] {
   const defaults = getDefaultChecklist(type);
-  const incoming = Array.isArray(rawItems) ? rawItems.map(toChecklistItem).filter(Boolean) as ChecklistItem[] : [];
+  const incoming = Array.isArray(rawItems)
+    ? (rawItems.map(toChecklistItem).filter(Boolean) as ChecklistItem[])
+    : [];
+
   const merged = defaults.map((item) => {
     const matched = incoming.find(
       (candidate) => candidate.key === item.key || candidate.label === item.label,
     );
+
     return matched
       ? {
           ...item,
@@ -87,7 +92,8 @@ export function normalizeChecklistItems(rawItems: unknown, type: ChecklistType):
   });
 
   const extraItems = incoming.filter(
-    (candidate) => !merged.some((item) => item.key === candidate.key || item.label === candidate.label),
+    (candidate) =>
+      !merged.some((item) => item.key === candidate.key || item.label === candidate.label),
   );
 
   return [...merged, ...extraItems];

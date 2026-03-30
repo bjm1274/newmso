@@ -45,13 +45,14 @@ export default function StaffHistoryTimeline({ staffId, staffName }: Props) {
     };
   }, [staffId]);
 
-  const summary = useMemo(() => {
-    return {
+  const summary = useMemo(
+    () => ({
       appointments: events.filter((event) => event.type === 'appointment').length,
       contracts: events.filter((event) => event.type === 'contract').length,
       salary: events.filter((event) => event.type === 'salary').length,
-    };
-  }, [events]);
+    }),
+    [events],
+  );
 
   return (
     <section className="bg-[var(--card)] p-4 border border-[var(--border)] rounded-[var(--radius-md)] shadow-sm min-w-[320px] flex-1">
@@ -59,7 +60,7 @@ export default function StaffHistoryTimeline({ staffId, staffName }: Props) {
         <div>
           <h3 className="text-base font-semibold text-[var(--foreground)]">{staffName} 인사 이력 원장</h3>
           <p className="text-xs text-[var(--toss-gray-3)] mt-1">
-            인사발령, 계약, 급여 조건, 근무형태, 휴가 이력을 한 번에 확인합니다.
+            인사발령, 계약, 급여 조건, 근무형태, 휴가 이력을 한눈에 확인합니다.
           </p>
         </div>
         <div className="flex gap-2 shrink-0">
