@@ -3630,21 +3630,42 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     const contentSnapshot = options?.contentSnapshot ?? inputMsgRef.current;
     setFileUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
       const response = await fetch('/api/chat/upload', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileName: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          fileSize: file.size,
+        }),
       });
       const payload = await response.json().catch(() => null) as {
+        bucket?: string;
+        path?: string;
+        token?: string;
         url?: string;
         error?: string;
       } | null;
-      if (!response.ok || !payload?.url) {
-        throw new Error(payload?.error || '파일 업로드에 실패했습니다.');
+      if (!response.ok || !payload?.bucket || !payload?.path || !payload?.token) {
+        throw new Error(payload?.error || `파일 업로드 준비에 실패했습니다. (HTTP ${response.status})`);
       }
 
-      const publicUrl = payload.url;
+      const uploadResult = await supabase.storage
+        .from(payload.bucket)
+        .uploadToSignedUrl(payload.path, payload.token, file, {
+          contentType: file.type || 'application/octet-stream',
+          upsert: false,
+          cacheControl: '3600',
+        });
+
+      if (uploadResult.error) {
+        throw new Error(uploadResult.error.message || 'Storage 직접 업로드에 실패했습니다.');
+      }
+
+      const publicUrl =
+        payload.url || supabase.storage.from(payload.bucket).getPublicUrl(payload.path).data.publicUrl;
       const fileKind = getFileKind(file.type || '');
       return await handleSendMessage({
         fileUrl: publicUrl,
@@ -3664,6 +3685,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         ? '로그인 세션이 만료되었을 수 있습니다. 다시 로그인 후 시도해 주세요.'
         : msg.includes('버킷') || msg.includes('bucket') || msg.includes('not found')
           ? 'Supabase Storage에 pchos-files 또는 board-attachments 버킷이 실제로 생성되어 있는지 확인해 주세요.'
+          : msg.includes('413') || msg.toLowerCase().includes('entity too large')
+            ? '서버 요청 한도를 초과했습니다. 이 경우 직접 업로드 경로가 반영된 최신 버전으로 다시 실행해 주세요.'
           : msg;
       toast(`파일 업로드에 실패했습니다.\n\n${hint}`, 'error');
       return false;
