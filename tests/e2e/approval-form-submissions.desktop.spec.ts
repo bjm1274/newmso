@@ -134,6 +134,42 @@ test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
 });
 
+test('approval submission stays blocked until an approver is selected', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    staffMembers: [composeUser, approver, supportStaff],
+    approvals: [],
+    companies: [
+      { id: 'hospital-1', name: String(composeUser.company), type: 'HOSPITAL', is_active: true },
+      { id: 'mso-company-id', name: 'SY INC.', type: 'MSO', is_active: true },
+    ],
+  });
+
+  await seedSession(page, {
+    user: composeUser,
+    localStorage: {
+      erp_permission_prompt_shown: '1',
+    },
+  });
+
+  await openCompose(page);
+  await expect(page.getByTestId('approval-approver-required')).toBeVisible();
+  await expect(page.getByTestId('approval-submit-button')).toBeDisabled();
+
+  await page.getByTestId('approval-form-type-7').click();
+  await expect(page.getByTestId('form-request-view')).toBeVisible();
+  await expect(page.getByTestId('form-request-approver-required')).toBeVisible();
+  await expect(page.getByTestId('form-request-submit')).toBeDisabled();
+
+  await selectApprover(page);
+  await expect(page.getByTestId('approval-approver-required')).toHaveCount(0);
+  await expect(page.getByTestId('form-request-approver-required')).toHaveCount(0);
+  await expect(page.getByTestId('form-request-submit')).toBeEnabled();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('shared approval forms submit with real field input', async ({ page }) => {
   test.setTimeout(180_000);
 

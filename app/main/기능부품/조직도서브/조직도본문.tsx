@@ -156,6 +156,8 @@ export default function MainContent({
             onOpenApproval={onOpenApproval}
             setMainMenu={setMainMenu}
             onOpenChatMessage={onOpenChatMessage}
+            selectedCo={selectedCo}
+            selectedCompanyId={selectedCompanyId}
           />
         </div>
       )}

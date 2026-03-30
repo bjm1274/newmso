@@ -4,13 +4,17 @@ import { useCallback, useEffect, useState } from 'react';
 import { resolveApprovalDelegateConfig } from '@/lib/approval-workflow';
 import { calculateApprovedAnnualLeaveUsage } from '@/lib/annual-leave-ledger';
 import { supabase } from '@/lib/supabase';
-import { withMissingColumnFallback } from '@/lib/supabase-compat';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 
 interface Props {
   user: any;
   setMainMenu?: (menu: string) => void;
   onOpenApproval?: (options?: Record<string, unknown>) => void;
+  selectedCo?: string | null;
+  selectedCompanyId?: string | null;
 }
+
+type ApprovalRow = Record<string, unknown>;
 
 type TodayAttendance = {
   in: string | null;
@@ -40,7 +44,65 @@ function formatTodayAttendanceSecondary(todayAttendance: TodayAttendance, format
   return todayAttendance.out ? `퇴근 ${formatTime(todayAttendance.out)}` : null;
 }
 
-export default function RoleDashboard({ user, setMainMenu, onOpenApproval }: Props) {
+function normalizeApprovalLineIds(line: unknown): string[] {
+  if (!Array.isArray(line)) return [];
+  const ids = line
+    .map((entry) => {
+      if (entry == null) return null;
+      if (typeof entry === 'string' || typeof entry === 'number') return String(entry);
+      if (typeof entry === 'object' && entry !== null && 'id' in entry && (entry as Record<string, unknown>).id != null) {
+        return String((entry as Record<string, unknown>).id);
+      }
+      return null;
+    })
+    .filter(Boolean) as string[];
+  return Array.from(new Set(ids));
+}
+
+function resolveApprovalLineIds(item: ApprovalRow): string[] {
+  const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+  const explicitLineIds = normalizeApprovalLineIds(item?.approver_line ?? metaData?.approver_line);
+  if (explicitLineIds.length > 0) return explicitLineIds;
+  if (item?.current_approver_id != null) return [String(item.current_approver_id)];
+  return [];
+}
+
+function resolveStoredCurrentApproverId(item: ApprovalRow): string | null {
+  const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+  if (item?.current_approver_id != null) {
+    const currentApproverId = String(item.current_approver_id);
+    const delegatedToId = String(metaData?.delegated_to_id || '');
+    const delegatedFromId = String(metaData?.delegated_from_id || '');
+    if (delegatedToId && delegatedToId === currentApproverId && delegatedFromId) {
+      return delegatedFromId;
+    }
+    return currentApproverId;
+  }
+
+  const lineIds = resolveApprovalLineIds(item);
+  return lineIds[0] ?? null;
+}
+
+function resolveEffectiveApproverId(
+  approverId: string | null | undefined,
+  approverMap: Map<string, Record<string, unknown>>,
+) {
+  if (!approverId) return null;
+  const matchedApprover = approverMap.get(String(approverId));
+  const delegateConfig = resolveApprovalDelegateConfig(matchedApprover ?? null);
+  if (delegateConfig.active && delegateConfig.delegateId) {
+    return String(delegateConfig.delegateId);
+  }
+  return String(approverId);
+}
+
+export default function RoleDashboard({
+  user,
+  setMainMenu,
+  onOpenApproval,
+  selectedCo,
+  selectedCompanyId,
+}: Props) {
   const [pendingApprovals, setPendingApprovals] = useState(0);
   const [lowStockCount, setLowStockCount] = useState(0);
   const [todayAttendance, setTodayAttendance] = useState<TodayAttendance>({ in: null, out: null, status: null });
@@ -52,29 +114,40 @@ export default function RoleDashboard({ user, setMainMenu, onOpenApproval }: Pro
 
   const fetchPending = useCallback(async () => {
     if (!user?.id) return;
+    const normalizedSelectedCo = typeof selectedCo === 'string' ? selectedCo.trim() : '';
+    const scopedCompanyId = !isAdmin ? user?.company_id : selectedCompanyId || null;
+    const scopedCompanyName = !isAdmin
+      ? user?.company
+      : normalizedSelectedCo && normalizedSelectedCo !== '전체'
+        ? normalizedSelectedCo
+        : null;
 
-    const scopedCompanyId = !isAdmin ? user?.company_id : null;
-    const scopedCompanyName = !isAdmin ? user?.company : null;
+    const { data, error } = await withMissingColumnsFallback(
+      async (omittedColumns) => {
+        const selectColumns = [
+          'id',
+          'status',
+          'current_approver_id',
+          'sender_company',
+          ...(omittedColumns.has('company_id') ? [] : ['company_id']),
+          ...(omittedColumns.has('approver_line') ? [] : ['approver_line']),
+          ...(omittedColumns.has('meta_data') ? [] : ['meta_data']),
+        ];
 
-    const { data, error } = await withMissingColumnFallback(
-      async () => {
         let query = supabase
           .from('approvals')
-          .select('id, status, current_approver_id, company_id, sender_company')
+          .select(selectColumns.join(', '))
           .eq('status', '대기');
-        if (scopedCompanyId) query = query.eq('company_id', scopedCompanyId);
-        else if (scopedCompanyName) query = query.eq('sender_company', scopedCompanyName);
+
+        if (scopedCompanyId && !omittedColumns.has('company_id')) {
+          query = query.eq('company_id', scopedCompanyId);
+        } else if (scopedCompanyName) {
+          query = query.eq('sender_company', scopedCompanyName);
+        }
+
         return query;
       },
-      async () => {
-        let query = supabase
-          .from('approvals')
-          .select('id, status, current_approver_id, sender_company')
-          .eq('status', '대기');
-        if (scopedCompanyName) query = query.eq('sender_company', scopedCompanyName);
-        return query;
-      },
-      'company_id'
+      ['company_id', 'approver_line', 'meta_data'],
     );
 
     if (error) {
@@ -83,11 +156,12 @@ export default function RoleDashboard({ user, setMainMenu, onOpenApproval }: Pro
       return;
     }
 
-    const approvalRows = Array.isArray(data) ? data : [];
+    const approvalRows = Array.isArray(data) ? (data as unknown as ApprovalRow[]) : [];
     const approverIds = Array.from(
       new Set(
         approvalRows
-          .map((item) => String(item?.current_approver_id || '').trim())
+          .map((item) => resolveStoredCurrentApproverId(item))
+          .map((approverId) => String(approverId || '').trim())
           .filter(Boolean)
       )
     );
@@ -109,18 +183,13 @@ export default function RoleDashboard({ user, setMainMenu, onOpenApproval }: Pro
     }
 
     const nextPendingCount = approvalRows.filter((item) => {
-      const currentApproverId = String(item?.current_approver_id || '').trim();
-      if (!currentApproverId) return false;
-      const delegateConfig = resolveApprovalDelegateConfig(approverMap.get(currentApproverId));
-      const effectiveApproverId =
-        delegateConfig.active && delegateConfig.delegateId
-          ? String(delegateConfig.delegateId)
-          : currentApproverId;
+      const effectiveApproverId = resolveEffectiveApproverId(resolveStoredCurrentApproverId(item), approverMap);
+      if (!effectiveApproverId) return false;
       return effectiveApproverId === String(user.id);
     }).length;
 
     setPendingApprovals(nextPendingCount);
-  }, [isAdmin, user?.company, user?.company_id, user?.id]);
+  }, [isAdmin, selectedCo, selectedCompanyId, user?.company, user?.company_id, user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -246,6 +315,19 @@ export default function RoleDashboard({ user, setMainMenu, onOpenApproval }: Pro
 
   const openApprovalInbox = () => {
     if (typeof onOpenApproval === 'function') {
+      // Open the actionable inbox view first; the legacy navigation stays below as a fallback.
+      if (selectedCo !== '__legacy__') {
+        onOpenApproval({
+          viewMode: '결재함',
+          statusFilter: '대기',
+          documentFilter: '전체 문서',
+          keyword: '',
+          dateMode: 'range',
+          dateFrom: '',
+          dateTo: '',
+        });
+        return;
+      }
       onOpenApproval({ viewMode: '결재함' });
       return;
     }

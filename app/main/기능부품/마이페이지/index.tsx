@@ -75,6 +75,8 @@ interface MyPageMainProps {
   onOpenApproval?: (options?: Record<string, unknown>) => void;
   setMainMenu?: (menu: string) => void;
   onOpenChatMessage?: (roomId: string, messageId: string) => void;
+  selectedCo?: string | null;
+  selectedCompanyId?: string | null;
 }
 
 type EmploymentContractRecord = {
@@ -87,7 +89,16 @@ type EmploymentContractRecord = {
   [key: string]: unknown;
 };
 
-export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInitialTab, onOpenApproval, setMainMenu, onOpenChatMessage }: MyPageMainProps) {
+export default function MyPageMain({
+  user,
+  initialMyPageTab,
+  onConsumeMyPageInitialTab,
+  onOpenApproval,
+  setMainMenu,
+  onOpenChatMessage,
+  selectedCo,
+  selectedCompanyId,
+}: MyPageMainProps) {
   const { dialog, openPrompt } = useActionDialog();
   const isRetired = user?.status === '퇴사';
   const [activeTab, setActiveTab] = useState<'profile' | 'records' | 'todo' | 'commute' | 'documents' | 'notifications'>('profile');
@@ -611,7 +622,13 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
                   onToggleEdit={handleToggleEdit}
                 />
                 <div className="min-w-0 flex-1">
-                  <RoleDashboard user={user} setMainMenu={setMainMenu} onOpenApproval={onOpenApproval} />
+                <RoleDashboard
+                  user={user}
+                  setMainMenu={setMainMenu}
+                  onOpenApproval={onOpenApproval}
+                  selectedCo={selectedCo}
+                  selectedCompanyId={selectedCompanyId}
+                />
                 </div>
               </div>
               <MyProfileCard

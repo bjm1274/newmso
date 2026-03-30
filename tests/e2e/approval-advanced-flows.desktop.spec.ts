@@ -99,6 +99,13 @@ async function readApprovals(page: Page) {
   });
 }
 
+async function confirmActionDialog(page: Page) {
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await dialog.locator('button').last().click();
+  await expect(dialog).toBeHidden();
+}
+
 async function waitForApprovalInsert(page: Page) {
   return page.waitForRequest(
     (request) =>
@@ -163,6 +170,7 @@ test('multi-step approval advances to the next approver and finalizes on second 
   const approvalCard = page.getByTestId('approval-card-approval-multistep-1');
   await expect(approvalCard).toBeVisible();
   await page.getByRole('button', { name: '승인' }).last().click();
+  await confirmActionDialog(page);
 
   let approvals = await readApprovals(page);
   let updatedRow = approvals.find((item: any) => item.id === 'approval-multistep-1');
@@ -182,6 +190,7 @@ test('multi-step approval advances to the next approver and finalizes on second 
   const secondApprovalCard = page.getByTestId('approval-card-approval-multistep-1');
   await expect(secondApprovalCard).toBeVisible();
   await secondApprovalCard.getByRole('button', { name: '승인' }).click();
+  await confirmActionDialog(page);
 
   approvals = await readApprovals(page);
   updatedRow = approvals.find((item: any) => item.id === 'approval-multistep-1');
@@ -330,6 +339,7 @@ test('supply approval shows requested items in detail and print view, then can b
   await expect(page.getByText('드레싱 교체')).toBeVisible();
 
   await page.getByTestId('approval-detail-recall').click();
+  await confirmActionDialog(page);
 
   const approvals = await readApprovals(page);
   const updatedRow = approvals.find((item: any) => item.id === 'approval-supply-recall-1');
@@ -397,6 +407,7 @@ test('final approval for an attendance correction syncs attendance records', asy
   const approvalCard = page.getByTestId('approval-card-approval-attendance-fix-1');
   await expect(approvalCard).toBeVisible();
   await page.getByRole('button', { name: '승인' }).last().click();
+  await confirmActionDialog(page);
 
   await expect
     .poll(async () => {
@@ -513,6 +524,7 @@ test('annual leave approvals show the requested date range and sync leave record
   await expect(page.getByText('개인 일정', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: '승인' }).last().click();
+  await confirmActionDialog(page);
 
   await expect
     .poll(async () => {

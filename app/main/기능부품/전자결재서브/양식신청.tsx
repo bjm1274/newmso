@@ -57,6 +57,11 @@ export default function FormRequest({
       return;
     }
 
+    if (approverLine.length === 0) {
+      toast('결재권자를 먼저 선택해주세요.', 'warning');
+      return;
+    }
+
     if (!purpose.trim()) {
       toast('신청 용도를 입력해 주세요.', 'warning');
       return;
@@ -70,7 +75,7 @@ export default function FormRequest({
       const selectedApproverIds = approverLine
         .map((staff) => String(staff?.id || '').trim())
         .filter(Boolean);
-      const currentApproverId = selectedApproverIds[0] ?? approver?.id ?? null;
+      const currentApproverId = selectedApproverIds[0] ?? null;
       const referenceUsers = ccLine
         .map((staff) => ({
           id: String(staff?.id || '').trim(),
@@ -96,7 +101,7 @@ export default function FormRequest({
           purpose,
           urgency,
           auto_issue: true,
-          approver_line: selectedApproverIds.length > 0 ? selectedApproverIds : approver?.id ? [approver.id] : [],
+          approver_line: selectedApproverIds,
           cc_users: referenceUsers,
           cc_departments: ['행정팀'],
         },
@@ -241,12 +246,18 @@ export default function FormRequest({
           </div>
         </div>
 
+        {approverLine.length === 0 && (
+          <div className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-bold text-red-600" data-testid="form-request-approver-required">
+            결재권자를 먼저 선택해야 양식 신청을 올릴 수 있습니다.
+          </div>
+        )}
+
         <button
           type="button"
           data-testid="form-request-submit"
           onClick={handleSubmit}
-          disabled={submitting}
-          className="w-full rounded-[var(--radius-md)] bg-black py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:scale-[0.98] disabled:opacity-50"
+          disabled={submitting || approverLine.length === 0}
+          className="w-full rounded-[var(--radius-md)] bg-black py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? '신청 중...' : '양식 신청'}
         </button>

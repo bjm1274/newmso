@@ -1647,6 +1647,9 @@ test("approval inbox can approve a pending document and refresh its status", asy
   );
 
   await approvalCard.locator("button").nth(1).click();
+  const confirmDialog = page.getByRole("dialog");
+  await expect(confirmDialog).toBeVisible();
+  await confirmDialog.locator("button").last().click();
 
   await approveRequest;
   await expect(approvalCard.locator("button")).toHaveCount(1);

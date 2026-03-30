@@ -37,21 +37,6 @@ test("final approval of a supply request creates inventory workflow and notifica
       mso: true,
     },
   };
-  const approvalPatchBodies: Array<Record<string, any>> = [];
-
-  page.on("request", (request) => {
-    if (
-      request.method() === "POST" &&
-      request.url().includes("/api/approvals/transition")
-    ) {
-      const body = request.postDataJSON();
-      approvalPatchBodies.push({
-        status: "?뱀씤",
-        ...(body && typeof body === "object" ? body : {}),
-      });
-    }
-  });
-
   await mockSupabase(page, {
     staffMembers: [fakeUser, requester, supportManager],
     inventoryItems: [
@@ -107,18 +92,22 @@ test("final approval of a supply request creates inventory workflow and notifica
 
   const approvalCard = page.getByTestId("approval-card-approval-supply-final-1");
   await expect(approvalCard).toBeVisible();
-  const transitionRequest = page.waitForRequest(
+  const transitionRequestPromise = page.waitForRequest(
     (request) =>
       request.url().includes("/api/approvals/transition") &&
       request.method() === "POST",
   );
 
   await approvalCard.locator("button").nth(1).click();
+  const confirmDialog = page.getByRole("dialog");
+  await expect(confirmDialog).toBeVisible();
+  await confirmDialog.locator("button").last().click();
 
-  await transitionRequest;
-
-  const statusPatch = approvalPatchBodies.find((body) => body.status === "승인");
-  expect(statusPatch).toBeTruthy();
+  const transitionRequest = await transitionRequestPromise;
+  expect(transitionRequest.postDataJSON()).toMatchObject({
+    action: "approve",
+    approvalIds: ["approval-supply-final-1"],
+  });
 
   await expect.poll(async () => {
     const approvalAfterFinalize = await page.evaluate(async () => {
@@ -153,7 +142,7 @@ test("final approval of a supply request creates inventory workflow and notifica
     return response.json();
   });
 
-  expect(approvalStatus).toBe("?뱀씤");
+  expect(approvalStatus).toBe("승인");
 
   expect(inventoryWorkflow).toMatchObject({
     status: "pending",
