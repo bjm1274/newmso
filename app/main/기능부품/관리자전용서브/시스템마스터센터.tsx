@@ -907,23 +907,15 @@ export default function SystemMasterCenter({
             </div>
 
             <div className="mt-5 overflow-x-auto">
-              <table className="min-w-[1260px] w-full table-fixed text-left text-xs">
-                <colgroup>
-                  <col className="w-[220px]" />
-                  <col className="w-[160px]" />
-                  <col className="w-[180px]" />
-                  <col />
-                  <col className="w-[110px]" />
-                  <col className="w-[92px]" />
-                </colgroup>
+              <table className="min-w-[1320px] w-full table-fixed text-left text-xs">
                 <thead className="bg-[var(--page-bg)] text-[11px] uppercase tracking-[0.14em] text-[var(--toss-gray-3)] [&_th]:whitespace-nowrap">
                   <tr>
-                    <th className="px-3 py-3">시간</th>
-                    <th className="px-3 py-3">채팅방</th>
-                    <th className="px-3 py-3">발신자</th>
-                    <th className="px-3 py-3">내용</th>
-                    <th className="px-3 py-3">첨부</th>
-                    <th className="px-3 py-3">삭제</th>
+                    <th className="w-[230px] px-4 py-3 text-left">시간</th>
+                    <th className="w-[180px] px-4 py-3 text-left">채팅방</th>
+                    <th className="w-[180px] px-4 py-3 text-left">발신자</th>
+                    <th className="px-4 py-3 text-left">내용</th>
+                    <th className="w-[120px] px-4 py-3 text-left">첨부</th>
+                    <th className="w-[96px] px-4 py-3 text-left">삭제</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -933,30 +925,30 @@ export default function SystemMasterCenter({
                       const flagged = message.content && hasBanned(message.content, bannedWords);
                       return (
                         <tr key={message.id} className={`border-t border-[var(--border)] align-top ${flagged ? 'bg-red-50' : ''}`}>
-                          <td className="px-3 py-3 align-top text-[var(--toss-gray-4)] whitespace-nowrap">{new Date(message.created_at).toLocaleString('ko-KR')}</td>
-                          <td className="px-3 py-3 align-top">
-                            <p className="truncate whitespace-nowrap font-semibold text-[var(--foreground)]" title={message.room_label}>{message.room_label}</p>
+                          <td className="w-[230px] px-4 py-4 align-top text-[var(--toss-gray-4)] whitespace-nowrap">{new Date(message.created_at).toLocaleString('ko-KR')}</td>
+                          <td className="w-[180px] px-4 py-4 align-top">
+                            <p className="truncate whitespace-nowrap break-keep font-semibold text-[var(--foreground)]" title={message.room_label}>{message.room_label}</p>
                             {message.edited_at && <p className="mt-1 text-[11px] text-amber-600">수정됨</p>}
                             {message.is_deleted && <p className="mt-1 text-[11px] text-red-500">삭제 처리</p>}
                           </td>
-                          <td className="px-3 py-3 align-top">
-                            <p className="truncate whitespace-nowrap font-semibold text-[var(--foreground)]" title={message.sender_name}>{message.sender_name}</p>
-                            <p className="mt-1 truncate whitespace-nowrap text-[11px] text-[var(--toss-gray-3)]" title={message.sender_company || '-'}>{message.sender_company || '-'}</p>
+                          <td className="w-[180px] px-4 py-4 align-top">
+                            <p className="truncate whitespace-nowrap break-keep font-semibold text-[var(--foreground)]" title={message.sender_name}>{message.sender_name}</p>
+                            <p className="mt-1 truncate whitespace-nowrap break-keep text-[11px] text-[var(--toss-gray-3)]" title={message.sender_company || '-'}>{message.sender_company || '-'}</p>
                           </td>
-                          <td className="break-words px-3 py-3 align-top text-[var(--foreground)]">
+                          <td className="break-words px-4 py-4 align-top leading-6 text-[var(--foreground)]">
                             {message.content
                               ? (flagged ? <span>{highlightBanned(message.content, bannedWords)}</span> : message.content)
                               : <span className="text-[var(--toss-gray-3)]">(내용 없음)</span>}
                             {flagged && <span className="ml-1 text-red-500 font-bold text-[11px]">●</span>}
                           </td>
-                          <td className="px-3 py-3 align-top whitespace-nowrap">
+                          <td className="w-[120px] px-4 py-4 align-top whitespace-nowrap">
                             {message.file_url ? (
                               <a href={message.file_url} target="_blank" rel="noreferrer" className="text-[var(--accent)] underline">첨부 보기</a>
                             ) : (
                               <span className="text-[var(--toss-gray-3)]">-</span>
                             )}
                           </td>
-                          <td className="px-3 py-3 align-top whitespace-nowrap">
+                          <td className="w-[96px] px-4 py-4 align-top whitespace-nowrap">
                             <button
                               type="button"
                               disabled={deletingMsgId === message.id}

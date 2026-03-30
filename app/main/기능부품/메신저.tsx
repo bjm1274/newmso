@@ -324,6 +324,100 @@ function AttachmentQuickActions({
   );
 }
 
+type AttachmentListCardProps = {
+  url: string;
+  name: string;
+  kind: AttachmentPreviewKind;
+  summary?: string | null;
+  meta?: string | null;
+  badgeLabel?: string | null;
+  onPreview: () => void;
+  onActivate?: (() => void) | null;
+  actionVariant?: AttachmentQuickActionsVariant;
+  className?: string;
+};
+
+function AttachmentListCard({
+  url,
+  name,
+  kind,
+  summary,
+  meta,
+  badgeLabel,
+  onPreview,
+  onActivate,
+  actionVariant = 'subtle',
+  className = '',
+}: AttachmentListCardProps) {
+  const isClickable = typeof onActivate === 'function';
+
+  return (
+    <div
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : -1}
+      onClick={() => onActivate?.()}
+      onKeyDown={(event) => {
+        if (!isClickable) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onActivate();
+        }
+      }}
+      className={`p-3 bg-[var(--tab-bg)] dark:bg-zinc-900/50 rounded-xl border border-[var(--border-subtle)] dark:border-zinc-800 ${
+        isClickable ? 'cursor-pointer hover:border-[var(--accent)] hover:shadow-sm transition-all' : ''
+      } ${className}`}
+    >
+      <div className="flex items-start gap-3">
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onPreview();
+          }}
+          className={`shrink-0 overflow-hidden rounded-xl border border-[var(--border)] ${
+            kind === 'image' || kind === 'video'
+              ? 'w-14 h-14 bg-black/80'
+              : 'w-12 h-12 bg-[var(--card)] dark:bg-zinc-900 flex items-center justify-center text-lg'
+          }`}
+        >
+          {kind === 'image' ? (
+            <img src={url} alt={name} className="w-full h-full object-cover" />
+          ) : kind === 'video' ? (
+            <div className="w-full h-full flex items-center justify-center text-white text-lg">🎬</div>
+          ) : (
+            <span>📎</span>
+          )}
+        </button>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <p className="text-[11px] font-bold text-foreground truncate">{name}</p>
+            {badgeLabel ? (
+              <span className="px-1.5 py-0.5 rounded bg-[var(--card)] dark:bg-zinc-800 text-[9px] font-bold text-[var(--toss-gray-4)] shrink-0">
+                {badgeLabel}
+              </span>
+            ) : null}
+          </div>
+          {summary ? (
+            <p className="text-[10px] text-[var(--toss-gray-4)] leading-relaxed mt-1 line-clamp-2 break-words">
+              {summary}
+            </p>
+          ) : null}
+          {meta ? (
+            <p className="text-[10px] text-[var(--toss-gray-3)] mt-1 truncate">{meta}</p>
+          ) : null}
+          <AttachmentQuickActions
+            url={url}
+            name={name}
+            onPreview={onPreview}
+            variant={actionVariant}
+            className="mt-2"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function getRoomPrefsStorageKey(userId: string | null | undefined): string {
   return `${CHAT_ROOM_PREFS_KEY}:${userId || 'guest'}`;
 }
@@ -1276,18 +1370,6 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       });
     },
     []
-  );
-
-  const imagePreviewUrl = attachmentPreview?.kind === 'image' ? attachmentPreview.url : null;
-  const setImagePreviewUrl = useCallback(
-    (nextUrl: string | null) => {
-      if (nextUrl) {
-        openAttachmentPreview(nextUrl, null, 'image');
-        return;
-      }
-      closeAttachmentPreview();
-    },
-    [closeAttachmentPreview, openAttachmentPreview]
   );
 
   const [threadRoot, setThreadRoot] = useState<any | null>(null);
@@ -4091,7 +4173,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                     <AttachmentQuickActions
                                       url={furl}
                                       name={attachmentName}
-                                      onPreview={() => setImagePreviewUrl(furl)}
+                                      onPreview={() => openAttachmentPreview(furl, attachmentName, 'image')}
                                       variant="overlay"
                                     />
                                   </div>
@@ -4477,24 +4559,15 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       const fileUrl = String(m.file_url || '');
                       const attachmentName = getAttachmentDisplayName(m.file_name, fileUrl);
                       return (
-                        <div key={m.id} className="p-3 bg-[var(--tab-bg)] dark:bg-zinc-800/50 rounded-xl border border-[var(--border-subtle)] dark:border-zinc-800">
-                          <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-[var(--card)] dark:bg-zinc-900 flex items-center justify-center text-lg shrink-0">📎</div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[11px] font-bold text-foreground truncate">{attachmentName}</p>
-                              <p className="text-[10px] text-[var(--toss-gray-4)] truncate mt-0.5">
-                                {(m.staff as { name?: string } | null | undefined)?.name || '알 수 없음'} · {new Date(m.created_at || 0).toLocaleDateString()}
-                              </p>
-                              <AttachmentQuickActions
-                                url={fileUrl}
-                                name={attachmentName}
-                                onPreview={() => openAttachmentPreview(fileUrl, attachmentName, 'file')}
-                                variant="subtle"
-                                className="mt-2"
-                              />
-                            </div>
-                          </div>
-                        </div>
+                        <AttachmentListCard
+                          key={m.id}
+                          url={fileUrl}
+                          name={attachmentName}
+                          kind="file"
+                          meta={`${(m.staff as { name?: string } | null | undefined)?.name || '알 수 없음'} · ${new Date(m.created_at || 0).toLocaleDateString()}`}
+                          onPreview={() => openAttachmentPreview(fileUrl, attachmentName, 'file')}
+                          actionVariant="subtle"
+                        />
                       );
                     })}
                     {sharedFilePreviewMessages.length === 0 && (
@@ -5470,29 +5543,18 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 filteredMediaMessages.map(( m: ChatMessage) => {
                   const furl = (m.file_url || '') as string;
                   const attachmentName = getAttachmentDisplayName(m.file_name, furl);
+                  const previewKind = isImageUrl(furl) ? 'image' : isVideoUrl(furl) ? 'video' : 'file';
                   return (
-                  <div key={m.id} className="p-3 bg-[var(--tab-bg)] dark:bg-zinc-900/50 border border-[var(--border-subtle)] dark:border-zinc-800 rounded-xl hover:border-blue-300 transition-all group">
-                    {isImageUrl(furl) ? (
-                      <img src={furl} alt="Attached media" className="w-full h-24 object-cover rounded-lg mb-2 cursor-zoom-in" onClick={() => setImagePreviewUrl(furl)} />
-                    ) : (
-                      <div className="w-full h-12 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-lg mb-2 flex items-center justify-center text-xl">📄</div>
-                    )}
-                    <div className="flex flex-col gap-1 min-w-0">
-                      <p className="text-[11px] font-bold text-foreground truncate">{attachmentName}</p>
-                      {m.content && (
-                        <p className="text-[10px] text-[var(--toss-gray-4)] line-clamp-2">{m.content}</p>
-                      )}
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-bold text-[var(--toss-gray-3)]">{new Date(m.created_at || 0).toLocaleDateString()}</span>
-                        <AttachmentQuickActions
-                          url={furl}
-                          name={attachmentName}
-                          onPreview={() => openAttachmentPreview(furl, attachmentName, isImageUrl(furl) ? 'image' : isVideoUrl(furl) ? 'video' : 'file')}
-                          variant="subtle"
-                        />
-                      </div>
-                    </div>
-                  </div>
+                    <AttachmentListCard
+                      key={m.id}
+                      url={furl}
+                      name={attachmentName}
+                      kind={previewKind}
+                      summary={m.content || null}
+                      meta={new Date(m.created_at || 0).toLocaleDateString()}
+                      onPreview={() => openAttachmentPreview(furl, attachmentName, previewKind)}
+                      actionVariant="subtle"
+                    />
                   );
                 })
               )}
@@ -5676,35 +5738,38 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                               }}
                               className="w-full text-left p-3 bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-xl hover:border-[var(--accent)] hover:shadow-sm transition-all cursor-pointer"
                             >
-                              <div className="flex items-center justify-between mb-1.5 gap-3">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="px-1.5 py-0.5 bg-[var(--muted)] dark:bg-zinc-800 text-[var(--toss-gray-4)] rounded text-[10px] font-bold truncate shrink-0 max-w-[110px]">
-                                    {roomName}
-                                  </span>
-                                  <span className="text-[11px] font-bold text-foreground truncate">{(msg.staff as { name?: string } | null | undefined)?.name || '이름 없음'}</span>
-                                  {isImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold shrink-0">이미지</span>}
-                                  {isFile && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-bold shrink-0">파일</span>}
-                                </div>
-                                <span className="text-[10px] font-medium text-[var(--toss-gray-3)] shrink-0">
-                                  {new Date(msg.created_at || 0).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} {new Date(msg.created_at || 0).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                              </div>
-                              {msg.content && (
-                                <p className="text-[12px] font-semibold text-[var(--toss-gray-5)] dark:text-[var(--toss-gray-3)] line-clamp-2 leading-relaxed">
-                                  {msg.content}
-                                </p>
-                              )}
-                              {fileName && (
-                                <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] truncate mt-0.5">첨부 {fileName}</p>
-                              )}
-                              {fileUrl && (
-                                <AttachmentQuickActions
+                              {fileUrl ? (
+                                <AttachmentListCard
                                   url={fileUrl}
                                   name={fileName}
-                                  onPreview={() => openAttachmentPreview(fileUrl, fileName, isImage ? 'image' : 'file')}
-                                  variant="subtle"
-                                  className="mt-2"
+                                  kind={isImage ? 'image' : isVideoUrl(fileUrl) ? 'video' : 'file'}
+                                  summary={msg.content || null}
+                                  meta={`${roomName} · ${(msg.staff as { name?: string } | null | undefined)?.name || '이름 없음'} · ${new Date(msg.created_at || 0).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} ${new Date(msg.created_at || 0).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`}
+                                  badgeLabel={isImage ? '이미지' : isFile ? '파일' : '동영상'}
+                                  onPreview={() => openAttachmentPreview(fileUrl, fileName, isImage ? 'image' : isVideoUrl(fileUrl) ? 'video' : 'file')}
+                                  onActivate={() => openRoomFromGlobalSearch(String(msg.room_id))}
+                                  actionVariant="subtle"
+                                  className="border-0 bg-transparent p-0 shadow-none"
                                 />
+                              ) : (
+                                <>
+                                  <div className="flex items-center justify-between mb-1.5 gap-3">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className="px-1.5 py-0.5 bg-[var(--muted)] dark:bg-zinc-800 text-[var(--toss-gray-4)] rounded text-[10px] font-bold truncate shrink-0 max-w-[110px]">
+                                        {roomName}
+                                      </span>
+                                      <span className="text-[11px] font-bold text-foreground truncate">{(msg.staff as { name?: string } | null | undefined)?.name || '이름 없음'}</span>
+                                    </div>
+                                    <span className="text-[10px] font-medium text-[var(--toss-gray-3)] shrink-0">
+                                      {new Date(msg.created_at || 0).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} {new Date(msg.created_at || 0).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                  {msg.content && (
+                                    <p className="text-[12px] font-semibold text-[var(--toss-gray-5)] dark:text-[var(--toss-gray-3)] line-clamp-2 leading-relaxed">
+                                      {msg.content}
+                                    </p>
+                                  )}
+                                </>
                               )}
                             </div>
                           );
@@ -5831,7 +5896,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       )}
 
       {/* ── 이미지 전체화면 미리보기 모달 ── */}
-      {attachmentPreview && attachmentPreview.kind !== 'image' && (
+      {attachmentPreview && (
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-sm"
           onClick={closeAttachmentPreview}
@@ -5873,7 +5938,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             className="max-w-[92vw] max-h-[88vh] w-full flex items-center justify-center"
             onClick={(e) => e.stopPropagation()}
           >
-            {attachmentPreview.kind === 'video' ? (
+            {attachmentPreview.kind === 'image' ? (
+              <img
+                src={attachmentPreview.url}
+                alt={attachmentPreview.name || '미리보기'}
+                className="max-w-[92vw] max-h-[80vh] rounded-xl object-contain shadow-2xl select-none"
+                draggable={false}
+              />
+            ) : attachmentPreview.kind === 'video' ? (
               <video
                 src={attachmentPreview.url}
                 controls
@@ -5910,52 +5982,6 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {imagePreviewUrl && (
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-sm"
-          onClick={() => setImagePreviewUrl(null)}
-          onKeyDown={(e) => { if (e.key === 'Escape') setImagePreviewUrl(null); }}
-          tabIndex={-1}
-        >
-          {/* 상단 버튼 바 - safe-area 적용 */}
-          <div
-            className="absolute top-0 left-0 right-0 z-10 flex items-center justify-end gap-2 px-4 pb-2"
-            style={{ paddingTop: 'calc(env(safe-area-inset-top, 12px) + 12px)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* 다운로드 */}
-            <a
-              href={imagePreviewUrl}
-              download
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-11 h-11 flex items-center justify-center rounded-full bg-white/15 hover:bg-white/30 text-white text-lg transition-colors"
-              aria-label="다운로드"
-              title="다운로드"
-            >
-              ↓
-            </a>
-            {/* 닫기 */}
-            <button
-              type="button"
-              className="w-11 h-11 flex items-center justify-center rounded-full bg-white/15 hover:bg-white/30 text-white text-2xl font-light transition-colors"
-              onClick={() => setImagePreviewUrl(null)}
-              aria-label="닫기"
-            >
-              ✕
-            </button>
-          </div>
-          {/* 이미지 */}
-          <img
-            src={imagePreviewUrl}
-            alt="미리보기"
-            className="max-w-[92vw] max-h-[80vh] rounded-xl object-contain shadow-2xl select-none"
-            onClick={(e) => e.stopPropagation()}
-            draggable={false}
-          />
         </div>
       )}
     </div>
