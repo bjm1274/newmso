@@ -5838,32 +5838,37 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           onKeyDown={(e) => { if (e.key === 'Escape') closeAttachmentPreview(); }}
           tabIndex={-1}
         >
-          <button
-            type="button"
-            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white text-xl transition-colors z-10"
-            onClick={closeAttachmentPreview}
-            aria-label="닫기"
-          >
-            ×
-          </button>
-          <a
-            href={buildDownloadUrl(attachmentPreview.url, attachmentPreview.name ?? '')}
+          {/* 상단 버튼 바 - safe-area 적용 */}
+          <div
+            className="absolute top-0 left-0 right-0 z-10 flex items-center justify-end gap-2 px-4 pb-2"
+            style={{ paddingTop: 'calc(env(safe-area-inset-top, 12px) + 12px)' }}
             onClick={(e) => e.stopPropagation()}
-            className="absolute top-4 right-14 h-9 inline-flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 px-3 text-white text-xs font-semibold transition-colors z-10"
-            aria-label="다운로드"
-            title="다운로드"
           >
-            다운로드
-          </a>
-          <a
-            href={attachmentPreview.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="absolute top-14 right-4 h-9 inline-flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 px-3 text-white text-xs font-semibold transition-colors z-10"
-          >
-            새 창 열기
-          </a>
+            <a
+              href={attachmentPreview.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="h-11 inline-flex items-center justify-center rounded-full bg-white/15 hover:bg-white/30 px-4 text-white text-xs font-semibold transition-colors"
+            >
+              새 창
+            </a>
+            <a
+              href={buildDownloadUrl(attachmentPreview.url, attachmentPreview.name ?? '')}
+              onClick={(e) => e.stopPropagation()}
+              className="h-11 inline-flex items-center justify-center rounded-full bg-white/15 hover:bg-white/30 px-4 text-white text-xs font-semibold transition-colors"
+              aria-label="다운로드"
+            >
+              다운로드
+            </a>
+            <button
+              type="button"
+              className="w-11 h-11 flex items-center justify-center rounded-full bg-white/15 hover:bg-white/30 text-white text-2xl font-light transition-colors"
+              onClick={closeAttachmentPreview}
+              aria-label="닫기"
+            >
+              ✕
+            </button>
+          </div>
           <div
             className="max-w-[92vw] max-h-[88vh] w-full flex items-center justify-center"
             onClick={(e) => e.stopPropagation()}
@@ -5915,33 +5920,39 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           onKeyDown={(e) => { if (e.key === 'Escape') setImagePreviewUrl(null); }}
           tabIndex={-1}
         >
-          {/* 닫기 */}
-          <button
-            type="button"
-            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white text-xl transition-colors z-10"
-            onClick={() => setImagePreviewUrl(null)}
-            aria-label="닫기"
-          >
-            ✕
-          </button>
-          {/* 다운로드 */}
-          <a
-            href={imagePreviewUrl}
-            download
-            target="_blank"
-            rel="noopener noreferrer"
+          {/* 상단 버튼 바 - safe-area 적용 */}
+          <div
+            className="absolute top-0 left-0 right-0 z-10 flex items-center justify-end gap-2 px-4 pb-2"
+            style={{ paddingTop: 'calc(env(safe-area-inset-top, 12px) + 12px)' }}
             onClick={(e) => e.stopPropagation()}
-            className="absolute top-4 right-14 w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white text-base transition-colors z-10"
-            aria-label="다운로드"
-            title="다운로드"
           >
-            ↓
-          </a>
+            {/* 다운로드 */}
+            <a
+              href={imagePreviewUrl}
+              download
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-11 h-11 flex items-center justify-center rounded-full bg-white/15 hover:bg-white/30 text-white text-lg transition-colors"
+              aria-label="다운로드"
+              title="다운로드"
+            >
+              ↓
+            </a>
+            {/* 닫기 */}
+            <button
+              type="button"
+              className="w-11 h-11 flex items-center justify-center rounded-full bg-white/15 hover:bg-white/30 text-white text-2xl font-light transition-colors"
+              onClick={() => setImagePreviewUrl(null)}
+              aria-label="닫기"
+            >
+              ✕
+            </button>
+          </div>
           {/* 이미지 */}
           <img
             src={imagePreviewUrl}
             alt="미리보기"
-            className="max-w-[92vw] max-h-[88vh] rounded-xl object-contain shadow-2xl select-none"
+            className="max-w-[92vw] max-h-[80vh] rounded-xl object-contain shadow-2xl select-none"
             onClick={(e) => e.stopPropagation()}
             draggable={false}
           />
