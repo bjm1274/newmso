@@ -669,15 +669,15 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     setReadStatusPost(post);
     setReadStatusLoading(true);
     try {
-      // 현재 필터와 무관하게 게시글의 회사 기준으로 대상자 조회
-      const postCompany = typeof post.company === 'string' && post.company ? post.company : null;
-      let audienceQuery = supabase
+      // 공지사항·경조사 등 전사 공지 게시판은 전 직원이 대상
+      // 회사 필터 없이 모든 재직 중 직원 조회
+      const { data: audienceData } = await supabase
         .from('staff_members')
         .select('id, name, company, company_id, department, position, status')
         .neq('status', '퇴사')
-        .neq('status', '퇴직');
-      if (postCompany) audienceQuery = audienceQuery.eq('company', postCompany);
-      const { data: audienceData } = await audienceQuery.order('name', { ascending: true });
+        .neq('status', '퇴직')
+        .order('company', { ascending: true })
+        .order('name', { ascending: true });
       setReadStatusAudience((audienceData || []) as StaffSummary[]);
       await loadBoardReadState([String(post.id)]);
     } finally {

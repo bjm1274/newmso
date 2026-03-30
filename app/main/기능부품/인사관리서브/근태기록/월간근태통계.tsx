@@ -1,5 +1,5 @@
 'use client';
-﻿
+
 export default function MonthlyStats({ stats }: Record<string, unknown>) {
   return (
     <div className="p-4 h-full overflow-y-auto custom-scrollbar bg-[var(--muted)]/50">

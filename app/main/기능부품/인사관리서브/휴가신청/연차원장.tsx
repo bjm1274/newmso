@@ -25,6 +25,22 @@ type LeaveLedgerRow = {
   approved_at?: string | null;
 };
 
+type LeaveRollbackAuditRow = {
+  id: string;
+  action: string;
+  target_id?: string | null;
+  user_name?: string | null;
+  created_at: string;
+  details?: {
+    staff_id?: string;
+    leave_type?: string | null;
+    before_status?: string | null;
+    after_status?: string | null;
+    rollback_applied?: boolean;
+    annual_leave_used_recalculated?: number | null;
+  } | null;
+};
+
 type AnnualLeaveLedgerProps = {
   staffs: StaffLite[];
   selectedCo: string;
@@ -32,6 +48,7 @@ type AnnualLeaveLedgerProps = {
 
 export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLedgerProps) {
   const [leaveRows, setLeaveRows] = useState<LeaveLedgerRow[]>([]);
+  const [rollbackAudits, setRollbackAudits] = useState<LeaveRollbackAuditRow[]>([]);
   const [loading, setLoading] = useState(false);
 
   const filteredStaffs = useMemo(
@@ -55,20 +72,41 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
           return;
         }
 
-        const { data, error } = await supabase
-          .from('leave_requests')
-          .select('id, staff_id, leave_type, start_date, end_date, status, reason, approved_at')
-          .in('staff_id', staffIds)
-          .order('approved_at', { ascending: false, nullsFirst: false })
-          .order('created_at', { ascending: false });
+        const [{ data, error }, { data: auditData, error: auditError }] = await Promise.all([
+          supabase
+            .from('leave_requests')
+            .select('id, staff_id, leave_type, start_date, end_date, status, reason, approved_at')
+            .in('staff_id', staffIds)
+            .order('approved_at', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('audit_logs')
+            .select('id, action, target_id, user_name, created_at, details')
+            .eq('target_type', 'leave_request')
+            .eq('action', 'leave_request_status_updated')
+            .order('created_at', { ascending: false })
+            .limit(200),
+        ]);
 
         if (error) throw error;
+        if (auditError) throw auditError;
+
+        const leaveIds = new Set((data || []).map((row) => String(row.id)));
+        const nextRollbackAudits = ((auditData || []) as LeaveRollbackAuditRow[]).filter((row) => {
+          const auditedStaffId = String(row.details?.staff_id || '');
+          return leaveIds.has(String(row.target_id || '')) || staffIds.includes(auditedStaffId);
+        });
+
         if (active) {
           setLeaveRows((data || []) as LeaveLedgerRow[]);
+          setRollbackAudits(nextRollbackAudits);
         }
       } catch (error) {
         console.error('연차 원장 조회 실패:', error);
-        if (active) setLeaveRows([]);
+        if (active) {
+          setLeaveRows([]);
+          setRollbackAudits([]);
+        }
       } finally {
         if (active) setLoading(false);
       }
@@ -108,6 +146,31 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
         })
         .sort((a, b) => a.staff.name.localeCompare(b.staff.name, 'ko')),
     [approvedAnnualLeaveRows, filteredStaffs]
+  );
+
+  const rollbackTimelineRows = useMemo(
+    () =>
+      rollbackAudits.map((row) => {
+        const details = row.details || {};
+        const staff = filteredStaffs.find((item) => item.id === details.staff_id);
+        const beforeStatus = String(details.before_status || '-');
+        const afterStatus = String(details.after_status || '-');
+        return {
+          id: row.id,
+          staffName: staff?.name || details.staff_id || '-',
+          leaveType: details.leave_type || '-',
+          beforeStatus,
+          afterStatus,
+          rollbackApplied: Boolean(details.rollback_applied),
+          recalculatedUsedDays:
+            typeof details.annual_leave_used_recalculated === 'number'
+              ? details.annual_leave_used_recalculated
+              : null,
+          actor: row.user_name || '시스템',
+          createdAt: row.created_at,
+        };
+      }),
+    [filteredStaffs, rollbackAudits]
   );
 
   return (
@@ -207,6 +270,70 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
                 <tr>
                   <td colSpan={5} className="px-4 py-10 text-center text-sm text-[var(--toss-gray-4)]">
                     승인된 연차 사용 이력이 없습니다.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm overflow-hidden">
+        <div className="border-b border-[var(--border)] px-4 py-3">
+          <h4 className="text-sm font-bold text-[var(--foreground)]">승인 취소/반려 롤백 추적</h4>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-[var(--hover-bg)]">
+              <tr className="text-left text-[11px] font-bold text-[var(--toss-gray-4)]">
+                <th className="px-4 py-3">직원</th>
+                <th className="px-4 py-3">휴가 종류</th>
+                <th className="px-4 py-3">상태 변경</th>
+                <th className="px-4 py-3 text-right">재계산 사용일수</th>
+                <th className="px-4 py-3">처리자</th>
+                <th className="px-4 py-3">처리 시각</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rollbackTimelineRows.slice(0, 30).map((row) => (
+                <tr key={row.id} className="border-t border-[var(--border)] align-top">
+                  <td className="px-4 py-3 font-semibold text-[var(--foreground)]">{row.staffName}</td>
+                  <td className="px-4 py-3 text-[var(--toss-gray-4)]">{row.leaveType}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-[var(--hover-bg)] px-2 py-1 text-[11px] font-semibold text-[var(--toss-gray-4)]">
+                        {row.beforeStatus}
+                      </span>
+                      <span className="text-[var(--toss-gray-3)]">→</span>
+                      <span
+                        className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
+                          row.rollbackApplied
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
+                        }`}
+                      >
+                        {row.afterStatus}
+                      </span>
+                      {row.rollbackApplied && (
+                        <span className="rounded-full bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-600">
+                          롤백 적용
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-[var(--foreground)]">
+                    {row.recalculatedUsedDays !== null ? row.recalculatedUsedDays.toFixed(1) : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-[var(--toss-gray-4)]">{row.actor}</td>
+                  <td className="px-4 py-3 text-[var(--toss-gray-4)]">
+                    {new Date(row.createdAt).toLocaleString('ko-KR')}
+                  </td>
+                </tr>
+              ))}
+              {!loading && rollbackTimelineRows.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-[var(--toss-gray-4)]">
+                    최근 승인/반려 롤백 추적 이력이 없습니다.
                   </td>
                 </tr>
               )}
