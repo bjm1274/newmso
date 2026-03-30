@@ -326,9 +326,9 @@ export default function AdminView(props: Record<string, unknown>) {
         {activeTab === '직원권한' && <StaffPermissionManager onRefresh={onRefresh} />}
         {activeTab === '수술검사템플릿' && <SurgeryExamTemplateManager />}
         {activeTab === '팝업관리' && <PopupManager />}
-        {activeTab === '데이터백업' && <DataBackup />}
+        {activeTab === '데이터백업' && <DataBackup user={user as Record<string, unknown> | null | undefined} />}
         {activeTab === '데이터초기화' && <DataReseter onRefresh={onRefresh ?? (() => {})} />}
-        {activeTab === '문서양식' && <FormBuilder user={user} />}
+        {activeTab === '문서양식' && <FormBuilder user={user as Record<string, unknown> | null | undefined} />}
         {activeTab === '급여이상치' && <SalaryAnomalyDetector staffs={staffs} />}
         {activeTab === '공문서대장' && <OfficialDocumentLog staffs={staffs} selectedCo="전체" user={user} />}
         {activeTab === '비품대여설정' && <AssetLoanSettingsAdminView staffs={staffs} user={user as any} />}

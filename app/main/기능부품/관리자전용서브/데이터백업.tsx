@@ -1,13 +1,15 @@
 'use client';
 
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from '@/lib/toast';
-import { useEffect, useMemo, useRef, useState } from 'react';
 import { BACKUP_GROUPS, BACKUP_RESTORE_ORDER, resolveBackupTables } from '@/lib/backup-config';
 import { supabase } from '@/lib/supabase';
 import { useActionDialog } from '@/app/components/useActionDialog';
+import { getStaffLikeId, normalizeStaffLike } from '@/lib/staff-identity';
 
 const PAGE_SIZE = 1000;
 const RESTORE_BATCH_SIZE = 200;
+const RESTORE_HISTORY_LIMIT = 6;
 
 type BackupMeta = {
   version?: number;
@@ -17,10 +19,34 @@ type BackupMeta = {
   skipped_tables?: Array<{ table: string; reason: string }>;
 };
 
+type RestorePreviewTable = {
+  table: string;
+  rowCount: number;
+  currentRowCount: number | null;
+  delta: number | null;
+};
+
 type RestorePreview = {
   meta: BackupMeta | null;
-  tables: Array<{ table: string; rowCount: number }>;
+  tables: RestorePreviewTable[];
   totalRows: number;
+  currentTotalRows: number;
+};
+
+type RestoreRunRow = {
+  id: string;
+  file_name: string;
+  status: 'preview' | 'running' | 'completed' | 'failed' | string;
+  total_tables: number;
+  total_rows: number;
+  requested_by_name?: string | null;
+  started_at: string;
+  finished_at?: string | null;
+  result_summary?: Record<string, unknown> | null;
+};
+
+type Props = {
+  user?: Record<string, unknown> | null;
 };
 
 function chunkRows<T>(rows: T[], size: number) {
@@ -76,12 +102,59 @@ async function readAllRows(table: string) {
   return { rows, error: null };
 }
 
-export default function DataBackup() {
+async function readExactCount(table: string) {
+  const { count, error } = await supabase
+    .from(table)
+    .select('*', { count: 'exact', head: true });
+
+  if (error) {
+    return { count: null as number | null, error };
+  }
+
+  return { count: typeof count === 'number' ? count : 0, error: null };
+}
+
+function formatDelta(delta: number | null) {
+  if (delta === null) return '비교 불가';
+  if (delta === 0) return '변화 없음';
+  return `${delta > 0 ? '+' : ''}${delta.toLocaleString()}건`;
+}
+
+function getRunStatusMeta(status: string) {
+  switch (status) {
+    case 'completed':
+      return { label: '완료', className: 'bg-emerald-100 text-emerald-700' };
+    case 'failed':
+      return { label: '실패', className: 'bg-red-100 text-red-700' };
+    case 'running':
+      return { label: '진행 중', className: 'bg-amber-100 text-amber-700' };
+    default:
+      return { label: status || '미상', className: 'bg-slate-100 text-slate-600' };
+  }
+}
+
+function isMissingRestoreRunSchema(error: unknown) {
+  const code = String((error as { code?: string } | null)?.code || '').trim();
+  const message = `${String((error as { message?: string } | null)?.message || '')} ${String((error as { details?: string } | null)?.details || '')}`.toLowerCase();
+  return code === '42P01' || message.includes('backup_restore_runs');
+}
+
+export default function DataBackup({ user }: Props) {
+  const normalizedUser = useMemo(
+    () => normalizeStaffLike((user ?? {}) as Record<string, unknown>),
+    [user]
+  );
+  const requestedBy = getStaffLikeId(normalizedUser);
+  const requestedByName = String(normalizedUser.name || '').trim() || null;
+
   const [loading, setLoading] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [lastExport, setLastExport] = useState<string | null>(null);
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const [restorePreview, setRestorePreview] = useState<RestorePreview | null>(null);
   const [restoreLogs, setRestoreLogs] = useState<string[]>([]);
+  const [restoreRuns, setRestoreRuns] = useState<RestoreRunRow[]>([]);
   const [exportSummary, setExportSummary] = useState<{
     exportedAt: string;
     tableCount: number;
@@ -100,6 +173,41 @@ export default function DataBackup() {
     [selectedGroupIds]
   );
 
+  const loadRestoreRuns = useCallback(async () => {
+    try {
+      setHistoryLoading(true);
+      const { data, error } = await supabase
+        .from('backup_restore_runs')
+        .select('id,file_name,status,total_tables,total_rows,requested_by_name,started_at,finished_at,result_summary')
+        .order('started_at', { ascending: false })
+        .limit(RESTORE_HISTORY_LIMIT);
+      if (error) throw error;
+      setRestoreRuns((data || []) as RestoreRunRow[]);
+    } catch (error) {
+      console.error('restore run history load failed:', error);
+      setRestoreRuns([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadRestoreRuns();
+  }, [loadRestoreRuns]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('backup-restore-runs-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'backup_restore_runs' }, () => {
+        void loadRestoreRuns();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadRestoreRuns]);
+
   useEffect(() => {
     if (!restoreFile) {
       setRestorePreview(null);
@@ -109,9 +217,10 @@ export default function DataBackup() {
     let cancelled = false;
     const parseRestorePreview = async () => {
       try {
+        setPreviewLoading(true);
         const text = await restoreFile.text();
         const parsed = normalizeBackupPayload(JSON.parse(text));
-        const tables = Object.entries(parsed.tables)
+        const baseTables = Object.entries(parsed.tables)
           .filter(([, rows]) => Array.isArray(rows))
           .map(([table, rows]) => ({
             table,
@@ -119,16 +228,48 @@ export default function DataBackup() {
           }))
           .sort((a, b) => b.rowCount - a.rowCount || a.table.localeCompare(b.table));
 
-        if (!cancelled) {
-          setRestorePreview({
-            meta: parsed.meta,
-            tables,
-            totalRows: tables.reduce((sum, entry) => sum + entry.rowCount, 0),
-          });
-        }
-      } catch {
+        const currentCounts = await Promise.all(
+          baseTables.map(async (entry) => {
+            const result = await readExactCount(entry.table);
+            return {
+              table: entry.table,
+              currentRowCount: result.error ? null : result.count,
+            };
+          })
+        );
+
+        if (cancelled) return;
+
+        const currentCountMap = new Map(
+          currentCounts.map((entry) => [entry.table, entry.currentRowCount])
+        );
+        const tables = baseTables.map((entry) => {
+          const currentRowCount = currentCountMap.get(entry.table) ?? null;
+          return {
+            table: entry.table,
+            rowCount: entry.rowCount,
+            currentRowCount,
+            delta: currentRowCount === null ? null : entry.rowCount - currentRowCount,
+          };
+        });
+
+        setRestorePreview({
+          meta: parsed.meta,
+          tables,
+          totalRows: tables.reduce((sum, entry) => sum + entry.rowCount, 0),
+          currentTotalRows: tables.reduce(
+            (sum, entry) => sum + (typeof entry.currentRowCount === 'number' ? entry.currentRowCount : 0),
+            0
+          ),
+        });
+      } catch (error) {
+        console.error('restore preview parse failed:', error);
         if (!cancelled) {
           setRestorePreview(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setPreviewLoading(false);
         }
       }
     };
@@ -216,6 +357,47 @@ export default function DataBackup() {
     }
   };
 
+  const createRestoreRun = async (preview: RestorePreview) => {
+    const payload = {
+      file_name: restoreFile?.name || 'restore.json',
+      meta: restorePreview?.meta || {},
+      preview: preview.tables,
+      total_tables: preview.tables.length,
+      total_rows: preview.totalRows,
+      status: 'running',
+      requested_by: requestedBy,
+      requested_by_name: requestedByName,
+      started_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase
+      .from('backup_restore_runs')
+      .insert(payload)
+      .select('id')
+      .single();
+
+    if (error) {
+      if (isMissingRestoreRunSchema(error)) return '';
+      throw error;
+    }
+    return String(data?.id || '');
+  };
+
+  const updateRestoreRun = async (
+    runId: string,
+    payload: Record<string, unknown>
+  ) => {
+    if (!runId) return;
+    const { error } = await supabase
+      .from('backup_restore_runs')
+      .update(payload)
+      .eq('id', runId);
+    if (error) {
+      if (isMissingRestoreRunSchema(error)) return;
+      throw error;
+    }
+  };
+
   const restoreData = async () => {
     if (!restoreFile || !restorePreview) {
       toast('복원할 JSON 파일을 먼저 선택해 주세요.', 'warning');
@@ -224,13 +406,13 @@ export default function DataBackup() {
 
     const answer = await openPrompt({
       title: '백업 복원',
-      description: `${restorePreview.tables.length}개 테이블 / ${restorePreview.totalRows.toLocaleString()}건 데이터를 복원합니다.\n기존 데이터와 겹치는 항목은 갱신될 수 있습니다. 계속하려면 아래에 "복원"을 입력해 주세요.`,
+      description: `${restorePreview.tables.length}개 테이블 / ${restorePreview.totalRows.toLocaleString()}건 데이터를 복원합니다.\n현재 기준 ${restorePreview.currentTotalRows.toLocaleString()}건과 비교한 뒤 upsert로 복원합니다. 계속하려면 아래에 "복원"을 입력해 주세요.`,
       confirmText: '복원 실행',
       cancelText: '취소',
       tone: 'danger',
       placeholder: '복원',
       required: true,
-      helperText: '이 작업은 백업 파일 기준으로 upsert 됩니다. 먼저 최신 백업을 하나 더 받아두는 것을 권장합니다.',
+      helperText: '복원 실행 이력과 로그가 관리자 화면에 저장됩니다.',
     });
 
     if (answer?.trim() !== '복원') {
@@ -240,7 +422,10 @@ export default function DataBackup() {
     setLoading(true);
     setRestoreLogs([]);
 
+    let runId = '';
     try {
+      runId = await createRestoreRun(restorePreview);
+
       const text = await restoreFile.text();
       const parsed = normalizeBackupPayload(JSON.parse(text));
       const tableEntries = Object.entries(parsed.tables).filter(([, rows]) => Array.isArray(rows) && rows.length > 0);
@@ -250,11 +435,14 @@ export default function DataBackup() {
       ];
 
       const nextLogs: string[] = [];
+      const failedTables: Array<{ table: string; error: string }> = [];
+      let completedTables = 0;
+
       for (const table of restoreOrder) {
         const rows = parsed.tables[table];
         if (!Array.isArray(rows) || rows.length === 0) continue;
 
-        nextLogs.push(`${table}: ${rows.length}건 복원 시작`);
+        nextLogs.push(`${table}: ${rows.length.toLocaleString()}건 복원 시작`);
         setRestoreLogs([...nextLogs]);
 
         let failed = false;
@@ -265,24 +453,60 @@ export default function DataBackup() {
 
           if (error) {
             failed = true;
-            nextLogs.push(`${table}: 실패 - ${String(error.message || error.details || 'unknown error')}`);
+            const message = String(error.message || error.details || 'unknown error');
+            failedTables.push({ table, error: message });
+            nextLogs.push(`${table}: 실패 - ${message}`);
             setRestoreLogs([...nextLogs]);
             break;
           }
         }
 
         if (!failed) {
+          completedTables += 1;
           nextLogs.push(`${table}: 완료`);
           setRestoreLogs([...nextLogs]);
         }
       }
 
-      toast('복원 작업을 완료했습니다. 로그를 확인해 주세요.', 'success');
+      const status = failedTables.length > 0 ? 'failed' : 'completed';
+      await updateRestoreRun(runId, {
+        status,
+        finished_at: new Date().toISOString(),
+        log_lines: nextLogs,
+        result_summary: {
+          completed_tables: completedTables,
+          failed_tables: failedTables,
+          preview_total_rows: restorePreview.totalRows,
+          preview_current_rows: restorePreview.currentTotalRows,
+        },
+      });
+
+      toast(
+        failedTables.length > 0
+          ? '일부 테이블 복원에 실패했습니다. 복원 로그를 확인해 주세요.'
+          : '복원 작업이 완료되었습니다. 복원 로그를 확인해 주세요.',
+        failedTables.length > 0 ? 'warning' : 'success'
+      );
       setRestoreFile(null);
       setRestorePreview(null);
       if (fileRef.current) fileRef.current.value = '';
+      void loadRestoreRuns();
     } catch (error) {
       console.error(error);
+      if (runId) {
+        try {
+          await updateRestoreRun(runId, {
+            status: 'failed',
+            finished_at: new Date().toISOString(),
+            log_lines: restoreLogs,
+            result_summary: {
+              error: String((error as Error)?.message || error),
+            },
+          });
+        } catch (updateError) {
+          console.error('restore run update failed:', updateError);
+        }
+      }
       toast('복원 중 오류가 발생했습니다.', 'error');
     } finally {
       setLoading(false);
@@ -296,7 +520,7 @@ export default function DataBackup() {
       <div className="space-y-1">
         <h3 className="text-lg font-black tracking-tight text-[var(--foreground)]">데이터 백업</h3>
         <p className="text-xs font-semibold leading-relaxed text-[var(--toss-gray-3)]">
-          운영 중인 핵심 테이블만 골라 JSON으로 내보내고, 복원 전에는 미리보기와 로그를 함께 확인할 수 있습니다.
+          운영 중인 핵심 테이블만 골라 JSON으로 내보내고, 복원 전에는 현재 행 수와 차이를 미리 보고 실행 이력까지 남깁니다.
         </p>
       </div>
 
@@ -368,7 +592,7 @@ export default function DataBackup() {
                 ))}
               </div>
             ) : (
-              <p className="mt-1">누락된 테이블 없이 백업되었습니다.</p>
+              <p className="mt-1">제외된 테이블 없이 백업했습니다.</p>
             )}
           </div>
         ) : null}
@@ -378,7 +602,7 @@ export default function DataBackup() {
         <div className="space-y-1">
           <h4 className="text-sm font-black text-[var(--foreground)]">백업 복원</h4>
           <p className="text-[11px] font-semibold leading-relaxed text-[var(--toss-gray-3)]">
-            복원은 파일 기준으로 upsert 되며, 파일에 들어 있지 않은 기존 행은 그대로 유지됩니다.
+            복원은 파일 기준 데이터로 upsert하며, 실행 전에 현재 DB 행 수와 차이를 비교하고 결과를 이력으로 남깁니다.
           </p>
         </div>
 
@@ -401,7 +625,7 @@ export default function DataBackup() {
           <button
             type="button"
             onClick={restoreData}
-            disabled={!restoreFile || !restorePreview || loading}
+            disabled={!restoreFile || !restorePreview || loading || previewLoading}
             className="rounded-[16px] bg-red-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
           >
             복원 실행
@@ -414,28 +638,45 @@ export default function DataBackup() {
           </p>
         ) : null}
 
+        {previewLoading ? (
+          <div className="rounded-[18px] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-[12px] font-semibold text-[var(--toss-gray-4)]">
+            현재 DB 기준 행 수를 계산하는 중입니다...
+          </div>
+        ) : null}
+
         {restorePreview ? (
           <div className="rounded-[18px] border border-[var(--border)] bg-[var(--card)] p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-black text-[var(--foreground)]">
-                {restorePreview.tables.length}개 테이블 / {restorePreview.totalRows.toLocaleString()}건
-              </p>
+              <div>
+                <p className="text-sm font-black text-[var(--foreground)]">
+                  {restorePreview.tables.length}개 테이블 / {restorePreview.totalRows.toLocaleString()}건
+                </p>
+                <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                  현재 기준 {restorePreview.currentTotalRows.toLocaleString()}건 비교
+                </p>
+              </div>
               {restorePreview.meta?.exported_at ? (
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
                   내보낸 시각: {new Date(restorePreview.meta.exported_at).toLocaleString()}
                 </p>
               ) : null}
             </div>
-            <div className="mt-3 max-h-48 space-y-1 overflow-y-auto pr-1 text-[12px] font-semibold text-[var(--toss-gray-4)]">
+            <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1 text-[12px] font-semibold text-[var(--toss-gray-4)]">
               {restorePreview.tables.map((entry) => (
-                <div key={entry.table} className="flex items-center justify-between rounded-[12px] bg-[var(--background)]/60 px-3 py-2">
-                  <span>{entry.table}</span>
-                  <span>{entry.rowCount.toLocaleString()}건</span>
+                <div key={entry.table} className="rounded-[12px] bg-[var(--background)]/60 px-3 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-bold text-[var(--foreground)]">{entry.table}</span>
+                    <span>{entry.rowCount.toLocaleString()}건 가져옴</span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--toss-gray-3)]">
+                    <span>현재 {entry.currentRowCount === null ? '비교 불가' : `${entry.currentRowCount.toLocaleString()}건`}</span>
+                    <span>차이 {formatDelta(entry.delta)}</span>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
-        ) : restoreFile ? (
+        ) : restoreFile && !previewLoading ? (
           <div className="rounded-[18px] border border-red-200 bg-red-50 px-4 py-3 text-[12px] font-semibold text-red-600">
             파일을 읽지 못했습니다. 유효한 JSON 백업 파일인지 확인해 주세요.
           </div>
@@ -451,6 +692,66 @@ export default function DataBackup() {
             </div>
           </div>
         ) : null}
+      </section>
+
+      <section className="space-y-3 rounded-[24px] border border-[var(--border)] bg-[var(--background)]/40 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h4 className="text-sm font-black text-[var(--foreground)]">최근 복원 이력</h4>
+            <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
+              최근 실행된 복원 작업 상태와 결과 요약입니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void loadRestoreRuns()}
+            disabled={historyLoading}
+            className="rounded-[14px] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--muted)] disabled:opacity-50"
+          >
+            새로고침
+          </button>
+        </div>
+
+        {restoreRuns.length > 0 ? (
+          <div className="space-y-2">
+            {restoreRuns.map((run) => {
+              const statusMeta = getRunStatusMeta(run.status);
+              const failedTables = Array.isArray(run.result_summary?.failed_tables)
+                ? (run.result_summary?.failed_tables as Array<Record<string, unknown>>)
+                : [];
+              return (
+                <article key={run.id} className="rounded-[18px] border border-[var(--border)] bg-[var(--card)] p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-black text-[var(--foreground)]">{run.file_name}</p>
+                      <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                        {new Date(run.started_at).toLocaleString('ko-KR')}
+                        {run.requested_by_name ? ` · ${run.requested_by_name}` : ''}
+                      </p>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${statusMeta.className}`}>
+                      {statusMeta.label}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                    <span>{Number(run.total_tables || 0).toLocaleString('ko-KR')}개 테이블</span>
+                    <span>{Number(run.total_rows || 0).toLocaleString('ko-KR')}건</span>
+                    <span>
+                      실패 {failedTables.length.toLocaleString('ko-KR')}개
+                    </span>
+                    <span>
+                      종료 {run.finished_at ? new Date(run.finished_at).toLocaleString('ko-KR') : '진행 중'}
+                    </span>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-[18px] border border-dashed border-[var(--border)] px-4 py-8 text-center text-[12px] font-semibold text-[var(--toss-gray-3)]">
+            아직 기록된 복원 이력이 없습니다.
+          </div>
+        )}
       </section>
     </div>
   );

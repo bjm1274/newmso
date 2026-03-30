@@ -564,12 +564,15 @@ export default function SystemMasterCenter({
 
       {activeTab === '운영대시보드' && operations && (
         <section className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
             {[
               { id: 'queue-pending', label: '대기 푸시 작업', value: operations.queue?.pending ?? 0 },
               { id: 'queue-dead', label: 'Dead Letter', value: operations.queue?.deadLettered ?? 0 },
               { id: 'push-total', label: '푸시 구독', value: operations.subscriptions?.total ?? 0 },
               { id: 'backup-count', label: '최근 백업', value: (operations.recentBackups || []).length },
+              { id: 'restore-count', label: '복원 이력', value: (operations.restoreRuns || []).length },
+              { id: 'todo-due', label: '리마인더 대기', value: operations.todoAutomation?.dueReminders ?? 0 },
+              { id: 'wiki-version', label: '위키 버전', value: operations.wiki?.versions ?? 0 },
             ].map((card) => (
               <article key={card.id} className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">{card.label}</p>
@@ -649,11 +652,21 @@ export default function SystemMasterCenter({
                     ))}
                   </div>
                 </div>
+
+                <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] p-4">
+                  <p className="text-xs font-bold text-[var(--foreground)]">할일 자동화 / 위키 버전</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <p className="text-[11px] text-[var(--toss-gray-3)]">리마인더 대기 <span className="font-bold text-[var(--foreground)]">{Number(operations.todoAutomation?.dueReminders || 0).toLocaleString('ko-KR')}</span></p>
+                    <p className="text-[11px] text-[var(--toss-gray-3)]">반복 할일 <span className="font-bold text-[var(--foreground)]">{Number(operations.todoAutomation?.repeatingOpenTodos || 0).toLocaleString('ko-KR')}</span></p>
+                    <p className="text-[11px] text-[var(--toss-gray-3)]">24시간 리마인더 <span className="font-bold text-[var(--foreground)]">{Number(operations.todoAutomation?.reminderLogs24h || 0).toLocaleString('ko-KR')}</span></p>
+                    <p className="text-[11px] text-[var(--toss-gray-3)]">위키 문서/버전 <span className="font-bold text-[var(--foreground)]">{Number(operations.wiki?.documents || 0).toLocaleString('ko-KR')} / {Number(operations.wiki?.versions || 0).toLocaleString('ko-KR')}</span></p>
+                  </div>
+                </div>
               </div>
             </article>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+          <div className="grid gap-4 xl:grid-cols-[0.9fr_0.9fr_1.1fr]">
             <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
               <h3 className="text-base font-bold text-[var(--foreground)]">최근 백업</h3>
               <div className="mt-4 space-y-3">
@@ -661,6 +674,29 @@ export default function SystemMasterCenter({
                   <div key={backup.name} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
                     <p className="text-sm font-bold text-[var(--foreground)]">{backup.name}</p>
                     <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{new Date(backup.created_at).toLocaleString('ko-KR')}</p>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
+              <h3 className="text-base font-bold text-[var(--foreground)]">최근 복원 / 위키 버전</h3>
+              <div className="mt-4 space-y-3">
+                {((operations.restoreRuns as any[]) || []).slice(0, 3).map((run: any) => (
+                  <div key={run.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-bold text-[var(--foreground)]">{run.file_name}</p>
+                      <span className={`rounded-[var(--radius-md)] px-2.5 py-1 text-[10px] font-bold ${run.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : run.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {run.status === 'completed' ? '완료' : run.status === 'failed' ? '실패' : '진행'}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{run.started_at ? new Date(run.started_at).toLocaleString('ko-KR') : '-'}</p>
+                  </div>
+                ))}
+                {((operations.wiki?.recentVersions as any[]) || []).slice(0, 2).map((version: any) => (
+                  <div key={version.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
+                    <p className="text-sm font-bold text-[var(--foreground)]">{version.title}</p>
+                    <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">버전 {Number(version.version_no || 0).toLocaleString('ko-KR')} · {version.created_at ? new Date(version.created_at).toLocaleString('ko-KR') : '-'}</p>
                   </div>
                 ))}
               </div>
