@@ -68,6 +68,8 @@ const TYPE_CFG: Record<string, { icon: string; bg: string; progress: string; acc
 const DEFAULT_CFG = { icon: '🔔', bg: 'bg-[var(--toss-gray-4)]', progress: 'bg-[var(--toss-gray-3)]', accent: 'border-[var(--border)]' };
 const getTypeCfg = (type: string) => TYPE_CFG[type] || DEFAULT_CFG;
 
+const ACTIVE_CHAT_ROOM_SESSION_KEY = 'erp_chat_active_room';
+
 function toNotificationText(value: unknown, fallback = '') {
   if (typeof value === 'string') return value;
   if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
@@ -199,6 +201,17 @@ function getPushClientPlatform() {
   }
   if (/android/i.test(navigator.userAgent || '')) return 'android';
   return 'web';
+}
+
+function getVisibleActiveChatRoomId() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return null;
+  if (document.visibilityState === 'hidden') return null;
+  try {
+    const activeRoomId = window.sessionStorage.getItem(ACTIVE_CHAT_ROOM_SESSION_KEY);
+    return activeRoomId && activeRoomId.trim() ? activeRoomId.trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 function getNotificationDisplayKey(row: Record<string, unknown>) {
@@ -729,38 +742,51 @@ export default function NotificationSystem({
     const rowMetadata = (row.metadata && typeof row.metadata === 'object') ? row.metadata as Record<string, unknown> : {};
     const title = toNotificationText(row.title, '?뚮┝');
     const body = toNotificationText(row.body, '');
+    const isChatType = type === 'message' || type === 'mention';
+    const incomingRoomId = String(rowMetadata.room_id || '').trim();
+    const activeChatRoomId = getVisibleActiveChatRoomId();
+    const suppressLiveDisplay = Boolean(isChatType && incomingRoomId && activeChatRoomId === incomingRoomId);
 
-    addToast({
-      id: rowId,
-      title,
-      body,
-      type,
-      senderName: rowMetadata.sender_name as string | undefined,
-      data: rowMetadata,
-    });
+    if (!suppressLiveDisplay) {
+      addToast({
+        id: rowId,
+        title,
+        body,
+        type,
+        senderName: rowMetadata.sender_name as string | undefined,
+        data: rowMetadata,
+      });
+    }
 
     if (typeof window !== 'undefined') {
-      const evt = (type === 'message' || type === 'mention') ? 'erp-chat-notification' : 'erp-alert';
-      window.dispatchEvent(new CustomEvent(evt, {
-        detail: {
-          title,
-          body,
-          type,
-          room_id: rowMetadata.room_id,
-          data: rowMetadata,
-        },
-      }));
+      if (!suppressLiveDisplay) {
+        const evt = isChatType ? 'erp-chat-notification' : 'erp-alert';
+        window.dispatchEvent(new CustomEvent(evt, {
+          detail: {
+            title,
+            body,
+            type,
+            room_id: rowMetadata.room_id,
+            message_id: rowMetadata.message_id || rowMetadata.id || row.id,
+            data: rowMetadata,
+          },
+        }));
+      }
       window.dispatchEvent(new CustomEvent('erp-new-notification', { detail: row }));
     }
 
     const isDND = isInDND(settings);
-    if (settings.sound && !isDND) {
+    if (!suppressLiveDisplay && settings.sound && !isDND) {
       if (type === 'message' || type === 'mention') sound.playTalk();
       else sound.playSystem();
     }
-    if (settings.vibration && !isDND) vibrateIfSupported();
+    if (!suppressLiveDisplay && settings.vibration && !isDND) vibrateIfSupported();
 
-    const isChatType = type === 'message' || type === 'mention';
+    if (suppressLiveDisplay) {
+      void syncBadge();
+      return;
+    }
+
     void (async () => {
       const canShowNativeNotification = await claimCrossTabDisplayNotificationAsync(displayKey, 5000);
       if (canShowNativeNotification && (!isChatType || !hasPushSubscriptionActive(effectiveUserId))) {

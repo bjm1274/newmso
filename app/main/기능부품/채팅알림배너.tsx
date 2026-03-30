@@ -1,11 +1,11 @@
 'use client';
 import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from 'react';
 
-type ChatDetail = { title?: unknown; body?: unknown; room_id?: unknown };
+type ChatDetail = { title?: unknown; body?: unknown; room_id?: unknown; message_id?: unknown };
 type AlertDetail = { title?: unknown; body?: unknown; type?: unknown; data?: unknown };
 
 type BannerItem =
-  | { kind: 'chat';  id: string; title: string; body: string; room_id?: string }
+  | { kind: 'chat';  id: string; title: string; body: string; room_id?: string; message_id?: string }
   | { kind: 'alert'; id: string; title: string; body: string; type: string; data?: any };
 
 const DISPLAY_MS = 6000;
@@ -45,8 +45,13 @@ export default function ChatAlertBanner({
   const [current, setCurrent] = useState<BannerItem | null>(null);
   const [progressKey, setProgressKey] = useState(0);   // 진행바 리셋용
   const queueRef = useRef<BannerItem[]>([]);
+  const currentRef = useRef<BannerItem | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showingRef = useRef(false);
+
+  useEffect(() => {
+    currentRef.current = current;
+  }, [current]);
 
   const showNext = useCallback(() => {
     if (queueRef.current.length === 0) { showingRef.current = false; setCurrent(null); return; }
@@ -59,7 +64,8 @@ export default function ChatAlertBanner({
   }, []);
 
   const enqueue = useCallback((item: BannerItem) => {
-    if (item.kind === 'chat' && item.room_id && queueRef.current.some(q => q.kind === 'chat' && q.room_id === item.room_id)) return;
+    if (queueRef.current.some((queued) => queued.id === item.id)) return;
+    if (currentRef.current?.id === item.id) return;
     queueRef.current.push(item);
     if (!showingRef.current) showNext();
   }, [showNext]);
@@ -71,12 +77,16 @@ export default function ChatAlertBanner({
       const d = (e as CustomEvent<ChatDetail>).detail;
       const title = toBannerText(d?.title, '새 메시지');
       if (!title) return;
+      const roomId = typeof d?.room_id === 'string' ? d.room_id : undefined;
+      const body = toBannerText(d?.body, '');
+      const messageId = toBannerText(d?.message_id, '');
       enqueue({
         kind: 'chat',
-        id: Date.now().toString(),
+        id: messageId || `${roomId || 'chat'}:${title}:${body}`,
         title,
-        body: toBannerText(d?.body, ''),
-        room_id: typeof d?.room_id === 'string' ? d.room_id : undefined,
+        body,
+        room_id: roomId,
+        message_id: messageId || undefined,
       });
     };
     const alertHandler = (e: Event) => {

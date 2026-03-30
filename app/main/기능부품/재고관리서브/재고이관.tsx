@@ -43,6 +43,7 @@ function findDestinationInventoryItem(
         normalizeInventoryText(candidate.category) === normalizeInventoryText(selectedItem.category) &&
         normalizeInventoryText(candidate.spec) === normalizeInventoryText(selectedItem.spec) &&
         normalizeInventoryText(candidate.lot_number) === normalizeInventoryText(selectedItem.lot_number) &&
+        normalizeInventoryText(candidate.serial_number) === normalizeInventoryText(selectedItem.serial_number) &&
         normalizeInventoryText(candidate.company) === normalizeInventoryText(toCompany) &&
         normalizeInventoryText(candidate.department) === normalizeInventoryText(toDept)
       );
@@ -288,6 +289,7 @@ export default function InventoryTransfer({
           unit_price: selectedItem?.unit_price ?? selectedItem?.price ?? 0,
           expiry_date: selectedItem?.expiry_date || null,
           lot_number: selectedItem?.lot_number || null,
+          serial_number: selectedItem?.serial_number || null,
           is_udi: Boolean(selectedItem?.is_udi),
           company: form.to_company,
           department: form.to_dept || '',
@@ -328,21 +330,31 @@ export default function InventoryTransfer({
         destinationInventoryId = insertedDestination?.id ?? null;
       }
 
-      const { error: transferError } = await supabase.from('inventory_transfers').insert([
-        {
-          item_id: form.item_id,
-          item_name: getItemName(selectedItem),
-          quantity: transferQuantity,
-          from_company: sourceCompany,
-          from_department: sourceDept,
-          to_company: form.to_company,
-          to_department: form.to_dept,
-          reason: form.reason,
-          transferred_by: user?.name,
-          transferred_by_id: user?.id,
-          status: '완료',
+      const transferPayload: Record<string, unknown> = {
+        item_id: form.item_id,
+        item_name: getItemName(selectedItem),
+        quantity: transferQuantity,
+        from_company: sourceCompany,
+        from_department: sourceDept,
+        to_company: form.to_company,
+        to_department: form.to_dept,
+        reason: form.reason,
+        serial_number: selectedItem?.serial_number || null,
+        transferred_by: user?.name,
+        transferred_by_id: user?.id,
+        status: '완료',
+      };
+
+      const { error: transferError } = await withMissingColumnsFallback(
+        (omittedColumns) => {
+          const nextPayload = { ...transferPayload };
+          if (omittedColumns.has('serial_number')) {
+            delete nextPayload.serial_number;
+          }
+          return supabase.from('inventory_transfers').insert([nextPayload]);
         },
-      ]);
+        ['serial_number'],
+      );
       if (transferError) {
         throw transferError;
       }
@@ -356,6 +368,7 @@ export default function InventoryTransfer({
           quantity: transferQuantity,
           prev_quantity: maxQty,
           next_quantity: sourceNextQty,
+          serial_number: selectedItem?.serial_number || null,
           actor_name: user?.name,
           company: sourceCompany,
           notes: sourceNotes,
@@ -371,13 +384,26 @@ export default function InventoryTransfer({
           quantity: transferQuantity,
           prev_quantity: destinationPrevQty,
           next_quantity: destinationNextQty,
+          serial_number: selectedItem?.serial_number || null,
           actor_name: user?.name,
           company: form.to_company,
           notes: destinationNotes,
         });
       }
 
-      const { error: logError } = await supabase.from('inventory_logs').insert(logRows);
+      const { error: logError } = await withMissingColumnsFallback(
+        (omittedColumns) => {
+          const nextRows = logRows.map((row) => {
+            const nextRow = { ...row };
+            if (omittedColumns.has('serial_number')) {
+              delete nextRow.serial_number;
+            }
+            return nextRow;
+          });
+          return supabase.from('inventory_logs').insert(nextRows);
+        },
+        ['serial_number'],
+      );
       if (logError) {
         throw logError;
       }
@@ -576,6 +602,9 @@ export default function InventoryTransfer({
                 <p className="text-[10px] text-[var(--toss-gray-3)]">
                   {transfer.from_company} {transfer.from_department} → {transfer.to_company} {transfer.to_department} · {transfer.quantity}개 · {transfer.transferred_by}
                 </p>
+                {transfer.serial_number && (
+                  <p className="text-[10px] text-[var(--toss-gray-3)]">시리얼: {transfer.serial_number}</p>
+                )}
                 {transfer.reason && <p className="text-[10px] text-[var(--toss-gray-3)]">사유: {transfer.reason}</p>}
               </div>
               <div className="text-right">

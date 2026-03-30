@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { StaffMember, InventoryItem, Supplier } from '@/types';
 import { canAccessInventorySection } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
-import { withMissingColumnFallback } from '@/lib/supabase-compat';
+import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import UDIManagement from './재고관리서브/UDI관리';
 import PurchaseOrderManagement from './재고관리서브/발주관리';
 import ScanModule from './재고관리서브/스캔모듈완성';
@@ -168,6 +168,7 @@ export default function IntegratedInventoryManagement({
   const [statusFilter, setStatusFilter] = useState<InventoryStatusFilter>(initialResolvedView.statusFilter ?? '전체');
   const [stockModal, setStockModal] = useState<{ item: InventoryItem; type: 'in' | 'out'; targetCompany: string; targetDept: string } | null>(null);
   const [stockAmount, setStockAmount] = useState(1);
+  const [stockSerialInput, setStockSerialInput] = useState('');
   const [logs, setLogs] = useState<Record<string, unknown>[]>([]);
   const [registrationMode, setRegistrationMode] = useState<'form' | 'excel' | 'auto_extract'>('form');
   const [supplierWorkspaceTab, setSupplierWorkspaceTab] = useState<SupplierWorkspaceTab>(initialResolvedView.supplierTab ?? 'suppliers');
@@ -177,6 +178,14 @@ export default function IntegratedInventoryManagement({
   const [workflowActionKey, setWorkflowActionKey] = useState<string | null>(null);
   const [highlightedSupplyApprovalId, setHighlightedSupplyApprovalId] = useState<string | null>(null);
   const [highlightedSupplyOrderTarget, setHighlightedSupplyOrderTarget] = useState<LinkedSupplyOrderTarget | null>(null);
+
+  useEffect(() => {
+    if (!stockModal) {
+      setStockSerialInput('');
+      return;
+    }
+    setStockSerialInput(String((stockModal.item as Record<string, unknown>).serial_number || '').trim());
+  }, [stockModal]);
 
   const { lowStockItems, expiryImminentItems } = useInventoryAlertSystem(inventory, user);
   const isMsoUser = user?.company === 'SY INC.' || user?.permissions?.mso === true;
@@ -267,6 +276,7 @@ export default function IntegratedInventoryManagement({
         (i.name || '').toLowerCase().includes(k) ||
         (i.category || '').toLowerCase().includes(k) ||
         ((i as Record<string, unknown>).lot_number as string || '').toLowerCase().includes(k) ||
+        ((i as Record<string, unknown>).serial_number as string || '').toLowerCase().includes(k) ||
         (i.company || '').toLowerCase().includes(k)
       );
     }
@@ -663,9 +673,12 @@ export default function IntegratedInventoryManagement({
     [openInventoryView],
   );
 
-  const handleStockUpdate = async (item: InventoryItem, type: 'in' | 'out', amount: number, targetCompany: string, targetDept: string) => {
+  const handleStockUpdate = async (item: InventoryItem, type: 'in' | 'out', amount: number, targetCompany: string, targetDept: string, serialNumber?: string) => {
     if (amount <= 0) return toast("수량은 0보다 커야 합니다.");
     const delta = type === 'in' ? amount : -amount;
+    const effectiveSerialNumber = String(
+      (type === 'in' ? serialNumber : (item as Record<string, unknown>).serial_number) || '',
+    ).trim() || null;
     try {
       // 원자적 RPC로 race condition 방지
       const { data: rpcResult, error: rpcError } = await supabase.rpc('atomic_stock_update', {
@@ -695,6 +708,24 @@ export default function IntegratedInventoryManagement({
         nextQty = row?.next_qty ?? 0;
       }
 
+      if (type === 'in' && effectiveSerialNumber) {
+        const { error: serialUpdateError } = await withMissingColumnsFallback(
+          (omittedColumns) => {
+            if (omittedColumns.has('serial_number')) {
+              return Promise.resolve({ data: null, error: null });
+            }
+            return supabase
+              .from('inventory')
+              .update({ serial_number: effectiveSerialNumber })
+              .eq('id', item.id);
+          },
+          ['serial_number'],
+        );
+        if (serialUpdateError) {
+          throw serialUpdateError;
+        }
+      }
+
       const logRows: Record<string, unknown>[] = [{
         item_id: item.id,
         inventory_id: item.id,
@@ -703,18 +734,28 @@ export default function IntegratedInventoryManagement({
         quantity: amount,
         prev_quantity: prevQty,
         next_quantity: nextQty,
+        serial_number: effectiveSerialNumber,
         actor_name: targetDept && targetDept !== '전체' ? `${user?.name} (${targetDept})` : user?.name,
         company: targetCompany || item.company
       }];
       if (item.company_id || user?.company_id || selectedCompanyId) {
         logRows[0].company_id = item.company_id ?? (user?.company === 'SY INC.' ? selectedCompanyId : user?.company_id);
       }
-      await withMissingColumnFallback(
-        () => supabase.from('inventory_logs').insert(logRows),
-        () => {
-          const legacyRows = logRows.map(({ company_id: _cid, ...rest }) => rest);
-          return supabase.from('inventory_logs').insert(legacyRows);
-        }
+      await withMissingColumnsFallback(
+        (omittedColumns) => {
+          const nextRows = logRows.map((row) => {
+            const nextRow = { ...row };
+            if (omittedColumns.has('company_id')) {
+              delete nextRow.company_id;
+            }
+            if (omittedColumns.has('serial_number')) {
+              delete nextRow.serial_number;
+            }
+            return nextRow;
+          });
+          return supabase.from('inventory_logs').insert(nextRows);
+        },
+        ['company_id', 'serial_number'],
       );
       toast(`${type === 'in' ? '입고' : '출고'} 처리가 완료되었습니다.`, 'success');
       await refreshCurrentInventory();
@@ -1024,9 +1065,10 @@ export default function IntegratedInventoryManagement({
 
   const executeStockUpdate = () => {
     if (!stockModal) return;
-    handleStockUpdate(stockModal.item, stockModal.type, stockAmount, stockModal.targetCompany, stockModal.targetDept);
+    handleStockUpdate(stockModal.item, stockModal.type, stockAmount, stockModal.targetCompany, stockModal.targetDept, stockSerialInput);
     setStockModal(null);
     setStockAmount(1);
+    setStockSerialInput('');
   };
 
   return (
@@ -1079,7 +1121,7 @@ export default function IntegratedInventoryManagement({
                       </select>
                       <input
                         type="text"
-                        placeholder="품목명 · 분류 · LOT · 회사 검색"
+                        placeholder="품목명 · 분류 · LOT · 시리얼 · 회사 검색"
                         value={searchKeyword}
                         onChange={(e) => setSearchKeyword(e.target.value)}
                         className="flex-1 min-w-[160px] max-w-md px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] outline-none"
@@ -1546,7 +1588,7 @@ export default function IntegratedInventoryManagement({
                       <thead>
                         <tr className="bg-[var(--muted)]/50 border-b border-[var(--border)]">
                           <th className="px-5 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">회사/분류</th>
-                          <th className="px-5 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">품목명/LOT</th>
+                          <th className="px-5 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">품목명/LOT/시리얼</th>
                           <th className="px-5 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-center">현재고</th>
                           <th className="px-5 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-center">단가</th>
                           <th className="px-5 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-center">유효기간</th>
@@ -1563,6 +1605,7 @@ export default function IntegratedInventoryManagement({
                           const displayName = String(itemEx.item_name || item.name || '');
                           const itemDepartment = String(itemEx.department || '');
                           const lotNumber = itemEx.lot_number ? String(itemEx.lot_number) : null;
+                          const serialNumber = itemEx.serial_number ? String(itemEx.serial_number) : null;
                           const isUdi = Boolean(itemEx.is_udi);
                           return (
                             <tr key={item.id} className="hover:bg-[var(--toss-blue-light)]/50 transition-all group">
@@ -1574,6 +1617,7 @@ export default function IntegratedInventoryManagement({
                                 <p className="text-xs font-semibold text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors">{displayName}</p>
                                 <div className="flex gap-1 mt-0.5">
                                   {lotNumber && <span className="text-[7px] font-semibold bg-[var(--muted)] text-[var(--toss-gray-4)] px-1 py-0.5 rounded">LOT: {lotNumber}</span>}
+                                  {serialNumber && <span className="text-[7px] font-semibold bg-emerald-50 text-emerald-600 px-1 py-0.5 rounded">S/N: {serialNumber}</span>}
                                   {isUdi && <span className="text-[7px] font-semibold bg-purple-50 text-purple-500 px-1 py-0.5 rounded uppercase">UDI</span>}
                                 </div>
                               </td>
@@ -1675,7 +1719,7 @@ export default function IntegratedInventoryManagement({
                         <th className="px-4 py-3">수량</th>
                         <th className="px-4 py-3">변동</th>
                         <th className="px-4 py-3">처리자</th>
-                        <th className="px-4 py-3">회사</th>
+                        <th className="px-4 py-3">회사/시리얼</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1686,6 +1730,7 @@ export default function IntegratedInventoryManagement({
                         const logQuantity = log.quantity ?? '-';
                         const logPrevQty = log.prev_quantity;
                         const logNextQty = log.next_quantity;
+                        const logSerialNumber = String(log.serial_number || '').trim();
                         return (
                         <tr key={logId} className="border-t border-[var(--border)]">
                           <td className="px-4 py-3 font-mono text-[11px] text-[var(--toss-gray-4)]">{logCreatedAt}</td>
@@ -1703,7 +1748,10 @@ export default function IntegratedInventoryManagement({
                             {logPrevQty !== undefined && logPrevQty !== null ? `${String(logPrevQty)} → ${String(logNextQty ?? '')}` : '-'}
                           </td>
                           <td className="px-4 py-3 text-[var(--foreground)]">{String(log.actor_name || '') || '-'}</td>
-                          <td className="px-4 py-3 text-[var(--toss-gray-4)]">{String(log.company || '') || '-'}</td>
+                          <td className="px-4 py-3 text-[var(--toss-gray-4)]">
+                            <p>{String(log.company || '') || '-'}</p>
+                            {logSerialNumber && <p className="mt-1 text-[10px] font-semibold text-emerald-600">S/N: {logSerialNumber}</p>}
+                          </td>
                         </tr>
                         );
                       })}
@@ -1812,6 +1860,17 @@ export default function IntegratedInventoryManagement({
                 <label className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1 block">수량 (개/단위)</label>
                 <input data-testid="inventory-stock-amount-input" type="number" min={1} max={stockModal.type === 'out' ? (stockModal.item.quantity ?? Number((stockModal.item as Record<string, unknown>).stock ?? 0)) : 99999} value={stockAmount} onChange={e => setStockAmount(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] text-sm font-semibold" />
               </div>
+              {stockModal.type === 'in' && (
+                <div>
+                  <label className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1 block">시리얼 번호 (선택)</label>
+                  <input
+                    value={stockSerialInput}
+                    onChange={e => setStockSerialInput(e.target.value)}
+                    className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] text-sm font-semibold"
+                    placeholder="SERIAL-0000"
+                  />
+                </div>
+              )}
               <div className="flex gap-2">
                 <div className="flex-1">
                   <label className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1 block">대상 회사</label>
