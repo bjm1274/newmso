@@ -86,6 +86,7 @@ export const BACKUP_GROUPS: BackupGroupDefinition[] = [
       'posts',
       'wiki_folders',
       'wiki_documents',
+      'wiki_document_versions',
     ],
   },
   {
@@ -107,6 +108,8 @@ export const BACKUP_GROUPS: BackupGroupDefinition[] = [
     description: '할일, 팝업, 감사 로그, 운영 보조 데이터',
     tables: [
       'todos',
+      'todo_reminder_logs',
+      'backup_restore_runs',
       'tasks',
       'popups',
       'audit_logs',
@@ -125,7 +128,12 @@ export const BACKUP_RESTORE_ORDER = Array.from(
     'work_shifts',
     'chat_rooms',
     'board_posts',
+    'wiki_documents',
+    'wiki_document_versions',
     'inventory',
+    'todos',
+    'todo_reminder_logs',
+    'backup_restore_runs',
     ...FULL_BACKUP_TABLES,
   ])
 );

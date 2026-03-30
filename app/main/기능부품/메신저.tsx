@@ -2,7 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { withMissingColumnFallback } from '@/lib/supabase-compat';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { bindPageRefresh } from '@/lib/realtime-maintenance';
 import SmartDatePicker from './공통/SmartDatePicker';
@@ -3279,7 +3279,6 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     }
   };
 
-
   const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;   // 일반 파일: 20MB
   const MAX_VIDEO_SIZE_BYTES = 200 * 1024 * 1024; // 동영상: 200MB
   const insertChatMessage = useCallback(
@@ -3287,14 +3286,32 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       payload: Record<string, unknown>,
       selectClause = '*',
     ) =>
-      withMissingColumnFallback<TData>(
-        () => supabase.from('messages').insert([payload]).select(selectClause).single(),
-        () => {
+      withMissingColumnsFallback<TData>(
+        (omittedColumns) => {
           const fallbackPayload = { ...payload };
-          delete fallbackPayload.file_name;
+          omittedColumns.forEach((column) => {
+            delete fallbackPayload[column];
+          });
           return supabase.from('messages').insert([fallbackPayload]).select(selectClause).single();
         },
-        'file_name',
+        ['file_name', 'file_size_bytes', 'file_kind', 'reply_to_id'],
+      ),
+    [],
+  );
+  const insertAlbumChatMessage = useCallback(
+    <TData extends Record<string, unknown> = Record<string, unknown>>(
+      payload: Record<string, unknown>,
+      selectClause = '*',
+    ) =>
+      withMissingColumnsFallback<TData>(
+        (omittedColumns) => {
+          const fallbackPayload = { ...payload };
+          omittedColumns.forEach((column) => {
+            delete fallbackPayload[column];
+          });
+          return supabase.from('messages').insert([fallbackPayload]).select(selectClause).single();
+        },
+        ['album_id', 'album_index', 'album_total', 'file_name', 'file_size_bytes', 'file_kind'],
       ),
     [],
   );
@@ -3589,7 +3606,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     }
   ) => {
     if (file.type.startsWith('image/')) {
-      // 이미지: 크기 제한 없음
+      // 사진: 용량 제한 없음
     } else if (file.type.startsWith('video/')) {
       if (file.size > MAX_VIDEO_SIZE_BYTES) {
         toast('동영상 크기는 200MB 이하여야 합니다.');
@@ -3741,18 +3758,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           album_index: i,
           album_total: files.length,
         };
-        try {
-          const { data: inserted } = await supabase.from('messages').insert([dbPayload]).select('*').single();
-          if (inserted) {
-            setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, ...inserted } : m));
-          }
-        } catch {
-          // album_id 컬럼 없을 경우 일반 전송으로 폴백
-          const { data: inserted2 } = await supabase.from('messages').insert([{
-            room_id: roomId, sender_id: senderId, content: '',
-            file_url: payload.url, file_name: file.name, file_size_bytes: file.size, file_kind: 'image',
-          }]).select('*').single();
-          if (inserted2) setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, ...inserted2 } : m));
+        const { data: inserted, error } = await insertAlbumChatMessage<ChatMessage>(dbPayload);
+        if (error) {
+          throw error;
+        }
+        if (inserted) {
+          setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, ...inserted } : m));
         }
       }
       requestAnimationFrame(() => scrollToBottom('smooth'));
@@ -3761,7 +3772,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     } finally {
       setFileUploading(false);
     }
-  }, [pendingAlbumFiles, selectedRoomId, effectiveChatUserId, user, cancelAlbumUpload, processFileUpload]);
+  }, [pendingAlbumFiles, selectedRoomId, effectiveChatUserId, user, cancelAlbumUpload, processFileUpload, insertAlbumChatMessage]);
 
   const handleComposerPaste = useCallback(async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const clipboardItems = Array.from(e.clipboardData?.items || []);
