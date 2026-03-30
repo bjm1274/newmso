@@ -27,7 +27,12 @@ export default function CalendarSync({ yearMonth }: { yearMonth?: string }) {
 
     const fetchEvents = async () => {
       const list: { title: string; start: string; end: string; desc?: string }[] = [];
-      const { data: leaves } = await supabase.from('leave_requests').select('*, staff_members(name)').eq('status', '승인').gte('start_date', start).lte('end_date', end);
+      const { data: leaves } = await supabase
+        .from('leave_requests')
+        .select('*, staff_members(name)')
+        .eq('status', '승인')
+        .lte('start_date', end)
+        .gte('end_date', start);
       (leaves || []).forEach((l: any) => {
         list.push({
           title: `휴가: ${l.staff_members?.name || ''} ${l.leave_type}`,

@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { resolveApprovalDelegateConfig } from '@/lib/approval-workflow';
 import { supabase } from '@/lib/supabase';
+import { withMissingColumnFallback } from '@/lib/supabase-compat';
 
 interface Props {
   user: any;
@@ -31,24 +33,80 @@ export default function RoleDashboard({ user, setMainMenu, onOpenApproval }: Pro
   const isAdmin = user?.role === 'admin' || user?.company === 'SY INC.' || user?.permissions?.mso;
   const isManager = MANAGER_POSITIONS.includes(user?.position);
 
-  useEffect(() => {
+  const fetchPending = useCallback(async () => {
     if (!user?.id) return;
 
-    const fetchPending = async () => {
-      const { count, error } = await supabase
-        .from('approvals')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', '대기')
-        .eq('current_approver_id', user.id);
+    const scopedCompanyId = !isAdmin ? user?.company_id : null;
+    const scopedCompanyName = !isAdmin ? user?.company : null;
 
-      if (error) {
-        console.error('Failed to load pending approvals:', error);
-        setPendingApprovals(0);
-        return;
+    const { data, error } = await withMissingColumnFallback(
+      async () => {
+        let query = supabase
+          .from('approvals')
+          .select('id, status, current_approver_id, company_id, sender_company')
+          .eq('status', '대기');
+        if (scopedCompanyId) query = query.eq('company_id', scopedCompanyId);
+        else if (scopedCompanyName) query = query.eq('sender_company', scopedCompanyName);
+        return query;
+      },
+      async () => {
+        let query = supabase
+          .from('approvals')
+          .select('id, status, current_approver_id, sender_company')
+          .eq('status', '대기');
+        if (scopedCompanyName) query = query.eq('sender_company', scopedCompanyName);
+        return query;
+      },
+      'company_id'
+    );
+
+    if (error) {
+      console.error('Failed to load pending approvals:', error);
+      setPendingApprovals(0);
+      return;
+    }
+
+    const approvalRows = Array.isArray(data) ? data : [];
+    const approverIds = Array.from(
+      new Set(
+        approvalRows
+          .map((item) => String(item?.current_approver_id || '').trim())
+          .filter(Boolean)
+      )
+    );
+
+    const approverMap = new Map<string, Record<string, unknown>>();
+    if (approverIds.length > 0) {
+      const { data: approverRows, error: approverError } = await supabase
+        .from('staff_members')
+        .select('id, permissions')
+        .in('id', approverIds);
+
+      if (approverError) {
+        console.error('Failed to load approval approvers:', approverError);
+      } else {
+        (approverRows || []).forEach((staff) => {
+          approverMap.set(String(staff.id), staff as Record<string, unknown>);
+        });
       }
+    }
 
-      setPendingApprovals(count || 0);
-    };
+    const nextPendingCount = approvalRows.filter((item) => {
+      const currentApproverId = String(item?.current_approver_id || '').trim();
+      if (!currentApproverId) return false;
+      const delegateConfig = resolveApprovalDelegateConfig(approverMap.get(currentApproverId));
+      const effectiveApproverId =
+        delegateConfig.active && delegateConfig.delegateId
+          ? String(delegateConfig.delegateId)
+          : currentApproverId;
+      return effectiveApproverId === String(user.id);
+    }).length;
+
+    setPendingApprovals(nextPendingCount);
+  }, [isAdmin, user?.company, user?.company_id, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
 
     const fetchToday = async () => {
       const today = new Date().toISOString().slice(0, 10);
@@ -82,7 +140,7 @@ export default function RoleDashboard({ user, setMainMenu, onOpenApproval }: Pro
       }
     };
 
-    fetchPending();
+    void fetchPending();
     fetchToday();
     fetchLeave();
 
@@ -111,7 +169,33 @@ export default function RoleDashboard({ user, setMainMenu, onOpenApproval }: Pro
       fetchLowStock();
       fetchTeam();
     }
-  }, [isAdmin, isManager, user?.department, user?.id]);
+  }, [fetchPending, isAdmin, isManager, user?.department, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`mypage-pending-approvals-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'approvals' }, () => {
+        void fetchPending();
+      })
+      .subscribe();
+
+    const handleFocus = () => {
+      void fetchPending();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', handleFocus);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', handleFocus);
+      }
+      supabase.removeChannel(channel);
+    };
+  }, [fetchPending, user?.id]);
 
   const formatTime = (value: string | null) => {
     if (!value) return '-';

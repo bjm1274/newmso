@@ -199,6 +199,17 @@ export default function NotificationInbox({ user: _rawUser, onRefresh }: Record<
     return () => { supabase.removeChannel(ch); };
   }, [_u?.id, fetchNotifications]);
 
+  // 인박스가 열리면 1.5초 후 자동으로 전체 읽음 처리 (뱃지 클리어)
+  useEffect(() => {
+    if (!_u?.id) return;
+    const timer = setTimeout(async () => {
+      await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('user_id', _u.id as string).is('read_at', null);
+      setNotifications(prev => prev.map(n => ({ ...n, read_at: n.read_at || new Date().toISOString() })));
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('erp-notification-read'));
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [_u?.id]);
+
   const emitNotificationReadSync = useCallback(() => {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('erp-notification-read'));

@@ -408,6 +408,120 @@ export default function MyProfileCard({
     toast('내 정보가 바로 저장되었습니다. 인사관리에도 즉시 반영됩니다.', 'success');
   };
 
+  const buildRequestedProfileChanges = (currentUser: any) => {
+    const currentPermissions =
+      currentUser?.permissions && typeof currentUser.permissions === 'object' && !Array.isArray(currentUser.permissions)
+        ? currentUser.permissions
+        : {};
+
+    return {
+      email: editForm.email || null,
+      phone: editForm.phone || null,
+      address: editForm.address || null,
+      bank_account: editForm.bank_account || null,
+      bank_name: editForm.bank_name || null,
+      permissions: {
+        ...currentPermissions,
+        extension: editForm.extension || null,
+        bank_name: editForm.bank_name || null,
+      },
+    };
+  };
+
+  const submitProfileChangeRequest = async (currentUser: any) => {
+    const requestedChanges = buildRequestedProfileChanges(currentUser);
+    const beforeUser = normalizeProfileUser(currentUser);
+    const nextUser = normalizeProfileUser({
+      ...currentUser,
+      ...requestedChanges,
+      permissions: requestedChanges.permissions,
+      extension: (requestedChanges.permissions as Record<string, unknown>)?.extension ?? null,
+      bank_name:
+        (requestedChanges.bank_name as string | null | undefined) ??
+        (requestedChanges.permissions as Record<string, unknown>)?.bank_name ??
+        null,
+    });
+
+    const diff = buildAuditDiff(beforeUser, nextUser, [
+      'email',
+      'phone',
+      'address',
+      'bank_account',
+      'bank_name',
+      'extension',
+      'permissions',
+    ]);
+
+    if (Object.keys(diff).length === 0) {
+      toast('변경된 내용이 없습니다.', 'warning');
+      return;
+    }
+
+    const existingPendingRequest = await supabase
+      .from('audit_logs')
+      .select('id')
+      .eq('target_type', 'ESS_PROFILE_UPDATE_PENDING')
+      .eq('target_id', String(currentUser.id))
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingPendingRequest.error) {
+      throw existingPendingRequest.error;
+    }
+
+    const details = {
+      requested_changes: requestedChanges,
+      original_data: {
+        email: currentUser.email || null,
+        phone: currentUser.phone || null,
+        address: currentUser.address || null,
+        bank_account: currentUser.bank_account || null,
+        bank_name: currentUser.bank_name || currentUser?.permissions?.bank_name || null,
+        extension: currentUser.extension || currentUser?.permissions?.extension || null,
+        permissions:
+          currentUser?.permissions && typeof currentUser.permissions === 'object' && !Array.isArray(currentUser.permissions)
+            ? currentUser.permissions
+            : {},
+      },
+    };
+
+    if (existingPendingRequest.data?.id) {
+      const { error: updateError } = await supabase
+        .from('audit_logs')
+        .update({
+          user_name: currentUser.name,
+          action: '인사변경',
+          details,
+          created_at: new Date().toISOString(),
+        })
+        .eq('id', existingPendingRequest.data.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+    } else {
+      const { error: insertError } = await supabase.from('audit_logs').insert([
+        {
+          user_id: currentUser.id,
+          user_name: currentUser.name,
+          action: '인사변경',
+          target_type: 'ESS_PROFILE_UPDATE_PENDING',
+          target_id: String(currentUser.id),
+          details,
+          created_at: new Date().toISOString(),
+        },
+      ]);
+
+      if (insertError) {
+        throw insertError;
+      }
+    }
+
+    applyIsEditing(false);
+    toast('내정보 변경 요청을 전송했습니다. 인사관리 승인 후 반영됩니다.', 'success');
+  };
+
   const handleSaveProfile = async () => {
     try {
       let currentUser = user;
@@ -419,50 +533,11 @@ export default function MyProfileCard({
         } catch (_) { }
       }
       if (!getStaffLikeId(currentUser)) {
-        toast('내 정보 수정은 직원 계정(이름으로 로그인)에서만 가능합니다.', 'success');
+        toast('내 정보 수정은 직원 계정(이름으로 로그인)에서만 가능합니다.', 'warning');
         return;
       }
 
-      await saveProfileDirectly(currentUser);
-      return;
-
-      if (currentUser?.id) {
-        await saveProfileDirectly(currentUser);
-      } else {
-      const { extension, ...otherForm } = editForm;
-      const updatedPermissions = {
-        ...(currentUser.permissions || {}),
-        extension: extension || null
-      };
-
-      // 내 정보를 즉시 수정하지 않고, 인사팀 승인을 받기 위한 요청(ESS) 데이터 전송
-      const { error }: any = await supabase
-        .from('audit_logs')
-        .insert([{
-          user_id: currentUser.id,
-          user_name: currentUser.name,
-          action: '인사변경', // 임시로 인사변경 액션 사용
-          target_type: 'ESS_PROFILE_UPDATE_PENDING',
-          target_id: String(currentUser.id),
-          details: {
-            requested_changes: { ...otherForm, permissions: updatedPermissions },
-            original_data: currentUser
-          },
-          created_at: new Date().toISOString()
-        }]);
-
-      if (error) {
-        const safeError: any = error;
-        console.error(error);
-        toast(`정보 변경 요청 중 오류가 발생했습니다.\n상세: ${safeError.message || JSON.stringify(safeError)}`, 'error');
-        return;
-        toast(`정보 변경 요청 중 오류가 발생했습니다.\n상세: ${error.message || JSON.stringify(error)}`, 'error');
-        return;
-      }
-
-      applyIsEditing(false);
-      toast('인사팀으로 내 정보 변경 요청(결재 대기)이 전송되었습니다. 관리자 승인 후 반영됩니다.', 'success');
-      }
+      await submitProfileChangeRequest(currentUser);
     } catch (err) {
       console.error(err);
       toast('요청 전송에 실패했습니다.', 'error');

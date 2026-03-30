@@ -1,5 +1,60 @@
 importScripts('/push-notification-shared.js');
 
+// ── Web Share Target: 다른 앱에서 파일/텍스트 공유 시 처리 ──
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+  if (url.pathname !== '/share-target' || event.request.method !== 'POST') return;
+
+  event.respondWith((async () => {
+    try {
+      const formData = await event.request.formData();
+      const files = formData.getAll('files');
+      const title = formData.get('title') || '';
+      const text = formData.get('text') || '';
+      const sharedUrl = formData.get('url') || '';
+
+      // 파일을 임시 캐시에 저장
+      const cache = await caches.open('erp-share-target-v1');
+      const shareId = Date.now().toString();
+
+      if (files.length > 0) {
+        await Promise.all(files.map(async (file, i) => {
+          if (!(file instanceof File)) return;
+          const buf = await file.arrayBuffer();
+          await cache.put(
+            `/share-target-file/${shareId}/${i}?name=${encodeURIComponent(file.name)}&type=${encodeURIComponent(file.type)}`,
+            new Response(buf, { headers: { 'Content-Type': file.type, 'X-File-Name': file.name } })
+          );
+        }));
+      }
+
+      // 클라이언트에 메시지 전달 (채팅창 열기)
+      const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const client of clients) {
+        client.postMessage({
+          type: 'ERP_SHARE_TARGET',
+          shareId,
+          fileCount: files.length,
+          title: String(title),
+          text: String(text),
+          url: String(sharedUrl),
+        });
+      }
+
+      // 채팅 페이지로 리다이렉트
+      const redirectUrl = `/main?open_menu=채팅&share_id=${shareId}&share_file_count=${files.length}` +
+        (title ? `&share_title=${encodeURIComponent(String(title))}` : '') +
+        (text ? `&share_text=${encodeURIComponent(String(text).slice(0, 300))}` : '') +
+        (sharedUrl ? `&share_url=${encodeURIComponent(String(sharedUrl))}` : '');
+
+      return Response.redirect(redirectUrl, 303);
+    } catch (err) {
+      console.error('[SW] share-target 처리 실패:', err);
+      return Response.redirect('/main?open_menu=채팅', 303);
+    }
+  })());
+});
+
 self.addEventListener('push', (event) => {
   if (!event.data) return;
 

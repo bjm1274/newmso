@@ -74,6 +74,8 @@ interface MainContentProps {
   onConsumeInitialInventoryWorkflowApprovalId?: () => void;
   setMainMenu?: (v: string) => void;
   onOpenChatMessage?: (roomId: string, messageId: string) => void;
+  shareTarget?: { id: string; fileCount: number; text: string | null; url: string | null; title: string | null } | null;
+  onConsumeShareTarget?: () => void;
 }
 
 function MenuViewLoading({ label }: { label: string }) {
@@ -116,6 +118,8 @@ export default function MainContent({
   onConsumeInitialInventoryWorkflowApprovalId,
   setMainMenu,
   onOpenChatMessage,
+  shareTarget,
+  onConsumeShareTarget,
 }: MainContentProps) {
   const [annualLeaveNotice, setAnnualLeaveNotice] = useState<{ remaining: number; total: number } | null>(null);
 
@@ -183,6 +187,8 @@ export default function MainContent({
             initialOpenChatRoomId={initialOpenChatRoomId}
             initialOpenMessageId={initialOpenMessageId}
             onConsumeOpenChatRoomId={onConsumeOpenChatRoomId}
+            shareTarget={shareTarget}
+            onConsumeShareTarget={onConsumeShareTarget}
           />
         </div>
       )}

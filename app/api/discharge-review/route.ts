@@ -8,6 +8,7 @@ import {
   analyzeDischargeReviewRules,
   formatDischargeRuleAnalysisForPrompt,
 } from '@/lib/discharge-review-rules';
+import type { DischargeCustomRule } from '@/lib/discharge-custom-rules';
 
 const MODELS = ['gemini-2.5-pro', 'gemini-2.5-flash'];
 
@@ -96,6 +97,7 @@ export async function POST(req: Request) {
       allItems,
       chartData,
       templateData,
+      customRules,
     } = body;
 
     const admDate = new Date(admissionDate);
@@ -126,6 +128,7 @@ export async function POST(req: Request) {
       templateData,
       allItems,
       checkedItems,
+      customRules: Array.isArray(customRules) ? (customRules as DischargeCustomRule[]) : [],
     });
     const rulePromptContext = formatDischargeRuleAnalysisForPrompt(ruleAnalysis);
 

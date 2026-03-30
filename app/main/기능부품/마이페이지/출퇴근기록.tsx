@@ -323,18 +323,9 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   ) => {
     const buildFallback = (department?: string) => {
       if (department === '의료진') {
-        return {
-          hour: 8,
-          minute: 30,
-          label: '08:30',
-        };
+        return { hour: 8, minute: 30, label: '08:30', endHour: null as number | null, endMinute: null as number | null, shiftKnown: false };
       }
-
-      return {
-        hour: 9,
-        minute: 10,
-        label: '09:10',
-      };
+      return { hour: 9, minute: 10, label: '09:10', endHour: null as number | null, endMinute: null as number | null, shiftKnown: false };
     };
 
     const userId = effectiveUserId;
@@ -378,11 +369,12 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
       const { data: shiftRow } = await supabase
         .from('work_shifts')
-        .select('start_time')
+        .select('start_time, end_time')
         .eq('id', shiftId)
         .maybeSingle();
 
       const startTime = String((shiftRow as Record<string, unknown> | null | undefined)?.start_time || '').trim();
+      const endTime = String((shiftRow as Record<string, unknown> | null | undefined)?.end_time || '').trim();
       const match = startTime.match(/^(\d{1,2}):(\d{2})/);
 
       if (!match) {
@@ -396,10 +388,17 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         return buildFallback(effectiveDepartment);
       }
 
+      const endMatch = endTime.match(/^(\d{1,2}):(\d{2})/);
+      const endHour = endMatch ? Number(endMatch[1]) : null;
+      const endMinute = endMatch ? Number(endMatch[2]) : null;
+
       return {
         hour,
         minute,
         label: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+        endHour: (endHour !== null && !Number.isNaN(endHour)) ? endHour : null,
+        endMinute: (endMinute !== null && !Number.isNaN(endMinute)) ? endMinute : null,
+        shiftKnown: true,
       };
     } catch (error) {
       console.warn('지각 기준 시간 조회 실패:', error);
@@ -434,21 +433,54 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     try {
       if (type === 'in') {
         const lateThreshold = await resolveLateThreshold(today, userDepartment);
-        const isLate =
+        const nowMin = now.getHours() * 60 + now.getMinutes();
+        const startMin = lateThreshold.hour * 60 + lateThreshold.minute;
+
+        // 기본 지각 판단
+        const isLateByStart =
           now.getHours() > lateThreshold.hour ||
           (now.getHours() === lateThreshold.hour && now.getMinutes() > lateThreshold.minute);
+
+        // 근무 종료 시간 기반 시간대 이탈 감지 (교대 근무 오출근 방지)
+        let isOutOfShiftWindow = false;
+        if (lateThreshold.shiftKnown && lateThreshold.endHour !== null && lateThreshold.endMinute !== null) {
+          const endMin = lateThreshold.endHour * 60 + lateThreshold.endMinute;
+          // 야간/교대 근무: end_time < start_time (자정을 넘는 경우)
+          if (endMin < startMin) {
+            // 유효 체크인 범위: [start - 2h, end + 1h 다음날]
+            // 시계 기준: endMin~(startMin-120) 구간이 무효
+            const invalidStart = endMin; // 예: 06:00
+            const invalidEnd = Math.max(0, startMin - 120); // 예: 20:00
+            if (nowMin >= invalidStart && nowMin < invalidEnd) {
+              isOutOfShiftWindow = true;
+            }
+          } else {
+            // 일반 주간 근무: 근무 종료 이후 3시간 이상 경과 후 체크인은 이탈
+            if (nowMin > endMin + 180) {
+              isOutOfShiftWindow = true;
+            }
+          }
+        }
+
+        const isLate = isLateByStart || isOutOfShiftWindow;
+        const finalStatus = isLate ? '지각' : '정상';
+        const toastMsg = isOutOfShiftWindow
+          ? `근무 시간대와 다른 시간에 출근 체크되었습니다. 지각으로 처리됩니다. (기준: ${lateThreshold.label})`
+          : isLateByStart
+          ? `지각 처리되었습니다. (기준: ${lateThreshold.label})`
+          : '정상 출근되었습니다. 오늘도 화이팅!';
 
         const { data, error } = await supabase.from('attendance').upsert([{
           staff_id: userId,
           date: today,
           check_in: timeString,
-          status: isLate ? '지각' : '정상'
+          status: finalStatus
         }], { onConflict: 'staff_id,date' }).select().single();
 
         if (error) throw error;
-        await syncToAttendances(today, timeString, null, isLate ? '지각' : '정상');
+        await syncToAttendances(today, timeString, null, finalStatus);
         setTodayLog(data);
-        toast(isLate ? `지각 처리되었습니다. (기준: ${lateThreshold.label})` : '정상 출근되었습니다. 오늘도 화이팅!', 'success');
+        toast(toastMsg, isLate ? 'warning' : 'success');
 
       } else {
         if (!todayLog) return;
@@ -577,7 +609,11 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
                     <TimeBox label="출근" time={formatTime(log.check_in as string)} />
                     <TimeBox label="퇴근" time={formatTime(log.check_out as string)} />
                   </div>
-                  {onRequestCorrection && (
+                  {onRequestCorrection && !(
+                    (log.status === '정상' || log.status === 'present') &&
+                    log.check_in &&
+                    log.check_out
+                  ) && (
                     <button
                       type="button"
                       onClick={() => onRequestCorrection(log)}

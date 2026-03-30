@@ -14,7 +14,13 @@ function getSupabaseConfig(): { url: string; key: string } {
 
 const { url, key } = getSupabaseConfig();
 
-if (url === PLACEHOLDER_URL || key === PLACEHOLDER_KEY) {
+const shouldWarnMissingSupabaseConfig =
+  (url === PLACEHOLDER_URL || key === PLACEHOLDER_KEY) &&
+  typeof window !== 'undefined' &&
+  process.env.NODE_ENV !== 'test' &&
+  !(typeof navigator !== 'undefined' && navigator.webdriver);
+
+if (shouldWarnMissingSupabaseConfig) {
   console.warn(
     '[SY INC. ERP] Supabase URL 또는 Anon Key가 설정되지 않았습니다. .env.local에 NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY를 추가하세요.'
   );

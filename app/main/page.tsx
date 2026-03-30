@@ -77,6 +77,7 @@ function MainPageContent() {
   const [initialBoardView, setInitialBoardView] = useState<string | null>(null);
   const [initialOpenChatRoomId, setInitialOpenChatRoomId] = useState<string | null>(null);
   const [initialOpenMessageId, setInitialOpenMessageId] = useState<string | null>(null);
+  const [shareTarget, setShareTarget] = useState<{ id: string; fileCount: number; text: string | null; url: string | null; title: string | null } | null>(null);
   const [initialOpenPostId, setInitialOpenPostId] = useState<string | null>(null);
   const [initialApprovalIntent, setInitialApprovalIntent] = useState<any>(null);
   const [initialInventoryWorkflowApprovalId, setInitialInventoryWorkflowApprovalId] = useState<string | null>(null);
@@ -110,6 +111,11 @@ function MainPageContent() {
       openBoard: searchParams.get('open_board')?.trim() || null,
       openInventoryView: searchParams.get('open_inventory_view')?.trim() || null,
       openInventoryApproval: searchParams.get('open_inventory_approval')?.trim() || null,
+      shareId: searchParams.get('share_id')?.trim() || null,
+      shareFileCount: Number(searchParams.get('share_file_count') || '0'),
+      shareText: searchParams.get('share_text')?.trim() || null,
+      shareUrl: searchParams.get('share_url')?.trim() || null,
+      shareTitle: searchParams.get('share_title')?.trim() || null,
     }),
     [searchParams]
   );
@@ -479,6 +485,20 @@ function MainPageContent() {
     const interval = setInterval(refreshSession, 30 * 60 * 1000); // 30분마다
     return () => clearInterval(interval);
   }, [user, clearClientSession, router]);
+
+  // Web Share Target: 다른 앱에서 공유하기로 파일/텍스트 수신
+  useEffect(() => {
+    if (!navigationIntent.shareId) return;
+    setMainMenu('채팅');
+    setShareTarget({
+      id: navigationIntent.shareId,
+      fileCount: navigationIntent.shareFileCount,
+      text: navigationIntent.shareText,
+      url: navigationIntent.shareUrl,
+      title: navigationIntent.shareTitle,
+    });
+    router.replace('/main', { scroll: false });
+  }, [navigationIntent.shareId]);
 
   // 알림 클릭 시 open_chat_room 쿼리 처리 → 채팅 메뉴 + 해당 채팅방 연동 (웹/모바일 동일)
   useEffect(() => {
@@ -932,6 +952,8 @@ function MainPageContent() {
             setInitialOpenChatRoomId(null);
             setInitialOpenMessageId(null);
           }}
+          shareTarget={shareTarget}
+          onConsumeShareTarget={() => setShareTarget(null)}
           onOpenApproval={handleOpenApproval}
           initialApprovalIntent={initialApprovalIntent}
           onConsumeApprovalIntent={() => setInitialApprovalIntent(null)}

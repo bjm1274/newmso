@@ -566,11 +566,103 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     );
   }, [getSupplyRequestItems]);
 
+  const formatLeaveDateLabel = useCallback((value: unknown) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '-';
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return raw;
+    return parsed.toLocaleDateString('ko-KR');
+  }, []);
+
+  const normalizeLeaveAttendanceStatus = useCallback((leaveTypeValue: unknown) => {
+    const normalized = String(leaveTypeValue || '').trim().toLowerCase();
+    if (normalized.includes('병가')) {
+      return { legacy: '병가', modern: 'sick_leave' };
+    }
+    if (normalized.includes('반차') || normalized.includes('0.5')) {
+      return { legacy: '반차휴가', modern: 'half_leave' };
+    }
+    return { legacy: '연차휴가', modern: 'annual_leave' };
+  }, []);
+
+  const getLeaveRequestSummary = useCallback((metaData: Record<string, unknown> | null | undefined) => {
+    if (!metaData) return null;
+    const startDate = String(metaData.startDate || metaData.start || '').trim();
+    const endDate = String(metaData.endDate || metaData.end || startDate).trim();
+    const leaveType = String(metaData.leaveType || '연차').trim() || '연차';
+    if (!startDate) return null;
+    return {
+      startDate,
+      endDate,
+      leaveType,
+      reason: String(metaData.reason || '').trim(),
+      dateLabel:
+        startDate === endDate
+          ? formatLeaveDateLabel(startDate)
+          : `${formatLeaveDateLabel(startDate)} ~ ${formatLeaveDateLabel(endDate)}`,
+    };
+  }, [formatLeaveDateLabel]);
+
+  const renderLeaveRequestInfoHtml = useCallback((metaData: Record<string, unknown> | null | undefined) => {
+    const leaveSummary = getLeaveRequestSummary(metaData);
+    if (!leaveSummary) return '';
+
+    return `
+      <div class="section">
+        <div class="section-title">휴가 정보</div>
+        <table class="supply-table">
+          <tbody>
+            <tr>
+              <th>휴가일시</th>
+              <td>${escapeHtml(leaveSummary.dateLabel)}</td>
+            </tr>
+            <tr>
+              <th>휴가구분</th>
+              <td>${escapeHtml(leaveSummary.leaveType)}</td>
+            </tr>
+            <tr>
+              <th>사유</th>
+              <td>${escapeHtml(leaveSummary.reason || '-')}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+  }, [getLeaveRequestSummary]);
+
+  const renderLeaveRequestInfoPanel = useCallback((metaData: Record<string, unknown> | null | undefined) => {
+    const leaveSummary = getLeaveRequestSummary(metaData);
+    if (!leaveSummary) return null;
+
+    return (
+      <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)]">
+        <div className="border-b border-[var(--border)] px-4 py-3">
+          <h4 className="text-sm font-bold text-[var(--foreground)]">휴가 정보</h4>
+        </div>
+        <div className="grid gap-0 divide-y divide-[var(--border)] text-xs">
+          <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 px-4 py-3">
+            <span className="font-bold text-[var(--toss-gray-4)]">휴가일시</span>
+            <span className="font-semibold text-[var(--foreground)]">{leaveSummary.dateLabel}</span>
+          </div>
+          <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 px-4 py-3">
+            <span className="font-bold text-[var(--toss-gray-4)]">휴가구분</span>
+            <span className="font-semibold text-[var(--foreground)]">{leaveSummary.leaveType}</span>
+          </div>
+          <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 px-4 py-3">
+            <span className="font-bold text-[var(--toss-gray-4)]">사유</span>
+            <span className="text-[var(--toss-gray-4)]">{leaveSummary.reason || '-'}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }, [getLeaveRequestSummary]);
+
   const openApprovalPrintView = useCallback((item: Record<string, unknown>) => {
     const design = resolveApprovalTemplateDesign(item);
     const templateMeta = resolveApprovalTemplateMeta(item);
     const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
     const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, staffs);
+    const leaveRequestSection = renderLeaveRequestInfoHtml(metaData);
     const supplyItemsSection = renderSupplyRequestItemsHtml(metaData);
     const contentSection = `
       <div class="body">
@@ -647,6 +739,7 @@ window.onload = () => window.print();
       <div class="doc-title">${escapeHtml(item?.title || '(제목 없음)')}</div>
       <div class="content">${escapeHtml(item?.content || '-').replace(/\n/g, '<br>')}</div>
     </div>
+    ${leaveRequestSection}
     ${supplyItemsSection}
     ${referenceSection}
     ${design.showSignArea === false ? '' : `<div class="approval-line">${approvalBoxes}</div>`}
@@ -704,7 +797,7 @@ window.onload = () => window.print();
     }
     win.document.write(html);
     win.document.close();
-  }, [renderSupplyRequestItemsHtml, resolveApprovalTemplateDesign, resolveApprovalTemplateMeta, staffs]);
+  }, [renderLeaveRequestInfoHtml, renderSupplyRequestItemsHtml, resolveApprovalTemplateDesign, resolveApprovalTemplateMeta, staffs]);
 
   // 결재자 후보: 부서장 이상(팀장·부장·병원장 등)만 표시 (staffs는 이미 메인에서 회사별로 불러옴)
   const APPROVER_POSITIONS = ['팀장', '간호과장', '실장', '부장', '본부장', '총무부장', '진료부장', '간호부장', '이사', '병원장', '원장', '대표'];
@@ -1918,6 +2011,7 @@ window.onload = () => window.print();
           }
           const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
           const leaveType = String(itemMetaData?.leaveType || '연차');
+          const leaveStatus = normalizeLeaveAttendanceStatus(leaveType);
 
           // 1. 인사관리 휴가신청 테이블(leave_requests) 동기화
           try {
@@ -1938,8 +2032,16 @@ window.onload = () => window.print();
             await supabase.from('attendance').upsert({
               staff_id: senderId,
               date: dateStr,
-              status: '휴가',
+              status: leaveStatus.legacy,
             }, { onConflict: 'staff_id,date' });
+            await supabase.from('attendances').upsert({
+              staff_id: senderId,
+              work_date: dateStr,
+              status: leaveStatus.modern,
+              check_in_time: null,
+              check_out_time: null,
+              work_hours_minutes: 0,
+            }, { onConflict: 'staff_id,work_date' });
           }
           if (isAnnualLeaveType(leaveType)) {
             await syncAnnualLeaveUsedForStaff(senderId);
@@ -2226,6 +2328,7 @@ window.onload = () => window.print();
       content: formContent || '',
       meta_data: {
         ...extraData,
+        ...(formType === '연차/휴가' ? { reason: formContent || '' } : {}),
         form_slug: resolvedFormSlug,
         form_name: resolvedFormName,
         cc_departments,
@@ -2887,6 +2990,7 @@ window.onload = () => window.print();
                   const templateDesign = resolveApprovalTemplateDesign(item);
                   const itemMetaData = item.meta_data as Record<string, unknown> | null | undefined;
                   const cardCcUsers = normalizeApprovalCcUsers(itemMetaData?.cc_users, staffs);
+                  const leaveRequestSummary = getLeaveRequestSummary(itemMetaData);
                   const delegateSnapshot = resolveApprovalDelegateSnapshot(item);
                   const delaySnapshot = resolveApprovalDelaySnapshot(item);
                   const lockSnapshot = resolveApprovalLockSnapshot(item);
@@ -2934,7 +3038,7 @@ window.onload = () => window.print();
                                 수정 잠금
                               </span>
                             )}
-                            {itemStatus === '?湲?' && delaySnapshot.overdue && (
+                            {itemStatus === '대기중' && delaySnapshot.overdue && (
                               <span className="px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-rose-50 text-rose-600 border border-rose-200">
                                 결재 지연
                               </span>
@@ -2942,6 +3046,16 @@ window.onload = () => window.print();
                           </div>
                           <h3 className="font-semibold text-[13px] text-[var(--foreground)] tracking-tight line-clamp-2 leading-[1.35]">{itemTitle}</h3>
                           <p className="text-[10px] text-[var(--toss-gray-3)] font-medium mt-0.5 line-clamp-2 leading-[1.35]">기안자: {itemSenderName || '사용자'} | {new Date(itemCreatedAt).toLocaleDateString()}{itemDocNumber && ` | 문서번호: ${itemDocNumber}`}</p>
+                          {leaveRequestSummary && (
+                            <div className="mt-0.5 flex flex-wrap gap-0.5">
+                              <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-cyan-50 text-cyan-700 border border-cyan-200">
+                                {leaveRequestSummary.leaveType}
+                              </span>
+                              <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-[var(--muted)] text-[var(--toss-gray-3)]">
+                                {leaveRequestSummary.dateLabel}
+                              </span>
+                            </div>
+                          )}
                           {steps.length > 0 && (
                             <div className="mt-0.5 flex flex-wrap gap-0.5">
                               <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-[var(--muted)] text-[var(--toss-gray-3)]">결재선 {steps.length}명</span>
@@ -3183,6 +3297,7 @@ window.onload = () => window.print();
                   </div>
                 )}
                 <div className="text-sm text-[var(--toss-gray-4)] whitespace-pre-wrap border-t border-[var(--border)] pt-4">{detailContent || '-'}</div>
+                {renderLeaveRequestInfoPanel(detailMetaData)}
                 {renderSupplyRequestItemsPanel(detailMetaData)}
               </div>
               {detailStatus === '대기' && (
