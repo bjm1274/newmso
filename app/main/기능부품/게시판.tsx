@@ -1146,11 +1146,10 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     const postId = String(readStatusPost.id ?? '').trim();
     const readSet = postReadMap[postId] || new Set<string>();
     const audience = readStatusAudience.length > 0 ? readStatusAudience : boardAudience;
-    // 작성자 자신은 대상자에서 제외
     const authorId = String(readStatusPost.author_id ?? '').trim();
     return audience.filter((member) => {
       const memberId = String(member.id ?? '').trim();
-      if (authorId && memberId === authorId) return false;
+      if (authorId && memberId === authorId) return true;
       return readSet.has(memberId);
     });
   }, [boardAudience, readStatusAudience, postReadMap, readStatusPost]);
