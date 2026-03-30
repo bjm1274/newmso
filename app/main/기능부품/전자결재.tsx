@@ -1582,6 +1582,42 @@ window.onload = () => window.print();
         ? requestedCcUsers
         : resolveDefaultReferenceUsersForForm(nextFormType)
     );
+
+    if (typeof initialComposeRequest?.statusFilter === 'string') {
+      const requestedStatusFilter = initialComposeRequest.statusFilter.trim();
+      setApprovalStatusFilter(
+        requestedStatusFilter === '대기' || requestedStatusFilter === '승인' || requestedStatusFilter === '반려'
+          ? requestedStatusFilter
+          : '전체'
+      );
+    }
+
+    if ('documentFilter' in initialComposeRequest) {
+      const requestedDocumentFilter = String(initialComposeRequest.documentFilter || '').trim();
+      setApprovalDocumentFilter(requestedDocumentFilter || ALL_DOCUMENT_FILTER);
+    }
+
+    if ('keyword' in initialComposeRequest) {
+      setApprovalKeyword(String(initialComposeRequest.keyword || ''));
+    }
+
+    if ('dateMode' in initialComposeRequest) {
+      setApprovalDateMode(initialComposeRequest.dateMode === 'range' ? 'range' : 'month');
+    }
+
+    if ('month' in initialComposeRequest) {
+      const requestedMonth = String(initialComposeRequest.month || '').trim();
+      setApprovalMonth(/^\d{4}-\d{2}$/.test(requestedMonth) ? requestedMonth : defaultApprovalMonth);
+    }
+
+    if ('dateFrom' in initialComposeRequest) {
+      setApprovalDateFrom(String(initialComposeRequest.dateFrom || '').slice(0, 10));
+    }
+
+    if ('dateTo' in initialComposeRequest) {
+      setApprovalDateTo(String(initialComposeRequest.dateTo || '').slice(0, 10));
+    }
+
     try { window.localStorage.setItem(APPROVAL_VIEW_KEY, nextView); } catch { /* ignore */ }
 
     if (nextFormType === '출결정정') {
@@ -1601,7 +1637,7 @@ window.onload = () => window.print();
     }
 
     onConsumeComposeRequest?.();
-  }, [initialComposeRequest, onConsumeComposeRequest, resolveAccessibleView, resolveDefaultReferenceUsersForForm, staffs]);
+  }, [defaultApprovalMonth, initialComposeRequest, onConsumeComposeRequest, resolveAccessibleView, resolveDefaultReferenceUsersForForm, staffs]);
 
   const fetchApprovals = useCallback(async () => {
     const scopedCompanyId = !isMso ? user?.company_id : selectedCompanyId;
@@ -2458,8 +2494,17 @@ window.onload = () => window.print();
   };
 
   const handleSubmit = async () => {
+    const trimmedTitle = formTitle.trim();
     if (!user?.id) {
       toast("로그인한 직원 계정으로만 기안할 수 있습니다.");
+      return;
+    }
+    if (!trimmedTitle) {
+      toast('기안 제목을 입력해주세요.', 'warning');
+      return;
+    }
+    if (!hasApproverSelection) {
+      toast('결재권자를 먼저 선택해주세요.', 'warning');
       return;
     }
     if (!formTitle || approverLine.length === 0) {
@@ -2700,6 +2745,7 @@ window.onload = () => window.print();
   const referenceBoxList = useMemo(() => {
     return applyListFilters(referenceBaseList);
   }, [applyListFilters, referenceBaseList]);
+  const hasApproverSelection = approverLine.length > 0;
 
   const listForView =
     viewMode === '기안함'
@@ -2887,6 +2933,11 @@ window.onload = () => window.print();
                   <p className="text-[11px] font-bold text-[var(--toss-gray-4)]">결재선</p>
                   <div className="grid gap-2 sm:grid-cols-2">{approverLine.map((a, i) => <div key={i} className="bg-[var(--card)] px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] text-[12px] font-bold shadow-sm text-[var(--accent)] flex items-center justify-between gap-3"><span className="min-w-0 flex-1 truncate">{i + 1}. {a.name} {a.position}</span><button onClick={() => setApproverLine(approverLine.filter((_, idx) => idx !== i))} className="shrink-0 ml-1 text-[var(--toss-gray-3)] hover:text-red-500">✕</button></div>)}</div>
                 </div>
+                {!hasApproverSelection && (
+                  <p className="text-[11px] font-bold text-red-500" data-testid="approval-approver-required">
+                    결재권자를 최소 1명 선택해야 기안할 수 있습니다.
+                  </p>
+                )}
                 {ccLine.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-[11px] font-bold text-[var(--toss-gray-4)]">참조자</p>
@@ -2993,7 +3044,8 @@ window.onload = () => window.print();
                   <button
                     data-testid="approval-submit-button"
                     onClick={handleSubmit}
-                    className="w-full py-4 md:py-5 bg-[var(--accent)] text-white rounded-[var(--radius-md)] font-bold text-sm shadow-sm hover:opacity-95 active:scale-[0.99] transition-all"
+                    disabled={!hasApproverSelection}
+                    className="w-full py-4 md:py-5 bg-[var(--accent)] text-white rounded-[var(--radius-md)] font-bold text-sm shadow-sm hover:opacity-95 active:scale-[0.99] transition-all disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:opacity-45 disabled:active:scale-100"
                   >
                     결재 상신
                   </button>

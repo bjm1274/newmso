@@ -15,7 +15,8 @@ function trackRuntimeErrors(page: Page) {
     if (
       text.includes('favicon') ||
       text.includes('Failed to load resource') ||
-      text.includes('ERR_ABORTED')
+      text.includes('ERR_ABORTED') ||
+      (text.includes('WebSocket connection to') && text.includes('/realtime/v1/websocket'))
     ) {
       return;
     }

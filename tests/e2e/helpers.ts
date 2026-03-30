@@ -1028,7 +1028,7 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   const processFinalApprovalEffects = async (approval: any) => {
     const approvalType = String(approval?.type || '').trim();
     const formSlug = String(approval?.meta_data?.form_slug || '').trim();
-    let warnings: string[] = [];
+    const warnings: string[] = [];
     let supplySummary: Record<string, unknown> | null = null;
 
     if (approvalType === '\uC5F0\uCC28/\uD734\uAC00' || formSlug === 'leave_request') {
@@ -1039,7 +1039,12 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       applyAttendanceCorrectionApprovalEffects(approval);
     }
 
-    if (approvalType === '\uBB3C\uD488\uC694\uCCAD' && Array.isArray(approval?.meta_data?.items)) {
+    if (
+      (approvalType === '\uBB3C\uD488\uC694\uCCAD' ||
+        approvalType === '\uBB3C\uD488\uC2E0\uCCAD' ||
+        formSlug === 'supplies') &&
+      Array.isArray(approval?.meta_data?.items)
+    ) {
       supplySummary = await applySupplyApprovalEffects(approval);
     }
 
@@ -1071,7 +1076,19 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
     const body = route.request().postDataJSON?.() as
       | { fileName?: string; mimeType?: string; fileSize?: number }
       | undefined;
-    const extension = String(body?.fileName || 'upload.bin').split('.').pop() || 'bin';
+    const normalizedFileName = String(body?.fileName || '').trim();
+    const mimeType = String(body?.mimeType || '').trim().toLowerCase();
+    const extensionFromName = normalizedFileName.includes('.')
+      ? normalizedFileName.split('.').pop()?.trim().toLowerCase()
+      : '';
+    const extensionFromMime = mimeType.startsWith('image/')
+      ? mimeType.replace('image/', '') || 'png'
+      : mimeType.startsWith('video/')
+        ? mimeType.replace('video/', '') || 'mp4'
+        : mimeType === 'application/pdf'
+          ? 'pdf'
+          : '';
+    const extension = extensionFromName || extensionFromMime || 'bin';
     const path = `chat/mock-${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
     return route.fulfill({
       status: 200,
