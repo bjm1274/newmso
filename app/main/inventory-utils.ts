@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/supabase-compat';
 
@@ -286,16 +287,16 @@ export function normalizeSupportInventoryRows(rows: any[] = []) {
   });
 }
 
-export async function fetchSupportInventoryRows() {
+export async function fetchSupportInventoryRows(client: SupabaseClient = supabase) {
   const result = await withMissingColumnFallback<Record<string, any>[]>(
     () =>
-      supabase
+      client
         .from('inventory')
         .select('*')
         .eq('company', INVENTORY_SUPPORT_COMPANY)
         .eq('department', INVENTORY_SUPPORT_DEPARTMENT),
     () =>
-      supabase
+      client
         .from('inventory')
         .select('*')
         .eq('company', INVENTORY_SUPPORT_COMPANY),
