@@ -45,7 +45,7 @@ function getTitle(type: ChecklistType) {
 function getDescription(type: ChecklistType) {
   return type === '입사'
     ? '계약, 계정, 장비, 오리엔테이션까지 입사 초기 준비를 한 화면에서 관리합니다.'
-    : '권한 회수, 장비 반납, 최종 정산, 문서 마감까지 퇴사 준비 절차를 추적합니다.';
+    : '권한 회수, 장비 반납, 최종 정산, 문서 마감까지 퇴사 준비 진행도를 추적합니다.';
 }
 
 function getDayDiff(fromDate?: string | null) {
@@ -74,42 +74,51 @@ export default function OnboardingChecklist({
 
   useEffect(() => {
     let active = true;
+
     const run = async () => {
       setLoading(true);
-      const [{ data: checklistData, error: checklistError }, { data: contractData, error: contractError }] =
-        await Promise.all([
-          supabase
-            .from('onboarding_checklists')
-            .select('items, target_date, completed_at')
-            .eq('staff_id', staffId)
-            .eq('checklist_type', type)
-            .maybeSingle(),
-          supabase
-            .from('employment_contracts')
-            .select('id, contract_type, status, requested_at, signed_at')
-            .eq('staff_id', staffId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle(),
-        ]);
+      const [
+        { data: checklistData, error: checklistError },
+        { data: contractData, error: contractError },
+      ] = await Promise.all([
+        supabase
+          .from('onboarding_checklists')
+          .select('items, target_date, completed_at')
+          .eq('staff_id', staffId)
+          .eq('checklist_type', type)
+          .maybeSingle(),
+        supabase
+          .from('employment_contracts')
+          .select('id, contract_type, status, requested_at, signed_at')
+          .eq('staff_id', staffId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
 
       if (!active) return;
+
+      const fallbackTargetDate = getChecklistTargetDate(type, joinedAt);
 
       if (checklistError) {
         console.warn(`${type} checklist load failed:`, checklistError);
         setItems(getDefaultChecklist(type));
-        setTargetDate(getChecklistTargetDate(type, joinedAt));
+        setTargetDate(fallbackTargetDate);
       } else {
         const normalizedItems = normalizeChecklistItems(checklistData?.items, type);
-        const nextItems = syncChecklistWithContract(normalizedItems, type, contractData
-          ? {
-              status: contractData.status,
-              requestedAt: contractData.requested_at,
-              signedAt: contractData.signed_at,
-            }
-          : null);
-        const nextTargetDate =
-          checklistData?.target_date ?? getChecklistTargetDate(type, joinedAt);
+        const nextItems = syncChecklistWithContract(
+          normalizedItems,
+          type,
+          contractData
+            ? {
+                status: contractData.status,
+                requestedAt: contractData.requested_at,
+                signedAt: contractData.signed_at,
+              }
+            : null,
+        );
+        const nextTargetDate = checklistData?.target_date ?? fallbackTargetDate;
+
         setItems(nextItems);
         setTargetDate(nextTargetDate);
 
@@ -119,16 +128,18 @@ export default function OnboardingChecklist({
           JSON.stringify(nextItems) !== JSON.stringify(normalizedItems);
 
         if (shouldPersistChecklist) {
-          const { error: initializeError } = await supabase.from('onboarding_checklists').upsert(
-            {
-              staff_id: staffId,
-              checklist_type: type,
-              items: nextItems,
-              target_date: nextTargetDate,
-              completed_at: isChecklistComplete(nextItems) ? new Date().toISOString() : null,
-            },
-            { onConflict: 'staff_id,checklist_type' },
-          );
+          const { error: initializeError } = await supabase
+            .from('onboarding_checklists')
+            .upsert(
+              {
+                staff_id: staffId,
+                checklist_type: type,
+                items: nextItems,
+                target_date: nextTargetDate,
+                completed_at: isChecklistComplete(nextItems) ? new Date().toISOString() : null,
+              },
+              { onConflict: 'staff_id,checklist_type' },
+            );
 
           if (initializeError) {
             console.warn(`${type} checklist init failed:`, initializeError);
@@ -150,26 +161,28 @@ export default function OnboardingChecklist({
     return () => {
       active = false;
     };
-  }, [staffId, type]);
+  }, [joinedAt, staffId, type]);
 
   const doneCount = useMemo(() => countChecklistDone(items), [items]);
-  const isComplete = useMemo(() => isChecklistComplete(items), [items]);
+  const complete = useMemo(() => isChecklistComplete(items), [items]);
   const joinedDayDiff = useMemo(() => getDayDiff(joinedAt), [joinedAt]);
 
   const persistChecklist = async (nextItems: ChecklistItem[]) => {
     setSaving(true);
-    const { error } = await supabase.from('onboarding_checklists').upsert(
-      {
-        staff_id: staffId,
-        checklist_type: type,
-        items: nextItems,
-        target_date: targetDate,
-        completed_at: isChecklistComplete(nextItems) ? new Date().toISOString() : null,
-      },
-      { onConflict: 'staff_id,checklist_type' },
-    );
-
+    const { error } = await supabase
+      .from('onboarding_checklists')
+      .upsert(
+        {
+          staff_id: staffId,
+          checklist_type: type,
+          items: nextItems,
+          target_date: targetDate,
+          completed_at: isChecklistComplete(nextItems) ? new Date().toISOString() : null,
+        },
+        { onConflict: 'staff_id,checklist_type' },
+      );
     setSaving(false);
+
     if (error) {
       console.error(`${type} checklist save failed:`, error);
       return false;
@@ -213,7 +226,7 @@ export default function OnboardingChecklist({
         <div className="text-right shrink-0">
           <span
             className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${
-              isComplete
+              complete
                 ? 'bg-emerald-50 text-emerald-700'
                 : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'
             }`}
@@ -245,7 +258,7 @@ export default function OnboardingChecklist({
           </div>
         ) : (
           <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">
-            아직 계약 요청이 없거나 전자서명 기록이 없습니다.
+            아직 계약 요청 또는 전자서명 기록이 없습니다.
           </p>
         )}
       </div>
@@ -287,7 +300,13 @@ export default function OnboardingChecklist({
       )}
 
       <div className="mt-3 flex items-center justify-between text-[11px] text-[var(--toss-gray-3)]">
-        <span>{saving ? '저장 중입니다.' : isComplete ? '모든 항목이 완료되었습니다.' : '완료 시 자동으로 원장에 반영됩니다.'}</span>
+        <span>
+          {saving
+            ? '저장 중입니다.'
+            : complete
+              ? '모든 항목을 완료했습니다.'
+              : '완료 여부는 자동으로 저장 후 반영됩니다.'}
+        </span>
         <span>{type === '입사' ? '온보딩 패키지' : '퇴사 준비'}</span>
       </div>
     </section>

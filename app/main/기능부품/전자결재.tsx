@@ -199,6 +199,32 @@ function toLocalDateKey(value: string | number | Date | null | undefined) {
   return `${year}-${month}-${day}`;
 }
 
+function getCurrentMonthValue() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+function getDateRangeFromMonth(monthValue: string) {
+  if (!monthValue || !/^\d{4}-\d{2}$/.test(monthValue)) {
+    return { from: '', to: '' };
+  }
+
+  const [yearText, monthText] = monthValue.split('-');
+  const year = Number(yearText);
+  const month = Number(monthText);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    return { from: '', to: '' };
+  }
+
+  const lastDay = new Date(year, month, 0).getDate();
+  return {
+    from: `${yearText}-${monthText}-01`,
+    to: `${yearText}-${monthText}-${String(lastDay).padStart(2, '0')}`,
+  };
+}
+
 function matchesCreatedDateRange(createdAt: string | number | Date | null | undefined, from: string, to: string) {
   if (!from && !to) return true;
   const createdDate = toLocalDateKey(createdAt);
@@ -319,8 +345,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대기' | '승인' | '반려'>('전체');
   const [approvalDocumentFilter, setApprovalDocumentFilter] = useState(ALL_DOCUMENT_FILTER);
   const [approvalKeyword, setApprovalKeyword] = useState('');
+  const [approvalDateMode, setApprovalDateMode] = useState<'month' | 'range'>('month');
+  const [approvalMonth, setApprovalMonth] = useState(getCurrentMonthValue);
   const [approvalDateFrom, setApprovalDateFrom] = useState('');
   const [approvalDateTo, setApprovalDateTo] = useState('');
+  const defaultApprovalMonth = useMemo(() => getCurrentMonthValue(), []);
   const [savedApproverLine, setSavedApproverLine] = useState<StaffMember[]>([]);
   // 결재선 다중 템플릿 (name + line 배열)
   const [approverTemplates, setApproverTemplates] = useState<{id: string; name: string; line: StaffMember[]}[]>([]);
@@ -2312,7 +2341,23 @@ window.onload = () => window.print();
       .join(' ');
   }, [staffs]);
 
-  const dateRangeInvalid = Boolean(approvalDateFrom && approvalDateTo && approvalDateFrom > approvalDateTo);
+  const effectiveApprovalDateRange = useMemo(() => {
+    return approvalDateMode === 'month'
+      ? getDateRangeFromMonth(approvalMonth)
+      : { from: approvalDateFrom, to: approvalDateTo };
+  }, [approvalDateFrom, approvalDateMode, approvalDateTo, approvalMonth]);
+
+  const hasApprovalFilterOverrides =
+    approvalDocumentFilter !== ALL_DOCUMENT_FILTER ||
+    Boolean(approvalKeyword) ||
+    approvalDateMode !== 'month' ||
+    approvalMonth !== defaultApprovalMonth ||
+    Boolean(approvalDateFrom) ||
+    Boolean(approvalDateTo);
+
+  const dateRangeInvalid =
+    approvalDateMode === 'range' &&
+    Boolean(effectiveApprovalDateRange.from && effectiveApprovalDateRange.to && effectiveApprovalDateRange.from > effectiveApprovalDateRange.to);
   const applyListFilters = useCallback((items: Record<string, unknown>[]) => {
     let filtered = approvalStatusFilter === '전체'
       ? items
@@ -2322,8 +2367,14 @@ window.onload = () => window.print();
       filtered = filtered.filter((item) => item.type === approvalDocumentFilter);
     }
 
-    if (approvalDateFrom || approvalDateTo) {
-      filtered = filtered.filter((item) => matchesCreatedDateRange(item.created_at as string | null, approvalDateFrom, approvalDateTo));
+    if (effectiveApprovalDateRange.from || effectiveApprovalDateRange.to) {
+      filtered = filtered.filter((item) =>
+        matchesCreatedDateRange(
+          item.created_at as string | null,
+          effectiveApprovalDateRange.from,
+          effectiveApprovalDateRange.to
+        )
+      );
     }
 
     const normalizedKeyword = approvalKeyword.trim().toLocaleLowerCase('ko-KR');
@@ -2332,7 +2383,7 @@ window.onload = () => window.print();
     }
 
     return filtered;
-  }, [approvalDateFrom, approvalDateTo, approvalDocumentFilter, approvalKeyword, approvalStatusFilter, buildApprovalSearchText]);
+  }, [approvalDocumentFilter, approvalKeyword, approvalStatusFilter, buildApprovalSearchText, effectiveApprovalDateRange.from, effectiveApprovalDateRange.to]);
 
   const draftBoxList = useMemo(() => {
     return applyListFilters(draftBaseList);
@@ -2675,27 +2726,54 @@ window.onload = () => window.print();
                     placeholder={viewMode === '참조 문서함' ? '참조 문서 검색' : '문서 검색'}
                     data-testid="approval-keyword-filter"
                   />
-                  <input
-                    type="date"
-                    value={approvalDateFrom}
-                    onChange={(e) => setApprovalDateFrom(e.target.value)}
-                    className="h-10 w-full sm:w-auto sm:min-w-[138px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
-                    aria-label="조회 시작일"
-                  />
-                  <span className="text-sm font-semibold text-[var(--toss-gray-3)]">~</span>
-                  <input
-                    type="date"
-                    value={approvalDateTo}
-                    onChange={(e) => setApprovalDateTo(e.target.value)}
-                    className="h-10 w-full sm:w-auto sm:min-w-[138px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
-                    aria-label="조회 종료일"
-                  />
-                  {(approvalDocumentFilter !== ALL_DOCUMENT_FILTER || approvalKeyword || approvalDateFrom || approvalDateTo) && (
+                  <select
+                    value={approvalDateMode}
+                    onChange={(e) => setApprovalDateMode(e.target.value === 'range' ? 'range' : 'month')}
+                    className="h-10 w-full sm:w-auto sm:min-w-[116px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                    aria-label="조회 기간 유형"
+                    data-testid="approval-date-mode"
+                  >
+                    <option value="month">월별</option>
+                    <option value="range">기간지정</option>
+                  </select>
+                  {approvalDateMode === 'month' ? (
+                    <input
+                      type="month"
+                      value={approvalMonth}
+                      onChange={(e) => setApprovalMonth(e.target.value)}
+                      className="h-10 w-full sm:w-auto sm:min-w-[150px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                      aria-label="조회 월"
+                      data-testid="approval-month-filter"
+                    />
+                  ) : (
+                    <>
+                      <input
+                        type="date"
+                        value={approvalDateFrom}
+                        onChange={(e) => setApprovalDateFrom(e.target.value)}
+                        className="h-10 w-full sm:w-auto sm:min-w-[138px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                        aria-label="조회 시작일"
+                        data-testid="approval-date-from"
+                      />
+                      <span className="text-sm font-semibold text-[var(--toss-gray-3)]">~</span>
+                      <input
+                        type="date"
+                        value={approvalDateTo}
+                        onChange={(e) => setApprovalDateTo(e.target.value)}
+                        className="h-10 w-full sm:w-auto sm:min-w-[138px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                        aria-label="조회 종료일"
+                        data-testid="approval-date-to"
+                      />
+                    </>
+                  )}
+                  {hasApprovalFilterOverrides && (
                     <button
                       type="button"
                       onClick={() => {
                         setApprovalDocumentFilter(ALL_DOCUMENT_FILTER);
                         setApprovalKeyword('');
+                        setApprovalDateMode('month');
+                        setApprovalMonth(defaultApprovalMonth);
                         setApprovalDateFrom('');
                         setApprovalDateTo('');
                       }}

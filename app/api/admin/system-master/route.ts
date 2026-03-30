@@ -173,7 +173,11 @@ function normalizeChatRoom(room: Record<string, any>, staffMap: Map<string, Reco
   };
 }
 
-function normalizeMessage(message: Record<string, any>, rooms: Map<string, Record<string, any>>, staffMap: Map<string, Record<string, any>>) {
+function normalizeMessage(
+  message: Record<string, any>,
+  rooms: Map<string, Record<string, any>>,
+  staffMap: Map<string, Record<string, any>>,
+) {
   const sender = message.sender_id ? staffMap.get(String(message.sender_id)) : undefined;
   const room = rooms.get(String(message.room_id));
   return {
@@ -225,7 +229,10 @@ async function listRecentBackups(limit = 8): Promise<BackupSummaryRow[]> {
 }
 
 function buildUsageSummary(logs: Record<string, any>[]) {
-  const grouped = new Map<string, { label: string; count: number; latestAt: string; topAction: string; actionCounts: Map<string, number> }>();
+  const grouped = new Map<
+    string,
+    { label: string; count: number; latestAt: string; topAction: string; actionCounts: Map<string, number> }
+  >();
 
   for (const log of logs) {
     const category = getAuditCategory(log);
@@ -254,23 +261,25 @@ function buildUsageSummary(logs: Record<string, any>[]) {
     grouped.set(category, existing);
   }
 
-  return Array.from(grouped.entries()).map(([id, entry]) => {
-    let topAction = '-';
-    let topCount = -1;
-    for (const [action, count] of entry.actionCounts.entries()) {
-      if (count > topCount) {
-        topAction = action;
-        topCount = count;
+  return Array.from(grouped.entries())
+    .map(([id, entry]) => {
+      let topAction = '-';
+      let topCount = -1;
+      for (const [action, count] of entry.actionCounts.entries()) {
+        if (count > topCount) {
+          topAction = action;
+          topCount = count;
+        }
       }
-    }
-    return {
-      id,
-      label: entry.label,
-      count: entry.count,
-      latestAt: entry.latestAt || null,
-      topAction,
-    };
-  }).sort((left, right) => right.count - left.count);
+      return {
+        id,
+        label: entry.label,
+        count: entry.count,
+        latestAt: entry.latestAt || null,
+        topAction,
+      };
+    })
+    .sort((left, right) => right.count - left.count);
 }
 
 function groupDuplicateEndpoints(rows: PushSubscriptionRow[]) {
@@ -325,8 +334,8 @@ async function collectPushQueueHealth(supabase: ReturnType<typeof getAdminClient
   const now = Date.now();
   return queueRows.reduce(
     (acc, row) => {
-      const processedAt = row.processed_at ? Date.parse(String(row.processed_at)) : NaN;
-      const nextAttemptAt = row.next_attempt_at ? Date.parse(String(row.next_attempt_at)) : NaN;
+      const processedAt = row.processed_at ? Date.parse(String(row.processed_at)) : Number.NaN;
+      const nextAttemptAt = row.next_attempt_at ? Date.parse(String(row.next_attempt_at)) : Number.NaN;
       const isProcessed = Number.isFinite(processedAt);
 
       acc.total += 1;
@@ -508,10 +517,7 @@ function buildIntegrityChecks(params: {
       const missingMembers = Array.isArray(room.members)
         ? room.members.filter((memberId: string) => !validStaffIds.has(String(memberId)))
         : [];
-      return {
-        room,
-        missingMembers,
-      };
+      return { room, missingMembers };
     })
     .filter((entry) => entry.missingMembers.length > 0);
   const approvalsWithMissingApprover = approvalRows.filter((row) => {
@@ -572,7 +578,6 @@ function buildIntegrityChecks(params: {
       samples: duplicateEmployeeNoRows.slice(0, 5).map(([employeeNo, count]) => `${employeeNo} (${count}건)`),
     });
   }
-
   if (issues.length === 0) {
     issues.push({
       id: 'integrity-ok',
@@ -614,38 +619,24 @@ export async function GET(request: NextRequest) {
     }
 
     const safeStaffRows = (staffRows || []).map((row: any) => sanitizeStaffRow(row));
-    const staffMap = new Map<string, Record<string, any>>(
-      safeStaffRows.map((staff: Record<string, any>) => [String(staff.id), staff])
-    );
+    const staffMap = new Map<string, Record<string, any>>(safeStaffRows.map((staff: Record<string, any>) => [String(staff.id), staff]));
 
     if (scope === 'overview') {
-      const [
-        staffCountRes,
-        auditCountRes,
-        payrollCountRes,
-        roomCountRes,
-        messageCountRes,
-        auditRes,
-        payrollRes,
-        roomRes,
-        messageRes,
-      ] = await Promise.all([
-        supabase.from('staff_members').select('id', { head: true, count: 'exact' }),
-        supabase.from('audit_logs').select('id', { head: true, count: 'exact' }),
-        supabase.from('payroll_records').select('id', { head: true, count: 'exact' }),
-        supabase.from('chat_rooms').select('id', { head: true, count: 'exact' }),
-        supabase.from('messages').select('id', { head: true, count: 'exact' }),
-        supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(40),
-        supabase.from('payroll_records').select('*').order('created_at', { ascending: false }).limit(80),
-        supabase.from('chat_rooms').select('*').order('created_at', { ascending: false }).limit(80),
-        supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(80),
-      ]);
+      const [staffCountRes, auditCountRes, payrollCountRes, roomCountRes, messageCountRes, auditRes, payrollRes, roomRes, messageRes] =
+        await Promise.all([
+          supabase.from('staff_members').select('id', { head: true, count: 'exact' }),
+          supabase.from('audit_logs').select('id', { head: true, count: 'exact' }),
+          supabase.from('payroll_records').select('id', { head: true, count: 'exact' }),
+          supabase.from('chat_rooms').select('id', { head: true, count: 'exact' }),
+          supabase.from('messages').select('id', { head: true, count: 'exact' }),
+          supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(40),
+          supabase.from('payroll_records').select('*').order('created_at', { ascending: false }).limit(80),
+          supabase.from('chat_rooms').select('*').order('created_at', { ascending: false }).limit(80),
+          supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(80),
+        ]);
 
       const rooms = roomRes.data || [];
-      const roomMap = new Map<string, Record<string, any>>(
-        rooms.map((room: Record<string, any>) => [String(room.id), room])
-      );
-
+      const roomMap = new Map<string, Record<string, any>>(rooms.map((room: Record<string, any>) => [String(room.id), room]));
       const payrollItems = (payrollRes.data || []).map((record: Record<string, any>) => {
         const staff = staffMap.get(String(record.staff_id));
         return {
@@ -669,9 +660,7 @@ export async function GET(request: NextRequest) {
         sensitiveStaffs: safeStaffRows,
         recentPayrolls: payrollItems,
         chatRooms: rooms.map((room: Record<string, any>) => normalizeChatRoom(room, staffMap)),
-        recentMessages: (messageRes.data || []).map((message: Record<string, any>) =>
-          normalizeMessage(message, roomMap, staffMap)
-        ),
+        recentMessages: (messageRes.data || []).map((message: Record<string, any>) => normalizeMessage(message, roomMap, staffMap)),
       });
     }
 
@@ -691,28 +680,16 @@ export async function GET(request: NextRequest) {
         .filter((log: Record<string, any>) => category === 'all' || log.category === category)
         .filter((log: Record<string, any>) => matchSearch(log, keyword));
 
-      return NextResponse.json({
-        logs: filtered,
-      });
+      return NextResponse.json({ logs: filtered });
     }
 
     if (scope === 'chats') {
       const [roomRes, messageRes] = await Promise.all([
         supabase.from('chat_rooms').select('*').order('created_at', { ascending: false }),
         (() => {
-          let query = supabase
-            .from('messages')
-            .select('*')
-            .order('created_at', { ascending: false });
-
-          if (roomId) {
-            query = query.eq('room_id', roomId);
-          }
-
-          if (keyword) {
-            query = query.ilike('content', `%${keyword}%`);
-          }
-
+          let query = supabase.from('messages').select('*').order('created_at', { ascending: false });
+          if (roomId) query = query.eq('room_id', roomId);
+          if (keyword) query = query.ilike('content', `%${keyword}%`);
           return query;
         })(),
       ]);
@@ -720,15 +697,12 @@ export async function GET(request: NextRequest) {
       if (roomRes.error) {
         return NextResponse.json({ error: '채팅방 데이터를 불러오는 중 오류가 발생했습니다.' }, { status: 500 });
       }
-
       if (messageRes.error) {
         return NextResponse.json({ error: '메시지 데이터를 불러오는 중 오류가 발생했습니다.' }, { status: 500 });
       }
 
       const rooms = roomRes.data || [];
-      const roomMap = new Map<string, Record<string, any>>(
-        rooms.map((room: Record<string, any>) => [String(room.id), room])
-      );
+      const roomMap = new Map<string, Record<string, any>>(rooms.map((room: Record<string, any>) => [String(room.id), room]));
       const normalizedRooms = rooms
         .map((room: Record<string, any>) => normalizeChatRoom(room, staffMap))
         .sort((left: Record<string, any>, right: Record<string, any>) => {
@@ -741,10 +715,7 @@ export async function GET(request: NextRequest) {
         .filter((message: Record<string, any>) => !keyword || matchSearch(message, keyword))
         .map((message: Record<string, any>) => normalizeMessage(message, roomMap, staffMap));
 
-      return NextResponse.json({
-        rooms: normalizedRooms,
-        messages: filteredMessages,
-      });
+      return NextResponse.json({ rooms: normalizedRooms, messages: filteredMessages });
     }
 
     if (scope === 'operations') {
@@ -755,12 +726,8 @@ export async function GET(request: NextRequest) {
         collectPushQueueHealth(supabase),
       ]);
 
-      if (auditRes.error) {
-        return NextResponse.json({ error: auditRes.error.message }, { status: 500 });
-      }
-      if (staffIdRes.error) {
-        return NextResponse.json({ error: staffIdRes.error.message }, { status: 500 });
-      }
+      if (auditRes.error) return NextResponse.json({ error: auditRes.error.message }, { status: 500 });
+      if (staffIdRes.error) return NextResponse.json({ error: staffIdRes.error.message }, { status: 500 });
 
       const validStaffIds = new Set((staffIdRes.data || []).map((row: { id: string | null }) => String(row.id || '')));
       const subscriptionRes = await supabase.from('push_subscriptions').select('id, staff_id, endpoint');
@@ -777,18 +744,10 @@ export async function GET(request: NextRequest) {
       const nullStaffSubscriptions = subscriptionRows.filter((row) => !String(row.staff_id || '').trim()).length;
 
       const latestBackup = backupRows[0] || null;
-      const backupAgeHours = latestBackup
-        ? (Date.now() - new Date(latestBackup.created_at).getTime()) / (1000 * 60 * 60)
-        : null;
+      const backupAgeHours = latestBackup ? (Date.now() - new Date(latestBackup.created_at).getTime()) / (1000 * 60 * 60) : null;
       const failureItems = [
         queueSummary.deadLettered > 0
-          ? {
-              id: 'chat-push-dead-letter',
-              severity: 'critical',
-              label: '채팅 푸시 Dead Letter',
-              count: queueSummary.deadLettered,
-              detail: '재시도 한도를 넘긴 채팅 푸시 작업이 남아 있습니다.',
-            }
+          ? { id: 'chat-push-dead-letter', severity: 'critical', label: '채팅 푸시 Dead Letter', count: queueSummary.deadLettered, detail: '재시도 한도를 넘긴 채팅 푸시 작업이 남아 있습니다.' }
           : null,
         queueSummary.pending > 0
           ? {
@@ -796,37 +755,17 @@ export async function GET(request: NextRequest) {
               severity: queueSummary.ready > 0 ? 'warning' : 'info',
               label: '대기 중인 채팅 푸시 작업',
               count: queueSummary.pending,
-              detail: queueSummary.oldestPendingAt
-                ? `가장 오래된 작업: ${new Date(queueSummary.oldestPendingAt).toLocaleString('ko-KR')}`
-                : '처리 대기 중인 작업이 있습니다.',
+              detail: queueSummary.oldestPendingAt ? `가장 오래된 작업: ${new Date(queueSummary.oldestPendingAt).toLocaleString('ko-KR')}` : '처리 대기 중인 작업이 있습니다.',
             }
           : null,
         orphanSubscriptions + nullStaffSubscriptions > 0
-          ? {
-              id: 'push-subscription-orphan',
-              severity: 'warning',
-              label: '정리 필요한 푸시 구독',
-              count: orphanSubscriptions + nullStaffSubscriptions,
-              detail: `null staff ${nullStaffSubscriptions}건 · orphan ${orphanSubscriptions}건`,
-            }
+          ? { id: 'push-subscription-orphan', severity: 'warning', label: '정리 필요한 푸시 구독', count: orphanSubscriptions + nullStaffSubscriptions, detail: `null staff ${nullStaffSubscriptions}건 · orphan ${orphanSubscriptions}건` }
           : null,
         duplicateEndpointInfo.duplicateRows > 0
-          ? {
-              id: 'push-subscription-duplicate',
-              severity: 'info',
-              label: '중복 푸시 구독',
-              count: duplicateEndpointInfo.duplicateRows,
-              detail: `${duplicateEndpointInfo.duplicateGroups}개 endpoint 그룹에서 중복이 발견됐습니다.`,
-            }
+          ? { id: 'push-subscription-duplicate', severity: 'info', label: '중복 푸시 구독', count: duplicateEndpointInfo.duplicateRows, detail: `${duplicateEndpointInfo.duplicateGroups}개 endpoint 그룹에서 중복이 발견됐습니다.` }
           : null,
         backupAgeHours !== null && backupAgeHours > 30
-          ? {
-              id: 'backup-stale',
-              severity: 'warning',
-              label: '백업 지연',
-              count: 1,
-              detail: `마지막 로컬 백업이 ${Math.floor(backupAgeHours)}시간 전에 생성됐습니다.`,
-            }
+          ? { id: 'backup-stale', severity: 'warning', label: '백업 지연', count: 1, detail: `마지막 로컬 백업이 ${Math.floor(backupAgeHours)}시간 전에 생성됐습니다.` }
           : null,
       ].filter(Boolean);
 
@@ -920,34 +859,21 @@ export async function DELETE(request: NextRequest) {
 
     const supabase = getAdminClient();
 
-    const { data: room, error: roomError } = await supabase
-      .from('chat_rooms')
-      .select('id')
-      .eq('id', roomId)
-      .maybeSingle();
+    const { data: room, error: roomError } = await supabase.from('chat_rooms').select('id').eq('id', roomId).maybeSingle();
 
     if (roomError) {
       return NextResponse.json({ error: roomError.message }, { status: 500 });
     }
-
     if (!room) {
       return NextResponse.json({ error: 'Chat room not found' }, { status: 404 });
     }
 
-    const { data: messageRows, error: messageRowsError } = await supabase
-      .from('messages')
-      .select('id')
-      .eq('room_id', roomId);
-
+    const { data: messageRows, error: messageRowsError } = await supabase.from('messages').select('id').eq('room_id', roomId);
     if (messageRowsError) {
       return NextResponse.json({ error: messageRowsError.message }, { status: 500 });
     }
 
-    const { data: pollRows, error: pollRowsError } = await supabase
-      .from('polls')
-      .select('id')
-      .eq('room_id', roomId);
-
+    const { data: pollRows, error: pollRowsError } = await supabase.from('polls').select('id').eq('room_id', roomId);
     if (pollRowsError) {
       return NextResponse.json({ error: pollRowsError.message }, { status: 500 });
     }
@@ -966,13 +892,8 @@ export async function DELETE(request: NextRequest) {
         supabase.from('message_bookmarks').delete().in('message_id', messageIds),
       ]);
 
-      if (reactionsError) {
-        return NextResponse.json({ error: reactionsError.message }, { status: 500 });
-      }
-
-      if (bookmarksByMessageError) {
-        return NextResponse.json({ error: bookmarksByMessageError.message }, { status: 500 });
-      }
+      if (reactionsError) return NextResponse.json({ error: reactionsError.message }, { status: 500 });
+      if (bookmarksByMessageError) return NextResponse.json({ error: bookmarksByMessageError.message }, { status: 500 });
     }
 
     const cleanupResults = await Promise.all([
@@ -991,7 +912,6 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { error: deleteRoomError } = await supabase.from('chat_rooms').delete().eq('id', roomId);
-
     if (deleteRoomError) {
       return NextResponse.json({ error: deleteRoomError.message }, { status: 500 });
     }
@@ -1003,10 +923,7 @@ export async function DELETE(request: NextRequest) {
       deletedPollCount: pollIds.length,
     });
   } catch (error) {
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : 'Server error';
+    const message = error instanceof Error && error.message ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
