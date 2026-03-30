@@ -29,7 +29,7 @@ const DEFAULT_SETTINGS: NotifSettings = {
   types: {
     message: true, mention: true, approval: true, payroll: true,
     inventory: true, attendance: true, board: true, 인사: true,
-    education: true, notification: true,
+    education: true, notification: true, todo: true,
   },
 };
 
@@ -64,6 +64,7 @@ const TYPE_CFG: Record<string, { icon: string; bg: string; progress: string; acc
   board: { icon: '📌', bg: 'bg-pink-500', progress: 'bg-pink-400', accent: 'border-pink-400' },
   인사: { icon: '👥', bg: 'bg-cyan-600', progress: 'bg-cyan-400', accent: 'border-cyan-400' },
   education: { icon: '📚', bg: 'bg-purple-500', progress: 'bg-purple-400', accent: 'border-purple-400' },
+  todo: { icon: '🗓️', bg: 'bg-sky-600', progress: 'bg-sky-400', accent: 'border-sky-400' },
   notification: { icon: '🔔', bg: 'bg-[var(--toss-gray-4)]', progress: 'bg-[var(--toss-gray-3)]', accent: 'border-[var(--border)]' },
 };
 const DEFAULT_CFG = { icon: '🔔', bg: 'bg-[var(--toss-gray-4)]', progress: 'bg-[var(--toss-gray-3)]', accent: 'border-[var(--border)]' };
@@ -94,6 +95,18 @@ function timeAgo(ts: number) {
   if (d < 3600) return `${Math.floor(d / 60)}분 전`;
   if (d < 86400) return `${Math.floor(d / 3600)}시간 전`;
   return `${Math.floor(d / 86400)}일 전`;
+}
+
+function isMissingTodoReminderSchema(error: unknown) {
+  const code = String((error as { code?: string } | null)?.code || '').trim();
+  const message = `${String((error as { message?: string } | null)?.message || '')} ${String((error as { details?: string } | null)?.details || '')}`.toLowerCase();
+  return (
+    code === '42P01' ||
+    code === '42703' ||
+    message.includes('todo_reminder_logs') ||
+    message.includes('repeat_parent_id') ||
+    message.includes('reminder_at')
+  );
 }
 
 function setAppBadge(count: number) {
@@ -943,6 +956,92 @@ export default function NotificationSystem({
       void syncBadge();
     };
 
+    const processDueTodoReminders = async () => {
+      try {
+        const nowIso = new Date().toISOString();
+        const { data: dueRows, error: dueError } = await supabase
+          .from('todos')
+          .select('id,content,task_date,reminder_at')
+          .eq('user_id', uid)
+          .eq('is_complete', false)
+          .not('reminder_at', 'is', null)
+          .lte('reminder_at', nowIso)
+          .order('reminder_at', { ascending: true })
+          .limit(20);
+
+        if (dueError) throw dueError;
+
+        const todos = (dueRows || []) as Array<Record<string, unknown>>;
+        if (todos.length === 0) return;
+
+        const todoIds = todos
+          .map((row) => String(row.id || '').trim())
+          .filter(Boolean);
+
+        const { data: logRows, error: logError } = await supabase
+          .from('todo_reminder_logs')
+          .select('todo_id,reminder_at')
+          .eq('user_id', uid)
+          .in('todo_id', todoIds);
+
+        if (logError) throw logError;
+
+        const loggedKeys = new Set(
+          ((logRows || []) as Array<{ todo_id?: string | null; reminder_at?: string | null }>).map(
+            (row) => `${String(row.todo_id || '')}:${String(row.reminder_at || '')}`
+          )
+        );
+
+        for (const row of todos) {
+          const todoId = String(row.id || '').trim();
+          const reminderAt = String(row.reminder_at || '').trim();
+          if (!todoId || !reminderAt) continue;
+
+          const reminderKey = `${todoId}:${reminderAt}`;
+          if (loggedKeys.has(reminderKey)) continue;
+
+          const notification = await insertNoti(
+            {
+              type: 'todo',
+              title: '🗓️ 할일 리마인더',
+              body: `${String(row.content || '할일').trim() || '할일'}${String(row.task_date || '').trim() ? ` · ${String(row.task_date)}` : ''}`,
+              data: {
+                type: 'todo',
+                todo_id: todoId,
+                task_date: row.task_date || null,
+                reminder_at: reminderAt,
+              },
+            },
+            `todo-reminder:${uid}:${todoId}:${reminderAt}`,
+            60_000
+          );
+
+          const { error: writeLogError } = await supabase
+            .from('todo_reminder_logs')
+            .upsert(
+              [
+                {
+                  todo_id: todoId,
+                  user_id: uid,
+                  reminder_at: reminderAt,
+                  notification_id: notification?.id || null,
+                  status: notification?.id ? 'sent' : 'duplicate',
+                  title: '할일 리마인더',
+                  body: String(row.content || '할일'),
+                },
+              ],
+              { onConflict: 'user_id,todo_id,reminder_at' }
+            );
+
+          if (writeLogError) throw writeLogError;
+          loggedKeys.add(reminderKey);
+        }
+      } catch (error) {
+        if (isMissingTodoReminderSchema(error)) return;
+        console.error('todo reminder processing failed:', error);
+      }
+    };
+
     const nTableChannel = supabase.channel(`noti-db-${uid}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` }, (payload: Record<string, unknown>) => {
         emitIncomingNotification(payload.new as Record<string, unknown>);
@@ -951,6 +1050,7 @@ export default function NotificationSystem({
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           void fetchUnreadNotificationsSince(mountedAt);
+          void processDueTodoReminders();
         }
       });
 
@@ -1115,6 +1215,7 @@ export default function NotificationSystem({
 
     // 초기 렌더와 realtime 구독 사이에 들어온 unread 알림을 놓치지 않도록 한 번 더 보강 조회합니다.
     void fetchUnreadNotificationsSince(mountedAt);
+    void processDueTodoReminders();
 
     let quickCatchupPolledAt = mountedAt;
     const unbindQuickCatchup = bindPageRefresh(() => {
@@ -1131,12 +1232,17 @@ export default function NotificationSystem({
       void fetchUnreadNotificationsSince(since);
     }, { intervalMs: 30_000 }); // 5초 → 30초, Realtime이 주 경로이므로 보완용으로만
 
+    const unbindTodoReminderPoll = bindPageRefresh(() => {
+      void processDueTodoReminders();
+    }, { intervalMs: 60_000 });
+
     const unbindHealthcheck = bindChannelHealthcheck(channels, 30_000);
 
     return () => {
       unbindHealthcheck();
       unbindQuickCatchup();
       unbindFallbackPoll();
+      unbindTodoReminderPoll();
       channels.forEach(ch => supabase.removeChannel(ch));
     };
   }, [user?.department, user?.name, user?.permissions?.inventory, claimCrossTabNotificationAsync, effectiveUserId, emitIncomingNotification, syncBadge]);

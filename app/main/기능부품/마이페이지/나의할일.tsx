@@ -23,12 +23,14 @@ type TodoRow = {
   reminder_at?: string | null;
   repeat_type?: TodoRepeatType;
   assignee_kind?: TodoAssigneeKind;
+  repeat_parent_id?: string | null;
+  repeat_generated_from_id?: string | null;
   source_message_id?: string | null;
   source_room_id?: string | null;
   [key: string]: unknown;
 };
 
-const OPTIONAL_TODO_COLUMNS = ['priority', 'reminder_at', 'repeat_type', 'assignee_kind'] as const;
+const OPTIONAL_TODO_COLUMNS = ['priority', 'reminder_at', 'repeat_type', 'assignee_kind', 'repeat_parent_id', 'repeat_generated_from_id'] as const;
 const PRIORITY_OPTIONS: Array<{ value: TodoPriority; label: string }> = [
   { value: 'urgent', label: '긴급' },
   { value: 'high', label: '높음' },
@@ -149,6 +151,46 @@ function formatReminder(value: unknown) {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function getNextTaskDate(taskDate: string, repeatType: TodoRepeatType | undefined) {
+  const baseDate = new Date(`${taskDate}T12:00:00`);
+  if (Number.isNaN(baseDate.getTime())) return null;
+
+  switch (repeatType) {
+    case 'daily':
+      baseDate.setDate(baseDate.getDate() + 1);
+      break;
+    case 'weekly':
+      baseDate.setDate(baseDate.getDate() + 7);
+      break;
+    case 'monthly':
+      baseDate.setMonth(baseDate.getMonth() + 1);
+      break;
+    default:
+      return null;
+  }
+
+  return baseDate.toISOString().slice(0, 10);
+}
+
+function shiftReminderAt(value: string | null | undefined, nextTaskDate: string) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  const [year, month, day] = nextTaskDate.split('-').map((token) => Number.parseInt(token, 10));
+  if (!year || !month || !day) return null;
+
+  const nextReminder = new Date(parsed);
+  nextReminder.setFullYear(year, month - 1, day);
+  return nextReminder.toISOString();
+}
+
+function getRepeatParentId(task: TodoRow) {
+  const raw = String(task.repeat_parent_id || task.id || '').trim();
+  return raw || null;
 }
 
 function normalizeTodoPayload(
@@ -341,6 +383,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
   };
 
   const toggleTask = async (taskId: string | number, currentStatus: boolean) => {
+    const targetTask = tasks.find((task) => String(task.id) === String(taskId)) || null;
     setTasks((prev) =>
       sortTasks(
         prev.map((task) =>
@@ -355,6 +398,66 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
         .update({ is_complete: !currentStatus })
         .eq('id', taskId);
       if (error) throw error;
+
+      if (!currentStatus && effectiveUserId && targetTask && targetTask.repeat_type && targetTask.repeat_type !== 'none') {
+        const nextTaskDate = getNextTaskDate(targetTask.task_date, targetTask.repeat_type);
+        if (nextTaskDate) {
+          const repeatParentId = getRepeatParentId(targetTask);
+
+          let duplicateRows: Array<{ id: string | number }> = [];
+          const duplicateQuery = () =>
+            supabase
+              .from('todos')
+              .select('id')
+              .eq('user_id', effectiveUserId)
+              .eq('task_date', nextTaskDate)
+              .eq('content', targetTask.content)
+              .eq('repeat_type', targetTask.repeat_type)
+              .limit(5);
+
+          const { data: duplicateWithParent, error: duplicateWithParentError } = repeatParentId
+            ? await duplicateQuery().eq('repeat_parent_id', repeatParentId)
+            : await duplicateQuery();
+
+          if (duplicateWithParentError) {
+            const { data: duplicateFallback } = await duplicateQuery();
+            duplicateRows = (duplicateFallback || []) as Array<{ id: string | number }>;
+          } else {
+            duplicateRows = (duplicateWithParent || []) as Array<{ id: string | number }>;
+          }
+
+          if (duplicateRows.length === 0) {
+            const recurringPayload: Record<string, unknown> = {
+              user_id: effectiveUserId,
+              content: targetTask.content,
+              is_complete: false,
+              task_date: nextTaskDate,
+              priority: targetTask.priority || 'medium',
+              reminder_at: shiftReminderAt(targetTask.reminder_at, nextTaskDate),
+              repeat_type: targetTask.repeat_type,
+              assignee_kind: targetTask.assignee_kind || 'self',
+              source_message_id: targetTask.source_message_id || null,
+              source_room_id: targetTask.source_room_id || null,
+              repeat_parent_id: repeatParentId,
+              repeat_generated_from_id: String(targetTask.id),
+            };
+
+            const recurringResult = await withMissingColumnsFallback(
+              (omittedColumns) =>
+                supabase
+                  .from('todos')
+                  .insert([normalizeTodoPayload(recurringPayload, omittedColumns)]),
+              [...OPTIONAL_TODO_COLUMNS]
+            );
+
+            if (recurringResult.error) {
+              throw recurringResult.error;
+            }
+
+            void fetchTasks(effectiveUserId);
+          }
+        }
+      }
     } catch {
       if (effectiveUserId) {
         void fetchTasks(effectiveUserId);

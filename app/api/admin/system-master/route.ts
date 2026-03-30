@@ -202,6 +202,37 @@ function isMissingColumnError(error: any, columnName: string) {
   return code === '42703' && message.includes(columnName.toLowerCase());
 }
 
+function isMissingRelationError(error: any, relationName?: string) {
+  if (!error) return false;
+  const code = String(error?.code || '');
+  const message = String(error?.message || error?.details || '').toLowerCase();
+  return code === '42P01' || (relationName ? message.includes(relationName.toLowerCase()) : false);
+}
+
+async function safeHeadCount(
+  queryFactory: () => PromiseLike<{ count?: number | null; error?: any }>,
+  relationName?: string,
+) {
+  const result = await queryFactory();
+  if (result.error) {
+    if (isMissingRelationError(result.error, relationName)) return 0;
+    throw result.error;
+  }
+  return Number(result.count || 0);
+}
+
+async function safeRows<T>(
+  queryFactory: () => PromiseLike<{ data?: T[] | null; error?: any }>,
+  relationName?: string,
+) {
+  const result = await queryFactory();
+  if (result.error) {
+    if (isMissingRelationError(result.error, relationName)) return [] as T[];
+    throw result.error;
+  }
+  return (result.data || []) as T[];
+}
+
 async function listRecentBackups(limit = 8): Promise<BackupSummaryRow[]> {
   try {
     const backupRoot = path.join(process.cwd(), 'backups');
@@ -719,11 +750,18 @@ export async function GET(request: NextRequest) {
     }
 
     if (scope === 'operations') {
-      const [auditRes, staffIdRes, backupRows, queueSummary] = await Promise.all([
+      const [auditRes, staffIdRes, backupRows, queueSummary, restoreRuns, dueTodoCount, repeatingTodoCount, reminderLogCount24h, wikiDocumentCount, wikiVersionCount, recentWikiVersions] = await Promise.all([
         supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(400),
         supabase.from('staff_members').select('id'),
         listRecentBackups(10),
         collectPushQueueHealth(supabase),
+        safeRows(() => supabase.from('backup_restore_runs').select('id,file_name,status,total_tables,total_rows,requested_by_name,started_at,finished_at,result_summary').order('started_at', { ascending: false }).limit(10), 'backup_restore_runs'),
+        safeHeadCount(() => supabase.from('todos').select('*', { count: 'exact', head: true }).eq('is_complete', false).not('reminder_at', 'is', null).lte('reminder_at', new Date().toISOString()), 'todos'),
+        safeHeadCount(() => supabase.from('todos').select('*', { count: 'exact', head: true }).eq('is_complete', false).neq('repeat_type', 'none'), 'todos'),
+        safeHeadCount(() => supabase.from('todo_reminder_logs').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()), 'todo_reminder_logs'),
+        safeHeadCount(() => supabase.from('wiki_documents').select('*', { count: 'exact', head: true }).eq('is_archived', false), 'wiki_documents'),
+        safeHeadCount(() => supabase.from('wiki_document_versions').select('*', { count: 'exact', head: true }), 'wiki_document_versions'),
+        safeRows(() => supabase.from('wiki_document_versions').select('id,document_id,title,version_no,created_at,change_summary').order('created_at', { ascending: false }).limit(5), 'wiki_document_versions'),
       ]);
 
       if (auditRes.error) return NextResponse.json({ error: auditRes.error.message }, { status: 500 });
@@ -745,6 +783,9 @@ export async function GET(request: NextRequest) {
 
       const latestBackup = backupRows[0] || null;
       const backupAgeHours = latestBackup ? (Date.now() - new Date(latestBackup.created_at).getTime()) / (1000 * 60 * 60) : null;
+      const failedRestoreRuns = (restoreRuns as Array<Record<string, any>>).filter((run) => String(run.status || '') === 'failed');
+      const latestRestoreRun = (restoreRuns as Array<Record<string, any>>)[0] || null;
+      const versionGap = Math.max(0, Number(wikiDocumentCount || 0) - Number(wikiVersionCount || 0));
       const failureItems = [
         queueSummary.deadLettered > 0
           ? { id: 'chat-push-dead-letter', severity: 'critical', label: '채팅 푸시 Dead Letter', count: queueSummary.deadLettered, detail: '재시도 한도를 넘긴 채팅 푸시 작업이 남아 있습니다.' }
@@ -767,6 +808,33 @@ export async function GET(request: NextRequest) {
         backupAgeHours !== null && backupAgeHours > 30
           ? { id: 'backup-stale', severity: 'warning', label: '백업 지연', count: 1, detail: `마지막 로컬 백업이 ${Math.floor(backupAgeHours)}시간 전에 생성됐습니다.` }
           : null,
+        failedRestoreRuns.length > 0
+          ? {
+              id: 'backup-restore-failed',
+              severity: 'warning',
+              label: '백업 복원 실패 이력',
+              count: failedRestoreRuns.length,
+              detail: latestRestoreRun?.started_at ? `최근 복원 시각: ${new Date(String(latestRestoreRun.started_at)).toLocaleString('ko-KR')}` : '최근 복원 작업 중 실패한 이력이 있습니다.',
+            }
+          : null,
+        dueTodoCount > 0
+          ? {
+              id: 'todo-reminder-backlog',
+              severity: 'info',
+              label: '대기 중인 할일 리마인더',
+              count: dueTodoCount,
+              detail: `미완료 리마인더 대상 ${Number(dueTodoCount || 0).toLocaleString('ko-KR')}건이 확인됩니다.`,
+            }
+          : null,
+        versionGap > 0
+          ? {
+              id: 'wiki-version-gap',
+              severity: 'info',
+              label: '버전 기록이 없는 위키 문서',
+              count: versionGap,
+              detail: `문서 ${Number(wikiDocumentCount || 0).toLocaleString('ko-KR')}건 중 버전 기록 ${Number(wikiVersionCount || 0).toLocaleString('ko-KR')}건이 있습니다.`,
+            }
+          : null,
       ].filter(Boolean);
 
       return NextResponse.json({
@@ -780,8 +848,19 @@ export async function GET(request: NextRequest) {
         },
         recentBackups: backupRows,
         latestBackup,
+        restoreRuns,
         cronJobs: OPERATION_CRONS,
         usageSummary: buildUsageSummary(auditRes.data || []),
+        todoAutomation: {
+          dueReminders: dueTodoCount,
+          repeatingOpenTodos: repeatingTodoCount,
+          reminderLogs24h: reminderLogCount24h,
+        },
+        wiki: {
+          documents: wikiDocumentCount,
+          versions: wikiVersionCount,
+          recentVersions: recentWikiVersions,
+        },
         failureItems,
       });
     }

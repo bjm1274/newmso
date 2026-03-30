@@ -16,12 +16,27 @@ type FolderRow = {
 type DocumentRow = {
   id: string;
   folder_id: string;
+  company_id?: string | null;
+  company_name?: string | null;
   title: string;
   summary?: string | null;
   content: string;
   tags?: string[] | null;
   editor_ids?: string[] | null;
   updated_at?: string | null;
+  created_at?: string | null;
+};
+
+type VersionRow = {
+  id: string;
+  document_id: string;
+  version_no: number;
+  title: string;
+  summary?: string | null;
+  content: string;
+  tags?: string[] | null;
+  editor_ids?: string[] | null;
+  change_summary?: string | null;
   created_at?: string | null;
 };
 
@@ -37,6 +52,12 @@ function isMissingWikiSchema(error: unknown) {
   return code === '42P01' || message.includes('wiki_folders') || message.includes('wiki_documents');
 }
 
+function isMissingVersionSchema(error: unknown) {
+  const code = String((error as { code?: string } | null)?.code || '').trim();
+  const message = `${String((error as { message?: string } | null)?.message || '')} ${String((error as { details?: string } | null)?.details || '')}`.toLowerCase();
+  return code === '42P01' || message.includes('wiki_document_versions');
+}
+
 function parseTags(value: string) {
   return Array.from(new Set(value.split(',').map((tag) => tag.trim()).filter(Boolean)));
 }
@@ -46,20 +67,31 @@ function formatDate(value: unknown) {
   if (!raw) return '';
   const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) return '';
-  return parsed.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  return parsed.toLocaleString('ko-KR', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export default function WikiDashboard({ user: initialUser, selectedCo, selectedCompanyId }: Props) {
-  const normalizedUser = useMemo(() => normalizeStaffLike((initialUser ?? {}) as Record<string, unknown>), [initialUser]);
+  const normalizedUser = useMemo(
+    () => normalizeStaffLike((initialUser ?? {}) as Record<string, unknown>),
+    [initialUser]
+  );
   const [user, setUser] = useState<Record<string, unknown>>(normalizedUser);
   const [folders, setFolders] = useState<FolderRow[]>([]);
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
+  const [versions, setVersions] = useState<VersionRow[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loadingVersions, setLoadingVersions] = useState(false);
   const [schemaReady, setSchemaReady] = useState(true);
+  const [versionSchemaReady, setVersionSchemaReady] = useState(true);
   const [title, setTitle] = useState('');
   const [summary, setSummary] = useState('');
   const [content, setContent] = useState('');
@@ -85,20 +117,27 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
   }, [normalizedUser]);
 
   const effectiveUserId = getStaffLikeId(user);
-  const userPermissions = (user?.permissions as Record<string, unknown> | null | undefined) || null;
-  const isMsoUser = user?.company === 'SY INC.' || userPermissions?.mso === true;
-  const scopeCompanyId = isMsoUser ? String(selectedCompanyId || '').trim() || null : String(user?.company_id || '').trim() || null;
+  const permissions = (user?.permissions as Record<string, unknown> | null | undefined) || null;
+  const isMsoUser = user?.company === 'SY INC.' || permissions?.mso === true;
+  const scopeCompanyId = isMsoUser
+    ? String(selectedCompanyId || '').trim() || null
+    : String(user?.company_id || '').trim() || null;
   const scopeCompanyName = isMsoUser
     ? (() => {
-        const companyName = String(selectedCo || '').trim();
-        return companyName && companyName !== '전체' ? companyName : null;
+        const name = String(selectedCo || '').trim();
+        return name && name !== '전체' ? name : null;
       })()
     : String(user?.company || '').trim() || null;
 
   const refreshWiki = useCallback(async () => {
     try {
       setLoading(true);
-      let folderQuery = supabase.from('wiki_folders').select('*').eq('is_archived', false).order('sort_order', { ascending: true }).order('created_at', { ascending: true });
+      let folderQuery = supabase
+        .from('wiki_folders')
+        .select('*')
+        .eq('is_archived', false)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true });
       if (scopeCompanyId) folderQuery = folderQuery.or(`company_id.is.null,company_id.eq.${scopeCompanyId}`);
       else if (scopeCompanyName) folderQuery = folderQuery.or(`company_id.is.null,company_name.eq.${scopeCompanyName}`);
 
@@ -106,6 +145,7 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
       if (folderError) throw folderError;
       const nextFolders = (folderRows || []) as FolderRow[];
       const folderIds = nextFolders.map((folder) => folder.id);
+
       let nextDocuments: DocumentRow[] = [];
       if (folderIds.length > 0) {
         const { data: documentRows, error: documentError } = await supabase
@@ -117,6 +157,7 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
         if (documentError) throw documentError;
         nextDocuments = (documentRows || []) as DocumentRow[];
       }
+
       setSchemaReady(true);
       setFolders(nextFolders);
       setDocuments(nextDocuments);
@@ -128,32 +169,50 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
         return;
       }
       console.error('wiki load failed:', error);
-      toast('사내위키를 불러오지 못했습니다.', 'error');
+      toast('Wiki load failed.', 'error');
     } finally {
       setLoading(false);
     }
   }, [scopeCompanyId, scopeCompanyName]);
 
+  const loadVersions = useCallback(async (documentId: string | null) => {
+    if (!documentId) {
+      setVersions([]);
+      return;
+    }
+
+    try {
+      setLoadingVersions(true);
+      const { data, error } = await supabase
+        .from('wiki_document_versions')
+        .select('*')
+        .eq('document_id', documentId)
+        .order('version_no', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      setVersionSchemaReady(true);
+      setVersions((data || []) as VersionRow[]);
+    } catch (error) {
+      if (isMissingVersionSchema(error)) {
+        setVersionSchemaReady(false);
+        setVersions([]);
+        return;
+      }
+      console.error('wiki version load failed:', error);
+      toast('Version history load failed.', 'error');
+    } finally {
+      setLoadingVersions(false);
+    }
+  }, []);
+
   useEffect(() => {
     void refreshWiki();
   }, [refreshWiki]);
 
-  useEffect(() => {
-    if (!schemaReady) return;
-    const channel = supabase
-      .channel(`wiki-${scopeCompanyId || scopeCompanyName || 'shared'}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'wiki_folders' }, () => { void refreshWiki(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'wiki_documents' }, () => { void refreshWiki(); })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [refreshWiki, schemaReady, scopeCompanyId, scopeCompanyName]);
-
   const docsByFolder = useMemo(() => {
     const map = new Map<string, DocumentRow[]>();
     documents.forEach((document) => {
-      const current = map.get(document.folder_id) || [];
-      current.push(document);
-      map.set(document.folder_id, current);
+      map.set(document.folder_id, [...(map.get(document.folder_id) || []), document]);
     });
     return map;
   }, [documents]);
@@ -162,18 +221,16 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
     const keyword = search.trim().toLowerCase();
     return folders
       .map((folder) => {
-        const rows = docsByFolder.get(folder.id) || [];
-        const filtered = keyword
-          ? rows.filter((document) =>
-              [folder.name, document.title, document.summary, document.content, ...(document.tags || [])]
-                .map((value) => String(value || '').toLowerCase())
-                .join(' ')
-                .includes(keyword)
-            )
-          : rows;
-        return keyword && filtered.length === 0 && !folder.name.toLowerCase().includes(keyword)
-          ? null
-          : { folder, documents: filtered };
+        const folderDocs = docsByFolder.get(folder.id) || [];
+        if (!keyword || folder.name.toLowerCase().includes(keyword)) {
+          return { folder, documents: folderDocs };
+        }
+        const filtered = folderDocs.filter((document) =>
+          [document.title, document.summary, document.content, ...(document.tags || [])]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(keyword))
+        );
+        return filtered.length > 0 ? { folder, documents: filtered } : null;
       })
       .filter(Boolean) as Array<{ folder: FolderRow; documents: DocumentRow[] }>;
   }, [docsByFolder, folders, search]);
@@ -187,8 +244,14 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
     }
   }, [documents, filteredFolders, folders, selectedDocId, selectedFolderId]);
 
-  const selectedDocument = useMemo(() => documents.find((document) => document.id === selectedDocId) || null, [documents, selectedDocId]);
-  const selectedFolder = useMemo(() => folders.find((folder) => folder.id === (selectedDocument?.folder_id || selectedFolderId)) || null, [folders, selectedDocument?.folder_id, selectedFolderId]);
+  const selectedDocument = useMemo(
+    () => documents.find((document) => document.id === selectedDocId) || null,
+    [documents, selectedDocId]
+  );
+  const selectedFolder = useMemo(
+    () => folders.find((folder) => folder.id === (selectedDocument?.folder_id || selectedFolderId)) || null,
+    [folders, selectedDocument?.folder_id, selectedFolderId]
+  );
 
   useEffect(() => {
     if (!selectedDocument) {
@@ -197,106 +260,168 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
       setContent('');
       setTags('');
       setDirty(false);
+      setVersions([]);
       return;
     }
-    setSelectedFolderId(selectedDocument.folder_id);
     setTitle(selectedDocument.title || '');
     setSummary(selectedDocument.summary || '');
     setContent(selectedDocument.content || '');
     setTags(Array.isArray(selectedDocument.tags) ? selectedDocument.tags.join(', ') : '');
     setDirty(false);
-  }, [selectedDocument?.id, selectedDocument?.updated_at]);
+    void loadVersions(selectedDocument.id);
+  }, [loadVersions, selectedDocument?.id, selectedDocument?.updated_at]);
 
   const createFolder = useCallback(async () => {
-    const name = await openPrompt({ title: '새 폴더', description: '사내위키 폴더 이름을 입력해 주세요.', confirmText: '생성', cancelText: '취소', required: true, placeholder: '폴더 이름' });
+    const name = await openPrompt({ title: 'New Folder', description: 'Enter folder name.', confirmText: 'Create', cancelText: 'Cancel', required: true, placeholder: 'Folder name' });
     if (!name?.trim()) return;
-    const { data, error } = await supabase.from('wiki_folders').insert({
-      name: name.trim(),
-      company_id: scopeCompanyId,
-      company_name: scopeCompanyName || '전체',
-      sort_order: folders.length,
-      created_by: effectiveUserId || null,
-      updated_by: effectiveUserId || null,
-    }).select().single();
-    if (error) return void toast('폴더를 만들지 못했습니다.', 'error');
+    const { data, error } = await supabase
+      .from('wiki_folders')
+      .insert({ name: name.trim(), company_id: scopeCompanyId, company_name: scopeCompanyName || 'All', sort_order: folders.length, created_by: effectiveUserId || null, updated_by: effectiveUserId || null })
+      .select()
+      .single();
+    if (error) return void toast('Folder create failed.', 'error');
     setSelectedFolderId((data as FolderRow).id);
-    toast('폴더를 만들었습니다.', 'success');
     void refreshWiki();
   }, [effectiveUserId, folders.length, openPrompt, refreshWiki, scopeCompanyId, scopeCompanyName]);
 
   const createDocument = useCallback(async (folderId?: string | null) => {
     const nextFolderId = folderId || selectedFolderId;
-    if (!nextFolderId) return void toast('먼저 폴더를 선택해 주세요.', 'warning');
-    const name = await openPrompt({ title: '새 문서', description: '문서 제목을 입력해 주세요.', confirmText: '생성', cancelText: '취소', required: true, placeholder: '문서 제목' });
+    if (!nextFolderId) return;
+    const name = await openPrompt({ title: 'New Document', description: 'Enter document title.', confirmText: 'Create', cancelText: 'Cancel', required: true, placeholder: 'Document title' });
     if (!name?.trim()) return;
     const folder = folders.find((item) => item.id === nextFolderId) || null;
-    const { data, error } = await supabase.from('wiki_documents').insert({
-      folder_id: nextFolderId,
-      company_id: folder?.company_id ?? scopeCompanyId,
-      company_name: folder?.company_name ?? scopeCompanyName ?? '전체',
-      title: name.trim(),
-      summary: null,
-      content: '',
-      tags: [],
-      editor_ids: effectiveUserId ? [effectiveUserId] : [],
-      created_by: effectiveUserId || null,
-      updated_by: effectiveUserId || null,
-    }).select().single();
-    if (error) return void toast('문서를 만들지 못했습니다.', 'error');
+    const { data, error } = await supabase
+      .from('wiki_documents')
+      .insert({
+        folder_id: nextFolderId,
+        company_id: folder?.company_id ?? scopeCompanyId,
+        company_name: folder?.company_name ?? scopeCompanyName ?? 'All',
+        title: name.trim(),
+        summary: null,
+        content: '',
+        tags: [],
+        editor_ids: effectiveUserId ? [effectiveUserId] : [],
+        created_by: effectiveUserId || null,
+        updated_by: effectiveUserId || null,
+      })
+      .select()
+      .single();
+    if (error) return void toast('Document create failed.', 'error');
     setSelectedDocId((data as DocumentRow).id);
-    setSelectedFolderId(nextFolderId);
-    toast('문서를 만들었습니다.', 'success');
     void refreshWiki();
   }, [effectiveUserId, folders, openPrompt, refreshWiki, scopeCompanyId, scopeCompanyName, selectedFolderId]);
 
-  const deleteFolder = useCallback(async (folder: FolderRow) => {
-    const confirmed = await openConfirm({ title: '폴더 삭제', description: `문서 ${(docsByFolder.get(folder.id) || []).length}건도 함께 삭제됩니다.`, confirmText: '삭제', cancelText: '취소', tone: 'danger' });
-    if (!confirmed) return;
-    const { error } = await supabase.from('wiki_folders').delete().eq('id', folder.id);
-    if (error) return void toast('폴더를 삭제하지 못했습니다.', 'error');
-    toast('폴더를 삭제했습니다.', 'success');
-    if (selectedFolderId === folder.id) setSelectedFolderId(null);
-    if (selectedDocument?.folder_id === folder.id) setSelectedDocId(null);
-    void refreshWiki();
-  }, [docsByFolder, openConfirm, refreshWiki, selectedDocument?.folder_id, selectedFolderId]);
-
-  const deleteDocument = useCallback(async (document: DocumentRow) => {
-    const confirmed = await openConfirm({ title: '문서 삭제', description: '삭제 후 바로 복구되지는 않습니다.', confirmText: '삭제', cancelText: '취소', tone: 'danger' });
-    if (!confirmed) return;
-    const { error } = await supabase.from('wiki_documents').delete().eq('id', document.id);
-    if (error) return void toast('문서를 삭제하지 못했습니다.', 'error');
-    toast('문서를 삭제했습니다.', 'success');
-    if (selectedDocId === document.id) setSelectedDocId(null);
-    void refreshWiki();
-  }, [openConfirm, refreshWiki, selectedDocId]);
-
   const saveDocument = useCallback(async () => {
-    if (!selectedDocument) return;
-    if (!title.trim()) return void toast('문서 제목을 입력해 주세요.', 'warning');
+    if (!selectedDocument || !title.trim()) return;
     try {
       setSaving(true);
       const editorIds = Array.from(new Set([...(selectedDocument.editor_ids || []), ...(effectiveUserId ? [effectiveUserId] : [])].filter(Boolean)));
-      const { data, error } = await supabase.from('wiki_documents').update({
-        title: title.trim(),
-        summary: summary.trim() || null,
-        content,
-        tags: parseTags(tags),
-        editor_ids: editorIds,
-        updated_by: effectiveUserId || null,
-      }).eq('id', selectedDocument.id).select().single();
+      const { data, error } = await supabase
+        .from('wiki_documents')
+        .update({ title: title.trim(), summary: summary.trim() || null, content, tags: parseTags(tags), editor_ids: editorIds, updated_by: effectiveUserId || null })
+        .eq('id', selectedDocument.id)
+        .select()
+        .single();
       if (error) throw error;
       const next = data as DocumentRow;
-      setDocuments((prev) => prev.map((document) => document.id === next.id ? next : document));
-      setSelectedDocId(next.id);
+      setDocuments((prev) => prev.map((document) => (document.id === next.id ? next : document)));
+
+      const { data: latestRows } = await supabase
+        .from('wiki_document_versions')
+        .select('version_no')
+        .eq('document_id', next.id)
+        .order('version_no', { ascending: false })
+        .limit(1);
+      const nextVersionNo = Number((latestRows || [])[0]?.version_no || 0) + 1;
+      await supabase.from('wiki_document_versions').insert({
+        document_id: next.id,
+        version_no: nextVersionNo,
+        title: next.title,
+        summary: next.summary || null,
+        content: next.content || '',
+        tags: Array.isArray(next.tags) ? next.tags : [],
+        editor_ids: Array.isArray(next.editor_ids) ? next.editor_ids : [],
+        company_id: next.company_id ?? scopeCompanyId,
+        company_name: next.company_name ?? scopeCompanyName ?? 'All',
+        change_summary: 'Saved from wiki editor',
+        created_by: effectiveUserId || null,
+      });
       setDirty(false);
-      toast('문서를 저장했습니다.', 'success');
+      void loadVersions(next.id);
     } catch (error) {
       console.error('wiki save failed:', error);
-      toast('문서를 저장하지 못했습니다.', 'error');
+      toast('Document save failed.', 'error');
     } finally {
       setSaving(false);
     }
-  }, [content, effectiveUserId, selectedDocument, summary, tags, title]);
+  }, [content, effectiveUserId, loadVersions, scopeCompanyId, scopeCompanyName, selectedDocument, summary, tags, title]);
+
+  const restoreVersion = useCallback(async (version: VersionRow) => {
+    if (!selectedDocument) return;
+    const confirmed = await openConfirm({
+      title: `Restore v${version.version_no}`,
+      description: 'Replace the current document with this saved version?',
+      confirmText: 'Restore',
+      cancelText: 'Cancel',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+
+    try {
+      setSaving(true);
+      const editorIds = Array.from(
+        new Set([...(version.editor_ids || []), ...(effectiveUserId ? [effectiveUserId] : [])].filter(Boolean))
+      );
+      const { data, error } = await supabase
+        .from('wiki_documents')
+        .update({
+          title: version.title,
+          summary: version.summary || null,
+          content: version.content || '',
+          tags: Array.isArray(version.tags) ? version.tags : [],
+          editor_ids: editorIds,
+          updated_by: effectiveUserId || null,
+        })
+        .eq('id', selectedDocument.id)
+        .select()
+        .single();
+      if (error) throw error;
+      const restored = data as DocumentRow;
+      setDocuments((prev) => prev.map((document) => (document.id === restored.id ? restored : document)));
+      setTitle(restored.title);
+      setSummary(restored.summary || '');
+      setContent(restored.content || '');
+      setTags(Array.isArray(restored.tags) ? restored.tags.join(', ') : '');
+      const { data: latestRows } = await supabase
+        .from('wiki_document_versions')
+        .select('version_no')
+        .eq('document_id', restored.id)
+        .order('version_no', { ascending: false })
+        .limit(1);
+      const nextVersionNo = Number((latestRows || [])[0]?.version_no || 0) + 1;
+      await supabase.from('wiki_document_versions').insert({
+        document_id: restored.id,
+        version_no: nextVersionNo,
+        title: restored.title,
+        summary: restored.summary || null,
+        content: restored.content || '',
+        tags: Array.isArray(restored.tags) ? restored.tags : [],
+        editor_ids: Array.isArray(restored.editor_ids) ? restored.editor_ids : [],
+        company_id: restored.company_id ?? scopeCompanyId,
+        company_name: restored.company_name ?? scopeCompanyName ?? 'All',
+        change_summary: `Restored v${version.version_no}`,
+        created_by: effectiveUserId || null,
+      });
+      void loadVersions(restored.id);
+      setDirty(false);
+      toast(`Restored v${version.version_no}.`, 'success');
+    } catch (error) {
+      console.error('wiki restore failed:', error);
+      toast('Version restore failed.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  }, [effectiveUserId, loadVersions, openConfirm, scopeCompanyId, scopeCompanyName, selectedDocument]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--card)] shadow-sm md:flex-row">
@@ -306,47 +431,32 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">Company Wiki</p>
-              <h2 className="mt-1 text-lg font-bold text-[var(--foreground)]">사내위키</h2>
+              <h2 className="mt-1 text-lg font-bold text-[var(--foreground)]">Wiki</h2>
             </div>
-            <button type="button" onClick={() => void createFolder()} className="rounded-[14px] bg-[var(--foreground)] px-3 py-2 text-[11px] font-bold text-white">+ 폴더</button>
+            <button type="button" onClick={() => void createFolder()} className="rounded-[14px] bg-[var(--foreground)] px-3 py-2 text-[11px] font-bold text-white">+ Folder</button>
           </div>
           <div className="flex gap-2">
-            <input type="text" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="문서 검색" className="h-11 flex-1 rounded-[16px] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]" />
-            <button type="button" onClick={() => void createDocument()} className="rounded-[16px] border border-[var(--border)] bg-[var(--card)] px-3 text-[11px] font-bold text-[var(--accent)]">+ 문서</button>
+            <input type="text" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search docs" className="h-11 flex-1 rounded-[16px] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]" />
+            <button type="button" onClick={() => void createDocument()} className="rounded-[16px] border border-[var(--border)] bg-[var(--card)] px-3 text-[11px] font-bold text-[var(--accent)]">+ Doc</button>
           </div>
         </div>
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 custom-scrollbar">
-          {!schemaReady ? (
-            <div className="rounded-[20px] border border-amber-200 bg-amber-50 p-4 text-[12px] font-semibold text-amber-700">`20260330_wiki_todo_foundation.sql` 적용이 필요합니다.</div>
-          ) : loading ? (
-            <div className="flex justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--border)] border-t-[var(--accent)]" /></div>
-          ) : filteredFolders.length > 0 ? (
-            filteredFolders.map(({ folder, documents: folderDocs }) => (
-              <section key={folder.id} className={`rounded-[18px] border p-2 ${selectedFolder?.id === folder.id ? 'border-[var(--accent)]/30 bg-[var(--accent)]/5' : 'border-[var(--border)] bg-[var(--card)]'}`}>
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => setSelectedFolderId(folder.id)} className="min-w-0 flex-1 rounded-[12px] px-2 py-2 text-left hover:bg-[var(--muted)]">
-                    <p className="truncate text-[13px] font-bold text-[var(--foreground)]">{folder.name}</p>
-                    <p className="text-[11px] font-medium text-[var(--toss-gray-3)]">{folderDocs.length}개 문서</p>
+          {!schemaReady ? <div className="rounded-[20px] border border-amber-200 bg-amber-50 p-4 text-[12px] font-semibold text-amber-700">Wiki migration required.</div> : loading ? <div className="flex justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--border)] border-t-[var(--accent)]" /></div> : filteredFolders.length > 0 ? filteredFolders.map(({ folder, documents: folderDocs }) => (
+            <section key={folder.id} className={`rounded-[18px] border p-2 ${selectedFolder?.id === folder.id ? 'border-[var(--accent)]/30 bg-[var(--accent)]/5' : 'border-[var(--border)] bg-[var(--card)]'}`}>
+              <button type="button" onClick={() => setSelectedFolderId(folder.id)} className="w-full rounded-[12px] px-2 py-2 text-left hover:bg-[var(--muted)]">
+                <p className="truncate text-[13px] font-bold text-[var(--foreground)]">{folder.name}</p>
+                <p className="text-[11px] font-medium text-[var(--toss-gray-3)]">{folderDocs.length} docs</p>
+              </button>
+              <div className="mt-2 space-y-1 border-l border-[var(--border)] pl-3">
+                {folderDocs.map((document) => (
+                  <button key={document.id} type="button" onClick={() => { setSelectedFolderId(folder.id); setSelectedDocId(document.id); }} className={`block w-full rounded-[12px] px-3 py-2 text-left ${selectedDocId === document.id ? 'bg-[var(--accent)] text-white' : 'hover:bg-[var(--muted)]'}`}>
+                    <p className={`truncate text-[12px] font-bold ${selectedDocId === document.id ? 'text-white' : 'text-[var(--foreground)]'}`}>{document.title}</p>
+                    <p className={`mt-1 truncate text-[11px] font-medium ${selectedDocId === document.id ? 'text-white/80' : 'text-[var(--toss-gray-3)]'}`}>{document.summary || 'No summary'}</p>
                   </button>
-                  <button type="button" onClick={() => void createDocument(folder.id)} className="rounded-[10px] px-2 py-1 text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]">+ 문서</button>
-                </div>
-                <div className="mt-2 space-y-1 border-l border-[var(--border)] pl-3">
-                  {folderDocs.length > 0 ? folderDocs.map((document) => (
-                    <div key={document.id} className="flex items-center gap-2">
-                      <button type="button" onClick={() => { setSelectedFolderId(folder.id); setSelectedDocId(document.id); }} className={`min-w-0 flex-1 rounded-[12px] px-3 py-2 text-left ${selectedDocId === document.id ? 'bg-[var(--accent)] text-white' : 'hover:bg-[var(--muted)]'}`}>
-                        <p className={`truncate text-[12px] font-bold ${selectedDocId === document.id ? 'text-white' : 'text-[var(--foreground)]'}`}>{document.title}</p>
-                        <p className={`mt-1 truncate text-[11px] font-medium ${selectedDocId === document.id ? 'text-white/80' : 'text-[var(--toss-gray-3)]'}`}>{document.summary || '요약 없음'}</p>
-                      </button>
-                      <button type="button" onClick={() => void deleteDocument(document)} className="rounded-[10px] px-2 py-1 text-[11px] font-bold text-[var(--toss-gray-3)] hover:bg-red-50 hover:text-red-600">삭제</button>
-                    </div>
-                  )) : <button type="button" onClick={() => void createDocument(folder.id)} className="w-full rounded-[12px] border border-dashed border-[var(--border)] px-3 py-3 text-left text-[11px] font-bold text-[var(--toss-gray-3)]">첫 문서 만들기</button>}
-                </div>
-                <button type="button" onClick={() => void deleteFolder(folder)} className="mt-2 rounded-[10px] px-2 py-1 text-[11px] font-bold text-red-500 hover:bg-red-50">폴더 삭제</button>
-              </section>
-            ))
-          ) : (
-            <div className="rounded-[20px] border-2 border-dashed border-[var(--border)] px-4 py-10 text-center text-[12px] font-medium text-[var(--toss-gray-3)]">폴더와 문서를 만들어 위키를 시작해 보세요.</div>
-          )}
+                ))}
+              </div>
+            </section>
+          )) : <div className="rounded-[20px] border-2 border-dashed border-[var(--border)] px-4 py-10 text-center text-[12px] font-medium text-[var(--toss-gray-3)]">Create a folder and document to start.</div>}
         </div>
       </aside>
       <section className="flex min-h-0 flex-1 flex-col bg-[var(--card)]">
@@ -354,25 +464,30 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
           <>
             <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">{selectedFolder?.name || '문서'}</p>
-                <h3 className="mt-1 text-xl font-bold text-[var(--foreground)]">{selectedDocument.title}</h3>
-                <p className="mt-1 text-[12px] font-medium text-[var(--toss-gray-3)]">마지막 수정 {formatDate(selectedDocument.updated_at || selectedDocument.created_at) || '방금'}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">{selectedFolder?.name || 'Document'}</p>
+                <h3 className="mt-1 text-xl font-bold text-[var(--foreground)]">{title || selectedDocument.title}</h3>
+                <p className="mt-1 text-[12px] font-medium text-[var(--toss-gray-3)]">Updated {formatDate(selectedDocument.updated_at || selectedDocument.created_at) || 'now'}</p>
               </div>
-              <button type="button" onClick={() => void saveDocument()} disabled={saving || !dirty} className="rounded-[14px] bg-[var(--accent)] px-3 py-2 text-[11px] font-bold text-white disabled:opacity-50">{saving ? '저장중...' : dirty ? '저장' : '저장됨'}</button>
+              <button type="button" onClick={() => void saveDocument()} disabled={saving || !dirty} className="rounded-[14px] bg-[var(--accent)] px-3 py-2 text-[11px] font-bold text-white disabled:opacity-50">{saving ? 'Saving...' : dirty ? 'Save' : 'Saved'}</button>
             </header>
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 custom-scrollbar">
-              <div className="mx-auto flex max-w-4xl flex-col gap-4">
-                <input value={title} onChange={(event) => { setTitle(event.target.value); setDirty(true); }} placeholder="문서 제목" className="h-12 rounded-[18px] border border-[var(--border)] bg-[var(--input-bg)] px-4 text-[16px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]" />
-                <input value={summary} onChange={(event) => { setSummary(event.target.value); setDirty(true); }} placeholder="한 줄 요약" className="h-12 rounded-[18px] border border-[var(--border)] bg-[var(--input-bg)] px-4 text-[13px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]" />
-                <input value={tags} onChange={(event) => { setTags(event.target.value); setDirty(true); }} placeholder="태그를 쉼표로 구분해 입력" className="h-12 rounded-[18px] border border-[var(--border)] bg-[var(--input-bg)] px-4 text-[13px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]" />
-                <textarea value={content} onChange={(event) => { setContent(event.target.value); setDirty(true); }} placeholder="# 제목&#10;&#10;- 절차&#10;- 참고사항" className="min-h-[420px] rounded-[22px] border border-[var(--border)] bg-[var(--input-bg)] px-4 py-4 text-[14px] font-medium leading-7 text-[var(--foreground)] outline-none focus:border-[var(--accent)]" />
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-[var(--border)] bg-[var(--muted)]/60 px-4 py-3">
-                  <div className="flex flex-wrap gap-2">
-                    {parseTags(tags).map((tag) => <span key={tag} className="rounded-full bg-[var(--card)] px-2.5 py-1 text-[11px] font-bold text-[var(--accent)]">#{tag}</span>)}
-                    {parseTags(tags).length === 0 ? <span className="text-[11px] font-medium text-[var(--toss-gray-3)]">태그를 넣으면 검색이 쉬워집니다.</span> : null}
-                  </div>
-                  <button type="button" onClick={() => void deleteDocument(selectedDocument)} className="rounded-[12px] px-3 py-2 text-[11px] font-bold text-red-500 hover:bg-red-50">문서 삭제</button>
+              <div className="mx-auto grid max-w-6xl gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+                <div className="flex min-h-0 flex-col gap-4">
+                  <input value={title} onChange={(event) => { setTitle(event.target.value); setDirty(true); }} placeholder="Title" className="h-12 rounded-[18px] border border-[var(--border)] bg-[var(--input-bg)] px-4 text-[16px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]" />
+                  <input value={summary} onChange={(event) => { setSummary(event.target.value); setDirty(true); }} placeholder="Summary" className="h-12 rounded-[18px] border border-[var(--border)] bg-[var(--input-bg)] px-4 text-[13px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]" />
+                  <input value={tags} onChange={(event) => { setTags(event.target.value); setDirty(true); }} placeholder="tag1, tag2" className="h-12 rounded-[18px] border border-[var(--border)] bg-[var(--input-bg)] px-4 text-[13px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]" />
+                  <textarea value={content} onChange={(event) => { setContent(event.target.value); setDirty(true); }} placeholder="# Title&#10;&#10;- Notes" className="min-h-[420px] rounded-[22px] border border-[var(--border)] bg-[var(--input-bg)] px-4 py-4 text-[14px] font-medium leading-7 text-[var(--foreground)] outline-none focus:border-[var(--accent)]" />
                 </div>
+                <aside className="rounded-[22px] border border-[var(--border)] bg-[var(--background)]/40 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">Version History</p>
+                      <h4 className="mt-1 text-sm font-black text-[var(--foreground)]">Versions</h4>
+                    </div>
+                    <span className="rounded-full bg-[var(--card)] px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-4)]">{versions.length}</span>
+                  </div>
+                  {!versionSchemaReady ? <div className="mt-4 rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] font-semibold text-amber-700">Advanced wiki migration required.</div> : loadingVersions ? <div className="mt-6 flex justify-center"><div className="h-7 w-7 animate-spin rounded-full border-4 border-[var(--border)] border-t-[var(--accent)]" /></div> : versions.length > 0 ? <div className="mt-4 space-y-2">{versions.map((version) => <article key={version.id} className="rounded-[16px] border border-[var(--border)] bg-[var(--card)] p-3"><div className="flex items-start justify-between gap-2"><div><p className="text-[12px] font-black text-[var(--foreground)]">v{version.version_no}</p><p className="mt-1 text-[11px] font-medium text-[var(--toss-gray-3)]">{formatDate(version.created_at) || 'now'}</p></div><button type="button" onClick={() => void restoreVersion(version)} className="rounded-[10px] border border-[var(--border)] px-2 py-1 text-[10px] font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]">Restore</button></div><p className="mt-2 truncate text-[12px] font-semibold text-[var(--foreground)]">{version.title}</p><p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{version.change_summary || 'Saved snapshot'}</p></article>)}</div> : <div className="mt-4 rounded-[16px] border border-dashed border-[var(--border)] px-4 py-8 text-center text-[12px] font-medium text-[var(--toss-gray-3)]">No saved versions yet.</div>}
+                </aside>
               </div>
             </div>
           </>
@@ -380,16 +495,12 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
             <div className="rounded-full bg-[var(--toss-blue-light)] p-4 text-3xl">📚</div>
             <div>
-              <h3 className="text-xl font-bold text-[var(--foreground)]">문서를 선택해 주세요.</h3>
-              <p className="mt-2 text-[13px] font-medium text-[var(--toss-gray-3)]">운영 매뉴얼, 온보딩 자료, 팀 지식을 문서로 남길 수 있습니다.</p>
-            </div>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => void createFolder()} className="rounded-[14px] border border-[var(--border)] px-4 py-2 text-[12px] font-bold text-[var(--foreground)]">폴더 만들기</button>
-              <button type="button" onClick={() => void createDocument(selectedFolderId)} className="rounded-[14px] bg-[var(--accent)] px-4 py-2 text-[12px] font-bold text-white">문서 만들기</button>
+              <h3 className="text-xl font-bold text-[var(--foreground)]">Select a document.</h3>
+              <p className="mt-2 text-[13px] font-medium text-[var(--toss-gray-3)]">Team knowledge, manuals, and notes can live here.</p>
             </div>
           </div>
         ) : (
-          <div className="flex flex-1 items-center justify-center px-6 text-center text-[13px] font-medium text-amber-700">위키 테이블이 아직 없어 `20260330_wiki_todo_foundation.sql` 적용이 필요합니다.</div>
+          <div className="flex flex-1 items-center justify-center px-6 text-center text-[13px] font-medium text-amber-700">Wiki migration required.</div>
         )}
       </section>
     </div>
