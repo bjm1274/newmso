@@ -553,7 +553,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     >
       <div className="flex w-full max-h-[34vh] shrink-0 flex-col border-[var(--border)] md:sticky md:top-0 md:max-h-[calc(100vh-8rem)] md:min-w-[200px] md:self-start md:w-[200px] md:border-r lg:w-[216px]">
         <div className="p-4 border-b border-[var(--border)] bg-[var(--muted)]">
-          <h3 className="text-sm font-semibold text-[var(--foreground)]">吏곸썝 紐낅떒</h3>
+          <h3 className="text-sm font-semibold text-[var(--foreground)]">직원 명단</h3>
         </div>
         <div className="flex-1 overflow-y-auto bg-[var(--muted)]/40">
           <div className="space-y-2 p-2">

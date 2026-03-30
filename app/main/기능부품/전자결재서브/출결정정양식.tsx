@@ -214,6 +214,27 @@ export default function AttendanceCorrectionForm({
         const attendances = attendancesByDate.get(dateStr);
         const status = attendances?.status;
 
+        // 정상 출근: "present" 상태만으로 확정하지 않고 실제 출근 기록도 함께 본다.
+        if (status === 'present') {
+          if (attendance?.check_in) continue;
+          if (!attendance) {
+            nextProblemDates.set(dateStr, {
+              date: dateStr,
+              reason: '미체크',
+              label: '출퇴근 미체크',
+              checkIn: null,
+              checkOut: null,
+            });
+            continue;
+          }
+        }
+        if (
+          !status &&
+          attendance &&
+          (attendance.status === '정상' || attendance.status === 'present') &&
+          attendance.check_in
+        ) continue;
+
         if (status === 'absent') {
           nextProblemDates.set(dateStr, { date: dateStr, reason: '결근', label: '결근', checkIn: attendance?.check_in, checkOut: attendance?.check_out });
           continue;

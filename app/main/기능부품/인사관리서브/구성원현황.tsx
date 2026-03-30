@@ -3,6 +3,7 @@ import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { StaffMember } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { isMissingColumnError } from '@/lib/supabase-compat';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import { getChecklistTargetDate, getDefaultChecklist } from '@/lib/hr-checklists';
 import StaffHistoryTimeline from './인사이력타임라인';
@@ -108,10 +109,10 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       Array.from(
         new Set([
           ...companySelectOptions,
-          ...吏곸썝紐⑸줉.map((s) => s.company).filter(Boolean),
+          ...직원목록.map((s) => s.company).filter(Boolean),
         ]),
       ).sort() as string[],
-    [companySelectOptions, 吏곸썝紐⑸줉],
+    [companySelectOptions, 직원목록],
   );
 
   );
@@ -235,6 +236,81 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     };
     fetchEssRequests();
   }, [새로고침, 선택사업체, 직원목록]);
+
+  const handleApproveEssSafe = async (request: Record<string, unknown>) => {
+    if (!confirm(`${request.user_name}님의 정보 변경 요청을 승인하시겠습니까?`)) return;
+    try {
+      const updates =
+        ((request.details as Record<string, unknown> | undefined)?.requested_changes as Record<string, unknown> | undefined) || {};
+      const { data: staffRow, error: staffLoadError } = await supabase
+        .from('staff_members')
+        .select('permissions')
+        .eq('id', request.target_id)
+        .maybeSingle();
+
+      if (staffLoadError) throw staffLoadError;
+
+      const currentPermissions =
+        staffRow?.permissions && typeof staffRow.permissions === 'object' && !Array.isArray(staffRow.permissions)
+          ? (staffRow.permissions as Record<string, unknown>)
+          : {};
+      const requestedPermissions =
+        updates.permissions && typeof updates.permissions === 'object' && !Array.isArray(updates.permissions)
+          ? (updates.permissions as Record<string, unknown>)
+          : {};
+
+      const updatePayload: Record<string, unknown> = {
+        email: (updates.email as string | null | undefined) ?? null,
+        phone: (updates.phone as string | null | undefined) ?? null,
+        address: (updates.address as string | null | undefined) ?? null,
+        bank_account: (updates.bank_account as string | null | undefined) ?? null,
+        permissions: {
+          ...currentPermissions,
+          ...requestedPermissions,
+        },
+        bank_name:
+          (updates.bank_name as string | null | undefined) ??
+          (requestedPermissions.bank_name as string | null | undefined) ??
+          null,
+      };
+
+      const primaryUpdate = await supabase
+        .from('staff_members')
+        .update(updatePayload)
+        .eq('id', request.target_id);
+
+      if (primaryUpdate.error) {
+        if (!isMissingColumnError(primaryUpdate.error, 'bank_name')) throw primaryUpdate.error;
+
+        const fallbackPayload = { ...updatePayload };
+        delete fallbackPayload.bank_name;
+        const fallbackUpdate = await supabase
+          .from('staff_members')
+          .update(fallbackPayload)
+          .eq('id', request.target_id);
+
+        if (fallbackUpdate.error) throw fallbackUpdate.error;
+      }
+
+      await supabase
+        .from('audit_logs')
+        .update({
+          target_type: 'ESS_PROFILE_UPDATE_APPROVED',
+          details: {
+            ...((request.details as Record<string, unknown>) || {}),
+            approved_at: new Date().toISOString(),
+          },
+        })
+        .eq('id', request.id);
+
+      toast('승인했습니다.');
+      setEssRequests(prev => prev.filter(r => r.id !== request.id));
+      새로고침?.();
+    } catch (error) {
+      console.error('ESS profile approve failed:', error);
+      toast('승인 처리 중 오류가 발생했습니다.', 'error');
+    }
+  };
 
   const handleApproveEss = async (request: Record<string, unknown>) => {
     if (!confirm(`${request.user_name}님의 정보 변경 요청을 승인하시겠습니까?`)) return;
@@ -1562,7 +1638,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
                         <div className="flex justify-end gap-2 pt-2">
                           <button onClick={() => handleRejectEss(req)} className="px-5 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-[var(--radius-md)] font-semibold text-[11px] transition-colors">반려</button>
-                          <button onClick={() => handleApproveEss(req)} className="px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-600 rounded-[var(--radius-md)] font-semibold text-[11px] transition-colors shadow-sm">승인하기</button>
+                          <button onClick={() => handleApproveEssSafe(req)} className="px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-600 rounded-[var(--radius-md)] font-semibold text-[11px] transition-colors shadow-sm">승인하기</button>
                         </div>
                       </div>
                     )
