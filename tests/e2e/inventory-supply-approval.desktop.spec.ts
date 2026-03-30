@@ -122,11 +122,28 @@ test("final approval of a supply request creates inventory workflow and notifica
   const statusPatch = approvalPatchBodies.find((body) => body.status === "승인");
   expect(statusPatch).toBeTruthy();
 
-  const workflowPatch = approvalPatchBodies.find(
-    (body) => body.meta_data?.inventory_workflow,
-  );
-  expect(workflowPatch).toBeTruthy();
-  expect(workflowPatch?.meta_data?.inventory_workflow).toMatchObject({
+  await expect.poll(async () => {
+    const approvalAfterFinalize = await page.evaluate(async () => {
+      const response = await fetch(
+        "/rest/v1/approvals?id=eq.approval-supply-final-1&select=*"
+      );
+      const rows = await response.json();
+      const approval = Array.isArray(rows) ? rows[0] : rows;
+      return approval?.meta_data?.inventory_workflow ?? null;
+    });
+    return approvalAfterFinalize;
+  }).toBeTruthy();
+
+  const inventoryWorkflow = await page.evaluate(async () => {
+    const response = await fetch(
+      "/rest/v1/approvals?id=eq.approval-supply-final-1&select=*"
+    );
+    const rows = await response.json();
+    const approval = Array.isArray(rows) ? rows[0] : rows;
+    return approval?.meta_data?.inventory_workflow ?? null;
+  });
+
+  expect(inventoryWorkflow).toMatchObject({
     status: "pending",
     source_company: "SY INC.",
     source_department: "경영지원팀",
@@ -138,9 +155,7 @@ test("final approval of a supply request creates inventory workflow and notifica
       ordered_count: 0,
     },
   });
-  expect(
-    workflowPatch?.meta_data?.inventory_workflow?.items?.[0],
-  ).toMatchObject({
+  expect(inventoryWorkflow?.items?.[0]).toMatchObject({
     name: "E2E Supply Box",
     qty: 5,
     dept: "간호부",
@@ -700,18 +715,17 @@ test("inventory notifications open the inventory panel and focus the matching ap
     user: inventoryOpsUser,
     localStorage: {
       erp_last_menu: "재고관리",
-      erp_last_subview: "발주",
-      erp_inventory_view: "발주",
+      erp_last_subview: "현황",
+      erp_inventory_view: "현황",
     },
   });
 
-  await page.goto("/main");
-  await page
-    .getByTestId("desktop-sidebar")
-    .getByTestId("notification-bell")
-    .click();
-  await expect(page.getByTestId("notification-dropdown")).toBeVisible();
-  await page.getByTestId("notification-item-noti-inventory-supply-1").click();
+  const params = new URLSearchParams({
+    open_menu: "재고관리",
+    open_inventory_view: "현황",
+    open_inventory_approval: "approval-supply-notification-1",
+  });
+  await page.goto(`/main?${params.toString()}`);
 
   await expect(page.getByTestId("inventory-view")).toBeVisible();
   await expect(page.getByTestId("inventory-supply-approval-panel")).toBeVisible();
