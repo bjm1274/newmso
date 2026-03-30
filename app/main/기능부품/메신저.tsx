@@ -3695,13 +3695,6 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    await processFileUpload(file, { contentSnapshot: inputMsgRef.current });
-    e.target.value = '';
-  };
-
   const confirmPendingAttachmentUpload = useCallback(async () => {
     if (pendingAttachmentFiles.length === 0) return;
     const queuedFiles = [...pendingAttachmentFiles];
@@ -3821,6 +3814,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
     setPendingAttachmentFiles((prev) => [...prev, ...files]);
   }, [appendPendingAlbumFiles, pendingAlbumFiles.length]);
+
+  const handleAttachmentSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    queueDroppedFiles(files);
+    e.target.value = '';
+  }, [queueDroppedFiles]);
 
   useEffect(() => {
     setPendingAttachmentFiles([]);
@@ -5300,25 +5300,16 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             ? 'bg-[var(--muted)] border-[var(--border)] opacity-80 pointer-events-none'
             : 'bg-[var(--muted)] border-[var(--border)] focus-within:bg-[var(--card)] focus-within:ring-2 focus-within:ring-[var(--accent)]/50'
             }`}>
-            <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.hwp" />
+            <input type="file" ref={fileInputRef} className="hidden" onChange={handleAttachmentSelect} accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.hwp" multiple />
             <input type="file" ref={albumFileInputRef} className="hidden" onChange={handleAlbumFileSelect} accept="image/*" multiple />
-            {/* 파일 첨부 버튼 */}
+            {/* 통합 첨부 버튼 */}
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={fileUploading}
-              title="파일 첨부"
+              title="사진/파일 첨부"
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] transition-colors hover:text-[var(--accent)] disabled:opacity-50 md:h-8 md:w-8"
             >
               {fileUploading ? <span className="animate-pulse text-xs">...</span> : <span className="text-[11px] font-bold md:text-xs">첨부</span>}
-            </button>
-            {/* 사진 묶어 보내기 버튼 */}
-            <button
-              onClick={() => albumFileInputRef.current?.click()}
-              disabled={fileUploading}
-              title="사진 여러 장 묶어 보내기"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] transition-colors hover:text-[var(--accent)] disabled:opacity-50"
-            >
-              <span className="text-base leading-none">🖼️</span>
             </button>
             <div className="relative flex-1">
               <textarea
