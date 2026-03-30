@@ -694,6 +694,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const [chatSearch, setChatSearch] = useState('');
   const deferredOmniSearch = useDeferredValue(omniSearch);
   const deferredChatSearch = useDeferredValue(chatSearch);
+  const [transientHighlightQuery, setTransientHighlightQuery] = useState('');
   const [inputMsg, setInputMsg] = useState('');
   const [activeActionMsg, setActiveActionMsg] = useState<ChatMessage | null>(null);
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
@@ -719,7 +720,32 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     }
   };
 
-  const renderMessageContent = (content: string, isMine = false) => {
+  const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const renderHighlightedText = (text: string, highlightQuery: string, isMine = false) => {
+    const normalizedQuery = highlightQuery.trim();
+    if (!normalizedQuery) {
+      return <span className="break-words whitespace-pre-wrap">{text}</span>;
+    }
+
+    const matcher = new RegExp(`(${escapeRegExp(normalizedQuery)})`, 'ig');
+    return text.split(matcher).map((part, index) => {
+      if (part.toLowerCase() !== normalizedQuery.toLowerCase()) {
+        return <span key={index} className="break-words whitespace-pre-wrap">{part}</span>;
+      }
+
+      return (
+        <mark
+          key={index}
+          className={`rounded px-0.5 py-0 ${isMine ? 'bg-white/25 text-white' : 'bg-amber-100 text-amber-900'}`}
+        >
+          {part}
+        </mark>
+      );
+    });
+  };
+
+  const renderMessageContent = (content: string, isMine = false, highlightQuery = '') => {
     if (!content) return null;
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const parts = content.split(urlRegex);
@@ -742,7 +768,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
           </a>
         );
       }
-      return <span key={i} className="break-words whitespace-pre-wrap">{part}</span>;
+      return <span key={i}>{renderHighlightedText(part, highlightQuery, isMine)}</span>;
     });
   };
 
@@ -1066,17 +1092,18 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   }, []);
 
   const setRoom = (roomId: string | null) => {
+    const previousSelectedRoomId = selectedRoomIdRef.current;
     const conversationRoomIds = roomId
       ? getConversationRoomIdsByRoomId(roomId, chatRoomsRef.current as ChatRoom[])
       : [];
     // 현재 방의 입력 draft 저장
-    if (selectedRoomIdRef.current && selectedRoomIdRef.current !== roomId) {
-      draftMapRef.current.set(selectedRoomIdRef.current, inputMsgRef.current);
+    if (previousSelectedRoomId && previousSelectedRoomId !== roomId) {
+      draftMapRef.current.set(previousSelectedRoomId, inputMsgRef.current);
     }
     pendingBottomAlignRoomIdRef.current = roomId;
     isNearBottomRef.current = true;
     setShowScrollToLatest(false);
-    if (selectedRoomIdRef.current !== roomId) {
+    if (previousSelectedRoomId !== roomId) {
       lastTimelineTailRef.current = '';
       setMessages([]);
       setReadCounts({});
@@ -1096,6 +1123,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         return next;
       });
     }
+    selectedRoomIdRef.current = roomId;
     setSelectedRoomId(roomId);
     // 새 방의 저장된 draft 복원
     const savedDraft = (roomId ? draftMapRef.current.get(roomId) : '') || '';
@@ -1744,16 +1772,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           })
         );
         const counts = Object.fromEntries(countEntries);
+        const activeRoomId = pendingBottomAlignRoomIdRef.current || selectedRoomIdRef.current;
         const openConversationRoomIds = getConversationRoomIdSet(
-          selectedRoomIdRef.current,
+          activeRoomId,
           myRooms as ChatRoom[]
         );
-        if (
-          openConversationRoomIds.size > 0 &&
-          typeof document !== 'undefined' &&
-          document.visibilityState === 'visible' &&
-          isFocusedRef.current
-        ) {
+        if (openConversationRoomIds.size > 0) {
           openConversationRoomIds.forEach((roomId) => {
             counts[roomId] = 0;
           });
@@ -2653,7 +2677,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       const payload = event.data;
       if (!payload?.roomId) return;
       // ref를 통해 항상 최신 selectedRoomId와 fetchData를 참조 (채널 재생성 없이)
-      if (isRoomInSelectedConversation(String(payload.roomId), chatRoomsRef.current)) {
+      if (
+        payload.action !== 'message-sent' &&
+        isRoomInSelectedConversation(String(payload.roomId), chatRoomsRef.current)
+      ) {
         fetchDataRef.current?.();
       } else if (chatRoomsRef.current.length > 0) {
         updateUnreadForRooms(chatRoomsRef.current);
@@ -3063,9 +3090,23 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   }, [closeGlobalSearch]);
   const openRoomFromGlobalSearch = useCallback((roomId: string, messageId?: string) => {
     if (messageId) pendingScrollMsgIdRef.current = messageId;
+    setTransientHighlightQuery(globalSearchQuery.trim());
+    if (
+      messageId &&
+      String(selectedRoomIdRef.current || '') === roomId &&
+      messages.some((message: ChatMessage) => String(message.id) === messageId)
+    ) {
+      window.setTimeout(() => scrollToMessage(messageId), 120);
+    }
     setRoom(roomId);
     closeGlobalSearch();
-  }, [closeGlobalSearch]);
+  }, [closeGlobalSearch, globalSearchQuery, messages, scrollToMessage]);
+
+  useEffect(() => {
+    if (!transientHighlightQuery.trim()) return;
+    const timer = window.setTimeout(() => setTransientHighlightQuery(''), 12000);
+    return () => window.clearTimeout(timer);
+  }, [transientHighlightQuery]);
 
   const typingNoticeText = useMemo(() => {
     const names = Object.values(typingUsers).filter(Boolean);
@@ -4265,6 +4306,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     }
     return msgs;
   }, [messages, deferredChatSearch]);
+  const activeMessageHighlightQuery = deferredChatSearch.trim() || transientHighlightQuery.trim();
   const selectedRoomPollTimelineItems = useMemo(
     () =>
       polls
@@ -4944,9 +4986,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   deliveryState === 'sent' &&
                   totalRecipients > 0
                 );
-                const displayedReadStatusSummary = !isMine && !readStatusSummary && totalRecipients > 0 && readersCount > 0
-                  ? `${readersCount}`
-                  : readStatusSummary;
+                const displayedReadStatusSummary = isMine ? readStatusSummary : null;
 
                 const TOOLBAR_EMOJIS = ['👍', '❤️', '👏', '🎉', '🔥', '✅', '👀', '🙏'];
 
@@ -4966,7 +5006,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 lastSenderId = String(msg.sender_id);
 
                 return (
-                  <div key={msg.id} className={isContinuous ? 'mt-0.5' : 'mt-1 md:mt-2'}>
+                  <div key={msg.id} data-testid={`chat-message-row-${msg.id}`} className={isContinuous ? 'mt-0.5' : 'mt-1 md:mt-2'}>
                     {showDateDivider && (
                       <div className="my-0.5 flex items-center justify-center gap-1 md:my-2 md:gap-2">
                         <div className="flex-1 h-px bg-[var(--border)]" />
@@ -5048,7 +5088,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             ) : null;
                           })()}
                           <div className={`leading-relaxed ${(msg.content && !isDeletedMessage) ? 'mb-0.5' : ''}`}>
-                            {isDeletedMessage ? '삭제된 메시지입니다.' : renderMessageContent(msg.content || '', isMine)}
+                            {isDeletedMessage ? '삭제된 메시지입니다.' : renderMessageContent(msg.content || '', isMine, activeMessageHighlightQuery)}
                           </div>
                           {!isDeletedMessage && msg.file_url && (() => {
                             const furl = msg.file_url!;
@@ -5094,6 +5134,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             {displayedReadStatusSummary && (
                               canOpenReadStatus ? (
                                 <button
+                                  data-testid={`chat-message-read-status-${msg.id}`}
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -5104,7 +5145,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                   {displayedReadStatusSummary}
                                 </button>
                               ) : (
-                                <span className={`text-[10px] font-bold ${deliveryState === 'failed' ? 'text-red-500' : 'text-emerald-500'}`}>
+                                <span
+                                  data-testid={`chat-message-read-status-${msg.id}`}
+                                  className={`text-[10px] font-bold ${deliveryState === 'failed' ? 'text-red-500' : 'text-emerald-500'}`}
+                                >
                                   {displayedReadStatusSummary}
                                 </span>
                               )

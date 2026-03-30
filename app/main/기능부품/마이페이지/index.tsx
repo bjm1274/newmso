@@ -601,7 +601,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
       {/* 메인 콘텐츠 영역 */}
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden transition-all duration-300">
           {activeTab === 'profile' && (
-            <div data-testid="mypage-profile-tab" className="space-y-3 pb-3">
+            <div data-testid="mypage-profile-tab" className="animate-premium-fade space-y-3 pb-3">
               <div className="flex flex-col gap-3 xl:flex-row xl:items-start">
                 <ProfileHeaderSummary
                   user={profileSummary}
@@ -627,7 +627,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
             </div>
           )}
           {activeTab === 'commute' && (
-            <div data-testid="mypage-commute-tab" className="pb-3">
+            <div data-testid="mypage-commute-tab" className="animate-premium-fade pb-3">
               <CommuteRecord
               user={user}
               onRequestCorrection={(log: any) =>
@@ -640,9 +640,9 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
               />
             </div>
           )}
-          {activeTab === 'todo' && <div data-testid="mypage-todo-tab" className="pb-3"><MyTodoList user={user} onChatNavigate={onOpenChatMessage} /></div>}
+          {activeTab === 'todo' && <div data-testid="mypage-todo-tab" className="animate-premium-fade pb-3"><MyTodoList user={user} onChatNavigate={onOpenChatMessage} /></div>}
           {activeTab === 'records' && (
-            <div data-testid="mypage-records-tab" className="pb-3">
+            <div data-testid="mypage-records-tab" className="animate-premium-fade pb-3">
               <PayrollAndCertificatesHub
                 user={user}
                 activeView={recordsView}
@@ -651,7 +651,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
             </div>
           )}
           {activeTab === 'documents' && (
-            <div data-testid="mypage-documents-tab" className="pb-3">
+            <div data-testid="mypage-documents-tab" className="animate-premium-fade pb-3">
               <MyDocuments
                 user={user}
                 latestContract={latestContract}
@@ -663,7 +663,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
               />
             </div>
           )}
-          {activeTab === 'notifications' && <div data-testid="mypage-notifications-tab" className="pb-3"><NotificationInbox user={user} onRefresh={() => { }} /></div>}
+          {activeTab === 'notifications' && <div data-testid="mypage-notifications-tab" className="animate-premium-fade pb-3"><NotificationInbox user={user} onRefresh={() => { }} /></div>}
       </div>
 
     </div>
