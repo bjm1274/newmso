@@ -223,13 +223,20 @@ export default function ExtraFeatures({
     }
   }, []);
 
+  const activeSubViewCard = useMemo(
+    () => FEATURE_CARDS.find((card) => card.subView === subView) || null,
+    [subView]
+  );
+
+  const resolvedSubView =
+    activeSubViewCard && !canAccessExtraFeature(user, activeSubViewCard.id) ? null : subView;
+
   useEffect(() => {
     if (!subView) return;
-    const activeCard = FEATURE_CARDS.find((card) => card.subView === subView);
-    if (activeCard && !canAccessExtraFeature(user, activeCard.id)) {
+    if (activeSubViewCard && !canAccessExtraFeature(user, activeSubViewCard.id)) {
       setSubView(null);
     }
-  }, [subView, user]);
+  }, [activeSubViewCard, subView, user]);
 
   const persistRecent = useCallback((next: string[]) => {
     try {
@@ -372,7 +379,7 @@ export default function ExtraFeatures({
     </div>
   ), [favorites, getCardStyle, getFeatureCardTestId, handleFeatureClick, toggleFavorite]);
 
-  if (subView === '조직도') {
+  if (resolvedSubView === '조직도') {
     return (
       <FeatureShell onBack={() => setSubView(null)} maxWidth="max-w-7xl">
         <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm overflow-x-auto">
@@ -388,7 +395,7 @@ export default function ExtraFeatures({
     );
   }
 
-  if (subView === '부서별재고') {
+  if (resolvedSubView === '부서별재고') {
     return (
       <FeatureShell onBack={() => setSubView(null)} boxed>
         <DepartmentInventoryView user={user || {}} />
@@ -396,7 +403,7 @@ export default function ExtraFeatures({
     );
   }
 
-  if (subView === '근무현황') {
+  if (resolvedSubView === '근무현황') {
     return (
       <FeatureShell onBack={() => setSubView(null)} boxed>
         <WorkStatusView user={user || {}} />
@@ -404,7 +411,7 @@ export default function ExtraFeatures({
     );
   }
 
-  if (subView === '인계노트') {
+  if (resolvedSubView === '인계노트') {
     return (
       <FeatureShell onBack={() => setSubView(null)}>
         <HandoverNotesView user={user || {}} />
@@ -412,7 +419,7 @@ export default function ExtraFeatures({
     );
   }
 
-  if (subView === '퇴원심사') {
+  if (resolvedSubView === '퇴원심사') {
     return (
       <FeatureShell onBack={() => setSubView(null)}>
         <DischargeReviewView user={user || {}} />
@@ -420,7 +427,7 @@ export default function ExtraFeatures({
     );
   }
 
-  if (subView === '마감보고') {
+  if (resolvedSubView === '마감보고') {
     return (
       <FeatureShell onBack={() => setSubView(null)}>
         <ClosingReportView user={user || {}} />
@@ -428,7 +435,7 @@ export default function ExtraFeatures({
     );
   }
 
-  if (subView === '직원평가') {
+  if (resolvedSubView === '직원평가') {
     return (
       <FeatureShell onBack={() => setSubView(null)} boxed>
         <StaffEvaluationView user={user || {}} staffs={staffs} />
@@ -436,7 +443,7 @@ export default function ExtraFeatures({
     );
   }
 
-  if (subView === '입금실시간조회') {
+  if (resolvedSubView === '입금실시간조회') {
     return (
       <FeatureShell onBack={() => setSubView(null)} maxWidth="max-w-6xl">
         <RealtimeDepositView user={user || {}} />
@@ -444,7 +451,7 @@ export default function ExtraFeatures({
     );
   }
 
-  if (subView === '수술상담') {
+  if (resolvedSubView === '수술상담') {
     return (
       <FeatureShell onBack={() => setSubView(null)} maxWidth="max-w-4xl">
         <SurgeryConsultationView user={user || {}} />
@@ -452,7 +459,7 @@ export default function ExtraFeatures({
     );
   }
 
-  if (subView === 'OP체크') {
+  if (resolvedSubView === 'OP체크') {
     return (
       <FeatureShell onBack={() => setSubView(null)} maxWidth="max-w-7xl">
         <OperationCheckView
