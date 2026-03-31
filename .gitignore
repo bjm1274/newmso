@@ -27,6 +27,7 @@
 cd
 git
 *.pem
+backups/*.zip
 
 # debug
 npm-debug.log*
