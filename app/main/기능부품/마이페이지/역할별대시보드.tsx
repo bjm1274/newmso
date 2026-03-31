@@ -16,6 +16,13 @@ interface Props {
 
 type ApprovalRow = Record<string, unknown>;
 
+type PendingApprovalItem = {
+  id: string;
+  title: string;
+  department: string;
+  created_at: string;
+};
+
 type TodayAttendance = {
   in: string | null;
   out: string | null;
@@ -101,27 +108,21 @@ export default function RoleDashboard({
   setMainMenu,
   onOpenApproval,
   selectedCo,
-  selectedCompanyId,
 }: Props) {
   const [pendingApprovals, setPendingApprovals] = useState(0);
+  const [pendingApprovalItems, setPendingApprovalItems] = useState<PendingApprovalItem[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [lowStockCount, setLowStockCount] = useState(0);
   const [todayAttendance, setTodayAttendance] = useState<TodayAttendance>({ in: null, out: null, status: null });
   const [annualLeave, setAnnualLeave] = useState<AnnualLeaveSummary | null>(null);
   const [teamCount, setTeamCount] = useState(0);
+  const [teamCheckedIn, setTeamCheckedIn] = useState(0);
 
   const isAdmin = user?.role === 'admin' || user?.company === 'SY INC.' || user?.permissions?.mso;
   const isManager = MANAGER_POSITIONS.includes(user?.position);
 
   const fetchPending = useCallback(async () => {
     if (!user?.id) return;
-    const normalizedSelectedCo = typeof selectedCo === 'string' ? selectedCo.trim() : '';
-    const scopedCompanyId = !isAdmin ? user?.company_id : selectedCompanyId || null;
-    const scopedCompanyName = !isAdmin
-      ? user?.company
-      : normalizedSelectedCo && normalizedSelectedCo !== '전체'
-        ? normalizedSelectedCo
-        : null;
 
     const { data, error } = await withMissingColumnsFallback(
       async (omittedColumns) => {
@@ -130,6 +131,9 @@ export default function RoleDashboard({
           'status',
           'current_approver_id',
           'sender_company',
+          'created_at',
+          ...(omittedColumns.has('title') ? [] : ['title']),
+          ...(omittedColumns.has('sender_department') ? [] : ['sender_department']),
           ...(omittedColumns.has('company_id') ? [] : ['company_id']),
           ...(omittedColumns.has('approver_line') ? [] : ['approver_line']),
           ...(omittedColumns.has('meta_data') ? [] : ['meta_data']),
@@ -140,15 +144,9 @@ export default function RoleDashboard({
           .select(selectColumns.join(', '))
           .eq('status', '대기');
 
-        if (scopedCompanyId && !omittedColumns.has('company_id')) {
-          query = query.eq('company_id', scopedCompanyId);
-        } else if (scopedCompanyName) {
-          query = query.eq('sender_company', scopedCompanyName);
-        }
-
         return query;
       },
-      ['company_id', 'approver_line', 'meta_data'],
+      ['company_id', 'approver_line', 'meta_data', 'title', 'sender_department'],
     );
 
     if (error) {
@@ -184,14 +182,25 @@ export default function RoleDashboard({
       }
     }
 
-    const nextPendingCount = approvalRows.filter((item) => {
+    const myPendingItems = approvalRows.filter((item) => {
       const effectiveApproverId = resolveEffectiveApproverId(resolveStoredCurrentApproverId(item), approverMap);
       if (!effectiveApproverId) return false;
       return effectiveApproverId === String(user.id);
-    }).length;
+    });
 
-    setPendingApprovals(nextPendingCount);
-  }, [isAdmin, selectedCo, selectedCompanyId, user?.company, user?.company_id, user?.id]);
+    setPendingApprovals(myPendingItems.length);
+    setPendingApprovalItems(
+      myPendingItems
+        .sort((a, b) => new Date(String(a.created_at || 0)).getTime() - new Date(String(b.created_at || 0)).getTime())
+        .slice(0, 5)
+        .map((item) => ({
+          id: String(item.id || ''),
+          title: String(item.title || (item.meta_data as Record<string, unknown>)?.title || '결재 문서'),
+          department: String(item.sender_department || item.sender_company || ''),
+          created_at: String(item.created_at || ''),
+        }))
+    );
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -270,13 +279,22 @@ export default function RoleDashboard({
       const fetchTeam = async () => {
         if (!user?.department) return;
 
-        const { count } = await supabase
-          .from('staff_members')
-          .select('*', { count: 'exact', head: true })
-          .eq('department', user.department)
-          .eq('status', '재직');
+        const today = new Date().toISOString().slice(0, 10);
+        const [{ count: totalCount }, { count: checkedInCount }] = await Promise.all([
+          supabase
+            .from('staff_members')
+            .select('*', { count: 'exact', head: true })
+            .eq('department', user.department)
+            .eq('status', '재직'),
+          supabase
+            .from('attendances')
+            .select('*', { count: 'exact', head: true })
+            .eq('work_date', today)
+            .not('check_in_time', 'is', null),
+        ]);
 
-        setTeamCount(count || 0);
+        setTeamCount(totalCount || 0);
+        setTeamCheckedIn(checkedInCount || 0);
       };
 
       fetchLowStock();
@@ -347,6 +365,7 @@ export default function RoleDashboard({
       {isAdmin ? (
         <AdminDashboard
           pendingApprovals={pendingApprovals}
+          pendingApprovalItems={pendingApprovalItems}
           lowStockCount={lowStockCount}
           setMainMenu={setMainMenu}
           openApprovalInbox={openApprovalInbox}
@@ -354,8 +373,10 @@ export default function RoleDashboard({
       ) : isManager ? (
         <ManagerDashboard
           teamCount={teamCount}
+          teamCheckedIn={teamCheckedIn}
           department={user?.department}
           pendingApprovals={pendingApprovals}
+          pendingApprovalItems={pendingApprovalItems}
           todayAttendance={todayAttendance}
           lowStockCount={lowStockCount}
           setMainMenu={setMainMenu}
@@ -367,6 +388,7 @@ export default function RoleDashboard({
           todayAttendance={todayAttendance}
           annualLeave={annualLeave}
           pendingApprovals={pendingApprovals}
+          pendingApprovalItems={pendingApprovalItems}
           setMainMenu={setMainMenu}
           openApprovalInbox={openApprovalInbox}
           formatTime={formatTime}
@@ -531,10 +553,41 @@ function _LegacyManagerDashboard({
   );
 }
 
+function PendingApprovalPreview({ items, onOpen }: { items: PendingApprovalItem[]; onOpen: () => void }) {
+  if (items.length === 0) return null;
+  const now = Date.now();
+  return (
+    <div className="mt-2 space-y-1">
+      {items.map((item) => {
+        const isOld = now - new Date(item.created_at).getTime() > 24 * 60 * 60 * 1000;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            onClick={onOpen}
+            className="flex w-full items-center justify-between gap-2 rounded-[var(--radius-md)] px-2 py-1.5 text-left transition hover:bg-[var(--muted)]"
+          >
+            <span className={`truncate text-[11px] font-medium ${isOld ? 'text-red-500' : 'text-[var(--foreground)]'}`}>
+              {isOld && <span className="mr-1">🔴</span>}
+              {item.title}
+            </span>
+            {item.department && (
+              <span className="shrink-0 rounded bg-[var(--muted)] px-1.5 py-0.5 text-[10px] text-[var(--toss-gray-3)]">
+                {item.department}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function UserDashboard({
   todayAttendance,
   annualLeave,
   pendingApprovals,
+  pendingApprovalItems,
   setMainMenu,
   openApprovalInbox,
   formatTime,
@@ -542,53 +595,65 @@ function UserDashboard({
   todayAttendance: TodayAttendance;
   annualLeave: AnnualLeaveSummary | null;
   pendingApprovals: number;
+  pendingApprovalItems: PendingApprovalItem[];
   setMainMenu?: (menu: string) => void;
   openApprovalInbox: () => void;
   formatTime: (value: string | null) => string;
 }) {
   return (
-    <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
-        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">오늘 근태</p>
-        <p className="text-lg font-bold text-[var(--foreground)]">{formatTodayAttendancePrimary(todayAttendance, formatTime)}</p>
-        {formatTodayAttendanceSecondary(todayAttendance, formatTime) ? (
-          <p className="text-[11px] text-[var(--toss-gray-3)]">{formatTodayAttendanceSecondary(todayAttendance, formatTime)}</p>
-        ) : null}
+    <div className="mb-4 space-y-3">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">오늘 근태</p>
+          <p className="text-lg font-bold text-[var(--foreground)]">{formatTodayAttendancePrimary(todayAttendance, formatTime)}</p>
+          {formatTodayAttendanceSecondary(todayAttendance, formatTime) ? (
+            <p className="text-[11px] text-[var(--toss-gray-3)]">{formatTodayAttendanceSecondary(todayAttendance, formatTime)}</p>
+          ) : null}
+        </div>
+
+        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">연차 잔여</p>
+          <p className="text-lg font-bold text-[var(--accent)]">{annualLeave?.remaining ?? '-'}일</p>
+          {annualLeave ? <p className="text-[11px] text-[var(--toss-gray-3)]">총 {annualLeave.total}일</p> : null}
+        </div>
+
+        <button
+          type="button"
+          className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 text-left transition-all hover:bg-[var(--toss-blue-light)]/30"
+          onClick={openApprovalInbox}
+        >
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">결재 대기</p>
+          <p className={`text-lg font-bold ${pendingApprovals > 0 ? 'text-orange-500' : 'text-[var(--foreground)]'}`}>{pendingApprovals}건</p>
+          <p className="text-[11px] text-[var(--accent)]">바로가기</p>
+        </button>
+
+        <button
+          type="button"
+          className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 text-left transition-all hover:bg-[var(--toss-blue-light)]/30"
+          onClick={() => setMainMenu?.('채팅')}
+        >
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">채팅</p>
+          <p className="text-lg font-bold text-[var(--foreground)]">열기</p>
+          <p className="text-[11px] text-[var(--accent)]">바로가기</p>
+        </button>
       </div>
 
-      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
-        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">연차 잔여</p>
-        <p className="text-lg font-bold text-[var(--accent)]">{annualLeave?.remaining ?? '-'}일</p>
-        {annualLeave ? <p className="text-[11px] text-[var(--toss-gray-3)]">총 {annualLeave.total}일</p> : null}
-      </div>
-
-      <button
-        type="button"
-        className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 text-left transition-all hover:bg-[var(--toss-blue-light)]/30"
-        onClick={openApprovalInbox}
-      >
-        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">결재 대기</p>
-        <p className={`text-lg font-bold ${pendingApprovals > 0 ? 'text-orange-500' : 'text-[var(--foreground)]'}`}>{pendingApprovals}건</p>
-        <p className="text-[11px] text-[var(--accent)]">바로가기</p>
-      </button>
-
-      <button
-        type="button"
-        className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 text-left transition-all hover:bg-[var(--toss-blue-light)]/30"
-        onClick={() => setMainMenu?.('채팅')}
-      >
-        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">채팅</p>
-        <p className="text-lg font-bold text-[var(--foreground)]">열기</p>
-        <p className="text-[11px] text-[var(--accent)]">바로가기</p>
-      </button>
+      {pendingApprovalItems.length > 0 && (
+        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5">
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">결재 대기 목록</p>
+          <PendingApprovalPreview items={pendingApprovalItems} onOpen={openApprovalInbox} />
+        </div>
+      )}
     </div>
   );
 }
 
 function ManagerDashboard({
   teamCount,
+  teamCheckedIn,
   department,
   pendingApprovals,
+  pendingApprovalItems,
   todayAttendance,
   lowStockCount,
   setMainMenu,
@@ -596,74 +661,98 @@ function ManagerDashboard({
   formatTime,
 }: {
   teamCount: number;
+  teamCheckedIn: number;
   department?: string;
   pendingApprovals: number;
+  pendingApprovalItems: PendingApprovalItem[];
   todayAttendance: TodayAttendance;
   lowStockCount: number;
   setMainMenu?: (menu: string) => void;
   openApprovalInbox: () => void;
   formatTime: (value: string | null) => string;
 }) {
+  const teamNotCheckedIn = Math.max(0, teamCount - teamCheckedIn);
   return (
-    <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
-        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">팀 인원</p>
-        <p className="text-lg font-bold text-[var(--foreground)]">{teamCount}명</p>
-        <p className="text-[11px] text-[var(--toss-gray-3)]">{department || '-'}</p>
+    <div className="mb-4 space-y-3">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">팀 출근 현황</p>
+          <p className="text-lg font-bold text-[var(--foreground)]">
+            <span className="text-green-600">{teamCheckedIn}</span>
+            <span className="text-[13px] text-[var(--toss-gray-3)]"> / {teamCount}명</span>
+          </p>
+          <p className="text-[11px]">
+            {teamNotCheckedIn > 0 ? (
+              <span className="text-orange-500">미출근 {teamNotCheckedIn}명</span>
+            ) : (
+              <span className="text-[var(--toss-gray-3)]">{department || '-'}</span>
+            )}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className={`rounded-[var(--radius-lg)] border p-4 text-left transition-all ${
+            pendingApprovals > 0
+              ? 'border-orange-200 bg-orange-500/10 hover:bg-orange-500/20'
+              : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
+          }`}
+          onClick={openApprovalInbox}
+        >
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">결재 대기</p>
+          <p className={`text-lg font-bold ${pendingApprovals > 0 ? 'text-orange-500' : 'text-[var(--foreground)]'}`}>{pendingApprovals}건</p>
+          <p className="text-[11px] text-[var(--accent)]">바로가기</p>
+        </button>
+
+        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">내 근태</p>
+          <p className="text-lg font-bold text-[var(--foreground)]">{formatTodayAttendancePrimary(todayAttendance, formatTime)}</p>
+          {formatTodayAttendanceSecondary(todayAttendance, formatTime) ? (
+            <p className="text-[11px] text-[var(--toss-gray-3)]">{formatTodayAttendanceSecondary(todayAttendance, formatTime)}</p>
+          ) : null}
+        </div>
+
+        <button
+          type="button"
+          className={`rounded-[var(--radius-lg)] border p-4 text-left transition-all ${
+            lowStockCount > 0
+              ? 'border-red-200 bg-red-500/10 hover:bg-red-500/20'
+              : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
+          }`}
+          onClick={() => setMainMenu?.('재고관리')}
+        >
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">재고 부족</p>
+          <p className={`text-lg font-bold ${lowStockCount > 0 ? 'text-red-600' : 'text-[var(--foreground)]'}`}>{lowStockCount}건</p>
+          <p className="text-[11px] text-[var(--accent)]">바로가기</p>
+        </button>
       </div>
 
-      <button
-        type="button"
-        className={`rounded-[var(--radius-lg)] border p-4 text-left transition-all ${
-          pendingApprovals > 0
-            ? 'border-orange-200 bg-orange-50 hover:bg-orange-100'
-            : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
-        }`}
-        onClick={openApprovalInbox}
-      >
-        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">결재 대기</p>
-        <p className={`text-lg font-bold ${pendingApprovals > 0 ? 'text-orange-600' : 'text-[var(--foreground)]'}`}>{pendingApprovals}건</p>
-        <p className="text-[11px] text-[var(--accent)]">바로가기</p>
-      </button>
-
-      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
-        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">오늘 근태</p>
-        <p className="text-lg font-bold text-[var(--foreground)]">{formatTodayAttendancePrimary(todayAttendance, formatTime)}</p>
-        {formatTodayAttendanceSecondary(todayAttendance, formatTime) ? (
-          <p className="text-[11px] text-[var(--toss-gray-3)]">{formatTodayAttendanceSecondary(todayAttendance, formatTime)}</p>
-        ) : null}
-      </div>
-
-      <button
-        type="button"
-        className={`rounded-[var(--radius-lg)] border p-4 text-left transition-all ${
-          lowStockCount > 0
-            ? 'border-red-200 bg-red-50 hover:bg-red-100'
-            : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
-        }`}
-        onClick={() => setMainMenu?.('재고관리')}
-      >
-        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">재고 부족</p>
-        <p className={`text-lg font-bold ${lowStockCount > 0 ? 'text-red-600' : 'text-[var(--foreground)]'}`}>{lowStockCount}건</p>
-        <p className="text-[11px] text-[var(--accent)]">바로가기</p>
-      </button>
+      {pendingApprovalItems.length > 0 && (
+        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5">
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">결재 대기 목록</p>
+          <PendingApprovalPreview items={pendingApprovalItems} onOpen={openApprovalInbox} />
+        </div>
+      )}
     </div>
   );
 }
 
 function AdminDashboard({
   pendingApprovals,
+  pendingApprovalItems,
   lowStockCount,
   setMainMenu,
   openApprovalInbox,
 }: {
   pendingApprovals: number;
+  pendingApprovalItems: PendingApprovalItem[];
   lowStockCount: number;
   setMainMenu?: (menu: string) => void;
   openApprovalInbox: () => void;
 }) {
   return (
-    <div className="mb-0 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-stretch sm:gap-3">
+    <div className="mb-0 space-y-3">
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-stretch sm:gap-3">
       <AdminActionCard
         title="결재 대기"
         value={`${pendingApprovals}건`}
@@ -678,6 +767,13 @@ function AdminDashboard({
         active={lowStockCount > 0}
         onValueClick={() => setMainMenu?.('재고관리')}
       />
+      </div>
+      {pendingApprovalItems.length > 0 && (
+        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5">
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">결재 대기 목록</p>
+          <PendingApprovalPreview items={pendingApprovalItems} onOpen={openApprovalInbox} />
+        </div>
+      )}
     </div>
   );
 }

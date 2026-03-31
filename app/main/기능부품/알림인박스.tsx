@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -49,6 +49,23 @@ function timeAgo(dateStr: string) {
   if (d < 3600) return `${Math.floor(d / 60)}분 전`;
   if (d < 86400) return `${Math.floor(d / 3600)}시간 전`;
   return new Date(dateStr).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' });
+}
+
+function buildApprovalNotificationHref(metadata: Record<string, any>) {
+  const params = new URLSearchParams({
+    open_menu: '전자결재',
+  });
+
+  if (typeof metadata?.approval_view === 'string' && metadata.approval_view.trim()) {
+    params.set('open_subview', metadata.approval_view.trim());
+  }
+
+  const approvalId = String(metadata?.approval_id || '').trim();
+  if (approvalId) {
+    params.set('open_approval_id', approvalId);
+  }
+
+  return `/main?${params.toString()}`;
 }
 
 const NOTIF_TYPES_FOR_SETTINGS = [
@@ -244,15 +261,7 @@ export default function NotificationInbox({ user: _rawUser, onRefresh }: Record<
     const meta = n.metadata || {};
     if (n.type === 'message' || n.type === 'mention') router.push(meta.room_id ? `/main?open_chat_room=${meta.room_id}` : '/main?open_menu=채팅');
     else if (n.type === 'approval') {
-      const approvalView =
-        typeof meta.approval_view === 'string' && meta.approval_view.trim()
-          ? encodeURIComponent(meta.approval_view)
-          : null;
-      router.push(
-        approvalView
-          ? `/main?open_menu=전자결재&open_subview=${approvalView}`
-          : '/main?open_menu=전자결재'
-      );
+      router.push(buildApprovalNotificationHref(meta));
     }
     else if (n.type === 'board' || n.type === 'notice') router.push('/main?open_menu=게시판');
     else if (n.type === '인사' || n.type === 'payroll' || n.type === 'education' || n.type === 'attendance') router.push('/main?open_menu=내정보');

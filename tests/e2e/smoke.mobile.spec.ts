@@ -73,6 +73,65 @@ test('mobile chat room list opens the selected room at the latest message', asyn
     .toBe(true);
 });
 
+test('mobile chat menu opens the room list as the chat main screen', async ({ page }) => {
+  await mockSupabase(page, {
+    chatRooms: [
+      {
+        id: '00000000-0000-0000-0000-000000000000',
+        name: 'Notice',
+        type: 'notice',
+        members: [],
+        created_at: '2026-03-08T00:00:00.000Z',
+        last_message_at: '2026-03-08T00:00:00.000Z',
+      },
+      {
+        id: 'room-mobile-main',
+        name: 'Mobile Main Room',
+        type: 'group',
+        members: [fakeUser.id, 'peer-mobile-main'],
+        created_at: '2026-03-08T09:00:00.000Z',
+        last_message_at: '2026-03-08T10:00:00.000Z',
+        last_message_preview: 'main room message',
+      },
+    ],
+    staffMembers: [
+      fakeUser,
+      {
+        ...fakeUser,
+        id: 'peer-mobile-main',
+        name: 'Mobile Main Peer',
+        employee_no: 'E2E-CHAT-MOBILE-MAIN',
+      },
+    ],
+    messages: [
+      {
+        id: 'msg-mobile-main-1',
+        room_id: 'room-mobile-main',
+        sender_id: 'peer-mobile-main',
+        content: 'main room message',
+        created_at: '2026-03-08T10:00:00.000Z',
+        is_deleted: false,
+        staff: { name: 'Mobile Main Peer', photo_url: null },
+      },
+    ],
+  });
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '내정보',
+      erp_chat_last_room: 'room-mobile-main',
+    },
+  });
+
+  await page.goto('/main');
+  await expect(page.getByTestId('mypage-view')).toBeVisible();
+
+  await page.getByTestId('sidebar-menu-chat-mobile').click();
+
+  await expect(page.getByTestId('chat-view')).toBeVisible();
+  await expect(page.getByTestId('chat-room-room-mobile-main')).toBeVisible();
+  await expect(page.getByTestId('chat-message-input')).toBeHidden();
+});
+
 test('mobile chat tab returns to the room list when tapped again', async ({ page }) => {
   await mockSupabase(page, {
     chatRooms: [

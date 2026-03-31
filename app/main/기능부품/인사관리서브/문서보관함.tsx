@@ -65,13 +65,8 @@ export default function DocumentRepository({
 
   const fetchDocs = async () => {
     setLoading(true);
-    const companyFilter = selectedCo === '전체' ? undefined : selectedCo;
     let repositoryQuery = supabase.from('document_repository').select('*').order('updated_at', { ascending: false });
     let approvalsQuery = supabase.from('approvals').select('*').order('created_at', { ascending: false });
-    if (companyFilter) {
-      repositoryQuery = repositoryQuery.eq('company_name', companyFilter);
-      approvalsQuery = approvalsQuery.eq('sender_company', companyFilter);
-    }
     const [{ data: repositoryDocs }, { data: approvalDocs }] = await Promise.all([repositoryQuery, approvalsQuery]);
     const existingDocNumbers = new Set(
       (repositoryDocs || [])
@@ -190,7 +185,7 @@ export default function DocumentRepository({
           file_url: pdfUrl || selected.file_url || null,
           version: newVersion,
           updated_at: new Date().toISOString(),
-          company_name: selectedCo === '전체' ? '전체' : selectedCo
+          company_name: '전체'
         }).eq('id', selected.id);
       } else {
         await supabase.from('document_repository').insert({
@@ -199,7 +194,7 @@ export default function DocumentRepository({
           content: form.content,
           file_url: pdfUrl || null,
           version: 1,
-          company_name: selectedCo === '전체' ? '전체' : selectedCo,
+          company_name: '전체',
           created_by: user?.id
         });
       }
