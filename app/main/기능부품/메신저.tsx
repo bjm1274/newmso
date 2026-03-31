@@ -5344,7 +5344,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     <span
                       key={`${displayName}-${index}`}
                       data-testid={`chat-pending-upload-file-${index}`}
-                      className="max-w-full truncate rounded-full border border-blue-200 bg-white px-2 py-1 text-[11px] font-semibold text-blue-900"
+                      className="max-w-full truncate rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-[11px] font-semibold text-[var(--accent)]"
                       title={displayName}
                     >
                       {displayName}
@@ -6985,7 +6985,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 <img
                   src={attachmentPreview.url}
                   alt={attachmentPreview.name || '미리보기'}
-                  className="max-w-[92vw] max-h-[80vh] rounded-xl object-contain shadow-2xl select-none"
+                  className="max-w-[92vw] max-h-[80vh] rounded-xl object-contain shadow-sm select-none"
                   style={{
                     transform: `translate3d(${attachmentOffset.x}px, ${attachmentOffset.y}px, 0) scale(${attachmentZoom})`,
                     transformOrigin: 'center center',
@@ -7000,16 +7000,16 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 controls
                 autoPlay
                 playsInline
-                className="max-w-[92vw] max-h-[88vh] rounded-xl bg-black shadow-2xl"
+                className="max-w-[92vw] max-h-[88vh] rounded-xl bg-black shadow-sm"
               />
             ) : /\.pdf(\?|#|$)/i.test(attachmentPreview.url) ? (
               <iframe
                 src={attachmentPreview.url}
                 title={attachmentPreview.name}
-                className="w-[92vw] h-[88vh] rounded-xl bg-white shadow-2xl"
+                className="w-[92vw] h-[88vh] rounded-xl bg-[var(--card)] shadow-sm"
               />
             ) : (
-              <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl text-left">
+              <div className="w-full max-w-md rounded-[var(--radius-xl)] bg-[var(--card)] p-6 shadow-sm text-left">
                 <p className="text-sm font-bold text-[var(--foreground)] break-all">{attachmentPreview.name}</p>
                 <p className="mt-2 text-xs text-[var(--toss-gray-4)] break-all">{attachmentPreview.url}</p>
                 <div className="mt-4 flex flex-wrap gap-2">

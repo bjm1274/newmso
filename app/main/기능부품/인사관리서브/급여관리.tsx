@@ -163,7 +163,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: Payr
 
           <div className="h-6 w-[1px] bg-[var(--border)] mx-1" />
 
-          <nav className="flex gap-1">
+          <nav className="no-scrollbar overflow-x-auto flex gap-1">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -172,7 +172,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: Payr
                   setActiveTab(tab.id);
                   if (tab.id !== '급여정산') setSelectedStaffId(null as any);
                 }}
-                className={`px-4 py-2 rounded-[var(--radius-md)] text-[11px] md:text-xs font-bold transition-all flex items-center gap-2 ${activeTab === tab.id
+                className={`px-4 py-2.5 rounded-[var(--radius-md)] text-[12px] font-bold transition-all flex items-center gap-2 whitespace-nowrap ${activeTab === tab.id
                   ? 'bg-[var(--accent)] text-white shadow-sm scale-[1.02]'
                   : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--card)]/50'
                   }`}
@@ -185,7 +185,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: Payr
 
         <div className="hidden lg:flex items-center gap-3">
           <div className="px-4 py-2 bg-[var(--toss-blue-light)]/50 rounded-[var(--radius-md)] border border-[var(--accent)]/10">
-            <p className="text-[10px] font-bold text-[var(--accent)]/60 text-center leading-tight">선택된 사업체</p>
+            <p className="text-[11px] font-bold text-[var(--accent)]/60 text-center leading-tight">선택된 사업체</p>
             <p className="text-sm font-bold text-[var(--accent)] leading-tight">{selectedCo as string}</p>
           </div>
         </div>
@@ -212,7 +212,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: Payr
             )}
 
             {activeTab === '급여대장' && (
-              <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-4">
+              <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3 xl:grid-cols-4">
                 <div className="xl:col-span-1 h-fit max-h-[800px] sticky top-4">
                   <PayrollTable
                     staffs={filtered}

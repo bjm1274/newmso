@@ -13,6 +13,7 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: Record<s
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('계약현황');
   const [contractSubType, setContractSubType] = useState<'신규' | '변경'>('신규'); // 신규/변경계약서용
+  const [mobileListOpen, setMobileListOpen] = useState(false);
 
   // 확장된 비과세 항목 상태 (근로계약서·변경계약서·연봉계약서 공통)
   const [salaryInfo, setSalaryInfo] = useState({
@@ -178,7 +179,7 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: Record<s
           </div>
         </div>
         {activeTab !== '양식 편집' && (
-          <button onClick={handleRequestSignature} disabled={loading || checkedIds.length === 0} className="px-4 py-3 bg-[var(--foreground)] text-white text-[11px] font-semibold rounded-[var(--radius-md)] shadow-sm hover:scale-[0.98] transition-all disabled:opacity-50">
+          <button onClick={handleRequestSignature} disabled={loading || checkedIds.length === 0} className="px-4 py-3 bg-[var(--foreground)] text-white text-[12px] font-semibold rounded-[var(--radius-md)] shadow-sm hover:scale-[0.98] transition-all disabled:opacity-50">
             {loading ? '처리 중...' : `${activeTab === '연봉계약갱신' ? '연봉 갱신 및 계약 발송' : activeTab === '신규/변경계약서' ? `${contractSubType} 계약서 발송` : '근로계약서 발송'} (${checkedIds.length}명)`}
           </button>
         )}
@@ -189,66 +190,170 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: Record<s
         {activeTab === '양식 편집' ? (
           <ContractTemplateEditor selectedCo={selectedCo as string} />
         ) : (
-        <div className="flex h-full">
-          {/* 좌측: 계약 대상자 명단 (Compact List) */}
-          <div className="w-1/3 lg:w-1/4 border-r border-[var(--border)] bg-[var(--card)] overflow-y-auto custom-scrollbar">
+        <div className="flex flex-col md:flex-row h-full">
+          {/* 모바일: 직원 선택 토글 버튼 */}
+          <div className="md:hidden shrink-0 border-b border-[var(--border)] bg-[var(--card)] px-4 py-2.5 flex items-center justify-between">
+            <span className="text-[12px] font-semibold text-[var(--foreground)]">
+              {selectedStaffId
+                ? `선택됨 · ${checkedIds.length}명 체크`
+                : '직원을 선택하세요'}
+            </span>
+            <button
+              onClick={() => setMobileListOpen(v => !v)}
+              className="px-3 py-1.5 bg-[var(--accent)] text-white text-[12px] font-semibold rounded-[var(--radius-md)] flex items-center gap-1"
+            >
+              직원 선택 {mobileListOpen ? '▲' : '▼'}
+            </button>
+          </div>
+
+          {/* 모바일 오버레이 드로워 */}
+          {mobileListOpen && (
+            <div className="md:hidden fixed inset-0 z-50 flex">
+              {/* 배경 딤 */}
+              <div
+                className="absolute inset-0 bg-black/40"
+                onClick={() => setMobileListOpen(false)}
+              />
+              {/* 드로워 패널 */}
+              <div className="relative z-10 w-[80%] max-w-xs h-full bg-[var(--card)] overflow-y-auto custom-scrollbar shadow-xl flex flex-col">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] shrink-0">
+                  <span className="text-[13px] font-bold text-[var(--foreground)]">직원 선택</span>
+                  <button onClick={() => setMobileListOpen(false)} className="text-[var(--toss-gray-3)] text-lg leading-none px-1">✕</button>
+                </div>
+                <div className="p-4 flex-1">
+                  {activeTab === '신규/변경계약서' && (
+                    <div className="mb-4 p-4 bg-[var(--accent)] text-white rounded-[var(--radius-lg)] shadow-sm space-y-3 animate-in slide-in-from-top-4 duration-500">
+                      <div className="flex flex-col gap-2">
+                        <h3 className="text-sm font-bold">비과세 항목 설정</h3>
+                        <div className="flex gap-1.5 p-1 bg-[var(--card)]/10 rounded-lg">
+                          <button onClick={() => setContractSubType('신규')} className={`flex-1 py-1.5 rounded-md text-[11px] font-bold transition-all ${contractSubType === '신규' ? 'bg-[var(--card)] text-[var(--accent)]' : 'text-white hover:bg-[var(--card)]/10'}`}>신규</button>
+                          <button onClick={() => setContractSubType('변경')} className={`flex-1 py-1.5 rounded-md text-[11px] font-bold transition-all ${contractSubType === '변경' ? 'bg-[var(--card)] text-[var(--accent)]' : 'text-white hover:bg-[var(--card)]/10'}`}>변경</button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 gap-2.5">
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold">기본급 (월)</label>
+                          <input type="number" value={salaryInfo.base_salary} onChange={(e) => setSalaryInfo({ ...salaryInfo, base_salary: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold">식대 (한도 20만)</label>
+                          <input type="number" value={salaryInfo.meal_allowance} onChange={(e) => setSalaryInfo({ ...salaryInfo, meal_allowance: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold">적용일자</label>
+                          <input type="text" value={salaryInfo.effective_date} onChange={(e) => setSalaryInfo({ ...salaryInfo, effective_date: e.target.value })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white selection:bg-[var(--card)]/30" placeholder="0000-00-00" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-white/10 mt-1">
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-bold">주당 시간</label>
+                            <input type="number" value={salaryInfo.working_hours_per_week} onChange={(e) => setSalaryInfo({ ...salaryInfo, working_hours_per_week: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-bold">주당 일수</label>
+                            <input type="number" value={salaryInfo.working_days_per_week} onChange={(e) => setSalaryInfo({ ...salaryInfo, working_days_per_week: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-bold">출근시간</label>
+                            <input type="text" value={salaryInfo.shift_start_time} onChange={(e) => setSalaryInfo({ ...salaryInfo, shift_start_time: e.target.value })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" placeholder="09:00" />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-bold">퇴근시간</label>
+                            <input type="text" value={salaryInfo.shift_end_time} onChange={(e) => setSalaryInfo({ ...salaryInfo, shift_end_time: e.target.value })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" placeholder="18:00" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {activeTab === '연봉계약갱신' && (
+                    <div className="mb-4 p-4 bg-[var(--foreground)] text-white rounded-[var(--radius-lg)] shadow-sm space-y-3 animate-in slide-in-from-top-4 duration-500">
+                      <h3 className="text-sm font-bold text-[var(--accent)]">연봉 계약 갱신 설정</h3>
+                      <div className="grid grid-cols-1 gap-2.5">
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold">갱신 기본급</label>
+                          <input type="number" value={salaryInfo.base_salary} onChange={(e) => setSalaryInfo({ ...salaryInfo, base_salary: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/5 border border-white/10 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/10 text-white" />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold">적용 시작일</label>
+                          <input type="text" value={salaryInfo.effective_date} onChange={(e) => setSalaryInfo({ ...salaryInfo, effective_date: e.target.value })} className="w-full px-3 py-2.5 bg-[var(--card)]/5 border border-white/10 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/10 text-white selection:bg-[var(--card)]/20" placeholder="0000-00-00" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <ContractList
+                    selectedCo={selectedCo as string}
+                    staffs={staffs as any[]}
+                    contracts={contracts}
+                    onSelect={(id: number) => { setSelectedStaffId(id); setMobileListOpen(false); }}
+                    checkedIds={checkedIds}
+                    setCheckedIds={setCheckedIds}
+                    isCompact={true}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 데스크탑 좌측 패널 */}
+          <div className="hidden md:block md:w-1/3 lg:w-1/4 border-r border-[var(--border)] bg-[var(--card)] overflow-y-auto custom-scrollbar">
             <div className="p-4">
               {activeTab === '신규/변경계약서' && (
                 <div className="mb-4 p-5 bg-[var(--accent)] text-white rounded-[var(--radius-lg)] shadow-sm space-y-4 animate-in slide-in-from-top-4 duration-500">
                   <div className="flex flex-col gap-3">
                     <h3 className="text-sm font-bold">비과세 항목 설정</h3>
                     <div className="flex gap-1.5 p-1 bg-[var(--card)]/10 rounded-lg">
-                      <button onClick={() => setContractSubType('신규')} className={`flex-1 py-1.5 rounded-md text-[10px] font-bold transition-all ${contractSubType === '신규' ? 'bg-[var(--card)] text-[var(--accent)]' : 'text-white hover:bg-[var(--card)]/10'}`}>신규</button>
-                      <button onClick={() => setContractSubType('변경')} className={`flex-1 py-1.5 rounded-md text-[10px] font-bold transition-all ${contractSubType === '변경' ? 'bg-[var(--card)] text-[var(--accent)]' : 'text-white hover:bg-[var(--card)]/10'}`}>변경</button>
+                      <button onClick={() => setContractSubType('신규')} className={`flex-1 py-1.5 rounded-md text-[11px] font-bold transition-all ${contractSubType === '신규' ? 'bg-[var(--card)] text-[var(--accent)]' : 'text-white hover:bg-[var(--card)]/10'}`}>신규</button>
+                      <button onClick={() => setContractSubType('변경')} className={`flex-1 py-1.5 rounded-md text-[11px] font-bold transition-all ${contractSubType === '변경' ? 'bg-[var(--card)] text-[var(--accent)]' : 'text-white hover:bg-[var(--card)]/10'}`}>변경</button>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold opacity-80">기본급 (월)</label>
-                      <input type="number" value={salaryInfo.base_salary} onChange={(e) => setSalaryInfo({ ...salaryInfo, base_salary: Number(e.target.value) })} className="w-full p-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
+                      <label className="text-[11px] font-bold">기본급 (월)</label>
+                      <input type="number" value={salaryInfo.base_salary} onChange={(e) => setSalaryInfo({ ...salaryInfo, base_salary: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold opacity-80">식대 (한도 20만)</label>
-                      <input type="number" value={salaryInfo.meal_allowance} onChange={(e) => setSalaryInfo({ ...salaryInfo, meal_allowance: Number(e.target.value) })} className="w-full p-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
+                      <label className="text-[11px] font-bold">식대 (한도 20만)</label>
+                      <input type="number" value={salaryInfo.meal_allowance} onChange={(e) => setSalaryInfo({ ...salaryInfo, meal_allowance: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold opacity-80">적용일자</label>
-                      <input type="text" value={salaryInfo.effective_date} onChange={(e) => setSalaryInfo({ ...salaryInfo, effective_date: e.target.value })} className="w-full p-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white selection:bg-[var(--card)]/30" placeholder="0000-00-00" />
+                      <label className="text-[11px] font-bold">적용일자</label>
+                      <input type="text" value={salaryInfo.effective_date} onChange={(e) => setSalaryInfo({ ...salaryInfo, effective_date: e.target.value })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white selection:bg-[var(--card)]/30" placeholder="0000-00-00" />
                     </div>
                     <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/10 mt-2">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold opacity-80">주당 시간</label>
-                        <input type="number" value={salaryInfo.working_hours_per_week} onChange={(e) => setSalaryInfo({ ...salaryInfo, working_hours_per_week: Number(e.target.value) })} className="w-full p-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
+                        <label className="text-[11px] font-bold">주당 시간</label>
+                        <input type="number" value={salaryInfo.working_hours_per_week} onChange={(e) => setSalaryInfo({ ...salaryInfo, working_hours_per_week: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold opacity-80">주당 일수</label>
-                        <input type="number" value={salaryInfo.working_days_per_week} onChange={(e) => setSalaryInfo({ ...salaryInfo, working_days_per_week: Number(e.target.value) })} className="w-full p-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
+                        <label className="text-[11px] font-bold">주당 일수</label>
+                        <input type="number" value={salaryInfo.working_days_per_week} onChange={(e) => setSalaryInfo({ ...salaryInfo, working_days_per_week: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold opacity-80">출근시간</label>
-                        <input type="text" value={salaryInfo.shift_start_time} onChange={(e) => setSalaryInfo({ ...salaryInfo, shift_start_time: e.target.value })} className="w-full p-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" placeholder="09:00" />
+                        <label className="text-[11px] font-bold">출근시간</label>
+                        <input type="text" value={salaryInfo.shift_start_time} onChange={(e) => setSalaryInfo({ ...salaryInfo, shift_start_time: e.target.value })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" placeholder="09:00" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold opacity-80">퇴근시간</label>
-                        <input type="text" value={salaryInfo.shift_end_time} onChange={(e) => setSalaryInfo({ ...salaryInfo, shift_end_time: e.target.value })} className="w-full p-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" placeholder="18:00" />
+                        <label className="text-[11px] font-bold">퇴근시간</label>
+                        <input type="text" value={salaryInfo.shift_end_time} onChange={(e) => setSalaryInfo({ ...salaryInfo, shift_end_time: e.target.value })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" placeholder="18:00" />
                       </div>
                     </div>
                   </div>
                 </div>
               )}
               {activeTab === '연봉계약갱신' && (
-                <div className="mb-4 p-5 bg-slate-800 text-white rounded-[var(--radius-lg)] shadow-sm space-y-4 animate-in slide-in-from-top-4 duration-500">
-                  <h3 className="text-sm font-bold text-blue-400">연봉 계약 갱신 설정</h3>
+                <div className="mb-4 p-5 bg-[var(--foreground)] text-white rounded-[var(--radius-lg)] shadow-sm space-y-4 animate-in slide-in-from-top-4 duration-500">
+                  <h3 className="text-sm font-bold text-[var(--accent)]">연봉 계약 갱신 설정</h3>
                   <div className="grid grid-cols-1 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold opacity-70">갱신 기본급</label>
-                      <input type="number" value={salaryInfo.base_salary} onChange={(e) => setSalaryInfo({ ...salaryInfo, base_salary: Number(e.target.value) })} className="w-full p-2.5 bg-[var(--card)]/5 border border-white/10 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/10 text-white" />
+                      <label className="text-[11px] font-bold">갱신 기본급</label>
+                      <input type="number" value={salaryInfo.base_salary} onChange={(e) => setSalaryInfo({ ...salaryInfo, base_salary: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/5 border border-white/10 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/10 text-white" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold opacity-70">적용 시작일</label>
-                      <input type="text" value={salaryInfo.effective_date} onChange={(e) => setSalaryInfo({ ...salaryInfo, effective_date: e.target.value })} className="w-full p-2.5 bg-[var(--card)]/5 border border-white/10 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/10 text-white selection:bg-[var(--card)]/20" placeholder="0000-00-00" />
+                      <label className="text-[11px] font-bold">적용 시작일</label>
+                      <input type="text" value={salaryInfo.effective_date} onChange={(e) => setSalaryInfo({ ...salaryInfo, effective_date: e.target.value })} className="w-full px-3 py-2.5 bg-[var(--card)]/5 border border-white/10 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/10 text-white selection:bg-[var(--card)]/20" placeholder="0000-00-00" />
                     </div>
                   </div>
                 </div>

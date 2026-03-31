@@ -361,7 +361,7 @@ function getBoardStatusTone(status: string | null | undefined) {
     case '완료':
       return 'bg-emerald-50 text-emerald-700';
     case '보류':
-      return 'bg-slate-100 text-slate-600';
+      return 'bg-[var(--muted)] text-[var(--toss-gray-3)]';
     default:
       return 'bg-[var(--toss-blue-light)] text-[var(--accent)]';
   }
@@ -2156,7 +2156,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                                       onClick={() =>
                                         setExistingAttachmentItems((prev) => prev.filter((_, idx) => idx !== i))
                                       }
-                                      className="shrink-0 rounded border border-red-200 px-2 py-1 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                                      className="shrink-0 rounded border border-red-200 px-2.5 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-50"
                                     >
                                       삭제
                                     </button>
@@ -2201,7 +2201,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                                 <button
                                   type="button"
                                   onClick={() => setAttachmentFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                                  className="shrink-0 px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 text-[11px]"
+                                  className="shrink-0 px-2.5 py-1.5 rounded border border-red-200 text-red-600 hover:bg-red-50 text-[11px]"
                                 >
                                   삭제
                                 </button>
@@ -2428,7 +2428,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                         type="button"
                         data-testid={`board-legacy-schedule-item-${post.id}`}
                         onClick={() => setSelectedPostId(post.id)}
-                        className="rounded-[var(--radius-md)] border border-amber-200 bg-white px-2 py-1 text-[11px] font-bold text-amber-800 hover:bg-amber-100"
+                        className="rounded-[var(--radius-md)] border border-amber-200 bg-[var(--card)] px-2.5 py-1.5 text-[11px] font-bold text-amber-800 hover:bg-amber-100"
                       >
                         {post.title || '제목 없음'}
                       </button>
@@ -2481,7 +2481,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                                   data-testid={`board-calendar-day-count-${key}`}
                                   type="button"
                                   onClick={() => events[0] && setSelectedPostId(events[0].id)}
-                                  className="text-[11px] font-semibold text-[var(--accent)] px-1 py-0.5 rounded-[var(--radius-md)] hover:bg-[var(--toss-blue-light)]"
+                                  className="text-[11px] font-semibold text-[var(--accent)] px-2 py-1 rounded-[var(--radius-md)] hover:bg-[var(--toss-blue-light)]"
                                 >
                                   {events.length}건
                                 </button>

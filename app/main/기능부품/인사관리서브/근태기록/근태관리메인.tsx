@@ -173,7 +173,7 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
                 <button
                   key={mode.id}
                   onClick={() => setViewMode(mode.id as any)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-[var(--radius-md)] text-[11px] font-bold transition-all whitespace-nowrap ${viewMode === mode.id
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-[var(--radius-md)] text-[12px] font-bold transition-all whitespace-nowrap ${viewMode === mode.id
                     ? 'bg-[var(--card)] dark:bg-zinc-700 text-foreground shadow-sm ring-1 ring-zinc-900/5 dark:ring-white/10'
                     : 'text-[var(--toss-gray-4)] hover:text-foreground hover:bg-[var(--card)]/50 dark:hover:bg-zinc-700/50'
                     }`}
@@ -189,7 +189,7 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
             <button
               type="button"
               onClick={() => setBulkEditOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--card)] dark:bg-zinc-800 text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] border border-[var(--border)] dark:border-zinc-700 shadow-sm hover:border-blue-400 hover:text-blue-600 transition-colors whitespace-nowrap focus:outline-none"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--card)] dark:bg-zinc-800 text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] border border-[var(--border)] dark:border-zinc-700 shadow-sm hover:border-blue-400 hover:text-blue-600 transition-colors whitespace-nowrap focus:outline-none"
             >
               <span className="text-sm">⚡</span> 상태 일괄 수정
             </button>
@@ -201,7 +201,7 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
                   <SmartDatePicker
                     value={selectedDate}
                     onChange={(val) => setSelectedDate(val)}
-                    className="bg-transparent px-3 py-1.5 text-xs font-bold text-foreground outline-none w-32 cursor-pointer"
+                    className="bg-transparent px-3 py-1.5 text-xs font-bold text-foreground outline-none w-full sm:w-32 cursor-pointer"
                   />
                 </>
               ) : (
@@ -210,7 +210,7 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
                   <SmartMonthPicker
                     value={selectedMonth}
                     onChange={(val) => setSelectedMonth(val)}
-                    className="bg-transparent px-3 py-1.5 text-xs font-bold text-foreground outline-none w-32 cursor-pointer"
+                    className="bg-transparent px-3 py-1.5 text-xs font-bold text-foreground outline-none w-full sm:w-32 cursor-pointer"
                   />
                 </>
               )}

@@ -249,7 +249,7 @@ export default function ShiftCalendar({ staffs = [], selectedCo = '전체' }: Sh
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-[var(--tab-bg)] overflow-hidden flex items-center justify-center shrink-0">
                         {staff.avatar_url ? (
-                          <img src={staff.avatar_url} alt="" className="w-full h-full object-cover" />
+                          <img src={staff.avatar_url} alt={staff.name ? `${staff.name} 프로필 사진` : '프로필 사진'} className="w-full h-full object-cover" />
                         ) : (
                           <span className="text-xl">👤</span>
                         )}

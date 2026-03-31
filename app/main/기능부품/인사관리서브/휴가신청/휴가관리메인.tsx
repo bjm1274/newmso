@@ -222,7 +222,7 @@ export default function LeaveManagement({
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               data-testid={`leave-tab-${tab.id.replace(/[^\w가-힣]+/g, '-')}`}
-              className={`px-4 py-3 rounded-[var(--radius-md)] text-[11px] font-semibold whitespace-nowrap transition-all ${activeTab === tab.id
+              className={`px-3 py-2.5 rounded-[var(--radius-md)] text-[12px] font-semibold whitespace-nowrap transition-all ${activeTab === tab.id
                 ? 'bg-[var(--foreground)] text-white shadow-sm'
                 : 'bg-[var(--card)] text-[var(--toss-gray-3)] border border-[var(--border)] hover:bg-[var(--muted)]'
                 }`}
@@ -296,7 +296,7 @@ export default function LeaveManagement({
             </div>
 
             <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
-              <div className="overflow-x-auto no-scrollbar">
+              <div className="overflow-x-auto custom-scrollbar">
                 <table className="w-full text-left border-collapse min-w-[800px]">
                   <thead className="bg-[var(--muted)]/50 text-[11px] font-semibold text-[var(--toss-gray-3)] border-b border-[var(--border)] uppercase">
                     <tr>
@@ -342,8 +342,8 @@ export default function LeaveManagement({
                         <td className="px-5 py-5 text-right">
                           {l.status === '대기' && (
                             <div className="flex justify-end gap-2">
-                              <button type="button" onClick={() => handleStatusUpdate(l.id, '승인')} className="px-4 py-2 bg-[var(--accent)] text-white text-[11px] font-semibold rounded-[var(--radius-lg)] shadow-sm hover:scale-[0.98] transition-all">승인</button>
-                              <button type="button" onClick={() => handleStatusUpdate(l.id, '반려')} className="px-4 py-2 bg-red-50 border border-red-200 text-[11px] font-semibold text-red-600 rounded-[var(--radius-lg)] hover:bg-red-100 transition-all">반려</button>
+                              <button type="button" onClick={() => handleStatusUpdate(l.id, '승인')} className="px-3 py-2 min-h-[36px] bg-[var(--accent)] text-white text-[11px] font-semibold rounded-[var(--radius-lg)] shadow-sm hover:scale-[0.98] transition-all">승인</button>
+                              <button type="button" onClick={() => handleStatusUpdate(l.id, '반려')} className="px-3 py-2 min-h-[36px] bg-red-50 border border-red-200 text-[11px] font-semibold text-red-600 rounded-[var(--radius-lg)] hover:bg-red-100 transition-all">반려</button>
                             </div>
                           )}
                         </td>

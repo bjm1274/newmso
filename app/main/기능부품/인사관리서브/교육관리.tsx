@@ -272,7 +272,7 @@ export default function EducationMain({ staffs, selectedCo }: Record<string, unk
       </header>
 
       {showNoti && (
-        <div className="absolute top-32 right-8 w-80 bg-[var(--card)] border border-[var(--border)] shadow-sm z-50 p-4 rounded-none animate-in slide-in-from-top-4">
+        <div className="absolute top-32 right-8 w-full max-w-sm bg-[var(--card)] border border-[var(--border)] shadow-sm z-50 p-4 rounded-none animate-in slide-in-from-top-4">
           <div className="flex justify-between items-center mb-4 border-b pb-2">
             <h4 className="text-xs font-semibold text-[var(--foreground)]">
               {activeTab === '의무교육' ? '교육 이수 독려 대상' : '면허 갱신 독려 대상'}
@@ -281,7 +281,7 @@ export default function EducationMain({ staffs, selectedCo }: Record<string, unk
           </div>
           <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar">
             {activeAlerts.map((item: any, index) => (
-              <div key={index} className={`p-3 border-l-4 ${item.type === 'URGENT' ? 'border-red-500 bg-red-50' : 'border-orange-400 bg-orange-50'}`}>
+              <div key={index} className={`p-3 border-l-4 ${item.type === 'URGENT' ? 'border-red-500 bg-red-500/10' : 'border-orange-400 bg-orange-500/10'}`}>
                 <p className="text-[11px] font-semibold text-[var(--foreground)]">
                   {activeTab === '의무교육' ? `${item.name} (${item.education})` : `${item.name} (${item.licenseName})`}
                 </p>
@@ -348,17 +348,17 @@ export default function EducationMain({ staffs, selectedCo }: Record<string, unk
           </>
         ) : (
           <>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
               <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">만료 임박</p>
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">만료 임박</p>
                 <p className="mt-2 text-3xl font-bold text-red-500">{urgentLicenseCount}건</p>
               </div>
               <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">90일 내 갱신</p>
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">90일 내 갱신</p>
                 <p className="mt-2 text-3xl font-bold text-orange-500">{licenseNotifications.length}건</p>
               </div>
               <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">즉시 조치</p>
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">즉시 조치</p>
                 <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">갱신 요청 발송 / 사본 확보 / 부서장 확인</p>
               </div>
             </div>

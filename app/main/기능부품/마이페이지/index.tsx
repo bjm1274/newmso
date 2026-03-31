@@ -481,7 +481,13 @@ export default function MyPageMain({
     }
   };
 
-  if (!user) return <div className="p-5 text-center font-bold">사용자 정보 로딩 중...</div>;
+  if (!user) return (
+    <div className="flex h-full flex-col items-center justify-center gap-4 p-8">
+      <div className="h-14 w-14 rounded-full skeleton" />
+      <div className="w-40 skeleton-text" />
+      <div className="w-56 skeleton-sm" />
+    </div>
+  );
 
   return (
     <div className="relative h-full min-h-0 flex flex-col overflow-x-hidden app-page px-3 py-2.5 md:px-4 md:py-3">
@@ -554,7 +560,7 @@ export default function MyPageMain({
             <button
               type="button"
               onClick={() => setShowFavPicker((v) => !v)}
-              className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-3 py-1.5 text-[11px] font-semibold whitespace-nowrap text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
+              className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-3 py-2 text-[11px] font-semibold whitespace-nowrap text-[var(--toss-gray-3)] hover:bg-[var(--muted)] min-h-[36px]"
             >
               + 즐겨찾기 추가
             </button>
@@ -744,7 +750,7 @@ function ProfileHeaderSummary({
           <button
             type="button"
             onClick={onToggleSecret}
-            className="rounded-[var(--radius-md)] border border-transparent bg-[var(--muted)] px-3 py-1.5 text-[10px] font-bold text-[var(--toss-gray-3)] transition-all hover:border-[var(--toss-blue-light)] hover:text-[var(--accent)]"
+            className="rounded-[var(--radius-md)] border border-transparent bg-[var(--muted)] px-3 py-2 text-[11px] font-bold text-[var(--toss-gray-3)] transition-all hover:border-[var(--toss-blue-light)] hover:text-[var(--accent)]"
           >
             {showSecret ? '민감 정보 숨기기' : '보안 정보 보기'}
           </button>
@@ -752,7 +758,7 @@ function ProfileHeaderSummary({
             type="button"
             onClick={onToggleEdit}
             data-testid="mypage-profile-edit-toggle"
-            className={`rounded-[var(--radius-md)] border px-3 py-1.5 text-[10px] font-bold transition-all ${
+            className={`rounded-[var(--radius-md)] border px-3 py-2 text-[11px] font-bold transition-all ${
               isEditing
                 ? 'bg-red-50 text-red-500 border-red-100 hover:bg-red-100'
                 : 'bg-[var(--toss-blue-light)] text-[var(--accent)] border-[var(--toss-blue-light)] hover:bg-[var(--toss-blue-light)]'
@@ -885,11 +891,11 @@ function TabButton({ isActive, onClick, label, icon, ariaLabel }: {
     <button
       onClick={onClick}
       {...(ariaLabel ? { 'aria-label': ariaLabel } : {})}
-      className={`flex flex-col md:flex-row items-center gap-0.5 md:gap-1.5 px-2 md:px-4 py-1.5 md:py-2 rounded-[var(--radius-md)] text-[10px] md:text-[12px] font-semibold transition-all whitespace-nowrap
-        ${isActive ? 'bg-[var(--accent)] text-white' : 'text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)]'}
+      className={`flex flex-col md:flex-row items-center gap-0.5 md:gap-1.5 px-2.5 md:px-4 py-2 md:py-2.5 rounded-[var(--radius-md)] text-[11px] md:text-[12px] font-semibold transition-all whitespace-nowrap min-h-[44px] md:min-h-0
+        ${isActive ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'}
       `}
     >
-      <span className="text-[12px] md:text-[13px]">{icon}</span>
+      <span className="text-[13px] md:text-[13px]">{icon}</span>
       <span>{label}</span>
     </button>
   );
@@ -905,7 +911,7 @@ function QuickFavoriteButton({ label, icon, onClick, active, onRemove }: {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-md)] text-[11px] font-semibold border transition-all
+      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-md)] text-[11px] font-semibold border transition-all
         ${active ? 'bg-[var(--accent)] text-white border-[var(--accent)]' : 'bg-[var(--card)] text-[var(--toss-gray-4)] border-[var(--border)] hover:bg-[var(--tab-bg)]'}
       `}
     >

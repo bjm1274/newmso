@@ -104,6 +104,7 @@ export default function RoleDashboard({
   selectedCompanyId,
 }: Props) {
   const [pendingApprovals, setPendingApprovals] = useState(0);
+  const [loadError, setLoadError] = useState(false);
   const [lowStockCount, setLowStockCount] = useState(0);
   const [todayAttendance, setTodayAttendance] = useState<TodayAttendance>({ in: null, out: null, status: null });
   const [annualLeave, setAnnualLeave] = useState<AnnualLeaveSummary | null>(null);
@@ -152,6 +153,7 @@ export default function RoleDashboard({
 
     if (error) {
       console.error('Failed to load pending approvals:', error);
+      setLoadError(true);
       setPendingApprovals(0);
       return;
     }
@@ -337,6 +339,11 @@ export default function RoleDashboard({
 
   return (
     <div className="mb-0">
+      {loadError && (
+        <div className="text-center py-4 text-[var(--toss-gray-3)] text-[12px]">
+          데이터를 불러오지 못했습니다
+        </div>
+      )}
       {isAdmin ? (
         <AdminDashboard
           pendingApprovals={pendingApprovals}
