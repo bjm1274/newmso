@@ -88,6 +88,10 @@ const SurgeryConsultationView = dynamic(() => import('./수술상담'), {
   ssr: false,
   loading: () => <SubviewLoading label="수술상담 AI 분석" />,
 });
+const OperationCheckView = dynamic(() => import('./OP체크'), {
+  ssr: false,
+  loading: () => <SubviewLoading label="OP체크" />,
+});
 const OrgChart = dynamic(() => import('./조직도서브/OrgChart'), {
   ssr: false,
   loading: () => <SubviewLoading label="조직도" />,
@@ -115,6 +119,7 @@ const FEATURE_CARDS: FeatureCard[] = [
   { id: '직원평가', label: '직원평가', icon: '✍️', subView: '직원평가' },
   { id: '입금실시간조회', label: '입금 실시간 조회', icon: '🏦', subView: '입금실시간조회' },
   { id: '수술상담', label: '수술상담 AI 분석', icon: '🎙️', subView: '수술상담' },
+  { id: 'OP체크', label: 'OP체크', icon: '🩺', subView: 'OP체크' },
 ];
 
 const FEATURE_CARD_TEST_IDS = [
@@ -126,6 +131,8 @@ const FEATURE_CARD_TEST_IDS = [
   'closing-report',
   'staff-evaluation',
   'realtime-deposit',
+  'surgery-consultation',
+  'op-check',
 ] as const;
 
 const MAX_RECENT = 5;
@@ -437,6 +444,14 @@ export default function ExtraFeatures({
     return (
       <FeatureShell onBack={() => setSubView(null)} maxWidth="max-w-4xl">
         <SurgeryConsultationView user={user || {}} />
+      </FeatureShell>
+    );
+  }
+
+  if (subView === 'OP체크') {
+    return (
+      <FeatureShell onBack={() => setSubView(null)} maxWidth="max-w-7xl">
+        <OperationCheckView user={user || {}} staffs={staffs} />
       </FeatureShell>
     );
   }

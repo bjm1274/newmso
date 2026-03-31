@@ -247,6 +247,64 @@ export interface InventoryItem {
   [key: string]: unknown;
 }
 
+export interface OpCheckItem {
+  id: string;
+  name: string;
+  quantity?: string | null;
+  unit?: string | null;
+  note?: string | null;
+  checked?: boolean | null;
+  source_label?: string | null;
+  [key: string]: unknown;
+}
+
+export interface OpCheckTemplate {
+  id: string;
+  company_id?: string | null;
+  company_name?: string | null;
+  template_scope?: 'surgery' | 'anesthesia' | null;
+  template_name?: string | null;
+  surgery_template_id?: string | null;
+  surgery_name?: string | null;
+  anesthesia_type?: string | null;
+  prep_items?: OpCheckItem[] | null;
+  consumable_items?: OpCheckItem[] | null;
+  notes?: string | null;
+  is_active?: boolean | null;
+  created_by?: string | null;
+  created_by_name?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  [key: string]: unknown;
+}
+
+export interface OpPatientCheck {
+  id: string;
+  schedule_post_id: string;
+  company_id?: string | null;
+  company_name?: string | null;
+  patient_name?: string | null;
+  chart_no?: string | null;
+  surgery_name?: string | null;
+  surgery_template_id?: string | null;
+  anesthesia_type?: string | null;
+  schedule_date?: string | null;
+  schedule_time?: string | null;
+  schedule_room?: string | null;
+  prep_items?: OpCheckItem[] | null;
+  consumable_items?: OpCheckItem[] | null;
+  notes?: string | null;
+  status?: string | null;
+  applied_template_ids?: string[] | null;
+  created_by?: string | null;
+  created_by_name?: string | null;
+  updated_by?: string | null;
+  updated_by_name?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  [key: string]: unknown;
+}
+
 export interface Supplier {
   id: string;
   name: string;

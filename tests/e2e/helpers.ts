@@ -184,6 +184,8 @@ export type MockFixtures = {
   dischargeTemplates?: any[];
   dischargeReviews?: any[];
   surgeryTemplates?: any[];
+  opCheckTemplates?: any[];
+  opPatientChecks?: any[];
   dailyClosures?: any[];
   dailyClosureItems?: any[];
   dailyChecks?: any[];
@@ -424,6 +426,8 @@ function buildFixtures(overrides: MockFixtures = {}) {
     dischargeTemplates: overrides.dischargeTemplates ?? [],
     dischargeReviews: overrides.dischargeReviews ?? [],
     surgeryTemplates: overrides.surgeryTemplates ?? [],
+    opCheckTemplates: overrides.opCheckTemplates ?? [],
+    opPatientChecks: overrides.opPatientChecks ?? [],
     dailyClosures: overrides.dailyClosures ?? [],
     dailyClosureItems: overrides.dailyClosureItems ?? [],
     dailyChecks: overrides.dailyChecks ?? [],
@@ -674,6 +678,8 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   let dischargeTemplates = [...fixtures.dischargeTemplates];
   let dischargeReviews = [...fixtures.dischargeReviews];
   const surgeryTemplates = [...fixtures.surgeryTemplates];
+  let opCheckTemplates = [...fixtures.opCheckTemplates];
+  let opPatientChecks = [...fixtures.opPatientChecks];
   let dailyClosures = [...fixtures.dailyClosures];
   let dailyClosureItems = [...fixtures.dailyClosureItems];
   let dailyChecks = [...fixtures.dailyChecks];
@@ -2145,6 +2151,110 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       }
 
       return json(route, surgeryTemplates);
+    }
+
+    if (path.includes('/op_check_templates')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(opCheckTemplates, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `op-check-template-${opCheckTemplates.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          updated_at: payload.updated_at || new Date().toISOString(),
+          prep_items: payload.prep_items ?? [],
+          consumable_items: payload.consumable_items ?? [],
+          is_active: payload.is_active ?? true,
+          ...payload,
+        }));
+        opCheckTemplates = [...opCheckTemplates, ...inserted];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'PATCH') {
+        const body = request.postDataJSON();
+        opCheckTemplates = opCheckTemplates.map((row: any) =>
+          matchFilters(row, url)
+            ? { ...row, ...body, updated_at: body.updated_at || new Date().toISOString() }
+            : row
+        );
+        const updated = applyQueryFilters(opCheckTemplates, url);
+        return json(route, wantsObject ? updated[0] ?? null : updated);
+      }
+
+      if (method === 'DELETE') {
+        const deleting = applyQueryFilters(opCheckTemplates, url);
+        const deleteIds = new Set(deleting.map((row: any) => String(row.id)));
+        opCheckTemplates = opCheckTemplates.filter((row: any) => !deleteIds.has(String(row.id)));
+        return json(route, wantsObject ? deleting[0] ?? null : deleting);
+      }
+
+      return json(route, opCheckTemplates);
+    }
+
+    if (path.includes('/op_patient_checks')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(opPatientChecks, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const upserted = payloads.map((payload: any, index: number) => {
+          const existingIndex = opPatientChecks.findIndex(
+            (row: any) =>
+              String(row.schedule_post_id || '') === String(payload.schedule_post_id || '') ||
+              (payload.id && String(row.id || '') === String(payload.id))
+          );
+          const nextRow = {
+            id:
+              payload.id ||
+              (existingIndex >= 0
+                ? opPatientChecks[existingIndex].id
+                : `op-patient-check-${opPatientChecks.length + index + 1}`),
+            created_at:
+              payload.created_at ||
+              (existingIndex >= 0 ? opPatientChecks[existingIndex].created_at : new Date().toISOString()),
+            updated_at: payload.updated_at || new Date().toISOString(),
+            prep_items: payload.prep_items ?? [],
+            consumable_items: payload.consumable_items ?? [],
+            applied_template_ids: payload.applied_template_ids ?? [],
+            ...payload,
+          };
+
+          if (existingIndex >= 0) {
+            opPatientChecks[existingIndex] = { ...opPatientChecks[existingIndex], ...nextRow };
+            return opPatientChecks[existingIndex];
+          }
+
+          opPatientChecks = [nextRow, ...opPatientChecks];
+          return nextRow;
+        });
+        return json(route, wantsObject ? upserted[0] : upserted);
+      }
+
+      if (method === 'PATCH') {
+        const body = request.postDataJSON();
+        opPatientChecks = opPatientChecks.map((row: any) =>
+          matchFilters(row, url)
+            ? { ...row, ...body, updated_at: body.updated_at || new Date().toISOString() }
+            : row
+        );
+        const updated = applyQueryFilters(opPatientChecks, url);
+        return json(route, wantsObject ? updated[0] ?? null : updated);
+      }
+
+      if (method === 'DELETE') {
+        const deleting = applyQueryFilters(opPatientChecks, url);
+        const deleteIds = new Set(deleting.map((row: any) => String(row.id)));
+        opPatientChecks = opPatientChecks.filter((row: any) => !deleteIds.has(String(row.id)));
+        return json(route, wantsObject ? deleting[0] ?? null : deleting);
+      }
+
+      return json(route, opPatientChecks);
     }
 
     if (path.includes('/daily_closures')) {
