@@ -1300,7 +1300,19 @@ test("inventory registration creates a new inventory item through the form tab",
   page,
 }) => {
   await mockSupabase(page, {
-    inventoryItems: [],
+    inventoryItems: [
+      {
+        id: "inventory-existing-box-1",
+        item_name: "멸균거즈",
+        company: fakeUser.company,
+        company_id: fakeUser.company_id,
+        department: "간호부",
+        category: "소모품",
+        unit: "BOX",
+        quantity: 5,
+        stock: 5,
+      },
+    ],
     staffMembers: [
       {
         ...fakeUser,
@@ -1333,13 +1345,15 @@ test("inventory registration creates a new inventory item through the form tab",
   await expect(page.getByTestId("inventory-registration-view")).toBeVisible();
   await page
     .getByTestId("inventory-registration-item-name")
-    .fill("E2E 신규품목");
+    .fill("멸균거즈");
+  await expect(page.getByTestId("inventory-registration-unit-box")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await page
     .getByTestId("inventory-registration-category")
     .selectOption("소모품");
   await page.getByTestId("inventory-registration-quantity").fill("12");
-  await page.getByTestId("inventory-registration-unit-box").click();
-  await page.getByTestId("inventory-registration-spec").fill("30매 / 1BOX");
   await page
     .getByTestId("inventory-registration-company")
     .selectOption(fakeUser.company);
@@ -1354,7 +1368,12 @@ test("inventory registration creates a new inventory item through the form tab",
 
   await page.getByTestId("inventory-registration-submit").click();
 
-  await createRequest;
+  const request = await createRequest;
+  const requestBody = request.postDataJSON();
+  const payload = Array.isArray(requestBody) ? requestBody[0] : requestBody;
+
+  expect(payload.spec).toBeUndefined();
+  expect(payload.unit).toBe("BOX");
 });
 
 test("company manager edits an existing company and persists the updated name", async ({
@@ -2278,7 +2297,6 @@ test("employee and admin can complete a realistic monthly operations lifecycle",
   await page.getByTestId("inventory-registration-category").selectOption("소모품");
   await page.getByTestId("inventory-registration-quantity").fill("10");
   await page.getByTestId("inventory-registration-unit-ea").click();
-  await page.getByTestId("inventory-registration-spec").fill("기본 규격");
   await page
     .getByTestId("inventory-registration-company")
     .selectOption(hospital.name);

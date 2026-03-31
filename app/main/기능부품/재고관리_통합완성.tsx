@@ -1816,6 +1816,7 @@ export default function IntegratedInventoryManagement({
               {registrationMode === 'form' ? (
                 <ProductRegistration
                   user={user}
+                  inventory={inventory}
                   suppliers={suppliers}
                   fetchInventory={fetchInventory}
                   fetchSuppliers={fetchSuppliers}
