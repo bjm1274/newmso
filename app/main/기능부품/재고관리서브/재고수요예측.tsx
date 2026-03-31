@@ -87,10 +87,10 @@ export default function InventoryDemandForecast({ user, inventory, selectedCo }:
     : forecasts.filter(f => f.status === filterStatus);
 
   const statusColor = (s: string) =>
-    s === '긴급' ? 'text-red-600 bg-red-50 border-red-200' :
+    s === '긴급' ? 'text-red-600 bg-red-500/10 border-red-500/20' :
     s === '주의' ? 'text-amber-600 bg-amber-50 border-amber-200' :
-    s === '초과재고' ? 'text-purple-600 bg-purple-50 border-purple-200' :
-    'text-green-600 bg-green-50 border-green-200';
+    s === '초과재고' ? 'text-purple-600 bg-purple-500/10 border-purple-500/20' :
+    'text-green-600 bg-green-500/10 border-green-500/20';
 
   const handleAutoOrder = async (fc: ItemForecast) => {
     if (!confirm(`${getItemName(fc.item)} ${fc.orderQty}개 발주를 자동 신청하시겠습니까?`)) return;

@@ -180,7 +180,7 @@ export default function AccessAuditLog({ user }: Props) {
               {filtered.map(log => {
                 const suspicious = isSuspicious(log);
                 return (
-                  <tr key={log.id} className={`border-t border-[var(--border)] ${suspicious ? 'bg-red-50' : 'hover:bg-[var(--muted)]/50'}`}>
+                  <tr key={log.id} className={`border-t border-[var(--border)] ${suspicious ? 'bg-red-500/10' : 'hover:bg-[var(--muted)]/50'}`}>
                     <td className={`p-2 font-bold ${suspicious ? 'text-red-600' : ''}`}>
                       {new Date(log.created_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                       {suspicious && <span className="ml-1 text-[9px] bg-red-600 text-white px-1 rounded">새벽</span>}

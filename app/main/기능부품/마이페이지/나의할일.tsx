@@ -99,13 +99,13 @@ function priorityRank(value: unknown) {
 function getPriorityMeta(priority: unknown) {
   switch (String(priority || '').trim()) {
     case 'urgent':
-      return { label: '긴급', className: 'bg-red-100 text-red-600' };
+      return { label: '긴급', className: 'bg-red-500/20 text-red-600' };
     case 'high':
-      return { label: '높음', className: 'bg-orange-100 text-orange-600' };
+      return { label: '높음', className: 'bg-orange-500/20 text-orange-600' };
     case 'low':
       return { label: '낮음', className: 'bg-slate-100 text-slate-500' };
     default:
-      return { label: '보통', className: 'bg-blue-100 text-blue-600' };
+      return { label: '보통', className: 'bg-blue-500/20 text-blue-600' };
   }
 }
 
@@ -751,7 +751,7 @@ function TodoItem({
       <button
         type="button"
         onClick={() => onToggle(task.id, task.is_complete)}
-        className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-[var(--radius-md)] border-2 transition-all ${task.is_complete ? 'border-green-500 bg-green-500 text-white' : 'border-[var(--border)] hover:border-[var(--accent)]'}`}
+        className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-[var(--radius-md)] border-2 transition-all ${task.is_complete ? 'border-green-500 bg-green-500/100 text-white' : 'border-[var(--border)] hover:border-[var(--accent)]'}`}
       >
         {task.is_complete ? <span className="text-[11px] font-bold">V</span> : null}
       </button>
@@ -788,7 +788,7 @@ function TodoItem({
       <button
         type="button"
         onClick={() => void onDelete(task.id)}
-        className="rounded-md bg-[var(--muted)] px-2 py-1 text-[11px] font-semibold text-[var(--toss-gray-3)] transition-all hover:bg-red-50 hover:text-red-500 md:opacity-0 md:group-hover:opacity-100"
+        className="rounded-md bg-[var(--muted)] px-2 py-1 text-[11px] font-semibold text-[var(--toss-gray-3)] transition-all hover:bg-red-500/10 hover:text-red-500 md:opacity-0 md:group-hover:opacity-100"
       >
         삭제
       </button>

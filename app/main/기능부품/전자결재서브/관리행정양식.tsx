@@ -81,7 +81,7 @@ export default function AdminForms({ staffs, formType, setExtraData }: AdminForm
                 <label className="text-[11px] font-semibold text-blue-500 block ml-1">변경(발령) 직급/부서</label>
                 <div className="flex gap-2">
                   <select
-                    className="flex-1 p-4 bg-blue-50/50 rounded-[var(--radius-lg)] text-xs font-semibold text-[var(--accent)] outline-none border-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                    className="flex-1 p-4 bg-blue-500/10/50 rounded-[var(--radius-lg)] text-xs font-semibold text-[var(--accent)] outline-none border-none focus:ring-2 focus:ring-[var(--accent)]/30"
                     onChange={e => setExtraData((p) => ({ ...p, newPosition: e.target.value }))}
                   >
                     <option value="">직급 선택</option>
@@ -94,7 +94,7 @@ export default function AdminForms({ staffs, formType, setExtraData }: AdminForm
                     <option>사원</option>
                   </select>
                   <select
-                    className="flex-1 p-4 bg-blue-50/50 rounded-[var(--radius-lg)] text-xs font-semibold text-[var(--accent)] outline-none border-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                    className="flex-1 p-4 bg-blue-500/10/50 rounded-[var(--radius-lg)] text-xs font-semibold text-[var(--accent)] outline-none border-none focus:ring-2 focus:ring-[var(--accent)]/30"
                     onChange={e => setExtraData((p) => ({ ...p, targetDept: e.target.value }))}
                   >
                     <option value="">부서 선택</option>

@@ -740,7 +740,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
         {step === 2 && (
           <div className="space-y-5">
             {!hasExactIncomeTaxBracket(taxInsuranceRates) && (
-              <div data-testid="salary-settlement-finalize-block-warning" className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3">
+              <div data-testid="salary-settlement-finalize-block-warning" className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/10 px-4 py-3">
                 <p className="text-sm font-bold text-red-700">급여 확정 차단: 정확한 근로소득세표가 없습니다.</p>
                 <p className="mt-1 text-xs font-medium text-red-600">
                   보험요율은 적용되지만, 소득세는 아직 근사 계산입니다. 세액표가 설정되기 전에는 저장을 막습니다.
@@ -809,7 +809,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-orange-600 ml-1">근태/기타차감</label>
-                        <input type="text" value={Number(data.attendance_deduction).toLocaleString()} readOnly className="w-full h-8 px-3 border border-orange-200 bg-orange-50/30 rounded-lg text-xs font-bold text-orange-700 outline-none" />
+                        <input type="text" value={Number(data.attendance_deduction).toLocaleString()} readOnly className="w-full h-8 px-3 border border-orange-500/20 bg-orange-500/10/30 rounded-lg text-xs font-bold text-orange-700 outline-none" />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-amber-600 ml-1">선지급(차감)</label>
@@ -859,7 +859,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                           type="text"
                           value={Number(data.custom_deduction).toLocaleString()}
                           onChange={(e) => updateData(s.id, 'custom_deduction', parseInt(e.target.value.replace(/,/g, '')) || 0)}
-                          className="w-full h-8 px-3 border border-orange-200 bg-orange-50/30 rounded-lg text-xs font-bold text-orange-700 outline-none"
+                          className="w-full h-8 px-3 border border-orange-500/20 bg-orange-500/10/30 rounded-lg text-xs font-bold text-orange-700 outline-none"
                         />
                       </div>
                       <div className="col-span-2 flex items-center justify-between bg-[var(--muted)] px-4 py-2 rounded-xl mt-1">

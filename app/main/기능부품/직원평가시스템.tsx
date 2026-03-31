@@ -277,17 +277,17 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
                                         {evaluations.map((ev) => (
                                             <div key={ev.id} data-testid={`staff-evaluation-item-${ev.id}`} className="relative group">
                                                 {/* 타임라인 점 */}
-                                                <div className={`absolute -left-[31px] top-0 w-4 h-4 rounded-full border-4 border-[var(--card)] shadow-sm ${ev.category === '문제사항' ? 'bg-red-500' :
+                                                <div className={`absolute -left-[31px] top-0 w-4 h-4 rounded-full border-4 border-[var(--card)] shadow-sm ${ev.category === '문제사항' ? 'bg-red-500/100' :
                                                         ev.category === '칭찬' ? 'bg-emerald-500' :
-                                                            ev.category === '주의' ? 'bg-orange-500' : 'bg-[var(--accent)]'
+                                                            ev.category === '주의' ? 'bg-orange-500/100' : 'bg-[var(--accent)]'
                                                     }`} />
 
                                                 <div className="flex flex-col gap-2">
                                                     <div className="flex items-center justify-between">
                                                         <div className="flex items-center gap-2">
-                                                            <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold ${ev.category === '문제사항' ? 'bg-red-50 text-red-600' :
+                                                            <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold ${ev.category === '문제사항' ? 'bg-red-500/10 text-red-600' :
                                                                     ev.category === '칭찬' ? 'bg-emerald-50 text-emerald-600' :
-                                                                        ev.category === '주의' ? 'bg-orange-50 text-orange-600' :
+                                                                        ev.category === '주의' ? 'bg-orange-500/10 text-orange-600' :
                                                                             'bg-[var(--toss-blue-light)] text-[var(--accent)]'
                                                                 }`}>
                                                                 {ev.category} {ev.score ? ` · ${ev.score}점` : ''}

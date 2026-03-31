@@ -848,7 +848,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
               className="relative bg-amber-100 text-amber-800 px-4 py-2 text-[11px] font-bold rounded-[var(--radius-md)] hover:bg-amber-200 transition-all shadow-sm ring-1 ring-amber-300"
             >
               내정보 변경 요청
-              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white flex items-center justify-center rounded-full text-[10px] shadow-sm animate-bounce">
+              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500/100 text-white flex items-center justify-center rounded-full text-[10px] shadow-sm animate-bounce">
                 {essRequests.length}
               </span>
             </button>
@@ -873,7 +873,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           {[
             { label: 보기상태 === '퇴사' ? '퇴사자 수' : '재직자 수', value: 필터목록.length, tone: 'bg-[var(--card)] border-[var(--border)] text-[var(--foreground)]' },
             { label: '면허/자격 등록', value: 면허등록인원수, tone: 'bg-amber-50 border-amber-200 text-amber-900' },
-            { label: '계약직', value: 계약직인원수, tone: 'bg-blue-50 border-blue-200 text-blue-900' },
+            { label: '계약직', value: 계약직인원수, tone: 'bg-blue-500/10 border-blue-500/20 text-blue-900' },
             { label: '부서 수', value: 부서수, tone: 'bg-emerald-50 border-emerald-200 text-emerald-900' },
           ].map((card) => (
             <div key={card.label} className={`rounded-[var(--radius-lg)] border p-4 shadow-sm ${card.tone}`}>
@@ -944,7 +944,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       <span className="w-fit px-3 py-1 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-[var(--radius-md)]">
                         {근무형태목록.find(s => s.id === (직원.shift_id as string))?.name as string || '-'}
                       </span>
-                      <span className={`w-fit px-3 py-1 text-[10px] font-semibold rounded-full ${직원고용형태(직원) === '계약직' ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      <span className={`w-fit px-3 py-1 text-[10px] font-semibold rounded-full ${직원고용형태(직원) === '계약직' ? 'bg-orange-500/20 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>
                         {직원고용형태(직원)}
                       </span>
                     </div>
@@ -954,7 +954,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                     <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">취득일 {(직원.permissions?.license_date as string) || '-'}</p>
                   </td>
                   <td className="p-4">
-                    <span className={`px-3 py-1 text-[11px] font-semibold rounded-full ${직원.status === '퇴사' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                    <span className={`px-3 py-1 text-[11px] font-semibold rounded-full ${직원.status === '퇴사' ? 'bg-red-500/20 text-red-600' : 'bg-green-500/20 text-green-600'}`}>
                       {직원.status || '재직중'}
                     </span>
                   </td>
@@ -967,7 +967,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                     </button>
                     <button
                       onClick={() => 직원삭제(직원)}
-                      className="px-3 py-2 bg-red-50 text-red-600 text-[11px] font-semibold rounded-[var(--radius-md)] hover:bg-red-100 transition-all"
+                      className="px-3 py-2 bg-red-500/10 text-red-600 text-[11px] font-semibold rounded-[var(--radius-md)] hover:bg-red-500/20 transition-all"
                     >
                       삭제
                     </button>
@@ -998,7 +998,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">{직원.company} · {직원.position} · {(직원.joined_at as string) || (직원.join_date as string)}</p>
                   </div>
                 </div>
-                <span className={`px-3 py-1 text-[11px] font-semibold rounded-full ${직원.status === '퇴사' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{직원.status || '재직중'}</span>
+                <span className={`px-3 py-1 text-[11px] font-semibold rounded-full ${직원.status === '퇴사' ? 'bg-red-500/20 text-red-600' : 'bg-green-500/20 text-green-600'}`}>{직원.status || '재직중'}</span>
               </div>
               <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[var(--border)]">
                 <div>
@@ -1031,7 +1031,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                 </button>
                 <button
                   onClick={() => 직원삭제(직원)}
-                  className="px-3 py-3 bg-red-50 text-red-600 text-[11px] font-semibold rounded-[var(--radius-md)] hover:bg-red-100 transition-all"
+                  className="px-3 py-3 bg-red-500/10 text-red-600 text-[11px] font-semibold rounded-[var(--radius-md)] hover:bg-red-500/20 transition-all"
                 >
                   삭제
                 </button>
@@ -1235,7 +1235,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
                     <div className="space-y-4">
                       <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
-                        <span className="w-1.5 h-4 bg-purple-500 rounded-full" />
+                        <span className="w-1.5 h-4 bg-purple-500/100 rounded-full" />
                         근무 조건
                       </h4>
                       <div className="grid grid-cols-2 gap-4">
@@ -1272,7 +1272,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                           <select
                             value={신규직원.probation_months}
                             onChange={e => 신규직원설정({ ...신규직원, probation_months: Number(e.target.value) })}
-                            className="w-full p-4 bg-blue-50 rounded-[var(--radius-lg)] border border-blue-100 outline-none font-bold text-sm focus:ring-2 focus:ring-blue-300 appearance-none"
+                            className="w-full p-4 bg-blue-500/10 rounded-[var(--radius-lg)] border border-blue-100 outline-none font-bold text-sm focus:ring-2 focus:ring-blue-300 appearance-none"
                           >
                             <option value={0}>수습 없음</option>
                             <option value={1}>1개월</option>
@@ -1282,7 +1282,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                           </select>
                         </div>
                       </div>
-                      <div className="p-5 bg-purple-50 rounded-[var(--radius-xl)] border border-purple-100 space-y-4">
+                      <div className="p-5 bg-purple-500/10 rounded-[var(--radius-xl)] border border-purple-100 space-y-4">
                         <h5 className="text-[11px] font-extrabold text-purple-800 flex items-center gap-1.5">⏱️ 상세 근로 시간 설정</h5>
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1.5">
@@ -1318,7 +1318,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                           <SmartDatePicker
                             value={신규직원.계약종료일}
                             onChange={val => 신규직원설정({ ...신규직원, 계약종료일: val || '' })}
-                            className="w-full p-4 bg-orange-50 rounded-[var(--radius-lg)] border border-orange-100 outline-none font-bold text-sm focus:ring-2 focus:ring-orange-300"
+                            className="w-full p-4 bg-orange-500/10 rounded-[var(--radius-lg)] border border-orange-100 outline-none font-bold text-sm focus:ring-2 focus:ring-orange-300"
                           />
                         </div>
                       )}
@@ -1342,7 +1342,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                           ))}
                         </select>
                         {새근무형태표시 && (
-                          <div className="bg-blue-50 border border-blue-100 rounded-[var(--radius-lg)] p-3 space-y-2 animate-in fade-in slide-in-from-top-2">
+                          <div className="bg-blue-500/10 border border-blue-100 rounded-[var(--radius-lg)] p-3 space-y-2 animate-in fade-in slide-in-from-top-2">
                             <p className="text-[11px] font-bold text-blue-700">새 근무형태 추가</p>
                             <input
                               type="text"
@@ -1519,7 +1519,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                           ))}
                         </div>
 
-                        <div className="p-4 bg-blue-50 border border-blue-100 rounded-[var(--radius-xl)] space-y-3">
+                        <div className="p-4 bg-blue-500/10 border border-blue-100 rounded-[var(--radius-xl)] space-y-3">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <span className="text-base">💎</span>
@@ -1533,13 +1533,13 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                                 placeholder="0000-00"
                                 value={신규직원.duru_nuri_start}
                                 onChange={val => 신규직원설정({ ...신규직원, duru_nuri_start: val || '' })}
-                                inputClassName="p-2.5 bg-[var(--card)] border border-blue-200 rounded-lg text-[10px] font-bold"
+                                inputClassName="p-2.5 bg-[var(--card)] border border-blue-500/20 rounded-lg text-[10px] font-bold"
                               />
                               <SmartDatePicker
                                 placeholder="0000-00"
                                 value={신규직원.duru_nuri_end}
                                 onChange={val => 신규직원설정({ ...신규직원, duru_nuri_end: val || '' })}
-                                inputClassName="p-2.5 bg-[var(--card)] border border-blue-200 rounded-lg text-[10px] font-bold"
+                                inputClassName="p-2.5 bg-[var(--card)] border border-blue-500/20 rounded-lg text-[10px] font-bold"
                               />
                             </div>
                           )}
@@ -1637,7 +1637,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         </div>
 
                         <div className="flex justify-end gap-2 pt-2">
-                          <button onClick={() => handleRejectEss(req)} className="px-5 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-[var(--radius-md)] font-semibold text-[11px] transition-colors">반려</button>
+                          <button onClick={() => handleRejectEss(req)} className="px-5 py-2.5 bg-red-500/10 text-red-600 hover:bg-red-500/20 rounded-[var(--radius-md)] font-semibold text-[11px] transition-colors">반려</button>
                           <button onClick={() => handleApproveEssSafe(req)} className="px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-600 rounded-[var(--radius-md)] font-semibold text-[11px] transition-colors shadow-sm">승인하기</button>
                         </div>
                       </div>

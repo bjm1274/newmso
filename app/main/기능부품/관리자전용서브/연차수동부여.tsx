@@ -142,7 +142,7 @@ export default function AnnualLeaveManualGrant({
       {message && (
         <div
           className={`mb-3 rounded-[var(--radius-lg)] p-3 text-sm font-bold ${
-            message.includes('실패') ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
+            message.includes('실패') ? 'bg-red-500/10 text-red-700' : 'bg-emerald-50 text-emerald-700'
           }`}
         >
           {message}

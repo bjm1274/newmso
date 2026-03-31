@@ -196,7 +196,7 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<st
       </div>
 
       {loadError && (
-        <p className="mb-3 rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
+        <p className="mb-3 rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-600">
           {loadError}
         </p>
       )}

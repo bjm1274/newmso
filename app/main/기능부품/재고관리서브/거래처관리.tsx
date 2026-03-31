@@ -165,16 +165,16 @@ export default function SupplierManagement({ user }: { user: any }) {
                   </td>
                   <td className="px-4 py-3">
                     {isExpired(s) ? (
-                      <span className="px-2 py-0.5 bg-red-50 text-red-600 rounded-[var(--radius-md)] text-[10px] font-bold">계약만료</span>
+                      <span className="px-2 py-0.5 bg-red-500/10 text-red-600 rounded-[var(--radius-md)] text-[10px] font-bold">계약만료</span>
                     ) : isNearExpiry(s) ? (
-                      <span className="px-2 py-0.5 bg-orange-50 text-orange-600 rounded-[var(--radius-md)] text-[10px] font-bold">만료임박</span>
+                      <span className="px-2 py-0.5 bg-orange-500/10 text-orange-600 rounded-[var(--radius-md)] text-[10px] font-bold">만료임박</span>
                     ) : (
-                      <span className="px-2 py-0.5 bg-green-50 text-green-600 rounded-[var(--radius-md)] text-[10px] font-bold">정상</span>
+                      <span className="px-2 py-0.5 bg-green-500/10 text-green-600 rounded-[var(--radius-md)] text-[10px] font-bold">정상</span>
                     )}
                   </td>
                   <td className="px-4 py-3 space-x-1">
                     <button data-testid={`supplier-edit-${s.id}`} onClick={() => openEdit(s)} className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--accent)] text-[10px] font-semibold rounded-md">수정</button>
-                    <button data-testid={`supplier-delete-${s.id}`} onClick={() => handleDelete(s.id, s.name)} className="px-2 py-1 bg-red-50 text-red-500 text-[10px] font-semibold rounded-md">삭제</button>
+                    <button data-testid={`supplier-delete-${s.id}`} onClick={() => handleDelete(s.id, s.name)} className="px-2 py-1 bg-red-500/10 text-red-500 text-[10px] font-semibold rounded-md">삭제</button>
                   </td>
                 </tr>
               ))}

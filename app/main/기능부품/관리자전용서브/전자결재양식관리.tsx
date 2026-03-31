@@ -974,7 +974,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
                 }}
                 className={`rounded-[var(--radius-xl)] border p-4 text-left transition-all ${
                   isBase || isSelected
-                    ? 'border-blue-200 bg-[var(--toss-blue-light)]/70 shadow-sm'
+                    ? 'border-blue-500/20 bg-[var(--toss-blue-light)]/70 shadow-sm'
                     : 'border-[var(--border)] hover:border-blue-100 hover:bg-[var(--muted)]/50'
                 }`}
               >
@@ -983,7 +983,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
                     <p className="text-sm font-bold text-[var(--foreground)]">{template.name}</p>
                     <p className="mt-2 text-xs leading-5 text-[var(--toss-gray-3)]">{template.summary}</p>
                   </div>
-                  <span className={`rounded-[var(--radius-md)] px-2.5 py-1 text-[10px] font-semibold ${isBase ? 'bg-[var(--accent)] text-white' : 'bg-blue-50 text-blue-600'}`}>
+                  <span className={`rounded-[var(--radius-md)] px-2.5 py-1 text-[10px] font-semibold ${isBase ? 'bg-[var(--accent)] text-white' : 'bg-blue-500/10 text-blue-600'}`}>
                     {isBase ? '추가 기준' : '기본양식'}
                   </span>
                 </div>
@@ -1004,7 +1004,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
               선택한 기본양식을 복제해서 새 결재양식을 만들고, 아래에서 이어서 수정합니다.
             </p>
           </div>
-          <div className="rounded-[var(--radius-md)] bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-700">
+          <div className="rounded-[var(--radius-md)] bg-blue-500/10 px-4 py-2 text-xs font-semibold text-blue-700">
             현재 기준: {selectedBaseTemplate?.name || '기본양식'}
           </div>
         </div>
@@ -1113,7 +1113,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
                           <span className="text-sm font-bold text-[var(--foreground)]">{row.name}</span>
                           <span className="text-xs text-[var(--toss-gray-3)]">{row.slug}</span>
                           {!row.is_active && (
-                            <span className="rounded-[var(--radius-md)] bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-600">비활성</span>
+                            <span className="rounded-[var(--radius-md)] bg-red-500/10 px-2 py-1 text-[10px] font-semibold text-red-600">비활성</span>
                           )}
                         </div>
                         <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-[var(--toss-gray-3)]">
@@ -1134,7 +1134,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
                         <button type="button" onClick={() => startEdit(row)} className="rounded-[var(--radius-lg)] bg-amber-100 px-3 py-2 text-xs font-bold text-amber-800">
                           이름/코드 수정
                         </button>
-                        <button type="button" onClick={() => handleDelete(row)} className="rounded-[var(--radius-lg)] bg-red-50 px-3 py-2 text-xs font-bold text-red-600">
+                        <button type="button" onClick={() => handleDelete(row)} className="rounded-[var(--radius-lg)] bg-red-500/10 px-3 py-2 text-xs font-bold text-red-600">
                           삭제
                         </button>
                       </div>

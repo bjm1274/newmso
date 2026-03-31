@@ -305,7 +305,7 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
                 <span className="relative text-[17px] leading-none">
                   {menu.icon}
                   {menu.id === '채팅' && chatUnreadCount > 0 && (
-                    <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                    <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/100 text-white text-[9px] font-bold flex items-center justify-center leading-none">
                       {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
                     </span>
                   )}
@@ -338,7 +338,7 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
               <span className="relative text-[22px] leading-none">
                 {menu.icon}
                 {menu.id === '채팅' && chatUnreadCount > 0 && (
-                  <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-[16px] px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                  <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-[16px] px-0.5 rounded-full bg-red-500/100 text-white text-[9px] font-bold flex items-center justify-center leading-none">
                     {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
                   </span>
                 )}

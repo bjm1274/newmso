@@ -120,9 +120,9 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
       {/* 요약 */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: '전체 장비', value: devices.length, color: 'bg-blue-50 text-blue-700 border-blue-200' },
-          { label: '점검 임박 (14일)', value: dueCount, color: 'bg-orange-50 text-orange-700 border-orange-200' },
-          { label: '점검 기한 초과', value: overdueCount, color: 'bg-red-50 text-red-600 border-red-200' },
+          { label: '전체 장비', value: devices.length, color: 'bg-blue-500/10 text-blue-700 border-blue-500/20' },
+          { label: '점검 임박 (14일)', value: dueCount, color: 'bg-orange-500/10 text-orange-700 border-orange-500/20' },
+          { label: '점검 기한 초과', value: overdueCount, color: 'bg-red-500/10 text-red-600 border-red-500/20' },
         ].map(c => (
           <div key={c.label} className={`p-3 rounded-[var(--radius-lg)] border ${c.color} text-center`}>
             <p className="text-xl font-bold">{c.value}</p>
@@ -167,7 +167,7 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-bold text-[var(--foreground)]">{d.name}</p>
-                          <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${d.status === 'overdue' ? 'bg-red-100 text-red-600' : d.status === 'due' ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-700'}`}>
+                          <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${d.status === 'overdue' ? 'bg-red-500/20 text-red-600' : d.status === 'due' ? 'bg-orange-500/20 text-orange-600' : 'bg-green-500/20 text-green-700'}`}>
                             {d.status === 'overdue' ? '기한초과' : d.status === 'due' ? '점검임박' : '정상'}
                           </span>
                         </div>
@@ -185,9 +185,9 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
                       )}
                     </div>
                     <div className="flex gap-1.5 mt-3">
-                      <button onClick={() => openInspect(d)} className="flex-1 py-1.5 text-[10px] bg-green-50 text-green-700 font-bold rounded-[var(--radius-md)] hover:bg-green-100">점검 기록</button>
-                      <button onClick={() => openEditDevice(d)} className="px-3 py-1.5 text-[10px] bg-blue-50 text-blue-600 font-bold rounded-[var(--radius-md)] hover:bg-blue-100">편집</button>
-                      <button onClick={() => handleDeleteDevice(d.id)} className="px-3 py-1.5 text-[10px] bg-red-50 text-red-500 font-bold rounded-[var(--radius-md)] hover:bg-red-100">삭제</button>
+                      <button onClick={() => openInspect(d)} className="flex-1 py-1.5 text-[10px] bg-green-500/10 text-green-700 font-bold rounded-[var(--radius-md)] hover:bg-green-500/20">점검 기록</button>
+                      <button onClick={() => openEditDevice(d)} className="px-3 py-1.5 text-[10px] bg-blue-500/10 text-blue-600 font-bold rounded-[var(--radius-md)] hover:bg-blue-500/20">편집</button>
+                      <button onClick={() => handleDeleteDevice(d.id)} className="px-3 py-1.5 text-[10px] bg-red-500/10 text-red-500 font-bold rounded-[var(--radius-md)] hover:bg-red-500/20">삭제</button>
                     </div>
                   </div>
                 );

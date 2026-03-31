@@ -51,7 +51,7 @@ function BannedWordModal({ onClose }: { onClose: () => void }) {
         <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto mb-4 p-2 bg-[var(--page-bg)] rounded-[var(--radius-md)] border border-[var(--border)]">
           {words.length === 0 && <p className="text-xs text-[var(--toss-gray-3)]">등록된 금지어 없음</p>}
           {words.map((w) => (
-            <span key={w} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs font-semibold rounded-full">
+            <span key={w} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-500/20 text-red-700 text-xs font-semibold rounded-full">
               {w}<button onClick={() => remove(w)} className="hover:text-red-900 font-bold">×</button>
             </span>
           ))}
@@ -412,7 +412,7 @@ export default function SystemMasterCenter({
   if (!isSystemMaster) {
     return (
       <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 text-center shadow-sm">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-2xl">🔒</div>
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10 text-2xl">🔒</div>
         <h2 className="text-lg font-bold text-[var(--foreground)]">시스템마스터 전용 화면입니다.</h2>
         <p className="mt-2 text-sm text-[var(--toss-gray-3)]">
           <code className="rounded bg-[var(--muted)] px-1.5 py-0.5 font-mono text-[11px]">{SYSTEM_MASTER_ACCOUNT_ID}</code>
@@ -468,7 +468,7 @@ export default function SystemMasterCenter({
       </section>
 
       {error && (
-        <div className="rounded-[var(--radius-lg)] border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
+        <div className="rounded-[var(--radius-lg)] border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-600">
           {error}
         </div>
       )}
@@ -631,7 +631,7 @@ export default function SystemMasterCenter({
                     key={item.id}
                     className={`rounded-[var(--radius-lg)] border px-4 py-3 ${
                       item.severity === 'critical'
-                        ? 'border-red-200 bg-red-50'
+                        ? 'border-red-500/20 bg-red-500/10'
                         : item.severity === 'warning'
                           ? 'border-amber-200 bg-amber-50'
                           : 'border-[var(--border)] bg-[var(--page-bg)]'
@@ -717,7 +717,7 @@ export default function SystemMasterCenter({
                   <div key={run.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm font-bold text-[var(--foreground)]">{run.file_name}</p>
-                      <span className={`rounded-[var(--radius-md)] px-2.5 py-1 text-[10px] font-bold ${run.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : run.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                      <span className={`rounded-[var(--radius-md)] px-2.5 py-1 text-[10px] font-bold ${run.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : run.status === 'failed' ? 'bg-red-500/20 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
                         {run.status === 'completed' ? '완료' : run.status === 'failed' ? '실패' : '진행'}
                       </span>
                     </div>
@@ -860,10 +860,10 @@ export default function SystemMasterCenter({
                     <p className="mt-3 text-[11px] text-[var(--toss-gray-3)]">{new Date(log.created_at).toLocaleString('ko-KR')}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {(log.permission_summary?.enabled || []).map((key: string) => (
-                        <span key={`on-${key}`} className="rounded-full bg-green-100 px-2.5 py-1 text-[10px] font-bold text-green-700">+ {key}</span>
+                        <span key={`on-${key}`} className="rounded-full bg-green-500/20 px-2.5 py-1 text-[10px] font-bold text-green-700">+ {key}</span>
                       ))}
                       {(log.permission_summary?.disabled || []).map((key: string) => (
-                        <span key={`off-${key}`} className="rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-bold text-red-700">- {key}</span>
+                        <span key={`off-${key}`} className="rounded-full bg-red-500/20 px-2.5 py-1 text-[10px] font-bold text-red-700">- {key}</span>
                       ))}
                     </div>
                     {(log.permission_summary?.beforeRole || log.permission_summary?.afterRole) && (
@@ -932,7 +932,7 @@ export default function SystemMasterCenter({
                       const room = chatRooms.find((item: any) => item.id === selectedRoomId);
                       if (room) void handleDeleteRoom(room);
                     }}
-                    className="h-9 rounded-[var(--radius-md)] border border-red-200 px-3 text-xs font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="h-9 rounded-[var(--radius-md)] border border-red-500/20 px-3 text-xs font-bold text-red-600 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {deletingRoomId === selectedRoomId ? '삭제 중...' : '선택 방 삭제'}
                   </button>
@@ -940,13 +940,13 @@ export default function SystemMasterCenter({
                 {(() => {
                   const flagged = chatMessages.filter((m: any) => m.content && hasBanned(m.content, bannedWords)).length;
                   return flagged > 0 ? (
-                    <span className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-full">🔍 필터 단어 {flagged}건</span>
+                    <span className="text-[11px] font-bold text-red-600 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-full">🔍 필터 단어 {flagged}건</span>
                   ) : null;
                 })()}
                 <button
                   type="button"
                   onClick={() => setShowFlaggedOnly((v) => !v)}
-                  className={`h-9 px-3 text-xs font-bold rounded-[var(--radius-md)] border transition ${showFlaggedOnly ? 'bg-red-500 text-white border-red-500' : 'border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]'}`}
+                  className={`h-9 px-3 text-xs font-bold rounded-[var(--radius-md)] border transition ${showFlaggedOnly ? 'bg-red-500/100 text-white border-red-500' : 'border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]'}`}
                 >
                   선택검색
                 </button>
@@ -991,7 +991,7 @@ export default function SystemMasterCenter({
                     .map((message: any) => {
                       const flagged = message.content && hasBanned(message.content, bannedWords);
                       return (
-                        <tr key={message.id} className={`border-t border-[var(--border)] align-top ${flagged ? 'bg-red-50' : ''}`}>
+                        <tr key={message.id} className={`border-t border-[var(--border)] align-top ${flagged ? 'bg-red-500/10' : ''}`}>
                           <td className="w-[230px] px-4 py-4 align-top text-[var(--toss-gray-4)] whitespace-nowrap">{new Date(message.created_at).toLocaleString('ko-KR')}</td>
                           <td className="w-[180px] px-4 py-4 align-top">
                             <p className="truncate whitespace-nowrap break-keep font-semibold text-[var(--foreground)]" title={message.room_label}>{message.room_label}</p>
@@ -1029,8 +1029,8 @@ export default function SystemMasterCenter({
                               }}
                               className={`px-2 py-1 text-[11px] font-bold rounded-[var(--radius-md)] transition ${
                                 flagged
-                                  ? 'bg-red-500 text-white hover:bg-red-600'
-                                  : 'border border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-red-500 hover:text-white hover:border-red-500'
+                                  ? 'bg-red-500/100 text-white hover:bg-red-600'
+                                  : 'border border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-red-500/100 hover:text-white hover:border-red-500'
                               }`}
                             >
                               {deletingMsgId === message.id ? '…' : '삭제'}
@@ -1072,7 +1072,7 @@ export default function SystemMasterCenter({
                 key={issue.id}
                 className={`rounded-[var(--radius-xl)] border p-5 shadow-sm ${
                   issue.severity === 'critical'
-                    ? 'border-red-200 bg-red-50'
+                    ? 'border-red-500/20 bg-red-500/10'
                     : issue.severity === 'warning'
                       ? 'border-amber-200 bg-amber-50'
                       : 'border-[var(--border)] bg-[var(--card)]'

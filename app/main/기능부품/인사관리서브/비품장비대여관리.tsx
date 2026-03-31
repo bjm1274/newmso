@@ -334,7 +334,7 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: Record<str
                   {!row.returned_at && (
                     <button
                       onClick={() => handleReturn(row.id)}
-                      className="px-3 py-1 bg-green-100 text-green-700 text-[11px] font-semibold rounded-[var(--radius-md)]"
+                      className="px-3 py-1 bg-green-500/20 text-green-700 text-[11px] font-semibold rounded-[var(--radius-md)]"
                     >
                       반납
                     </button>
@@ -450,7 +450,7 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: Record<str
                   <button
                     type="button"
                     onClick={() => setAssetTypeDrafts((prev) => prev.filter((_, valueIndex) => valueIndex !== index))}
-                    className="px-3 py-3 bg-red-50 text-red-600 text-xs font-semibold rounded-[var(--radius-lg)]"
+                    className="px-3 py-3 bg-red-500/10 text-red-600 text-xs font-semibold rounded-[var(--radius-lg)]"
                   >
                     삭제
                   </button>

@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const STATUS_COLORS: Record<string, string> = {
-  valid: 'bg-green-100 text-green-700',
-  expiring: 'bg-orange-100 text-orange-700',
-  expired: 'bg-red-100 text-red-600',
+  valid: 'bg-green-500/20 text-green-700',
+  expiring: 'bg-orange-500/20 text-orange-700',
+  expired: 'bg-red-500/20 text-red-600',
 };
 const STATUS_LABELS: Record<string, string> = { valid: '유효', expiring: '만료 임박', expired: '만료' };
 
@@ -107,9 +107,9 @@ export default function LicenseManager({ staffs = [], selectedCo, user }: { staf
       {/* 요약 카드 */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: '전체', value: enriched.length, color: 'bg-blue-50 text-blue-700 border-blue-200' },
-          { label: '만료 임박 (60일)', value: expiringCount, color: 'bg-orange-50 text-orange-700 border-orange-200' },
-          { label: '만료됨', value: expiredCount, color: 'bg-red-50 text-red-600 border-red-200' },
+          { label: '전체', value: enriched.length, color: 'bg-blue-500/10 text-blue-700 border-blue-500/20' },
+          { label: '만료 임박 (60일)', value: expiringCount, color: 'bg-orange-500/10 text-orange-700 border-orange-500/20' },
+          { label: '만료됨', value: expiredCount, color: 'bg-red-500/10 text-red-600 border-red-500/20' },
         ].map(c => (
           <div key={c.label} className={`p-3 rounded-[var(--radius-lg)] border ${c.color} text-center`}>
             <p className="text-xl font-bold">{c.value}</p>
@@ -162,8 +162,8 @@ export default function LicenseManager({ staffs = [], selectedCo, user }: { staf
                   </div>
                 </div>
                 <div className="flex gap-1.5">
-                  <button onClick={() => openEdit(l)} className="px-2 py-1 text-[10px] bg-blue-50 text-blue-600 font-bold rounded-md hover:bg-blue-100">편집</button>
-                  <button onClick={() => handleDelete(l.id)} className="px-2 py-1 text-[10px] bg-red-50 text-red-500 font-bold rounded-md hover:bg-red-100">삭제</button>
+                  <button onClick={() => openEdit(l)} className="px-2 py-1 text-[10px] bg-blue-500/10 text-blue-600 font-bold rounded-md hover:bg-blue-500/20">편집</button>
+                  <button onClick={() => handleDelete(l.id)} className="px-2 py-1 text-[10px] bg-red-500/10 text-red-500 font-bold rounded-md hover:bg-red-500/20">삭제</button>
                 </div>
               </div>
             );

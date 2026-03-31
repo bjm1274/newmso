@@ -30,13 +30,13 @@ export default function ScheduleManager({ schedules, onAdd, onEdit, onDelete }: 
                             
                             {/* [수정] 근무 유형별 뱃지 디자인 */}
                             <span className={`px-2 py-1 rounded-[var(--radius-md)] text-xs font-bold 
-                                ${s.shift_type === '3교대' ? 'bg-purple-100 text-purple-600' : 
+                                ${s.shift_type === '3교대' ? 'bg-purple-500/20 text-purple-600' : 
                                   s.shift_type === '나이트전담' ? 'bg-gray-800 text-yellow-300' : 
                                   s.shift_type === '데이전담' ? 'bg-sky-100 text-sky-600' :
-                                  s.shift_type === '이브전담' ? 'bg-pink-100 text-pink-600' :
-                                  s.shift_type === '식당' ? 'bg-orange-100 text-orange-600' :
+                                  s.shift_type === '이브전담' ? 'bg-pink-500/20 text-pink-600' :
+                                  s.shift_type === '식당' ? 'bg-orange-500/20 text-orange-600' :
                                   s.shift_type === '청소' ? 'bg-teal-100 text-teal-600' :
-                                  'bg-green-100 text-green-600'}`}>
+                                  'bg-green-500/20 text-green-600'}`}>
                                 {s.shift_type === '식당' ? '🍚 식당' : 
                                  s.shift_type === '청소' ? '🧹 청소' : 
                                  s.shift_type || '상근직'}
@@ -65,7 +65,7 @@ export default function ScheduleManager({ schedules, onAdd, onEdit, onDelete }: 
 
                     <div className="flex gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => _onEdit(s)} className="flex-1 py-2.5 bg-[var(--muted)] text-[var(--toss-gray-4)] rounded-[var(--radius-lg)] text-xs font-bold hover:bg-[var(--toss-gray-2)]">수정</button>
-                        <button onClick={() => _onDelete(s.id)} className="flex-1 py-2.5 bg-red-50 text-red-500 rounded-[var(--radius-lg)] text-xs font-bold hover:bg-red-100">삭제</button>
+                        <button onClick={() => _onDelete(s.id)} className="flex-1 py-2.5 bg-red-500/10 text-red-500 rounded-[var(--radius-lg)] text-xs font-bold hover:bg-red-500/20">삭제</button>
                     </div>
                 </div>
             ))}

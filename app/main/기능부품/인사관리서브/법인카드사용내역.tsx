@@ -352,7 +352,7 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
                 const suggested = autoClassify(m);
                 setForm({ ...form, merchant: m, category: suggested });
               }} placeholder="가맹점 (입력 시 카테고리 자동 제안)" className="w-full p-3 border rounded-[var(--radius-lg)]" />
-              {form.merchant && <span className="absolute right-3 top-3 text-[10px] text-[var(--accent)] font-bold bg-blue-50 px-2 py-0.5 rounded-lg">자동: {autoClassify(form.merchant)}</span>}
+              {form.merchant && <span className="absolute right-3 top-3 text-[10px] text-[var(--accent)] font-bold bg-blue-500/10 px-2 py-0.5 rounded-lg">자동: {autoClassify(form.merchant)}</span>}
             </div>
             <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full p-3 border rounded-[var(--radius-lg)]">
               {CATEGORIES.map((c) => (

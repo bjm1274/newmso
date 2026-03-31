@@ -183,7 +183,7 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
                       key={i}
                       title={holidayName}
                       className={`relative min-h-[44px] p-1 rounded-md text-[11px] font-bold text-center
-                        ${holidayName ? 'bg-red-50 text-red-600' : isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-[var(--foreground)]'}
+                        ${holidayName ? 'bg-red-500/10 text-red-600' : isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-[var(--foreground)]'}
                         ${d === today.getDate() && month === today.getMonth() && year === today.getFullYear() ? 'ring-2 ring-[var(--accent)]' : ''}
                       `}
                     >
@@ -228,7 +228,7 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
           <h3 className="text-sm font-bold text-[var(--foreground)]">{year}년 전체 공휴일 ({yearHolidays.length}건)</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {yearHolidays.map(([date, name]) => (
-              <div key={date} className="flex items-center gap-3 p-2.5 bg-red-50 rounded-[var(--radius-md)] border border-red-100">
+              <div key={date} className="flex items-center gap-3 p-2.5 bg-red-500/10 rounded-[var(--radius-md)] border border-red-100">
                 <span className="text-[11px] font-bold text-red-600 shrink-0">{date}</span>
                 <span className="text-[11px] font-bold text-[var(--foreground)]">{name}</span>
               </div>

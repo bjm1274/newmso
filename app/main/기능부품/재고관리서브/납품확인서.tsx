@@ -140,7 +140,7 @@ export default function DeliveryConfirmation({ user, selectedCo }: { user: any; 
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-bold text-[var(--foreground)]">품목 목록</p>
-              <button onClick={addItem} className="px-2 py-1 text-[10px] bg-green-50 text-green-700 font-bold rounded-md">+ 품목 추가</button>
+              <button onClick={addItem} className="px-2 py-1 text-[10px] bg-green-500/10 text-green-700 font-bold rounded-md">+ 품목 추가</button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left" style={{ minWidth: '600px' }}>
@@ -160,7 +160,7 @@ export default function DeliveryConfirmation({ user, selectedCo }: { user: any; 
                       <td className="px-1 py-1"><input type="number" value={item.quantity} onChange={e => updateItem(idx, 'quantity', Number(e.target.value))} className="w-16 px-2 py-1 border border-[var(--border)] rounded text-xs outline-none" /></td>
                       <td className="px-1 py-1"><input type="number" value={item.unit_price} onChange={e => updateItem(idx, 'unit_price', Number(e.target.value))} className="w-24 px-2 py-1 border border-[var(--border)] rounded text-xs outline-none" /></td>
                       <td className="px-2 py-1 text-xs font-bold text-right">{item.amount.toLocaleString()}</td>
-                      <td className="px-1 py-1"><button onClick={() => removeItem(idx)} className="px-1.5 py-0.5 text-[9px] bg-red-50 text-red-500 rounded">삭제</button></td>
+                      <td className="px-1 py-1"><button onClick={() => removeItem(idx)} className="px-1.5 py-0.5 text-[9px] bg-red-500/10 text-red-500 rounded">삭제</button></td>
                     </tr>
                   ))}
                   <tr className="bg-[var(--muted)]">
@@ -190,13 +190,13 @@ export default function DeliveryConfirmation({ user, selectedCo }: { user: any; 
               <div>
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-bold text-[var(--foreground)]">{d.doc_number}</p>
-                  <span className="px-2 py-0.5 rounded-[var(--radius-md)] text-[9px] font-bold bg-blue-100 text-blue-700">납품확인서</span>
+                  <span className="px-2 py-0.5 rounded-[var(--radius-md)] text-[9px] font-bold bg-blue-500/20 text-blue-700">납품확인서</span>
                 </div>
                 <p className="text-[10px] text-[var(--toss-gray-3)]">{d.supplier_name} → {d.receiver_company} · {d.issue_date}</p>
                 <p className="text-[10px] font-bold text-[var(--accent)]">합계: {(d.total_amount || 0).toLocaleString()}원</p>
               </div>
               <div className="flex gap-1.5">
-                <button onClick={() => printDelivery(d)} className="px-3 py-1.5 text-[10px] bg-green-50 text-green-700 font-bold rounded-[var(--radius-md)] hover:bg-green-100">인쇄</button>
+                <button onClick={() => printDelivery(d)} className="px-3 py-1.5 text-[10px] bg-green-500/10 text-green-700 font-bold rounded-[var(--radius-md)] hover:bg-green-500/20">인쇄</button>
               </div>
             </div>
           ))}

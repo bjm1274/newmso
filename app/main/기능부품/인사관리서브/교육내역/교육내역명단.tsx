@@ -132,11 +132,11 @@ export default function EducationList({
         </h3>
         <div className="flex gap-4">
           <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <div className="w-2 h-2 bg-green-500/100 rounded-full"></div>
             <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">이수완료</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+            <div className="w-2 h-2 bg-red-500/100 rounded-full"></div>
             <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">미이수</span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -211,8 +211,8 @@ export default function EducationList({
                             <span
                               className={`px-2 py-1 text-[11px] font-semibold border rounded-md transition-opacity whitespace-nowrap ${
                                 alertInfo.type === 'URGENT'
-                                  ? 'bg-orange-50 text-orange-600 border-orange-100 animate-pulse'
-                                  : 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100'
+                                  ? 'bg-orange-500/10 text-orange-600 border-orange-100 animate-pulse'
+                                  : 'bg-red-500/10 text-red-600 border-red-100 hover:bg-red-500/20'
                               }`}
                             >
                               {alertInfo.type === 'URGENT' ? '기한임박' : '미이수'}
@@ -233,8 +233,8 @@ export default function EducationList({
                             onClick={() => openActionModal(staff, item.name)}
                             className={`px-2 py-1 text-[11px] font-semibold border rounded-md transition-all hover:scale-105 active:scale-95 whitespace-nowrap flex items-center gap-1 ${
                               isCompleted
-                                ? 'bg-green-50 text-green-600 border-green-100'
-                                : 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100'
+                                ? 'bg-green-500/10 text-green-600 border-green-100'
+                                : 'bg-red-500/10 text-red-600 border-red-100 hover:bg-red-500/20'
                             }`}
                           >
                             {isCompleted ? '이수완료' : '미이수'}

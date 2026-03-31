@@ -505,17 +505,17 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                         <span className="text-lg">📚</span>
                                         규정 기반 점검
                                     </h3>
-                                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">
+                                    <span className="text-[10px] font-bold text-blue-600 bg-blue-500/10 px-2 py-1 rounded-lg">
                                         PDF 기반
                                     </span>
                                 </div>
 
                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                                    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-center">
+                                    <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-center">
                                         <p className="text-lg font-bold text-red-600" data-testid="discharge-rule-critical-count">{selectedRuleAnalysis!.summary.critical}</p>
                                         <p className="text-[10px] font-bold text-red-500 mt-1">Critical</p>
                                     </div>
-                                    <div className="rounded-xl border border-orange-200 bg-orange-50 p-3 text-center">
+                                    <div className="rounded-xl border border-orange-500/20 bg-orange-500/10 p-3 text-center">
                                         <p className="text-lg font-bold text-orange-600">{selectedRuleAnalysis!.summary.warning}</p>
                                         <p className="text-[10px] font-bold text-orange-500 mt-1">Warning</p>
                                     </div>
@@ -523,11 +523,11 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                         <p className="text-lg font-bold text-amber-600">{selectedRuleAnalysis!.summary.review}</p>
                                         <p className="text-[10px] font-bold text-amber-500 mt-1">Review</p>
                                     </div>
-                                    <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-center">
+                                    <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 text-center">
                                         <p className="text-lg font-bold text-blue-600">{selectedRuleAnalysis!.summary.missing}</p>
                                         <p className="text-[10px] font-bold text-blue-500 mt-1">누락</p>
                                     </div>
-                                    <div className="rounded-xl border border-purple-200 bg-purple-50 p-3 text-center">
+                                    <div className="rounded-xl border border-purple-500/20 bg-purple-500/10 p-3 text-center">
                                         <p className="text-lg font-bold text-purple-600">{selectedRuleAnalysis!.summary.overuse}</p>
                                         <p className="text-[10px] font-bold text-purple-500 mt-1">과잉 후보</p>
                                     </div>
@@ -541,12 +541,12 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                                 key={item.key}
                                                 className={`rounded-xl border p-3 ${
                                                     item.status === 'critical'
-                                                        ? 'border-red-200 bg-red-50'
+                                                        ? 'border-red-500/20 bg-red-500/10'
                                                         : item.status === 'warning'
-                                                            ? 'border-orange-200 bg-orange-50'
+                                                            ? 'border-orange-500/20 bg-orange-500/10'
                                                             : item.status === 'review'
                                                                 ? 'border-amber-200 bg-amber-50'
-                                                                : 'border-green-200 bg-green-50'
+                                                                : 'border-green-500/20 bg-green-500/10'
                                                 }`}
                                             >
                                                 <div className="flex items-center justify-between gap-2">
@@ -563,7 +563,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 <div className="space-y-2">
                                     <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">규정 경고</p>
                                     {selectedRuleAnalysis!.issues.length === 0 ? (
-                                        <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-bold text-green-700">
+                                        <div className="rounded-xl border border-green-500/20 bg-green-500/10 p-4 text-sm font-bold text-green-700">
                                             현재 규칙 기준으로 뚜렷한 경고는 감지되지 않았습니다.
                                         </div>
                                     ) : (
@@ -574,9 +574,9 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                                     data-testid={`discharge-rule-issue-${idx}`}
                                                     className={`rounded-xl border p-4 ${
                                                         issue.severity === 'critical'
-                                                            ? 'border-red-200 bg-red-50'
+                                                            ? 'border-red-500/20 bg-red-500/10'
                                                             : issue.severity === 'warning'
-                                                                ? 'border-orange-200 bg-orange-50'
+                                                                ? 'border-orange-500/20 bg-orange-500/10'
                                                                 : 'border-amber-200 bg-amber-50'
                                                     }`}
                                                 >
@@ -600,17 +600,17 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                         <span className="text-lg">📚</span>
                                         규정 기반 점검
                                     </h3>
-                                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">
+                                    <span className="text-[10px] font-bold text-blue-600 bg-blue-500/10 px-2 py-1 rounded-lg">
                                         PDF 기반
                                     </span>
                                 </div>
 
                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                                    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-center">
+                                    <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-center">
                                         <p className="text-lg font-bold text-red-600" data-testid="discharge-rule-critical-count">{selectedRuleAnalysis!.summary.critical}</p>
                                         <p className="text-[10px] font-bold text-red-500 mt-1">Critical</p>
                                     </div>
-                                    <div className="rounded-xl border border-orange-200 bg-orange-50 p-3 text-center">
+                                    <div className="rounded-xl border border-orange-500/20 bg-orange-500/10 p-3 text-center">
                                         <p className="text-lg font-bold text-orange-600">{selectedRuleAnalysis!.summary.warning}</p>
                                         <p className="text-[10px] font-bold text-orange-500 mt-1">Warning</p>
                                     </div>
@@ -618,11 +618,11 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                         <p className="text-lg font-bold text-amber-600">{selectedRuleAnalysis!.summary.review}</p>
                                         <p className="text-[10px] font-bold text-amber-500 mt-1">Review</p>
                                     </div>
-                                    <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-center">
+                                    <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 text-center">
                                         <p className="text-lg font-bold text-blue-600">{selectedRuleAnalysis!.summary.missing}</p>
                                         <p className="text-[10px] font-bold text-blue-500 mt-1">누락</p>
                                     </div>
-                                    <div className="rounded-xl border border-purple-200 bg-purple-50 p-3 text-center">
+                                    <div className="rounded-xl border border-purple-500/20 bg-purple-500/10 p-3 text-center">
                                         <p className="text-lg font-bold text-purple-600">{selectedRuleAnalysis!.summary.overuse}</p>
                                         <p className="text-[10px] font-bold text-purple-500 mt-1">과잉 후보</p>
                                     </div>
@@ -636,12 +636,12 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                                 key={item.key}
                                                 className={`rounded-xl border p-3 ${
                                                     item.status === 'critical'
-                                                        ? 'border-red-200 bg-red-50'
+                                                        ? 'border-red-500/20 bg-red-500/10'
                                                         : item.status === 'warning'
-                                                            ? 'border-orange-200 bg-orange-50'
+                                                            ? 'border-orange-500/20 bg-orange-500/10'
                                                             : item.status === 'review'
                                                                 ? 'border-amber-200 bg-amber-50'
-                                                                : 'border-green-200 bg-green-50'
+                                                                : 'border-green-500/20 bg-green-500/10'
                                                 }`}
                                             >
                                                 <div className="flex items-center justify-between gap-2">
@@ -658,7 +658,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 <div className="space-y-2">
                                     <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">규정 경고</p>
                                     {selectedRuleAnalysis!.issues.length === 0 ? (
-                                        <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-bold text-green-700">
+                                        <div className="rounded-xl border border-green-500/20 bg-green-500/10 p-4 text-sm font-bold text-green-700">
                                             현재 규칙 기준으로 뚜렷한 경고는 감지되지 않았습니다.
                                         </div>
                                     ) : (
@@ -669,9 +669,9 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                                     data-testid={`discharge-rule-issue-${idx}`}
                                                     className={`rounded-xl border p-4 ${
                                                         issue.severity === 'critical'
-                                                            ? 'border-red-200 bg-red-50'
+                                                            ? 'border-red-500/20 bg-red-500/10'
                                                             : issue.severity === 'warning'
-                                                                ? 'border-orange-200 bg-orange-50'
+                                                                ? 'border-orange-500/20 bg-orange-500/10'
                                                                 : 'border-amber-200 bg-amber-50'
                                                     }`}
                                                 >
@@ -692,14 +692,14 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                             <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm space-y-4" data-testid="discharge-rule-analysis">
                                 <div className="flex items-center justify-between gap-3">
                                     <h3 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2"><span className="text-lg">📚</span> 규정 기반 점검</h3>
-                                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">PDF 기반</span>
+                                    <span className="text-[10px] font-bold text-blue-600 bg-blue-500/10 px-2 py-1 rounded-lg">PDF 기반</span>
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                                    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-center">
+                                    <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-center">
                                         <p className="text-lg font-bold text-red-600" data-testid="discharge-rule-critical-count">{selectedRuleAnalysis!.summary.critical}</p>
                                         <p className="text-[10px] font-bold text-red-500 mt-1">Critical</p>
                                     </div>
-                                    <div className="rounded-xl border border-orange-200 bg-orange-50 p-3 text-center">
+                                    <div className="rounded-xl border border-orange-500/20 bg-orange-500/10 p-3 text-center">
                                         <p className="text-lg font-bold text-orange-600">{selectedRuleAnalysis!.summary.warning}</p>
                                         <p className="text-[10px] font-bold text-orange-500 mt-1">Warning</p>
                                     </div>
@@ -707,11 +707,11 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                         <p className="text-lg font-bold text-amber-600">{selectedRuleAnalysis!.summary.review}</p>
                                         <p className="text-[10px] font-bold text-amber-500 mt-1">Review</p>
                                     </div>
-                                    <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-center">
+                                    <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 text-center">
                                         <p className="text-lg font-bold text-blue-600">{selectedRuleAnalysis!.summary.missing}</p>
                                         <p className="text-[10px] font-bold text-blue-500 mt-1">누락</p>
                                     </div>
-                                    <div className="rounded-xl border border-purple-200 bg-purple-50 p-3 text-center">
+                                    <div className="rounded-xl border border-purple-500/20 bg-purple-500/10 p-3 text-center">
                                         <p className="text-lg font-bold text-purple-600">{selectedRuleAnalysis!.summary.overuse}</p>
                                         <p className="text-[10px] font-bold text-purple-500 mt-1">과잉 후보</p>
                                     </div>
@@ -722,7 +722,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                         {selectedRuleAnalysis!.checklist.map((item) => (
                                             <div
                                                 key={item.key}
-                                                className={`rounded-xl border p-3 ${item.status === 'critical' ? 'border-red-200 bg-red-50' : item.status === 'warning' ? 'border-orange-200 bg-orange-50' : item.status === 'review' ? 'border-amber-200 bg-amber-50' : 'border-green-200 bg-green-50'}`}
+                                                className={`rounded-xl border p-3 ${item.status === 'critical' ? 'border-red-500/20 bg-red-500/10' : item.status === 'warning' ? 'border-orange-500/20 bg-orange-500/10' : item.status === 'review' ? 'border-amber-200 bg-amber-50' : 'border-green-500/20 bg-green-500/10'}`}
                                             >
                                                 <div className="flex items-center justify-between gap-2">
                                                     <p className="text-xs font-bold text-[var(--foreground)]">{item.label}</p>
@@ -737,7 +737,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 <div className="space-y-2">
                                     <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">규정 경고</p>
                                     {selectedRuleAnalysis!.issues.length === 0 ? (
-                                        <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-bold text-green-700">
+                                        <div className="rounded-xl border border-green-500/20 bg-green-500/10 p-4 text-sm font-bold text-green-700">
                                             현재 규칙 기준으로 뚜렷한 경고는 감지되지 않았습니다.
                                         </div>
                                     ) : (
@@ -746,7 +746,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                                 <div
                                                     key={issue.key}
                                                     data-testid={`discharge-rule-issue-${idx}`}
-                                                    className={`rounded-xl border p-4 ${issue.severity === 'critical' ? 'border-red-200 bg-red-50' : issue.severity === 'warning' ? 'border-orange-200 bg-orange-50' : 'border-amber-200 bg-amber-50'}`}
+                                                    className={`rounded-xl border p-4 ${issue.severity === 'critical' ? 'border-red-500/20 bg-red-500/10' : issue.severity === 'warning' ? 'border-orange-500/20 bg-orange-500/10' : 'border-amber-200 bg-amber-50'}`}
                                                 >
                                                     <div className="flex items-center justify-between gap-3">
                                                         <p className="text-sm font-bold text-[var(--foreground)]">{issue.title}</p>
@@ -772,20 +772,20 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 <div className="text-center py-10 space-y-3">
                                     <div className="text-4xl opacity-30">📋</div>
                                     <p className="text-sm text-[var(--toss-gray-3)] font-medium">아직 등록된 템플릿이 없습니다.</p>
-                                    <button onClick={startNewTemplate} className="px-4 py-2 text-xs font-bold text-[var(--accent)] bg-blue-50 rounded-xl hover:bg-blue-100">첫 번째 템플릿 만들기</button>
+                                    <button onClick={startNewTemplate} className="px-4 py-2 text-xs font-bold text-[var(--accent)] bg-blue-500/10 rounded-xl hover:bg-blue-500/20">첫 번째 템플릿 만들기</button>
                                 </div>
                             )}
 
                             <div className="space-y-2">
                                 {templates.map(t => (
-                                    <div key={t.id} className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${editTmplId === t.id ? 'border-[var(--accent)] bg-blue-50/30' : 'border-[var(--border)] bg-[var(--tab-bg)] hover:border-[var(--border)]'}`}>
+                                    <div key={t.id} className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${editTmplId === t.id ? 'border-[var(--accent)] bg-blue-500/10/30' : 'border-[var(--border)] bg-[var(--tab-bg)] hover:border-[var(--border)]'}`}>
                                         <div className="flex-1 min-w-0">
                                             <h4 className="text-sm font-bold text-[var(--foreground)]">{t.title}</h4>
                                             <p className="text-[10px] text-[var(--toss-gray-3)] font-medium mt-0.5">{parseChartData(t.data).length}개 항목</p>
                                         </div>
                                         <div className="flex gap-1 shrink-0">
-                                            <button onClick={() => startEditTemplate(t)} className="px-3 py-1.5 text-[11px] font-bold text-[var(--accent)] bg-blue-50 rounded-lg hover:bg-blue-100">수정</button>
-                                            <button onClick={() => deleteTemplate(t.id)} className="px-3 py-1.5 text-[11px] font-bold text-red-500 bg-red-50 rounded-lg hover:bg-red-100">삭제</button>
+                                            <button onClick={() => startEditTemplate(t)} className="px-3 py-1.5 text-[11px] font-bold text-[var(--accent)] bg-blue-500/10 rounded-lg hover:bg-blue-500/20">수정</button>
+                                            <button onClick={() => deleteTemplate(t.id)} className="px-3 py-1.5 text-[11px] font-bold text-red-500 bg-red-500/10 rounded-lg hover:bg-red-500/20">삭제</button>
                                         </div>
                                     </div>
                                 ))}
@@ -812,7 +812,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 </div>
 
                                 {editParsed.length > 0 && (
-                                    <div className="bg-blue-50 p-3 rounded-xl">
+                                    <div className="bg-blue-500/10 p-3 rounded-xl">
                                         <p className="text-xs font-bold text-[var(--accent)]">📋 {editParsed.length}개 항목 인식됨</p>
                                     </div>
                                 )}
@@ -983,14 +983,14 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                     ))}
                                 </select>
                                 {selectedTemplate && (
-                                    <div className="bg-blue-50 p-3 rounded-xl mt-2">
+                                    <div className="bg-blue-500/10 p-3 rounded-xl mt-2">
                                         <p className="text-xs font-bold text-[var(--accent)]">📋 &quot;{selectedTemplate.title}&quot; 템플릿 선택됨 &mdash; 심사 생성 시 자동 비교</p>
                                     </div>
                                 )}
                             </div>
 
                             {admissionDate && dischargeDate && (
-                                <div className="bg-blue-50 p-3 rounded-xl flex items-center gap-4">
+                                <div className="bg-blue-500/10 p-3 rounded-xl flex items-center gap-4">
                                     <p className="text-sm font-bold text-[var(--accent)]">입원 기간: {stayDays(admissionDate, dischargeDate)}일</p>
                                     {birthDate && <p className="text-sm font-medium text-[var(--toss-gray-4)]">나이: {Math.floor((Date.now() - new Date(birthDate).getTime()) / 31557600000)}세</p>}
                                 </div>
@@ -1007,11 +1007,11 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 className="w-full p-4 bg-[var(--tab-bg)] border border-[var(--border)] rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-[var(--accent)]/20 resize-none h-48 custom-scrollbar placeholder:text-[var(--toss-gray-3)]" />
 
                             {parsedNewChart.length > 0 && (
-                                <div className="bg-blue-50 p-4 rounded-xl space-y-2">
+                                <div className="bg-blue-500/10 p-4 rounded-xl space-y-2">
                                     <p className="text-xs font-bold text-[var(--accent)]">📋 {parsedNewChart.length}개 항목이 체크리스트로 생성됩니다</p>
                                     <div className="flex flex-wrap gap-1.5">
                                         {parsedNewChart.slice(0, 8).map((it, i) => (
-                                            <span key={i} className="px-2 py-1 bg-[var(--card)] rounded-lg text-[10px] font-medium text-[var(--toss-gray-4)] border border-blue-200 truncate max-w-[180px]">{it.name}</span>
+                                            <span key={i} className="px-2 py-1 bg-[var(--card)] rounded-lg text-[10px] font-medium text-[var(--toss-gray-4)] border border-blue-500/20 truncate max-w-[180px]">{it.name}</span>
                                         ))}
                                         {parsedNewChart.length > 8 && <span className="px-2 py-1 text-[10px] font-bold text-blue-400">+{parsedNewChart.length - 8}개 더</span>}
                                     </div>
@@ -1043,11 +1043,11 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 <div className="flex justify-between items-start">
                                     <div className="space-y-1">
                                         <div className="flex items-center gap-2">
-                                            <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${r.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                                            <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${r.status === 'approved' ? 'bg-green-500/20 text-green-700' : 'bg-orange-500/20 text-orange-700'}`}>
                                                 {r.status === 'approved' ? '✅ 승인' : '⏳ 심사 중'}
                                             </span>
                                             <span className="text-sm font-bold text-[var(--foreground)]">{r.patient_name}</span>
-                                            {r.diagnosis && <span className="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-0.5 rounded-lg">{r.diagnosis}</span>}
+                                            {r.diagnosis && <span className="text-[10px] font-bold text-purple-500 bg-purple-500/10 px-2 py-0.5 rounded-lg">{r.diagnosis}</span>}
                                         </div>
                                         <p className="text-xs text-[var(--toss-gray-3)] font-medium">{r.department} · {stayDays(r.admission_date, r.discharge_date)}일 · {r.items.length}개 항목</p>
                                     </div>
@@ -1057,7 +1057,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                     </div>
                                 </div>
                                 <div className="mt-3 h-1.5 bg-[var(--tab-bg)] rounded-full overflow-hidden">
-                                    <div className={`h-full rounded-full transition-all ${r.status === 'approved' ? 'bg-green-500' : 'bg-[var(--accent)]'}`}
+                                    <div className={`h-full rounded-full transition-all ${r.status === 'approved' ? 'bg-green-500/100' : 'bg-[var(--accent)]'}`}
                                         style={{ width: `${r.items.length > 0 ? (r.items.filter(i => i.checked).length / r.items.length) * 100 : 0}%` }} />
                                 </div>
                             </button>
@@ -1071,7 +1071,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                         <div className="flex justify-between items-center">
                             <button onClick={() => { setSelectedReview(null); setCompareResult(null); setIsEditing(false); }} className="text-[11px] font-bold text-[var(--accent)] hover:underline">← 목록으로</button>
                             {!isEditing && selectedReview.status !== 'approved' && (
-                                <button onClick={handleStartEdit} className="px-3 py-1.5 text-[11px] font-bold text-[var(--accent)] bg-blue-50 rounded-lg hover:bg-blue-100">✏️ 정보 수정</button>
+                                <button onClick={handleStartEdit} className="px-3 py-1.5 text-[11px] font-bold text-[var(--accent)] bg-blue-500/10 rounded-lg hover:bg-blue-500/20">✏️ 정보 수정</button>
                             )}
                         </div>
 
@@ -1080,23 +1080,23 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                             <div className="flex justify-between items-start mb-4">
                                 <div>
                                     <div className="flex items-center gap-2 mb-1">
-                                        <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${selectedReview.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                                        <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${selectedReview.status === 'approved' ? 'bg-green-500/20 text-green-700' : 'bg-orange-500/20 text-orange-700'}`}>
                                             {selectedReview.status === 'approved' ? '✅ 승인' : '⏳ 심사 중'}
                                         </span>
                                         {isEditing ? (
                                             <select value={editForm.template_id} onChange={e => {
                                                 const tmpl = templates.find(t => t.id === e.target.value);
                                                 setEditForm({ ...editForm, template_id: e.target.value, diagnosis: tmpl?.title || '' });
-                                            }} className="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-1 rounded-lg border-none outline-none">
+                                            }} className="text-[10px] font-bold text-purple-500 bg-purple-500/10 px-2 py-1 rounded-lg border-none outline-none">
                                                 <option value="">템플릿 선택</option>
                                                 {templates.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
                                             </select>
                                         ) : (
-                                            selectedReview.diagnosis && <span className="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-0.5 rounded-lg">{selectedReview.diagnosis}</span>
+                                            selectedReview.diagnosis && <span className="text-[10px] font-bold text-purple-500 bg-purple-500/10 px-2 py-0.5 rounded-lg">{selectedReview.diagnosis}</span>
                                         )}
                                         {isEditing ? (
                                             <select value={editForm.insurance_type} onChange={e => setEditForm({ ...editForm, insurance_type: e.target.value })}
-                                                className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-lg border-none outline-none">
+                                                className="text-[10px] font-bold text-blue-500 bg-blue-500/10 px-2 py-1 rounded-lg border-none outline-none">
                                                 <option value="건강보험">건강보험</option>
                                                 <option value="의료급여 1종">의료급여 1종</option>
                                                 <option value="의료급여 2종">의료급여 2종</option>
@@ -1105,7 +1105,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                                 <option value="비급여">비급여</option>
                                             </select>
                                         ) : (
-                                            selectedReview.insurance_type && <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-lg">{selectedReview.insurance_type}</span>
+                                            selectedReview.insurance_type && <span className="text-[10px] font-bold text-blue-500 bg-blue-500/10 px-2 py-0.5 rounded-lg">{selectedReview.insurance_type}</span>
                                         )}
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -1142,7 +1142,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                         )}
                                     </div>
                                 </div>
-                                {!isEditing && <button onClick={() => deleteReview(selectedReview.id)} className="px-3 py-2 text-[11px] font-bold text-red-500 bg-red-50 rounded-lg hover:bg-red-100">🗑️</button>}
+                                {!isEditing && <button onClick={() => deleteReview(selectedReview.id)} className="px-3 py-2 text-[11px] font-bold text-red-500 bg-red-500/10 rounded-lg hover:bg-red-500/20">🗑️</button>}
                             </div>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
                                 <div className="bg-[var(--tab-bg)] rounded-xl p-3">
@@ -1248,7 +1248,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 </div>
                             ) : (
                                 selectedReview.disease_codes && (
-                                    <div className="bg-purple-50 p-3 rounded-xl mt-3">
+                                    <div className="bg-purple-500/10 p-3 rounded-xl mt-3">
                                         <p className="text-[10px] font-bold text-purple-500 mb-1">🏥 상병명</p>
                                         <p className="text-xs font-mono text-[var(--toss-gray-5)] whitespace-pre-line">{selectedReview.disease_codes}</p>
                                     </div>
@@ -1279,7 +1279,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                     <span className="text-xs font-bold text-[var(--accent)]">{selectedReview.items.length > 0 ? Math.round((selectedReview.items.filter(i => i.checked).length / selectedReview.items.length) * 100) : 0}%</span>
                                     {selectedReview.status !== 'approved' && (
                                         <div className="flex gap-1">
-                                            <button data-testid="discharge-review-toggle-all" onClick={() => toggleAll(true)} className="px-2 py-1 text-[10px] font-bold text-green-600 bg-green-50 rounded hover:bg-green-100">전체✓</button>
+                                            <button data-testid="discharge-review-toggle-all" onClick={() => toggleAll(true)} className="px-2 py-1 text-[10px] font-bold text-green-600 bg-green-500/10 rounded hover:bg-green-500/20">전체✓</button>
                                             <button onClick={() => toggleAll(false)} className="px-2 py-1 text-[10px] font-bold text-[var(--toss-gray-4)] bg-[var(--tab-bg)] rounded hover:bg-[var(--tab-bg)]">해제</button>
                                         </div>
                                     )}
@@ -1293,8 +1293,8 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 {selectedReview.items.map(item => (
                                     <button key={item.id} onClick={() => selectedReview.status !== 'approved' && toggleItem(selectedReview.id, item.id)}
                                         disabled={selectedReview.status === 'approved'}
-                                        className={`w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-all ${item.checked ? 'bg-green-50 border border-green-200' : 'bg-[var(--tab-bg)] border border-transparent hover:border-[var(--border)]'} ${selectedReview.status === 'approved' ? 'cursor-default' : 'cursor-pointer'}`}>
-                                        <div className={`w-4 h-4 rounded-full flex items-center justify-center border-2 shrink-0 text-[10px] ${item.checked ? 'bg-green-500 border-green-500 text-white' : 'border-[var(--border)]'}`}>{item.checked && '✓'}</div>
+                                        className={`w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-all ${item.checked ? 'bg-green-500/10 border border-green-500/20' : 'bg-[var(--tab-bg)] border border-transparent hover:border-[var(--border)]'} ${selectedReview.status === 'approved' ? 'cursor-default' : 'cursor-pointer'}`}>
+                                        <div className={`w-4 h-4 rounded-full flex items-center justify-center border-2 shrink-0 text-[10px] ${item.checked ? 'bg-green-500/100 border-green-500 text-white' : 'border-[var(--border)]'}`}>{item.checked && '✓'}</div>
                                         {item.code && <span className="font-mono text-[10px] text-[var(--toss-gray-3)] w-20 shrink-0 truncate">{item.code}</span>}
                                         <span className={`text-xs font-medium flex-1 ${item.checked ? 'text-green-700 line-through' : 'text-[var(--toss-gray-5)]'}`}>{item.label}</span>
                                     </button>
@@ -1315,37 +1315,37 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                             {compareResult && (
                                 <div className="space-y-3">
                                     <div className="grid grid-cols-3 gap-3">
-                                        <div className="bg-green-50 rounded-xl p-3 text-center border border-green-200">
+                                        <div className="bg-green-500/10 rounded-xl p-3 text-center border border-green-500/20">
                                             <p className="text-2xl font-bold text-green-600">{compareResult.matched.length}</p>
                                             <p className="text-[10px] font-bold text-green-500 mt-1">✅ 일치</p>
                                         </div>
-                                        <div className="bg-red-50 rounded-xl p-3 text-center border border-red-200">
+                                        <div className="bg-red-500/10 rounded-xl p-3 text-center border border-red-500/20">
                                             <p className="text-2xl font-bold text-red-600">{compareResult.missing.length}</p>
                                             <p className="text-[10px] font-bold text-red-500 mt-1">❌ 누락</p>
                                         </div>
-                                        <div className="bg-yellow-50 rounded-xl p-3 text-center border border-yellow-200">
+                                        <div className="bg-yellow-500/10 rounded-xl p-3 text-center border border-yellow-500/20">
                                             <p className="text-2xl font-bold text-yellow-600">{compareResult.extra.length}</p>
                                             <p className="text-[10px] font-bold text-yellow-600 mt-1">🆕 추가</p>
                                         </div>
                                     </div>
                                     {compareResult.missing.length > 0 && (
-                                        <div className="border border-red-200 rounded-xl p-4 space-y-2">
+                                        <div className="border border-red-500/20 rounded-xl p-4 space-y-2">
                                             <h4 className="text-xs font-bold text-red-600">❌ 누락 항목 (기본값에 있지만 차트에 없음)</h4>
                                             <div className="space-y-1 max-h-[200px] overflow-y-auto custom-scrollbar">
-                                                {compareResult.missing.map((item, idx) => <div key={idx} className="text-xs text-red-700 bg-red-50 p-2 rounded-lg font-medium">{item}</div>)}
+                                                {compareResult.missing.map((item, idx) => <div key={idx} className="text-xs text-red-700 bg-red-500/10 p-2 rounded-lg font-medium">{item}</div>)}
                                             </div>
                                         </div>
                                     )}
                                     {compareResult.extra.length > 0 && (
-                                        <div className="border border-yellow-200 rounded-xl p-4 space-y-2">
+                                        <div className="border border-yellow-500/20 rounded-xl p-4 space-y-2">
                                             <h4 className="text-xs font-bold text-yellow-600">🆕 추가 항목 (차트에 있지만 기본값에 없음)</h4>
                                             <div className="space-y-1 max-h-[200px] overflow-y-auto custom-scrollbar">
-                                                {compareResult.extra.map((item, idx) => <div key={idx} className="text-xs text-yellow-700 bg-yellow-50 p-2 rounded-lg font-medium">{item}</div>)}
+                                                {compareResult.extra.map((item, idx) => <div key={idx} className="text-xs text-yellow-700 bg-yellow-500/10 p-2 rounded-lg font-medium">{item}</div>)}
                                             </div>
                                         </div>
                                     )}
                                     {compareResult.missing.length === 0 && compareResult.extra.length === 0 && (
-                                        <div className="bg-green-50 p-4 rounded-xl text-center"><p className="text-sm font-bold text-green-600">✅ 모든 항목이 일치합니다!</p></div>
+                                        <div className="bg-green-500/10 p-4 rounded-xl text-center"><p className="text-sm font-bold text-green-600">✅ 모든 항목이 일치합니다!</p></div>
                                     )}
                                 </div>
                             )}
@@ -1356,16 +1356,16 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                         {/* AI 분석 */}
                         <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm space-y-4">
                             <div className="flex justify-between items-center">
-                                <h3 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2"><span className="text-lg">🤖</span> AI 분석 <span className="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-0.5 rounded-lg">Gemini 3</span></h3>
+                                <h3 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2"><span className="text-lg">🤖</span> AI 분석 <span className="text-[10px] font-bold text-purple-500 bg-purple-500/10 px-2 py-0.5 rounded-lg">Gemini 3</span></h3>
                                 <button onClick={requestAiAnalysis} disabled={aiLoading}
                                     className="px-4 py-2 text-xs font-bold text-white bg-purple-600 rounded-xl hover:bg-purple-700 disabled:opacity-50 transition-all flex items-center gap-1.5">
                                     {aiLoading ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> 분석 중...</> : '✨ AI 분석'}
                                 </button>
                             </div>
                             {(aiResult || aiLoading) && (
-                                <div className={`p-5 rounded-xl border ${aiLoading ? 'bg-purple-50/50 border-purple-100' : 'bg-[var(--tab-bg)] border-[var(--border)]'}`}>
+                                <div className={`p-5 rounded-xl border ${aiLoading ? 'bg-purple-500/10/50 border-purple-100' : 'bg-[var(--tab-bg)] border-[var(--border)]'}`}>
                                     {aiLoading ? (
-                                        <div className="flex items-center gap-3"><div className="w-5 h-5 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin" /><p className="text-sm text-purple-600 font-medium">심사 분석 중...</p></div>
+                                        <div className="flex items-center gap-3"><div className="w-5 h-5 border-2 border-purple-500/20 border-t-purple-600 rounded-full animate-spin" /><p className="text-sm text-purple-600 font-medium">심사 분석 중...</p></div>
                                     ) : <div className="text-sm text-[var(--toss-gray-5)] font-medium leading-relaxed whitespace-pre-wrap">{aiResult}</div>}
                                 </div>
                             )}
