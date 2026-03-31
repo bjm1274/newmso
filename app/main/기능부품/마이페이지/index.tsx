@@ -760,7 +760,7 @@ function ProfileHeaderSummary({
             data-testid="mypage-profile-edit-toggle"
             className={`rounded-[var(--radius-md)] border px-3 py-2 text-[11px] font-bold transition-all ${
               isEditing
-                ? 'bg-red-50 text-red-500 border-red-100 hover:bg-red-100'
+                ? 'bg-red-500/10 text-red-500 border-red-100 hover:bg-red-500/20'
                 : 'bg-[var(--toss-blue-light)] text-[var(--accent)] border-[var(--toss-blue-light)] hover:bg-[var(--toss-blue-light)]'
             }`}
           >

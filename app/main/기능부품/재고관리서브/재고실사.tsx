@@ -280,7 +280,7 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
                 const hasError = Boolean(actualError);
                 const hasDiff = diff !== null && diff !== 0;
                 return (
-                  <tr key={it.id} className={`transition-colors ${hasError ? 'bg-red-50/60' : hasDiff ? 'bg-orange-50/50' : ''}`}>
+                  <tr key={it.id} className={`transition-colors ${hasError ? 'bg-red-500/10/60' : hasDiff ? 'bg-orange-500/10/50' : ''}`}>
                     <td className="px-4 py-3">
                       <p className="text-[10px] font-bold text-[var(--accent)]">{it.company}</p>
                       <p className="text-[9px] text-[var(--toss-gray-3)]">{it.category}</p>
@@ -295,7 +295,7 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
                         value={it.actual}
                         onChange={e => setActual(it.id, e.target.value)}
                         placeholder="실물 수량"
-                        className={`w-24 px-3 py-1.5 border rounded-[var(--radius-md)] text-sm font-bold text-center outline-none focus:ring-2 focus:ring-[var(--accent)]/20 ${hasError ? 'border-red-400 bg-red-50' : hasDiff ? 'border-orange-400 bg-orange-50' : 'border-[var(--border)] bg-[var(--card)]'}`}
+                        className={`w-24 px-3 py-1.5 border rounded-[var(--radius-md)] text-sm font-bold text-center outline-none focus:ring-2 focus:ring-[var(--accent)]/20 ${hasError ? 'border-red-400 bg-red-500/10' : hasDiff ? 'border-orange-400 bg-orange-500/10' : 'border-[var(--border)] bg-[var(--card)]'}`}
                       />
                       {actualError && (
                         <p className="mt-1 text-[10px] font-semibold text-red-500">{actualError}</p>

@@ -966,7 +966,7 @@ function StaffCardRow({ staff, onClick, isEditMode, setDraggedStaff, draggedStaf
         ${isEditMode ? 'cursor-grab active:cursor-grabbing hover:bg-[var(--tab-bg)]' : 'cursor-pointer'}
       `}
     >
-      <div className={`w-[42px] h-[42px] shrink-0 rounded-[var(--radius-md)] flex items-center justify-center text-base overflow-hidden ${isAdmin ? 'bg-red-50 text-red-400' : 'bg-[var(--muted)] text-[var(--toss-gray-3)] group-hover:bg-[var(--toss-blue-light)] group-hover:text-[var(--accent)]'}`}>
+      <div className={`w-[42px] h-[42px] shrink-0 rounded-[var(--radius-md)] flex items-center justify-center text-base overflow-hidden ${isAdmin ? 'bg-red-500/10 text-red-400' : 'bg-[var(--muted)] text-[var(--toss-gray-3)] group-hover:bg-[var(--toss-blue-light)] group-hover:text-[var(--accent)]'}`}>
         {photoUrl ? (
           <img src={photoUrl} alt={staff.name ?? ''} className="w-full h-full object-cover rounded-[var(--radius-md)]" />
         ) : (

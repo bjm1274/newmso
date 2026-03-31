@@ -173,7 +173,7 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: Record<string
                                 <p className="text-[10px] text-[var(--toss-gray-3)] font-semibold mt-0.5">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                             </div>
                             <div className="flex gap-2 w-full mt-2">
-                                <button onClick={clearFile} className="flex-1 py-2 rounded-xl bg-[var(--page-bg)] border border-[var(--border)] text-xs font-bold text-[var(--toss-gray-4)] hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors">지우기</button>
+                                <button onClick={clearFile} className="flex-1 py-2 rounded-xl bg-[var(--page-bg)] border border-[var(--border)] text-xs font-bold text-[var(--toss-gray-4)] hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/20 transition-colors">지우기</button>
                                 <button
                                     onClick={handleExtract}
                                     disabled={isLoading}
@@ -208,7 +208,7 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: Record<string
                                     <div key={idx} className={`bg-[var(--page-bg)] border ${item.edited ? 'border-[var(--accent)]' : 'border-[var(--border)]'} rounded-[var(--radius-lg)] p-4 relative group transition-all`}>
                                         <button
                                             onClick={() => handleDeleteItem(idx)}
-                                            className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[var(--muted)] text-[var(--toss-gray-4)] flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-100 hover:text-red-500"
+                                            className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[var(--muted)] text-[var(--toss-gray-4)] flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/20 hover:text-red-500"
                                         >
                                             ×
                                         </button>

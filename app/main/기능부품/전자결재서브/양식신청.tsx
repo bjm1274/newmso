@@ -247,7 +247,7 @@ export default function FormRequest({
         </div>
 
         {approverLine.length === 0 && (
-          <div className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-bold text-red-600" data-testid="form-request-approver-required">
+          <div className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/10 px-3 py-2 text-[11px] font-bold text-red-600" data-testid="form-request-approver-required">
             결재권자를 먼저 선택해야 양식 신청을 올릴 수 있습니다.
           </div>
         )}

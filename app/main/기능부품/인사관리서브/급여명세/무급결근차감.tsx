@@ -165,7 +165,7 @@ export default function UnpaidAbsenceDeduction({ staffs, selectedCo, user }: Pro
 
       {/* 메시지 */}
       {message && (
-        <div className={`px-4 py-3 rounded-xl text-sm font-bold ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+        <div className={`px-4 py-3 rounded-xl text-sm font-bold ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-500/10 text-red-700 border border-red-500/20'}`}>
           {message.text}
         </div>
       )}
@@ -180,7 +180,7 @@ export default function UnpaidAbsenceDeduction({ staffs, selectedCo, user }: Pro
           <p className="text-xs font-bold text-[var(--toss-gray-3)]">총 결근 일수</p>
           <p className="text-2xl font-extrabold text-[var(--foreground)] mt-1">{records.reduce((s, r) => s + (r.absent_days || 0), 0)}<span className="text-sm ml-1">일</span></p>
         </div>
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4">
           <p className="text-xs font-bold text-red-400">총 차감 금액</p>
           <p className="text-2xl font-extrabold text-red-600 mt-1">{totalDeduction.toLocaleString()}<span className="text-sm ml-1">원</span></p>
         </div>
@@ -204,7 +204,7 @@ export default function UnpaidAbsenceDeduction({ staffs, selectedCo, user }: Pro
 
       {/* 입력 폼 */}
       {editingId !== null && (
-        <div className="bg-blue-50 border border-[var(--accent)]/30 rounded-2xl p-4 space-y-4">
+        <div className="bg-blue-500/10 border border-[var(--accent)]/30 rounded-2xl p-4 space-y-4">
           <h3 className="text-sm font-bold text-[var(--accent)]">{editingId > 0 ? '결근 기록 수정' : '결근 기록 추가'} — {form.staff_name}</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
@@ -306,8 +306,8 @@ export default function UnpaidAbsenceDeduction({ staffs, selectedCo, user }: Pro
                     <td className="px-4 py-3 text-[var(--toss-gray-3)]">{rec.note || '-'}</td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
-                        <button onClick={() => openEdit(rec)} className="px-2 py-1 text-[10px] font-bold bg-blue-50 text-[var(--accent)] rounded-lg hover:bg-blue-100 transition-colors">수정</button>
-                        <button onClick={() => handleDelete(rec.id!)} className="px-2 py-1 text-[10px] font-bold bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition-colors">삭제</button>
+                        <button onClick={() => openEdit(rec)} className="px-2 py-1 text-[10px] font-bold bg-blue-500/10 text-[var(--accent)] rounded-lg hover:bg-blue-500/20 transition-colors">수정</button>
+                        <button onClick={() => handleDelete(rec.id!)} className="px-2 py-1 text-[10px] font-bold bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors">삭제</button>
                       </div>
                     </td>
                   </tr>

@@ -130,10 +130,10 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
   };
 
   const severityColor = (s: string) =>
-    s === '사망' ? 'text-red-700 bg-red-100' :
-    s === '중증' ? 'text-red-500 bg-red-50' :
+    s === '사망' ? 'text-red-700 bg-red-500/20' :
+    s === '중증' ? 'text-red-500 bg-red-500/10' :
     s === '중등' ? 'text-amber-600 bg-amber-50' :
-    'text-green-600 bg-green-50';
+    'text-green-600 bg-green-500/10';
 
   // 통계
   const typeCounts: Record<string, number> = {};
@@ -287,7 +287,7 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
                 <div key={s} className="flex items-center gap-2 mb-1.5">
                   <span className={`text-[10px] font-bold w-12 shrink-0 ${s === '사망' ? 'text-red-700' : s === '중증' ? 'text-red-500' : s === '중등' ? 'text-amber-600' : 'text-green-600'}`}>{s}</span>
                   <div className="flex-1 bg-[var(--muted)] rounded-full h-3 overflow-hidden">
-                    <div className={`h-full rounded-full ${s === '사망' ? 'bg-red-700' : s === '중증' ? 'bg-red-500' : s === '중등' ? 'bg-amber-400' : 'bg-green-400'}`} style={{ width: `${(count / max) * 100}%` }} />
+                    <div className={`h-full rounded-full ${s === '사망' ? 'bg-red-700' : s === '중증' ? 'bg-red-500/100' : s === '중등' ? 'bg-amber-400' : 'bg-green-400'}`} style={{ width: `${(count / max) * 100}%` }} />
                   </div>
                   <span className="text-[10px] font-bold w-6 text-right">{count}</span>
                 </div>

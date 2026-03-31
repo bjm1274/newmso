@@ -109,7 +109,7 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
         </div>
       ) : (
         <div className="w-full max-w-2xl space-y-4">
-          <div className="bg-red-50 p-4 border border-red-100 text-center mb-4">
+          <div className="bg-red-500/10 p-4 border border-red-100 text-center mb-4">
             <h3 className="text-red-600 font-semibold text-sm mb-1 tracking-tight uppercase">통합 데이터 초기화 관리</h3>
             <p className="text-[11px] text-red-400 font-bold uppercase tracking-widest">항목별 실행 버튼을 누르면 즉시 영구 삭제됩니다.</p>
           </div>
@@ -130,7 +130,7 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
             {/* 직원 삭제: 관리자는 항상 제외 */}
             <button
               onClick={() => runReset('staff')}
-              className="p-4 bg-[var(--card)] border-2 border-red-50 hover:border-red-600 hover:bg-red-50 text-left font-semibold text-xs text-red-600 flex justify-between items-center transition-all group"
+              className="p-4 bg-[var(--card)] border-2 border-red-50 hover:border-red-600 hover:bg-red-500/10 text-left font-semibold text-xs text-red-600 flex justify-between items-center transition-all group"
             >
               <span>👤 관리자 제외 전 직원 계정 및 데이터 삭제</span>
               <span className="text-[11px] font-bold px-2 py-1 bg-red-600 text-white uppercase">관리자 유지</span>

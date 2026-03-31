@@ -36,7 +36,7 @@ type Props = {
 const WORK_TYPES: WorkType[] = ['정규직', '파트타임', '계약직', '일용직', '파견'];
 
 const TYPE_STYLES: Record<string, string> = {
-  정규직: 'bg-blue-50 text-blue-700 border-blue-200',
+  정규직: 'bg-blue-500/10 text-blue-700 border-blue-500/20',
   파트타임: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   계약직: 'bg-amber-50 text-amber-700 border-amber-200',
   일용직: 'bg-rose-50 text-rose-700 border-rose-200',
@@ -341,7 +341,7 @@ export default function WorkTypeChangeHistory({ staffs, selectedCo, user }: Prop
       </div>
 
       {showForm && (
-        <div className="space-y-4 rounded-2xl border border-[var(--accent)]/20 bg-blue-50/50 p-4 shadow-sm">
+        <div className="space-y-4 rounded-2xl border border-[var(--accent)]/20 bg-blue-500/10/50 p-4 shadow-sm">
           <div>
             <h3 className="text-sm font-bold text-[var(--accent)]">근무형태 변경 등록</h3>
             <p className="text-[11px] text-[var(--toss-gray-3)]">
@@ -499,7 +499,7 @@ export default function WorkTypeChangeHistory({ staffs, selectedCo, user }: Prop
                       <button
                         type="button"
                         onClick={() => handleDelete(record)}
-                        className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-bold text-red-600 transition-colors hover:bg-red-100"
+                        className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-[11px] font-bold text-red-600 transition-colors hover:bg-red-500/20"
                       >
                         삭제
                       </button>

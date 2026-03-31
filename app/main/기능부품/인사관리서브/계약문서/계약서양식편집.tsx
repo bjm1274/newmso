@@ -44,10 +44,10 @@ const VARIABLES: { key: string; desc: string; category: string }[] = [
 ];
 
 const CATEGORY_COLORS: Record<string, string> = {
-  근로자: 'bg-blue-50 text-blue-700 border-blue-200',
+  근로자: 'bg-blue-500/10 text-blue-700 border-blue-500/20',
   사업자: 'bg-violet-50 text-violet-700 border-violet-200',
   계약: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  임금: 'bg-orange-50 text-orange-700 border-orange-200',
+  임금: 'bg-orange-500/10 text-orange-700 border-orange-500/20',
   근무: 'bg-cyan-50 text-cyan-700 border-cyan-200',
 };
 
@@ -179,7 +179,7 @@ export default function ContractTemplateEditor({ selectedCo }: TemplateEditorPro
     str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
   const highlightedPreview = escapeHtml(templateContent).replace(
     /\{\{([^}]+)\}\}/g,
-    (_, key) => `<mark class="bg-blue-100 text-blue-800 px-0.5 rounded text-[11px] font-semibold not-italic">{{${key}}}</mark>`
+    (_, key) => `<mark class="bg-blue-500/20 text-blue-800 px-0.5 rounded text-[11px] font-semibold not-italic">{{${key}}}</mark>`
   );
 
   return (
@@ -250,7 +250,7 @@ export default function ContractTemplateEditor({ selectedCo }: TemplateEditorPro
                   key={v.key}
                   onClick={() => insertVariable(v.key)}
                   title={v.desc}
-                  className={`px-2 py-1 rounded border text-[10px] font-mono font-semibold hover:opacity-80 transition-all ${CATEGORY_COLORS[v.category] || 'bg-gray-50 text-gray-700 border-gray-200'}`}
+                  className={`px-2 py-1 rounded border text-[10px] font-mono font-semibold hover:opacity-80 transition-all ${CATEGORY_COLORS[v.category] || 'bg-[var(--muted)] text-gray-700 border-gray-200'}`}
                 >
                   {v.key} <span className="opacity-60 font-sans not-italic">{v.desc}</span>
                 </button>

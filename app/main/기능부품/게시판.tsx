@@ -355,7 +355,7 @@ const BOARD_POST_STATUSES = ['게시중', '중요', '검토중', '완료', '보�
 function getBoardStatusTone(status: string | null | undefined) {
   switch (normalizeBoardPostStatus(status)) {
     case '중요':
-      return 'bg-red-50 text-red-600';
+      return 'bg-red-500/10 text-red-600';
     case '검토중':
       return 'bg-amber-50 text-amber-700';
     case '완료':
@@ -2125,7 +2125,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                                       onClick={() =>
                                         setExistingAttachmentItems((prev) => prev.filter((_, idx) => idx !== i))
                                       }
-                                      className="shrink-0 rounded border border-red-200 px-2.5 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                                      className="shrink-0 rounded border border-red-500/20 px-2.5 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-500/10"
                                     >
                                       삭제
                                     </button>
@@ -2155,7 +2155,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                                   <button
                                     type="button"
                                     onClick={() => setAttachmentFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                                    className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-red-500 text-white text-xs font-semibold flex items-center justify-center shadow hover:bg-red-600"
+                                    className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-red-500/100 text-white text-xs font-semibold flex items-center justify-center shadow hover:bg-red-600"
                                   >
                                     ×
                                   </button>
@@ -2170,7 +2170,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                                 <button
                                   type="button"
                                   onClick={() => setAttachmentFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                                  className="shrink-0 px-2.5 py-1.5 rounded border border-red-200 text-red-600 hover:bg-red-50 text-[11px]"
+                                  className="shrink-0 px-2.5 py-1.5 rounded border border-red-500/20 text-red-600 hover:bg-red-500/10 text-[11px]"
                                 >
                                   삭제
                                 </button>
@@ -2512,7 +2512,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                                 {post.patient_name || '환자명 미지정'} {post.content && <span className="text-[var(--toss-gray-4)] ml-1">| 차트번호: {post.content}</span>}
                               </p>
                             </div>
-                            <span className={`px-2 py-1 rounded-[var(--radius-md)] text-[11px] font-semibold shrink-0 ${activeBoard === '수술일정' ? 'bg-red-100 text-red-600' : 'bg-purple-100 text-purple-600'
+                            <span className={`px-2 py-1 rounded-[var(--radius-md)] text-[11px] font-semibold shrink-0 ${activeBoard === '수술일정' ? 'bg-red-500/20 text-red-600' : 'bg-purple-500/20 text-purple-600'
                               }`}>
                               {activeBoard === '수술일정' ? '🏥 수술' : '🔬 MRI'}
                             </span>
@@ -2534,7 +2534,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                           {(post.surgery_fasting || post.surgery_inpatient || post.surgery_guardian || post.surgery_caregiver || post.surgery_transfusion) && (
                             <div className="pt-2 flex flex-wrap gap-1 items-center">
                               {post.surgery_fasting && (
-                                <span className="px-2 py-1 rounded-[var(--radius-md)] bg-red-50 text-red-600 text-[11px] font-semibold">
+                                <span className="px-2 py-1 rounded-[var(--radius-md)] bg-red-500/10 text-red-600 text-[11px] font-semibold">
                                   금식
                                 </span>
                               )}
@@ -2549,12 +2549,12 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                                 </span>
                               )}
                               {post.surgery_caregiver && (
-                                <span className="px-2 py-1 rounded-[var(--radius-md)] bg-purple-50 text-purple-600 text-[11px] font-semibold">
+                                <span className="px-2 py-1 rounded-[var(--radius-md)] bg-purple-500/10 text-purple-600 text-[11px] font-semibold">
                                   간병인
                                 </span>
                               )}
                               {post.surgery_transfusion && (
-                                <span className="px-2 py-1 rounded-[var(--radius-md)] bg-red-50 text-red-700 text-[11px] font-semibold ml-auto">
+                                <span className="px-2 py-1 rounded-[var(--radius-md)] bg-red-500/10 text-red-700 text-[11px] font-semibold ml-auto">
                                   수혈
                                 </span>
                               )}
@@ -2676,8 +2676,8 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                       disabled={!!likingPostId}
                       className={`px-3 py-1.5 rounded-[var(--radius-md)] border text-[11px] font-bold transition ${
                         myLikedPostIds.has(String(selectedPost.id ?? '').trim())
-                          ? 'border-red-200 text-red-500 bg-red-50 hover:bg-red-100'
-                          : 'border-[var(--border)] text-[var(--toss-gray-3)] hover:text-red-400 hover:border-red-200'
+                          ? 'border-red-500/20 text-red-500 bg-red-500/10 hover:bg-red-500/20'
+                          : 'border-[var(--border)] text-[var(--toss-gray-3)] hover:text-red-400 hover:border-red-500/20'
                       }`}
                     >
                       {myLikedPostIds.has(String(selectedPost.id ?? '').trim()) ? '♥' : '♡'} 좋아요 {(selectedPost.likes_count as number) ?? 0}
@@ -2695,7 +2695,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                           <button
                             type="button"
                             onClick={() => handleEditPostStart(selectedPost)}
-                            className="px-3 py-1.5 rounded-[var(--radius-md)] border border-blue-100 text-[11px] font-bold text-blue-600 hover:bg-blue-50"
+                            className="px-3 py-1.5 rounded-[var(--radius-md)] border border-blue-100 text-[11px] font-bold text-blue-600 hover:bg-blue-500/10"
                           >
                             수정
                           </button>
@@ -2704,7 +2704,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                           <button
                             type="button"
                             onClick={() => handleDeletePost(selectedPost)}
-                            className="px-3 py-1.5 rounded-[var(--radius-md)] border border-red-100 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                            className="px-3 py-1.5 rounded-[var(--radius-md)] border border-red-100 text-[11px] font-bold text-red-600 hover:bg-red-500/10"
                           >
                             삭제
                           </button>
@@ -2783,7 +2783,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                     {Boolean((selectedPost as Record<string, unknown>).schedule_meta_legacy_missing) && (
                       <div
                         data-testid="board-schedule-legacy-warning"
-                        className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-3 text-[11px] font-semibold text-red-700"
+                        className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/10 px-3 py-3 text-[11px] font-semibold text-red-700"
                       >
                         이 일정은 예전에 날짜/시간 없이 저장되어 달력에 표시되지 않습니다. 수정 버튼을 눌러 일정 정보를 다시 입력한 뒤 저장해 주세요.
                       </div>
@@ -2816,7 +2816,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                           <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">수술/검사 준비 상태</p>
                           <div className="flex flex-wrap gap-1 pt-1">
                             {selectedPost.surgery_fasting && (
-                              <span className="px-2 py-1 rounded-[var(--radius-md)] bg-red-50 text-red-600 text-[11px] font-semibold">
+                              <span className="px-2 py-1 rounded-[var(--radius-md)] bg-red-500/10 text-red-600 text-[11px] font-semibold">
                                 금식
                               </span>
                             )}
@@ -2831,12 +2831,12 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                               </span>
                             )}
                             {selectedPost.surgery_caregiver && (
-                              <span className="px-2 py-1 rounded-[var(--radius-md)] bg-purple-50 text-purple-600 text-[11px] font-semibold">
+                              <span className="px-2 py-1 rounded-[var(--radius-md)] bg-purple-500/10 text-purple-600 text-[11px] font-semibold">
                                 간병인
                               </span>
                             )}
                             {selectedPost.surgery_transfusion && (
-                              <span className="px-2 py-1 rounded-[var(--radius-md)] bg-red-100 text-red-700 text-[11px] font-semibold">
+                              <span className="px-2 py-1 rounded-[var(--radius-md)] bg-red-500/20 text-red-700 text-[11px] font-semibold">
                                 수혈 필요
                               </span>
                             )}
@@ -2910,7 +2910,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                               onError={(e) => {
                                 const el = e.target as HTMLImageElement;
                                 el.alt = '이미지를 불러올 수 없습니다.';
-                                el.classList.add('bg-red-50', 'border-red-200');
+                                el.classList.add('bg-red-500/10', 'border-red-500/20');
                               }}
                             />
                           </a>

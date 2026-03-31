@@ -133,7 +133,7 @@ export default function DischargeRuleBuilder({
             키워드 기반 규정을 직접 추가해 퇴원심사 규정 분석과 AI 심사 요청에 함께 반영합니다.
           </p>
         </div>
-        <span className="rounded-lg bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-600">
+        <span className="rounded-lg bg-blue-500/10 px-2 py-1 text-[10px] font-bold text-blue-600">
           {rules.length}개 규정
         </span>
       </div>
@@ -288,13 +288,13 @@ export default function DischargeRuleBuilder({
                 </button>
                 <button
                   onClick={() => startEdit(rule)}
-                  className="rounded-lg bg-blue-50 px-3 py-2 text-[11px] font-bold text-[var(--accent)]"
+                  className="rounded-lg bg-blue-500/10 px-3 py-2 text-[11px] font-bold text-[var(--accent)]"
                 >
                   수정
                 </button>
                 <button
                   onClick={() => removeRule(rule.id)}
-                  className="rounded-lg bg-red-50 px-3 py-2 text-[11px] font-bold text-red-500"
+                  className="rounded-lg bg-red-500/10 px-3 py-2 text-[11px] font-bold text-red-500"
                 >
                   삭제
                 </button>

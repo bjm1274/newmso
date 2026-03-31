@@ -268,36 +268,15 @@ export default function ProductRegistration({
 
           <div className="space-y-2">
             <label className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">단위 *</label>
-            <div className="grid grid-cols-2 gap-2">
-              {(['EA', 'BOX'] as const).map((unit) => {
-                const active = productForm.unit === unit;
-                return (
-                  <button
-                    key={unit}
-                    type="button"
-                    data-testid={`inventory-registration-unit-${unit.toLowerCase()}`}
-                    aria-pressed={active}
-                    onClick={() => updateForm({ unit })}
-                    className={`flex min-h-[52px] items-center justify-between rounded-[var(--radius-md)] border px-4 py-3 text-left transition ${
-                      active
-                        ? 'border-[var(--accent)] bg-[var(--toss-blue-light)] text-[var(--accent)]'
-                        : 'border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)]'
-                    }`}
-                  >
-                    <span className="text-sm font-black">{unit}</span>
-                    <span
-                      className={`flex h-5 w-5 items-center justify-center rounded-md border text-[11px] font-black ${
-                        active
-                          ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
-                          : 'border-[var(--border)] text-transparent'
-                      }`}
-                    >
-                      ✓
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            <select
+              data-testid="inventory-registration-unit"
+              value={productForm.unit}
+              onChange={(event) => updateForm({ unit: normalizeInventoryUnit(event.target.value) })}
+              className="w-full rounded-[var(--radius-md)] bg-[var(--input-bg)] p-4 text-sm font-bold outline-none transition focus:ring-2 focus:ring-[var(--accent)]/20"
+            >
+              <option value="EA">EA</option>
+              <option value="BOX">BOX</option>
+            </select>
           </div>
 
           <div className="space-y-2">

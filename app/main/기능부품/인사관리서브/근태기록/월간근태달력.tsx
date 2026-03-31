@@ -76,7 +76,7 @@ export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick
           </thead>
           <tbody className="divide-y divide-[var(--border)]">
             {_calendarData.map((row: any) => (
-              <tr key={row.staff.id} className="hover:bg-blue-50/10 transition-colors group">
+              <tr key={row.staff.id} className="hover:bg-blue-500/10/10 transition-colors group">
                 <td
                   className="p-4 font-semibold border-r text-center text-sm cursor-pointer group-hover:text-[var(--accent)] transition-colors bg-[var(--card)] sticky left-0 z-10"
                   onClick={() => _onBulkNormal(row.staff)}
@@ -90,9 +90,9 @@ export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick
                     return dayNum >= startDay && dayNum <= endDay;
                 }).map((d: any, i: number) => {
                   let statusStyle = "bg-[var(--card)] text-[var(--toss-gray-3)] border-[var(--border)]";
-                  if (d.status === '정상') statusStyle = "bg-green-50 text-green-700 border-green-200";
-                  else if (d.status === '지각') statusStyle = "bg-red-50 text-red-600 border-red-200";
-                  else if (d.status?.includes('휴가')) statusStyle = "bg-purple-50 text-purple-600 border-purple-200";
+                  if (d.status === '정상') statusStyle = "bg-green-500/10 text-green-700 border-green-500/20";
+                  else if (d.status === '지각') statusStyle = "bg-red-500/10 text-red-600 border-red-500/20";
+                  else if (d.status?.includes('휴가')) statusStyle = "bg-purple-500/10 text-purple-600 border-purple-500/20";
 
                   return (
                     <td key={i} className="p-2 h-28">

@@ -55,7 +55,7 @@ export default function FinancialDashboard() {
                     </div>
                     <p className="text-2xl font-black text-emerald-700 mt-2">₩ {(cashFlow.in).toLocaleString()}</p>
                 </div>
-                <div className="p-3 bg-red-50 rounded-[var(--radius-lg)] border border-red-100">
+                <div className="p-3 bg-red-500/10 rounded-[var(--radius-lg)] border border-red-100">
                     <div className="flex items-center gap-2 mb-1.5">
                         <span className="w-7 h-7 rounded-full bg-red-200 text-red-700 flex items-center justify-center font-black text-sm">↑</span>
                         <span className="text-xs font-black text-red-800 uppercase">Cash Out (지출/출금)</span>
@@ -93,7 +93,7 @@ export default function FinancialDashboard() {
                                     </div>
                                     <div className="h-3 bg-[var(--tab-bg)] rounded-full overflow-hidden flex">
                                         <div
-                                            className={`h-full ${isWarning ? 'bg-red-500' : 'bg-[var(--accent)]'}`}
+                                            className={`h-full ${isWarning ? 'bg-red-500/100' : 'bg-[var(--accent)]'}`}
                                             style={{ width: `${percent}%`, transition: 'width 1s ease-out' }}
                                         ></div>
                                     </div>

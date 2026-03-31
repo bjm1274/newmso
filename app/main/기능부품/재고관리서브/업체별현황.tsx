@@ -168,11 +168,11 @@ export default function VendorAnalysis() {
               ₩{vendorData.reduce((sum, v) => sum + v.total_purchase_amount, 0).toLocaleString()}
             </p>
           </div>
-          <div className="bg-purple-50 p-3 rounded-[var(--radius-md)] border border-purple-200">
+          <div className="bg-purple-500/10 p-3 rounded-[var(--radius-md)] border border-purple-500/20">
             <p className="text-xs font-bold text-purple-600 mb-0.5">거래 업체</p>
             <p className="text-lg font-bold text-purple-800">{vendorData.length}개</p>
           </div>
-          <div className="bg-green-50 p-3 rounded-[var(--radius-md)] border border-green-200">
+          <div className="bg-green-500/10 p-3 rounded-[var(--radius-md)] border border-green-500/20">
             <p className="text-xs font-bold text-green-600 mb-0.5">총 품목 수</p>
             <p className="text-lg font-bold text-green-800">
               {vendorData.reduce((sum, v) => sum + v.item_count, 0)}개
@@ -254,19 +254,19 @@ export default function VendorAnalysis() {
         </div>
 
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-green-50 p-3 rounded-[var(--radius-md)] border border-green-200">
+          <div className="bg-green-500/10 p-3 rounded-[var(--radius-md)] border border-green-500/20">
             <p className="text-xs font-bold text-green-600 mb-0.5">총 처방액</p>
             <p className="text-lg font-bold text-green-800">
               ₩{prescriptionData.reduce((sum, p) => sum + (p.total_amount || 0), 0).toLocaleString()}
             </p>
           </div>
-          <div className="bg-orange-50 p-3 rounded-[var(--radius-md)] border border-orange-200">
+          <div className="bg-orange-500/10 p-3 rounded-[var(--radius-md)] border border-orange-500/20">
             <p className="text-xs font-bold text-orange-600 mb-0.5">환자 수</p>
             <p className="text-lg font-bold text-orange-800">
               {new Set(prescriptionData.map(p => p.patient_id)).size}명
             </p>
           </div>
-          <div className="bg-pink-50 p-3 rounded-[var(--radius-md)] border border-pink-200">
+          <div className="bg-pink-500/10 p-3 rounded-[var(--radius-md)] border border-pink-500/20">
             <p className="text-xs font-bold text-pink-600 mb-0.5">처방 건수</p>
             <p className="text-lg font-bold text-pink-800">{prescriptionData.length}건</p>
           </div>

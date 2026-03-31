@@ -40,7 +40,7 @@ function getDepositStatusClass(status: string | null | undefined) {
     case 'deposited':
       return 'bg-emerald-100 text-emerald-700';
     case 'issued':
-      return 'bg-blue-100 text-blue-700';
+      return 'bg-blue-500/20 text-blue-700';
     case 'cancelled':
       return 'bg-rose-100 text-rose-700';
     default:
@@ -482,7 +482,7 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
             <h2 className="text-lg font-bold text-[var(--foreground)]">입금 실시간 조회</h2>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-bold text-[var(--toss-gray-3)]">정산 계좌</span>
-              <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-black rounded-md border border-blue-200">
+              <span className="px-2 py-0.5 bg-blue-500/10 text-blue-700 text-xs font-black rounded-md border border-blue-500/20">
                 🏦 토스뱅크 {TOSS_BANK_ACCOUNT}
               </span>
             </div>
@@ -524,7 +524,7 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
             <p className="text-xs text-[var(--toss-gray-3)] mt-1">토스뱅크 앱에서 확인한 입금 내역을 직접 등록합니다. 등록 후 입금 내역 탭에서 확인할 수 있습니다.</p>
           </div>
           {manualError && (
-            <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{manualError}</div>
+            <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-sm text-red-700">{manualError}</div>
           )}
           <div className="grid gap-3 md:grid-cols-2">
             <label className="space-y-1 text-sm">
@@ -621,7 +621,7 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
                     <p className="font-mono bg-[var(--muted)] p-1.5 rounded text-[11px] break-all">{webhookUrl}</p>
                     <p>• 이벤트: <strong>DEPOSIT_CALLBACK</strong> 선택</p>
                     <p>• 웹훅 시크릿 발급 시 아래 토큰과 동일하게 설정</p>
-                    <p className="font-mono bg-yellow-50 border border-yellow-200 p-1.5 rounded text-[11px] break-all">
+                    <p className="font-mono bg-yellow-500/10 border border-yellow-500/20 p-1.5 rounded text-[11px] break-all">
                       a382ddced410e85277f311353a8eb8d930f8a78a28135b5000673320ae3e1b02
                     </p>
                   </div>
@@ -658,14 +658,14 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
               },
             ].map(({ step, title, color, content }) => (
               <div key={step} className={`rounded-xl border p-3.5 ${
-                color === 'blue' ? 'bg-blue-50 border-blue-200' :
+                color === 'blue' ? 'bg-blue-500/10 border-blue-500/20' :
                 color === 'violet' ? 'bg-violet-50 border-violet-200' :
                 color === 'teal' ? 'bg-teal-50 border-teal-200' :
                 'bg-emerald-50 border-emerald-200'
               }`}>
                 <div className="flex items-center gap-2 mb-2">
                   <span className={`w-5 h-5 rounded-full text-white text-[10px] font-black flex items-center justify-center ${
-                    color === 'blue' ? 'bg-blue-500' :
+                    color === 'blue' ? 'bg-blue-500/100' :
                     color === 'violet' ? 'bg-violet-500' :
                     color === 'teal' ? 'bg-teal-500' : 'bg-emerald-500'
                   }`}>{step}</span>
@@ -914,7 +914,7 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
                   </button>
                   {row.provider === 'manual' && (
                     <button type="button" onClick={() => handleDeleteDeposit(row.id)}
-                      className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100">
+                      className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-500/20">
                       🗑️ 삭제
                     </button>
                   )}

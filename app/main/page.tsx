@@ -87,7 +87,7 @@ function MainPageContent() {
   const [selectedCo, setSelectedCo] = useState('전체');
   const [initialMyPageTab, setInitialMyPageTab] = useState<string | null>(null);
   const [initialBoardView, setInitialBoardView] = useState<string | null>(null);
-  const [forceChatListOnMount, setForceChatListOnMount] = useState(false);
+  const [chatListResetToken, setChatListResetToken] = useState(0);
   const [initialOpenChatRoomId, setInitialOpenChatRoomId] = useState<string | null>(null);
   const [initialOpenMessageId, setInitialOpenMessageId] = useState<string | null>(null);
   const [shareTarget, setShareTarget] = useState<{ id: string; fileCount: number; text: string | null; url: string | null; title: string | null } | null>(null);
@@ -849,7 +849,7 @@ function MainPageContent() {
       clearMenuNavigationTargets();
       resetPersistedMenuState(menu);
       if (menu === '채팅') {
-        setForceChatListOnMount(true);
+        setChatListResetToken((prev) => prev + 1);
       }
       setMenuResetVersion((prev) => prev + 1);
 
@@ -996,8 +996,7 @@ function MainPageContent() {
           initialBoard={initialBoardView}
           initialOpenPostId={initialOpenPostId}
           onConsumeOpenPostId={() => setInitialOpenPostId(null)}
-          forceChatListOnMount={forceChatListOnMount}
-          onConsumeForceChatListOnMount={() => setForceChatListOnMount(false)}
+          chatListResetToken={chatListResetToken}
           initialOpenChatRoomId={initialOpenChatRoomId}
           initialOpenMessageId={initialOpenMessageId}
           onConsumeOpenChatRoomId={() => {

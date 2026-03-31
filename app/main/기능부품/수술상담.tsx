@@ -46,32 +46,32 @@ const SECTIONS: { key: keyof ConsultationResult; label: string; icon: string; co
 ];
 
 const COLOR_MAP: Record<string, string> = {
-  blue:   'bg-blue-50 border-blue-200 text-blue-900',
+  blue:   'bg-blue-500/10 border-blue-500/20 text-blue-900',
   rose:   'bg-rose-50 border-rose-200 text-rose-900',
   violet: 'bg-violet-50 border-violet-200 text-violet-900',
   teal:   'bg-teal-50 border-teal-200 text-teal-900',
   amber:  'bg-amber-50 border-amber-200 text-amber-900',
   sky:    'bg-sky-50 border-sky-200 text-sky-900',
-  green:  'bg-green-50 border-green-200 text-green-900',
-  orange: 'bg-orange-50 border-orange-200 text-orange-900',
-  indigo: 'bg-indigo-50 border-indigo-200 text-indigo-900',
-  pink:   'bg-pink-50 border-pink-200 text-pink-900',
+  green:  'bg-green-500/10 border-green-500/20 text-green-900',
+  orange: 'bg-orange-500/10 border-orange-500/20 text-orange-900',
+  indigo: 'bg-indigo-500/10 border-indigo-200 text-indigo-900',
+  pink:   'bg-pink-500/10 border-pink-500/20 text-pink-900',
   cyan:   'bg-cyan-50 border-cyan-200 text-cyan-900',
   lime:   'bg-lime-50 border-lime-200 text-lime-900',
-  slate:  'bg-slate-50 border-slate-200 text-slate-900',
+  slate:  'bg-[var(--muted)] border-slate-200 text-slate-900',
 };
 
 const BADGE_MAP: Record<string, string> = {
-  blue:   'bg-blue-100 text-blue-700',
+  blue:   'bg-blue-500/20 text-blue-700',
   rose:   'bg-rose-100 text-rose-700',
   violet: 'bg-violet-100 text-violet-700',
   teal:   'bg-teal-100 text-teal-700',
   amber:  'bg-amber-100 text-amber-700',
   sky:    'bg-sky-100 text-sky-700',
-  green:  'bg-green-100 text-green-700',
-  orange: 'bg-orange-100 text-orange-700',
+  green:  'bg-green-500/20 text-green-700',
+  orange: 'bg-orange-500/20 text-orange-700',
   indigo: 'bg-indigo-100 text-indigo-700',
-  pink:   'bg-pink-100 text-pink-700',
+  pink:   'bg-pink-500/20 text-pink-700',
   cyan:   'bg-cyan-100 text-cyan-700',
   lime:   'bg-lime-100 text-lime-700',
   slate:  'bg-slate-100 text-slate-700',
@@ -422,7 +422,7 @@ export default function SurgeryConsultationView({ user }: { user?: any }) {
                 <button
                   type="button"
                   onClick={startRecording}
-                  className="flex items-center gap-2 px-8 py-4 bg-red-500 hover:bg-red-600 text-white font-black text-sm rounded-2xl transition-all hover:scale-105 active:scale-95 shadow-md"
+                  className="flex items-center gap-2 px-8 py-4 bg-red-500/100 hover:bg-red-600 text-white font-black text-sm rounded-2xl transition-all hover:scale-105 active:scale-95 shadow-md"
                 >
                   <span className="w-3 h-3 bg-white rounded-full animate-pulse" />
                   녹음 시작
@@ -500,7 +500,7 @@ export default function SurgeryConsultationView({ user }: { user?: any }) {
               지원 형식: MP3, MP4, WAV, WebM, OGG, M4A · 최대 20MB
             </p>
             {uploadFile && (
-              <span className="px-3 py-1 bg-green-100 text-green-700 text-[11px] font-bold rounded-full">
+              <span className="px-3 py-1 bg-green-500/20 text-green-700 text-[11px] font-bold rounded-full">
                 {(uploadFile.size / (1024 * 1024)).toFixed(1)}MB 선택됨
               </span>
             )}
@@ -586,7 +586,7 @@ export default function SurgeryConsultationView({ user }: { user?: any }) {
                     <button
                       type="button"
                       onClick={() => { if (confirm('이 기록을 삭제하시겠습니까?')) deleteRecord(rec.id); }}
-                      className="p-1.5 rounded-lg text-[var(--toss-gray-3)] hover:bg-red-50 hover:text-red-500 transition-colors text-sm"
+                      className="p-1.5 rounded-lg text-[var(--toss-gray-3)] hover:bg-red-500/10 hover:text-red-500 transition-colors text-sm"
                       title="삭제"
                     >🗑️</button>
                   </div>

@@ -62,8 +62,7 @@ interface MainContentProps {
   initialMyPageTab?: string | null;
   onConsumeMyPageInitialTab?: () => void;
   initialBoard?: string | null;
-  forceChatListOnMount?: boolean;
-  onConsumeForceChatListOnMount?: () => void;
+  chatListResetToken?: number;
   initialOpenChatRoomId?: string | null;
   onConsumeOpenChatRoomId?: () => void;
   initialOpenMessageId?: string | null;
@@ -108,8 +107,7 @@ export default function MainContent({
   onRefresh,
   initialMyPageTab,
   onConsumeMyPageInitialTab,
-  forceChatListOnMount,
-  onConsumeForceChatListOnMount,
+  chatListResetToken,
   initialOpenChatRoomId,
   onConsumeOpenChatRoomId,
   initialOpenMessageId,
@@ -190,8 +188,7 @@ export default function MainContent({
             user={user}
             onRefresh={onRefresh}
             staffs={data.staffs}
-            forceChatListOnMount={forceChatListOnMount}
-            onConsumeForceChatListOnMount={onConsumeForceChatListOnMount}
+            chatListResetToken={chatListResetToken}
             initialOpenChatRoomId={initialOpenChatRoomId}
             initialOpenMessageId={initialOpenMessageId}
             onConsumeOpenChatRoomId={onConsumeOpenChatRoomId}

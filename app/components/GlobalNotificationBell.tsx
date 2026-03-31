@@ -142,7 +142,7 @@ export default function GlobalNotificationBell({ user, onOpenFull }: { user: any
         >
           <span className="text-xl">🔔</span>
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-red-500 text-white text-[10px] font-black rounded-full">
+            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-red-500/100 text-white text-[10px] font-black rounded-full">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}

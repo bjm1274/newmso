@@ -26,7 +26,7 @@ const ACTION_TYPES = ['취득', '변경', '상실'] as const;
 const STATUS_COLORS: Record<string, string> = {
     '미신고': 'bg-amber-100 text-amber-700',
     '신고완료': 'bg-emerald-100 text-emerald-700',
-    '반려': 'bg-red-100 text-red-700',
+    '반려': 'bg-red-500/20 text-red-700',
 };
 
 export default function InsuranceManagement({ staffs = [], selectedCo }: Record<string, unknown>) {
@@ -248,7 +248,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: Record<
                                             <div className="text-[11px] text-[var(--toss-gray-3)]">{r.company} · {r.department}</div>
                                         </td>
                                         <td className="px-4 py-3">
-                                            <span className={`px-2 py-1 rounded-lg text-[11px] font-bold ${r.type === '취득' ? 'bg-blue-100 text-blue-700' : r.type === '상실' ? 'bg-red-100 text-red-700' : 'bg-purple-100 text-purple-700'}`}>
+                                            <span className={`px-2 py-1 rounded-lg text-[11px] font-bold ${r.type === '취득' ? 'bg-blue-500/20 text-blue-700' : r.type === '상실' ? 'bg-red-500/20 text-red-700' : 'bg-purple-500/20 text-purple-700'}`}>
                                                 {r.type}
                                             </span>
                                         </td>
@@ -286,7 +286,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: Record<
                             const diff = (Date.now() - joinDate.getTime()) / (1000 * 60 * 60 * 24);
                             return diff <= 14 && s.status !== '퇴사';
                         }).map((s: any) => (
-                            <div key={s.id} className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                            <div key={s.id} className="flex items-center justify-between p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
                                 <div className="flex items-center gap-3">
                                     <span className="text-lg">🆕</span>
                                     <div>
@@ -309,7 +309,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: Record<
                             if (selectedCo !== '전체' && s.company !== selectedCo) return false;
                             return s.status === '퇴사' && s.resigned_at;
                         }).slice(0, 5).map((s: any) => (
-                            <div key={s.id} className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-xl">
+                            <div key={s.id} className="flex items-center justify-between p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
                                 <div className="flex items-center gap-3">
                                     <span className="text-lg">📤</span>
                                     <div>
@@ -322,7 +322,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: Record<
                                         setForm({ ...form, staff_id: s.id, type: '상실', reason: '퇴사' });
                                         setShowForm(true);
                                     }}
-                                    className="px-3 py-1.5 bg-red-500 text-white text-[11px] font-bold rounded-lg hover:opacity-90 transition-all"
+                                    className="px-3 py-1.5 bg-red-500/100 text-white text-[11px] font-bold rounded-lg hover:opacity-90 transition-all"
                                 >
                                     상실 신고
                                 </button>

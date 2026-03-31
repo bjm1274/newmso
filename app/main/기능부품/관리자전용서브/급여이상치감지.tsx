@@ -418,10 +418,10 @@ export default function SalaryAnomalyDetector({ staffs = [] as StaffLike[] }) {
             const meta = getStaffMeta(item.staff);
             const accentClass =
               item.severity === 'critical'
-                ? 'border-red-200 bg-red-50'
+                ? 'border-red-500/20 bg-red-500/10'
                 : item.severity === 'warning'
-                  ? 'border-orange-200 bg-orange-50'
-                  : 'border-blue-200 bg-blue-50';
+                  ? 'border-orange-500/20 bg-orange-500/10'
+                  : 'border-blue-500/20 bg-blue-500/10';
             const amountClass =
               item.diff >= 0 ? 'text-blue-600' : 'text-red-600';
 
@@ -464,7 +464,7 @@ export default function SalaryAnomalyDetector({ staffs = [] as StaffLike[] }) {
       )}
 
       {newPayments.length > 0 ? (
-        <div className="rounded-[var(--radius-xl)] border border-blue-200 bg-blue-50 p-4 shadow-sm">
+        <div className="rounded-[var(--radius-xl)] border border-blue-500/20 bg-blue-500/10 p-4 shadow-sm">
           <div className="mb-3 text-base font-black text-[var(--foreground)]">신규 지급 직원</div>
           <div className="space-y-2">
             {newPayments.map((item) => (

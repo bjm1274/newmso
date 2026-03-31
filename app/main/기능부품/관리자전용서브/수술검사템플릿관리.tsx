@@ -200,7 +200,7 @@ export default function SurgeryExamTemplateManager() {
                   <button
                     type="button"
                     onClick={() => removeTemplate('surgery', t.id)}
-                    className="px-2 py-1 rounded-[var(--radius-md)] text-[11px] font-semibold text-red-500 hover:bg-red-50"
+                    className="px-2 py-1 rounded-[var(--radius-md)] text-[11px] font-semibold text-red-500 hover:bg-red-500/10"
                   >
                     삭제
                   </button>
@@ -279,7 +279,7 @@ export default function SurgeryExamTemplateManager() {
                   <button
                     type="button"
                     onClick={() => removeTemplate('mri', t.id)}
-                    className="px-2 py-1 rounded-[var(--radius-md)] text-[11px] font-semibold text-red-500 hover:bg-red-50"
+                    className="px-2 py-1 rounded-[var(--radius-md)] text-[11px] font-semibold text-red-500 hover:bg-red-500/10"
                   >
                     삭제
                   </button>

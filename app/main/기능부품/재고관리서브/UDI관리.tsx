@@ -80,15 +80,15 @@ export default function UDIManagement({ user, inventory, fetchInventory }: Recor
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-          <div className="bg-purple-50 p-3 rounded-[var(--radius-md)] border border-purple-100">
+          <div className="bg-purple-500/10 p-3 rounded-[var(--radius-md)] border border-purple-100">
             <p className="text-[11px] font-semibold text-purple-500 uppercase tracking-widest mb-0.5">UDI 대상 품목</p>
             <p className="text-lg font-bold text-purple-700">{udiItems.length}개</p>
           </div>
-          <div className="bg-blue-50 p-3 rounded-[var(--radius-md)] border border-blue-100">
+          <div className="bg-blue-500/10 p-3 rounded-[var(--radius-md)] border border-blue-100">
             <p className="text-[11px] font-semibold text-blue-500 uppercase tracking-widest mb-0.5">선택된 품목</p>
             <p className="text-lg font-bold text-blue-700">{selectedItems.length}개</p>
           </div>
-          <div className="bg-green-50 p-3 rounded-[var(--radius-md)] border border-green-100">
+          <div className="bg-green-500/10 p-3 rounded-[var(--radius-md)] border border-green-100">
             <p className="text-[11px] font-semibold text-green-500 uppercase tracking-widest mb-0.5">총 자산가치</p>
             <p className="text-lg font-bold text-green-700">
               ₩{udiItems.reduce((sum: number, item: any) => sum + ((item.quantity || 0) * (item.unit_price || 0)), 0).toLocaleString()}
@@ -113,7 +113,7 @@ export default function UDIManagement({ user, inventory, fetchInventory }: Recor
                   key={item.id}
                   onClick={() => toggleItemSelection(item.id)}
                   className={`p-3 rounded-[var(--radius-md)] border-2 transition-all cursor-pointer ${
-                    selectedItems.includes(item.id) ? 'bg-purple-50 border-purple-600 shadow-sm shadow-purple-50' : 'bg-[var(--card)] border-[var(--border)] hover:border-purple-200'
+                    selectedItems.includes(item.id) ? 'bg-purple-500/10 border-purple-600 shadow-sm shadow-purple-50' : 'bg-[var(--card)] border-[var(--border)] hover:border-purple-500/20'
                   }`}
                 >
                   <div className="flex items-start gap-4">

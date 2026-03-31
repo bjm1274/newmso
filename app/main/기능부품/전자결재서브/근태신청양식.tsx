@@ -133,7 +133,7 @@ export default function AttendanceForms({
 
       {formType === '연장근무' ? (
         <>
-          <div className="border-b border-orange-100 bg-orange-50 p-3">
+          <div className="border-b border-orange-100 bg-orange-500/10 p-3">
             <h4 className="text-sm font-bold text-orange-600">연장근무 내역 선택</h4>
             <p className="mt-1 text-[11px] font-semibold text-orange-500/70">
               근태 기록을 기준으로 초과 근무 내역을 불러옵니다.
@@ -174,7 +174,7 @@ export default function AttendanceForms({
                       퇴근: {String(row.check_out || '').slice(11, 16)}
                     </p>
                   </div>
-                  <span className="rounded-[var(--radius-md)] bg-orange-50 px-2 py-1 text-[10px] font-bold text-orange-500 md:text-[11px]">
+                  <span className="rounded-[var(--radius-md)] bg-orange-500/10 px-2 py-1 text-[10px] font-bold text-orange-500 md:text-[11px]">
                     +{formatOTLabel(overtimeMinutes)}
                   </span>
                 </button>

@@ -1530,7 +1530,7 @@ export default function OperationCheckView({
                           <span className="rounded-full bg-violet-50 px-2 py-1 text-violet-700">보호자 동행</span>
                         ) : null}
                         {selectedSchedule.surgery_caregiver ? (
-                          <span className="rounded-full bg-indigo-50 px-2 py-1 text-indigo-700">간병인 동행</span>
+                          <span className="rounded-full bg-indigo-500/10 px-2 py-1 text-indigo-700">간병인 동행</span>
                         ) : null}
                         {selectedSchedule.surgery_transfusion ? (
                           <span className="rounded-full bg-amber-50 px-2 py-1 text-amber-700">수혈 준비</span>
@@ -1872,7 +1872,7 @@ export default function OperationCheckView({
                               <button
                                 type="button"
                                 onClick={() => void removeTemplate(String(template.id || ''))}
-                                className="rounded-full border border-red-200 px-3 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                                className="rounded-full border border-red-500/20 px-3 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-500/10"
                               >
                                 삭제
                               </button>

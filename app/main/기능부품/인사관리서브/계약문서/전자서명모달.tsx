@@ -278,7 +278,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
 
                 <div className="p-4 border-b border-[var(--border)] flex items-center justify-between bg-[var(--tab-bg)] shrink-0">
                     <div>
-                        <span className="px-2.5 py-1 text-[10px] font-bold text-blue-700 bg-blue-100 rounded-[var(--radius-md)] mb-1 inline-block">전자서명 진행 중</span>
+                        <span className="px-2.5 py-1 text-[10px] font-bold text-blue-700 bg-blue-500/20 rounded-[var(--radius-md)] mb-1 inline-block">전자서명 진행 중</span>
                         <h2 className="text-xl font-bold tracking-tight text-[var(--foreground)]">{contract?.contract_type || '표준근로계약서'}</h2>
                     </div>
                     <button onClick={onClose} className="p-2 text-[var(--toss-gray-4)] hover:text-red-500 transition-colors">✕</button>
@@ -331,7 +331,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                                     {lines.map((line, li) => {
                                                         const t = line.trim();
                                                         if (t.startsWith('[') && t.endsWith(']')) {
-                                                            return <div key={li} className="mt-4 mb-2"><span className="inline-block text-[12px] font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md">{t.replace(/[\[\]]/g, '')}</span></div>;
+                                                            return <div key={li} className="mt-4 mb-2"><span className="inline-block text-[12px] font-black text-blue-700 bg-blue-500/10 px-2.5 py-1 rounded-md">{t.replace(/[\[\]]/g, '')}</span></div>;
                                                         }
                                                         if (/^[①②③④⑤⑥⑦⑧⑨⑩]/.test(t)) {
                                                             return (
@@ -383,7 +383,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                     <label
                                         key={item.id}
                                         className={`flex items-start gap-3 p-3.5 rounded-xl border-2 transition-all cursor-pointer ${agreements[item.id]
-                                            ? 'bg-blue-50 border-blue-500 shadow-sm'
+                                            ? 'bg-blue-500/10 border-blue-500 shadow-sm'
                                             : 'bg-[var(--card)] border-[var(--border-subtle)] hover:border-[var(--border)]'
                                             }`}
                                     >
@@ -460,7 +460,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                 </button>
                             </div>
 
-                            <div className="bg-blue-50 p-4 rounded-xl text-[10px] font-bold text-blue-600 text-center">
+                            <div className="bg-blue-500/10 p-4 rounded-xl text-[10px] font-bold text-blue-600 text-center">
                                 이 전자 서명은 인감 날인과 동일한 법적 효력을 가집니다.
                             </div>
                         </div>

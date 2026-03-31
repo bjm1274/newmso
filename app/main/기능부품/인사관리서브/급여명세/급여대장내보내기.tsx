@@ -129,7 +129,7 @@ export default function PayrollExport({ checkedIds = [], selectedCo, yearMonth: 
       </div>
 
       {errorMessage && (
-        <div className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
+        <div className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-600">
           {errorMessage}
         </div>
       )}

@@ -193,7 +193,7 @@ export default function ChatAlertBanner(props: {
           </div>
 
           <div className="mt-1.5 flex items-center gap-2">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent-light)] text-[11px] font-black text-[var(--accent)] dark:bg-blue-500/15 dark:text-blue-200">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent-light)] text-[11px] font-black text-[var(--accent)] dark:bg-blue-500/100/15 dark:text-blue-200">
               {initials}
             </div>
             <p

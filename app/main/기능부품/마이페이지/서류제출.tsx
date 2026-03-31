@@ -280,7 +280,7 @@ export default function MyDocuments(props: MyDocumentsProps) {
             )}
 
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                <div className="col-span-2 md:col-span-4 lg:col-span-5 xl:col-span-6 bg-blue-50/50 p-4 rounded-2xl border border-blue-100 flex items-center gap-4">
+                <div className="col-span-2 md:col-span-4 lg:col-span-5 xl:col-span-6 bg-blue-500/10/50 p-4 rounded-2xl border border-blue-100 flex items-center gap-4">
                     <div className="text-2xl">📸</div>
                     <div>
                         <h3 className="text-xs font-black text-blue-600">스마트 스캔 기능이 활성화되었습니다.</h3>
@@ -316,7 +316,7 @@ export default function MyDocuments(props: MyDocumentsProps) {
                                     <div className="flex w-full gap-1">
                                         <button
                                             onClick={() => setScanningDoc(doc)}
-                                            className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-blue-50 py-2 text-[9px] font-black text-blue-700 transition-colors hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/50"
+                                            className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-blue-500/10 py-2 text-[9px] font-black text-blue-700 transition-colors hover:bg-blue-500/20 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/50"
                                         >
                                             📷 촬영
                                         </button>
@@ -338,7 +338,7 @@ export default function MyDocuments(props: MyDocumentsProps) {
                 })}
             </div>
 
-            <div className="bg-blue-50/50 p-4 rounded-[var(--radius-xl)] border border-blue-100">
+            <div className="bg-blue-500/10/50 p-4 rounded-[var(--radius-xl)] border border-blue-100">
                 <h4 className="text-[13px] font-black text-blue-800 mb-2">📢 제출 및 촬영 가이드</h4>
                 <ul className="text-[11px] text-blue-700 space-y-2 font-medium list-disc ml-5">
                     <li><strong className="font-black underline decoration-2">모바일 촬영 시</strong>: 글자가 선명하게 보이도록 밝은 곳에서 촬영해 주세요.</li>
@@ -490,7 +490,7 @@ function CameraScanner(scannerProps: Record<string, unknown>) {
         <div className="fixed inset-0 z-[500] bg-black md:bg-black/90 flex flex-col items-center justify-center animate-in fade-in">
             <div className="absolute top-6 left-6 z-10 flex flex-col gap-1">
                 <h3 className="text-white font-bold">{doc.label} 스캔</h3>
-                <span className="text-[10px] text-blue-400 font-black px-2 py-0.5 bg-blue-500/10 rounded-[var(--radius-md)] w-fit">
+                <span className="text-[10px] text-blue-400 font-black px-2 py-0.5 bg-blue-500/100/10 rounded-[var(--radius-md)] w-fit">
                     현재 {capturedBlobs.length}페이지 수집됨
                 </span>
             </div>
