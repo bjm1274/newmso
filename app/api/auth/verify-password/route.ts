@@ -24,6 +24,10 @@ function isUuidLike(value: string | null | undefined) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
 }
 
+function isIdentityMismatch(requestValue: string, sessionValue: string) {
+  return Boolean(requestValue && sessionValue && requestValue !== sessionValue);
+}
+
 export async function POST(request: Request) {
   try {
     const session = await readSessionFromRequest(request);
@@ -38,6 +42,21 @@ export async function POST(request: Request) {
     const requestEmployeeNo = String(body?.employeeNo ?? '').trim();
     if (!password) {
       return NextResponse.json({ verified: false, error: 'Password is required' }, { status: 400 });
+    }
+
+    const sessionUserId = String(session?.user?.id ?? '').trim();
+    const sessionEmployeeNo = String(session?.user?.employee_no ?? '').trim();
+    const sessionUserName = String(session?.user?.name ?? '').trim();
+
+    if (
+      isIdentityMismatch(requestUserId, sessionUserId) ||
+      isIdentityMismatch(requestEmployeeNo, sessionEmployeeNo) ||
+      isIdentityMismatch(requestName, sessionUserName)
+    ) {
+      return NextResponse.json(
+        { verified: false, error: '다른 사용자 본인 확인은 허용되지 않습니다.' },
+        { status: 403 }
+      );
     }
 
     const privilegedVerification = await verifyPrivilegedSessionPassword(session?.user, password);
@@ -96,19 +115,13 @@ export async function POST(request: Request) {
       (data || []).forEach(addCandidate);
     };
 
-    const sessionUserId = String(session?.user?.id ?? '').trim();
     await fetchById(sessionUserId);
-    await fetchById(requestUserId);
 
-    const sessionEmployeeNo = String(session?.user?.employee_no ?? '').trim();
-    const fallbackEmployeeNos = Array.from(new Set([sessionEmployeeNo, requestEmployeeNo].filter(Boolean)));
-    for (const employeeNo of fallbackEmployeeNos) {
+    for (const employeeNo of Array.from(new Set([sessionEmployeeNo].filter(Boolean)))) {
       await fetchByEmployeeNo(employeeNo);
     }
 
-    const sessionUserName = String(session?.user?.name ?? '').trim();
-    const fallbackNames = Array.from(new Set([sessionUserName, requestName].filter(Boolean)));
-    for (const candidateName of fallbackNames) {
+    for (const candidateName of Array.from(new Set([sessionUserName].filter(Boolean)))) {
       await fetchByName(candidateName);
     }
 
