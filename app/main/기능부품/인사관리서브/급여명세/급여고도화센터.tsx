@@ -112,6 +112,113 @@ type PayrollPolicyVersionRow = {
   snapshot: PayrollPolicySnapshot | null;
 };
 
+type BonusItemRow = {
+  id?: string | null;
+  staff_id?: string | null;
+  company_name?: string | null;
+  year_month?: string | null;
+  category?: string | null;
+  amount?: number | null;
+  note?: string | null;
+};
+
+type RetroItemRow = {
+  id?: string | null;
+  staff_id?: string | null;
+  company_name?: string | null;
+  start_month?: string | null;
+  end_month?: string | null;
+  before_base?: number | null;
+  after_base?: number | null;
+  retro_total?: number | null;
+  reason?: string | null;
+};
+
+type DeductionItemRow = {
+  id?: string | null;
+  staff_id?: string | null;
+  company_name?: string | null;
+  deduction_type?: string | null;
+  monthly_amount?: number | null;
+  balance?: number | null;
+  note?: string | null;
+  is_active?: boolean | null;
+};
+
+type FreelancerItemRow = {
+  id?: string | null;
+  company_name?: string | null;
+  year_month?: string | null;
+  vendor_name?: string | null;
+  work_type?: string | null;
+  payment_date?: string | null;
+  supply_amount?: number | null;
+  tax_rate?: number | null;
+  withholding_tax?: number | null;
+  note?: string | null;
+};
+
+type CalendarItemRow = {
+  id?: string | null;
+  company_name?: string | null;
+  year_month?: string | null;
+  title?: string | null;
+  due_date?: string | null;
+  owner_label?: string | null;
+  status?: CalendarItem['status'] | null;
+  sort_order?: number | null;
+};
+
+type ApprovalWorkflowRow = {
+  id?: string | null;
+  step1_status?: ApprovalState['step1Status'] | null;
+  step2_status?: ApprovalState['step2Status'] | null;
+  step1_comment?: string | null;
+  step2_comment?: string | null;
+  step1_actor_id?: string | null;
+  step2_actor_id?: string | null;
+  step1_updated_at?: string | null;
+  step2_updated_at?: string | null;
+  updated_at?: string | null;
+};
+
+type ApprovalLogRow = {
+  id?: string | null;
+  year_month?: string | null;
+  company_name?: string | null;
+  actor_name?: string | null;
+  action?: string | null;
+  comment?: string | null;
+  created_at?: string | null;
+};
+
+type PayrollRecordSummaryRow = {
+  staff_id?: string | null;
+  total_taxable?: number | null;
+  total_taxfree?: number | null;
+  total_deduction?: number | null;
+  net_pay?: number | null;
+  deduction_detail?: Record<string, unknown> | null;
+};
+
+const PAYROLL_BONUS_ITEM_SELECT = 'id, staff_id, company_name, year_month, category, amount, note';
+const PAYROLL_RETRO_ADJUSTMENT_SELECT =
+  'id, staff_id, company_name, start_month, end_month, before_base, after_base, retro_total, reason';
+const PAYROLL_DEDUCTION_CONTROL_SELECT =
+  'id, staff_id, company_name, deduction_type, monthly_amount, balance, note, is_active';
+const FREELANCER_PAYMENT_SELECT =
+  'id, company_name, year_month, vendor_name, work_type, payment_date, supply_amount, tax_rate, withholding_tax, note';
+const PAYROLL_CALENDAR_ITEM_SELECT =
+  'id, company_name, year_month, title, due_date, owner_label, status, sort_order';
+const PAYROLL_APPROVAL_WORKFLOW_SELECT =
+  'id, step1_status, step2_status, step1_comment, step2_comment, step1_actor_id, step2_actor_id, step1_updated_at, step2_updated_at, updated_at';
+const PAYROLL_APPROVAL_LOG_SELECT =
+  'id, year_month, company_name, actor_name, action, comment, created_at';
+const PAYROLL_RECORD_SUMMARY_SELECT =
+  'staff_id, total_taxable, total_taxfree, total_deduction, net_pay, deduction_detail';
+const PAYROLL_POLICY_VERSION_SELECT =
+  'id, company_name, effective_year, version_label, note, created_at, snapshot';
+
 const EMPTY_APPROVAL_STATE: ApprovalState = {
   step1Status: '대기',
   step2Status: '대기',
@@ -139,11 +246,11 @@ function downloadCsv(fileName: string, rows: Array<Record<string, string | numbe
   link.click();
 }
 
-function readStoredUser() {
+function readStoredUser(): StaffMember | null {
   if (typeof window === 'undefined') return null;
   try {
     const raw = window.localStorage.getItem('erp_user');
-    return raw ? JSON.parse(raw) : null;
+    return raw ? (JSON.parse(raw) as StaffMember) : null;
   } catch {
     return null;
   }
@@ -159,7 +266,7 @@ function buildDefaultCalendarItems(yearMonth: string) {
   ];
 }
 
-function mapBonusRow(row: any): BonusItem {
+function mapBonusRow(row: BonusItemRow): BonusItem {
   return {
     id: String(row.id),
     staffId: String(row.staff_id),
@@ -171,7 +278,7 @@ function mapBonusRow(row: any): BonusItem {
   };
 }
 
-function mapRetroRow(row: any): RetroItem {
+function mapRetroRow(row: RetroItemRow): RetroItem {
   return {
     id: String(row.id),
     staffId: String(row.staff_id),
@@ -185,7 +292,7 @@ function mapRetroRow(row: any): RetroItem {
   };
 }
 
-function mapDeductionRow(row: any): DeductionItem {
+function mapDeductionRow(row: DeductionItemRow): DeductionItem {
   return {
     id: String(row.id),
     staffId: String(row.staff_id),
@@ -198,7 +305,7 @@ function mapDeductionRow(row: any): DeductionItem {
   };
 }
 
-function mapFreelancerRow(row: any): FreelancerItem {
+function mapFreelancerRow(row: FreelancerItemRow): FreelancerItem {
   return {
     id: String(row.id),
     companyName: row.company_name || '전체',
@@ -213,7 +320,7 @@ function mapFreelancerRow(row: any): FreelancerItem {
   };
 }
 
-function mapCalendarRow(row: any): CalendarItem {
+function mapCalendarRow(row: CalendarItemRow): CalendarItem {
   return {
     id: String(row.id),
     companyName: row.company_name || '전체',
@@ -226,7 +333,7 @@ function mapCalendarRow(row: any): CalendarItem {
   };
 }
 
-function mapApprovalRow(row: any): ApprovalState {
+function mapApprovalRow(row: ApprovalWorkflowRow): ApprovalState {
   return {
     id: String(row.id),
     step1Status: row.step1_status || '대기',
@@ -241,7 +348,7 @@ function mapApprovalRow(row: any): ApprovalState {
   };
 }
 
-function mapApprovalLogRow(row: any): ApprovalLog {
+function mapApprovalLogRow(row: ApprovalLogRow): ApprovalLog {
   return {
     id: String(row.id),
     yearMonth: row.year_month || '',
@@ -260,10 +367,10 @@ export default function PayrollAdvancedCenter({
   payrollRecords = [],
   onRefresh,
 }: {
-  staffs?: Record<string, unknown>[];
+  staffs?: StaffMember[];
   selectedCo?: string;
   yearMonth: string;
-  payrollRecords?: Record<string, unknown>[];
+  payrollRecords?: PayrollRecordSummaryRow[];
   onRefresh?: () => void;
 }) {
   const [viewer, setViewer] = useState<StaffMember | null>(null);
@@ -284,13 +391,13 @@ export default function PayrollAdvancedCenter({
   const [step2Comment, setStep2Comment] = useState('');
   const [taxFreeSettings, setTaxFreeSettings] = useState<TaxFreeSettings>(DEFAULT_SETTINGS);
   const [taxInsuranceRates, setTaxInsuranceRates] = useState<TaxInsuranceRates>(DEFAULT_TAX_INSURANCE_RATES);
-  const [previousMonthRecords, setPreviousMonthRecords] = useState<Record<string, unknown>[]>([]);
+  const [previousMonthRecords, setPreviousMonthRecords] = useState<PayrollRecordSummaryRow[]>([]);
   const [policyVersions, setPolicyVersions] = useState<PayrollPolicyVersionRow[]>([]);
   const [policyVersionNote, setPolicyVersionNote] = useState('');
 
   const companyScope = selectedCo && selectedCo.trim() ? selectedCo : '전체';
   const filteredStaffs = useMemo(
-    () => (selectedCo === '전체' ? (staffs as StaffMember[]) : (staffs as StaffMember[]).filter((staff) => staff.company === selectedCo)),
+    () => (selectedCo === '전체' ? staffs : staffs.filter((staff) => staff.company === selectedCo)),
     [selectedCo, staffs]
   );
 
@@ -323,10 +430,10 @@ export default function PayrollAdvancedCenter({
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      let bonusQuery = supabase.from('payroll_bonus_items').select('*').eq('year_month', yearMonth).order('created_at', { ascending: false });
-      let retroQuery = supabase.from('payroll_retro_adjustments').select('*').order('created_at', { ascending: false });
-      let deductionQuery = supabase.from('payroll_deduction_controls').select('*').order('created_at', { ascending: false });
-      let freelancerQuery = supabase.from('freelancer_payments').select('*').eq('year_month', yearMonth).order('payment_date', { ascending: false });
+      let bonusQuery = supabase.from('payroll_bonus_items').select(PAYROLL_BONUS_ITEM_SELECT).eq('year_month', yearMonth).order('created_at', { ascending: false });
+      let retroQuery = supabase.from('payroll_retro_adjustments').select(PAYROLL_RETRO_ADJUSTMENT_SELECT).order('created_at', { ascending: false });
+      let deductionQuery = supabase.from('payroll_deduction_controls').select(PAYROLL_DEDUCTION_CONTROL_SELECT).order('created_at', { ascending: false });
+      let freelancerQuery = supabase.from('freelancer_payments').select(FREELANCER_PAYMENT_SELECT).eq('year_month', yearMonth).order('payment_date', { ascending: false });
 
       if (selectedCo && selectedCo !== '전체') {
         bonusQuery = bonusQuery.eq('company_name', selectedCo);
@@ -341,11 +448,11 @@ export default function PayrollAdvancedCenter({
         retroQuery,
         deductionQuery,
         freelancerQuery,
-        supabase.from('payroll_calendar_items').select('*').eq('company_name', companyScope).eq('year_month', yearMonth).order('sort_order', { ascending: true }),
-        supabase.from('payroll_approval_workflows').select('*').eq('company_name', companyScope).eq('year_month', yearMonth).maybeSingle(),
-        supabase.from('payroll_approval_logs').select('*').eq('company_name', companyScope).eq('year_month', yearMonth).order('created_at', { ascending: false }).limit(20),
-        supabase.from('payroll_records').select('*').eq('year_month', previousYearMonth),
-        supabase.from('payroll_policy_versions').select('*').eq('company_name', companyScope).order('created_at', { ascending: false }).limit(12),
+        supabase.from('payroll_calendar_items').select(PAYROLL_CALENDAR_ITEM_SELECT).eq('company_name', companyScope).eq('year_month', yearMonth).order('sort_order', { ascending: true }),
+        supabase.from('payroll_approval_workflows').select(PAYROLL_APPROVAL_WORKFLOW_SELECT).eq('company_name', companyScope).eq('year_month', yearMonth).maybeSingle(),
+        supabase.from('payroll_approval_logs').select(PAYROLL_APPROVAL_LOG_SELECT).eq('company_name', companyScope).eq('year_month', yearMonth).order('created_at', { ascending: false }).limit(20),
+        supabase.from('payroll_records').select(PAYROLL_RECORD_SUMMARY_SELECT).eq('year_month', previousYearMonth),
+        supabase.from('payroll_policy_versions').select(PAYROLL_POLICY_VERSION_SELECT).eq('company_name', companyScope).order('created_at', { ascending: false }).limit(12),
       ]);
 
       if (bonusRes.error) throw bonusRes.error;
@@ -357,13 +464,13 @@ export default function PayrollAdvancedCenter({
       if (logRes.error) throw logRes.error;
       if (previousMonthRes.error) throw previousMonthRes.error;
 
-      setBonusItems((bonusRes.data || []).map(mapBonusRow));
-      setRetroItems((retroRes.data || []).map(mapRetroRow));
-      setDeductionItems((deductionRes.data || []).map(mapDeductionRow));
-      setFreelancerItems((freelancerRes.data || []).map(mapFreelancerRow));
-      setApprovalState(approvalRes.data ? mapApprovalRow(approvalRes.data) : EMPTY_APPROVAL_STATE);
-      setApprovalLogs((logRes.data || []).map(mapApprovalLogRow));
-      setPreviousMonthRecords((previousMonthRes.data || []) as Record<string, unknown>[]);
+      setBonusItems(((bonusRes.data || []) as BonusItemRow[]).map(mapBonusRow));
+      setRetroItems(((retroRes.data || []) as RetroItemRow[]).map(mapRetroRow));
+      setDeductionItems(((deductionRes.data || []) as DeductionItemRow[]).map(mapDeductionRow));
+      setFreelancerItems(((freelancerRes.data || []) as FreelancerItemRow[]).map(mapFreelancerRow));
+      setApprovalState(approvalRes.data ? mapApprovalRow(approvalRes.data as ApprovalWorkflowRow) : EMPTY_APPROVAL_STATE);
+      setApprovalLogs(((logRes.data || []) as ApprovalLogRow[]).map(mapApprovalLogRow));
+      setPreviousMonthRecords((previousMonthRes.data || []) as PayrollRecordSummaryRow[]);
       setPolicyVersions(policyVersionRes.error ? [] : ((policyVersionRes.data || []) as PayrollPolicyVersionRow[]));
 
       let nextCalendarItems = (calendarRes.data || []).map(mapCalendarRow);
@@ -381,9 +488,9 @@ export default function PayrollAdvancedCenter({
         }));
         const { error: seedError } = await supabase.from('payroll_calendar_items').upsert(defaults, { onConflict: 'company_name,year_month,title' });
         if (seedError) throw seedError;
-        const { data: seededCalendar, error: seededCalendarError } = await supabase.from('payroll_calendar_items').select('*').eq('company_name', companyScope).eq('year_month', yearMonth).order('sort_order', { ascending: true });
+        const { data: seededCalendar, error: seededCalendarError } = await supabase.from('payroll_calendar_items').select(PAYROLL_CALENDAR_ITEM_SELECT).eq('company_name', companyScope).eq('year_month', yearMonth).order('sort_order', { ascending: true });
         if (seededCalendarError) throw seededCalendarError;
-        nextCalendarItems = (seededCalendar || []).map(mapCalendarRow);
+        nextCalendarItems = ((seededCalendar || []) as CalendarItemRow[]).map(mapCalendarRow);
       }
       setCalendarItems(nextCalendarItems);
     } catch (error) {
@@ -418,10 +525,10 @@ export default function PayrollAdvancedCenter({
   const activeDeductions = useMemo(() => deductionItems.filter((item) => item.active && filteredStaffs.some((staff) => String(staff.id) === item.staffId)), [deductionItems, filteredStaffs]);
   const visibleFreelancers = useMemo(() => freelancerItems.filter((item) => item.yearMonth === yearMonth), [freelancerItems, yearMonth]);
   const companySummary = useMemo(() => {
-    const staffMap = new Map((staffs as StaffMember[]).map((staff) => [String(staff.id), staff]));
+    const staffMap = new Map(staffs.map((staff) => [String(staff.id), staff]));
     const summary = new Map<string, { company: string; count: number; taxable: number; deductions: number; net: number }>();
 
-    payrollRecords.forEach((record: any) => {
+    payrollRecords.forEach((record) => {
       const company = staffMap.get(String(record.staff_id))?.company || '미분류';
       if (selectedCo !== '전체' && selectedCo && company !== selectedCo) return;
       if (!summary.has(company)) {
@@ -441,22 +548,22 @@ export default function PayrollAdvancedCenter({
     () =>
       buildMonthlyPayrollComparison({
         currentYearMonth: yearMonth,
-        currentRecords: payrollRecords as any[],
-        previousRecords: previousMonthRecords as any[],
-        staffs: staffs as StaffMember[],
+        currentRecords: payrollRecords,
+        previousRecords: previousMonthRecords,
+        staffs,
         selectedCompany: selectedCo,
       }),
     [payrollRecords, previousMonthRecords, selectedCo, staffs, yearMonth]
   );
 
   const glRows = useMemo(() => {
-    const payrollExpense = payrollRecords.reduce((sum: number, record: any) => sum + Number(record.total_taxable || 0) + Number(record.total_taxfree || 0), 0);
-    const withholdingTax = payrollRecords.reduce((sum: number, record: any) => {
-      const detail = record.deduction_detail || {};
+    const payrollExpense = payrollRecords.reduce((sum: number, record) => sum + Number(record.total_taxable || 0) + Number(record.total_taxfree || 0), 0);
+    const withholdingTax = payrollRecords.reduce((sum: number, record) => {
+      const detail = (record.deduction_detail || {}) as Record<string, unknown>;
       return sum + Number(detail.income_tax || 0) + Number(detail.local_income_tax || 0);
     }, 0);
-    const deductionTotal = payrollRecords.reduce((sum: number, record: any) => sum + Number(record.total_deduction || 0), 0);
-    const netPay = payrollRecords.reduce((sum: number, record: any) => sum + Number(record.net_pay || 0), 0);
+    const deductionTotal = payrollRecords.reduce((sum: number, record) => sum + Number(record.total_deduction || 0), 0);
+    const netPay = payrollRecords.reduce((sum: number, record) => sum + Number(record.net_pay || 0), 0);
     const bonusTotal = monthBonusItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
     const freelancerSupply = visibleFreelancers.reduce((sum, item) => sum + Number(item.supplyAmount || 0), 0);
 
@@ -493,7 +600,7 @@ export default function PayrollAdvancedCenter({
           snapshot,
           created_by: viewer?.id || null,
         })
-        .select('*')
+        .select(PAYROLL_POLICY_VERSION_SELECT)
         .single();
       if (error) throw error;
       if (data) {
@@ -523,10 +630,10 @@ export default function PayrollAdvancedCenter({
       action,
       comment,
     };
-    const { data, error } = await supabase.from('payroll_approval_logs').insert(payload).select('*').single();
+    const { data, error } = await supabase.from('payroll_approval_logs').insert(payload).select(PAYROLL_APPROVAL_LOG_SELECT).single();
     if (error) throw error;
     if (data) {
-      setApprovalLogs((prev) => [mapApprovalLogRow(data), ...prev].slice(0, 20));
+      setApprovalLogs((prev) => [mapApprovalLogRow(data as ApprovalLogRow), ...prev].slice(0, 20));
     }
   }, [companyScope, viewer?.id, viewerName, yearMonth]);
 
@@ -550,10 +657,10 @@ export default function PayrollAdvancedCenter({
       const { data, error } = await supabase
         .from('payroll_approval_workflows')
         .upsert(payload, { onConflict: 'company_name,year_month' })
-        .select('*')
+        .select(PAYROLL_APPROVAL_WORKFLOW_SELECT)
         .single();
       if (error) throw error;
-      if (data) setApprovalState(mapApprovalRow(data));
+      if (data) setApprovalState(mapApprovalRow(data as ApprovalWorkflowRow));
       await addApprovalLog(step === 'step1' ? '1차 승인 업데이트' : '2차 승인 업데이트', comment || status);
     } catch (error) {
       console.error('급여 승인 상태 저장 실패:', error);
@@ -582,7 +689,7 @@ export default function PayrollAdvancedCenter({
 
   const addBonusItem = async () => {
     if (!bonusForm.staffId || bonusForm.amount <= 0) return;
-    const targetStaff = (staffs as StaffMember[]).find((staff) => String(staff.id) === bonusForm.staffId);
+    const targetStaff = staffs.find((staff) => String(staff.id) === bonusForm.staffId);
     setSavingKey('bonus');
     try {
       const payload = {
@@ -594,9 +701,9 @@ export default function PayrollAdvancedCenter({
         note: bonusForm.note,
         created_by: viewer?.id || null,
       };
-      const { data, error } = await supabase.from('payroll_bonus_items').insert(payload).select('*').single();
+      const { data, error } = await supabase.from('payroll_bonus_items').insert(payload).select(PAYROLL_BONUS_ITEM_SELECT).single();
       if (error) throw error;
-      if (data) setBonusItems((prev) => [mapBonusRow(data), ...prev]);
+      if (data) setBonusItems((prev) => [mapBonusRow(data as BonusItemRow), ...prev]);
       setBonusForm({ staffId: '', category: '상여', amount: 0, note: '' });
     } catch (error) {
       console.error('상여/인센티브 저장 실패:', error);
@@ -608,7 +715,7 @@ export default function PayrollAdvancedCenter({
 
   const addRetroItem = async () => {
     if (!retroForm.staffId || retroPreviewTotal <= 0) return;
-    const targetStaff = (staffs as StaffMember[]).find((staff) => String(staff.id) === retroForm.staffId);
+    const targetStaff = staffs.find((staff) => String(staff.id) === retroForm.staffId);
     setSavingKey('retro');
     try {
       const payload = {
@@ -622,9 +729,9 @@ export default function PayrollAdvancedCenter({
         reason: retroForm.reason,
         created_by: viewer?.id || null,
       };
-      const { data, error } = await supabase.from('payroll_retro_adjustments').insert(payload).select('*').single();
+      const { data, error } = await supabase.from('payroll_retro_adjustments').insert(payload).select(PAYROLL_RETRO_ADJUSTMENT_SELECT).single();
       if (error) throw error;
-      if (data) setRetroItems((prev) => [mapRetroRow(data), ...prev]);
+      if (data) setRetroItems((prev) => [mapRetroRow(data as RetroItemRow), ...prev]);
     } catch (error) {
       console.error('소급 급여 저장 실패:', error);
       toast('소급 급여 저장에 실패했습니다.', 'error');
@@ -635,7 +742,7 @@ export default function PayrollAdvancedCenter({
 
   const addDeductionItem = async () => {
     if (!deductionForm.staffId || deductionForm.monthlyAmount <= 0) return;
-    const targetStaff = (staffs as StaffMember[]).find((staff) => String(staff.id) === deductionForm.staffId);
+    const targetStaff = staffs.find((staff) => String(staff.id) === deductionForm.staffId);
     setSavingKey('deduction');
     try {
       const payload = {
@@ -648,9 +755,9 @@ export default function PayrollAdvancedCenter({
         is_active: true,
         created_by: viewer?.id || null,
       };
-      const { data, error } = await supabase.from('payroll_deduction_controls').insert(payload).select('*').single();
+      const { data, error } = await supabase.from('payroll_deduction_controls').insert(payload).select(PAYROLL_DEDUCTION_CONTROL_SELECT).single();
       if (error) throw error;
-      if (data) setDeductionItems((prev) => [mapDeductionRow(data), ...prev]);
+      if (data) setDeductionItems((prev) => [mapDeductionRow(data as DeductionItemRow), ...prev]);
       setDeductionForm({ staffId: '', type: '가압류', monthlyAmount: 0, balance: 0, note: '' });
     } catch (error) {
       console.error('가압류/상계 저장 실패:', error);
@@ -677,9 +784,9 @@ export default function PayrollAdvancedCenter({
         withholding_tax: withholdingTax,
         created_by: viewer?.id || null,
       };
-      const { data, error } = await supabase.from('freelancer_payments').insert(payload).select('*').single();
+      const { data, error } = await supabase.from('freelancer_payments').insert(payload).select(FREELANCER_PAYMENT_SELECT).single();
       if (error) throw error;
-      if (data && itemYearMonth === yearMonth) setFreelancerItems((prev) => [mapFreelancerRow(data), ...prev]);
+      if (data && itemYearMonth === yearMonth) setFreelancerItems((prev) => [mapFreelancerRow(data as FreelancerItemRow), ...prev]);
       setFreelancerForm({ vendorName: '', workType: '', paymentDate: `${yearMonth}-10`, supplyAmount: 0, taxRate: 3.3 });
     } catch (error) {
       console.error('프리랜서 지급 저장 실패:', error);

@@ -1,10 +1,11 @@
 ﻿'use client';
 
-import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import AnnualLeaveManualGrant from './연차수동부여';
 import { SYSTEM_MASTER_ACCOUNT_ID, hasSystemMasterPermission } from '@/lib/system-master';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
+import type { StaffMember } from '@/types';
 
 // ── 금지어 관리 ────────────────────────────────────────────────────────
 const BANNED_WORDS_KEY = 'erp-banned-words';
@@ -86,6 +87,222 @@ const MASTER_TABS: MasterTabId[] = [
   '연차수동부여',
 ];
 
+type SystemMasterUser = Partial<StaffMember> & Record<string, unknown>;
+
+type SystemMasterSummary = {
+  staffCount?: number;
+  auditCount?: number;
+  payrollCount?: number;
+  roomCount?: number;
+  messageCount?: number;
+};
+
+type SystemMasterAuditLog = {
+  id: string;
+  action?: string | null;
+  category?: string | null;
+  target_label?: string | null;
+  actor_label?: string | null;
+  created_at?: string | null;
+  changed_fields?: string[];
+  details?: unknown;
+};
+
+type SystemMasterPermissionSummary = {
+  enabled?: string[];
+  disabled?: string[];
+  beforeRole?: string | null;
+  afterRole?: string | null;
+};
+
+type SystemMasterPermissionDiffLog = SystemMasterAuditLog & {
+  permission_summary?: SystemMasterPermissionSummary | null;
+};
+
+type SystemMasterPayrollRecord = {
+  id: string;
+  staff_name?: string | null;
+  employee_no?: string | null;
+  year_month?: string | null;
+  company?: string | null;
+  department?: string | null;
+  net_pay?: number | null;
+};
+
+type SystemMasterSensitiveStaff = {
+  id: string;
+  name?: string | null;
+  employee_no?: string | null;
+  company?: string | null;
+  department?: string | null;
+  resident_no?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  bank_name?: string | null;
+  bank_account?: string | null;
+  base_salary?: number | null;
+};
+
+type SystemMasterOverviewPayload = {
+  summary?: SystemMasterSummary;
+  recentAudits?: SystemMasterAuditLog[];
+  recentPayrolls?: SystemMasterPayrollRecord[];
+  sensitiveStaffs?: SystemMasterSensitiveStaff[];
+};
+
+type SystemMasterFailureItem = {
+  id: string;
+  severity?: 'info' | 'warning' | 'critical' | string | null;
+  label?: string | null;
+  count?: number | null;
+  detail?: string | null;
+};
+
+type SystemMasterPlatformSummary = {
+  platform?: string | null;
+  count?: number | null;
+};
+
+type SystemMasterPushFailureSummary = {
+  error?: string | null;
+  count?: number | null;
+};
+
+type SystemMasterRecentSubscription = {
+  id: string;
+  platform?: string | null;
+  has_fcm?: boolean | null;
+  created_at?: string | null;
+};
+
+type SystemMasterCronJob = {
+  path: string;
+  schedule?: string | null;
+  label?: string | null;
+};
+
+type SystemMasterBackup = {
+  name: string;
+  created_at?: string | null;
+};
+
+type SystemMasterRestoreRun = {
+  id: string;
+  file_name?: string | null;
+  status?: string | null;
+  started_at?: string | null;
+};
+
+type SystemMasterWikiVersion = {
+  id: string;
+  title?: string | null;
+  version_no?: number | null;
+  created_at?: string | null;
+};
+
+type SystemMasterUsageSummary = {
+  id: string;
+  label?: string | null;
+  count?: number | null;
+  topAction?: string | null;
+  latestAt?: string | null;
+};
+
+type SystemMasterOperationsPayload = {
+  checkedAt?: string | null;
+  queue?: {
+    pending?: number | null;
+    deadLettered?: number | null;
+    ready?: number | null;
+    retrying?: number | null;
+    inFlight?: number | null;
+    migrationReady?: boolean | null;
+  };
+  subscriptions?: {
+    total?: number | null;
+    nullStaff?: number | null;
+    orphan?: number | null;
+    duplicateEndpointGroups?: number | null;
+    duplicateRows?: number | null;
+    fcmEnabled?: number | null;
+    webPushOnly?: number | null;
+    placeholderEndpoints?: number | null;
+    platformSummary?: SystemMasterPlatformSummary[];
+    recentSubscriptions?: SystemMasterRecentSubscription[];
+  };
+  pushFailures?: {
+    total?: number | null;
+    summary?: SystemMasterPushFailureSummary[];
+  };
+  recentBackups?: SystemMasterBackup[];
+  restoreRuns?: SystemMasterRestoreRun[];
+  cronJobs?: SystemMasterCronJob[];
+  todoAutomation?: {
+    dueReminders?: number | null;
+    repeatingOpenTodos?: number | null;
+    reminderLogs24h?: number | null;
+  };
+  wiki?: {
+    documents?: number | null;
+    versions?: number | null;
+    recentVersions?: SystemMasterWikiVersion[];
+  };
+  failureItems?: SystemMasterFailureItem[];
+  usageSummary?: SystemMasterUsageSummary[];
+};
+
+type SystemMasterChatRoom = {
+  id: string;
+  room_label?: string | null;
+  member_labels?: string[];
+};
+
+type SystemMasterChatMessage = {
+  id: string;
+  room_id?: string | null;
+  room_label?: string | null;
+  sender_name?: string | null;
+  sender_company?: string | null;
+  content?: string | null;
+  file_url?: string | null;
+  created_at?: string | null;
+  edited_at?: string | null;
+  is_deleted?: boolean | null;
+};
+
+type SystemMasterChatsPayload = {
+  rooms?: SystemMasterChatRoom[];
+  messages?: SystemMasterChatMessage[];
+};
+
+type SystemMasterIntegrityIssue = {
+  id: string;
+  severity?: 'info' | 'warning' | 'critical' | string | null;
+  title?: string | null;
+  description?: string | null;
+  count?: number | null;
+  samples?: string[];
+};
+
+type SystemMasterIntegrityPayload = {
+  checkedAt?: string | null;
+  issues?: SystemMasterIntegrityIssue[];
+};
+
+type SystemMasterAuditPayload = {
+  logs?: SystemMasterAuditLog[];
+};
+
+type SystemMasterPermissionDiffPayload = {
+  logs?: SystemMasterPermissionDiffLog[];
+};
+
+type SystemMasterActionId =
+  | 'run_backup_full'
+  | 'run_chat_push_dispatch'
+  | 'run_todo_reminders'
+  | 'cleanup_push_subscriptions';
+
 function formatCurrency(value: unknown) {
   const amount = Number(value || 0);
   return `${amount.toLocaleString('ko-KR')}원`;
@@ -125,13 +342,13 @@ function formatPushPlatformLabel(platform: unknown) {
   return normalized;
 }
 
-async function readJson(url: string) {
+async function readJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { cache: 'no-store' });
   const payload = await response.json();
   if (!response.ok) {
     throw new Error(payload?.error || '데이터를 불러오지 못했습니다.');
   }
-  return payload;
+  return payload as T;
 }
 
 export default function SystemMasterCenter({
@@ -140,19 +357,19 @@ export default function SystemMasterCenter({
   onRefresh,
   initialTab,
 }: {
-  user?: any;
-  staffs?: any[];
+  user?: SystemMasterUser;
+  staffs?: StaffMember[];
   onRefresh?: () => void;
   initialTab?: MasterTabId;
 }) {
   const [activeTab, setActiveTab] = useState<MasterTabId>('개요');
-  const [overview, setOverview] = useState<Record<string, unknown> | null>(null);
-  const [operations, setOperations] = useState<Record<string, any> | null>(null);
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
-  const [permissionDiffLogs, setPermissionDiffLogs] = useState<any[]>([]);
-  const [chatRooms, setChatRooms] = useState<any[]>([]);
-  const [chatMessages, setChatMessages] = useState<any[]>([]);
-  const [integrityReport, setIntegrityReport] = useState<Record<string, any> | null>(null);
+  const [overview, setOverview] = useState<SystemMasterOverviewPayload | null>(null);
+  const [operations, setOperations] = useState<SystemMasterOperationsPayload | null>(null);
+  const [auditLogs, setAuditLogs] = useState<SystemMasterAuditLog[]>([]);
+  const [permissionDiffLogs, setPermissionDiffLogs] = useState<SystemMasterPermissionDiffLog[]>([]);
+  const [chatRooms, setChatRooms] = useState<SystemMasterChatRoom[]>([]);
+  const [chatMessages, setChatMessages] = useState<SystemMasterChatMessage[]>([]);
+  const [integrityReport, setIntegrityReport] = useState<SystemMasterIntegrityPayload | null>(null);
   const [auditCategory, setAuditCategory] = useState('all');
   const [auditKeyword, setAuditKeyword] = useState('');
   const [chatKeyword, setChatKeyword] = useState('');
@@ -178,7 +395,7 @@ export default function SystemMasterCenter({
     setLoading(true);
     setError('');
     try {
-      const payload = await readJson('/api/admin/system-master?scope=overview');
+      const payload = await readJson<SystemMasterOverviewPayload>('/api/admin/system-master?scope=overview');
       setOverview(payload);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : '개요를 불러오지 못했습니다.');
@@ -197,7 +414,7 @@ export default function SystemMasterCenter({
         keyword: auditKeyword,
         limit: '200',
       });
-      const payload = await readJson(`/api/admin/system-master?${query.toString()}`);
+      const payload = await readJson<SystemMasterAuditPayload>(`/api/admin/system-master?${query.toString()}`);
       setAuditLogs(payload.logs || []);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : '변경 이력을 불러오지 못했습니다.');
@@ -214,7 +431,7 @@ export default function SystemMasterCenter({
         scope: 'operations',
         limit: '200',
       });
-      const payload = await readJson(`/api/admin/system-master?${query.toString()}`);
+      const payload = await readJson<SystemMasterOperationsPayload>(`/api/admin/system-master?${query.toString()}`);
       setOperations(payload || null);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : '운영 대시보드를 불러오지 못했습니다.');
@@ -232,7 +449,7 @@ export default function SystemMasterCenter({
         keyword: auditKeyword,
         limit: '200',
       });
-      const payload = await readJson(`/api/admin/system-master?${query.toString()}`);
+      const payload = await readJson<SystemMasterPermissionDiffPayload>(`/api/admin/system-master?${query.toString()}`);
       setPermissionDiffLogs(payload.logs || []);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : '권한 변경 이력을 불러오지 못했습니다.');
@@ -245,7 +462,7 @@ export default function SystemMasterCenter({
     setLoading(true);
     setError('');
     try {
-      const payload = await readJson('/api/admin/system-master?scope=integrity');
+      const payload = await readJson<SystemMasterIntegrityPayload>('/api/admin/system-master?scope=integrity');
       setIntegrityReport(payload || null);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : '정합성 점검 결과를 불러오지 못했습니다.');
@@ -267,7 +484,7 @@ export default function SystemMasterCenter({
         query.set('roomId', selectedRoomId);
       }
 
-      const payload = await readJson(`/api/admin/system-master?${query.toString()}`);
+      const payload = await readJson<SystemMasterChatsPayload>(`/api/admin/system-master?${query.toString()}`);
       setChatRooms(payload.rooms || []);
       setChatMessages(payload.messages || []);
     } catch (loadError) {
@@ -337,12 +554,12 @@ export default function SystemMasterCenter({
       return;
     }
 
-    if (!selectedRoomId || !chatRooms.some((room: any) => room.id === selectedRoomId)) {
+    if (!selectedRoomId || !chatRooms.some((room) => room.id === selectedRoomId)) {
       setSelectedRoomId(chatRooms[0].id);
     }
   }, [chatRooms, selectedRoomId]);
 
-  const handleDeleteRoom = useCallback(async (room: any) => {
+  const handleDeleteRoom = useCallback(async (room: SystemMasterChatRoom) => {
     if (!room?.id) return;
     if (!confirm(`"${room.room_label || '채팅방'}" 채팅방 자체를 삭제하시겠습니까?\n대화내역과 관련 데이터도 함께 삭제됩니다.`)) {
       return;
@@ -359,8 +576,8 @@ export default function SystemMasterCenter({
         throw new Error(payload?.error || '채팅방 삭제에 실패했습니다.');
       }
 
-      setChatRooms((prev: any[]) => prev.filter((item: any) => item.id !== room.id));
-      setChatMessages((prev: any[]) => prev.filter((message: any) => message.room_id !== room.id));
+      setChatRooms((prev) => prev.filter((item) => item.id !== room.id));
+      setChatMessages((prev) => prev.filter((message) => message.room_id !== room.id));
       setSelectedRoomId((prev) => (prev === room.id ? '' : prev));
       toast('채팅방을 삭제했습니다.', 'success');
     } catch (deleteError) {
@@ -371,7 +588,7 @@ export default function SystemMasterCenter({
     }
   }, []);
 
-  const runOpsAction = useCallback(async (action: 'run_backup_full' | 'run_chat_push_dispatch' | 'run_todo_reminders' | 'cleanup_push_subscriptions') => {
+  const runOpsAction = useCallback(async (action: SystemMasterActionId) => {
     setOpsActionLoading(action);
     try {
       const response = await fetch('/api/admin/system-master', {
@@ -407,9 +624,27 @@ export default function SystemMasterCenter({
     }
   }, [loadIntegrityReport, loadOperations]);
 
+  const selectedChatRoom = useMemo(
+    () => chatRooms.find((room) => room.id === selectedRoomId) || null,
+    [chatRooms, selectedRoomId],
+  );
+
+  const flaggedChatMessageCount = useMemo(
+    () => chatMessages.filter((message) => message.content && hasBanned(message.content, bannedWords)).length,
+    [chatMessages, bannedWords],
+  );
+
+  const visibleChatMessages = useMemo(
+    () =>
+      chatMessages.filter(
+        (message) => !showFlaggedOnly || (message.content && hasBanned(message.content, bannedWords)),
+      ),
+    [bannedWords, chatMessages, showFlaggedOnly],
+  );
+
   const summaryCards = useMemo(() => {
     if (!overview?.summary) return [];
-    const summary = overview.summary as Record<string, unknown>;
+    const summary = overview.summary;
     return [
       { id: 'staff', label: '직원 계정', value: summary.staffCount },
       { id: 'audit', label: '감사 로그', value: summary.auditCount },
@@ -509,7 +744,7 @@ export default function SystemMasterCenter({
                 </div>
               </div>
               <div className="mt-4 space-y-3">
-                {((overview.recentAudits as any[]) || []).slice(0, 8).map((log: any) => (
+                {(overview.recentAudits || []).slice(0, 8).map((log) => (
                   <div key={log.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-2.5 py-1 text-[10px] font-bold text-[var(--accent)]">{log.action}</span>
@@ -531,7 +766,7 @@ export default function SystemMasterCenter({
               <h3 className="text-base font-bold text-[var(--foreground)]">최근 급여 반영</h3>
               <p className="mt-1 text-xs text-[var(--toss-gray-3)]">최근 저장된 급여 레코드 기준입니다.</p>
               <div className="mt-4 space-y-3">
-                {((overview.recentPayrolls as any[]) || []).slice(0, 8).map((record: any) => (
+                {(overview.recentPayrolls || []).slice(0, 8).map((record) => (
                   <div key={record.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
@@ -576,7 +811,7 @@ export default function SystemMasterCenter({
                   </tr>
                 </thead>
                 <tbody>
-                  {((overview.sensitiveStaffs as any[]) || []).map((staff: any) => (
+                  {(overview.sensitiveStaffs || []).map((staff) => (
                     <tr key={staff.id} className="border-t border-[var(--border)]">
                       <td className="px-3 py-3">
                         <p className="font-bold text-[var(--foreground)]">{staff.name}</p>
@@ -631,12 +866,12 @@ export default function SystemMasterCenter({
                 </p>
               </div>
               <div className="mt-4 space-y-3">
-                {((operations.failureItems as any[]) || []).length === 0 && (
+                {(operations.failureItems || []).length === 0 && (
                   <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-4 py-8 text-center text-sm text-[var(--toss-gray-3)]">
                     현재 감지된 실패/주의 작업이 없습니다.
                   </div>
                 )}
-                {((operations.failureItems as any[]) || []).map((item: any) => (
+                {(operations.failureItems || []).map((item) => (
                   <div
                     key={item.id}
                     className={`rounded-[var(--radius-lg)] border px-4 py-3 ${
@@ -702,10 +937,10 @@ export default function SystemMasterCenter({
                   <div className="mt-4">
                     <p className="text-[11px] font-bold text-[var(--foreground)]">플랫폼 분포</p>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {((operations.subscriptions?.platformSummary as any[]) || []).length === 0 && (
+                      {(operations.subscriptions?.platformSummary || []).length === 0 && (
                         <span className="text-[11px] text-[var(--toss-gray-3)]">표시할 플랫폼 데이터가 없습니다.</span>
                       )}
-                      {((operations.subscriptions?.platformSummary as any[]) || []).map((entry: any) => (
+                      {(operations.subscriptions?.platformSummary || []).map((entry) => (
                         <span
                           key={String(entry.platform)}
                           className="rounded-full border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-[10px] font-bold text-[var(--foreground)]"
@@ -720,10 +955,10 @@ export default function SystemMasterCenter({
                     <div>
                       <p className="text-[11px] font-bold text-[var(--foreground)]">최근 실패 사유</p>
                       <div className="mt-2 space-y-2">
-                        {((operations.pushFailures?.summary as any[]) || []).length === 0 && (
+                        {(operations.pushFailures?.summary || []).length === 0 && (
                           <p className="text-[11px] text-[var(--toss-gray-3)]">최근 실패 사유가 없습니다.</p>
                         )}
-                        {((operations.pushFailures?.summary as any[]) || []).slice(0, 4).map((entry: any) => (
+                        {(operations.pushFailures?.summary || []).slice(0, 4).map((entry) => (
                           <div key={String(entry.error)} className="flex items-center justify-between gap-3 text-[11px]">
                             <span className="font-semibold text-[var(--foreground)]">{String(entry.error || 'unknown')}</span>
                             <span className="text-[var(--toss-gray-3)]">{Number(entry.count || 0).toLocaleString('ko-KR')}건</span>
@@ -735,10 +970,10 @@ export default function SystemMasterCenter({
                     <div>
                       <p className="text-[11px] font-bold text-[var(--foreground)]">최근 구독 흐름</p>
                       <div className="mt-2 space-y-2">
-                        {((operations.subscriptions?.recentSubscriptions as any[]) || []).length === 0 && (
+                        {(operations.subscriptions?.recentSubscriptions || []).length === 0 && (
                           <p className="text-[11px] text-[var(--toss-gray-3)]">최근 구독 데이터가 없습니다.</p>
                         )}
-                        {((operations.subscriptions?.recentSubscriptions as any[]) || []).slice(0, 4).map((entry: any) => (
+                        {(operations.subscriptions?.recentSubscriptions || []).slice(0, 4).map((entry) => (
                           <div key={String(entry.id)} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2">
                             <p className="text-[11px] font-semibold text-[var(--foreground)]">{formatPushPlatformLabel(entry.platform)} · {entry.has_fcm ? 'FCM 포함' : 'Web Push'}</p>
                             <p className="mt-1 text-[10px] text-[var(--toss-gray-3)]">{entry.created_at ? new Date(String(entry.created_at)).toLocaleString('ko-KR') : '-'}</p>
@@ -752,7 +987,7 @@ export default function SystemMasterCenter({
                 <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] p-4">
                   <p className="text-xs font-bold text-[var(--foreground)]">크론 스케줄</p>
                   <div className="mt-3 space-y-2">
-                    {((operations.cronJobs as any[]) || []).map((cron: any) => (
+                    {(operations.cronJobs || []).map((cron) => (
                       <div key={cron.path} className="flex items-center justify-between gap-3 text-[11px]">
                         <span className="font-semibold text-[var(--foreground)]">{cron.label}</span>
                         <span className="text-[var(--toss-gray-3)]">{cron.schedule}</span>
@@ -788,7 +1023,7 @@ export default function SystemMasterCenter({
             <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
               <h3 className="text-base font-bold text-[var(--foreground)]">최근 백업</h3>
               <div className="mt-4 space-y-3">
-                {((operations.recentBackups as any[]) || []).map((backup: any) => (
+                {(operations.recentBackups || []).map((backup) => (
                   <div key={backup.name} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
                     <p className="text-sm font-bold text-[var(--foreground)]">{backup.name}</p>
                     <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{new Date(backup.created_at).toLocaleString('ko-KR')}</p>
@@ -800,7 +1035,7 @@ export default function SystemMasterCenter({
             <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
               <h3 className="text-base font-bold text-[var(--foreground)]">최근 복원 / 위키 버전</h3>
               <div className="mt-4 space-y-3">
-                {((operations.restoreRuns as any[]) || []).slice(0, 3).map((run: any) => (
+                {(operations.restoreRuns || []).slice(0, 3).map((run) => (
                   <div key={run.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm font-bold text-[var(--foreground)]">{run.file_name}</p>
@@ -811,7 +1046,7 @@ export default function SystemMasterCenter({
                     <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{run.started_at ? new Date(run.started_at).toLocaleString('ko-KR') : '-'}</p>
                   </div>
                 ))}
-                {((operations.wiki?.recentVersions as any[]) || []).slice(0, 2).map((version: any) => (
+                {(operations.wiki?.recentVersions || []).slice(0, 2).map((version) => (
                   <div key={version.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
                     <p className="text-sm font-bold text-[var(--foreground)]">{version.title}</p>
                     <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">버전 {Number(version.version_no || 0).toLocaleString('ko-KR')} · {version.created_at ? new Date(version.created_at).toLocaleString('ko-KR') : '-'}</p>
@@ -823,7 +1058,7 @@ export default function SystemMasterCenter({
             <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
               <h3 className="text-base font-bold text-[var(--foreground)]">기능별 사용 로그</h3>
               <div className="mt-4 space-y-3">
-                {((operations.usageSummary as any[]) || []).map((entry: any) => (
+                {(operations.usageSummary || []).map((entry) => (
                   <div key={entry.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm font-bold text-[var(--foreground)]">{entry.label}</p>
@@ -876,7 +1111,7 @@ export default function SystemMasterCenter({
               </div>
             )}
 
-            {auditLogs.map((log: any) => (
+            {auditLogs.map((log) => (
               <article key={log.id} className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--page-bg)] p-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
@@ -936,7 +1171,7 @@ export default function SystemMasterCenter({
               </div>
             )}
 
-            {permissionDiffLogs.map((log: any) => (
+            {permissionDiffLogs.map((log) => (
               <article key={log.id} className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                   <div className="min-w-0">
@@ -982,7 +1217,7 @@ export default function SystemMasterCenter({
               <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">{chatRooms.length}개</span>
             </div>
             <div className="mt-4 space-y-2">
-              {chatRooms.map((room: any) => (
+              {chatRooms.map((room) => (
                 <button
                   key={room.id}
                   type="button"
@@ -1006,7 +1241,7 @@ export default function SystemMasterCenter({
                 <h3 className="text-base font-bold text-[var(--foreground)]">전 직원 채팅 대화 열람</h3>
                 <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
                   {selectedRoomId
-                    ? `${chatRooms.find((room: any) => room.id === selectedRoomId)?.room_label || '선택 채팅방'} 대화`
+                    ? `${selectedChatRoom?.room_label || '선택 채팅방'} 대화`
                     : '전체 최근 대화'}
                 </p>
               </div>
@@ -1016,7 +1251,7 @@ export default function SystemMasterCenter({
                     type="button"
                     disabled={deletingRoomId === selectedRoomId}
                     onClick={() => {
-                      const room = chatRooms.find((item: any) => item.id === selectedRoomId);
+                      const room = chatRooms.find((item) => item.id === selectedRoomId);
                       if (room) void handleDeleteRoom(room);
                     }}
                     className="h-9 rounded-[var(--radius-md)] border border-red-500/20 px-3 text-xs font-bold text-red-600 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
@@ -1025,9 +1260,8 @@ export default function SystemMasterCenter({
                   </button>
                 )}
                 {(() => {
-                  const flagged = chatMessages.filter((m: any) => m.content && hasBanned(m.content, bannedWords)).length;
-                  return flagged > 0 ? (
-                    <span className="text-[11px] font-bold text-red-600 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-full">🔍 필터 단어 {flagged}건</span>
+                  return flaggedChatMessageCount > 0 ? (
+                    <span className="text-[11px] font-bold text-red-600 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-full">🔍 필터 단어 {flaggedChatMessageCount}건</span>
                   ) : null;
                 })()}
                 <button
@@ -1073,9 +1307,8 @@ export default function SystemMasterCenter({
                   </tr>
                 </thead>
                 <tbody>
-                  {chatMessages
-                    .filter((message: any) => !showFlaggedOnly || (message.content && hasBanned(message.content, bannedWords)))
-                    .map((message: any) => {
+                  {visibleChatMessages
+                    .map((message) => {
                       const flagged = message.content && hasBanned(message.content, bannedWords);
                       return (
                         <tr key={message.id} className={`border-t border-[var(--border)] align-top ${flagged ? 'bg-red-500/10' : ''}`}>
@@ -1111,7 +1344,7 @@ export default function SystemMasterCenter({
                                 setDeletingMsgId(message.id);
                                 const { error: delErr } = await supabase.from('messages').delete().eq('id', message.id);
                                 if (delErr) { toast('삭제 실패: ' + delErr.message, 'error'); }
-                                else { setChatMessages((prev: any[]) => prev.filter((m: any) => m.id !== message.id)); toast('삭제 완료', 'success'); }
+                                else { setChatMessages((prev) => prev.filter((item) => item.id !== message.id)); toast('삭제 완료', 'success'); }
                                 setDeletingMsgId(null);
                               }}
                               className={`px-2 py-1 text-[11px] font-bold rounded-[var(--radius-md)] transition ${
@@ -1154,7 +1387,7 @@ export default function SystemMasterCenter({
           </div>
 
           <div className="space-y-4">
-            {((integrityReport?.issues as any[]) || []).map((issue: any) => (
+            {(integrityReport?.issues || []).map((issue) => (
               <article
                 key={issue.id}
                 className={`rounded-[var(--radius-xl)] border p-5 shadow-sm ${
