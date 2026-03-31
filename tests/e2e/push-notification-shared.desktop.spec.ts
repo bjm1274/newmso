@@ -191,6 +191,7 @@ test('shared push subscription change re-subscribes and syncs the new endpoint',
         postMessage: (message: unknown) => {
           postedMessages.push(message);
         },
+        url: 'http://example.com/offline-client',
       },
     ],
   });
@@ -231,6 +232,77 @@ test('shared push subscription change re-subscribes and syncs the new endpoint',
     type: 'erp-push-subscription-refresh',
     payload: {
       active: true,
+    },
+  });
+});
+
+test('shared push queues failed requests offline and flushes them when the app asks again', async () => {
+  let offline = true;
+  const postedMessages: Array<unknown> = [];
+  const harness = createPushSharedHarness({
+    clients: [
+      {
+        postMessage: (message: unknown) => {
+          postedMessages.push(message);
+        },
+        url: 'http://example.com/offline-queue-client',
+      },
+    ],
+    fetchImpl: async (url: string) => {
+      if (url.endsWith('/api/notifications/mark-read')) {
+        return {
+          ok: !offline,
+          status: offline ? 503 : 200,
+          json: async () => ({}),
+        };
+      }
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+      };
+    },
+  });
+
+  await harness.shared?.handleNotificationClick({
+    action: 'open',
+    notification: {
+      close: () => undefined,
+      data: {
+        type: 'approval',
+        approval_id: 'approval-queued-1',
+        notification_id: 'notification-queued-1',
+      },
+    },
+  });
+
+  const failedReadAttempts = harness.fetchCalls.filter((call) =>
+    call.url.endsWith('/api/notifications/mark-read')
+  );
+  expect(failedReadAttempts.length).toBeGreaterThan(0);
+  expect(postedMessages).toContainEqual({
+    type: 'erp-push-retry-queue-state',
+    payload: {
+      pending: true,
+    },
+  });
+
+  offline = false;
+  await harness.shared?.handleClientMessage({
+    data: {
+      type: 'erp-push-flush-retry-queue',
+    },
+  });
+
+  const successfulReadAttempts = harness.fetchCalls.filter((call) =>
+    call.url.endsWith('/api/notifications/mark-read')
+  );
+  expect(successfulReadAttempts.length).toBeGreaterThan(failedReadAttempts.length);
+  expect(postedMessages).toContainEqual({
+    type: 'erp-notification-read-sync',
+    payload: {
+      notificationId: 'notification-queued-1',
     },
   });
 });

@@ -1,6 +1,10 @@
 const ERP_PUSH_BADGE_URL = '/badge-72x72.png';
 const ERP_PUSH_ICON_URL = '/sy-logo.png';
+const ERP_PUSH_RETRY_DB_NAME = 'erp-push-retry-v1';
+const ERP_PUSH_RETRY_STORE = 'requests';
 const erpRecentlyShownNotifications = new Map();
+let erpRetryFallbackQueue = [];
+let erpRetryDbPromise = null;
 
 async function erpGetWindowClients() {
   return self.clients.matchAll({ type: 'window', includeUncontrolled: true });
@@ -26,6 +30,217 @@ async function erpBroadcastMessage(type, payload) {
       // ignore postMessage failures
     }
   });
+}
+
+async function erpOpenRetryDb() {
+  if (typeof indexedDB === 'undefined') return null;
+  if (erpRetryDbPromise) return erpRetryDbPromise;
+
+  erpRetryDbPromise = new Promise((resolve, reject) => {
+    const request = indexedDB.open(ERP_PUSH_RETRY_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(ERP_PUSH_RETRY_STORE)) {
+        database.createObjectStore(ERP_PUSH_RETRY_STORE, { keyPath: 'id' });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error('retry-db-open-failed'));
+  }).catch(() => null);
+
+  return erpRetryDbPromise;
+}
+
+function erpBuildRetryEntry(type, payload) {
+  const normalizedPayload = payload && typeof payload === 'object' ? { ...payload } : {};
+  let id = '';
+
+  if (type === 'mark-read') {
+    const notificationId = erpNormalizeString(normalizedPayload.notification_id);
+    if (!notificationId) return null;
+    id = `mark-read:${notificationId}`;
+  } else if (type === 'push-subscription-post') {
+    const endpoint = erpNormalizeString(normalizedPayload.endpoint);
+    if (!endpoint) return null;
+    id = `push-subscription-post:${endpoint}`;
+  } else if (type === 'push-subscription-delete') {
+    const endpoint = erpNormalizeString(normalizedPayload.endpoint);
+    if (!endpoint) return null;
+    id = `push-subscription-delete:${endpoint}`;
+  } else {
+    return null;
+  }
+
+  return {
+    id,
+    type,
+    payload: normalizedPayload,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+async function erpPutRetryEntry(entry) {
+  const database = await erpOpenRetryDb();
+  if (!database) {
+    erpRetryFallbackQueue = [
+      ...erpRetryFallbackQueue.filter((item) => item.id !== entry.id),
+      entry,
+    ];
+    return;
+  }
+
+  await new Promise((resolve, reject) => {
+    const transaction = database.transaction(ERP_PUSH_RETRY_STORE, 'readwrite');
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error || new Error('retry-db-write-failed'));
+    transaction.objectStore(ERP_PUSH_RETRY_STORE).put(entry);
+  }).catch(() => {
+    erpRetryFallbackQueue = [
+      ...erpRetryFallbackQueue.filter((item) => item.id !== entry.id),
+      entry,
+    ];
+  });
+}
+
+async function erpReadRetryEntries() {
+  const database = await erpOpenRetryDb();
+  if (!database) {
+    return [...erpRetryFallbackQueue].sort((left, right) =>
+      String(left.createdAt || '').localeCompare(String(right.createdAt || ''))
+    );
+  }
+
+  const entries = await new Promise((resolve, reject) => {
+    const transaction = database.transaction(ERP_PUSH_RETRY_STORE, 'readonly');
+    const request = transaction.objectStore(ERP_PUSH_RETRY_STORE).getAll();
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => reject(request.error || new Error('retry-db-read-failed'));
+  }).catch(() => [...erpRetryFallbackQueue]);
+
+  return [...entries].sort((left, right) =>
+    String(left.createdAt || '').localeCompare(String(right.createdAt || ''))
+  );
+}
+
+async function erpDeleteRetryEntries(entryIds) {
+  if (!Array.isArray(entryIds) || entryIds.length === 0) return;
+  erpRetryFallbackQueue = erpRetryFallbackQueue.filter((item) => !entryIds.includes(item.id));
+
+  const database = await erpOpenRetryDb();
+  if (!database) return;
+
+  await new Promise((resolve, reject) => {
+    const transaction = database.transaction(ERP_PUSH_RETRY_STORE, 'readwrite');
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error || new Error('retry-db-delete-failed'));
+    const store = transaction.objectStore(ERP_PUSH_RETRY_STORE);
+    entryIds.forEach((entryId) => {
+      store.delete(entryId);
+    });
+  }).catch(() => {});
+}
+
+async function erpQueueRetryEntry(type, payload) {
+  const entry = erpBuildRetryEntry(type, payload);
+  if (!entry) return;
+  await erpPutRetryEntry(entry);
+  await erpBroadcastMessage('erp-push-retry-queue-state', {
+    pending: true,
+  });
+}
+
+async function erpSendRetryEntry(entry) {
+  const payload = entry?.payload && typeof entry.payload === 'object' ? entry.payload : {};
+
+  if (entry.type === 'mark-read') {
+    const response = await fetch('/api/notifications/mark-read', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        notification_id: erpNormalizeString(payload.notification_id),
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`mark-read failed (${response.status})`);
+    }
+    await erpBroadcastMessage('erp-notification-read-sync', {
+      notificationId: erpNormalizeString(payload.notification_id),
+    });
+    return;
+  }
+
+  if (entry.type === 'push-subscription-post') {
+    const response = await fetch('/api/notifications/push-subscription', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error(`push-subscription-post failed (${response.status})`);
+    }
+    await erpBroadcastMessage('erp-push-subscription-refresh', {
+      active: true,
+    });
+    return;
+  }
+
+  if (entry.type === 'push-subscription-delete') {
+    const response = await fetch('/api/notifications/push-subscription', {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        endpoint: erpNormalizeString(payload.endpoint),
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`push-subscription-delete failed (${response.status})`);
+    }
+  }
+}
+
+async function erpFlushRetryQueue() {
+  const entries = await erpReadRetryEntries();
+  if (!entries.length) {
+    await erpBroadcastMessage('erp-push-retry-queue-state', {
+      pending: false,
+    });
+    return {
+      flushed: 0,
+      pending: 0,
+    };
+  }
+
+  const flushedIds = [];
+  for (const entry of entries) {
+    try {
+      await erpSendRetryEntry(entry);
+      flushedIds.push(entry.id);
+    } catch {
+      // keep the entry in queue for the next online retry
+    }
+  }
+
+  if (flushedIds.length > 0) {
+    await erpDeleteRetryEntries(flushedIds);
+  }
+
+  await erpBroadcastMessage('erp-push-retry-queue-state', {
+    pending: entries.length - flushedIds.length > 0,
+  });
+
+  return {
+    flushed: flushedIds.length,
+    pending: Math.max(0, entries.length - flushedIds.length),
+  };
 }
 
 function erpIsVisibleClient(client) {
@@ -101,6 +316,7 @@ function erpNormalizeNotificationPayload(raw) {
 }
 
 async function erpShowIncomingNotification(rawPayload) {
+  await erpFlushRetryQueue();
   const payload = erpNormalizeNotificationPayload(rawPayload);
   if (!erpShouldShowNotification(payload.tag)) return;
 
@@ -176,21 +392,16 @@ async function erpMarkNotificationAsRead(data) {
   if (!notificationId) return;
 
   try {
-    await fetch('/api/notifications/mark-read', {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    await erpSendRetryEntry({
+      type: 'mark-read',
+      payload: {
         notification_id: notificationId,
-      }),
-    });
-    await erpBroadcastMessage('erp-notification-read-sync', {
-      notificationId,
+      },
     });
   } catch {
-    // ignore read-sync failures
+    await erpQueueRetryEntry('mark-read', {
+      notification_id: notificationId,
+    });
   }
 }
 
@@ -207,6 +418,8 @@ function erpUrlBase64ToUint8Array(b64) {
 
 async function erpHandlePushSubscriptionChange(event) {
   const oldEndpoint = erpNormalizeString(event?.oldSubscription?.endpoint);
+  let pendingSubscriptionPayload = null;
+  await erpFlushRetryQueue();
 
   try {
     let nextSubscription = event?.newSubscription || null;
@@ -236,44 +449,60 @@ async function erpHandlePushSubscriptionChange(event) {
     if (!payload?.endpoint || !payload.keys?.p256dh || !payload.keys?.auth) {
       throw new Error('invalid subscription payload');
     }
+    pendingSubscriptionPayload = {
+      endpoint: payload.endpoint,
+      p256dh: payload.keys.p256dh,
+      auth: payload.keys.auth,
+    };
 
-    const syncResponse = await fetch('/api/notifications/push-subscription', {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        endpoint: payload.endpoint,
-        p256dh: payload.keys.p256dh,
-        auth: payload.keys.auth,
-      }),
+    await erpSendRetryEntry({
+      type: 'push-subscription-post',
+      payload: pendingSubscriptionPayload,
     });
 
-    if (!syncResponse.ok) {
-      throw new Error(`push subscription sync failed (${syncResponse.status})`);
-    }
-
     if (oldEndpoint && oldEndpoint !== payload.endpoint) {
-      await fetch('/api/notifications/push-subscription', {
-        method: 'DELETE',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      try {
+        await erpSendRetryEntry({
+          type: 'push-subscription-delete',
+          payload: {
+            endpoint: oldEndpoint,
+          },
+        });
+      } catch {
+        await erpQueueRetryEntry('push-subscription-delete', {
           endpoint: oldEndpoint,
-        }),
-      }).catch(() => {});
+        });
+      }
     }
 
     await erpBroadcastMessage('erp-push-subscription-refresh', {
       active: true,
     });
   } catch {
+    if (pendingSubscriptionPayload) {
+      await erpQueueRetryEntry('push-subscription-post', pendingSubscriptionPayload);
+    }
+    if (
+      pendingSubscriptionPayload &&
+      oldEndpoint &&
+      oldEndpoint !== erpNormalizeString(pendingSubscriptionPayload.endpoint)
+    ) {
+      await erpQueueRetryEntry('push-subscription-delete', {
+        endpoint: oldEndpoint,
+      });
+    }
     await erpBroadcastMessage('erp-push-subscription-refresh', {
       active: false,
     });
+  }
+}
+
+async function erpHandleClientMessage(event) {
+  const message = event?.data && typeof event.data === 'object' ? event.data : null;
+  if (!message?.type) return;
+
+  if (message.type === 'erp-push-flush-retry-queue') {
+    await erpFlushRetryQueue();
   }
 }
 
@@ -292,6 +521,7 @@ async function erpHandleNotificationClick(event) {
 
   const data = event.notification.data || {};
   await erpMarkNotificationAsRead(data);
+  await erpFlushRetryQueue();
   const targetUrl = erpBuildTargetUrl(data);
   const baseUrl = self.registration.scope.replace(/\/$/, '');
   const clientList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
@@ -317,4 +547,6 @@ self.__erpPushShared = {
   showIncomingNotification: erpShowIncomingNotification,
   handleNotificationClick: erpHandleNotificationClick,
   handlePushSubscriptionChange: erpHandlePushSubscriptionChange,
+  handleClientMessage: erpHandleClientMessage,
+  flushRetryQueue: erpFlushRetryQueue,
 };

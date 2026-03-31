@@ -24,6 +24,11 @@ type PushSubscriptionRow = {
   id: string;
   staff_id: string | null;
   endpoint: string | null;
+  platform?: string | null;
+  user_agent?: string | null;
+  device_id?: string | null;
+  fcm_token?: string | null;
+  created_at?: string | null;
 };
 
 type QueueHealthRow = {
@@ -32,6 +37,18 @@ type QueueHealthRow = {
   processed_at?: string | null;
   processing_started_at?: string | null;
   attempt_count?: number | null;
+  next_attempt_at?: string | null;
+  dead_lettered_at?: string | null;
+};
+
+type PushFailureRow = {
+  id: string;
+  room_id?: string | null;
+  message_id?: string | null;
+  attempt_count?: number | null;
+  last_error?: string | null;
+  created_at?: string | null;
+  processing_started_at?: string | null;
   next_attempt_at?: string | null;
   dead_lettered_at?: string | null;
 };
@@ -332,6 +349,78 @@ function groupDuplicateEndpoints(rows: PushSubscriptionRow[]) {
   }
 
   return { duplicateGroups, duplicateRows };
+}
+
+async function loadPushSubscriptionDiagnostics(supabase: ReturnType<typeof getAdminClient>) {
+  const extendedRes = await supabase
+    .from('push_subscriptions')
+    .select('id, staff_id, endpoint, platform, user_agent, device_id, fcm_token, created_at');
+
+  if (!extendedRes.error) {
+    return (extendedRes.data || []) as PushSubscriptionRow[];
+  }
+
+  if (
+    isMissingColumnError(extendedRes.error, 'platform') ||
+    isMissingColumnError(extendedRes.error, 'user_agent') ||
+    isMissingColumnError(extendedRes.error, 'device_id') ||
+    isMissingColumnError(extendedRes.error, 'fcm_token')
+  ) {
+    const fallbackRes = await supabase
+      .from('push_subscriptions')
+      .select('id, staff_id, endpoint, created_at');
+
+    if (fallbackRes.error) {
+      throw fallbackRes.error;
+    }
+
+    return (fallbackRes.data || []) as PushSubscriptionRow[];
+  }
+
+  throw extendedRes.error;
+}
+
+async function loadRecentPushFailures(supabase: ReturnType<typeof getAdminClient>) {
+  const failureRes = await supabase
+    .from('chat_push_jobs')
+    .select('id, room_id, message_id, attempt_count, last_error, created_at, processing_started_at, next_attempt_at, dead_lettered_at')
+    .not('last_error', 'is', null)
+    .order('processing_started_at', { ascending: false })
+    .limit(8);
+
+  if (!failureRes.error) {
+    return (failureRes.data || []) as PushFailureRow[];
+  }
+
+  if (isMissingColumnError(failureRes.error, 'last_error')) {
+    return [] as PushFailureRow[];
+  }
+
+  throw failureRes.error;
+}
+
+function buildPushSubscriptionPlatformSummary(rows: PushSubscriptionRow[]) {
+  const counters = new Map<string, number>();
+  rows.forEach((row) => {
+    const platform = String(row.platform || '').trim() || 'unknown';
+    counters.set(platform, (counters.get(platform) || 0) + 1);
+  });
+
+  return Array.from(counters.entries())
+    .map(([platform, count]) => ({ platform, count }))
+    .sort((left, right) => right.count - left.count);
+}
+
+function buildPushFailureSummary(rows: PushFailureRow[]) {
+  const counters = new Map<string, number>();
+  rows.forEach((row) => {
+    const errorKey = String(row.last_error || '').trim() || 'unknown';
+    counters.set(errorKey, (counters.get(errorKey) || 0) + 1);
+  });
+
+  return Array.from(counters.entries())
+    .map(([error, count]) => ({ error, count }))
+    .sort((left, right) => right.count - left.count);
 }
 
 async function collectPushQueueHealth(supabase: ReturnType<typeof getAdminClient>) {
@@ -752,7 +841,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (scope === 'operations') {
-      const [auditRes, staffIdRes, backupRows, queueSummary, restoreRuns, dueTodoCount, repeatingTodoCount, reminderLogCount24h, wikiDocumentCount, wikiVersionCount, recentWikiVersions] = await Promise.all([
+      const [auditRes, staffIdRes, backupRows, queueSummary, restoreRuns, dueTodoCount, repeatingTodoCount, reminderLogCount24h, wikiDocumentCount, wikiVersionCount, recentWikiVersions, recentPushFailures, subscriptionRows] = await Promise.all([
         supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(400),
         supabase.from('staff_members').select('id'),
         listRecentBackups(10),
@@ -764,24 +853,46 @@ export async function GET(request: NextRequest) {
         safeHeadCount(() => supabase.from('wiki_documents').select('*', { count: 'exact', head: true }).eq('is_archived', false), 'wiki_documents'),
         safeHeadCount(() => supabase.from('wiki_document_versions').select('*', { count: 'exact', head: true }), 'wiki_document_versions'),
         safeRows(() => supabase.from('wiki_document_versions').select('id,document_id,title,version_no,created_at,change_summary').order('created_at', { ascending: false }).limit(5), 'wiki_document_versions'),
+        loadRecentPushFailures(supabase),
+        loadPushSubscriptionDiagnostics(supabase),
       ]);
 
       if (auditRes.error) return NextResponse.json({ error: auditRes.error.message }, { status: 500 });
       if (staffIdRes.error) return NextResponse.json({ error: staffIdRes.error.message }, { status: 500 });
 
       const validStaffIds = new Set((staffIdRes.data || []).map((row: { id: string | null }) => String(row.id || '')));
-      const subscriptionRes = await supabase.from('push_subscriptions').select('id, staff_id, endpoint');
-      if (subscriptionRes.error) {
-        return NextResponse.json({ error: subscriptionRes.error.message }, { status: 500 });
-      }
-
-      const subscriptionRows = (subscriptionRes.data || []) as PushSubscriptionRow[];
       const duplicateEndpointInfo = groupDuplicateEndpoints(subscriptionRows);
       const orphanSubscriptions = subscriptionRows.filter((row) => {
         const staffId = String(row.staff_id || '').trim();
         return Boolean(staffId) && !validStaffIds.has(staffId);
       }).length;
       const nullStaffSubscriptions = subscriptionRows.filter((row) => !String(row.staff_id || '').trim()).length;
+      const platformSummary = buildPushSubscriptionPlatformSummary(subscriptionRows);
+      const fcmEnabledCount = subscriptionRows.filter((row) => Boolean(String(row.fcm_token || '').trim())).length;
+      const webPushOnlyCount = subscriptionRows.filter((row) => {
+        const endpoint = String(row.endpoint || '').trim();
+        return /^https?:\/\//i.test(endpoint) && !String(row.fcm_token || '').trim();
+      }).length;
+      const placeholderEndpointCount = subscriptionRows.filter((row) =>
+        String(row.endpoint || '').trim().startsWith('fcm:')
+      ).length;
+      const recentSubscriptions = [...subscriptionRows]
+        .sort((left, right) => {
+          const leftTime = new Date(String(left.created_at || 0)).getTime();
+          const rightTime = new Date(String(right.created_at || 0)).getTime();
+          return rightTime - leftTime;
+        })
+        .slice(0, 5)
+        .map((row) => ({
+          id: row.id,
+          staff_id: row.staff_id,
+          platform: String(row.platform || '').trim() || 'unknown',
+          device_id: String(row.device_id || '').trim() || null,
+          has_fcm: Boolean(String(row.fcm_token || '').trim()),
+          created_at: row.created_at || null,
+          user_agent: String(row.user_agent || '').trim() || null,
+        }));
+      const recentFailureSummary = buildPushFailureSummary(recentPushFailures);
 
       const latestBackup = backupRows[0] || null;
       const backupAgeHours = latestBackup ? (Date.now() - new Date(latestBackup.created_at).getTime()) / (1000 * 60 * 60) : null;
@@ -848,6 +959,16 @@ export async function GET(request: NextRequest) {
           orphan: orphanSubscriptions,
           duplicateEndpointGroups: duplicateEndpointInfo.duplicateGroups,
           duplicateRows: duplicateEndpointInfo.duplicateRows,
+          fcmEnabled: fcmEnabledCount,
+          webPushOnly: webPushOnlyCount,
+          placeholderEndpoints: placeholderEndpointCount,
+          platformSummary,
+          recentSubscriptions,
+        },
+        pushFailures: {
+          total: recentPushFailures.length,
+          summary: recentFailureSummary,
+          recent: recentPushFailures,
         },
         recentBackups: backupRows,
         latestBackup,

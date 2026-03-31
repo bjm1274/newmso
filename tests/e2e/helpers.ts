@@ -186,6 +186,8 @@ export type MockFixtures = {
   surgeryTemplates?: any[];
   opCheckTemplates?: any[];
   opPatientChecks?: any[];
+  missingSurgeryTemplatesSchema?: boolean;
+  missingInventoryItemsSchema?: boolean;
   dailyClosures?: any[];
   dailyClosureItems?: any[];
   dailyChecks?: any[];
@@ -428,6 +430,8 @@ function buildFixtures(overrides: MockFixtures = {}) {
     surgeryTemplates: overrides.surgeryTemplates ?? [],
     opCheckTemplates: overrides.opCheckTemplates ?? [],
     opPatientChecks: overrides.opPatientChecks ?? [],
+    missingSurgeryTemplatesSchema: overrides.missingSurgeryTemplatesSchema ?? false,
+    missingInventoryItemsSchema: overrides.missingInventoryItemsSchema ?? false,
     dailyClosures: overrides.dailyClosures ?? [],
     dailyClosureItems: overrides.dailyClosureItems ?? [],
     dailyChecks: overrides.dailyChecks ?? [],
@@ -680,6 +684,8 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   const surgeryTemplates = [...fixtures.surgeryTemplates];
   let opCheckTemplates = [...fixtures.opCheckTemplates];
   let opPatientChecks = [...fixtures.opPatientChecks];
+  const missingSurgeryTemplatesSchema = fixtures.missingSurgeryTemplatesSchema;
+  const missingInventoryItemsSchema = fixtures.missingInventoryItemsSchema;
   let dailyClosures = [...fixtures.dailyClosures];
   let dailyClosureItems = [...fixtures.dailyClosureItems];
   let dailyChecks = [...fixtures.dailyChecks];
@@ -2146,6 +2152,19 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
     }
 
     if (path.includes('/surgery_templates')) {
+      if (method === 'GET' && missingSurgeryTemplatesSchema) {
+        return json(
+          route,
+          {
+            code: 'PGRST205',
+            details: null,
+            hint: null,
+            message: "Could not find the table 'public.surgery_templates' in the schema cache",
+          },
+          400
+        );
+      }
+
       if (method === 'GET') {
         return json(route, firstOrList(applyQueryFilters(surgeryTemplates, url), wantsObject));
       }
@@ -2804,6 +2823,19 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
 
     if (path.includes('/inventory')) {
       if (method === 'GET') {
+        if (missingInventoryItemsSchema && path.includes('/inventory_items')) {
+          return json(
+            route,
+            {
+              code: 'PGRST205',
+              details: null,
+              hint: null,
+              message: "Could not find the table 'public.inventory_items' in the schema cache",
+            },
+            400
+          );
+        }
+
         if (legacyInventoryDepartmentSchema && url.searchParams.has('department')) {
           return missingColumn(route, 'department', 'inventory');
         }

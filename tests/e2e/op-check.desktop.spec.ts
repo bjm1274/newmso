@@ -24,7 +24,7 @@ const extraFeaturesUser = {
   ...fakeUser,
   permissions: {
     ...fakeUser.permissions,
-    extra_OP체크: true,
+    extra_OP泥댄겕: true,
   },
 };
 
@@ -35,7 +35,7 @@ const msoExtraFeaturesUser = {
   permissions: {
     ...fakeUser.permissions,
     mso: true,
-    extra_OP체크: true,
+    extra_OP泥댄겕: true,
   },
 };
 
@@ -57,12 +57,13 @@ async function prepareExtraFeature(
   await seedSession(page, {
     user: options?.user ?? extraFeaturesUser,
     localStorage: {
-      erp_last_menu: '추가기능',
       ...(options?.localStorage || {}),
     },
   });
 
-  await page.goto(`/main?open_menu=${encodeURIComponent('추가기능')}`);
+  await page.goto('/main');
+  await expect(page.getByTestId('main-shell')).toBeVisible();
+  await page.getByTestId('sidebar-menu-extra').click();
   await expect(page.getByTestId('extra-view')).toBeVisible();
   await page.getByTestId('extra-card-op-check').click();
   await expect(page.getByTestId('op-check-view')).toBeVisible();
@@ -72,9 +73,7 @@ test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
 });
 
-test('op check links surgery schedules, applies surgery/anesthesia templates, and saves patient record', async ({
-  page,
-}) => {
+test('op check links schedules, applies templates, and saves a patient record', async ({ page }) => {
   const runtimeErrors = trackRuntimeErrors(page);
   const todayKey = getTodayKey();
 
@@ -83,12 +82,12 @@ test('op check links surgery schedules, applies surgery/anesthesia templates, an
       {
         id: 'schedule-post-1',
         board_type: '수술일정',
-        title: '무릎 관절경',
+        title: 'Knee Scope',
         content: 'CH-001',
-        patient_name: '김수술',
+        patient_name: 'Patient Alpha',
         schedule_date: todayKey,
         schedule_time: '09:00',
-        schedule_room: '3번방',
+        schedule_room: 'Room 3',
         company: extraFeaturesUser.company,
         company_id: extraFeaturesUser.company_id,
         surgery_fasting: true,
@@ -97,7 +96,7 @@ test('op check links surgery schedules, applies surgery/anesthesia templates, an
     surgeryTemplates: [
       {
         id: 'surgery-template-knee',
-        name: '무릎 관절경',
+        name: 'Knee Scope',
         is_active: true,
         sort_order: 1,
       },
@@ -106,11 +105,11 @@ test('op check links surgery schedules, applies surgery/anesthesia templates, an
       {
         id: 'op-template-surgery-knee',
         template_scope: 'surgery',
-        template_name: '무릎 관절경 기본 준비',
+        template_name: 'Knee Prep',
         surgery_template_id: 'surgery-template-knee',
-        surgery_name: '무릎 관절경',
-        prep_items: [{ id: 'prep-1', name: '무릎 세트' }],
-        consumable_items: [{ id: 'consumable-1', name: '흡수성 봉합사', quantity: '1', unit: 'EA' }],
+        surgery_name: 'Knee Scope',
+        prep_items: [{ id: 'prep-1', name: 'Knee set' }],
+        consumable_items: [{ id: 'consumable-1', name: 'Screw set', quantity: '1', unit: 'EA' }],
         company_name: extraFeaturesUser.company,
         company_id: extraFeaturesUser.company_id,
         is_active: true,
@@ -118,10 +117,10 @@ test('op check links surgery schedules, applies surgery/anesthesia templates, an
       {
         id: 'op-template-anesthesia-general',
         template_scope: 'anesthesia',
-        template_name: '전신마취 기본 준비',
-        anesthesia_type: '전신마취',
-        prep_items: [{ id: 'prep-2', name: '기관내 삽관 세트' }],
-        consumable_items: [{ id: 'consumable-2', name: '프로포폴', quantity: '1', unit: '앰플' }],
+        template_name: 'General Prep',
+        anesthesia_type: 'General',
+        prep_items: [{ id: 'prep-2', name: 'Airway kit' }],
+        consumable_items: [{ id: 'consumable-2', name: 'Propofol', quantity: '1', unit: 'amp' }],
         company_name: extraFeaturesUser.company,
         company_id: extraFeaturesUser.company_id,
         is_active: true,
@@ -130,17 +129,17 @@ test('op check links surgery schedules, applies surgery/anesthesia templates, an
     inventoryItems: [
       {
         id: 'inventory-1',
-        name: '무릎 세트',
+        name: 'Knee set',
         quantity: 4,
-        unit: '세트',
+        unit: 'set',
         company: extraFeaturesUser.company,
         company_id: extraFeaturesUser.company_id,
       },
       {
         id: 'inventory-2',
-        name: '프로포폴',
+        name: 'Propofol',
         quantity: 12,
-        unit: '앰플',
+        unit: 'amp',
         company: extraFeaturesUser.company,
         company_id: extraFeaturesUser.company_id,
       },
@@ -148,18 +147,51 @@ test('op check links surgery schedules, applies surgery/anesthesia templates, an
   });
 
   await page.getByTestId('op-check-schedule-card-schedule-post-1').click();
-  await expect(page.getByRole('heading', { name: '김수술' })).toBeVisible();
-  await expect(page.locator('input[value="무릎 세트"]').first()).toBeVisible();
-  await expect(page.locator('input[value="흡수성 봉합사"]').first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Patient Alpha' })).toBeVisible();
+  await expect(page.locator('input[value="Knee set"]').first()).toBeVisible();
+  await expect(page.locator('input[value="Screw set"]').first()).toBeVisible();
 
-  await page.getByTestId('op-check-anesthesia-select').fill('전신마취');
+  await page.getByTestId('op-check-anesthesia-select').fill('General');
   await page.getByTestId('op-check-apply-template').click();
 
-  await expect(page.locator('input[value="기관내 삽관 세트"]').first()).toBeVisible();
-  await expect(page.locator('input[value="프로포폴"]').first()).toBeVisible();
+  await expect(page.locator('input[value="Airway kit"]').first()).toBeVisible();
+  await expect(page.locator('input[value="Propofol"]').first()).toBeVisible();
 
   await page.getByTestId('op-check-record-save').click();
-  await expect(page.getByText('저장됨 · 준비중')).toBeVisible();
+  await expect(page.getByTestId('op-check-schedule-card-schedule-post-1')).toContainText('저장됨 · 준비중');
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('op check stays available when optional surgery template and inventory sources are missing', async ({
+  page,
+}) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const todayKey = getTodayKey();
+
+  await prepareExtraFeature(page, {
+    boardPosts: [
+      {
+        id: 'schedule-post-optional-fallback',
+        board_type: '수술일정',
+        title: 'Fallback Surgery',
+        content: 'CH-404',
+        patient_name: 'Fallback Patient',
+        schedule_date: todayKey,
+        schedule_time: '10:30',
+        schedule_room: 'Room 1',
+        company: extraFeaturesUser.company,
+        company_id: extraFeaturesUser.company_id,
+      },
+    ],
+    missingSurgeryTemplatesSchema: true,
+    missingInventoryItemsSchema: true,
+  });
+
+  await expect(page.getByTestId('op-check-calendar-day-' + todayKey)).toContainText('Fallback Patient');
+  await expect(page.getByTestId('op-check-schedule-card-schedule-post-optional-fallback')).toBeVisible();
+  await page.getByTestId('op-check-schedule-card-schedule-post-optional-fallback').click();
+  await expect(page.getByRole('heading', { name: 'Fallback Patient' })).toBeVisible();
 
   expect(runtimeErrors).toEqual([]);
 });
@@ -168,7 +200,7 @@ test('op check follows the selected company scope for MSO users', async ({ page 
   const runtimeErrors = trackRuntimeErrors(page);
   const todayKey = getTodayKey();
   const targetCompanyId = 'target-hospital-company-id';
-  const targetCompanyName = '연동테스트병원';
+  const targetCompanyName = 'Linked Hospital';
 
   await prepareExtraFeature(
     page,
@@ -177,12 +209,12 @@ test('op check follows the selected company scope for MSO users', async ({ page 
         {
           id: 'schedule-post-selected-company',
           board_type: '수술일정',
-          title: '연동 확인 수술',
+          title: 'Scoped Surgery',
           content: 'CH-777',
-          patient_name: '연동환자',
+          patient_name: 'Scoped Patient',
           schedule_date: todayKey,
           schedule_time: '08:30',
-          schedule_room: '2번방',
+          schedule_room: 'Room 2',
           company: targetCompanyName,
           company_id: targetCompanyId,
         },
@@ -211,9 +243,9 @@ test('op check follows the selected company scope for MSO users', async ({ page 
     }
   );
 
-  await expect(page.getByTestId('op-check-calendar-day-' + todayKey)).toContainText('연동환자');
+  await expect(page.getByTestId('op-check-calendar-day-' + todayKey)).toContainText('Scoped Patient');
   await expect(page.getByTestId('op-check-schedule-card-schedule-post-selected-company')).toBeVisible();
-  await expect(page.getByText('연동환자')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Scoped Patient' })).toBeVisible();
 
   expect(runtimeErrors).toEqual([]);
 });

@@ -3,7 +3,11 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
-import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/supabase-compat';
+import {
+  isMissingColumnError,
+  withMissingColumnFallback,
+  withMissingColumnsFallback,
+} from '@/lib/supabase-compat';
 import type { BoardPost, InventoryItem, OpCheckItem, OpCheckTemplate, OpPatientCheck } from '@/types';
 
 const SCHEDULE_META_PREFIX = '[[SCHEDULE_META]]';
@@ -78,6 +82,11 @@ type PatientCheckState = {
   notes: string;
   status: string;
   applied_template_ids: string[];
+};
+
+type QueryResult<T> = {
+  data: T | null;
+  error: unknown;
 };
 
 function createLocalId(prefix: string) {
@@ -326,6 +335,57 @@ function isOpCheckSchemaMissing(error: unknown) {
   return code === '42P01' || message.includes('op_check_templates') || message.includes('op_patient_checks');
 }
 
+function isMissingRelationError(error: unknown, relationNames: string[]) {
+  if (!error || typeof error !== 'object') return false;
+  const code = String((error as { code?: string }).code || '');
+  const message = String(
+    (error as { message?: string; details?: string }).message ||
+      (error as { details?: string }).details ||
+      ''
+  ).toLowerCase();
+
+  return (
+    code === '42P01' ||
+    code === 'PGRST205' ||
+    relationNames.some((relationName) => {
+      const target = relationName.toLowerCase();
+      return message.includes(target) || message.includes(`public.${target}`);
+    })
+  );
+}
+
+async function withOptionalQueryFallback<T>(
+  execute: () => PromiseLike<QueryResult<T>>,
+  options: {
+    fallbackData: T;
+    relationNames?: string[];
+    columnNames?: string[];
+  }
+): Promise<QueryResult<T>> {
+  const result = await execute();
+  if (!result.error) return result;
+
+  const relationNames = options.relationNames || [];
+  const columnNames = options.columnNames || [];
+  const missingRelation = relationNames.length > 0 && isMissingRelationError(result.error, relationNames);
+  const missingColumn = columnNames.some((columnName) => isMissingColumnError(result.error, columnName));
+
+  if (!missingRelation && !missingColumn) {
+    return result;
+  }
+
+  console.warn('OP체크 선택 데이터 조회를 건너뜁니다.', {
+    relationNames,
+    columnNames,
+    error: result.error,
+  });
+
+  return {
+    data: options.fallbackData,
+    error: null,
+  };
+}
+
 export default function OperationCheckView({
   user,
   selectedCo,
@@ -361,12 +421,6 @@ export default function OperationCheckView({
     setSchemaError('');
 
     try {
-      const surgeryTemplateQuery = supabase
-        .from('surgery_templates')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true });
-
       const [scheduleRes, templateRes, patientCheckRes, surgeryTemplateRes, inventoryRes] = await Promise.all([
         withMissingColumnFallback(
           async () => {
@@ -416,18 +470,49 @@ export default function OperationCheckView({
               .order('schedule_time', { ascending: true });
           },
         ),
-        surgeryTemplateQuery,
-        withMissingColumnsFallback(
-          async (omittedColumns) => {
-            const selectedColumns = ['id', 'name', 'unit', 'quantity', 'company', 'company_id', 'department']
-              .filter((columnName) => !omittedColumns.has(columnName))
-              .join(', ');
-            return supabase
-              .from('inventory_items')
-              .select(selectedColumns)
-              .order('name', { ascending: true });
+        withOptionalQueryFallback(
+          async () =>
+            withMissingColumnsFallback(
+              async (omittedColumns) => {
+                const selectedColumns = ['id', 'name', 'sort_order', 'is_active']
+                  .filter((columnName) => !omittedColumns.has(columnName))
+                  .join(', ');
+                let query = supabase.from('surgery_templates').select(selectedColumns);
+                if (!omittedColumns.has('is_active')) {
+                  query = query.eq('is_active', true);
+                }
+                if (!omittedColumns.has('sort_order')) {
+                  query = query.order('sort_order', { ascending: true });
+                }
+                return query.order('name', { ascending: true });
+              },
+              ['sort_order', 'is_active'],
+            ),
+          {
+            fallbackData: [] as SurgeryTemplateRow[],
+            relationNames: ['surgery_templates'],
+            columnNames: ['sort_order', 'is_active'],
           },
-          ['company_id', 'department'],
+        ),
+        withOptionalQueryFallback(
+          async () =>
+            withMissingColumnsFallback(
+              async (omittedColumns) => {
+                const selectedColumns = ['id', 'name', 'unit', 'quantity', 'company', 'company_id', 'department']
+                  .filter((columnName) => !omittedColumns.has(columnName))
+                  .join(', ');
+                return supabase
+                  .from('inventory_items')
+                  .select(selectedColumns)
+                  .order('name', { ascending: true });
+              },
+              ['unit', 'quantity', 'company', 'company_id', 'department'],
+            ),
+          {
+            fallbackData: [] as InventoryItem[],
+            relationNames: ['inventory_items', 'inventory'],
+            columnNames: ['unit', 'quantity', 'company', 'company_id', 'department'],
+          },
         ),
       ]);
 
