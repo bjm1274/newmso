@@ -416,6 +416,12 @@ export default function OperationCheckView({
   const [checkForm, setCheckForm] = useState<PatientCheckState | null>(null);
   const [templateEditor, setTemplateEditor] = useState<TemplateEditorState>(emptyTemplateEditor);
 
+  const [showWardMsgModal, setShowWardMsgModal] = useState(false);
+  const [wardMsgText, setWardMsgText] = useState('');
+  const [wardMsgTargets, setWardMsgTargets] = useState<string[]>([]);
+  const [wardStaffs, setWardStaffs] = useState<{ id: string; name: string; department?: string | null; position?: string | null }[]>([]);
+  const [sendingMsg, setSendingMsg] = useState(false);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setSchemaError('');
@@ -997,6 +1003,126 @@ export default function OperationCheckView({
     setActiveTab('templates');
   }, []);
 
+  const quickStatusChange = useCallback(async (newStatus: string) => {
+    if (!checkForm || !selectedSchedule) return;
+    setSavingCheck(true);
+    try {
+      const payload = {
+        schedule_post_id: checkForm.schedule_post_id,
+        company_id: String(selectedSchedule.company_id || user?.company_id || '').trim() || null,
+        company_name: String(selectedSchedule.company || user?.company || '전체').trim() || '전체',
+        patient_name: checkForm.patient_name,
+        chart_no: checkForm.chart_no || null,
+        surgery_name: checkForm.surgery_name,
+        surgery_template_id: checkForm.surgery_template_id || null,
+        anesthesia_type: checkForm.anesthesia_type || null,
+        schedule_date: checkForm.schedule_date || null,
+        schedule_time: checkForm.schedule_time || null,
+        schedule_room: checkForm.schedule_room || null,
+        prep_items: formatChecklistItems(checkForm.prep_items),
+        consumable_items: formatChecklistItems(checkForm.consumable_items),
+        notes: checkForm.notes || null,
+        status: newStatus,
+        applied_template_ids: checkForm.applied_template_ids,
+        created_by: String(user?.id || '').trim() || null,
+        created_by_name: String(user?.name || '').trim() || null,
+        updated_by: String(user?.id || '').trim() || null,
+        updated_by_name: String(user?.name || '').trim() || null,
+        updated_at: new Date().toISOString(),
+      };
+      const { data, error } = await supabase
+        .from('op_patient_checks')
+        .upsert(payload, { onConflict: 'schedule_post_id' })
+        .select('*')
+        .single();
+      if (error) throw error;
+      const nextRow = data as OpPatientCheck;
+      setPatientChecks((prev) => {
+        const filtered = prev.filter((r) => String(r.schedule_post_id || '') !== checkForm.schedule_post_id);
+        return [nextRow, ...filtered];
+      });
+      setCheckForm(buildDefaultPatientCheck(selectedSchedule, nextRow));
+      toast(`상태가 "${newStatus}"(으)로 변경되었습니다.`, 'success');
+    } catch (err) {
+      console.error('상태 변경 실패', err);
+      toast('상태 변경 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setSavingCheck(false);
+    }
+  }, [buildDefaultPatientCheck, checkForm, selectedSchedule, user?.company, user?.company_id, user?.id, user?.name]);
+
+  const openWardMsgModal = useCallback(async () => {
+    if (!checkForm || !selectedSchedule) return;
+    const defaultMsg = `[수술실 메시지] ${checkForm.patient_name} 환자${checkForm.chart_no ? ` (차트: ${checkForm.chart_no})` : ''} ${checkForm.surgery_name} 수술 준비가 완료되었습니다.\n환자 처치 후 수술실로 올려주세요.\n수술실: ${checkForm.schedule_room || '미정'} / 수술 시간: ${checkForm.schedule_time || '미정'}`;
+    setWardMsgText(defaultMsg);
+    setWardMsgTargets([]);
+    try {
+      const companyId = String(selectedSchedule.company_id || user?.company_id || '').trim();
+      const { data } = companyId
+        ? await supabase.from('staff_members').select('id, name, department, position').eq('company_id', companyId).order('name')
+        : await supabase.from('staff_members').select('id, name, department, position').order('name');
+      setWardStaffs((data || []) as { id: string; name: string; department?: string | null; position?: string | null }[]);
+    } catch (e) {
+      console.error('직원 목록 로딩 실패', e);
+    }
+    setShowWardMsgModal(true);
+  }, [checkForm, selectedSchedule, user?.company_id]);
+
+  const sendWardMessage = useCallback(async () => {
+    if (!wardMsgTargets.length || !wardMsgText.trim()) {
+      toast('받는 사람과 메시지 내용을 입력해 주세요.', 'warning');
+      return;
+    }
+    const senderId = String(user?.id || '').trim();
+    if (!senderId) {
+      toast('로그인 정보를 확인해 주세요.', 'error');
+      return;
+    }
+    setSendingMsg(true);
+    try {
+      const { data: myRooms } = await supabase
+        .from('chat_rooms')
+        .select('id, member_ids')
+        .eq('type', 'direct')
+        .contains('member_ids', [senderId]);
+
+      const existingRoomMap = new Map<string, string>(
+        (myRooms || [])
+          .filter((r) => Array.isArray(r.member_ids))
+          .flatMap((r) =>
+            (r.member_ids as string[])
+              .filter((mid) => mid !== senderId)
+              .map((mid) => [mid, r.id as string] as [string, string])
+          )
+      );
+
+      let successCount = 0;
+      for (const targetId of wardMsgTargets) {
+        let roomId = existingRoomMap.get(targetId);
+        if (!roomId) {
+          const { data: newRoom, error: roomErr } = await supabase
+            .from('chat_rooms')
+            .insert({ type: 'direct', member_ids: [senderId, targetId], company_id: String(user?.company_id || '').trim() || null })
+            .select('id')
+            .single();
+          if (roomErr) { console.error('채팅방 생성 실패', roomErr); continue; }
+          roomId = String(newRoom?.id || '');
+        }
+        if (roomId) {
+          const { error: msgErr } = await supabase.from('messages').insert({ room_id: roomId, sender_id: senderId, content: wardMsgText });
+          if (!msgErr) successCount++;
+        }
+      }
+      toast(`병동팀 ${successCount}명에게 메시지를 보냈습니다.`, 'success');
+      setShowWardMsgModal(false);
+    } catch (err) {
+      console.error('메시지 전송 실패', err);
+      toast('메시지 전송 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setSendingMsg(false);
+    }
+  }, [wardMsgTargets, wardMsgText, user?.id, user?.company_id]);
+
   const removeTemplate = useCallback(async (templateId: string) => {
     if (typeof window !== 'undefined' && !window.confirm('이 템플릿을 삭제하시겠습니까?')) return;
     try {
@@ -1522,6 +1648,105 @@ export default function OperationCheckView({
               </div>
             ) : (
               <>
+                {/* 수술 진행 상황 표시 */}
+                <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+                  <p className="mb-3 text-[11px] font-semibold text-[var(--toss-gray-3)]">수술 진행 상황</p>
+                  <div className="flex items-center gap-0">
+                    {(['준비중', '준비완료', '수술중', '완료'] as const).map((step, idx) => {
+                      const stepIdx = ['준비중', '준비완료', '수술중', '완료'].indexOf(checkForm?.status || '준비중');
+                      const currentIdx = idx;
+                      const isPast = currentIdx < stepIdx;
+                      const isCurrent = currentIdx === stepIdx;
+                      return (
+                        <div key={step} className="flex flex-1 items-center">
+                          <div className="flex flex-1 flex-col items-center gap-1">
+                            <div
+                              className={`flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold transition-colors ${
+                                isCurrent
+                                  ? 'bg-[var(--accent)] text-white shadow-sm'
+                                  : isPast
+                                    ? 'bg-emerald-500 text-white'
+                                    : 'bg-[var(--muted)] text-[var(--toss-gray-3)]'
+                              }`}
+                            >
+                              {isPast ? '✓' : idx + 1}
+                            </div>
+                            <span className={`text-[10px] font-bold ${isCurrent ? 'text-[var(--accent)]' : isPast ? 'text-emerald-600' : 'text-[var(--toss-gray-3)]'}`}>
+                              {step}
+                            </span>
+                          </div>
+                          {idx < 3 && (
+                            <div className={`h-0.5 flex-1 transition-colors ${isPast || isCurrent ? 'bg-[var(--accent)]/40' : 'bg-[var(--border)]'}`} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* 상태별 액션 버튼 */}
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {checkForm?.status === '준비중' && (
+                      <button
+                        type="button"
+                        onClick={() => void quickStatusChange('준비완료')}
+                        disabled={savingCheck}
+                        className="rounded-[var(--radius-md)] bg-emerald-500 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 disabled:opacity-60"
+                      >
+                        준비 완료 처리
+                      </button>
+                    )}
+                    {(checkForm?.status === '준비완료') && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void openWardMsgModal()}
+                          className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white hover:opacity-90"
+                        >
+                          병동팀 메시지 보내기
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void quickStatusChange('수술중')}
+                          disabled={savingCheck}
+                          className="rounded-[var(--radius-md)] bg-orange-500 px-4 py-2 text-sm font-bold text-white hover:bg-orange-600 disabled:opacity-60"
+                        >
+                          환자 인계완료 (수술 시작)
+                        </button>
+                      </>
+                    )}
+                    {checkForm?.status === '수술중' && (
+                      <>
+                        <span className="flex items-center gap-2 rounded-[var(--radius-md)] bg-orange-50 px-4 py-2 text-sm font-bold text-orange-700">
+                          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-orange-500" />
+                          수술 진행 중
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => void quickStatusChange('완료')}
+                          disabled={savingCheck}
+                          className="rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] disabled:opacity-60"
+                        >
+                          수술 완료 처리
+                        </button>
+                      </>
+                    )}
+                    {checkForm?.status === '완료' && (
+                      <span className="flex items-center gap-2 rounded-[var(--radius-md)] bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700">
+                        ✓ 수술 완료
+                      </span>
+                    )}
+                    {checkForm?.status === '준비중' && (
+                      <button
+                        type="button"
+                        onClick={() => void openWardMsgModal()}
+                        className="rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                      >
+                        병동팀 메시지 보내기
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
                   <div className="grid gap-4 lg:grid-cols-[1.2fr,0.8fr]">
                     <div>
@@ -1651,10 +1876,21 @@ export default function OperationCheckView({
                   )}
                 </div>
 
-                <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+                <div className={`rounded-[var(--radius-xl)] border p-4 shadow-sm transition-colors ${
+                  checkForm?.status === '수술중'
+                    ? 'border-orange-300 bg-orange-50/50 dark:bg-orange-900/10'
+                    : 'border-[var(--border)] bg-[var(--card)]'
+                }`}>
                   <div className="mb-3 flex items-center justify-between">
                     <div>
-                      <h4 className="text-base font-bold text-[var(--foreground)]">수술 중 의료소모품 사용 체크</h4>
+                      <h4 className={`text-base font-bold ${checkForm?.status === '수술중' ? 'text-orange-700' : 'text-[var(--foreground)]'}`}>
+                        수술 중 의료소모품 사용 체크
+                        {checkForm?.status === '수술중' && (
+                          <span className="ml-2 inline-block animate-pulse rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                            실시간 입력
+                          </span>
+                        )}
+                      </h4>
                       <p className="text-[12px] font-medium text-[var(--toss-gray-3)]">
                         실제 사용한 소모품을 체크하고 수량과 메모를 남겨 관리합니다.
                       </p>
@@ -1973,6 +2209,120 @@ export default function OperationCheckView({
               </div>
             </div>
           </aside>
+        </div>
+      )}
+
+      {/* 병동팀 메시지 모달 */}
+      {showWardMsgModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowWardMsgModal(false); }}>
+          <div className="w-full max-w-lg rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-lg">
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
+              <div>
+                <h3 className="text-base font-bold text-[var(--foreground)]">병동팀 메시지 보내기</h3>
+                <p className="mt-0.5 text-[12px] font-medium text-[var(--toss-gray-3)]">
+                  환자를 수술실로 올려달라고 병동팀에게 메시지를 보냅니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowWardMsgModal(false)}
+                className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+              >
+                닫기
+              </button>
+            </div>
+
+            <div className="space-y-4 p-5">
+              {/* 받는 사람 선택 */}
+              <div>
+                <p className="mb-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                  받는 사람 선택 ({wardMsgTargets.length}명 선택됨)
+                </p>
+                <div className="max-h-44 overflow-y-auto custom-scrollbar rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/30 p-2 space-y-1">
+                  {wardStaffs.length === 0 ? (
+                    <p className="py-4 text-center text-[11px] font-medium text-[var(--toss-gray-3)]">직원 목록이 없습니다.</p>
+                  ) : (
+                    wardStaffs.map((staff) => {
+                      const checked = wardMsgTargets.includes(staff.id);
+                      return (
+                        <label
+                          key={staff.id}
+                          className={`flex cursor-pointer items-center gap-2.5 rounded-[var(--radius-md)] px-3 py-2 transition-colors ${
+                            checked ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]' : 'hover:bg-[var(--muted)]'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              setWardMsgTargets((prev) =>
+                                e.target.checked ? [...prev, staff.id] : prev.filter((id) => id !== staff.id)
+                              );
+                            }}
+                            className="h-4 w-4 rounded border-[var(--border)] text-[var(--accent)]"
+                          />
+                          <span className="flex-1 text-sm font-semibold">{staff.name}</span>
+                          {staff.department && (
+                            <span className="rounded-full bg-[var(--muted)] px-2 py-0.5 text-[10px] font-medium text-[var(--toss-gray-3)]">
+                              {staff.department}
+                            </span>
+                          )}
+                          {staff.position && (
+                            <span className="text-[11px] font-medium text-[var(--toss-gray-4)]">{staff.position}</span>
+                          )}
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setWardMsgTargets(wardStaffs.map((s) => s.id))}
+                    className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                  >
+                    전체 선택
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWardMsgTargets([])}
+                    className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                  >
+                    전체 해제
+                  </button>
+                </div>
+              </div>
+
+              {/* 메시지 내용 */}
+              <div>
+                <p className="mb-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">메시지 내용</p>
+                <textarea
+                  value={wardMsgText}
+                  onChange={(e) => setWardMsgText(e.target.value)}
+                  className="min-h-[120px] w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-medium"
+                  placeholder="전송할 메시지를 입력해 주세요."
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowWardMsgModal(false)}
+                  className="rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void sendWardMessage()}
+                  disabled={sendingMsg || wardMsgTargets.length === 0}
+                  className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+                >
+                  {sendingMsg ? '전송 중...' : `메시지 보내기 (${wardMsgTargets.length}명)`}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
