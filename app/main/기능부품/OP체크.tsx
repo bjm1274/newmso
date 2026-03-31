@@ -265,6 +265,21 @@ function formatDateLabel(dateText: string) {
   }
 }
 
+function compareSchedules(left: LinkedSchedulePost, right: LinkedSchedulePost) {
+  const leftDateTime = `${left.schedule_date || '9999-12-31'}T${left.schedule_time || '23:59'}`;
+  const rightDateTime = `${right.schedule_date || '9999-12-31'}T${right.schedule_time || '23:59'}`;
+  const dateDiff = leftDateTime.localeCompare(rightDateTime);
+  if (dateDiff !== 0) return dateDiff;
+  return String(left.patient_name || '').localeCompare(String(right.patient_name || ''), 'ko');
+}
+
+function findPreferredScheduleDate(posts: LinkedSchedulePost[]) {
+  if (posts.length === 0) return '';
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const upcoming = posts.find((post) => post.schedule_date && post.schedule_date >= todayKey);
+  return upcoming?.schedule_date || posts[0]?.schedule_date || '';
+}
+
 function emptyTemplateEditor(): TemplateEditorState {
   return {
     id: null,
@@ -329,6 +344,7 @@ export default function OperationCheckView({
   const [patientChecks, setPatientChecks] = useState<OpPatientCheck[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
 
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [searchTerm, setSearchTerm] = useState('');
   const deferredSearchTerm = useDeferredValue(searchTerm);
@@ -357,8 +373,6 @@ export default function OperationCheckView({
               .from('board_posts')
               .select('*')
               .eq('board_type', '수술일정')
-              .order('schedule_date', { ascending: true })
-              .order('schedule_time', { ascending: true })
               .order('created_at', { ascending: true });
             if (companyId) {
               query = query.eq('company_id', companyId);
@@ -372,8 +386,6 @@ export default function OperationCheckView({
               .from('board_posts')
               .select('*')
               .eq('board_type', '수술일정')
-              .order('schedule_date', { ascending: true })
-              .order('schedule_time', { ascending: true })
               .order('created_at', { ascending: true });
             if (companyName) {
               query = query.eq('company', companyName);
@@ -474,6 +486,7 @@ export default function OperationCheckView({
       const normalizedSchedules = ((scheduleRes.data || []) as BoardPost[])
         .map(mapSchedulePost)
         .filter((post) => post.id && post.patient_name && post.surgery_name);
+      normalizedSchedules.sort(compareSchedules);
 
       setSchedulePosts(normalizedSchedules);
       setOpTemplates((templateRes.data || []) as OpCheckTemplate[]);
@@ -514,10 +527,61 @@ export default function OperationCheckView({
     });
   }, [deferredSearchTerm, schedulePosts, selectedDate]);
 
+  const scheduleCalendarData = useMemo(() => {
+    const toKey = (date: Date) =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+    const search = normalizeLookupValue(deferredSearchTerm);
+    const filteredPosts = search
+      ? schedulePosts.filter((post) =>
+          [post.patient_name, post.surgery_name, post.chart_no, post.schedule_room].some((value) =>
+            normalizeLookupValue(value).includes(search)
+          )
+        )
+      : schedulePosts;
+
+    const eventsByDate: Record<string, LinkedSchedulePost[]> = {};
+    filteredPosts.forEach((post) => {
+      if (!post.schedule_date) return;
+      if (!eventsByDate[post.schedule_date]) {
+        eventsByDate[post.schedule_date] = [];
+      }
+      eventsByDate[post.schedule_date].push(post);
+    });
+
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    const firstOfMonth = new Date(year, month, 1);
+    const startDay = firstOfMonth.getDay();
+    const startDate = new Date(year, month, 1 - startDay);
+    const days = Array.from({ length: 42 }, (_, index) => (
+      new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + index)
+    ));
+
+    return {
+      filteredPosts,
+      eventsByDate,
+      days,
+      month,
+      toKey,
+    };
+  }, [calendarMonth, deferredSearchTerm, schedulePosts]);
+
   useEffect(() => {
-    if (selectedScheduleId && schedulePosts.some((post) => post.id === selectedScheduleId)) return;
-    setSelectedScheduleId(schedulePosts[0]?.id || null);
-  }, [schedulePosts, selectedScheduleId]);
+    if (schedulePosts.length === 0) return;
+    if (selectedDate && schedulePosts.some((post) => post.schedule_date === selectedDate)) return;
+
+    const preferredDate = findPreferredScheduleDate(schedulePosts);
+    if (!preferredDate) return;
+
+    setSelectedDate(preferredDate);
+    setCalendarMonth(new Date(`${preferredDate}T00:00:00`));
+  }, [schedulePosts, selectedDate]);
+
+  useEffect(() => {
+    if (selectedScheduleId && filteredSchedules.some((post) => post.id === selectedScheduleId)) return;
+    setSelectedScheduleId(filteredSchedules[0]?.id || null);
+  }, [filteredSchedules, selectedScheduleId]);
 
   const selectedSchedule = useMemo(
     () => schedulePosts.find((post) => post.id === selectedScheduleId) || null,
@@ -1162,15 +1226,7 @@ export default function OperationCheckView({
           <aside className="space-y-3">
             <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
               <div className="grid gap-2">
-                <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">수술일</label>
-                <input
-                  data-testid="op-check-date-filter"
-                  type="date"
-                  value={selectedDate}
-                  onChange={(event) => setSelectedDate(event.target.value)}
-                  className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-medium"
-                />
-                <label className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">환자/수술 검색</label>
+                <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">환자/수술 검색</label>
                 <input
                   data-testid="op-check-search"
                   value={searchTerm}
@@ -1181,9 +1237,155 @@ export default function OperationCheckView({
               </div>
             </div>
 
+            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">수술일정 달력</p>
+                    <h3 className="mt-1 text-lg font-bold text-[var(--foreground)]">
+                      {calendarMonth.getFullYear()}년 {calendarMonth.getMonth() + 1}월
+                    </h3>
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))
+                      }
+                      className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                    >
+                      이전
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const today = new Date();
+                        const todayKey = today.toISOString().slice(0, 10);
+                        setCalendarMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+                        setSelectedDate(todayKey);
+                        const firstTodayEvent = scheduleCalendarData.eventsByDate[todayKey]?.[0];
+                        if (firstTodayEvent) {
+                          setSelectedScheduleId(firstTodayEvent.id);
+                        }
+                      }}
+                      className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                    >
+                      오늘
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))
+                      }
+                      className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                    >
+                      다음
+                    </button>
+                  </div>
+                </div>
+
+                <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)]">
+                  <div className="grid grid-cols-7 bg-[var(--muted)] text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                    {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
+                      <div key={day} className="px-1 py-2 text-center">
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-7 bg-[var(--card)] text-[10px]">
+                    {scheduleCalendarData.days.map((day, index) => {
+                      const key = scheduleCalendarData.toKey(day);
+                      const inMonth = day.getMonth() === scheduleCalendarData.month;
+                      const events = scheduleCalendarData.eventsByDate[key] || [];
+                      const isSelectedDay = key === selectedDate;
+
+                      return (
+                        <button
+                          key={`${key}-${index}`}
+                          type="button"
+                          data-testid={`op-check-calendar-day-${key}`}
+                          onClick={() => {
+                            setSelectedDate(key);
+                            setCalendarMonth(new Date(day.getFullYear(), day.getMonth(), 1));
+                            if (events[0]) {
+                              setSelectedScheduleId(events[0].id);
+                            }
+                          }}
+                          className={`min-h-[92px] border border-[var(--border)] p-1.5 text-left align-top transition-colors ${
+                            isSelectedDay
+                              ? 'bg-[var(--toss-blue-light)]/60'
+                              : inMonth
+                                ? 'bg-[var(--card)] hover:bg-[var(--muted)]/35'
+                                : 'bg-[var(--tab-bg)] hover:bg-[var(--muted)]/35'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span
+                              className={`text-[10px] font-bold ${
+                                !inMonth
+                                  ? 'text-[var(--toss-gray-3)]'
+                                  : day.getDay() === 0
+                                    ? 'text-red-500'
+                                    : day.getDay() === 6
+                                      ? 'text-[var(--accent)]'
+                                      : 'text-[var(--foreground)]'
+                              }`}
+                            >
+                              {day.getDate()}
+                            </span>
+                            {events.length > 0 ? (
+                              <span className="rounded-full bg-[var(--accent)]/10 px-1.5 py-0.5 text-[9px] font-bold text-[var(--accent)]">
+                                {events.length}
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="mt-1 space-y-1">
+                            {events.slice(0, 2).map((event) => (
+                              <div
+                                key={event.id}
+                                className="rounded-md bg-[var(--toss-blue-light)]/50 px-1.5 py-1 text-[9px] font-bold leading-tight text-[var(--foreground)]"
+                              >
+                                <div className="truncate text-[var(--accent)]">{event.schedule_time || '시간 미정'}</div>
+                                <div className="truncate">{event.patient_name}</div>
+                              </div>
+                            ))}
+                            {events.length > 2 ? (
+                              <p className="text-center text-[9px] font-bold text-[var(--toss-gray-3)]">
+                                + {events.length - 2}건
+                              </p>
+                            ) : null}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/35 px-3 py-2">
+                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">선택된 수술일</p>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <p className="text-sm font-bold text-[var(--foreground)]">{formatDateLabel(selectedDate)}</p>
+                    <input
+                      data-testid="op-check-date-filter"
+                      type="date"
+                      value={selectedDate}
+                      onChange={(event) => {
+                        const nextDate = event.target.value;
+                        setSelectedDate(nextDate);
+                        if (nextDate) {
+                          setCalendarMonth(new Date(`${nextDate}T00:00:00`));
+                        }
+                      }}
+                      className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-xs font-medium"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm">
               <div className="mb-2 flex items-center justify-between px-1">
-                <p className="text-sm font-bold text-[var(--foreground)]">수술 환자 목록</p>
+                <p className="text-sm font-bold text-[var(--foreground)]">선택 날짜 수술 환자</p>
                 <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
                   {filteredSchedules.length}명
                 </span>
@@ -1205,7 +1407,13 @@ export default function OperationCheckView({
                         key={post.id}
                         type="button"
                         data-testid={`op-check-schedule-card-${post.id}`}
-                        onClick={() => setSelectedScheduleId(post.id)}
+                        onClick={() => {
+                          setSelectedDate(post.schedule_date);
+                          if (post.schedule_date) {
+                            setCalendarMonth(new Date(`${post.schedule_date}T00:00:00`));
+                          }
+                          setSelectedScheduleId(post.id);
+                        }}
                         className={`w-full rounded-[var(--radius-lg)] border p-3 text-left transition-all ${
                           selected
                             ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/60 shadow-sm'
