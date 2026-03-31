@@ -226,6 +226,7 @@ test('notification settings shows push status and lets the user retry registrati
   await expect(page.getByTestId('notification-settings-push-status')).toBeVisible();
   await expect(page.getByTestId('notification-settings-push-permission')).toHaveText('허용됨');
   await expect(page.getByTestId('notification-settings-push-connection')).toContainText('구독이 끊겨');
+  await expect(page.getByTestId('notification-settings-ios-guide')).toContainText('홈 화면에 추가');
 
   await expect.poll(async () => getPushRegistrationCount(page)).toBeGreaterThan(0);
   const initialCount = await getPushRegistrationCount(page);

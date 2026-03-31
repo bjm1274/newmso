@@ -200,7 +200,28 @@ export type PushConnectionStatus = {
   hasSubscription: boolean;
   requiresGesture: boolean;
   standalone: boolean;
+  platform: string;
+  appleMobile: boolean;
 };
+
+export async function flushPushRetryQueue() {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return false;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const worker =
+      registration.active ||
+      navigator.serviceWorker.controller ||
+      registration.waiting ||
+      registration.installing;
+    if (!worker || typeof worker.postMessage !== 'function') return false;
+    worker.postMessage({
+      type: 'erp-push-flush-retry-queue',
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export async function getPushConnectionStatus(staffId?: string): Promise<PushConnectionStatus> {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') {
@@ -212,6 +233,8 @@ export async function getPushConnectionStatus(staffId?: string): Promise<PushCon
       hasSubscription: false,
       requiresGesture: false,
       standalone: false,
+      platform: 'unknown',
+      appleMobile: false,
     };
   }
 
@@ -219,6 +242,8 @@ export async function getPushConnectionStatus(staffId?: string): Promise<PushCon
   const hasServiceWorkerApi = 'serviceWorker' in navigator;
   const supported = hasNotificationApi && hasServiceWorkerApi;
   const secureContext = Boolean(window.isSecureContext);
+  const platform = getPushClientPlatform();
+  const appleMobile = isAppleMobileDevice();
   const permission: NotificationPermission | 'unsupported' =
     hasNotificationApi ? Notification.permission : 'unsupported';
 
@@ -242,6 +267,8 @@ export async function getPushConnectionStatus(staffId?: string): Promise<PushCon
     hasSubscription,
     requiresGesture: supported && requiresUserGestureForPushPermission(),
     standalone: isStandaloneWebApp(),
+    platform,
+    appleMobile,
   };
 }
 
@@ -930,6 +957,7 @@ export default function NotificationSystem({
 
     const resyncPushSubscription = () => {
       if (document.visibilityState === 'hidden') return;
+      void flushPushRetryQueue();
       void initNotificationService({
         staffId: effectiveUserId,
         requestPermission: false,
@@ -1434,6 +1462,7 @@ export default function NotificationSystem({
     };
 
     navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+    void flushPushRetryQueue();
     return () => {
       navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
     };

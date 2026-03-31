@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import {
+  flushPushRetryQueue,
   getPushConnectionStatus,
   initNotificationService,
   loadNotifSettings,
@@ -162,6 +163,7 @@ function SettingsTab({ userId }: { userId?: string | null }) {
     }
 
     try {
+      await flushPushRetryQueue();
       setPushStatus(await getPushConnectionStatus(userId));
       setPushStatusError(null);
     } catch {
@@ -196,6 +198,7 @@ function SettingsTab({ userId }: { userId?: string | null }) {
     setPushStatusError(null);
     try {
       const currentStatus = await getPushConnectionStatus(userId);
+      await flushPushRetryQueue();
       await initNotificationService({
         staffId: userId,
         requestPermission:
@@ -240,6 +243,7 @@ function SettingsTab({ userId }: { userId?: string | null }) {
   );
   const pushActionLabel =
     pushStatus?.permission === 'default' ? '알림 권한 켜기' : '푸시 다시 연결';
+  const showIosGuide = Boolean(pushStatus?.appleMobile);
 
   return (
     <div className="space-y-4 p-4 md:p-4">
@@ -286,6 +290,30 @@ function SettingsTab({ userId }: { userId?: string | null }) {
               </p>
             </div>
           </div>
+
+          {showIosGuide && (
+            <div
+              data-testid="notification-settings-ios-guide"
+              className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-800"
+            >
+              <p className="font-bold">iPhone 안내</p>
+              {!pushStatus?.standalone && (
+                <p className="mt-1 leading-relaxed">
+                  iPhone은 Safari 탭보다 홈 화면에 추가한 설치형 앱에서 푸시가 더 안정적으로 동작합니다.
+                </p>
+              )}
+              {pushStatus?.permission === 'default' && (
+                <p className="mt-1 leading-relaxed">
+                  설치형 앱에서 화면을 한 번 터치한 뒤 권한 요청을 허용해야 닫힌 상태 알림이 살아납니다.
+                </p>
+              )}
+              {pushStatus?.permission === 'denied' && (
+                <p className="mt-1 leading-relaxed">
+                  설정 앱 또는 Safari 설정에서 알림 권한을 다시 허용한 뒤 이 화면으로 돌아와 재연결해 주세요.
+                </p>
+              )}
+            </div>
+          )}
 
           {pushStatus?.permission === 'denied' && (
             <p className="text-xs text-amber-600">
