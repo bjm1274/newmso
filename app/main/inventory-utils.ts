@@ -182,6 +182,103 @@ export function normalizeSupplyRequestItems(rawItems: any[] = []) {
     .filter((item) => item.name);
 }
 
+export type SupplyRequestMonthlySuggestion = {
+  key: string;
+  name: string;
+  dept: string;
+  purpose: string;
+  total_qty: number;
+  line_count: number;
+  document_count: number;
+  average_qty: number;
+  last_requested_at: string | null;
+};
+
+export function buildSupplyRequestMonthlySuggestions(
+  approvals: Array<Record<string, any>> = [],
+  limit = 8,
+) {
+  const grouped = new Map<
+    string,
+    {
+      key: string;
+      name: string;
+      dept: string;
+      purpose: string;
+      total_qty: number;
+      line_count: number;
+      document_ids: Set<string>;
+      last_requested_at: string | null;
+    }
+  >();
+
+  approvals.forEach((approval, approvalIndex) => {
+    const items = normalizeSupplyRequestItems(approval?.meta_data?.items);
+    if (items.length === 0) {
+      return;
+    }
+
+    const approvalId =
+      String(approval?.id || approval?.doc_number || approval?.created_at || `approval-${approvalIndex}`).trim() ||
+      `approval-${approvalIndex}`;
+    const createdAt = approval?.created_at ? String(approval.created_at) : null;
+
+    items.forEach((item) => {
+      const key = [
+        item.name.trim().toLowerCase(),
+        item.dept.trim().toLowerCase(),
+        item.purpose.trim().toLowerCase(),
+      ].join('::');
+      const current = grouped.get(key) || {
+        key,
+        name: item.name,
+        dept: item.dept,
+        purpose: item.purpose,
+        total_qty: 0,
+        line_count: 0,
+        document_ids: new Set<string>(),
+        last_requested_at: null as string | null,
+      };
+
+      current.total_qty += item.qty;
+      current.line_count += 1;
+      current.document_ids.add(approvalId);
+
+      if (!current.last_requested_at || (createdAt && createdAt > current.last_requested_at)) {
+        current.last_requested_at = createdAt;
+      }
+
+      grouped.set(key, current);
+    });
+  });
+
+  return Array.from(grouped.values())
+    .map((item) => {
+      const documentCount = Math.max(item.document_ids.size, 1);
+      return {
+        key: item.key,
+        name: item.name,
+        dept: item.dept,
+        purpose: item.purpose,
+        total_qty: item.total_qty,
+        line_count: item.line_count,
+        document_count: documentCount,
+        average_qty: Math.max(1, Math.round(item.total_qty / documentCount)),
+        last_requested_at: item.last_requested_at,
+      } satisfies SupplyRequestMonthlySuggestion;
+    })
+    .sort((left, right) => {
+      if (right.total_qty !== left.total_qty) {
+        return right.total_qty - left.total_qty;
+      }
+      if (right.document_count !== left.document_count) {
+        return right.document_count - left.document_count;
+      }
+      return left.name.localeCompare(right.name, 'ko');
+    })
+    .slice(0, limit);
+}
+
 export function findSupplySourceInventoryItem(
   inventoryRows: any[] = [],
   itemName: string,

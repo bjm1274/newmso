@@ -195,6 +195,18 @@ test('shared approval forms submit with real field input', async ({ page }) => {
         category: '소모품',
         created_at: '2026-03-16T09:00:00.000Z',
       },
+      {
+        id: 'inventory-item-2',
+        item_name: '멸균 거즈',
+        quantity: 6,
+        stock: 6,
+        min_quantity: 2,
+        company: '테스트병원',
+        company_id: 'hospital-1',
+        department: '수술팀',
+        category: '소모품',
+        created_at: '2026-03-16T09:10:00.000Z',
+      },
     ],
     attendance: [
       {
@@ -304,6 +316,8 @@ test('shared approval forms submit with real field input', async ({ page }) => {
 
     const insert = waitForApprovalInsert(page);
     await page.getByTestId('approval-submit-button').click();
+    await expect(page.getByTestId('approval-supply-review-modal')).toBeVisible();
+    await page.getByTestId('approval-supply-review-confirm').click();
     await insert;
 
     const row = await expectApproval(page, 'E2E 물품 신청');
@@ -497,6 +511,8 @@ test('admin-configured default references auto-apply, notify recipients, and app
 
   const insert = waitForApprovalInsert(page);
   await page.getByTestId('approval-submit-button').click();
+  await expect(page.getByTestId('approval-supply-review-modal')).toBeVisible();
+  await page.getByTestId('approval-supply-review-confirm').click();
   await insert;
 
   const approvals = await readApprovals(page);

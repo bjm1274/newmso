@@ -371,6 +371,7 @@ export async function dispatchChatPushForMessage(params: {
       room_id: params.roomId,
       id: params.messageId,
       sender_name: senderName,
+      room_name: room.name || '',
       type: 'message',
       created_at: message.created_at,
       dedupe_key: `chat:${params.messageId}:${targetId}`,

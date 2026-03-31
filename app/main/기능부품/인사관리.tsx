@@ -314,18 +314,18 @@ function SectionTabBar({
 }) {
   return (
     <div
-      className="border-b border-[var(--border)] bg-[var(--card)] px-3 py-2 md:px-4"
+      className="shrink-0 border-b border-[var(--border)] bg-[var(--card)] px-3 py-2 md:px-4"
       data-testid={testIdPrefix ? `${testIdPrefix}-bar` : undefined}
     >
       {title || description ? (
         <div className="mb-1.5">
           {title ? <h3 className="text-[13px] font-bold text-[var(--foreground)]">{title}</h3> : null}
           {description ? (
-            <p className="mt-0.5 text-[11px] text-[var(--toss-gray-3)]">{description}</p>
+            <p className="mt-0.5 hidden text-[11px] text-[var(--toss-gray-3)] md:block">{description}</p>
           ) : null}
         </div>
       ) : null}
-      <div className="no-scrollbar flex gap-1 overflow-x-auto">
+      <div className="no-scrollbar flex gap-1 overflow-x-auto pb-0.5">
         {tabs.map((tab, index) => (
           <button
             key={tab.id}
@@ -334,8 +334,8 @@ function SectionTabBar({
             data-testid={testIdPrefix ? `${testIdPrefix}-${index}` : undefined}
             className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[var(--radius-md)] px-3 py-1.5 text-[11px] font-semibold transition-all ${
               activeTab === tab.id
-                ? 'bg-[var(--accent)] text-white'
-                : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
+                ? 'bg-[var(--accent)] text-white shadow-sm'
+                : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)]'
             }`}
           >
             <span className="shrink-0 text-[11px]">{tab.icon}</span>
@@ -562,50 +562,55 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
 
   return (
     <div className="app-page flex h-full min-h-0 flex-col overflow-x-hidden md:flex-row">
+      {/* ── 사이드바 ── */}
       <aside className="flex h-auto w-full shrink-0 flex-col overflow-hidden border-b border-[var(--border)] bg-[var(--card)] md:sticky md:top-0 md:self-start md:h-[100dvh] md:max-h-[100dvh] md:w-[var(--submenu-width)] md:border-b-0 md:border-r">
-        {/* 워크스페이스 탭 */}
+
+        {/* 워크스페이스 탭 — 모바일: 균등 3분할 / 데스크탑: 세로 목록 */}
         <div className="shrink-0 border-b border-[var(--border)] px-2 py-2">
-          <p className="px-1 pb-1 text-[9px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">업무 공간</p>
-          <div className="no-scrollbar flex gap-0.5 overflow-x-auto md:flex-col md:overflow-visible">
+          <p className="hidden px-1 pb-1 text-[9px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)] md:block">업무 공간</p>
+          <div className="flex gap-0.5 md:flex-col md:gap-0.5">
             {availableWorkspaces.map((workspace) => (
               <button
                 key={workspace.id}
                 type="button"
                 onClick={() => handleWorkspaceChange(workspace.id)}
                 data-testid={`hr-workspace-${workspace.id}`}
-                className={`flex min-w-max shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[var(--radius-md)] px-2.5 py-1.5 text-[11px] font-semibold transition-all md:w-full md:justify-start ${
+                className={`flex flex-1 items-center justify-center gap-1 rounded-[var(--radius-md)] px-2 py-2 text-[11px] font-semibold transition-all md:w-full md:flex-none md:justify-start md:px-2.5 md:py-1.5 ${
                   activeWorkspace === workspace.id
-                    ? 'bg-[var(--foreground)] text-white'
-                    : 'text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)]'
+                    ? 'bg-[var(--accent)] text-white'
+                    : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
                 }`}
               >
-                <span className="shrink-0 text-[12px]">{workspace.icon}</span>
-                <span className="truncate whitespace-nowrap break-keep">{workspace.label}</span>
+                <span className="shrink-0 text-[13px] md:text-[12px]">{workspace.icon}</span>
+                <span className="truncate whitespace-nowrap break-keep text-[10px] md:text-[11px]">{workspace.label}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* 탭 메뉴 */}
-        <div className="no-scrollbar flex min-h-0 flex-row gap-0.5 overflow-x-auto px-2 py-2 md:flex-1 md:flex-col md:overflow-y-auto">
-          <div className="flex gap-0.5 md:hidden">
+        {/* 메뉴 탭 — 모바일: 가로 스크롤 chip / 데스크탑: 세로 그룹 목록 */}
+        <div className="no-scrollbar flex min-h-0 flex-row gap-1 overflow-x-auto px-2 py-1.5 md:flex-1 md:flex-col md:gap-0 md:overflow-y-auto md:py-2">
+          {/* 모바일 전용 */}
+          <div className="flex gap-1 md:hidden">
             {workspaceTabs.map(({ id, label, icon }) => (
               <button
                 key={id}
                 type="button"
                 onClick={() => handleMenuSelect(id)}
                 data-testid={`hr-menu-${id}`}
-                className={`flex-none whitespace-nowrap rounded-[var(--radius-md)] px-3 py-1.5 text-[11px] font-semibold transition-all ${
+                className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded-[var(--radius-md)] px-2.5 py-1.5 text-[11px] font-semibold transition-all ${
                   activeMenu === id
-                    ? 'bg-[var(--accent)] text-white'
-                    : 'text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)]'
+                    ? 'bg-[var(--accent)] text-white shadow-sm'
+                    : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:text-[var(--foreground)]'
                 }`}
               >
-                {icon} {label}
+                <span className="text-[11px]">{icon}</span>
+                <span>{label}</span>
               </button>
             ))}
           </div>
 
+          {/* 데스크탑 전용 그룹 목록 */}
           <div className="hidden md:flex md:flex-col gap-0">
             {activeWorkspaceConfig.groups.map((group, index) => {
               const groupTabs = workspaceTabs.filter((tab) => tab.group === group);
@@ -625,7 +630,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                       className={`flex w-full items-center gap-1.5 rounded-[var(--radius-md)] px-2.5 py-1.5 text-left text-[11px] font-semibold transition-all ${
                         activeMenu === id
                           ? 'bg-[var(--accent)] text-white'
-                          : 'text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)]'
+                          : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
                       }`}
                     >
                       <span className="shrink-0 text-[11px] opacity-80">{icon}</span>
@@ -638,18 +643,16 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
           </div>
         </div>
 
-        {/* 필터 */}
+        {/* 필터 — 모바일: 가로 한 줄 compact / 데스크탑: 세로 2줄 */}
         <div className="shrink-0 border-t border-[var(--border)] bg-[var(--card)] px-2 py-2 md:sticky md:bottom-0 md:z-10">
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--tab-bg)] px-2.5 py-1.5">
-              <span className="shrink-0 text-[9px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wide">
-                사업체
-              </span>
+          <div className="flex gap-1.5 md:flex-col">
+            <div className="flex flex-1 items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--tab-bg)] px-2 py-1.5">
+              <span className="shrink-0 text-[9px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wide">🏢</span>
               <select
                 data-testid="hr-company-select"
                 value={선택사업체}
                 onChange={(event) => 사업체설정(event.target.value)}
-                className="w-full bg-transparent text-[11px] font-semibold text-[var(--foreground)] outline-none"
+                className="w-full min-w-0 bg-transparent text-[11px] font-semibold text-[var(--foreground)] outline-none"
               >
                 {사업체목록.map((회사명) => (
                   <option key={회사명} value={회사명}>
@@ -658,15 +661,13 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                 ))}
               </select>
             </div>
-            <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--tab-bg)] px-2.5 py-1.5">
-              <span className="shrink-0 text-[9px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wide">
-                상태
-              </span>
+            <div className="flex flex-1 items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--tab-bg)] px-2 py-1.5">
+              <span className="shrink-0 text-[9px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wide">👤</span>
               <select
                 data-testid="hr-status-select"
                 value={직원상태필터}
                 onChange={(event) => 직원상태필터설정(event.target.value as StaffStatus)}
-                className="w-full bg-transparent text-[11px] font-semibold text-[var(--foreground)] outline-none"
+                className="w-full min-w-0 bg-transparent text-[11px] font-semibold text-[var(--foreground)] outline-none"
               >
                 <option value="재직">재직자</option>
                 <option value="퇴사">퇴사자</option>
@@ -677,7 +678,16 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
 
       </aside>
 
+      {/* ── 메인 콘텐츠 ── */}
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        {/* 모바일 전용: 현재 메뉴 컨텍스트 헤더 */}
+        <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--card)] px-3 py-2 md:hidden">
+          <span className="text-[14px]">{workspaceTabs.find((t) => t.id === activeMenu)?.icon ?? '📋'}</span>
+          <span className="text-[13px] font-bold text-[var(--foreground)]">
+            {workspaceTabs.find((t) => t.id === activeMenu)?.label ?? activeMenu}
+          </span>
+          <span className="ml-auto text-[10px] font-medium text-[var(--toss-gray-3)]">{activeWorkspace}</span>
+        </div>
         <section className="custom-scrollbar flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-0">
           {activeMenu === '구성원' && (
             <div className="flex h-full flex-col">

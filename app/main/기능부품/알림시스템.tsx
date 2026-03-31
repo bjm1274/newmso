@@ -789,8 +789,9 @@ export default function NotificationSystem({
     const incomingRoomId = String(rowMetadata.room_id || '').trim();
     const activeChatRoomId = getVisibleActiveChatRoomId();
     const suppressLiveDisplay = Boolean(isChatType && incomingRoomId && activeChatRoomId === incomingRoomId);
+    const useMobileChatPreview = Boolean(isChatType && isMobileClientDevice());
 
-    if (!suppressLiveDisplay) {
+    if (!suppressLiveDisplay && !useMobileChatPreview) {
       addToast({
         id: rowId,
         title,
@@ -1153,7 +1154,7 @@ export default function NotificationSystem({
         const msg = p.new;
         if (String(msg.sender_id) === uid) return;
         const [roomRes, senderRes] = await Promise.all([
-          supabase.from('chat_rooms').select('type, members').eq('id', msg.room_id).maybeSingle(),
+          supabase.from('chat_rooms').select('type, members, name').eq('id', msg.room_id).maybeSingle(),
           msg.sender_id ? supabase.from('staff_members').select('name').eq('id', msg.sender_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
         ]);
         if (roomRes.error || !roomRes.data) return;
@@ -1169,7 +1170,12 @@ export default function NotificationSystem({
           title: isMention ? `📣 ${senderName}님이 멘션` : senderName,
           body: (content || '📎 파일').slice(0, 80),
           senderName,
-          data: { room_id: msg.room_id, id: msg.id, sender_name: senderName },
+          data: {
+            room_id: msg.room_id,
+            id: msg.id,
+            sender_name: senderName,
+            room_name: typeof roomRes.data?.name === 'string' ? roomRes.data.name : '',
+          },
         }, `message:${String(msg.id)}`);
       })
       .subscribe();

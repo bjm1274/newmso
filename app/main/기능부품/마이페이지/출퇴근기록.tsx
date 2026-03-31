@@ -52,20 +52,12 @@ type CommuteLog = {
 } & Record<string, unknown>;
 
 function buildFallbackShiftBoundary(department?: string): ShiftBoundary {
-  if (department === '의료진') {
-    return {
-      hour: 8,
-      minute: 30,
-      label: '08:30',
-      endHour: null,
-      endMinute: null,
-      shiftKnown: false,
-    };
-  }
+  const isMedicalStaff = department === '의료진';
+
   return {
-    hour: 9,
-    minute: 10,
-    label: '09:10',
+    hour: isMedicalStaff ? 8 : 9,
+    minute: isMedicalStaff ? 30 : 10,
+    label: isMedicalStaff ? '08:30' : '09:10',
     endHour: null,
     endMinute: null,
     shiftKnown: false,
