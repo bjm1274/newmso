@@ -1,12 +1,17 @@
 'use client';
 
 import { toast } from '@/lib/toast';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import SmartDatePicker from '../공통/SmartDatePicker';
 
 type InventoryUnit = 'EA' | 'BOX';
+
+type InventoryCatalogEntry = {
+  name: string;
+  unit: InventoryUnit;
+};
 
 type ProductFormState = {
   item_name: string;
@@ -19,7 +24,6 @@ type ProductFormState = {
   lot_number: string;
   serial_number: string;
   insurance_code: string;
-  spec: string;
   unit: InventoryUnit;
   is_udi: boolean;
   company: string;
@@ -38,7 +42,6 @@ function createInitialProductForm(user: Record<string, unknown>): ProductFormSta
     lot_number: '',
     serial_number: '',
     insurance_code: '',
-    spec: '',
     unit: 'EA',
     is_udi: false,
     company: (user?.company as string) || 'SY INC.',
@@ -46,19 +49,58 @@ function createInitialProductForm(user: Record<string, unknown>): ProductFormSta
   };
 }
 
+function normalizeInventoryUnit(value: unknown): InventoryUnit {
+  return String(value || '').trim().toUpperCase() === 'BOX' ? 'BOX' : 'EA';
+}
+
 export default function ProductRegistration({
   user: _user,
+  inventory: _inventory,
   suppliers: _suppliers,
   fetchInventory: _fetchInventory,
   fetchSuppliers: _fetchSuppliers,
 }: Record<string, unknown>) {
   const user = (_user ?? {}) as Record<string, unknown>;
+  const inventory = Array.isArray(_inventory) ? (_inventory as Record<string, unknown>[]) : [];
   const suppliers = (_suppliers ?? []) as Record<string, unknown>[];
   const fetchInventory = _fetchInventory as (() => void) | undefined;
   const [loading, setLoading] = useState(false);
   const [departments, setDepartments] = useState<string[]>([]);
   const [companies, setCompanies] = useState<string[]>(['백정형외과', '서울한의원', 'SY INC.']);
   const [productForm, setProductForm] = useState<ProductFormState>(() => createInitialProductForm(user));
+
+  const inventoryCatalog = useMemo(() => {
+    const merged = new Map<string, InventoryCatalogEntry>();
+
+    inventory.forEach((row) => {
+      const itemName = String(row?.item_name || row?.name || '').trim();
+      if (!itemName) return;
+
+      const key = itemName.toLowerCase();
+      const rowUnit = normalizeInventoryUnit(row?.unit);
+      const current = merged.get(key);
+
+      if (!current) {
+        merged.set(key, {
+          name: itemName,
+          unit: rowUnit,
+        });
+        return;
+      }
+
+      if (current.unit !== 'BOX' && rowUnit === 'BOX') {
+        current.unit = rowUnit;
+      }
+    });
+
+    return Array.from(merged.values()).sort((left, right) => left.name.localeCompare(right.name, 'ko'));
+  }, [inventory]);
+
+  const matchedInventoryItem = useMemo(() => {
+    const normalizedItemName = productForm.item_name.trim().toLowerCase();
+    if (!normalizedItemName) return null;
+    return inventoryCatalog.find((entry) => entry.name.toLowerCase() === normalizedItemName) || null;
+  }, [inventoryCatalog, productForm.item_name]);
 
   useEffect(() => {
     const loadDeptsAndComps = async () => {
@@ -93,8 +135,8 @@ export default function ProductRegistration({
   };
 
   const handleRegisterProduct = async () => {
-    if (!productForm.item_name.trim() || !productForm.category.trim() || !productForm.spec.trim()) {
-      toast('제품명, 분류, 규격은 필수입니다.', 'warning');
+    if (!productForm.item_name.trim() || !productForm.category.trim()) {
+      toast('제품명과 분류는 필수입니다.', 'warning');
       return;
     }
 
@@ -105,7 +147,6 @@ export default function ProductRegistration({
           ...productForm,
           item_name: productForm.item_name.trim(),
           category: productForm.category.trim(),
-          spec: productForm.spec.trim(),
           supplier_name: productForm.supplier_name || null,
           unit_price: productForm.unit_price || 0,
           expiry_date: productForm.expiry_date || null,
@@ -121,13 +162,16 @@ export default function ProductRegistration({
         if (omittedColumns.has('unit')) {
           delete submissionData.unit;
         }
+        if (omittedColumns.has('serial_number')) {
+          delete submissionData.serial_number;
+        }
 
         return submissionData;
       };
 
       const { error, data: insertedData } = await withMissingColumnsFallback(
         (omittedColumns) => supabase.from('inventory').insert([buildSubmissionData(omittedColumns)]).select('id'),
-        ['department', 'unit'],
+        ['department', 'unit', 'serial_number'],
       );
 
       if (error) {
@@ -168,10 +212,31 @@ export default function ProductRegistration({
             <input
               data-testid="inventory-registration-item-name"
               value={productForm.item_name}
-              onChange={(event) => updateForm({ item_name: event.target.value })}
+              list="inventory-registration-item-name-options"
+              onChange={(event) => {
+                const nextItemName = event.target.value;
+                const exactMatch = inventoryCatalog.find(
+                  (entry) => entry.name.toLowerCase() === nextItemName.trim().toLowerCase(),
+                );
+
+                updateForm({
+                  item_name: nextItemName,
+                  ...(exactMatch ? { unit: exactMatch.unit } : {}),
+                });
+              }}
               className="w-full rounded-[var(--radius-md)] bg-[var(--input-bg)] p-4 text-sm font-bold outline-none transition focus:ring-2 focus:ring-[var(--accent)]/20"
-              placeholder="제품명을 입력하세요"
+              placeholder="제품명을 입력하거나 자동완성에서 선택하세요"
             />
+            <datalist id="inventory-registration-item-name-options">
+              {inventoryCatalog.map((entry) => (
+                <option key={entry.name} value={entry.name} />
+              ))}
+            </datalist>
+            {matchedInventoryItem && (
+              <p className="text-[11px] font-semibold text-[var(--accent)]">
+                등록된 품목입니다. 단위가 {matchedInventoryItem.unit}(으)로 자동 적용됩니다.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -233,17 +298,6 @@ export default function ProductRegistration({
                 );
               })}
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">규격 *</label>
-            <input
-              data-testid="inventory-registration-spec"
-              value={productForm.spec}
-              onChange={(event) => updateForm({ spec: event.target.value })}
-              className="w-full rounded-[var(--radius-md)] bg-[var(--input-bg)] p-4 text-sm font-bold outline-none transition focus:ring-2 focus:ring-[var(--accent)]/20"
-              placeholder="예: 4x4 / 30매 / 1BOX"
-            />
           </div>
 
           <div className="space-y-2">

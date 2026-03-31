@@ -89,6 +89,12 @@ type ApprovalCcUser = {
 };
 
 type ApprovalReferenceDefaultsMap = Record<string, ApprovalCcUser[]>;
+type ApproverTemplate = {
+  id: string;
+  name: string;
+  line: StaffMember[];
+  ccLine?: ApprovalCcUser[];
+};
 
 type SupplyInventoryReviewRow = {
   key: string;
@@ -118,7 +124,19 @@ function resolveApprovalStaffLine(line: unknown, staffs: StaffMember[] = []) {
         return staffMap.get(String(entry)) ?? null;
       }
       if (typeof entry === 'object' && entry !== null && 'id' in entry && (entry as Record<string, unknown>).id != null) {
-        return staffMap.get(String((entry as Record<string, unknown>).id)) ?? null;
+        const record = entry as Record<string, unknown>;
+        const id = String(record.id);
+        const matchedStaff = staffMap.get(id);
+        if (matchedStaff) return matchedStaff;
+        return {
+          ...(record as Partial<StaffMember>),
+          id,
+          name: String(record.name || ''),
+          position: typeof record.position === 'string' ? record.position : null,
+          company: typeof record.company === 'string' ? record.company : null,
+          department: typeof record.department === 'string' ? record.department : null,
+          team: typeof record.team === 'string' ? record.team : null,
+        } as StaffMember;
       }
       return null;
     })
@@ -184,6 +202,29 @@ function mergeApprovalStaffDirectory(...groups: StaffMember[][]): StaffMember[] 
         .map((staff) => [String(staff.id), staff])
     ).values()
   );
+}
+
+function normalizeApproverTemplates(value: unknown, staffs: StaffMember[] = []): ApproverTemplate[] {
+  if (!Array.isArray(value)) return [];
+
+  const normalized = value
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') return null;
+      const record = entry as Record<string, unknown>;
+      const id = String(record.id || '').trim();
+      const name = String(record.name || '').trim();
+      if (!id || !name) return null;
+
+      return {
+        id,
+        name,
+        line: resolveApprovalStaffLine(record.line, staffs),
+        ccLine: Array.isArray(record.ccLine) ? normalizeApprovalCcUsers(record.ccLine, staffs) : undefined,
+      } satisfies ApproverTemplate;
+    })
+    .filter(Boolean) as ApproverTemplate[];
+
+  return Array.from(new Map(normalized.map((template) => [template.id, template])).values());
 }
 
 function normalizeApprovalReferenceDefaultsMap(
@@ -400,7 +441,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const defaultApprovalMonth = useMemo(() => getCurrentMonthValue(), []);
   const [savedApproverLine, setSavedApproverLine] = useState<StaffMember[]>([]);
   // 결재선 다중 템플릿 (name + line 배열)
-  const [approverTemplates, setApproverTemplates] = useState<{id: string; name: string; line: StaffMember[]}[]>([]);
+  const [approverTemplates, setApproverTemplates] = useState<ApproverTemplate[]>([]);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [templateNameInput, setTemplateNameInput] = useState('');
   const [showApproverTemplateMenu, setShowApproverTemplateMenu] = useState(false);
@@ -475,7 +516,6 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
           supabase
             .from('staff_members')
             .select('*')
-            .in('position', APPROVER_POSITIONS)
             .order('employee_no', { ascending: true }),
         ]);
 
@@ -494,11 +534,12 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
         );
 
         setSupportApproverStaffs(
-          Array.isArray(staffRows)
+              Array.isArray(staffRows)
             ? (staffRows.filter((staff) => {
+                const position = String(staff?.position || '').trim();
                 const supportCompanyId = String((staff as Record<string, unknown>)?.company_id || '').trim();
                 return (
-                  APPROVER_POSITIONS.includes(String(staff?.position || '')) &&
+                  APPROVER_POSITIONS.includes(position) &&
                   (
                     matchesInventorySupportCompanyName(staff?.company) ||
                     (supportCompanyId !== '' && supportCompanyIds.has(supportCompanyId))
@@ -563,6 +604,38 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     },
     [resolveDefaultReferenceUsersForForm]
   );
+  const persistApproverTemplates = useCallback(
+    (nextTemplates: ApproverTemplate[]) => {
+      if (typeof window === 'undefined' || !user?.id) return;
+      window.localStorage.setItem(
+        `erp_approveline_templates_${user.id}`,
+        JSON.stringify(nextTemplates)
+      );
+    },
+    [user?.id]
+  );
+  const saveCurrentApproverTemplate = useCallback(() => {
+    if (!templateNameInput.trim()) {
+      toast('템플릿 이름을 입력하세요.', 'warning');
+      return;
+    }
+    if (approverLine.length === 0) {
+      toast('결재선을 먼저 지정해주세요.');
+      return;
+    }
+
+    const newTpl: ApproverTemplate = {
+      id: Date.now().toString(),
+      name: templateNameInput.trim(),
+      line: approverLine,
+      ccLine,
+    };
+    const next = [...approverTemplates, newTpl];
+    setApproverTemplates(next);
+    persistApproverTemplates(next);
+    setShowTemplateModal(false);
+    toast(`"${newTpl.name}" 템플릿이 저장되었습니다.`, 'success');
+  }, [approverLine, approverTemplates, ccLine, persistApproverTemplates, templateNameInput]);
   const resolveApprovalTemplateMeta = useCallback((item: Record<string, unknown>) => {
     const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
     const rawSlug = String(metaData?.form_slug || '').trim();
@@ -1028,9 +1101,9 @@ window.onload = () => window.print();
   const approverCandidates = useMemo(() => {
     const source = isSupplyRequestCompose ? approvalDirectoryStaffs : staffs;
     if (!Array.isArray(source)) return [];
-    const order = (s: StaffMember) => APPROVER_POSITIONS.indexOf(s.position || '');
+    const order = (s: StaffMember) => APPROVER_POSITIONS.indexOf(String(s.position || '').trim());
     return [...source]
-      .filter((s) => APPROVER_POSITIONS.includes(s.position || ''))
+      .filter((s) => APPROVER_POSITIONS.includes(String(s.position || '').trim()))
       .sort((a, b) => order(a) - order(b) || (a.name || '').localeCompare(b.name || ''));
   }, [approvalDirectoryStaffs, isSupplyRequestCompose, staffs]);
   const normalizeApprovalLineIds = useCallback((line: unknown): string[] => {
@@ -1750,10 +1823,12 @@ window.onload = () => window.print();
         const saved = window.localStorage.getItem(`erp_fav_approveline_${user.id}`);
         if (saved) setSavedApproverLine(JSON.parse(saved));
         const savedTpls = window.localStorage.getItem(`erp_approveline_templates_${user.id}`);
-        if (savedTpls) setApproverTemplates(JSON.parse(savedTpls));
+        if (savedTpls) {
+          setApproverTemplates(normalizeApproverTemplates(JSON.parse(savedTpls), approvalDirectoryStaffs));
+        }
       } catch { }
     }
-  }, [user?.id]);
+  }, [approvalDirectoryStaffs, user?.id]);
 
   // initialView 또는 로컬스토리지에서 탭 복구
   useEffect(() => {
@@ -3291,6 +3366,7 @@ window.onload = () => window.print();
                   <button
                     type="button"
                     onClick={() => { setTemplateNameInput(''); setShowTemplateModal(true); }}
+                    data-testid="approval-template-save-open"
                     className="w-full px-3 py-3 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] text-[12px] font-bold text-[var(--accent)] hover:bg-[var(--muted)]"
                   >
                     💾 템플릿 저장
@@ -3300,33 +3376,40 @@ window.onload = () => window.print();
                       <button
                         type="button"
                         onClick={() => setShowApproverTemplateMenu((prev) => !prev)}
+                        data-testid="approval-template-load-toggle"
                         className="w-full px-4 py-3 bg-[var(--accent)] border border-[var(--accent)] rounded-[var(--radius-md)] text-[12px] font-bold text-white shadow-sm hover:opacity-95"
                       >
                         📂 템플릿 불러오기 ({approverTemplates.length})
                       </button>
                       {showApproverTemplateMenu && (
-                        <div className="absolute left-0 right-0 top-full mt-1 overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] shadow-sm z-50 md:left-auto md:right-0 md:w-64">
+                        <div data-testid="approval-template-load-menu" className="absolute left-0 right-0 top-full mt-1 overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] shadow-sm z-50 md:left-auto md:right-0 md:w-64">
                           {approverTemplates.map(tpl => (
                             <div key={tpl.id} className="flex items-center justify-between px-3 py-2 hover:bg-[var(--muted)] first:rounded-t-[12px] last:rounded-b-[12px]">
                               <button
                                 type="button"
+                                data-testid={`approval-template-load-${tpl.id}`}
                                 onClick={() => {
-                                  setApproverLine(tpl.line);
+                                  setApproverLine(resolveApprovalStaffLine(tpl.line, approvalDirectoryStaffs));
+                                  if (Array.isArray(tpl.ccLine)) {
+                                    setCcLine(tpl.ccLine);
+                                  }
                                   setShowApproverTemplateMenu(false);
                                 }}
                                 className="flex-1 text-left text-xs font-semibold text-[var(--foreground)]"
                               >
                                 {tpl.name}
                                 <span className="text-[10px] text-[var(--toss-gray-3)] ml-1">({tpl.line.length}명)</span>
+                                {Array.isArray(tpl.ccLine) && tpl.ccLine.length > 0 && (
+                                  <span className="text-[10px] text-[var(--toss-gray-3)] ml-1">(참조 {tpl.ccLine.length}명)</span>
+                                )}
                               </button>
                               <button
                                 type="button"
+                                data-testid={`approval-template-delete-${tpl.id}`}
                                 onClick={() => {
                                   const next = approverTemplates.filter(t => t.id !== tpl.id);
                                   setApproverTemplates(next);
-                                  if (typeof window !== 'undefined' && user?.id) {
-                                    window.localStorage.setItem(`erp_approveline_templates_${user.id}`, JSON.stringify(next));
-                                  }
+                                  persistApproverTemplates(next);
                                   if (next.length === 0) {
                                     setShowApproverTemplateMenu(false);
                                   }
@@ -3342,7 +3425,7 @@ window.onload = () => window.print();
                 </div>
                 <div className="space-y-2">
                   <p className="text-[11px] font-bold text-[var(--toss-gray-4)]">결재선</p>
-                  <div className="grid gap-2 sm:grid-cols-2">{approverLine.map((a, i) => <div key={i} className="bg-[var(--card)] px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] text-[12px] font-bold shadow-sm text-[var(--accent)] flex items-center justify-between gap-3"><span className="min-w-0 flex-1 truncate">{i + 1}. {a.name} {a.position}</span><button onClick={() => setApproverLine(approverLine.filter((_, idx) => idx !== i))} className="shrink-0 ml-1 text-[var(--toss-gray-3)] hover:text-red-500">✕</button></div>)}</div>
+                  <div className="grid gap-2 sm:grid-cols-2">{approverLine.map((a, i) => <div key={i} className="bg-[var(--card)] px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] text-[12px] font-bold shadow-sm text-[var(--accent)] flex items-center justify-between gap-3"><span className="min-w-0 flex-1 truncate">{i + 1}. {a.name} {a.position}</span><button data-testid={`approval-selected-approver-remove-${i}`} onClick={() => setApproverLine(approverLine.filter((_, idx) => idx !== i))} className="shrink-0 ml-1 text-[var(--toss-gray-3)] hover:text-red-500">✕</button></div>)}</div>
                 </div>
                 {!hasApproverSelection && (
                   <p className="text-[11px] font-bold text-red-500" data-testid="approval-approver-required">
@@ -3355,7 +3438,7 @@ window.onload = () => window.print();
                     <div className="flex gap-2 flex-wrap">
                     {ccLine.map((c, i) => (
                       <div key={i} className="bg-yellow-50 border border-yellow-200 px-3 py-1.5 rounded-[var(--radius-md)] text-[11px] font-bold text-yellow-700 flex items-center gap-1.5">
-                        CC {c.name} <button onClick={() => setCcLine(prev => prev.filter((_, idx) => idx !== i))} className="text-yellow-400 hover:text-red-500">✕</button>
+                        CC {c.name} <button data-testid={`approval-selected-cc-remove-${i}`} onClick={() => setCcLine(prev => prev.filter((_, idx) => idx !== i))} className="text-yellow-400 hover:text-red-500">✕</button>
                       </div>
                     ))}
                     </div>
@@ -4003,7 +4086,7 @@ window.onload = () => window.print();
           <div className="bg-[var(--card)] rounded-[var(--radius-xl)] shadow-sm p-4 w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-bold text-[var(--foreground)] mb-1">결재선 템플릿 저장</h3>
             <p className="text-xs text-[var(--toss-gray-3)] mb-4">
-              현재 결재선 ({approverLine.length}명)을 이름을 붙여 저장합니다.
+              현재 결재선 ({approverLine.length}명)과 참조자 ({ccLine.length}명)를 이름을 붙여 저장합니다.
             </p>
             {approverLine.length === 0 ? (
               <p className="text-xs text-red-500 mb-4">결재선을 먼저 지정해주세요.</p>
@@ -4020,25 +4103,16 @@ window.onload = () => window.print();
               type="text"
               value={templateNameInput}
               onChange={e => setTemplateNameInput(e.target.value)}
+              data-testid="approval-template-name-input"
               placeholder="템플릿 이름 (예: 연차 기본, 물품 신청)"
               className="w-full px-4 py-3 border border-[var(--border)] rounded-[var(--radius-md)] text-sm font-semibold bg-[var(--muted)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] mb-4"
-              onKeyDown={e => { if (e.key === 'Enter' && templateNameInput.trim() && approverLine.length > 0) { const newTpl = { id: Date.now().toString(), name: templateNameInput.trim(), line: approverLine }; const next = [...approverTemplates, newTpl]; setApproverTemplates(next); if (typeof window !== 'undefined' && user?.id) window.localStorage.setItem(`erp_approveline_templates_${user.id}`, JSON.stringify(next)); setShowTemplateModal(false); toast(`"${newTpl.name}" 템플릿이 저장되었습니다.`, 'success'); } }}
+              onKeyDown={e => { if (e.key === 'Enter') saveCurrentApproverTemplate(); }}
             />
             <div className="flex gap-2">
               <button onClick={() => setShowTemplateModal(false)} className="flex-1 py-3 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
               <button
-                onClick={() => {
-                  if (!templateNameInput.trim()) return toast('템플릿 이름을 입력하세요.', 'warning');
-                  if (approverLine.length === 0) return toast('결재선을 먼저 지정해주세요.');
-                  const newTpl = { id: Date.now().toString(), name: templateNameInput.trim(), line: approverLine };
-                  const next = [...approverTemplates, newTpl];
-                  setApproverTemplates(next);
-                  if (typeof window !== 'undefined' && user?.id) {
-                    window.localStorage.setItem(`erp_approveline_templates_${user.id}`, JSON.stringify(next));
-                  }
-                  setShowTemplateModal(false);
-                  toast(`"${newTpl.name}" 템플릿이 저장되었습니다.`, 'success');
-                }}
+                data-testid="approval-template-save-confirm"
+                onClick={saveCurrentApproverTemplate}
                 className="flex-1 py-3 rounded-[var(--radius-md)] bg-[var(--accent)] text-white font-semibold text-sm"
               >
                 저장

@@ -43,6 +43,19 @@ const supportStaff = {
   role: 'manager',
 };
 
+const templateReferenceStaff = {
+  ...fakeUser,
+  id: 'approval-template-reference-1',
+  employee_no: 'APR-022',
+  name: '템플릿 참조자',
+  company: '테스트병원',
+  company_id: 'hospital-1',
+  department: '원무팀',
+  team: '원무팀',
+  position: '사원',
+  role: 'staff',
+};
+
 const supportDirector = {
   ...fakeUser,
   id: 'approval-support-director-1',
@@ -225,6 +238,49 @@ test('hospital supply request compose includes SY INC. approvers in approval lin
   await approverSelect.selectOption(supportDirectorWithLegacyCompanyName.id);
   await expect(page.getByText(`1. ${supportDirectorWithLegacyCompanyName.name} ${supportDirectorWithLegacyCompanyName.position}`)).toBeVisible();
 
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('supply request template load keeps saved reference users', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    staffMembers: [composeUser, approver, supportStaff, supportDirector, templateReferenceStaff],
+    approvals: [],
+    companies: [
+      { id: 'hospital-1', name: String(composeUser.company), type: 'HOSPITAL', is_active: true },
+      { id: 'mso-company-id', name: 'SY INC.', type: 'MSO', is_active: true },
+    ],
+  });
+
+  await seedSession(page, {
+    user: composeUser,
+    localStorage: {
+      erp_permission_prompt_shown: '1',
+    },
+  });
+
+  await openCompose(page);
+  await page.getByTestId('approval-form-type-3').click();
+  await expect(page.getByTestId('supplies-add-row-button')).toBeVisible();
+
+  await page.getByTestId('approval-approver-select').selectOption(approver.id);
+  await page.getByTestId('approval-cc-select').selectOption(templateReferenceStaff.id);
+  await expect(page.getByText(`CC ${templateReferenceStaff.name}`)).toBeVisible();
+
+  await page.getByTestId('approval-template-save-open').click();
+  await page.getByTestId('approval-template-name-input').fill('물품신청 템플릿 참조자 유지');
+  await page.getByTestId('approval-template-save-confirm').click();
+
+  await page.getByTestId('approval-selected-approver-remove-0').click();
+  await page.getByTestId('approval-selected-cc-remove-0').click();
+  await expect(page.getByText(`CC ${templateReferenceStaff.name}`)).toHaveCount(0);
+
+  await page.getByTestId('approval-template-load-toggle').click();
+  await page.getByRole('button', { name: /물품신청 템플릿 참조자 유지/ }).click();
+
+  await expect(page.getByText(`1. ${approver.name} ${approver.position}`)).toBeVisible();
+  await expect(page.getByText(`CC ${templateReferenceStaff.name}`)).toBeVisible();
   expect(runtimeErrors).toEqual([]);
 });
 
