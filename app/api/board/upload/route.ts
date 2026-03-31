@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { readSessionFromRequest } from '@/lib/server-session';
+import { canAccessBoard } from '@/lib/access-control';
+import {
+  normalizeSessionUser,
+  readSessionFromRequest,
+  resolveLatestSessionUser,
+} from '@/lib/server-session';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -73,7 +78,17 @@ export async function POST(request: NextRequest) {
     }
 
     const formData = await request.formData();
+    const boardType = String(formData.get('boardType') || formData.get('boardId') || '').trim();
     const file = formData.get('file');
+
+    if (!boardType) {
+      return NextResponse.json({ error: 'boardType is required.' }, { status: 400 });
+    }
+
+    const latestUser = await resolveLatestSessionUser(normalizeSessionUser(session.user));
+    if (!canAccessBoard(latestUser, boardType, 'write')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: '업로드할 파일이 없습니다.' }, { status: 400 });

@@ -91,6 +91,42 @@ test('inventory detail permissions can open inventory from the sidebar when the 
   await expect(page.getByTestId('inventory-view')).toBeVisible();
 });
 
+test('inventory detail permissions also honor direct inventory menu routing when the top-level menu key is missing', async ({
+  page,
+}) => {
+  const { menu_재고관리, ...detailScopedPermissions } = fakeUser.permissions;
+  const inventoryDetailOnlyUser = {
+    ...fakeUser,
+    id: 'inventory-detail-route-user',
+    employee_no: 'LOCK-004',
+    name: 'Inventory Detail Route User',
+    role: 'staff',
+    permissions: {
+      ...detailScopedPermissions,
+      inventory: false,
+      inventory_현황: true,
+      inventory_등록: true,
+    },
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [inventoryDetailOnlyUser],
+    companies: [
+      {
+        id: inventoryDetailOnlyUser.company_id,
+        name: inventoryDetailOnlyUser.company,
+        type: 'hospital',
+        is_active: true,
+      },
+    ],
+  });
+  await seedSession(page, { user: inventoryDetailOnlyUser });
+
+  await page.goto('/main?open_menu=재고관리');
+
+  await expect(page.getByTestId('inventory-view')).toBeVisible();
+});
+
 test('explicit admin detail permissions override the legacy admin flag', async ({ page }) => {
   const partiallyLockedAdminUser = {
     ...fakeUser,

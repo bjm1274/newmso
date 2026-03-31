@@ -179,6 +179,14 @@ function MainPageContent() {
     setInitialApprovalIntent(intent);
   }, []);
 
+  const clearNavigationQuery = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(window.history.state, '', '/main');
+      return;
+    }
+    router.replace('/main', { scroll: false });
+  }, [router]);
+
   const resolveLegacyNavigation = useCallback(
     (menuId?: string | null, subViewId?: string | null, candidateUser?: ErpUser | null) => {
       const canOpenAdmin =
@@ -511,8 +519,8 @@ function MainPageContent() {
       url: navigationIntent.shareUrl,
       title: navigationIntent.shareTitle,
     });
-    router.replace('/main', { scroll: false });
-  }, [navigationIntent.shareId]);
+    clearNavigationQuery();
+  }, [clearNavigationQuery, navigationIntent.shareFileCount, navigationIntent.shareId, navigationIntent.shareText, navigationIntent.shareTitle, navigationIntent.shareUrl]);
 
   // 알림 클릭 시 open_chat_room 쿼리 처리 → 채팅 메뉴 + 해당 채팅방 연동 (웹/모바일 동일)
   useEffect(() => {
@@ -522,9 +530,9 @@ function MainPageContent() {
       setMainMenu('채팅');
       if (roomId) setInitialOpenChatRoomId(roomId);
       if (msgId) setInitialOpenMessageId(msgId);
-      router.replace('/main', { scroll: false });
+      clearNavigationQuery();
     }
-  }, [navigationIntent.openChatRoom, navigationIntent.openMessage, router]);
+  }, [clearNavigationQuery, navigationIntent.openChatRoom, navigationIntent.openMessage]);
 
   // 페이지 이동 처리 (알림 인박스에서 메뉴 오픈용)
   useEffect(() => {
@@ -575,9 +583,10 @@ function MainPageContent() {
         setMainMenu('게시판'); // open_post가 있으면 무조건 게시판으로 이동
         setInitialOpenPostId(openPost);
       }
-      router.replace('/main', { scroll: false });
+      clearNavigationQuery();
     }
   }, [
+    clearNavigationQuery,
     navigationIntent.openBoard,
     navigationIntent.openApprovalId,
     navigationIntent.openInventoryApproval,
@@ -587,7 +596,6 @@ function MainPageContent() {
     navigationIntent.openPost,
     navigationIntent.openSubView,
     resolveLegacyNavigation,
-    router,
     user,
   ]);
 

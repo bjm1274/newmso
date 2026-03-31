@@ -6,6 +6,28 @@ async function erpGetWindowClients() {
   return self.clients.matchAll({ type: 'window', includeUncontrolled: true });
 }
 
+function erpNormalizeString(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+}
+
+function erpSetQueryParam(params, key, value) {
+  const normalized = erpNormalizeString(value);
+  if (!normalized) return;
+  params.set(key, normalized);
+}
+
+async function erpBroadcastMessage(type, payload) {
+  const clientList = await erpGetWindowClients();
+  clientList.forEach((client) => {
+    try {
+      client.postMessage({ type, payload });
+    } catch {
+      // ignore postMessage failures
+    }
+  });
+}
+
 function erpIsVisibleClient(client) {
   return client?.visibilityState === 'visible' || client?.focused === true;
 }
@@ -112,20 +134,147 @@ async function erpShowIncomingNotification(rawPayload) {
 
 function erpBuildTargetUrl(data) {
   const baseUrl = self.registration.scope.replace(/\/$/, '');
-  let targetUrl = `${baseUrl}/main`;
+  const params = new URLSearchParams();
 
   if (data.room_id) {
-    targetUrl += `?open_chat_room=${encodeURIComponent(data.room_id)}`;
-    if (data.message_id) {
-      targetUrl += `&open_msg=${encodeURIComponent(data.message_id)}`;
-    }
-    return targetUrl;
+    params.set('open_chat_room', erpNormalizeString(data.room_id));
+    erpSetQueryParam(params, 'open_msg', data.message_id);
+    return `${baseUrl}/main?${params.toString()}`;
   }
 
-  if (data.type === 'approval') return `${targetUrl}?open_menu=전자결재`;
-  if (data.type === 'inventory') return `${targetUrl}?open_menu=재고관리`;
-  if (data.type === 'board') return `${targetUrl}?open_menu=게시판`;
-  return targetUrl;
+  if (data.type === 'inventory' || data.inventory_view || data.inventory_approval) {
+    params.set('open_menu', '재고관리');
+    params.set('open_inventory_view', erpNormalizeString(data.inventory_view) || '현황');
+    erpSetQueryParam(params, 'open_inventory_approval', data.inventory_approval || data.approval_id);
+    return `${baseUrl}/main?${params.toString()}`;
+  }
+
+  if (data.type === 'approval' || data.approval_view || data.approval_id) {
+    params.set('open_menu', '전자결재');
+    erpSetQueryParam(params, 'open_subview', data.approval_view);
+    erpSetQueryParam(params, 'open_approval_id', data.approval_id);
+    return `${baseUrl}/main?${params.toString()}`;
+  }
+
+  if (data.type === 'board' || data.post_id || data.board_type) {
+    params.set('open_menu', '게시판');
+    erpSetQueryParam(params, 'open_board', data.board_type);
+    erpSetQueryParam(params, 'open_post', data.post_id);
+    return `${baseUrl}/main?${params.toString()}`;
+  }
+
+  if (data.type === '인사' || data.type === 'payroll' || data.type === 'education' || data.type === 'attendance') {
+    params.set('open_menu', '내정보');
+    return `${baseUrl}/main?${params.toString()}`;
+  }
+
+  return `${baseUrl}/main`;
+}
+
+async function erpMarkNotificationAsRead(data) {
+  const notificationId = erpNormalizeString(data?.notification_id);
+  if (!notificationId) return;
+
+  try {
+    await fetch('/api/notifications/mark-read', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        notification_id: notificationId,
+      }),
+    });
+    await erpBroadcastMessage('erp-notification-read-sync', {
+      notificationId,
+    });
+  } catch {
+    // ignore read-sync failures
+  }
+}
+
+function erpUrlBase64ToUint8Array(b64) {
+  const padding = '='.repeat((4 - (b64.length % 4)) % 4);
+  const base64 = (b64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for (let index = 0; index < raw.length; index += 1) {
+    out[index] = raw.charCodeAt(index);
+  }
+  return out;
+}
+
+async function erpHandlePushSubscriptionChange(event) {
+  const oldEndpoint = erpNormalizeString(event?.oldSubscription?.endpoint);
+
+  try {
+    let nextSubscription = event?.newSubscription || null;
+
+    if (!nextSubscription) {
+      const configResponse = await fetch('/api/notifications/push-config', {
+        cache: 'no-store',
+        credentials: 'include',
+      });
+      if (!configResponse.ok) {
+        throw new Error(`push config fetch failed (${configResponse.status})`);
+      }
+
+      const config = await configResponse.json().catch(() => ({}));
+      const vapidPublicKey = erpNormalizeString(config?.vapidPublicKey);
+      if (!vapidPublicKey) {
+        throw new Error('missing vapid public key');
+      }
+
+      nextSubscription = await self.registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: erpUrlBase64ToUint8Array(vapidPublicKey),
+      });
+    }
+
+    const payload = nextSubscription?.toJSON ? nextSubscription.toJSON() : null;
+    if (!payload?.endpoint || !payload.keys?.p256dh || !payload.keys?.auth) {
+      throw new Error('invalid subscription payload');
+    }
+
+    const syncResponse = await fetch('/api/notifications/push-subscription', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        endpoint: payload.endpoint,
+        p256dh: payload.keys.p256dh,
+        auth: payload.keys.auth,
+      }),
+    });
+
+    if (!syncResponse.ok) {
+      throw new Error(`push subscription sync failed (${syncResponse.status})`);
+    }
+
+    if (oldEndpoint && oldEndpoint !== payload.endpoint) {
+      await fetch('/api/notifications/push-subscription', {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          endpoint: oldEndpoint,
+        }),
+      }).catch(() => {});
+    }
+
+    await erpBroadcastMessage('erp-push-subscription-refresh', {
+      active: true,
+    });
+  } catch {
+    await erpBroadcastMessage('erp-push-subscription-refresh', {
+      active: false,
+    });
+  }
 }
 
 async function erpHandleNotificationClick(event) {
@@ -142,6 +291,7 @@ async function erpHandleNotificationClick(event) {
   if (event.action === 'close') return;
 
   const data = event.notification.data || {};
+  await erpMarkNotificationAsRead(data);
   const targetUrl = erpBuildTargetUrl(data);
   const baseUrl = self.registration.scope.replace(/\/$/, '');
   const clientList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
@@ -166,4 +316,5 @@ async function erpHandleNotificationClick(event) {
 self.__erpPushShared = {
   showIncomingNotification: erpShowIncomingNotification,
   handleNotificationClick: erpHandleNotificationClick,
+  handlePushSubscriptionChange: erpHandlePushSubscriptionChange,
 };

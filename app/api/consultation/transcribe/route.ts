@@ -4,7 +4,7 @@
  */
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { readSessionFromRequest } from '@/lib/server-session';
+import { readAuthorizedExtraFeatureUser } from '@/lib/server-extra-feature-access';
 
 const MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro'];
 
@@ -81,8 +81,13 @@ async function analyzeWithGemini(audioBase64: string, mimeType: string): Promise
 
 export async function POST(req: Request) {
     try {
-        const session = await readSessionFromRequest(req);
-        if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const auth = await readAuthorizedExtraFeatureUser(req, '수술상담');
+        if (!auth.user || auth.status || auth.error) {
+            return NextResponse.json(
+                { error: auth.status === 401 ? 'Unauthorized' : 'Forbidden' },
+                { status: auth.status ?? 500 }
+            );
+        }
 
         const body = await req.json();
         const { audio, mimeType } = body as { audio?: string; mimeType?: string };
