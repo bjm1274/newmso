@@ -131,10 +131,10 @@ const ADMIN_PERMISSION_KEYS: Record<string, string> = {
 };
 
 const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
-  menu_전자결재: ['approval'],
-  menu_인사관리: ['hr'],
-  menu_재고관리: ['inventory'],
-  menu_관리자: ['admin'],
+  menu_전자결재: ['approval', ...Object.values(APPROVAL_PERMISSION_KEYS)],
+  menu_인사관리: ['hr', ...Object.values(HR_PERMISSION_KEYS)],
+  menu_재고관리: ['inventory', ...Object.values(INVENTORY_PERMISSION_KEYS)],
+  menu_관리자: ['admin', ...Object.values(ADMIN_PERMISSION_KEYS)],
   extra_조직도: ['menu_조직도'],
   extra_입금실시간조회: ['menu_추가기능'],
   extra_수술상담: ['menu_추가기능'],

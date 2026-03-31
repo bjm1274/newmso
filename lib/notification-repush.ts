@@ -195,6 +195,7 @@ export async function processUnreadNotificationRepushServer(
     const uniqueSubscriptions = new Map<string, PushSubscriptionRow>();
     userSubscriptions.forEach((subscription) => {
       if (!subscription.endpoint) return;
+      if (!subscription.p256dh || !subscription.auth || !/^https?:\/\//i.test(String(subscription.endpoint))) return;
       if (!uniqueSubscriptions.has(subscription.endpoint)) {
         uniqueSubscriptions.set(subscription.endpoint, subscription);
       }
@@ -221,9 +222,38 @@ export async function processUnreadNotificationRepushServer(
     let rowSent = 0;
     let rowFailed = 0;
     const expiredSubscriptionIds: string[] = [];
+    const successfulFcmTokens = new Set<string>();
 
-    if (!pushDisabled && uniqueFcmTokens.length === 0) {
-      const webTargets = Array.from(uniqueSubscriptions.values());
+    if (uniqueFcmTokens.length > 0) {
+      try {
+        const fcmResult = await sendFcmBatch(uniqueFcmTokens, {
+          title: payload.title,
+          body: payload.body,
+          data: payloadData,
+        });
+        fcmResult.success.forEach((token) => successfulFcmTokens.add(String(token)));
+        rowSent += fcmResult.success.length > 0 ? 1 : 0;
+        rowFailed += fcmResult.success.length === 0 ? 1 : 0;
+        if (fcmResult.expired.length > 0) {
+          await supabase
+            .from('push_subscriptions')
+            .update({ fcm_token: null })
+            .in('fcm_token', fcmResult.expired);
+        }
+      } catch (fcmError) {
+        rowFailed += 1;
+        errors.push(`${row.id}: ${String((fcmError as Error)?.message || fcmError)}`);
+      }
+    } else if (pushDisabled && uniqueSubscriptions.size > 0) {
+      rowFailed += 1;
+    }
+
+    const webTargets = Array.from(uniqueSubscriptions.values()).filter((subscription) => {
+      const fcmToken = String(subscription.fcm_token || '').trim();
+      return !fcmToken || !successfulFcmTokens.has(fcmToken);
+    });
+
+    if (!pushDisabled && webTargets.length > 0) {
       const webResults = await Promise.allSettled(
         webTargets.map((subscription) =>
           sendWebPushNotification(subscription, payloadJson).then(() => ({ ok: true as const, id: subscription.id })),
@@ -246,29 +276,6 @@ export async function processUnreadNotificationRepushServer(
       }
     }
 
-    if (uniqueFcmTokens.length > 0) {
-      try {
-        const fcmResult = await sendFcmBatch(uniqueFcmTokens, {
-          title: payload.title,
-          body: payload.body,
-          data: payloadData,
-        });
-        rowSent += fcmResult.success.length > 0 ? 1 : 0;
-        rowFailed += fcmResult.success.length === 0 ? 1 : 0;
-        if (fcmResult.expired.length > 0) {
-          await supabase
-            .from('push_subscriptions')
-            .update({ fcm_token: null })
-            .in('fcm_token', fcmResult.expired);
-        }
-      } catch (fcmError) {
-        rowFailed += 1;
-        errors.push(`${row.id}: ${String((fcmError as Error)?.message || fcmError)}`);
-      }
-    } else if (pushDisabled) {
-      rowFailed += 1;
-    }
-
     if (expiredSubscriptionIds.length > 0) {
       await supabase.from('push_subscriptions').delete().in('id', expiredSubscriptionIds);
     }
@@ -277,7 +284,7 @@ export async function processUnreadNotificationRepushServer(
       await patchNotificationMetadata(supabase, row, {
         repush_attempt_count: repushAttempts + 1,
         repush_sent_at: nowIso,
-        repush_result: rowSent > 0 ? 'sent' : pushDisabled && uniqueFcmTokens.length === 0 ? 'web-push-disabled' : 'failed',
+        repush_result: rowSent > 0 ? 'sent' : pushDisabled && webTargets.length > 0 ? 'web-push-disabled' : 'failed',
       });
     } catch (metadataError) {
       errors.push(`${row.id}: ${String((metadataError as Error)?.message || metadataError)}`);

@@ -53,6 +53,44 @@ test('explicit menu permissions override legacy broad admin flags', async ({ pag
   await expect(page.getByTestId('sidebar-menu-admin')).toHaveCount(0);
 });
 
+test('inventory detail permissions can open inventory from the sidebar when the top-level menu key is missing', async ({
+  page,
+}) => {
+  const { menu_재고관리, ...detailScopedPermissions } = fakeUser.permissions;
+  const inventoryDetailOnlyUser = {
+    ...fakeUser,
+    id: 'inventory-detail-only-user',
+    employee_no: 'LOCK-003',
+    name: 'Inventory Detail Only User',
+    role: 'staff',
+    permissions: {
+      ...detailScopedPermissions,
+      inventory: false,
+      inventory_현황: true,
+      inventory_등록: true,
+    },
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [inventoryDetailOnlyUser],
+    companies: [
+      {
+        id: inventoryDetailOnlyUser.company_id,
+        name: inventoryDetailOnlyUser.company,
+        type: 'hospital',
+        is_active: true,
+      },
+    ],
+  });
+  await seedSession(page, { user: inventoryDetailOnlyUser });
+
+  await page.goto('/main');
+
+  await expect(page.getByTestId('sidebar-menu-inventory')).toBeVisible();
+  await page.getByTestId('sidebar-menu-inventory').click();
+  await expect(page.getByTestId('inventory-view')).toBeVisible();
+});
+
 test('explicit admin detail permissions override the legacy admin flag', async ({ page }) => {
   const partiallyLockedAdminUser = {
     ...fakeUser,

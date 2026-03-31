@@ -833,8 +833,10 @@ export default function NotificationSystem({
 
     void (async () => {
       const canShowNativeNotification = await claimCrossTabDisplayNotificationAsync(displayKey, 5000);
+      const isBackgroundClient =
+        typeof document !== 'undefined' && document.visibilityState !== 'visible';
       const shouldShowSystemNotification =
-        !isMobileClientDevice() &&
+        (!isMobileClientDevice() || isBackgroundClient) &&
         (!isChatType || !hasPushSubscriptionActive(effectiveUserId));
       if (canShowNativeNotification && shouldShowSystemNotification) {
         sendNotification(title, {
