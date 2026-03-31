@@ -518,6 +518,7 @@ test('shared approval forms submit with real field input', async ({ page }) => {
     await page.getByTestId('approval-title-input').fill('E2E 연차 신청');
     await page.getByTestId('approval-content-input').fill('연차 신청 사유를 작성합니다.');
     await page.getByTestId('approval-leave-type-select').selectOption({ index: 0 });
+    await page.getByTestId('approval-leave-delegate-select').selectOption(supportStaff.id);
     await page.getByTestId('approval-leave-start-date').fill('2026-03-18');
     await page.getByTestId('approval-leave-end-date').fill('2026-03-19');
 
@@ -530,6 +531,9 @@ test('shared approval forms submit with real field input', async ({ page }) => {
     expect(row.meta_data.vType).toContain('연차');
     expect(row.meta_data.startDate).toBe('2026-03-18');
     expect(row.meta_data.endDate).toBe('2026-03-19');
+    expect(row.meta_data.leaveType).toBeTruthy();
+    expect(row.meta_data.delegateId).toBe(supportStaff.id);
+    expect(row.meta_data.delegateName).toBe(supportStaff.name);
     expect(row.meta_data.cc_users).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: supportStaff.id, name: supportStaff.name }),

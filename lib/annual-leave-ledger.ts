@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 
 const APPROVED_STATUS_LABELS = new Set(['\uc2b9\uc778', 'approved']);
 
@@ -107,14 +108,61 @@ export function calculateApprovedAnnualLeaveUsage(
   }, 0);
 }
 
+type EnsureApprovedAnnualLeaveRequestParams = {
+  staffId: string;
+  leaveType: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  approvalId?: string | null;
+  companyId?: string | null;
+  companyName?: string | null;
+  delegateId?: string | null;
+  delegateName?: string | null;
+  delegateDepartment?: string | null;
+  delegatePosition?: string | null;
+};
+
+function buildLeaveRequestPayload(params: EnsureApprovedAnnualLeaveRequestParams) {
+  const optionalEntries = Object.entries({
+    approval_id: params.approvalId ?? null,
+    company_id: params.companyId ?? null,
+    company_name: params.companyName ?? null,
+    delegate_id: params.delegateId ?? null,
+    delegate_name: params.delegateName ?? null,
+    delegate_department: params.delegateDepartment ?? null,
+    delegate_position: params.delegatePosition ?? null,
+  }).filter(([, value]) => value != null && String(value).trim() !== '');
+
+  return {
+    staff_id: params.staffId,
+    leave_type: params.leaveType,
+    start_date: params.startDate,
+    end_date: params.endDate,
+    reason: params.reason,
+    status: '승인',
+    approved_at: new Date().toISOString(),
+    optionalEntries,
+  };
+}
+
 export async function ensureApprovedAnnualLeaveRequest(params: {
   staffId: string;
   leaveType: string;
   startDate: string;
   endDate: string;
   reason: string;
+  approvalId?: string | null;
+  companyId?: string | null;
+  companyName?: string | null;
+  delegateId?: string | null;
+  delegateName?: string | null;
+  delegateDepartment?: string | null;
+  delegatePosition?: string | null;
 }, client: SupabaseClient = supabase) {
-  const { staffId, leaveType, startDate, endDate, reason } = params;
+  const { staffId, leaveType, startDate, endDate } = params;
+  const payload = buildLeaveRequestPayload(params);
+  const optionalColumnNames = payload.optionalEntries.map(([columnName]) => columnName);
 
   const { data: existing, error: existingError } = await client
     .from('leave_requests')
@@ -134,13 +182,20 @@ export async function ensureApprovedAnnualLeaveRequest(params: {
 
   if (matched?.id) {
     if (!isApprovedLeaveStatus(matched.status)) {
-      const { error: approveError } = await client
-        .from('leave_requests')
-        .update({
-          status: '\uc2b9\uc778',
-          approved_at: new Date().toISOString(),
-        })
-        .eq('id', matched.id);
+      const { error: approveError } = await withMissingColumnsFallback(
+        (omittedColumns) =>
+          client
+            .from('leave_requests')
+            .update({
+              status: '승인',
+              approved_at: payload.approved_at,
+              ...Object.fromEntries(
+                payload.optionalEntries.filter(([columnName]) => !omittedColumns.has(columnName))
+              ),
+            })
+            .eq('id', matched.id),
+        optionalColumnNames,
+      );
 
       if (approveError) throw approveError;
     }
@@ -148,19 +203,26 @@ export async function ensureApprovedAnnualLeaveRequest(params: {
     return matched.id;
   }
 
-  const { data: inserted, error: insertError } = await client
-    .from('leave_requests')
-    .insert({
-      staff_id: staffId,
-      leave_type: leaveType,
-      start_date: startDate,
-      end_date: endDate,
-      reason,
-      status: '\uc2b9\uc778',
-      approved_at: new Date().toISOString(),
-    })
-    .select('id')
-    .single();
+  const { data: inserted, error: insertError } = await withMissingColumnsFallback(
+    (omittedColumns) =>
+      client
+        .from('leave_requests')
+        .insert({
+          staff_id: payload.staff_id,
+          leave_type: payload.leave_type,
+          start_date: payload.start_date,
+          end_date: payload.end_date,
+          reason: payload.reason,
+          status: payload.status,
+          approved_at: payload.approved_at,
+          ...Object.fromEntries(
+            payload.optionalEntries.filter(([columnName]) => !omittedColumns.has(columnName))
+          ),
+        })
+        .select('id')
+        .single(),
+    optionalColumnNames,
+  );
 
   if (insertError) throw insertError;
   return inserted?.id ?? null;
