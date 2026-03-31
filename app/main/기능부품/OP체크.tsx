@@ -3,6 +3,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
+import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import type { BoardPost, InventoryItem, OpCheckItem, OpCheckTemplate, OpPatientCheck } from '@/types';
 
 const SCHEDULE_META_PREFIX = '[[SCHEDULE_META]]';
@@ -279,6 +280,30 @@ function emptyTemplateEditor(): TemplateEditorState {
   };
 }
 
+function normalizeInventoryRows(rows: unknown) {
+  if (!Array.isArray(rows)) return [] as InventoryItem[];
+
+  return rows
+    .map((row) => {
+      const item = (row || {}) as Record<string, unknown>;
+      const id = String(item.id || '').trim();
+      const name = String(item.name || '').trim();
+      if (!id || !name) return null;
+
+      return {
+        ...item,
+        id,
+        name,
+        unit: String(item.unit || '').trim() || null,
+        quantity: typeof item.quantity === 'number' ? item.quantity : Number(item.quantity || 0),
+        company: String(item.company || '').trim() || null,
+        company_id: String(item.company_id || '').trim() || null,
+        department: String(item.department || '').trim() || null,
+      } as InventoryItem;
+    })
+    .filter((item): item is InventoryItem => Boolean(item));
+}
+
 function isOpCheckSchemaMissing(error: unknown) {
   if (!error || typeof error !== 'object') return false;
   const code = String((error as { code?: string }).code || '');
@@ -316,58 +341,119 @@ export default function OperationCheckView({
     setSchemaError('');
 
     try {
-      let scheduleQuery = supabase
-        .from('board_posts')
-        .select('*')
-        .eq('board_type', '수술일정')
-        .order('schedule_date', { ascending: true })
-        .order('schedule_time', { ascending: true })
-        .order('created_at', { ascending: true });
-
-      let templateQuery = supabase
-        .from('op_check_templates')
-        .select('*')
-        .order('template_scope', { ascending: true })
-        .order('template_name', { ascending: true });
-
-      let patientCheckQuery = supabase
-        .from('op_patient_checks')
-        .select('*')
-        .order('schedule_date', { ascending: true })
-        .order('schedule_time', { ascending: true });
-
       const surgeryTemplateQuery = supabase
         .from('surgery_templates')
         .select('*')
         .eq('is_active', true)
         .order('sort_order', { ascending: true });
 
-      let inventoryQuery = supabase
-        .from('inventory_items')
-        .select('id, name, unit, quantity, company, company_id, department')
-        .order('name', { ascending: true });
-
       const companyId = String(user?.company_id || '').trim();
       const companyName = String(user?.company || '').trim();
 
-      if (companyId) {
-        scheduleQuery = scheduleQuery.eq('company_id', companyId);
-        templateQuery = templateQuery.eq('company_id', companyId);
-        patientCheckQuery = patientCheckQuery.eq('company_id', companyId);
-        inventoryQuery = inventoryQuery.eq('company_id', companyId);
-      } else if (companyName) {
-        scheduleQuery = scheduleQuery.eq('company', companyName);
-        templateQuery = templateQuery.eq('company_name', companyName);
-        patientCheckQuery = patientCheckQuery.eq('company_name', companyName);
-        inventoryQuery = inventoryQuery.eq('company', companyName);
-      }
-
       const [scheduleRes, templateRes, patientCheckRes, surgeryTemplateRes, inventoryRes] = await Promise.all([
-        scheduleQuery,
-        templateQuery,
-        patientCheckQuery,
+        withMissingColumnFallback(
+          async () => {
+            let query = supabase
+              .from('board_posts')
+              .select('*')
+              .eq('board_type', '수술일정')
+              .order('schedule_date', { ascending: true })
+              .order('schedule_time', { ascending: true })
+              .order('created_at', { ascending: true });
+            if (companyId) {
+              query = query.eq('company_id', companyId);
+            } else if (companyName) {
+              query = query.eq('company', companyName);
+            }
+            return query;
+          },
+          async () => {
+            let query = supabase
+              .from('board_posts')
+              .select('*')
+              .eq('board_type', '수술일정')
+              .order('schedule_date', { ascending: true })
+              .order('schedule_time', { ascending: true })
+              .order('created_at', { ascending: true });
+            if (companyName) {
+              query = query.eq('company', companyName);
+            }
+            return query;
+          },
+        ),
+        withMissingColumnFallback(
+          async () => {
+            let query = supabase
+              .from('op_check_templates')
+              .select('*')
+              .order('template_scope', { ascending: true })
+              .order('template_name', { ascending: true });
+            if (companyId) {
+              query = query.eq('company_id', companyId);
+            } else if (companyName) {
+              query = query.eq('company_name', companyName);
+            }
+            return query;
+          },
+          async () => {
+            let query = supabase
+              .from('op_check_templates')
+              .select('*')
+              .order('template_scope', { ascending: true })
+              .order('template_name', { ascending: true });
+            if (companyName) {
+              query = query.eq('company_name', companyName);
+            }
+            return query;
+          },
+        ),
+        withMissingColumnFallback(
+          async () => {
+            let query = supabase
+              .from('op_patient_checks')
+              .select('*')
+              .order('schedule_date', { ascending: true })
+              .order('schedule_time', { ascending: true });
+            if (companyId) {
+              query = query.eq('company_id', companyId);
+            } else if (companyName) {
+              query = query.eq('company_name', companyName);
+            }
+            return query;
+          },
+          async () => {
+            let query = supabase
+              .from('op_patient_checks')
+              .select('*')
+              .order('schedule_date', { ascending: true })
+              .order('schedule_time', { ascending: true });
+            if (companyName) {
+              query = query.eq('company_name', companyName);
+            }
+            return query;
+          },
+        ),
         surgeryTemplateQuery,
-        inventoryQuery,
+        withMissingColumnsFallback(
+          async (omittedColumns) => {
+            const selectedColumns = ['id', 'name', 'unit', 'quantity', 'company', 'company_id', 'department']
+              .filter((columnName) => !omittedColumns.has(columnName))
+              .join(', ');
+            let query = supabase
+              .from('inventory_items')
+              .select(selectedColumns)
+              .order('name', { ascending: true });
+
+            if (!omittedColumns.has('company_id') && companyId) {
+              query = query.eq('company_id', companyId);
+            } else if (companyName) {
+              query = query.eq('company', companyName);
+            }
+
+            return query;
+          },
+          ['company_id', 'department'],
+        ),
       ]);
 
       const firstError =
@@ -393,7 +479,7 @@ export default function OperationCheckView({
       setOpTemplates((templateRes.data || []) as OpCheckTemplate[]);
       setPatientChecks((patientCheckRes.data || []) as OpPatientCheck[]);
       setSurgeryTemplates((surgeryTemplateRes.data || []) as SurgeryTemplateRow[]);
-      setInventoryItems((inventoryRes.data || []) as InventoryItem[]);
+      setInventoryItems(normalizeInventoryRows(inventoryRes.data));
     } catch (error) {
       console.error('OP체크 데이터 로딩 실패', error);
       toast('OP체크 데이터를 불러오지 못했습니다.', 'error');
