@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { readAuthorizedDepositUser } from '@/lib/server-deposit-access';
 import { normalizeVirtualAccountWebhook } from '@/lib/virtual-account-deposits';
 
 export const runtime = 'nodejs';
@@ -16,21 +17,63 @@ function getAdminClient() {
   return createClient(supabaseUrl, serviceKey);
 }
 
-function isWebhookAuthorized(request: NextRequest) {
-  const expectedToken = process.env.VIRTUAL_ACCOUNT_WEBHOOK_TOKEN?.trim();
-  if (!expectedToken) return true;
-
+async function authorizeWebhookRequest(request: NextRequest) {
+  const expectedToken = process.env.VIRTUAL_ACCOUNT_WEBHOOK_TOKEN?.trim() || '';
   const url = new URL(request.url);
   const providedToken =
     request.headers.get('x-webhook-token')?.trim() || url.searchParams.get('token')?.trim();
 
-  return providedToken === expectedToken;
+  if (expectedToken && providedToken === expectedToken) {
+    return {
+      allowed: true,
+      userCompanyId: null as string | null,
+      response: null as NextResponse<unknown> | null,
+    };
+  }
+
+  const access = await readAuthorizedDepositUser(request);
+  if (access.user) {
+    return {
+      allowed: true,
+      userCompanyId: String(access.user.company_id || '').trim() || null,
+      response: null as NextResponse<unknown> | null,
+    };
+  }
+
+  if (!expectedToken) {
+    const response =
+      access.status === 403
+        ? NextResponse.json({ error: '권한이 없습니다.' }, { status: 403 })
+        : NextResponse.json(
+            { error: 'VIRTUAL_ACCOUNT_WEBHOOK_TOKEN is not configured.' },
+            { status: 503 }
+          );
+    return {
+      allowed: false,
+      userCompanyId: null as string | null,
+      response,
+    };
+  }
+
+  const response = NextResponse.json(
+    { error: access.status === 403 ? '권한이 없습니다.' : 'Unauthorized webhook request.' },
+    { status: access.status ?? 401 }
+  );
+  return {
+    allowed: false,
+    userCompanyId: null as string | null,
+    response,
+  };
 }
 
 export async function POST(request: NextRequest) {
   try {
-    if (!isWebhookAuthorized(request)) {
-      return NextResponse.json({ error: 'Unauthorized webhook request.' }, { status: 401 });
+    const authorization = await authorizeWebhookRequest(request);
+    if (!authorization.allowed) {
+      return (
+        authorization.response ||
+        NextResponse.json({ error: 'Unauthorized webhook request.' }, { status: 401 })
+      );
     }
 
     const rawText = await request.text();
@@ -41,7 +84,7 @@ export async function POST(request: NextRequest) {
     const payload = JSON.parse(rawText) as unknown;
     const url = new URL(request.url);
     const normalized = normalizeVirtualAccountWebhook(payload, {
-      companyId: url.searchParams.get('companyId'),
+      companyId: url.searchParams.get('companyId') || authorization.userCompanyId,
       provider: url.searchParams.get('provider'),
     });
 

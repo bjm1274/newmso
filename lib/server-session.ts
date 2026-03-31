@@ -1,3 +1,4 @@
+import { createClient } from '@supabase/supabase-js';
 import { normalizeProfileUser } from './profile-photo';
 
 const encoder = new TextEncoder();
@@ -56,6 +57,17 @@ function getSessionSecret() {
     return 'dev-only-session-secret-change-this';
   }
   throw new Error('SESSION_SECRET 환경변수가 설정되지 않았습니다.');
+}
+
+function getAdminClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+
+  if (!supabaseUrl || !serviceKey) {
+    throw new Error('Supabase server configuration is missing.');
+  }
+
+  return createClient(supabaseUrl, serviceKey);
 }
 
 function bytesToBase64Url(bytes: Uint8Array) {
@@ -174,6 +186,52 @@ export function normalizeSessionUser(input: any): SessionUser {
         ? normalizedProfile.permissions
         : {},
   };
+}
+
+export async function resolveLatestSessionUser(sessionUser: any): Promise<SessionUser> {
+  const supabase = getAdminClient();
+  const normalizedUser = normalizeSessionUser(sessionUser);
+  const sessionUserId = String(normalizedUser?.id ?? '').trim();
+  const sessionEmployeeNo = String(normalizedUser?.employee_no ?? '').trim();
+  const sessionName = String(normalizedUser?.name ?? '').trim();
+
+  if (sessionUserId) {
+    const { data, error } = await supabase
+      .from('staff_members')
+      .select('*')
+      .eq('id', sessionUserId)
+      .maybeSingle();
+
+    if (!error && data) {
+      return normalizeSessionUser({ ...normalizedUser, ...data });
+    }
+  }
+
+  if (sessionEmployeeNo) {
+    const { data, error } = await supabase
+      .from('staff_members')
+      .select('*')
+      .eq('employee_no', sessionEmployeeNo)
+      .maybeSingle();
+
+    if (!error && data) {
+      return normalizeSessionUser({ ...normalizedUser, ...data });
+    }
+  }
+
+  if (sessionName) {
+    const { data, error } = await supabase
+      .from('staff_members')
+      .select('*')
+      .eq('name', sessionName)
+      .limit(2);
+
+    if (!error && Array.isArray(data) && data.length === 1) {
+      return normalizeSessionUser({ ...normalizedUser, ...data[0] });
+    }
+  }
+
+  return normalizedUser;
 }
 
 function createSessionUserSnapshot(input: any): SessionUser {
