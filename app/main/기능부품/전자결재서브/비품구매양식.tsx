@@ -7,13 +7,16 @@ import {
   buildSupplyRequestMonthlySuggestions,
   INVENTORY_SUPPORT_COMPANY,
   INVENTORY_SUPPORT_DEPARTMENT,
+  normalizeInventoryUnit,
   normalizeSupplyRequestItems,
+  type SupplyRequestItemUnit,
   type SupplyRequestMonthlySuggestion,
 } from '@/app/main/inventory-utils';
 
 type SupplyRow = {
   name: string;
   qty: number;
+  unit: SupplyRequestItemUnit;
   currentStock: number | null;
   dept: string;
   purpose: string;
@@ -24,6 +27,8 @@ type InventoryCatalogItem = {
   name: string;
   stock: number;
   min_stock: number;
+  unit: SupplyRequestItemUnit;
+  spec: string;
 };
 
 type SuppliesFormProps = {
@@ -33,12 +38,13 @@ type SuppliesFormProps = {
 };
 
 const MONTHLY_STATS_LIMIT = 8;
-const departments = ['병동팀', '수술팀', '외래팀', '검사팀', '총무팀', '원무팀', '진료부', '관리팀', '영양팀'];
+const DEPARTMENTS = ['병동부', '수술부', '외래부', '검사실', '총무부', '원무부', '진료부', '관리팀', '영양팀'];
 
 function defaultRow(overrides: Partial<Omit<SupplyRow, 'suggestions'>> = {}): SupplyRow {
   return {
     name: '',
     qty: 1,
+    unit: 'EA',
     currentStock: null,
     dept: '',
     purpose: '',
@@ -47,18 +53,28 @@ function defaultRow(overrides: Partial<Omit<SupplyRow, 'suggestions'>> = {}): Su
   };
 }
 
+function sanitizeQuantity(value: unknown) {
+  return Math.max(1, Number(value) || 1);
+}
+
 function getInventoryItemName(row: any) {
   return String(row?.item_name || row?.name || '').trim();
 }
 
 function getInventoryStock(row: any) {
-  const raw = row?.quantity ?? row?.stock ?? 0;
-  return Number(raw) || 0;
+  return Number(row?.quantity ?? row?.stock ?? 0) || 0;
 }
 
 function getInventoryMinStock(row: any) {
-  const raw = row?.min_quantity ?? row?.min_stock ?? 0;
-  return Number(raw) || 0;
+  return Number(row?.min_quantity ?? row?.min_stock ?? 0) || 0;
+}
+
+function getInventoryUnit(row: any): SupplyRequestItemUnit {
+  return normalizeInventoryUnit(row?.unit);
+}
+
+function getInventorySpec(row: any) {
+  return String(row?.spec || '').trim();
 }
 
 function isTargetInventory(row: any) {
@@ -68,18 +84,15 @@ function isTargetInventory(row: any) {
   );
 }
 
-function sanitizeQuantity(value: unknown) {
-  return Math.max(1, Number(value) || 1);
-}
-
 function buildRowFromUnknown(input: unknown): SupplyRow {
   const row = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
   return defaultRow({
-    name: String(row.name || '').trim(),
-    qty: sanitizeQuantity(row.qty),
+    name: String(row.name || row.item_name || '').trim(),
+    qty: sanitizeQuantity(row.qty || row.quantity),
+    unit: normalizeInventoryUnit(row.unit),
     currentStock: row.currentStock == null ? null : Number(row.currentStock) || 0,
     dept: String(row.dept || row.department || '').trim(),
-    purpose: String(row.purpose || '').trim(),
+    purpose: String(row.purpose || row.reason || '').trim(),
   });
 }
 
@@ -107,14 +120,31 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
       .forEach((row) => {
         const name = getInventoryItemName(row);
         if (!name) return;
+
         const key = name.toLowerCase();
-        const current = merged.get(key) || { name, stock: 0, min_stock: 0 };
+        const rowUnit = getInventoryUnit(row);
+        const rowSpec = getInventorySpec(row);
+        const current = merged.get(key) || {
+          name,
+          stock: 0,
+          min_stock: 0,
+          unit: rowUnit,
+          spec: rowSpec,
+        };
+
         current.stock += getInventoryStock(row);
         current.min_stock = Math.max(current.min_stock, getInventoryMinStock(row));
+        if (!current.spec && rowSpec) {
+          current.spec = rowSpec;
+        }
+        if (current.unit !== 'BOX' && rowUnit === 'BOX') {
+          current.unit = rowUnit;
+        }
+
         merged.set(key, current);
       });
 
-    return Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+    return Array.from(merged.values()).sort((left, right) => left.name.localeCompare(right.name, 'ko'));
   }, [inventory]);
 
   useEffect(() => {
@@ -174,6 +204,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
         return {
           ...item,
           currentStock: matched ? matched.stock : null,
+          unit: matched ? matched.unit : item.unit,
         };
       }),
     );
@@ -187,18 +218,21 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
     });
   }, [items, setExtraData]);
 
-  const handleSearch = (idx: number, value: string) => {
+  const handleSearch = (index: number, value: string) => {
     const keyword = value.trim().toLowerCase();
     setItems((prev) =>
-      prev.map((item, itemIdx) => {
-        if (itemIdx !== idx) return item;
+      prev.map((item, itemIndex) => {
+        if (itemIndex !== index) return item;
+
         const exactMatch = keyword
           ? inventoryCatalog.find((entry) => entry.name.toLowerCase() === keyword)
           : null;
+
         return {
           ...item,
           name: value,
           currentStock: exactMatch ? exactMatch.stock : null,
+          unit: exactMatch ? exactMatch.unit : item.unit,
           suggestions: keyword
             ? inventoryCatalog
                 .filter((entry) => {
@@ -212,14 +246,15 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
     );
   };
 
-  const selectItem = (idx: number, selected: InventoryCatalogItem) => {
+  const selectItem = (index: number, selected: InventoryCatalogItem) => {
     setItems((prev) =>
-      prev.map((item, itemIdx) =>
-        itemIdx === idx
+      prev.map((item, itemIndex) =>
+        itemIndex === index
           ? {
               ...item,
               name: selected.name,
               currentStock: selected.stock,
+              unit: selected.unit,
               suggestions: [],
             }
           : item,
@@ -227,15 +262,10 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
     );
   };
 
-  const applyBulkDept = () => {
-    if (!bulkDept) return;
-    setItems((prev) => prev.map((item) => ({ ...item, dept: bulkDept })));
-  };
-
-  const updateItemField = (idx: number, key: 'qty' | 'dept' | 'purpose', value: unknown) => {
+  const updateItemField = (index: number, key: 'qty' | 'dept' | 'purpose', value: unknown) => {
     setItems((prev) =>
-      prev.map((item, itemIdx) =>
-        itemIdx === idx
+      prev.map((item, itemIndex) =>
+        itemIndex === index
           ? {
               ...item,
               [key]: key === 'qty' ? sanitizeQuantity(value) : value,
@@ -253,9 +283,14 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
     setItems((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
   };
 
+  const applyBulkDept = () => {
+    if (!bulkDept) return;
+    setItems((prev) => prev.map((item) => ({ ...item, dept: bulkDept })));
+  };
+
   const applyMonthlyStats = () => {
     if (monthlySuggestions.length === 0) {
-      toast('최근 한 달 기준 추천할 물품 통계가 아직 없습니다.', 'warning');
+      toast('최근 30일 기준 추천 물품 통계가 아직 없습니다.', 'warning');
       return;
     }
 
@@ -279,6 +314,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
             ...nextRows[existingIndex],
             qty: Math.max(nextRows[existingIndex].qty, suggestion.average_qty),
             currentStock: matchedInventory ? matchedInventory.stock : nextRows[existingIndex].currentStock,
+            unit: matchedInventory ? matchedInventory.unit : nextRows[existingIndex].unit,
           };
           return;
         }
@@ -287,6 +323,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
           defaultRow({
             name: suggestion.name,
             qty: suggestion.average_qty,
+            unit: matchedInventory ? matchedInventory.unit : 'EA',
             dept: suggestion.dept,
             purpose: suggestion.purpose,
             currentStock: matchedInventory ? matchedInventory.stock : null,
@@ -297,7 +334,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
       return nextRows.length > 0 ? nextRows : [defaultRow()];
     });
 
-    toast('최근 한 달 통계 기준 자주 신청한 물품을 신청서에 채웠습니다.', 'success');
+    toast('최근 사용 통계 기준으로 자주 신청한 물품을 채웠습니다.', 'success');
   };
 
   return (
@@ -305,8 +342,8 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
       <div className="flex flex-col gap-3 border-b border-[var(--toss-blue-light)] bg-[var(--toss-blue-light)]/50 p-3 md:flex-row md:items-center md:justify-between">
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:flex md:flex-wrap md:items-center">
           <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-[var(--accent)]">
-            <span className="h-2 w-2 rounded-full bg-[var(--accent)] animate-pulse" />
-            SY INC 경영지원팀 재고
+            <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]" />
+            SY INC 경영지원팀 재고 기준
           </p>
           <button
             type="button"
@@ -317,7 +354,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
             <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[var(--foreground)] pb-[1px] text-[11px] leading-none">
               +
             </span>
-            품목 추가하기
+            항목 추가
           </button>
           <button
             type="button"
@@ -326,7 +363,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
             disabled={items.length <= 1}
             className="inline-flex items-center justify-center rounded-[var(--radius-md)] bg-red-50 px-3 py-1.5 text-[11px] font-bold text-red-500 transition-colors hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            품목 제거하기
+            항목 삭제
           </button>
           <button
             type="button"
@@ -347,7 +384,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
               className="min-h-[44px] rounded-[var(--radius-md)] border-none bg-[var(--card)] px-3 py-2 text-[13px] font-bold text-[var(--foreground)] shadow-sm outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
             >
               <option value="">선택...</option>
-              {departments.map((department) => (
+              {DEPARTMENTS.map((department) => (
                 <option key={department} value={department}>
                   {department}
                 </option>
@@ -365,80 +402,73 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
         </div>
       </div>
 
-      <div className="border-b border-[var(--border)] bg-[var(--background)]/35 px-3 py-3">
-        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-[12px] font-black text-[var(--foreground)]">통계치 입력</p>
-            <p className="mt-1 text-[11px] font-semibold leading-relaxed text-[var(--toss-gray-3)]">
-              최근 한 달 물품신청 기준으로 자주 신청한 품목을 평균 수량으로 한 번에 채웁니다.
-            </p>
-            <p className="mt-1 text-[11px] font-semibold leading-relaxed text-[var(--accent)]">
-              기본 재고 원천: {INVENTORY_SUPPORT_COMPANY} · {INVENTORY_SUPPORT_DEPARTMENT}
-            </p>
+      {(statsLoading || monthlySuggestions.length > 0) ? (
+        <div className="border-b border-[var(--border)] bg-[var(--background)]/35 px-3 py-3">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-[12px] font-black text-[var(--foreground)]">통계치 입력</p>
+              <p className="mt-1 text-[11px] font-semibold leading-relaxed text-[var(--toss-gray-3)]">
+                최근 30일 물품신청 기준으로 자주 쓰는 품목을 평균 수량으로 추천합니다.
+              </p>
+            </div>
+            {!statsLoading && monthlySuggestions.length > 0 ? (
+              <p className="text-[11px] font-semibold text-[var(--accent)]">추천 {monthlySuggestions.length}개</p>
+            ) : null}
           </div>
-          {!statsLoading && monthlySuggestions.length > 0 ? (
-            <p className="text-[11px] font-semibold text-[var(--accent)]">
-              추천 {monthlySuggestions.length}개
-            </p>
-          ) : null}
-        </div>
 
-        {statsLoading ? (
-          <div className="mt-3 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)] px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)]">
-            최근 한 달 물품신청 통계를 불러오는 중입니다.
-          </div>
-        ) : monthlySuggestions.length === 0 ? (
-          <div className="mt-3 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)] px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)]">
-            아직 이번 달 통계가 없어 자동으로 채울 추천 품목이 없습니다.
-          </div>
-        ) : (
-          <div className="mt-3 grid gap-2 md:grid-cols-2">
-            {monthlySuggestions.map((suggestion, index) => (
-              <div
-                key={suggestion.key}
-                data-testid={`supplies-stats-item-${index}`}
-                className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-[12px] font-black text-[var(--foreground)]">{suggestion.name}</p>
-                    <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                      {suggestion.dept || '부서 미지정'}
-                      {suggestion.purpose ? ` · ${suggestion.purpose}` : ''}
-                    </p>
+          {statsLoading ? (
+            <div className="mt-3 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)] px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+              추천 품목을 불러오는 중입니다.
+            </div>
+          ) : (
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              {monthlySuggestions.map((suggestion, index) => (
+                <div
+                  key={suggestion.key}
+                  data-testid={`supplies-stats-item-${index}`}
+                  className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-[12px] font-black text-[var(--foreground)]">{suggestion.name}</p>
+                      <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                        {suggestion.dept || '부서 미지정'}
+                        {suggestion.purpose ? ` · ${suggestion.purpose}` : ''}
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-[var(--toss-blue-light)] px-2.5 py-1 text-[11px] font-black text-[var(--accent)]">
+                      평균 {suggestion.average_qty}개
+                    </span>
                   </div>
-                  <span className="shrink-0 rounded-full bg-[var(--toss-blue-light)] px-2.5 py-1 text-[11px] font-black text-[var(--accent)]">
-                    평균 {suggestion.average_qty}개
-                  </span>
+                  <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                    <span className="rounded-full bg-[var(--muted)] px-2 py-1">문서 {suggestion.document_count}건</span>
+                    <span className="rounded-full bg-[var(--muted)] px-2 py-1">합계 {suggestion.total_qty}개</span>
+                  </div>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                  <span className="rounded-full bg-[var(--muted)] px-2 py-1">문서 {suggestion.document_count}건</span>
-                  <span className="rounded-full bg-[var(--muted)] px-2 py-1">합계 {suggestion.total_qty}개</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
 
       <div className="bg-[var(--tab-bg)]/20 p-2 md:p-3">
         <div className="space-y-3 md:hidden">
-          {items.map((item, idx) => (
+          {items.map((item, index) => (
             <div
-              key={idx}
+              key={index}
               className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm"
             >
               <div className="mb-3 flex items-center justify-between gap-3">
-                <span className="text-[12px] font-black text-[var(--foreground)]">품목 {idx + 1}</span>
-                {item.currentStock !== null && (
+                <span className="text-[12px] font-black text-[var(--foreground)]">항목 {index + 1}</span>
+                {item.currentStock !== null ? (
                   <span
                     className={`shrink-0 rounded-[var(--radius-md)] px-2 py-1 text-[10px] font-bold ${
                       item.currentStock <= 5 ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'
                     }`}
                   >
-                    SY INC 재고 {item.currentStock}
+                    SY INC 재고 {item.currentStock} {item.unit}
                   </span>
-                )}
+                ) : null}
               </div>
 
               <div className="space-y-3">
@@ -446,22 +476,30 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
                   <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">물품명</span>
                   <div className="relative">
                     <input
-                      data-testid={`supplies-item-name-mobile-${idx}`}
+                      data-testid={`supplies-item-name-mobile-${index}`}
                       value={item.name}
-                      onChange={(event) => handleSearch(idx, event.target.value)}
-                      onFocus={(event) => handleSearch(idx, event.target.value)}
+                      onChange={(event) => handleSearch(index, event.target.value)}
+                      onFocus={(event) => handleSearch(index, event.target.value)}
                       className="h-12 w-full rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-3 text-sm font-bold text-[var(--foreground)] outline-none transition-all focus:bg-[var(--card)] focus:ring-2 focus:ring-[var(--accent)]/20"
-                      placeholder="품목명 입력"
+                      placeholder="물품명을 입력하세요"
                     />
-                    {item.suggestions.length > 0 && (
+                    {item.suggestions.length > 0 ? (
                       <div className="absolute left-0 top-full z-[100] mt-1 w-full overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
                         {item.suggestions.map((suggestion, suggestionIndex) => (
                           <div
                             key={`${suggestion.name}-${suggestionIndex}`}
-                            onClick={() => selectItem(idx, suggestion)}
-                            className="flex cursor-pointer items-center justify-between border-b p-3 text-[12px] font-bold transition-colors last:border-none hover:bg-[var(--muted)]"
+                            data-testid={`supplies-item-suggestion-mobile-${index}-${suggestionIndex}`}
+                            onClick={() => selectItem(index, suggestion)}
+                            className="flex cursor-pointer items-center justify-between gap-3 border-b p-3 text-[12px] font-bold transition-colors last:border-none hover:bg-[var(--muted)]"
                           >
-                            <span className="text-[var(--foreground)]">{suggestion.name}</span>
+                            <div className="min-w-0">
+                              <span className="block truncate text-[var(--foreground)]">{suggestion.name}</span>
+                              {suggestion.spec ? (
+                                <span className="mt-1 block truncate text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                                  {suggestion.spec}
+                                </span>
+                              ) : null}
+                            </div>
                             <span
                               className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${
                                 suggestion.stock <= suggestion.min_stock
@@ -469,37 +507,46 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
                                   : 'bg-green-100 text-green-600'
                               }`}
                             >
-                              경영지원 재고: {suggestion.stock}
+                              재고 {suggestion.stock} {suggestion.unit}
                             </span>
                           </div>
                         ))}
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 </label>
 
                 <div className="grid grid-cols-2 gap-3">
                   <label className="block space-y-1.5">
-                    <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">수량</span>
-                    <input
-                      data-testid={`supplies-item-qty-mobile-${idx}`}
-                      type="number"
-                      min="1"
-                      value={item.qty}
-                      onChange={(event) => updateItemField(idx, 'qty', event.target.value)}
-                      className="h-12 w-full rounded-[var(--radius-md)] border-none bg-[var(--toss-blue-light)]/50 px-3 text-center text-2xl font-black tabular-nums text-[var(--accent)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
-                    />
+                    <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">수량 ({item.unit})</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        data-testid={`supplies-item-qty-mobile-${index}`}
+                        type="number"
+                        min="1"
+                        value={item.qty}
+                        onChange={(event) => updateItemField(index, 'qty', event.target.value)}
+                        className="h-12 w-full rounded-[var(--radius-md)] border-none bg-[var(--toss-blue-light)]/50 px-3 text-center text-2xl font-black tabular-nums text-[var(--accent)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                      />
+                      <span
+                        data-testid={`supplies-item-unit-mobile-${index}`}
+                        className="shrink-0 rounded-full bg-[var(--muted)] px-3 py-2 text-[11px] font-black text-[var(--accent)]"
+                      >
+                        {item.unit}
+                      </span>
+                    </div>
                   </label>
+
                   <label className="block space-y-1.5">
                     <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">사용부서</span>
                     <select
-                      data-testid={`supplies-item-dept-mobile-${idx}`}
-                      className="h-12 w-full rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-3 text-sm font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+                      data-testid={`supplies-item-dept-mobile-${index}`}
                       value={item.dept}
-                      onChange={(event) => updateItemField(idx, 'dept', event.target.value)}
+                      onChange={(event) => updateItemField(index, 'dept', event.target.value)}
+                      className="h-12 w-full rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-3 text-sm font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                     >
                       <option value="">부서 선택</option>
-                      {departments.map((department) => (
+                      {DEPARTMENTS.map((department) => (
                         <option key={department} value={department}>
                           {department}
                         </option>
@@ -511,11 +558,11 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
                 <label className="block space-y-1.5">
                   <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">용도</span>
                   <input
-                    data-testid={`supplies-item-purpose-mobile-${idx}`}
+                    data-testid={`supplies-item-purpose-mobile-${index}`}
                     value={item.purpose}
-                    onChange={(event) => updateItemField(idx, 'purpose', event.target.value)}
+                    onChange={(event) => updateItemField(index, 'purpose', event.target.value)}
                     className="h-12 w-full rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none transition-all focus:bg-[var(--card)] focus:ring-2 focus:ring-[var(--accent)]/20"
-                    placeholder="용도 입력"
+                    placeholder="사용 용도를 입력하세요"
                   />
                 </label>
               </div>
@@ -540,38 +587,46 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
               </tr>
             </thead>
             <tbody>
-              {items.map((item, idx) => (
-                <tr key={idx} className="border-b border-[var(--border)] last:border-b-0">
+              {items.map((item, index) => (
+                <tr key={index} className="border-b border-[var(--border)] last:border-b-0">
                   <td className="px-2 py-1.5 align-middle">
                     <div className="relative">
                       <input
-                        data-testid={`supplies-item-name-${idx}`}
+                        data-testid={`supplies-item-name-${index}`}
                         value={item.name}
-                        onChange={(event) => handleSearch(idx, event.target.value)}
-                        onFocus={(event) => handleSearch(idx, event.target.value)}
+                        onChange={(event) => handleSearch(index, event.target.value)}
+                        onFocus={(event) => handleSearch(index, event.target.value)}
                         className={`h-10 w-full rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-2.5 text-xs font-bold text-[var(--foreground)] outline-none transition-all focus:bg-[var(--card)] focus:ring-2 focus:ring-[var(--accent)]/20 ${
-                          item.currentStock !== null ? 'pr-24' : 'pr-20'
+                          item.currentStock !== null ? 'pr-28' : 'pr-20'
                         }`}
-                        placeholder="품목명 입력"
+                        placeholder="물품명을 입력하세요"
                       />
-                      {item.currentStock !== null && (
+                      {item.currentStock !== null ? (
                         <span
                           className={`pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 rounded-[var(--radius-md)] px-1.5 py-0.5 text-[10px] font-bold ${
                             item.currentStock <= 5 ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'
                           }`}
                         >
-                          SY INC 재고 {item.currentStock}
+                          재고 {item.currentStock} {item.unit}
                         </span>
-                      )}
-                      {item.suggestions.length > 0 && (
+                      ) : null}
+                      {item.suggestions.length > 0 ? (
                         <div className="absolute left-0 top-full z-[100] mt-1 w-full overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
                           {item.suggestions.map((suggestion, suggestionIndex) => (
                             <div
                               key={`${suggestion.name}-${suggestionIndex}`}
-                              onClick={() => selectItem(idx, suggestion)}
-                              className="flex cursor-pointer items-center justify-between border-b p-3 text-[11px] font-bold transition-colors last:border-none hover:bg-[var(--muted)]"
+                              data-testid={`supplies-item-suggestion-${index}-${suggestionIndex}`}
+                              onClick={() => selectItem(index, suggestion)}
+                              className="flex cursor-pointer items-center justify-between gap-3 border-b p-3 text-[11px] font-bold transition-colors last:border-none hover:bg-[var(--muted)]"
                             >
-                              <span className="text-[var(--foreground)]">{suggestion.name}</span>
+                              <div className="min-w-0">
+                                <span className="block truncate text-[var(--foreground)]">{suggestion.name}</span>
+                                {suggestion.spec ? (
+                                  <span className="mt-1 block truncate text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                                    {suggestion.spec}
+                                  </span>
+                                ) : null}
+                              </div>
                               <span
                                 className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${
                                   suggestion.stock <= suggestion.min_stock
@@ -579,42 +634,50 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
                                     : 'bg-green-100 text-green-600'
                                 }`}
                               >
-                                경영지원 재고: {suggestion.stock}
+                                재고 {suggestion.stock} {suggestion.unit}
                               </span>
                             </div>
                           ))}
                         </div>
-                      )}
+                      ) : null}
+                    </div>
+                  </td>
+                  <td className="px-2 py-1.5 align-middle">
+                    <div className="flex items-center gap-2">
+                      <input
+                        data-testid={`supplies-item-qty-${index}`}
+                        type="number"
+                        min="1"
+                        value={item.qty}
+                        onChange={(event) => updateItemField(index, 'qty', event.target.value)}
+                        className="h-10 w-full min-w-[64px] rounded-[var(--radius-md)] border-none bg-[var(--toss-blue-light)]/50 px-2.5 text-center text-sm font-black tabular-nums tracking-tight text-[var(--accent)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                      />
+                      <span
+                        data-testid={`supplies-item-unit-${index}`}
+                        className="shrink-0 rounded-full bg-[var(--muted)] px-2.5 py-1 text-[10px] font-black text-[var(--accent)]"
+                      >
+                        {item.unit}
+                      </span>
                     </div>
                   </td>
                   <td className="px-2 py-1.5 align-middle">
                     <input
-                      data-testid={`supplies-item-qty-${idx}`}
-                      type="number"
-                      min="1"
-                      value={item.qty}
-                      onChange={(event) => updateItemField(idx, 'qty', event.target.value)}
-                      className="h-10 w-full min-w-[64px] rounded-[var(--radius-md)] border-none bg-[var(--toss-blue-light)]/50 px-2.5 text-center text-sm font-black tabular-nums tracking-tight text-[var(--accent)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
-                    />
-                  </td>
-                  <td className="px-2 py-1.5 align-middle">
-                    <input
-                      data-testid={`supplies-item-purpose-${idx}`}
+                      data-testid={`supplies-item-purpose-${index}`}
                       value={item.purpose}
-                      onChange={(event) => updateItemField(idx, 'purpose', event.target.value)}
+                      onChange={(event) => updateItemField(index, 'purpose', event.target.value)}
                       className="h-10 w-full rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-2.5 text-xs font-semibold text-[var(--foreground)] outline-none transition-all focus:bg-[var(--card)] focus:ring-2 focus:ring-[var(--accent)]/20"
-                      placeholder="용도 입력"
+                      placeholder="사용 용도를 입력하세요"
                     />
                   </td>
                   <td className="px-1.5 py-1.5 align-middle">
                     <select
-                      data-testid={`supplies-item-dept-${idx}`}
-                      className="h-10 w-full max-w-[88px] rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-1.5 text-[10px] font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+                      data-testid={`supplies-item-dept-${index}`}
                       value={item.dept}
-                      onChange={(event) => updateItemField(idx, 'dept', event.target.value)}
+                      onChange={(event) => updateItemField(index, 'dept', event.target.value)}
+                      className="h-10 w-full max-w-[88px] rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-1.5 text-[10px] font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                     >
                       <option value="">부서 선택</option>
-                      {departments.map((department) => (
+                      {DEPARTMENTS.map((department) => (
                         <option key={department} value={department}>
                           {department}
                         </option>

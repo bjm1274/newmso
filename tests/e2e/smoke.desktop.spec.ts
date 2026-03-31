@@ -1338,6 +1338,8 @@ test("inventory registration creates a new inventory item through the form tab",
     .getByTestId("inventory-registration-category")
     .selectOption("소모품");
   await page.getByTestId("inventory-registration-quantity").fill("12");
+  await page.getByTestId("inventory-registration-unit-box").click();
+  await page.getByTestId("inventory-registration-spec").fill("30매 / 1BOX");
   await page
     .getByTestId("inventory-registration-company")
     .selectOption(fakeUser.company);
@@ -2275,6 +2277,8 @@ test("employee and admin can complete a realistic monthly operations lifecycle",
   await page.getByTestId("inventory-registration-item-name").fill("E2E 가상물품");
   await page.getByTestId("inventory-registration-category").selectOption("소모품");
   await page.getByTestId("inventory-registration-quantity").fill("10");
+  await page.getByTestId("inventory-registration-unit-ea").click();
+  await page.getByTestId("inventory-registration-spec").fill("기본 규격");
   await page
     .getByTestId("inventory-registration-company")
     .selectOption(hospital.name);
