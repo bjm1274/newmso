@@ -100,7 +100,7 @@ function formatPreviewText(value: string) {
   return String(value || '').trim() || '(empty)';
 }
 
-export default function WikiDashboard({ user: initialUser, selectedCo, selectedCompanyId }: Props) {
+export default function WikiDashboard({ user: initialUser }: Props) {
   const normalizedUser = useMemo(
     () => normalizeStaffLike((initialUser ?? {}) as Record<string, unknown>),
     [initialUser]
@@ -143,29 +143,18 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
   }, [normalizedUser]);
 
   const effectiveUserId = getStaffLikeId(user);
-  const permissions = (user?.permissions as Record<string, unknown> | null | undefined) || null;
-  const isMsoUser = user?.company === 'SY INC.' || permissions?.mso === true;
-  const scopeCompanyId = isMsoUser
-    ? String(selectedCompanyId || '').trim() || null
-    : String(user?.company_id || '').trim() || null;
-  const scopeCompanyName = isMsoUser
-    ? (() => {
-        const name = String(selectedCo || '').trim();
-        return name && name !== '전체' ? name : null;
-      })()
-    : String(user?.company || '').trim() || null;
+  const sharedCompanyId = null;
+  const sharedCompanyName = 'All';
 
   const refreshWiki = useCallback(async () => {
     try {
       setLoading(true);
-      let folderQuery = supabase
+      const folderQuery = supabase
         .from('wiki_folders')
         .select('*')
         .eq('is_archived', false)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true });
-      if (scopeCompanyId) folderQuery = folderQuery.or(`company_id.is.null,company_id.eq.${scopeCompanyId}`);
-      else if (scopeCompanyName) folderQuery = folderQuery.or(`company_id.is.null,company_name.eq.${scopeCompanyName}`);
 
       const { data: folderRows, error: folderError } = await folderQuery;
       if (folderError) throw folderError;
@@ -199,7 +188,7 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
     } finally {
       setLoading(false);
     }
-  }, [scopeCompanyId, scopeCompanyName]);
+  }, []);
 
   const loadVersions = useCallback(async (documentId: string | null) => {
     if (!documentId) {
@@ -330,13 +319,13 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
     if (!name?.trim()) return;
     const { data, error } = await supabase
       .from('wiki_folders')
-      .insert({ name: name.trim(), company_id: scopeCompanyId, company_name: scopeCompanyName || 'All', sort_order: folders.length, created_by: effectiveUserId || null, updated_by: effectiveUserId || null })
+      .insert({ name: name.trim(), company_id: sharedCompanyId, company_name: sharedCompanyName, sort_order: folders.length, created_by: effectiveUserId || null, updated_by: effectiveUserId || null })
       .select()
       .single();
     if (error) return void toast('Folder create failed.', 'error');
     setSelectedFolderId((data as FolderRow).id);
     void refreshWiki();
-  }, [effectiveUserId, folders.length, openPrompt, refreshWiki, scopeCompanyId, scopeCompanyName]);
+  }, [effectiveUserId, folders.length, openPrompt, refreshWiki, sharedCompanyId, sharedCompanyName]);
 
   const createDocument = useCallback(async (folderId?: string | null) => {
     const nextFolderId = folderId || selectedFolderId;
@@ -348,8 +337,8 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
       .from('wiki_documents')
       .insert({
         folder_id: nextFolderId,
-        company_id: folder?.company_id ?? scopeCompanyId,
-        company_name: folder?.company_name ?? scopeCompanyName ?? 'All',
+        company_id: folder?.company_id ?? sharedCompanyId,
+        company_name: folder?.company_name ?? sharedCompanyName,
         title: name.trim(),
         summary: null,
         content: '',
@@ -363,7 +352,7 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
     if (error) return void toast('Document create failed.', 'error');
     setSelectedDocId((data as DocumentRow).id);
     void refreshWiki();
-  }, [effectiveUserId, folders, openPrompt, refreshWiki, scopeCompanyId, scopeCompanyName, selectedFolderId]);
+  }, [effectiveUserId, folders, openPrompt, refreshWiki, selectedFolderId, sharedCompanyId, sharedCompanyName]);
 
   const saveDocument = useCallback(async () => {
     if (!selectedDocument || !title.trim()) return;
@@ -395,8 +384,8 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
         content: next.content || '',
         tags: Array.isArray(next.tags) ? next.tags : [],
         editor_ids: Array.isArray(next.editor_ids) ? next.editor_ids : [],
-        company_id: next.company_id ?? scopeCompanyId,
-        company_name: next.company_name ?? scopeCompanyName ?? 'All',
+        company_id: next.company_id ?? sharedCompanyId,
+        company_name: next.company_name ?? sharedCompanyName,
         change_summary: 'Saved from wiki editor',
         created_by: effectiveUserId || null,
       });
@@ -408,7 +397,7 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
     } finally {
       setSaving(false);
     }
-  }, [content, effectiveUserId, loadVersions, scopeCompanyId, scopeCompanyName, selectedDocument, summary, tags, title]);
+  }, [content, effectiveUserId, loadVersions, selectedDocument, sharedCompanyId, sharedCompanyName, summary, tags, title]);
 
   const restoreVersion = useCallback(async (version: VersionRow) => {
     if (!selectedDocument) return;
@@ -461,8 +450,8 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
         content: restored.content || '',
         tags: Array.isArray(restored.tags) ? restored.tags : [],
         editor_ids: Array.isArray(restored.editor_ids) ? restored.editor_ids : [],
-        company_id: restored.company_id ?? scopeCompanyId,
-        company_name: restored.company_name ?? scopeCompanyName ?? 'All',
+        company_id: restored.company_id ?? sharedCompanyId,
+        company_name: restored.company_name ?? sharedCompanyName,
         change_summary: `Restored v${version.version_no}`,
         created_by: effectiveUserId || null,
       });
@@ -475,7 +464,7 @@ export default function WikiDashboard({ user: initialUser, selectedCo, selectedC
     } finally {
       setSaving(false);
     }
-  }, [effectiveUserId, loadVersions, openConfirm, scopeCompanyId, scopeCompanyName, selectedDocument]);
+  }, [effectiveUserId, loadVersions, openConfirm, selectedDocument, sharedCompanyId, sharedCompanyName]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--card)] shadow-sm md:flex-row">

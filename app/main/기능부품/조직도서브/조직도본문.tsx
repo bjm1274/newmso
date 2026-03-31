@@ -272,6 +272,8 @@ export default function MainContent({
             user={user}
             staffs={data.staffs}
             posts={data.posts}
+            selectedCo={selectedCo}
+            selectedCompanyId={selectedCompanyId}
             onSearchSelect={(type: string) => {
               if (type === 'staff') setMainMenu?.(normalizeMainMenuForUser(user, '조직도'));
               else if (type === 'post') setMainMenu?.('게시판');

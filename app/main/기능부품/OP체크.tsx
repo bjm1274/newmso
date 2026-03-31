@@ -328,8 +328,12 @@ function isOpCheckSchemaMissing(error: unknown) {
 
 export default function OperationCheckView({
   user,
+  selectedCo,
+  selectedCompanyId,
 }: {
   user?: Record<string, any>;
+  selectedCo?: string | null;
+  selectedCompanyId?: string | null;
   staffs?: any[];
 }) {
   const [activeTab, setActiveTab] = useState<'patients' | 'templates'>('patients');
@@ -363,86 +367,53 @@ export default function OperationCheckView({
         .eq('is_active', true)
         .order('sort_order', { ascending: true });
 
-      const companyId = String(user?.company_id || '').trim();
-      const companyName = String(user?.company || '').trim();
-
       const [scheduleRes, templateRes, patientCheckRes, surgeryTemplateRes, inventoryRes] = await Promise.all([
         withMissingColumnFallback(
           async () => {
-            let query = supabase
+            return supabase
               .from('board_posts')
               .select('*')
               .eq('board_type', '수술일정')
               .order('created_at', { ascending: true });
-            if (companyId) {
-              query = query.eq('company_id', companyId);
-            } else if (companyName) {
-              query = query.eq('company', companyName);
-            }
-            return query;
           },
           async () => {
-            let query = supabase
+            return supabase
               .from('board_posts')
               .select('*')
               .eq('board_type', '수술일정')
               .order('created_at', { ascending: true });
-            if (companyName) {
-              query = query.eq('company', companyName);
-            }
-            return query;
           },
         ),
         withMissingColumnFallback(
           async () => {
-            let query = supabase
+            return supabase
               .from('op_check_templates')
               .select('*')
               .order('template_scope', { ascending: true })
               .order('template_name', { ascending: true });
-            if (companyId) {
-              query = query.eq('company_id', companyId);
-            } else if (companyName) {
-              query = query.eq('company_name', companyName);
-            }
-            return query;
           },
           async () => {
-            let query = supabase
+            return supabase
               .from('op_check_templates')
               .select('*')
               .order('template_scope', { ascending: true })
               .order('template_name', { ascending: true });
-            if (companyName) {
-              query = query.eq('company_name', companyName);
-            }
-            return query;
           },
         ),
         withMissingColumnFallback(
           async () => {
-            let query = supabase
+            return supabase
               .from('op_patient_checks')
               .select('*')
               .order('schedule_date', { ascending: true })
               .order('schedule_time', { ascending: true });
-            if (companyId) {
-              query = query.eq('company_id', companyId);
-            } else if (companyName) {
-              query = query.eq('company_name', companyName);
-            }
-            return query;
           },
           async () => {
-            let query = supabase
+            return supabase
               .from('op_patient_checks')
               .select('*')
               .order('schedule_date', { ascending: true })
               .order('schedule_time', { ascending: true });
-            if (companyName) {
-              query = query.eq('company_name', companyName);
-            }
-            return query;
           },
         ),
         surgeryTemplateQuery,
@@ -451,18 +422,10 @@ export default function OperationCheckView({
             const selectedColumns = ['id', 'name', 'unit', 'quantity', 'company', 'company_id', 'department']
               .filter((columnName) => !omittedColumns.has(columnName))
               .join(', ');
-            let query = supabase
+            return supabase
               .from('inventory_items')
               .select(selectedColumns)
               .order('name', { ascending: true });
-
-            if (!omittedColumns.has('company_id') && companyId) {
-              query = query.eq('company_id', companyId);
-            } else if (companyName) {
-              query = query.eq('company', companyName);
-            }
-
-            return query;
           },
           ['company_id', 'department'],
         ),
@@ -499,7 +462,7 @@ export default function OperationCheckView({
     } finally {
       setLoading(false);
     }
-  }, [user?.company, user?.company_id]);
+  }, []);
 
   useEffect(() => {
     void loadData();
@@ -796,8 +759,8 @@ export default function OperationCheckView({
       const payload = {
         id: checkForm.id || undefined,
         schedule_post_id: checkForm.schedule_post_id,
-        company_id: String(user?.company_id || selectedSchedule.company_id || '').trim() || null,
-        company_name: String(user?.company || selectedSchedule.company || '전체').trim() || '전체',
+        company_id: String(selectedSchedule.company_id || user?.company_id || '').trim() || null,
+        company_name: String(selectedSchedule.company || user?.company || '전체').trim() || '전체',
         patient_name: checkForm.patient_name,
         chart_no: checkForm.chart_no || null,
         surgery_name: checkForm.surgery_name,

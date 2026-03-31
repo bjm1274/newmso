@@ -28,18 +28,37 @@ const extraFeaturesUser = {
   },
 };
 
+const msoExtraFeaturesUser = {
+  ...fakeUser,
+  company: 'SY INC.',
+  company_id: 'mso-company-id',
+  permissions: {
+    ...fakeUser.permissions,
+    mso: true,
+    extra_OP체크: true,
+  },
+};
+
 function getTodayKey() {
   return new Intl.DateTimeFormat('sv-SE', {
     timeZone: 'Asia/Seoul',
   }).format(new Date());
 }
 
-async function prepareExtraFeature(page: Page, fixtures: Parameters<typeof mockSupabase>[1]) {
+async function prepareExtraFeature(
+  page: Page,
+  fixtures: Parameters<typeof mockSupabase>[1],
+  options?: {
+    user?: typeof extraFeaturesUser;
+    localStorage?: Record<string, string>;
+  }
+) {
   await mockSupabase(page, fixtures);
   await seedSession(page, {
-    user: extraFeaturesUser,
+    user: options?.user ?? extraFeaturesUser,
     localStorage: {
       erp_last_menu: '추가기능',
+      ...(options?.localStorage || {}),
     },
   });
 
@@ -141,6 +160,60 @@ test('op check links surgery schedules, applies surgery/anesthesia templates, an
 
   await page.getByTestId('op-check-record-save').click();
   await expect(page.getByText('저장됨 · 준비중')).toBeVisible();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('op check follows the selected company scope for MSO users', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const todayKey = getTodayKey();
+  const targetCompanyId = 'target-hospital-company-id';
+  const targetCompanyName = '연동테스트병원';
+
+  await prepareExtraFeature(
+    page,
+    {
+      boardPosts: [
+        {
+          id: 'schedule-post-selected-company',
+          board_type: '수술일정',
+          title: '연동 확인 수술',
+          content: 'CH-777',
+          patient_name: '연동환자',
+          schedule_date: todayKey,
+          schedule_time: '08:30',
+          schedule_room: '2번방',
+          company: targetCompanyName,
+          company_id: targetCompanyId,
+        },
+      ],
+      companies: [
+        {
+          id: msoExtraFeaturesUser.company_id,
+          name: msoExtraFeaturesUser.company,
+          type: 'mso',
+          is_active: true,
+        },
+        {
+          id: targetCompanyId,
+          name: targetCompanyName,
+          type: 'hospital',
+          is_active: true,
+        },
+      ],
+    },
+    {
+      user: msoExtraFeaturesUser,
+      localStorage: {
+        erp_last_co: targetCompanyName,
+        erp_selected_company_id: targetCompanyId,
+      },
+    }
+  );
+
+  await expect(page.getByTestId('op-check-calendar-day-' + todayKey)).toContainText('연동환자');
+  await expect(page.getByTestId('op-check-schedule-card-schedule-post-selected-company')).toBeVisible();
+  await expect(page.getByText('연동환자')).toBeVisible();
 
   expect(runtimeErrors).toEqual([]);
 });

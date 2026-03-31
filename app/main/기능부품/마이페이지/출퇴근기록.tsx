@@ -141,6 +141,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     capturedAt: number;
   } | null>(null);
 
+  const [historyView, setHistoryView] = useState<'list' | 'calendar'>('list');
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [showCheckInSuccess, setShowCheckInSuccess] = useState(false);
   const [checkInTime, setCheckInTime] = useState<Date | null>(null);
@@ -896,19 +897,37 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         <StatItem label="정상 출근" value={`${logs.filter((log) => getDisplayStatus(log) === '정상').length}회`} isSuccess />
       </div>
 
+      {/* 근무시간 차트 */}
+      {logs.length > 0 && <WorkHoursChart logs={logs} />}
 
       {/* 리스트 */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">근무 히스토리</h3>
-          <div className="flex gap-2">
+        <div className="flex flex-wrap justify-between items-center mb-4 gap-2">
+          <div className="flex items-center gap-2">
+            <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">근무 히스토리</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-[var(--radius-md)] border border-[var(--border)] overflow-hidden text-[11px] font-semibold">
+              <button
+                onClick={() => setHistoryView('list')}
+                className={`px-3 py-2 transition-colors ${historyView === 'list' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--card)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]'}`}
+              >목록</button>
+              <button
+                onClick={() => setHistoryView('calendar')}
+                className={`px-3 py-2 transition-colors ${historyView === 'calendar' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--card)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]'}`}
+              >달력</button>
+            </div>
             <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center border rounded-[var(--radius-md)] hover:bg-[var(--muted)]">◀</button>
-            <span className="font-semibold px-2">{currentMonth.getFullYear()}. {currentMonth.getMonth() + 1}</span>
+            <span className="font-semibold px-1 text-sm">{currentMonth.getFullYear()}. {currentMonth.getMonth() + 1}</span>
             <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center border rounded-[var(--radius-md)] hover:bg-[var(--muted)]">▶</button>
           </div>
         </div>
 
-        <div className="space-y-4">
+        {historyView === 'calendar' ? (
+          <AttendanceCalendar logs={logs} currentMonth={currentMonth} />
+        ) : null}
+
+        <div className={`space-y-4 ${historyView === 'calendar' ? 'hidden' : ''}`}>
           {logs.map((log) => {
             const workDate = new Date(log.date || '');
             const displayStatus = getDisplayStatus(log);
@@ -970,6 +989,144 @@ interface StatItemProps {
   value: string;
   isWarning?: boolean;
   isSuccess?: boolean;
+}
+
+function AttendanceCalendar({ logs, currentMonth }: { logs: CommuteLog[]; currentMonth: Date }) {
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = new Date();
+
+  const logByDate = new Map<string, CommuteLog>();
+  logs.forEach((log) => {
+    const dateKey = String(log.date || '').slice(0, 10);
+    if (dateKey) logByDate.set(dateKey, log);
+  });
+
+  const cells: (null | number)[] = [...Array(firstDay).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+  // pad to full weeks
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const getDayCellStyle = (day: number): string => {
+    const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const log = logByDate.get(dateKey);
+    const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
+    if (log) {
+      const status = getDisplayStatus(log);
+      if (status === '지각') return 'bg-orange-500/15 text-orange-600 font-semibold';
+      if (status === '연차' || status === '반차') return 'bg-purple-500/15 text-purple-600 font-semibold';
+      if (status === '병가') return 'bg-blue-500/15 text-blue-600 font-semibold';
+      return 'bg-green-500/15 text-green-700 font-semibold';
+    }
+    const dayOfWeek = new Date(year, month, day).getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) return 'text-[var(--toss-gray-3)]'; // weekend - no attendance OK
+    if (new Date(year, month, day) < today) return 'bg-red-500/10 text-red-400'; // past weekday no record
+    return 'text-[var(--toss-gray-4)]';
+  };
+
+  return (
+    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
+      <div className="grid grid-cols-7 mb-1">
+        {['일', '월', '화', '수', '목', '금', '토'].map((d, i) => (
+          <div key={d} className={`text-center text-[10px] font-bold py-1 ${i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-[var(--toss-gray-3)]'}`}>{d}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-0.5">
+        {cells.map((day, idx) => (
+          <div
+            key={idx}
+            className={`aspect-square flex items-center justify-center rounded-[var(--radius-md)] text-[11px] ${
+              day ? getDayCellStyle(day) : ''
+            }`}
+          >
+            {day || ''}
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-[var(--toss-gray-3)]">
+        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-green-500/30" />정상</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-orange-500/30" />지각</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-purple-500/30" />연차/반차</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-red-500/20" />미출근</span>
+      </div>
+    </div>
+  );
+}
+
+function WorkHoursChart({ logs }: { logs: CommuteLog[] }) {
+  if (logs.length === 0) return null;
+
+  const data = [...logs].reverse().map((log) => {
+    const checkIn = log.check_in ? new Date(String(log.check_in)) : null;
+    const checkOut = log.check_out ? new Date(String(log.check_out)) : null;
+    const hours =
+      checkIn && checkOut && !Number.isNaN(checkIn.getTime()) && !Number.isNaN(checkOut.getTime())
+        ? Math.min(12, Math.max(0, (checkOut.getTime() - checkIn.getTime()) / 3600000))
+        : 0;
+    const day = String(log.date || '').slice(8, 10).replace(/^0/, '');
+    const status = getDisplayStatus(log);
+    return { day, hours, status };
+  });
+
+  const maxHours = Math.max(8, ...data.map((d) => d.hours));
+  const totalWorked = data.reduce((sum, d) => sum + d.hours, 0);
+  const avgHours = data.filter((d) => d.hours > 0).length > 0
+    ? totalWorked / data.filter((d) => d.hours > 0).length
+    : 0;
+
+  return (
+    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">이번 달 근무시간</p>
+        <div className="flex items-center gap-3 text-[11px] text-[var(--toss-gray-3)]">
+          <span>총 <strong className="text-[var(--foreground)]">{totalWorked.toFixed(0)}h</strong></span>
+          <span>평균 <strong className="text-[var(--accent)]">{avgHours.toFixed(1)}h</strong></span>
+        </div>
+      </div>
+      <div className="flex h-16 items-end gap-0.5 overflow-x-auto pb-1">
+        {data.map(({ day, hours, status }) => {
+          const heightPercent = maxHours > 0 ? (hours / maxHours) * 100 : 0;
+          const barColor =
+            hours === 0
+              ? 'bg-[var(--border)]'
+              : status === '지각'
+                ? 'bg-orange-400'
+                : 'bg-[var(--accent)]';
+          return (
+            <div
+              key={day}
+              className="flex flex-1 shrink-0 flex-col items-center gap-0.5"
+              style={{ minWidth: '10px', maxWidth: '24px' }}
+            >
+              <div className="relative flex w-full flex-1 items-end">
+                <div
+                  className={`w-full rounded-t-sm ${barColor} transition-all`}
+                  style={{ height: `${Math.max(hours > 0 ? 15 : 4, heightPercent)}%` }}
+                  title={`${day}일: ${hours > 0 ? hours.toFixed(1) + 'h' : '미출근'}`}
+                />
+              </div>
+              <span className="text-[8px] text-[var(--toss-gray-3)]">{day}</span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-2 flex items-center gap-3 text-[10px] text-[var(--toss-gray-3)]">
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-2 w-2 rounded-sm bg-[var(--accent)]" />
+          정상
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-2 w-2 rounded-sm bg-orange-400" />
+          지각
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-2 w-2 rounded-sm bg-[var(--border)]" />
+          미출근
+        </span>
+      </div>
+    </div>
+  );
 }
 
 function StatItem({ label, value, isWarning, isSuccess }: StatItemProps) {

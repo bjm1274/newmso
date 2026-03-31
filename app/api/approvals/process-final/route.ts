@@ -14,6 +14,40 @@ function createAdminSupabase() {
   return createClient(supabaseUrl, serviceKey);
 }
 
+function normalizeApprovalLineIds(line: unknown): string[] {
+  if (!Array.isArray(line)) return [];
+  return Array.from(
+    new Set(
+      line
+        .map((entry) => {
+          if (entry == null) return null;
+          if (typeof entry === 'string' || typeof entry === 'number') return String(entry).trim();
+          if (typeof entry === 'object' && 'id' in (entry as Record<string, unknown>)) {
+            const value = (entry as Record<string, unknown>).id;
+            return value != null ? String(value).trim() : null;
+          }
+          return null;
+        })
+        .filter(Boolean) as string[]
+    )
+  );
+}
+
+function normalizeApprovalCcUserIds(ccUsers: unknown): string[] {
+  if (!Array.isArray(ccUsers)) return [];
+  return Array.from(
+    new Set(
+      ccUsers
+        .map((entry) => {
+          if (!entry || typeof entry !== 'object') return null;
+          const value = (entry as Record<string, unknown>).id;
+          return value != null ? String(value).trim() : null;
+        })
+        .filter(Boolean) as string[]
+    )
+  );
+}
+
 export async function POST(request: Request) {
   try {
     const session = await readSessionFromRequest(request);
@@ -44,10 +78,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'Approval is not finalized yet' }, { status: 409 });
     }
 
+    const metaData =
+      approval.meta_data && typeof approval.meta_data === 'object'
+        ? (approval.meta_data as Record<string, unknown>)
+        : null;
+    const sessionUserId = String(session.user.id || '').trim();
+    const currentApproverId = String(
+      approval.current_approver_id || metaData?.current_approver_id || ''
+    ).trim();
+    const approvalLineIds = normalizeApprovalLineIds(approval.approver_line ?? metaData?.approver_line);
+    const referenceUserIds = normalizeApprovalCcUserIds(metaData?.cc_users);
     const canAccess =
       isAdminSession(session.user) ||
-      String(session.user.id || '') === String(approval.sender_id || '') ||
-      String(session.user.company || '') === String(approval.sender_company || '');
+      sessionUserId === String(approval.sender_id || '').trim() ||
+      sessionUserId === currentApproverId ||
+      approvalLineIds.includes(sessionUserId) ||
+      referenceUserIds.includes(sessionUserId);
 
     if (!canAccess) {
       return NextResponse.json({ ok: false, error: 'Forbidden' }, { status: 403 });

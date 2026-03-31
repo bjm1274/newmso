@@ -409,7 +409,7 @@ interface ApprovalViewProps {
   onConsumeComposeRequest?: () => void;
 }
 
-export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, selectedCompanyId, onRefresh, initialView, onViewChange, initialComposeRequest, onConsumeComposeRequest }: ApprovalViewProps) {
+export default function ApprovalView({ user, staffs, selectedCompanyId, onRefresh, initialView, onViewChange, initialComposeRequest, onConsumeComposeRequest }: ApprovalViewProps) {
   const defaultApprovalView =
     APPROVAL_VIEWS.find((view) => canAccessApprovalSection(user, view)) || '기안함';
   const [viewMode, setViewMode] = useState(
@@ -1858,6 +1858,23 @@ window.onload = () => window.print();
   useEffect(() => {
     if (!initialComposeRequest) return;
 
+    const requestedApprovalId = String(initialComposeRequest?.approvalId || '').trim();
+    if (requestedApprovalId) {
+      const requestedView =
+        typeof initialComposeRequest?.viewMode === 'string' && initialComposeRequest.viewMode.trim()
+          ? initialComposeRequest.viewMode
+          : defaultApprovalView;
+      const nextView = resolveAccessibleView(requestedView) || defaultApprovalView;
+
+      setViewMode(nextView);
+      setSelectedApprovalId(requestedApprovalId);
+
+      try { window.localStorage.setItem(APPROVAL_VIEW_KEY, nextView); } catch { /* ignore */ }
+
+      onConsumeComposeRequest?.();
+      return;
+    }
+
     const requestedView =
       typeof initialComposeRequest?.viewMode === 'string' && initialComposeRequest.viewMode.trim()
         ? initialComposeRequest.viewMode
@@ -1936,22 +1953,44 @@ window.onload = () => window.print();
     }
 
     onConsumeComposeRequest?.();
-  }, [approvalDirectoryStaffs, defaultApprovalMonth, initialComposeRequest, onConsumeComposeRequest, resolveAccessibleView, resolveDefaultReferenceUsersForForm]);
+  }, [approvalDirectoryStaffs, defaultApprovalMonth, defaultApprovalView, initialComposeRequest, onConsumeComposeRequest, resolveAccessibleView, resolveDefaultReferenceUsersForForm]);
+
+  useEffect(() => {
+    if (!selectedApprovalId) return;
+    if (approvals.some((item) => String(item?.id || '') === selectedApprovalId)) return;
+
+    let cancelled = false;
+
+    const loadSelectedApproval = async () => {
+      const { data, error } = await supabase
+        .from('approvals')
+        .select('*')
+        .eq('id', selectedApprovalId)
+        .maybeSingle();
+
+      if (cancelled || error || !data) return;
+
+      setApprovals((prev) => (
+        prev.some((item) => String(item?.id || '') === selectedApprovalId)
+          ? prev
+          : [data as Record<string, unknown>, ...prev]
+      ));
+    };
+
+    void loadSelectedApproval();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [approvals, selectedApprovalId]);
 
   const fetchApprovals = useCallback(async () => {
-    const scopedCompanyId = !isMso ? user?.company_id : selectedCompanyId;
-    const scopedCompanyName = !isMso ? user?.company : selectedCo !== '전체' ? selectedCo : null;
     const { data } = await withMissingColumnFallback(
       async () => {
-        let query = supabase.from('approvals').select('*').order('created_at', { ascending: false });
-        if (scopedCompanyId) query = query.eq('company_id', scopedCompanyId);
-        else if (scopedCompanyName) query = query.eq('sender_company', scopedCompanyName);
-        return query;
+        return supabase.from('approvals').select('*').order('created_at', { ascending: false });
       },
       async () => {
-        let query = supabase.from('approvals').select('*').order('created_at', { ascending: false });
-        if (scopedCompanyName) query = query.eq('sender_company', scopedCompanyName);
-        return query;
+        return supabase.from('approvals').select('*').order('created_at', { ascending: false });
       }
     );
     if (data) {
@@ -1964,7 +2003,7 @@ window.onload = () => window.print();
       );
       void syncDelegatedApprovalDelayNotifications(nextItems);
     }
-  }, [isMso, resolveStoredCurrentApproverId, selectedCo, selectedCompanyId, syncDelegatedApprovalDelayNotifications, syncDelegatedApprovalRouting, user?.company, user?.company_id]);
+  }, [resolveStoredCurrentApproverId, syncDelegatedApprovalDelayNotifications, syncDelegatedApprovalRouting]);
 
   // 항상 최신 fetchApprovals를 ref에 유지 (realtime 클로저 stale 방지)
   useEffect(() => { fetchApprovalsRef.current = fetchApprovals; }, [fetchApprovals]);
@@ -2950,32 +2989,29 @@ window.onload = () => window.print();
     if (onRefresh) onRefresh();
   };
 
-  const byCompany = useMemo(() => {
-    if (selectedCo === '전체') return approvals;
-    return approvals.filter((a) => a.sender_company === selectedCo);
-  }, [approvals, selectedCo]);
+  const visibleApprovals = useMemo(() => approvals, [approvals]);
 
   const draftBaseList = useMemo(() => {
-    return byCompany.filter((a) => a.sender_id === user?.id);
-  }, [byCompany, user?.id]);
+    return visibleApprovals.filter((a) => a.sender_id === user?.id);
+  }, [user?.id, visibleApprovals]);
 
   const approvalBaseList = useMemo(() => {
     const uid = user?.id != null ? String(user.id) : '';
-    return byCompany.filter((a) => {
+    return visibleApprovals.filter((a) => {
       const lineIds = resolveApprovalLineIds(a);
       const currentApproverId = resolveCurrentApproverId(a);
       return lineIds.some((id: string) => String(id) === uid) || String(currentApproverId || '') === uid;
     });
-  }, [byCompany, resolveApprovalLineIds, resolveCurrentApproverId, user?.id]);
+  }, [resolveApprovalLineIds, resolveCurrentApproverId, user?.id, visibleApprovals]);
   const referenceBaseList = useMemo(() => {
     const uid = user?.id != null ? String(user.id) : '';
     if (!uid) return [];
-    return byCompany.filter((item) => {
+    return visibleApprovals.filter((item) => {
       const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
       const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, approvalDirectoryStaffs);
       return ccUsers.some((ccUser) => String(ccUser.id) === uid);
     });
-  }, [approvalDirectoryStaffs, byCompany, user?.id]);
+  }, [approvalDirectoryStaffs, user?.id, visibleApprovals]);
 
   const documentTypeOptions = useMemo(() => {
     const source =
@@ -3324,18 +3360,9 @@ window.onload = () => window.print();
             )}
             <div className="bg-[var(--card)] p-4 md:p-4 rounded-[var(--radius-lg)] md:rounded-[var(--radius-xl)] border border-[var(--border)] shadow-sm space-y-4 md:space-y-4">
               <div className="bg-[var(--toss-blue-light)] p-4 md:p-5 rounded-[var(--radius-lg)] border border-[var(--toss-blue-light)] space-y-3">
-                <div className="flex justify-start md:justify-end">
-                  <div className="flex gap-0.5 p-1 app-tab-bar w-full md:w-auto overflow-x-auto no-scrollbar">
-                    {['전체', '박철홍정형외과', '수연의원', 'SY INC.'].map(co => (
-                      <button
-                        key={co}
-                        onClick={() => setSelectedCo(co)}
-                        className={`min-h-[44px] touch-manipulation flex-1 md:flex-none px-3 py-1.5 rounded-[var(--radius-md)] text-[11px] font-bold transition-all whitespace-nowrap ${selectedCo === co ? 'bg-[var(--card)] shadow-sm text-[var(--accent)]' : 'text-[var(--toss-gray-3)]'}`}
-                      >
-                        {co}
-                      </button>
-                    ))}
-                  </div>
+                <div className="rounded-[var(--radius-md)] border border-[var(--accent)]/15 bg-[var(--card)]/80 px-3.5 py-3">
+                  <p className="text-[12px] font-bold text-[var(--foreground)]">전자결재는 회사 구분 없이 전사 공유로 표시됩니다.</p>
+                  <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">참조자와 결재 문서는 전체 직원 디렉터리 기준으로 같은 화면에서 바로 연결됩니다.</p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-2 items-start md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -3355,12 +3382,14 @@ window.onload = () => window.print();
                   <label className="space-y-1.5">
                     <span className="block text-[11px] font-bold text-[var(--toss-gray-4)]">참조자 선택</span>
                     <select data-testid="approval-cc-select" onChange={e => {
-                      const s = staffs.find((sf) => String(sf.id) === e.target.value);
+                      const s = approvalDirectoryStaffs.find((sf) => String(sf.id) === e.target.value);
                       if (s && !ccLine.find(c => c.id === s.id)) setCcLine(prev => [...prev, { id: s.id, name: s.name, position: s.position }]);
                       e.target.value = '';
                     }} className="min-h-[48px] min-w-0 w-full p-3 bg-[var(--input-bg)] rounded-[var(--radius-md)] text-sm font-bold border border-[var(--border)] outline-none shadow-sm">
                       <option value="">참조자 추가...</option>
-                      {staffs.filter((s) => !ccLine.find(c => c.id === s.id)).map((s) => <option key={s.id} value={s.id}>{s.name} ({s.position})</option>)}
+                      {approvalDirectoryStaffs
+                        .filter((s) => !ccLine.find((c) => c.id === s.id))
+                        .map((s) => <option key={s.id} value={s.id}>{s.name} ({s.position || '-'}) {s.company ? `· ${s.company}` : ''}</option>)}
                     </select>
                   </label>
                 </div>
@@ -3932,6 +3961,7 @@ window.onload = () => window.print();
         const templateDesign = resolveApprovalTemplateDesign(item);
         return (
           <div
+            data-testid="approval-detail-modal"
             className="fixed inset-0 z-[110] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/50"
             onClick={() => setSelectedApprovalId(null)}
           >

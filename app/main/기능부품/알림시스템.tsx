@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { sound } from '@/lib/sounds';
@@ -859,7 +859,10 @@ export default function NotificationSystem({
           typeof notif.data?.approval_view === 'string' && notif.data.approval_view.trim()
             ? notif.data.approval_view
             : undefined;
-        onOpenApproval(approvalView ? { viewMode: approvalView } : undefined);
+        onOpenApproval({
+          ...(approvalView ? { viewMode: approvalView } : {}),
+          ...(notif.data?.approval_id ? { approvalId: notif.data.approval_id } : {}),
+        });
       }
       else if (t === 'inventory' && onOpenInventory) {
         onOpenInventory({

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -50,6 +50,23 @@ function buildInventoryNotificationHref(metadata: Record<string, any>) {
   if (metadata?.approval_id) {
     params.set('open_inventory_view', '현황');
     params.set('open_inventory_approval', String(metadata.approval_id));
+  }
+
+  return `/main?${params.toString()}`;
+}
+
+function buildApprovalNotificationHref(metadata: Record<string, any>) {
+  const params = new URLSearchParams({
+    open_menu: '전자결재',
+  });
+
+  if (typeof metadata?.approval_view === 'string' && metadata.approval_view.trim()) {
+    params.set('open_subview', metadata.approval_view.trim());
+  }
+
+  const approvalId = String(metadata?.approval_id || '').trim();
+  if (approvalId) {
+    params.set('open_approval_id', approvalId);
   }
 
   return `/main?${params.toString()}`;
@@ -246,15 +263,7 @@ export default function NotificationCenter({
     }
 
     if (notification.type === 'approval') {
-      const approvalView =
-        typeof meta.approval_view === 'string' && meta.approval_view.trim()
-          ? encodeURIComponent(meta.approval_view)
-          : null;
-      router.push(
-        approvalView
-          ? `/main?open_menu=전자결재&open_subview=${approvalView}`
-          : '/main?open_menu=전자결재'
-      );
+      router.push(buildApprovalNotificationHref(meta));
       return;
     }
 

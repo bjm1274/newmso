@@ -583,26 +583,14 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       return;
     }
 
-    const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
-    const scopedCompanyId = isMso ? selectedCompanyId : user?.company_id;
-    const scopedCompanyName =
-      isMso
-        ? selectedCo && selectedCo !== '전체'
-          ? selectedCo
-          : null
-        : user?.company ?? null;
-
     const loadStaff = async () => {
-      let query = supabase
+      return supabase
         .from('staff_members')
         .select('id, name, company, company_id, department, position, status')
-        .neq('status', '퇴사');
-      if (scopedCompanyId) {
-        query = query.eq('company_id', scopedCompanyId);
-      } else if (scopedCompanyName) {
-        query = query.eq('company', scopedCompanyName);
-      }
-      return query.order('name', { ascending: true });
+        .neq('status', '퇴사')
+        .neq('status', '퇴직')
+        .order('company', { ascending: true })
+        .order('name', { ascending: true });
     };
 
     const { data, error } = await loadStaff();
@@ -611,7 +599,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       return;
     }
     setBoardAudience((data || []) as StaffSummary[]);
-  }, [effectiveBoardUserId, selectedCo, selectedCompanyId, user]);
+  }, [effectiveBoardUserId]);
 
   const loadBoardReadState = useCallback(async (postIds?: string[]) => {
     const targetIds = (postIds || visiblePosts.map((post) => String(post.id ?? '').trim()).filter(Boolean));
@@ -769,31 +757,12 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       return;
     }
 
-    const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
-    const scopedCompanyId = isMso ? selectedCompanyId : user?.company_id;
-    const scopedCompanyName =
-      isMso
-        ? selectedCo && selectedCo !== '전체'
-          ? selectedCo
-          : null
-        : user?.company ?? null;
-
     const { data } = await withMissingColumnFallback(
       async () => {
-        let query = supabase.from('board_posts').select('*').eq('board_type', activeBoard).order('created_at', { ascending: false });
-        if (scopedCompanyId) {
-          query = query.eq('company_id', scopedCompanyId);
-        } else if (scopedCompanyName) {
-          query = query.eq('company', scopedCompanyName);
-        }
-        return query;
+        return supabase.from('board_posts').select('*').eq('board_type', activeBoard).order('created_at', { ascending: false });
       },
       async () => {
-        let query = supabase.from('board_posts').select('*').eq('board_type', activeBoard).order('created_at', { ascending: false });
-        if (scopedCompanyName) {
-          query = query.eq('company', scopedCompanyName);
-        }
-        return query;
+        return supabase.from('board_posts').select('*').eq('board_type', activeBoard).order('created_at', { ascending: false });
       }
     );
     if (data) {
@@ -903,7 +872,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     if (activeBoard === '수술일정' || activeBoard === 'MRI일정') {
       setCalendarMonth(new Date());
     }
-  }, [activeBoard, effectiveBoardUserId, selectedCo, selectedCompanyId, user?.company, user?.company_id, loadBoardAudience]);
+  }, [activeBoard, effectiveBoardUserId, loadBoardAudience]);
 
   useEffect(() => {
     void loadBoardReadState();
@@ -934,7 +903,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [activeBoard, selectedCo, selectedCompanyId, user?.id, user?.company, user?.company_id]);
+  }, [activeBoard, user?.id]);
 
   // 근무현황 Effect 제거됨
 
