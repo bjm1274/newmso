@@ -93,6 +93,7 @@ type SupplyInventoryReviewRow = {
   key: string;
   name: string;
   requestedQty: number;
+  unit: string;
   supportStock: number;
   supportShortageQty: number;
   surgeryStock: number;
@@ -101,7 +102,7 @@ type SupplyInventoryReviewRow = {
 };
 
 type SupplyInventoryReviewState = {
-  items: Array<{ name: string; qty: number; dept: string; purpose: string }>;
+  items: Array<{ name: string; qty: number; unit: string; dept: string; purpose: string }>;
   rows: SupplyInventoryReviewRow[];
   notice?: string | null;
 };
@@ -169,6 +170,17 @@ function mergeApprovalCcUsers(...groups: ApprovalCcUser[][]): ApprovalCcUser[] {
         .flat()
         .filter((staff) => staff?.id && staff?.name)
         .map((staff) => [String(staff.id), { ...staff, id: String(staff.id) }])
+    ).values()
+  );
+}
+
+function mergeApprovalStaffDirectory(...groups: StaffMember[][]): StaffMember[] {
+  return Array.from(
+    new Map(
+      groups
+        .flat()
+        .filter((staff) => staff?.id)
+        .map((staff) => [String(staff.id), staff])
     ).values()
   );
 }
@@ -386,6 +398,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const [autoSaveMsg, setAutoSaveMsg] = useState<string | null>(null);
   const [draftBanner, setDraftBanner] = useState<boolean>(false);
   const [attendanceCorrectionSeedDates, setAttendanceCorrectionSeedDates] = useState<string[]>([]);
+  const [supportApproverStaffs, setSupportApproverStaffs] = useState<StaffMember[]>([]);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoSaveMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHydratingComposeRef = useRef(false);
@@ -419,13 +432,67 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     () => [...BUILTIN_FORM_TYPES, ...customFormTypes.map((item) => item.slug)],
     [customFormTypes]
   );
+  const activeComposeFormMeta = useMemo(() => {
+    const normalizedFormType = normalizeComposeFormType(formType);
+    const builtInForm = BUILTIN_FORM_TYPE_DEFINITIONS.find(
+      (item) => item.slug === normalizedFormType || item.name === normalizedFormType
+    );
+    const customForm = customFormTypes.find(
+      (item) => item.slug === normalizedFormType || item.name === normalizedFormType
+    );
+
+    return {
+      slug: customForm?.slug || builtInForm?.slug || normalizedFormType,
+      name: customForm?.name || builtInForm?.name || normalizedFormType,
+    };
+  }, [customFormTypes, formType]);
+  const isSupplyRequestCompose = activeComposeFormMeta.slug === 'purchase';
+  const approvalDirectoryStaffs = useMemo(
+    () => mergeApprovalStaffDirectory(staffs, supportApproverStaffs),
+    [staffs, supportApproverStaffs]
+  );
+  useEffect(() => {
+    if (isMso || !isSupplyRequestCompose) return;
+
+    let active = true;
+
+    const loadSupportApprovers = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('staff_members')
+          .select('*')
+          .eq('company', INVENTORY_SUPPORT_COMPANY)
+          .order('employee_no', { ascending: true });
+
+        if (error) throw error;
+        if (!active) return;
+
+        setSupportApproverStaffs(
+          Array.isArray(data)
+            ? (data.filter((staff) => APPROVER_POSITIONS.includes(String(staff?.position || ''))) as StaffMember[])
+            : []
+        );
+      } catch (error) {
+        console.error('SY INC. 결재선 디렉터리 조회 실패:', error);
+        if (active) {
+          setSupportApproverStaffs([]);
+        }
+      }
+    };
+
+    void loadSupportApprovers();
+
+    return () => {
+      active = false;
+    };
+  }, [isMso, isSupplyRequestCompose]);
   const approvalReferenceDefaults = useMemo(
     () =>
       normalizeApprovalReferenceDefaultsMap(
         (user?.permissions as Record<string, unknown> | null | undefined)?.[APPROVAL_REFERENCE_DEFAULTS_KEY],
-        staffs
+        approvalDirectoryStaffs
       ),
-    [staffs, user?.permissions]
+    [approvalDirectoryStaffs, user?.permissions]
   );
   const resolveDefaultReferenceUsersForForm = useCallback(
     (targetFormType: string) => {
@@ -503,24 +570,17 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   }, [formTemplateDesigns, resolveApprovalTemplateMeta, user?.company]);
 
   const getSupplyRequestItems = useCallback((metaData: Record<string, unknown> | null | undefined) => {
-    if (!Array.isArray(metaData?.items)) return [] as Array<{
-      name: string;
-      qty: string;
-      dept: string;
-      purpose: string;
-    }>;
+    if (!Array.isArray(metaData?.items)) {
+      return [] as Array<{
+        name: string;
+        qty: number;
+        unit: string;
+        dept: string;
+        purpose: string;
+      }>;
+    }
 
-    return metaData.items
-      .map((entry) => {
-        const row = (entry && typeof entry === 'object' ? entry : {}) as Record<string, unknown>;
-        return {
-          name: String(row.name || '').trim(),
-          qty: String(row.qty ?? row.quantity ?? '').trim(),
-          dept: String(row.dept || row.department || '').trim(),
-          purpose: String(row.purpose || row.reason || '').trim(),
-        };
-      })
-      .filter((row) => row.name || row.qty || row.dept || row.purpose);
+    return normalizeSupplyRequestItems(metaData.items);
   }, []);
 
   const renderSupplyRequestItemsHtml = useCallback((metaData: Record<string, unknown> | null | undefined) => {
@@ -545,7 +605,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                 (row) => `
                   <tr>
                     <td>${escapeHtml(row.name || '-')}</td>
-                    <td>${escapeHtml(row.qty || '-')}</td>
+                    <td>${escapeHtml(`${row.qty} ${row.unit}`)}</td>
                     <td>${escapeHtml(row.dept || '-')}</td>
                     <td>${escapeHtml(row.purpose || '-')}</td>
                   </tr>`
@@ -578,9 +638,9 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
             </thead>
             <tbody>
               {items.map((row, index) => (
-                <tr key={`${row.name}-${row.qty}-${index}`} className="border-t border-[var(--border)]">
+                <tr key={`${row.name}-${row.qty}-${row.unit}-${index}`} className="border-t border-[var(--border)]">
                   <td className="px-3 py-2 font-semibold text-[var(--foreground)]">{row.name || '-'}</td>
-                  <td className="px-3 py-2 font-bold text-[var(--accent)]">{row.qty || '-'}</td>
+                  <td className="px-3 py-2 font-bold text-[var(--accent)]">{`${row.qty} ${row.unit}`}</td>
                   <td className="px-3 py-2 text-[var(--toss-gray-4)]">{row.dept || '-'}</td>
                   <td className="px-3 py-2 text-[var(--toss-gray-4)]">{row.purpose || '-'}</td>
                 </tr>
@@ -594,7 +654,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
   const buildSupplyInventoryReviewRows = useCallback(
     (
-      items: Array<{ name: string; qty: number; dept: string; purpose: string }>,
+      items: Array<{ name: string; qty: number; unit: string; dept: string; purpose: string }>,
       supportInventoryRows: any[] = [],
       surgeryInventoryRows: any[] = [],
     ) => {
@@ -632,6 +692,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
           key: `${item.name}-${index}`,
           name: item.name,
           requestedQty: item.qty,
+          unit: item.unit,
           supportStock,
           supportShortageQty: Math.max(item.qty - supportStock, 0),
           surgeryStock,
@@ -644,7 +705,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   );
 
   const prepareSupplyInventoryReview = useCallback(
-    async (items: Array<{ name: string; qty: number; dept: string; purpose: string }>) => {
+    async (items: Array<{ name: string; qty: number; unit: string; dept: string; purpose: string }>) => {
       const companyName = String(user?.company || '').trim();
       const notices: string[] = [];
       let supportInventoryRows: any[] = [];
@@ -790,7 +851,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     const design = resolveApprovalTemplateDesign(item);
     const templateMeta = resolveApprovalTemplateMeta(item);
     const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
-    const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, staffs);
+    const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, approvalDirectoryStaffs);
     const leaveRequestSection = renderLeaveRequestInfoHtml(metaData);
     const supplyItemsSection = renderSupplyRequestItemsHtml(metaData);
     const contentSection = `
@@ -926,17 +987,18 @@ window.onload = () => window.print();
     }
     win.document.write(html);
     win.document.close();
-  }, [renderLeaveRequestInfoHtml, renderSupplyRequestItemsHtml, resolveApprovalTemplateDesign, resolveApprovalTemplateMeta, staffs]);
+  }, [approvalDirectoryStaffs, renderLeaveRequestInfoHtml, renderSupplyRequestItemsHtml, resolveApprovalTemplateDesign, resolveApprovalTemplateMeta]);
 
   // 결재자 후보: 부서장 이상(팀장·부장·병원장 등)만 표시 (staffs는 이미 메인에서 회사별로 불러옴)
   const APPROVER_POSITIONS = ['팀장', '간호과장', '실장', '부장', '본부장', '총무부장', '진료부장', '간호부장', '이사', '병원장', '원장', '대표'];
   const approverCandidates = useMemo(() => {
-    if (!Array.isArray(staffs)) return [];
+    const source = isSupplyRequestCompose ? approvalDirectoryStaffs : staffs;
+    if (!Array.isArray(source)) return [];
     const order = (s: StaffMember) => APPROVER_POSITIONS.indexOf(s.position || '');
-    return [...staffs]
+    return [...source]
       .filter((s) => APPROVER_POSITIONS.includes(s.position || ''))
       .sort((a, b) => order(a) - order(b) || (a.name || '').localeCompare(b.name || ''));
-  }, [staffs]);
+  }, [approvalDirectoryStaffs, isSupplyRequestCompose, staffs]);
   const normalizeApprovalLineIds = useCallback((line: unknown): string[] => {
     if (!Array.isArray(line)) return [];
     const ids = line
@@ -957,8 +1019,8 @@ window.onload = () => window.print();
     return [];
   }, [normalizeApprovalLineIds]);
   const approvalStaffMap = useMemo(
-    () => new Map((Array.isArray(staffs) ? staffs : []).map((staff) => [String(staff.id), staff])),
-    [staffs]
+    () => new Map((Array.isArray(approvalDirectoryStaffs) ? approvalDirectoryStaffs : []).map((staff) => [String(staff.id), staff])),
+    [approvalDirectoryStaffs]
   );
   const resolveApprovalDelayConfigForStaff = useCallback((staffId: string | null | undefined) => {
     if (!staffId) return resolveApprovalDelayConfig(null);
@@ -1082,7 +1144,7 @@ window.onload = () => window.print();
   }, []);
   const createApprovalReferenceNotifications = useCallback(async (item: Record<string, unknown>) => {
     const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
-    const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, staffs);
+    const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, approvalDirectoryStaffs);
     const fallbackCcUsers = Array.isArray(metaData?.cc_users)
       ? metaData.cc_users
           .map((entry) => {
@@ -1155,7 +1217,7 @@ window.onload = () => window.print();
     if (error) {
       console.error('참조자 알림 생성 실패:', error);
     }
-  }, [resolveApprovalLineIds, staffs]);
+  }, [approvalDirectoryStaffs, resolveApprovalLineIds]);
   const prepareSupplyApprovalInventoryWorkflow = useCallback(async (item: Record<string, unknown>) => {
     const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
     const requestedItems = Array.isArray(metaData?.items) ? metaData.items : [];
@@ -1701,7 +1763,7 @@ window.onload = () => window.print();
     setFormType(nextFormType);
     const requestedCcUsers = normalizeApprovalCcUsers(
       initialComposeRequest?.cc_users ?? initialComposeRequest?.ccLine,
-      staffs
+      approvalDirectoryStaffs
     );
     setCcLine(
       requestedCcUsers.length > 0
@@ -1763,7 +1825,7 @@ window.onload = () => window.print();
     }
 
     onConsumeComposeRequest?.();
-  }, [defaultApprovalMonth, initialComposeRequest, onConsumeComposeRequest, resolveAccessibleView, resolveDefaultReferenceUsersForForm, staffs]);
+  }, [approvalDirectoryStaffs, defaultApprovalMonth, initialComposeRequest, onConsumeComposeRequest, resolveAccessibleView, resolveDefaultReferenceUsersForForm]);
 
   const fetchApprovals = useCallback(async () => {
     const scopedCompanyId = !isMso ? user?.company_id : selectedCompanyId;
@@ -1854,11 +1916,11 @@ window.onload = () => window.print();
       : Array.isArray(lastMeta?.approver_line)
         ? lastMeta.approver_line as unknown[]
         : [];
-    setApproverLine(resolveApprovalStaffLine(storedApproverLine, staffs));
-    const storedCcUsers = normalizeApprovalCcUsers(lastMeta?.cc_users, staffs);
+    setApproverLine(resolveApprovalStaffLine(storedApproverLine, approvalDirectoryStaffs));
+    const storedCcUsers = normalizeApprovalCcUsers(lastMeta?.cc_users, approvalDirectoryStaffs);
     setCcLine(storedCcUsers.length > 0 ? storedCcUsers : resolveDefaultReferenceUsersForForm(formType));
     if (formType === '물품신청' && (lastMeta?.items as unknown[] | null | undefined)?.length) setSuppliesLoadKey((k) => k + 1);
-  }, [formType, lastDraftByType, resolveDefaultReferenceUsersForForm, staffs]);
+  }, [approvalDirectoryStaffs, formType, lastDraftByType, resolveDefaultReferenceUsersForForm]);
 
   const hydrateComposeFromApproval = useCallback((approval: Record<string, unknown>) => {
     const approvalMeta = approval.meta_data as Record<string, unknown> | null | undefined;
@@ -1874,19 +1936,19 @@ window.onload = () => window.print();
       : Array.isArray(approvalMeta?.approver_line)
         ? approvalMeta.approver_line as unknown[]
         : [];
-    const storedCcUsers = normalizeApprovalCcUsers(approvalMeta?.cc_users, staffs);
+    const storedCcUsers = normalizeApprovalCcUsers(approvalMeta?.cc_users, approvalDirectoryStaffs);
 
     isHydratingComposeRef.current = true;
     setFormType(nextFormType);
     setFormTitle((approval.title as string) || '');
     setFormContent((approval.content as string) || '');
     setExtraData((approvalMeta as Record<string, unknown>) || {});
-    setApproverLine(resolveApprovalStaffLine(storedApproverLine, staffs));
+    setApproverLine(resolveApprovalStaffLine(storedApproverLine, approvalDirectoryStaffs));
     setCcLine(storedCcUsers.length > 0 ? storedCcUsers : resolveDefaultReferenceUsersForForm(nextFormType));
     if (nextFormType === '물품신청' && (approvalMeta?.items as unknown[] | null | undefined)?.length) {
       setSuppliesLoadKey((key) => key + 1);
     }
-  }, [resolveDefaultReferenceUsersForForm, staffs]);
+  }, [approvalDirectoryStaffs, resolveDefaultReferenceUsersForForm]);
 
   useEffect(() => {
     if (viewMode !== '작성하기' || !composeSeedApproval) return;
@@ -1968,12 +2030,12 @@ window.onload = () => window.print();
       if (parsed?.extraData) setExtraData(parsed.extraData);
       const nextFormType = parsed?.formType ? normalizeComposeFormType(parsed.formType) : formType;
       if (parsed?.formType) setFormType(nextFormType);
-      setApproverLine(resolveApprovalStaffLine(parsed?.approverLine, staffs));
-      const storedCcUsers = normalizeApprovalCcUsers(parsed?.ccLine, staffs);
+      setApproverLine(resolveApprovalStaffLine(parsed?.approverLine, approvalDirectoryStaffs));
+      const storedCcUsers = normalizeApprovalCcUsers(parsed?.ccLine, approvalDirectoryStaffs);
       setCcLine(storedCcUsers.length > 0 ? storedCcUsers : resolveDefaultReferenceUsersForForm(nextFormType));
     } catch { /* ignore */ }
     setDraftBanner(false);
-  }, [formType, resolveDefaultReferenceUsersForForm, staffs]);
+  }, [approvalDirectoryStaffs, formType, resolveDefaultReferenceUsersForForm]);
 
   // 임시저장 삭제
   const clearDraftFromStorage = useCallback(() => {
@@ -2799,10 +2861,10 @@ window.onload = () => window.print();
     if (!uid) return [];
     return byCompany.filter((item) => {
       const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
-      const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, staffs);
+      const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, approvalDirectoryStaffs);
       return ccUsers.some((ccUser) => String(ccUser.id) === uid);
     });
-  }, [byCompany, staffs, user?.id]);
+  }, [approvalDirectoryStaffs, byCompany, user?.id]);
 
   const documentTypeOptions = useMemo(() => {
     const source =
@@ -2822,7 +2884,7 @@ window.onload = () => window.print();
 
   const buildApprovalSearchText = useCallback((item: Record<string, unknown>) => {
     const metaData = item.meta_data as Record<string, unknown> | null | undefined;
-    const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, staffs);
+    const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, approvalDirectoryStaffs);
     const leaveSummary = getLeaveRequestSummary(metaData);
     return [
       item.title,
@@ -2842,7 +2904,7 @@ window.onload = () => window.print();
       .map((value) => String(value ?? '').trim().toLocaleLowerCase('ko-KR'))
       .filter(Boolean)
       .join(' ');
-  }, [getLeaveRequestSummary, staffs]);
+  }, [approvalDirectoryStaffs, getLeaveRequestSummary]);
 
   const effectiveApprovalDateRange = useMemo(() => {
     return approvalDateMode === 'month'
@@ -3016,14 +3078,14 @@ window.onload = () => window.print();
                             </p>
                           </div>
                         </td>
-                        <td className="px-4 py-3 font-black text-[var(--foreground)]">{row.requestedQty}</td>
+                        <td className="px-4 py-3 font-black text-[var(--foreground)]">{`${row.requestedQty} ${row.unit}`}</td>
                         <td className="px-4 py-3">
-                          <div className="font-black text-indigo-600">{row.supportStock}</div>
+                          <div className="font-black text-indigo-600">{`${row.supportStock} ${row.unit}`}</div>
                           <div className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">
                             부족 {row.supportShortageQty}
                           </div>
                         </td>
-                        <td className="px-4 py-3 font-black text-[var(--accent)]">{row.surgeryStock}</td>
+                        <td className="px-4 py-3 font-black text-[var(--accent)]">{`${row.surgeryStock} ${row.unit}`}</td>
                         <td className="px-4 py-3">
                           <span
                             className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${
@@ -3079,20 +3141,20 @@ window.onload = () => window.print();
                     <div className="mt-3 grid grid-cols-2 gap-2 text-center">
                       <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2 py-2">
                         <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">신청</p>
-                        <p className="mt-1 text-sm font-black text-[var(--foreground)]">{row.requestedQty}</p>
+                        <p className="mt-1 text-sm font-black text-[var(--foreground)]">{`${row.requestedQty} ${row.unit}`}</p>
                       </div>
                       <div className="rounded-[var(--radius-md)] bg-indigo-50 px-2 py-2">
                         <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">SY INC 재고</p>
-                        <p className="mt-1 text-sm font-black text-indigo-600">{row.supportStock}</p>
+                        <p className="mt-1 text-sm font-black text-indigo-600">{`${row.supportStock} ${row.unit}`}</p>
                         <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">부족 {row.supportShortageQty}</p>
                       </div>
                       <div className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-2 py-2">
                         <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">수술실 현재고</p>
-                        <p className="mt-1 text-sm font-black text-[var(--accent)]">{row.surgeryStock}</p>
+                        <p className="mt-1 text-sm font-black text-[var(--accent)]">{`${row.surgeryStock} ${row.unit}`}</p>
                       </div>
                       <div className="rounded-[var(--radius-md)] bg-rose-50 px-2 py-2">
                         <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">수술실 부족</p>
-                        <p className="mt-1 text-sm font-black text-rose-600">{row.surgeryShortageQty}</p>
+                        <p className="mt-1 text-sm font-black text-rose-600">{`${row.surgeryShortageQty} ${row.unit}`}</p>
                       </div>
                     </div>
                   </div>
@@ -3551,7 +3613,7 @@ window.onload = () => window.print();
                   const lineIds = resolveApprovalLineIds(item);
                   const currentApproverId = resolveCurrentApproverId(item);
                   const steps = lineIds.map((id: string, i: number) => {
-                    const staff = Array.isArray(staffs) ? staffs.find((s) => s.id === id) : null;
+                    const staff = Array.isArray(approvalDirectoryStaffs) ? approvalDirectoryStaffs.find((s) => s.id === id) : null;
                     const name = staff?.name || '?';
                     const isCurrent = String(id) === String(currentApproverId || '');
                     return { step: i + 1, name, isCurrent };
@@ -3562,7 +3624,7 @@ window.onload = () => window.print();
                   const templateMeta = resolveApprovalTemplateMeta(item);
                   const templateDesign = resolveApprovalTemplateDesign(item);
                   const itemMetaData = item.meta_data as Record<string, unknown> | null | undefined;
-                  const cardCcUsers = normalizeApprovalCcUsers(itemMetaData?.cc_users, staffs);
+                  const cardCcUsers = normalizeApprovalCcUsers(itemMetaData?.cc_users, approvalDirectoryStaffs);
                   const leaveRequestSummary = getLeaveRequestSummary(itemMetaData);
                   const delegateSnapshot = resolveApprovalDelegateSnapshot(item);
                   const delaySnapshot = resolveApprovalDelaySnapshot(item);
@@ -3741,7 +3803,7 @@ window.onload = () => window.print();
         const detailContent = item.content as string | null | undefined;
         const detailStatus = item.status as string | null | undefined;
         const detailMetaData = item.meta_data as Record<string, unknown> | null | undefined;
-        const detailCcUsers = normalizeApprovalCcUsers(detailMetaData?.cc_users, staffs);
+        const detailCcUsers = normalizeApprovalCcUsers(detailMetaData?.cc_users, approvalDirectoryStaffs);
         const detailHistory = getApprovalEditHistory(detailMetaData);
         const detailLocked = isApprovalLocked(detailMetaData);
         const detailDelegateSnapshot = resolveApprovalDelegateSnapshot(item);

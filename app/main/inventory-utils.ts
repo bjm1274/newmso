@@ -171,13 +171,20 @@ export type SupplyRequestWorkflowItem = {
   note?: string | null;
 };
 
+export type SupplyRequestItemUnit = 'EA' | 'BOX';
+
+export function normalizeInventoryUnit(value: unknown): SupplyRequestItemUnit {
+  return String(value || '').trim().toUpperCase() === 'BOX' ? 'BOX' : 'EA';
+}
+
 export function normalizeSupplyRequestItems(rawItems: any[] = []) {
   return rawItems
     .map((item) => ({
       name: String(item?.name || item?.item_name || '').trim(),
       qty: Math.max(1, Number(item?.qty) || 1),
+      unit: normalizeInventoryUnit(item?.unit || item?.quantity_unit || item?.request_unit),
       dept: String(item?.dept || item?.department || '').trim(),
-      purpose: String(item?.purpose || '').trim(),
+      purpose: String(item?.purpose || item?.reason || '').trim(),
     }))
     .filter((item) => item.name);
 }

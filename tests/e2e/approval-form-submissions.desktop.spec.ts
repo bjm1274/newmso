@@ -43,6 +43,26 @@ const supportStaff = {
   role: 'manager',
 };
 
+const supportDirector = {
+  ...fakeUser,
+  id: 'approval-support-director-1',
+  employee_no: 'APR-021',
+  name: '백정민',
+  company: 'SY INC.',
+  company_id: 'mso-company-id',
+  department: '경영지원팀',
+  team: '경영지원팀',
+  position: '이사',
+  role: 'admin',
+  permissions: {
+    ...fakeUser.permissions,
+    mso: true,
+    approval: true,
+    ['menu_전자결재']: true,
+    ['approval_결재함']: true,
+  },
+};
+
 const adminUser = {
   ...fakeUser,
   id: 'approval-admin-1',
@@ -170,6 +190,40 @@ test('approval submission stays blocked until an approver is selected', async ({
   expect(runtimeErrors).toEqual([]);
 });
 
+test('hospital supply request compose includes SY INC. approvers in approval line options', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    staffMembers: [composeUser, approver, supportStaff, supportDirector],
+    approvals: [],
+    companies: [
+      { id: 'hospital-1', name: String(composeUser.company), type: 'HOSPITAL', is_active: true },
+      { id: 'mso-company-id', name: 'SY INC.', type: 'MSO', is_active: true },
+    ],
+  });
+
+  await seedSession(page, {
+    user: composeUser,
+    localStorage: {
+      erp_permission_prompt_shown: '1',
+    },
+  });
+
+  await openCompose(page);
+
+  const approverSelect = page.getByTestId('approval-approver-select');
+  await expect(approverSelect.locator('option', { hasText: supportDirector.name })).toHaveCount(0);
+
+  await page.getByTestId('approval-form-type-3').click();
+  await expect(page.getByTestId('supplies-add-row-button')).toBeVisible();
+  await expect(approverSelect.locator('option', { hasText: supportDirector.name })).toHaveCount(1);
+
+  await approverSelect.selectOption(supportDirector.id);
+  await expect(page.getByText(`1. ${supportDirector.name} ${supportDirector.position}`)).toBeVisible();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('shared approval forms submit with real field input', async ({ page }) => {
   test.setTimeout(180_000);
 
@@ -189,6 +243,8 @@ test('shared approval forms submit with real field input', async ({ page }) => {
         quantity: 20,
         stock: 20,
         min_quantity: 5,
+        unit: 'BOX',
+        spec: '4x4 / 30매',
         company: 'SY INC.',
         company_id: 'mso-company-id',
         department: '경영지원팀',
@@ -310,6 +366,7 @@ test('shared approval forms submit with real field input', async ({ page }) => {
     await page.getByTestId('approval-title-input').fill('E2E 물품 신청');
     await page.getByTestId('approval-content-input').fill('병동 비품 신청 사유입니다.');
     await page.getByTestId('supplies-item-name-0').fill('멸균 거즈');
+    await expect(page.getByTestId('supplies-item-unit-0')).toHaveText('BOX');
     await page.getByTestId('supplies-item-qty-0').fill('3');
     await page.getByTestId('supplies-item-purpose-0').fill('병동 처치용');
     await page.getByTestId('supplies-item-dept-0').selectOption('병동팀');
@@ -324,6 +381,7 @@ test('shared approval forms submit with real field input', async ({ page }) => {
     expect(row.type).toBe('물품신청');
     expect(row.meta_data.items[0].name).toBe('멸균 거즈');
     expect(Number(row.meta_data.items[0].qty)).toBe(3);
+    expect(row.meta_data.items[0].unit).toBe('BOX');
   });
 
   await test.step('수리요청서를 장비 정보와 함께 상신한다', async () => {
@@ -505,6 +563,7 @@ test('admin-configured default references auto-apply, notify recipients, and app
   await page.getByTestId('approval-title-input').fill('기본 참조자 물품신청');
   await page.getByTestId('approval-content-input').fill('기본 참조자 자동 세팅 검증');
   await page.getByTestId('supplies-item-name-0').fill('멸균 거즈');
+  await expect(page.getByTestId('supplies-item-unit-0')).toHaveText('BOX');
   await page.getByTestId('supplies-item-qty-0').fill('2');
   await page.getByTestId('supplies-item-purpose-0').fill('병동 처치');
   await page.getByTestId('supplies-item-dept-0').selectOption('병동팀');
