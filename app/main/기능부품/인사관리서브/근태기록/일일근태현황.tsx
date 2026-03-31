@@ -6,6 +6,7 @@ export default function DailyView({ date, dailyData, onEdit }: Record<string, un
     <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm overflow-hidden h-full">
       <div className="p-4 border-b border-[var(--border-subtle)] sticky top-0 bg-[var(--card)] z-10"><h3 className="font-bold text-lg">📅 {date as string} 근태 현황</h3></div>
       <div className="overflow-y-auto h-full pb-20 custom-scrollbar">
+        <div className="overflow-x-auto -mx-1">
         <table className="w-full text-sm text-left">
             <thead className="bg-[var(--muted)] text-[var(--toss-gray-3)] font-bold sticky top-0"><tr><th className="p-4">이름</th><th className="p-4">출근</th><th className="p-4">퇴근</th><th className="p-4">상태</th><th className="p-4">관리</th></tr></thead>
             <tbody>
@@ -20,6 +21,7 @@ export default function DailyView({ date, dailyData, onEdit }: Record<string, un
             ))}
             </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

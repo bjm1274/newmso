@@ -100,7 +100,7 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
                         </div>
                     </div>
                 )}
-                <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
+                <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-x-auto shadow-sm">
                     <table className="w-full text-[11px]">
                         <thead><tr className="bg-[var(--muted)] border-b border-[var(--border)]">
                             <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">직원</th>
