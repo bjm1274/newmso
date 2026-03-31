@@ -499,13 +499,15 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       name: customForm?.name || builtInForm?.name || normalizedFormType,
     };
   }, [customFormTypes, formType]);
-  const isSupplyRequestCompose = activeComposeFormMeta.slug === 'purchase';
   const approvalDirectoryStaffs = useMemo(
     () => mergeApprovalStaffDirectory(staffs, supportApproverStaffs),
     [staffs, supportApproverStaffs]
   );
   useEffect(() => {
-    if (isMso || !isSupplyRequestCompose) return;
+    if (isMso) {
+      setSupportApproverStaffs([]);
+      return;
+    }
 
     let active = true;
 
@@ -561,7 +563,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     return () => {
       active = false;
     };
-  }, [isMso, isSupplyRequestCompose]);
+  }, [isMso]);
   const approvalReferenceDefaults = useMemo(
     () =>
       normalizeApprovalReferenceDefaultsMap(
@@ -1099,13 +1101,13 @@ window.onload = () => window.print();
 
   // 결재자 후보: 부서장 이상(팀장·부장·병원장 등)만 표시 (staffs는 이미 메인에서 회사별로 불러옴)
   const approverCandidates = useMemo(() => {
-    const source = isSupplyRequestCompose ? approvalDirectoryStaffs : staffs;
+    const source = approvalDirectoryStaffs;
     if (!Array.isArray(source)) return [];
     const order = (s: StaffMember) => APPROVER_POSITIONS.indexOf(String(s.position || '').trim());
     return [...source]
       .filter((s) => APPROVER_POSITIONS.includes(String(s.position || '').trim()))
       .sort((a, b) => order(a) - order(b) || (a.name || '').localeCompare(b.name || ''));
-  }, [approvalDirectoryStaffs, isSupplyRequestCompose, staffs]);
+  }, [approvalDirectoryStaffs]);
   const normalizeApprovalLineIds = useCallback((line: unknown): string[] => {
     if (!Array.isArray(line)) return [];
     const ids = line

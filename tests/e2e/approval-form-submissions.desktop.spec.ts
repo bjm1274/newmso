@@ -203,7 +203,7 @@ test('approval submission stays blocked until an approver is selected', async ({
   expect(runtimeErrors).toEqual([]);
 });
 
-test('hospital supply request compose includes SY INC. approvers in approval line options', async ({ page }) => {
+test('hospital compose includes SY INC. approvers in approval line options across forms', async ({ page }) => {
   const runtimeErrors = trackRuntimeErrors(page);
   const supportDirectorWithLegacyCompanyName = {
     ...supportDirector,
@@ -229,7 +229,10 @@ test('hospital supply request compose includes SY INC. approvers in approval lin
   await openCompose(page);
 
   const approverSelect = page.getByTestId('approval-approver-select');
-  await expect(approverSelect.locator('option', { hasText: supportDirectorWithLegacyCompanyName.name })).toHaveCount(0);
+  await expect(approverSelect.locator('option', { hasText: supportDirectorWithLegacyCompanyName.name })).toHaveCount(1);
+
+  await page.getByTestId('approval-form-type-5').click();
+  await expect(approverSelect.locator('option', { hasText: supportDirectorWithLegacyCompanyName.name })).toHaveCount(1);
 
   await page.getByTestId('approval-form-type-3').click();
   await expect(page.getByTestId('supplies-add-row-button')).toBeVisible();
