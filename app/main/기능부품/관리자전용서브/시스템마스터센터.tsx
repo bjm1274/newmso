@@ -115,6 +115,16 @@ function prettyJson(value: unknown) {
   }
 }
 
+function formatPushPlatformLabel(platform: unknown) {
+  const normalized = String(platform || '').trim();
+  if (!normalized || normalized === 'unknown') return '미분류';
+  if (normalized === 'ios-webapp') return 'iPhone 설치형';
+  if (normalized === 'ios-browser') return 'iPhone 브라우저';
+  if (normalized === 'android') return 'Android';
+  if (normalized === 'web') return 'Desktop Web';
+  return normalized;
+}
+
 async function readJson(url: string) {
   const response = await fetch(url, { cache: 'no-store' });
   const payload = await response.json();
@@ -672,6 +682,73 @@ export default function SystemMasterCenter({
                   </div>
                 </div>
 
+                <div
+                  data-testid="system-master-push-diagnostics"
+                  className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] p-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-xs font-bold text-[var(--foreground)]">푸시 진단</p>
+                    <span className="text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                      최근 실패 {Number(operations.pushFailures?.total || 0).toLocaleString('ko-KR')}건
+                    </span>
+                  </div>
+
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <p className="text-[11px] text-[var(--toss-gray-3)]">FCM 연결 <span className="font-bold text-[var(--foreground)]">{Number(operations.subscriptions?.fcmEnabled || 0).toLocaleString('ko-KR')}</span></p>
+                    <p className="text-[11px] text-[var(--toss-gray-3)]">Web Push 전용 <span className="font-bold text-[var(--foreground)]">{Number(operations.subscriptions?.webPushOnly || 0).toLocaleString('ko-KR')}</span></p>
+                    <p className="text-[11px] text-[var(--toss-gray-3)]">가상 Endpoint <span className="font-bold text-[var(--foreground)]">{Number(operations.subscriptions?.placeholderEndpoints || 0).toLocaleString('ko-KR')}</span></p>
+                  </div>
+
+                  <div className="mt-4">
+                    <p className="text-[11px] font-bold text-[var(--foreground)]">플랫폼 분포</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {((operations.subscriptions?.platformSummary as any[]) || []).length === 0 && (
+                        <span className="text-[11px] text-[var(--toss-gray-3)]">표시할 플랫폼 데이터가 없습니다.</span>
+                      )}
+                      {((operations.subscriptions?.platformSummary as any[]) || []).map((entry: any) => (
+                        <span
+                          key={String(entry.platform)}
+                          className="rounded-full border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-[10px] font-bold text-[var(--foreground)]"
+                        >
+                          {formatPushPlatformLabel(entry.platform)} {Number(entry.count || 0).toLocaleString('ko-KR')}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                    <div>
+                      <p className="text-[11px] font-bold text-[var(--foreground)]">최근 실패 사유</p>
+                      <div className="mt-2 space-y-2">
+                        {((operations.pushFailures?.summary as any[]) || []).length === 0 && (
+                          <p className="text-[11px] text-[var(--toss-gray-3)]">최근 실패 사유가 없습니다.</p>
+                        )}
+                        {((operations.pushFailures?.summary as any[]) || []).slice(0, 4).map((entry: any) => (
+                          <div key={String(entry.error)} className="flex items-center justify-between gap-3 text-[11px]">
+                            <span className="font-semibold text-[var(--foreground)]">{String(entry.error || 'unknown')}</span>
+                            <span className="text-[var(--toss-gray-3)]">{Number(entry.count || 0).toLocaleString('ko-KR')}건</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[11px] font-bold text-[var(--foreground)]">최근 구독 흐름</p>
+                      <div className="mt-2 space-y-2">
+                        {((operations.subscriptions?.recentSubscriptions as any[]) || []).length === 0 && (
+                          <p className="text-[11px] text-[var(--toss-gray-3)]">최근 구독 데이터가 없습니다.</p>
+                        )}
+                        {((operations.subscriptions?.recentSubscriptions as any[]) || []).slice(0, 4).map((entry: any) => (
+                          <div key={String(entry.id)} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2">
+                            <p className="text-[11px] font-semibold text-[var(--foreground)]">{formatPushPlatformLabel(entry.platform)} · {entry.has_fcm ? 'FCM 포함' : 'Web Push'}</p>
+                            <p className="mt-1 text-[10px] text-[var(--toss-gray-3)]">{entry.created_at ? new Date(String(entry.created_at)).toLocaleString('ko-KR') : '-'}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] p-4">
                   <p className="text-xs font-bold text-[var(--foreground)]">크론 스케줄</p>
                   <div className="mt-3 space-y-2">
@@ -691,6 +768,16 @@ export default function SystemMasterCenter({
                     <p className="text-[11px] text-[var(--toss-gray-3)]">반복 할일 <span className="font-bold text-[var(--foreground)]">{Number(operations.todoAutomation?.repeatingOpenTodos || 0).toLocaleString('ko-KR')}</span></p>
                     <p className="text-[11px] text-[var(--toss-gray-3)]">24시간 리마인더 <span className="font-bold text-[var(--foreground)]">{Number(operations.todoAutomation?.reminderLogs24h || 0).toLocaleString('ko-KR')}</span></p>
                     <p className="text-[11px] text-[var(--toss-gray-3)]">위키 문서/버전 <span className="font-bold text-[var(--foreground)]">{Number(operations.wiki?.documents || 0).toLocaleString('ko-KR')} / {Number(operations.wiki?.versions || 0).toLocaleString('ko-KR')}</span></p>
+                  </div>
+                </div>
+
+                <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] p-4">
+                  <p className="text-xs font-bold text-[var(--foreground)]">실기기 QA 체크리스트</p>
+                  <div className="mt-3 space-y-2 text-[11px] text-[var(--toss-gray-3)]">
+                    <p>1. Android Chrome 또는 iPhone 설치형 앱에서 알림 권한이 허용된 상태인지 확인합니다.</p>
+                    <p>2. 앱을 완전히 내려놓은 뒤 다른 계정에서 채팅 메시지를 보내 상단 푸시가 오는지 확인합니다.</p>
+                    <p>3. 푸시를 눌렀을 때 채팅방, 결재 문서, 게시글이 정확한 대상까지 열리는지 확인합니다.</p>
+                    <p>4. 앱을 다시 열어 알림 설정의 푸시 상태가 연결됨으로 복구되는지 확인합니다.</p>
                   </div>
                 </div>
               </div>
