@@ -3,7 +3,7 @@
  * 차트 데이터와 기본 템플릿, 규정 기반 점검 결과를 함께 분석한다.
  */
 import { NextResponse } from 'next/server';
-import { readSessionFromRequest } from '@/lib/server-session';
+import { readAuthorizedExtraFeatureUser } from '@/lib/server-extra-feature-access';
 import {
   analyzeDischargeReviewRules,
   formatDischargeRuleAnalysisForPrompt,
@@ -69,9 +69,12 @@ async function callGemini(prompt: string): Promise<string> {
 
 export async function POST(req: Request) {
   try {
-    const session = await readSessionFromRequest(req);
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await readAuthorizedExtraFeatureUser(req, '퇴원심사');
+    if (!auth.user || auth.status || auth.error) {
+      return NextResponse.json(
+        { error: auth.status === 401 ? 'Unauthorized' : 'Forbidden' },
+        { status: auth.status ?? 500 }
+      );
     }
 
     const body = await req.json();

@@ -3,7 +3,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { loadNotifSettings, NotifSettings } from './알림시스템';
+import {
+  getPushConnectionStatus,
+  initNotificationService,
+  loadNotifSettings,
+  NotifSettings,
+  PUSH_STATUS_CHANGED_EVENT,
+  type PushConnectionStatus,
+} from './알림시스템';
 
 // ─── 타입 설정 ───
 const TABS = [
@@ -68,6 +75,45 @@ function buildApprovalNotificationHref(metadata: Record<string, any>) {
   return `/main?${params.toString()}`;
 }
 
+function buildBoardNotificationHref(metadata: Record<string, any>) {
+  const params = new URLSearchParams({
+    open_menu: '게시판',
+  });
+
+  if (typeof metadata?.board_type === 'string' && metadata.board_type.trim()) {
+    params.set('open_board', metadata.board_type.trim());
+  }
+
+  const postId = String(metadata?.post_id || '').trim();
+  if (postId) {
+    params.set('open_post', postId);
+  }
+
+  return `/main?${params.toString()}`;
+}
+
+function buildInventoryNotificationHref(metadata: Record<string, any>) {
+  const params = new URLSearchParams({
+    open_menu: '재고관리',
+  });
+
+  const inventoryView =
+    typeof metadata?.inventory_view === 'string' && metadata.inventory_view.trim()
+      ? metadata.inventory_view.trim()
+      : '';
+  const approvalId = String(metadata?.inventory_approval || metadata?.approval_id || '').trim();
+
+  if (inventoryView || approvalId) {
+    params.set('open_inventory_view', inventoryView || '현황');
+  }
+
+  if (approvalId) {
+    params.set('open_inventory_approval', approvalId);
+  }
+
+  return `/main?${params.toString()}`;
+}
+
 const NOTIF_TYPES_FOR_SETTINGS = [
   { id: 'message', label: '채팅 메시지', icon: '💬', desc: '새 채팅 메시지' },
   { id: 'mention', label: '멘션', icon: '📣', desc: '@멘션 알림' },
@@ -90,8 +136,11 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 }
 
 // ─── 알림 설정 탭 ───
-function SettingsTab() {
+function SettingsTab({ userId }: { userId?: string | null }) {
   const [settings, setSettings] = useState<NotifSettings>(loadNotifSettings);
+  const [pushStatus, setPushStatus] = useState<PushConnectionStatus | null>(null);
+  const [pushStatusError, setPushStatusError] = useState<string | null>(null);
+  const [pushActionPending, setPushActionPending] = useState(false);
 
   const update = (partial: Partial<NotifSettings>) => {
     const next = { ...settings, ...partial };
@@ -105,8 +154,172 @@ function SettingsTab() {
     if (typeof window !== 'undefined') localStorage.setItem('erp_notif_settings', JSON.stringify(next));
   };
 
+  const refreshPushStatus = useCallback(async () => {
+    if (!userId) {
+      setPushStatus(null);
+      setPushStatusError(null);
+      return;
+    }
+
+    try {
+      setPushStatus(await getPushConnectionStatus(userId));
+      setPushStatusError(null);
+    } catch {
+      setPushStatusError('푸시 상태를 확인하지 못했습니다.');
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    void refreshPushStatus();
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+    const handlePushStatusRefresh = () => {
+      if (document.visibilityState === 'hidden') return;
+      void refreshPushStatus();
+    };
+
+    window.addEventListener('focus', handlePushStatusRefresh);
+    document.addEventListener('visibilitychange', handlePushStatusRefresh);
+    window.addEventListener(PUSH_STATUS_CHANGED_EVENT, handlePushStatusRefresh);
+
+    return () => {
+      window.removeEventListener('focus', handlePushStatusRefresh);
+      document.removeEventListener('visibilitychange', handlePushStatusRefresh);
+      window.removeEventListener(PUSH_STATUS_CHANGED_EVENT, handlePushStatusRefresh);
+    };
+  }, [refreshPushStatus]);
+
+  const handleReconnectPush = useCallback(async () => {
+    if (!userId) return;
+
+    setPushActionPending(true);
+    setPushStatusError(null);
+    try {
+      const currentStatus = await getPushConnectionStatus(userId);
+      await initNotificationService({
+        staffId: userId,
+        requestPermission:
+          currentStatus.permission !== 'granted' && currentStatus.permission !== 'denied',
+      });
+    } catch {
+      setPushStatusError('푸시 재연결에 실패했습니다.');
+    } finally {
+      await refreshPushStatus();
+      setPushActionPending(false);
+    }
+  }, [refreshPushStatus, userId]);
+
+  const pushPermissionLabel =
+    pushStatus?.permission === 'granted'
+      ? '허용됨'
+      : pushStatus?.permission === 'denied'
+        ? '차단됨'
+        : pushStatus?.permission === 'default'
+          ? '미설정'
+          : '미지원';
+
+  const pushConnectionLabel = !pushStatus
+    ? '상태 확인 중'
+    : !pushStatus.supported
+      ? '이 기기에서는 웹 푸시를 지원하지 않습니다.'
+      : !pushStatus.secureContext
+        ? '보안 연결에서만 푸시를 사용할 수 있습니다.'
+        : pushStatus.active
+          ? '푸시가 이 기기에 연결되어 있습니다.'
+          : pushStatus.permission === 'denied'
+            ? '브라우저 또는 OS 설정에서 알림 권한을 다시 허용해야 합니다.'
+            : pushStatus.permission === 'default'
+              ? '알림 권한을 허용하면 닫힌 상태에서도 푸시를 받을 수 있습니다.'
+              : '권한은 허용됐지만 현재 구독이 끊겨 있습니다.';
+
+  const canReconnectPush = Boolean(
+    userId &&
+    pushStatus?.supported &&
+    pushStatus.secureContext &&
+    pushStatus.permission !== 'denied'
+  );
+  const pushActionLabel =
+    pushStatus?.permission === 'default' ? '알림 권한 켜기' : '푸시 다시 연결';
+
   return (
     <div className="space-y-4 p-4 md:p-4">
+      <div
+        data-testid="notification-settings-push-status"
+        className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden"
+      >
+        <div className="px-5 py-3 border-b border-[var(--border)] bg-[var(--muted)]/50">
+          <h3 className="text-[11px] font-black text-[var(--toss-gray-3)] uppercase tracking-wider">푸시 연결 상태</h3>
+        </div>
+        <div className="px-5 py-4 space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-[var(--foreground)]">모바일 상단 미리보기 / 닫힌 상태 알림</p>
+              <p
+                data-testid="notification-settings-push-connection"
+                className="text-xs text-[var(--toss-gray-3)] mt-1 leading-relaxed"
+              >
+                {userId ? pushConnectionLabel : '직원 계정으로 로그인하면 푸시 상태를 확인할 수 있습니다.'}
+              </p>
+            </div>
+            <span
+              className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black ${
+                pushStatus?.active
+                  ? 'bg-emerald-500/10 text-emerald-600'
+                  : 'bg-amber-500/10 text-amber-600'
+              }`}
+            >
+              {pushStatus?.active ? '연결됨' : '확인 필요'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--muted)]/40 px-3 py-2.5">
+              <p className="text-[var(--toss-gray-3)]">권한</p>
+              <p data-testid="notification-settings-push-permission" className="mt-1 font-bold text-[var(--foreground)]">
+                {pushPermissionLabel}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--muted)]/40 px-3 py-2.5">
+              <p className="text-[var(--toss-gray-3)]">구독</p>
+              <p className="mt-1 font-bold text-[var(--foreground)]">
+                {pushStatus?.hasSubscription ? '브라우저 등록됨' : '브라우저 등록 없음'}
+              </p>
+            </div>
+          </div>
+
+          {pushStatus?.permission === 'denied' && (
+            <p className="text-xs text-amber-600">
+              현재는 브라우저 또는 OS 설정에서 알림 권한을 다시 허용해야 합니다.
+            </p>
+          )}
+          {pushStatusError && (
+            <p className="text-xs text-red-500">{pushStatusError}</p>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            {canReconnectPush && (
+              <button
+                type="button"
+                data-testid="notification-settings-push-action"
+                onClick={() => void handleReconnectPush()}
+                disabled={pushActionPending}
+                className="px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold disabled:opacity-60"
+              >
+                {pushActionPending ? '연결 중...' : pushActionLabel}
+              </button>
+            )}
+            <button
+              type="button"
+              data-testid="notification-settings-push-refresh"
+              onClick={() => void refreshPushStatus()}
+              className="px-4 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--foreground)]"
+            >
+              상태 새로고침
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* 기본 설정 */}
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
         <div className="px-5 py-3 border-b border-[var(--border)] bg-[var(--muted)]/50">
@@ -263,9 +476,11 @@ export default function NotificationInbox({ user: _rawUser, onRefresh }: Record<
     else if (n.type === 'approval') {
       router.push(buildApprovalNotificationHref(meta));
     }
-    else if (n.type === 'board' || n.type === 'notice') router.push('/main?open_menu=게시판');
+    else if (n.type === 'board' || n.type === 'notice' || (n.type === 'notification' && meta?.post_id)) {
+      router.push(buildBoardNotificationHref(meta));
+    }
     else if (n.type === '인사' || n.type === 'payroll' || n.type === 'education' || n.type === 'attendance') router.push('/main?open_menu=내정보');
-    else if (n.type === 'inventory') router.push('/main?open_menu=재고관리');
+    else if (n.type === 'inventory') router.push(buildInventoryNotificationHref(meta));
   };
 
   // 탭 필터링
@@ -321,7 +536,7 @@ export default function NotificationInbox({ user: _rawUser, onRefresh }: Record<
       </header>
 
       {activeInnerTab === 'settings' ? (
-        <div className="flex-1 overflow-y-auto custom-scrollbar"><SettingsTab /></div>
+        <div className="flex-1 overflow-y-auto custom-scrollbar"><SettingsTab userId={_u?.id as string | undefined} /></div>
       ) : (
         <>
           {/* 타입 탭 가로 스크롤 */}

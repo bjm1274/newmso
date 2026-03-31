@@ -1,6 +1,73 @@
 import { expect, test, type Page } from '@playwright/test';
 import { dismissDialogs, fakeUser, mockSupabase, seedSession } from './helpers';
 
+async function installPushRegistrationRetryStubs(page: Page) {
+  await page.addInitScript(() => {
+    const registrationCounts = { register: 0 };
+    const fakeRegistration = {
+      scope: '/',
+      active: { scriptURL: '/sw.js' },
+      waiting: null,
+      installing: null,
+      unregister: async () => true,
+      pushManager: {
+        getSubscription: async () => null,
+        subscribe: async () => null,
+      },
+      showNotification: async () => undefined,
+    };
+
+    (
+      window as Window & {
+        __pushRegistrationCounts?: typeof registrationCounts;
+      }
+    ).__pushRegistrationCounts = registrationCounts;
+
+    function FakeNotification(this: Notification) {}
+
+    Object.defineProperty(FakeNotification, 'permission', {
+      configurable: true,
+      get: () => 'granted',
+    });
+    Object.defineProperty(FakeNotification, 'requestPermission', {
+      configurable: true,
+      value: async () => 'granted',
+    });
+
+    Object.defineProperty(window, 'Notification', {
+      configurable: true,
+      writable: true,
+      value: FakeNotification,
+    });
+
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        register: async () => {
+          registrationCounts.register += 1;
+          return fakeRegistration;
+        },
+        ready: Promise.resolve(fakeRegistration),
+        getRegistration: async () => fakeRegistration,
+        getRegistrations: async () => [fakeRegistration],
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      },
+    });
+  });
+}
+
+async function getPushRegistrationCount(page: Page) {
+  return page.evaluate(
+    () =>
+      (
+        window as Window & {
+          __pushRegistrationCounts?: { register?: number };
+        }
+      ).__pushRegistrationCounts?.register ?? 0
+  );
+}
+
 async function insertLiveNotification(
   page: Page,
   payload: {
@@ -119,4 +186,51 @@ test('mobile chat preview banner shows the message preview and opens the chat ro
 
   await expect(page.getByTestId('chat-view')).toBeVisible();
   await expect(page.getByTestId('chat-message-input')).toBeVisible();
+});
+
+test('mobile notification service retries push registration when focus returns without an active subscription', async ({
+  page,
+}) => {
+  await installPushRegistrationRetryStubs(page);
+  await mockSupabase(page, {
+    notifications: [],
+  });
+
+  await seedSession(page);
+  await page.goto('/main');
+  await expect(page.getByTestId('main-shell')).toBeVisible();
+
+  await expect.poll(async () => getPushRegistrationCount(page)).toBeGreaterThan(0);
+  const initialCount = await getPushRegistrationCount(page);
+
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('focus'));
+  });
+
+  await expect.poll(async () => getPushRegistrationCount(page)).toBe(initialCount + 1);
+});
+
+test('notification settings shows push status and lets the user retry registration', async ({
+  page,
+}) => {
+  await installPushRegistrationRetryStubs(page);
+  await mockSupabase(page, {
+    notifications: [],
+  });
+
+  await seedSession(page);
+  await page.goto('/main?open_menu=알림');
+  await expect(page.getByTestId('notifications-view')).toBeVisible();
+
+  await page.getByRole('button', { name: '⚙️ 설정' }).click();
+  await expect(page.getByTestId('notification-settings-push-status')).toBeVisible();
+  await expect(page.getByTestId('notification-settings-push-permission')).toHaveText('허용됨');
+  await expect(page.getByTestId('notification-settings-push-connection')).toContainText('구독이 끊겨');
+
+  await expect.poll(async () => getPushRegistrationCount(page)).toBeGreaterThan(0);
+  const initialCount = await getPushRegistrationCount(page);
+
+  await page.getByTestId('notification-settings-push-action').click();
+
+  await expect.poll(async () => getPushRegistrationCount(page)).toBe(initialCount + 1);
 });
