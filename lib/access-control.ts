@@ -52,6 +52,12 @@ const EXTRA_FEATURE_PERMISSION_KEYS: Record<string, string> = {
   OP체크: 'extra_OP체크',
 };
 
+const STRICT_EXTRA_FEATURE_PERMISSION_KEYS = new Set([
+  'extra_입금실시간조회',
+  'extra_수술상담',
+  'extra_OP체크',
+]);
+
 const BOARD_PERMISSION_KEYS: Record<string, { read: string; write: string }> = {
   공지사항: { read: 'board_공지사항_read', write: 'board_공지사항_write' },
   자유게시판: { read: 'board_자유게시판_read', write: 'board_자유게시판_write' },
@@ -136,9 +142,6 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   menu_재고관리: ['inventory', ...Object.values(INVENTORY_PERMISSION_KEYS)],
   menu_관리자: ['admin', ...Object.values(ADMIN_PERMISSION_KEYS)],
   extra_조직도: ['menu_조직도'],
-  extra_입금실시간조회: ['menu_추가기능'],
-  extra_수술상담: ['menu_추가기능'],
-  extra_OP체크: ['menu_추가기능'],
   extra_인계노트: ['handover_read'],
   approval_기안함: ['approval'],
   approval_결재함: ['approval'],
@@ -458,7 +461,17 @@ export function canAccessExtraFeature(
   if (featureIdOrPermissionKey === '조직도') return true;
   if (isPrivilegedUser(user)) return true;
   if (!canAccessMainMenu(user, '추가기능')) return false;
-  return hasPermission(user, resolvePermissionKey(featureIdOrPermissionKey, EXTRA_FEATURE_PERMISSION_KEYS));
+  const permissionKey = resolvePermissionKey(featureIdOrPermissionKey, EXTRA_FEATURE_PERMISSION_KEYS);
+
+  if (STRICT_EXTRA_FEATURE_PERMISSION_KEYS.has(permissionKey)) {
+    const explicitPermission = getExplicitPermissionState(user, permissionKey);
+    if (explicitPermission !== null) {
+      return explicitPermission;
+    }
+    return isAdminUser(user);
+  }
+
+  return hasPermission(user, permissionKey);
 }
 
 export function hasUserPayloadChanged(currentUser: any, nextUser: any): boolean {

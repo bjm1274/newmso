@@ -33,6 +33,7 @@ import {
   normalizeSupplyRequestItems,
   resolveInventoryDepartment,
   summarizeSupplyRequestWorkflow,
+  toLooseRecordArray,
 } from '@/app/main/inventory-utils';
 import { extractLeaveRequestMeta } from '@/lib/leave-notice';
 import AttendanceForms from './전자결재서브/근태신청양식';
@@ -1355,7 +1356,7 @@ window.onload = () => window.print();
     const workflowItems = buildSupplyRequestWorkflowItems(
       requestedItems,
       sourceInventoryRows || [],
-      inventoryWorkflow?.items as unknown[] | undefined,
+      toLooseRecordArray(inventoryWorkflow?.items),
     );
     const summary = summarizeSupplyRequestWorkflow(workflowItems);
     const now = new Date().toISOString();

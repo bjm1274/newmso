@@ -1,6 +1,6 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ChangeEvent } from 'react';
 import { supabase } from '@/lib/supabase';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 import { isMissingColumnError } from '@/lib/supabase-compat';
@@ -14,6 +14,25 @@ import {
 import { calculateApprovedAnnualLeaveUsage } from '@/lib/annual-leave-ledger';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { useActionDialog } from '@/app/components/useActionDialog';
+import type { StaffMember } from '@/types';
+
+type ProfileCardUser = Partial<StaffMember> &
+  Record<string, unknown> & {
+    permissions?: Record<string, unknown> | null;
+  };
+
+type ProfileCardProps = {
+  user?: ProfileCardUser | null;
+  onOpenApproval?: (options?: Record<string, unknown>) => void;
+  hideHeader?: boolean;
+  hideActionBar?: boolean;
+  showSecret?: boolean;
+  setShowSecret?: (nextValue: boolean) => void;
+  isEditing?: boolean;
+  setIsEditing?: (nextValue: boolean) => void;
+};
+
+const PROFILE_CARD_UPDATE_SELECT = 'id, email, phone, address, bank_account, bank_name, permissions';
 
 function toSafeText(value: unknown, fallback = '') {
   if (typeof value === 'string') return value;
@@ -32,11 +51,11 @@ export default function MyProfileCard({
   setShowSecret: setControlledShowSecret,
   isEditing: controlledIsEditing,
   setIsEditing: setControlledIsEditing,
-}: Record<string, unknown>) {
+}: ProfileCardProps) {
   const { dialog, openConfirm, openPrompt } = useActionDialog();
   const MASKED_TEXT = '********';
-  const _iu = normalizeStaffLike((initialUser ?? {}) as Record<string, unknown>);
-  const [user, setUser] = useState<Record<string, unknown>>(normalizeProfileUser(_iu));
+  const _iu = normalizeStaffLike((initialUser ?? {}) as ProfileCardUser);
+  const [user, setUser] = useState<ProfileCardUser>(normalizeProfileUser(_iu as ProfileCardUser));
   const [avatarUrl, setAvatarUrl] = useState<string | null>(getProfilePhotoUrl((_iu)));
   const [uploading, setUploading] = useState(false);
   const [internalShowSecret, setInternalShowSecret] = useState(false);
@@ -70,7 +89,7 @@ export default function MyProfileCard({
     setInternalIsEditing(nextValue);
   };
 
-  const broadcastProfileUpdate = (nextUser: any) => {
+  const broadcastProfileUpdate = (nextUser: ProfileCardUser) => {
     if (typeof window === 'undefined') return;
     const normalizedUser = normalizeProfileUser(nextUser);
     window.dispatchEvent(
@@ -211,7 +230,7 @@ export default function MyProfileCard({
     }
   };
 
-  const uploadAvatar = async (event: any) => {
+  const uploadAvatar = async (event: ChangeEvent<HTMLInputElement>) => {
     try {
       setUploading(true);
 
@@ -262,7 +281,7 @@ export default function MyProfileCard({
 
       // 3. DB 업데이트 (복구된/저장소 사용자 ID)
       let persistedToLegacyColumn = false;
-      let legacyUploadError: any = null;
+      let legacyUploadError: unknown = null;
       try {
         const avatarUpdate = await supabase
         .from('staff_members')
@@ -338,7 +357,7 @@ export default function MyProfileCard({
     }
   };
 
-  const saveProfileDirectly = async (currentUser: any) => {
+  const saveProfileDirectly = async (currentUser: ProfileCardUser) => {
     const { extension, bank_name, ...otherForm } = editForm;
     const actor = readClientAuditActor();
     const beforeUser = normalizeProfileUser(currentUser);
@@ -355,7 +374,7 @@ export default function MyProfileCard({
       permissions: updatedPermissions,
     };
 
-    let savedRow: any = null;
+    let savedRow: Record<string, unknown> | null = null;
     const primaryUpdate = await supabase
       .from('staff_members')
       .update({
@@ -363,7 +382,7 @@ export default function MyProfileCard({
         bank_name: bank_name || null,
       })
       .eq('id', currentUser.id)
-      .select('*')
+      .select(PROFILE_CARD_UPDATE_SELECT)
       .single();
 
     if (primaryUpdate.error) {
@@ -375,7 +394,7 @@ export default function MyProfileCard({
         .from('staff_members')
         .update(baseUpdatePayload)
         .eq('id', currentUser.id)
-        .select('*')
+        .select(PROFILE_CARD_UPDATE_SELECT)
         .single();
 
       if (fallbackUpdate.error) {
@@ -434,7 +453,7 @@ export default function MyProfileCard({
     toast('내 정보가 바로 저장되었습니다. 인사관리에도 즉시 반영됩니다.', 'success');
   };
 
-  const buildRequestedProfileChanges = (currentUser: any) => {
+  const buildRequestedProfileChanges = (currentUser: ProfileCardUser) => {
     const currentPermissions =
       currentUser?.permissions && typeof currentUser.permissions === 'object' && !Array.isArray(currentUser.permissions)
         ? currentUser.permissions
@@ -454,7 +473,7 @@ export default function MyProfileCard({
     };
   };
 
-  const submitProfileChangeRequest = async (currentUser: any) => {
+  const submitProfileChangeRequest = async (currentUser: ProfileCardUser) => {
     const requestedChanges = buildRequestedProfileChanges(currentUser);
     const beforeUser = normalizeProfileUser(currentUser);
     const nextUser = normalizeProfileUser({
@@ -1024,6 +1043,7 @@ function ProfileChangeRequestHistory({ user: rawUser }: { user: Record<string, u
 }
 
 function LegacyLeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record<string, unknown>) {
+  /*
   const user = (_rawUser ?? {}) as Record<string, unknown>;
   const [summary, setSummary] = useState<{
     total: number;
@@ -1114,7 +1134,7 @@ function LegacyLeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record
               : null;
 
       const lateDays =
-        commute
+        commuteRows
           ?.filter((c: any) => c.status === '지각')
           .map((c: any) => ({
             date: c.date,
@@ -1122,7 +1142,7 @@ function LegacyLeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record
           })) ?? [];
 
       const overworkDays =
-        commute
+        commuteRows
           ?.filter(
             (c: any) =>
               c.status === '추가근무' || c.status === '연장근로' || c.status === '야근'
@@ -1203,6 +1223,37 @@ function LegacyLeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record
       </div>
     </div>
   );
+  */
+  return null;
+}
+
+type AnnualLeaveStaffRow = {
+  id?: string;
+  annual_leave_total?: number | null;
+  annual_leave_used?: number | null;
+};
+
+type ApprovedLeaveRow = {
+  leave_type?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  status?: string | null;
+};
+
+type CommuteStatusRow = {
+  date?: string | null;
+  status?: string | null;
+};
+
+type TodayAttendanceStatusRow = {
+  status?: string | null;
+};
+
+function sanitizeCommuteSummaryItems(items: Array<{ date?: string | null; status?: string | null }>) {
+  return items.flatMap((item) => {
+    if (!item.date || !item.status) return [];
+    return [{ date: item.date, status: item.status }];
+  });
 }
 
 function LeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record<string, unknown>) {
@@ -1225,7 +1276,7 @@ function LeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record<strin
       const resolvedUser = await resolveStaffLike(user as Record<string, unknown>);
       const resolvedStaffId = getStaffLikeId(resolvedUser);
 
-      let staff: { id?: string; annual_leave_total?: number; annual_leave_used?: number } | null = null;
+      let staff: AnnualLeaveStaffRow | null = null;
       if (resolvedStaffId) {
         const res = await supabase
           .from('staff_members')
@@ -1241,7 +1292,7 @@ function LeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record<strin
           .select('id, annual_leave_total, annual_leave_used')
           .eq('name', resolvedUser.name)
           .maybeSingle();
-        staff = res.data;
+        staff = res.data as AnnualLeaveStaffRow | null;
       }
 
       const total = Number(staff?.annual_leave_total ?? resolvedUser?.annual_leave_total ?? user?.annual_leave_total ?? 0);
@@ -1250,42 +1301,39 @@ function LeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record<strin
       const yearStart = `${currentYear}-01-01`;
       const yearEnd = `${currentYear}-12-31`;
 
-      const { data: approvedLeaves } = staffId
-        ? await supabase
+      const approvedLeaves: ApprovedLeaveRow[] = staffId
+        ? ((await supabase
             .from('leave_requests')
             .select('leave_type,start_date,end_date,status')
             .eq('staff_id', staffId)
             .lte('start_date', yearEnd)
-            .gte('end_date', yearStart)
-        : { data: null as any };
+            .gte('end_date', yearStart)).data as ApprovedLeaveRow[] | null) || []
+        : [];
 
       const used = Math.max(
         Number(staff?.annual_leave_used ?? resolvedUser?.annual_leave_used ?? user?.annual_leave_used ?? 0),
-        calculateApprovedAnnualLeaveUsage(
-          Array.isArray(approvedLeaves) ? (approvedLeaves as Record<string, unknown>[]) : [],
-          currentYear
-        )
+        calculateApprovedAnnualLeaveUsage(approvedLeaves as Record<string, unknown>[], currentYear)
       );
       const remaining = Math.max(0, total - used);
 
-      const { data: commute } = staffId
-        ? await supabase
+      const commuteRows: CommuteStatusRow[] = staffId
+        ? ((await supabase
             .from('attendance')
             .select('date,status')
             .eq('staff_id', staffId)
             .order('date', { ascending: false })
-            .limit(60)
-        : { data: null as any };
+            .limit(60)).data as CommuteStatusRow[] | null) || []
+        : [];
 
       const today = new Date().toISOString().slice(0, 10);
-      const { data: todayAttendance } = staffId
-        ? await supabase
+      const todayAttendance: TodayAttendanceStatusRow | null = staffId
+        ? ((await supabase
             .from('attendances')
             .select('status')
             .eq('staff_id', staffId)
             .eq('work_date', today)
-            .maybeSingle()
-        : { data: null as any };
+            .maybeSingle()).data as TodayAttendanceStatusRow | null)
+        : null;
 
       const normalizedTodayStatus = String(todayAttendance?.status ?? '').trim().toLowerCase();
       const todayStatusLabel =
@@ -1298,23 +1346,30 @@ function LeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record<strin
               : null;
 
       const lateDays =
-        commute
-          ?.filter((entry: any) => entry.status === '지각')
-          .map((entry: any) => ({
+        commuteRows
+          .filter((entry) => entry.status === '지각')
+          .map((entry) => ({
             date: entry.date,
             status: entry.status,
           })) ?? [];
 
       const overworkDays =
-        commute
-          ?.filter((entry: any) => ['추가근무', '연장근무', '특근'].includes(String(entry.status ?? '')))
-          .map((entry: any) => ({
+        commuteRows
+          .filter((entry) => ['추가근무', '연장근무', '특근'].includes(String(entry.status ?? '')))
+          .map((entry) => ({
             date: entry.date,
             status: entry.status,
           })) ?? [];
 
       if (!cancelled) {
-        setSummary({ total, used, remaining, todayStatusLabel, lateDays, overworkDays });
+        setSummary({
+          total,
+          used,
+          remaining,
+          todayStatusLabel,
+          lateDays: sanitizeCommuteSummaryItems(lateDays),
+          overworkDays: sanitizeCommuteSummaryItems(overworkDays),
+        });
       }
     };
 

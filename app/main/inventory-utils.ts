@@ -1,23 +1,73 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/supabase-compat';
+import type { InventoryItem, StaffMember } from '@/types';
+
+type LooseRecord = Record<string, unknown>;
+type InventoryLike = Partial<InventoryItem> & LooseRecord;
+type InventoryUserLike = Partial<StaffMember> & LooseRecord;
+type SupabaseCompatResult<T> = {
+  data: T | null;
+  error: unknown;
+};
+type ApprovalLike = LooseRecord & {
+  id?: string | null;
+  doc_number?: string | null;
+  created_at?: string | null;
+  meta_data?: LooseRecord | null;
+};
+
+const INVENTORY_SELECT_COLUMNS = [
+  'id',
+  'item_name',
+  'name',
+  'quantity',
+  'stock',
+  'company',
+  'company_id',
+  'department',
+  'category',
+  'spec',
+  'min_quantity',
+  'min_stock',
+  'unit_price',
+  'price',
+  'expiry_date',
+  'lot_number',
+  'is_udi',
+  'location',
+  'insurance_code',
+  'udi_code',
+  'supplier_name',
+  'supplier',
+].join(', ');
 
 export const INVENTORY_SUPPORT_COMPANY = 'SY INC.';
 export const INVENTORY_SUPPORT_DEPARTMENT = '경영지원팀';
 
-export function getItemQuantity(item: any) {
+function isLooseRecord(value: unknown): value is LooseRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function toLooseRecordArray(value: unknown): LooseRecord[] {
+  return Array.isArray(value) ? value.filter(isLooseRecord) : [];
+}
+
+export function getItemQuantity(item: InventoryLike | null | undefined): number {
   return Number(item?.quantity ?? item?.stock ?? 0);
 }
 
-export function getItemMinQuantity(item: any) {
+export function getItemMinQuantity(item: InventoryLike | null | undefined): number {
   return Number(item?.min_quantity ?? item?.min_stock ?? 0);
 }
 
-export function getItemName(item: any) {
-  return item?.item_name || item?.name || '품목';
+export function getItemName(item: InventoryLike | null | undefined): string {
+  const rawName = item?.item_name ?? item?.name;
+  const normalizedName = typeof rawName === 'string' ? rawName.trim() : String(rawName ?? '').trim();
+  return normalizedName || '품목';
 }
 
-export function getItemUnitPrice(item: any) {
+export function getItemUnitPrice(item: InventoryLike | null | undefined): number {
   return Number(item?.unit_price ?? item?.price ?? 0);
 }
 
@@ -99,7 +149,7 @@ export function validateInventoryQuantity(
 }
 
 type InventoryTransferValidationParams = {
-  item: any;
+  item: InventoryLike | null | undefined;
   quantity: string | number | null | undefined;
   toCompany?: string | null;
   fromCompany?: string | null;
@@ -145,7 +195,7 @@ export function validateInventoryTransfer({
   return null;
 }
 
-export function getRecommendedOrderQuantity(item: any) {
+export function getRecommendedOrderQuantity(item: InventoryLike | null | undefined) {
   const quantity = getItemQuantity(item);
   const minQuantity = Math.max(getItemMinQuantity(item), 1);
   return Math.max(minQuantity * 2 - quantity, 1);
@@ -177,7 +227,7 @@ export function normalizeInventoryUnit(value: unknown): SupplyRequestItemUnit {
   return String(value || '').trim().toUpperCase() === 'BOX' ? 'BOX' : 'EA';
 }
 
-export function normalizeSupplyRequestItems(rawItems: any[] = []) {
+export function normalizeSupplyRequestItems(rawItems: LooseRecord[] = []) {
   return rawItems
     .map((item) => ({
       name: String(item?.name || item?.item_name || '').trim(),
@@ -202,7 +252,7 @@ export type SupplyRequestMonthlySuggestion = {
 };
 
 export function buildSupplyRequestMonthlySuggestions(
-  approvals: Array<Record<string, any>> = [],
+  approvals: ApprovalLike[] = [],
   limit = 8,
 ) {
   const grouped = new Map<
@@ -220,7 +270,7 @@ export function buildSupplyRequestMonthlySuggestions(
   >();
 
   approvals.forEach((approval, approvalIndex) => {
-    const items = normalizeSupplyRequestItems(approval?.meta_data?.items);
+    const items = normalizeSupplyRequestItems(toLooseRecordArray(approval?.meta_data?.items));
     if (items.length === 0) {
       return;
     }
@@ -287,7 +337,7 @@ export function buildSupplyRequestMonthlySuggestions(
 }
 
 export function findSupplySourceInventoryItem(
-  inventoryRows: any[] = [],
+  inventoryRows: InventoryLike[] = [],
   itemName: string,
   company = INVENTORY_SUPPORT_COMPANY,
   department = INVENTORY_SUPPORT_DEPARTMENT,
@@ -306,19 +356,19 @@ export function findSupplySourceInventoryItem(
 }
 
 export function buildSupplyRequestWorkflowItems(
-  rawItems: any[] = [],
-  inventoryRows: any[] = [],
-  previousWorkflowItems: any[] = [],
+  rawItems: unknown[] = [],
+  inventoryRows: InventoryLike[] = [],
+  previousWorkflowItems: unknown[] = [],
 ) {
-  const previousByIndex = new Map<number, any>();
-  previousWorkflowItems.forEach((item: any) => {
+  const previousByIndex = new Map<number, Partial<SupplyRequestWorkflowItem> & LooseRecord>();
+  toLooseRecordArray(previousWorkflowItems).forEach((item) => {
     const requestIndex = Number(item?.request_index);
     if (Number.isInteger(requestIndex) && requestIndex >= 0) {
       previousByIndex.set(requestIndex, item);
     }
   });
 
-  return normalizeSupplyRequestItems(rawItems).map((item, index) => {
+  return normalizeSupplyRequestItems(toLooseRecordArray(rawItems)).map((item, index) => {
     const sourceItem = findSupplySourceInventoryItem(inventoryRows, item.name);
     const availableQty = sourceItem ? getItemQuantity(sourceItem) : 0;
     const shortageQty = Math.max(item.qty - availableQty, 0);
@@ -373,7 +423,7 @@ export function summarizeSupplyRequestWorkflow(items: SupplyRequestWorkflowItem[
   );
 }
 
-export function resolveInventoryDepartment(item: any) {
+export function resolveInventoryDepartment(item: InventoryLike | null | undefined) {
   const department = String(item?.department || '').trim();
   if (department) {
     return department;
@@ -384,7 +434,7 @@ export function resolveInventoryDepartment(item: any) {
     : '';
 }
 
-export function normalizeSupportInventoryRows(rows: any[] = []) {
+export function normalizeSupportInventoryRows(rows: InventoryLike[] = []) {
   return rows.map((row) => {
     const department = resolveInventoryDepartment(row);
     return department === row?.department ? row : { ...row, department };
@@ -392,30 +442,30 @@ export function normalizeSupportInventoryRows(rows: any[] = []) {
 }
 
 export async function fetchSupportInventoryRows(client: SupabaseClient = supabase) {
-  const result = await withMissingColumnFallback<Record<string, any>[]>(
+  const result = await withMissingColumnFallback<LooseRecord[]>(
     () =>
       client
         .from('inventory')
-        .select('*')
+        .select(INVENTORY_SELECT_COLUMNS)
         .eq('company', INVENTORY_SUPPORT_COMPANY)
-        .eq('department', INVENTORY_SUPPORT_DEPARTMENT),
+        .eq('department', INVENTORY_SUPPORT_DEPARTMENT) as PromiseLike<SupabaseCompatResult<LooseRecord[]>>,
     () =>
       client
         .from('inventory')
-        .select('*')
-        .eq('company', INVENTORY_SUPPORT_COMPANY),
+        .select(INVENTORY_SELECT_COLUMNS)
+        .eq('company', INVENTORY_SUPPORT_COMPANY) as PromiseLike<SupabaseCompatResult<LooseRecord[]>>,
     'department',
   );
 
   return {
-    data: normalizeSupportInventoryRows(result.data || []),
+    data: normalizeSupportInventoryRows(toLooseRecordArray(result.data) as InventoryLike[]),
     error: result.error,
   };
 }
 
 function findDestinationInventoryItem(
-  inventoryRows: any[],
-  selectedItem: any,
+  inventoryRows: InventoryLike[],
+  selectedItem: InventoryLike | null | undefined,
   toCompany: string,
   toDept: string,
 ) {
@@ -442,13 +492,13 @@ function findDestinationInventoryItem(
 }
 
 type ProcessInventoryIssueParams = {
-  sourceItem: any;
-  inventoryRows?: any[];
+  sourceItem: InventoryLike;
+  inventoryRows?: InventoryLike[];
   quantity: number;
   toCompany: string;
   toDept: string;
   reason?: string;
-  user: any;
+  user?: InventoryUserLike | null;
   destinationCompanyId?: string | null;
 };
 
@@ -606,7 +656,7 @@ export async function processInventoryIssue({
           sourceNextQty = row?.next_qty ?? sourceNextQty;
         }
       }
-      const baseDestinationPayload: Record<string, any> = {
+      const baseDestinationPayload: Record<string, unknown> = {
         item_name: getItemName(sourceItem),
         category: sourceItem?.category || null,
         quantity: transferQuantity,
@@ -628,9 +678,9 @@ export async function processInventoryIssue({
       if (sourceItem?.supplier) baseDestinationPayload.supplier = sourceItem.supplier;
 
       const { data: insertedDestination, error: destinationInsertError } =
-        await withMissingColumnsFallback<Record<string, any>>(
+        await withMissingColumnsFallback<LooseRecord>(
           (omittedColumns) => {
-            const destinationPayload: Record<string, any> = { ...baseDestinationPayload };
+            const destinationPayload: Record<string, unknown> = { ...baseDestinationPayload };
 
             if (destinationCompanyId && !omittedColumns.has('company_id')) {
               destinationPayload.company_id = destinationCompanyId;
@@ -641,10 +691,10 @@ export async function processInventoryIssue({
             }
 
             return supabase
-              .from('inventory')
-              .insert([destinationPayload])
-              .select('*')
-              .single();
+                .from('inventory')
+                .insert([destinationPayload])
+                .select(INVENTORY_SELECT_COLUMNS)
+                .single() as PromiseLike<SupabaseCompatResult<LooseRecord>>;
           },
           ['company_id', 'department'],
         );
@@ -710,7 +760,7 @@ export async function processInventoryIssue({
     }
   }
 
-  const logRows: any[] = [
+  const logRows: Array<Record<string, unknown>> = [
     {
       item_id: sourceItem.id,
       inventory_id: sourceItem.id,
@@ -754,12 +804,12 @@ export async function processInventoryIssue({
 }
 
 type RequestInventoryReorderParams = {
-  item: any;
-  user: any;
+  item: InventoryLike;
+  user?: InventoryUserLike | null;
   selectedCompanyId?: string | null;
   quantity?: number;
   reason?: string;
-  metaData?: Record<string, any>;
+  metaData?: Record<string, unknown>;
 };
 
 export async function requestInventoryReorder({
@@ -774,7 +824,7 @@ export async function requestInventoryReorder({
   const currentStock = getItemQuantity(item);
   const minQuantity = getItemMinQuantity(item);
   const requestedQuantity = quantity ?? getRecommendedOrderQuantity(item);
-  const rows: any[] = [
+  const rows: Array<Record<string, unknown>> = [
     {
       sender_id: user?.id,
       sender_name: user?.name,
@@ -807,7 +857,7 @@ export async function requestInventoryReorder({
   return withMissingColumnFallback(
     () => supabase.from('approvals').insert(rows),
     () => {
-      const legacyRows = rows.map(({ company_id, ...rest }: any) => rest);
+      const legacyRows = rows.map(({ company_id, ...rest }) => rest);
       return supabase.from('approvals').insert(legacyRows);
     },
   );

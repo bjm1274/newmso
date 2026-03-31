@@ -1623,6 +1623,18 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       if (method === 'GET') {
         return json(route, applyQueryFilters(chatRooms, url));
       }
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `chat-room-${chatRooms.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          last_message_at: payload.last_message_at || payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        chatRooms = [...chatRooms, ...inserted];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
       if (method === 'PATCH') {
         const body = request.postDataJSON();
         chatRooms = chatRooms.map((room: any) =>
