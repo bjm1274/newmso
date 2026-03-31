@@ -3,6 +3,7 @@ import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { hasOfficialMonthlyIncomeTaxTable } from '@/lib/use-tax-insurance-rates';
+import type { StaffMember } from '@/types';
 import SalaryDetail from './급여명세/급여상세';
 import PayrollTable from './급여명세/급여대장표';
 import PayrollMonthlySummary from './급여명세/급여대장월별요약';
@@ -283,7 +284,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: Payr
             {activeTab === '미지급수당' && <UnpaidAllowanceAlert staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
             {activeTab === '급여고도화' && (
               <PayrollAdvancedCenter
-                staffs={staffs as Record<string, unknown>[]}
+                staffs={staffs as StaffMember[]}
                 selectedCo={selectedCo}
                 yearMonth={yearMonth}
                 payrollRecords={payrollRecords}

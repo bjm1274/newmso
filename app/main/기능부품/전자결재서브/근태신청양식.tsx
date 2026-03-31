@@ -37,31 +37,26 @@ export default function AttendanceForms({
 
   const leaveDelegateOptions = useMemo(() => {
     const currentUserId = String(currentUser.id || '').trim();
-    const currentCompanyId = String(currentUser.company_id || '').trim();
-    const currentCompanyName = String(currentUser.company || '').trim();
 
     return staffRows
       .filter((staff) => {
         const staffId = String(staff?.id || '').trim();
         if (!staffId || staffId === currentUserId) return false;
         if (String(staff?.status || '').trim() === '퇴사') return false;
-        if (currentCompanyId) {
-          return String(staff?.company_id || '').trim() === currentCompanyId;
-        }
-        if (currentCompanyName) {
-          return String(staff?.company || '').trim() === currentCompanyName;
-        }
         return true;
       })
       .sort((left, right) => {
+        const leftCompany = String(left?.company || '').trim();
+        const rightCompany = String(right?.company || '').trim();
         const leftDepartment = String(left?.department || left?.team || '').trim();
         const rightDepartment = String(right?.department || right?.team || '').trim();
         return (
+          leftCompany.localeCompare(rightCompany, 'ko-KR') ||
           leftDepartment.localeCompare(rightDepartment, 'ko-KR') ||
           String(left?.name || '').localeCompare(String(right?.name || ''), 'ko-KR')
         );
       });
-  }, [currentUser.company, currentUser.company_id, currentUser.id, staffRows]);
+  }, [currentUser.id, staffRows]);
 
   const buildLeaveExtraData = useCallback((
     nextLeaveType = leaveType,
@@ -203,10 +198,12 @@ export default function AttendanceForms({
               >
                 <option value="">업무대행자 선택</option>
                 {leaveDelegateOptions.map((staff) => {
+                  const companyLabel = String(staff.company || '').trim();
                   const departmentLabel = String(staff.department || staff.team || '').trim();
+                  const detailLabel = [companyLabel, departmentLabel].filter(Boolean).join(' / ');
                   return (
                     <option key={staff.id} value={staff.id}>
-                      {departmentLabel ? `${staff.name} (${departmentLabel})` : staff.name}
+                      {detailLabel ? `${staff.name} (${detailLabel})` : staff.name}
                     </option>
                   );
                 })}

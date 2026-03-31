@@ -154,7 +154,7 @@ test('op check links schedules, applies templates, and saves a patient record', 
 
   await page.getByTestId('op-check-calendar-day-' + todayKey).click();
   await expect(page.getByTestId('op-check-workspace-modal')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Patient Alpha' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Patient Alpha' }).first()).toBeVisible();
   await expect(page.locator('input[value="Knee set"]').first()).toBeVisible();
   await expect(page.locator('input[value="Screw set"]').first()).toBeVisible();
 
@@ -199,7 +199,7 @@ test('op check stays available when optional surgery template and inventory sour
   await expect(page.getByTestId('op-check-calendar-day-' + todayKey)).toContainText('Fallback Patient');
   await expect(page.getByTestId('op-check-schedule-card-schedule-post-optional-fallback')).toBeVisible();
   await page.getByTestId('op-check-schedule-card-schedule-post-optional-fallback').click();
-  await expect(page.getByRole('heading', { name: 'Fallback Patient' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Fallback Patient' }).first()).toBeVisible();
 
   expect(runtimeErrors).toEqual([]);
 });
@@ -255,7 +255,7 @@ test('op check follows the selected company scope for MSO users', async ({ page 
   await expect(page.getByTestId('op-check-calendar-day-' + todayKey)).toContainText('Scoped Patient');
   await expect(page.getByTestId('op-check-schedule-card-schedule-post-selected-company')).toBeVisible();
   await page.getByTestId('op-check-schedule-card-schedule-post-selected-company').click();
-  await expect(page.getByRole('heading', { name: 'Scoped Patient' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Scoped Patient' }).first()).toBeVisible();
 
   expect(runtimeErrors).toEqual([]);
 });
@@ -354,5 +354,79 @@ test('op check ward messages use dropdown recipients, keep favorites, and send s
     return raw ? JSON.parse(raw) : [];
   }, favoriteStorageKey);
   expect(favoriteIds).toContain(favoriteStaffId);
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('op check workspace guards unsaved changes, supports quick navigation, and remembers the last patient for a day', async ({
+  page,
+}) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const todayKey = getTodayKey();
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowKey = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Seoul',
+  }).format(tomorrow);
+
+  await prepareExtraFeature(page, {
+    staffMembers: [extraFeaturesUser],
+    boardPosts: [
+      {
+        id: 'schedule-post-workspace-1',
+        board_type: '수술일정',
+        title: 'Alpha Surgery',
+        content: 'CH-100',
+        patient_name: 'Patient Alpha',
+        schedule_date: todayKey,
+        schedule_time: '09:00',
+        schedule_room: 'Room 1',
+        company: extraFeaturesUser.company,
+        company_id: extraFeaturesUser.company_id,
+      },
+      {
+        id: 'schedule-post-workspace-2',
+        board_type: '수술일정',
+        title: 'Beta Surgery',
+        content: 'CH-200',
+        patient_name: 'Patient Beta',
+        schedule_date: todayKey,
+        schedule_time: '11:00',
+        schedule_room: 'Room 2',
+        company: extraFeaturesUser.company,
+        company_id: extraFeaturesUser.company_id,
+      },
+    ],
+  });
+
+  await page.getByTestId('op-check-calendar-day-' + todayKey).click();
+  await expect(page.getByTestId('op-check-workspace-modal')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Patient Alpha' }).first()).toBeVisible();
+
+  await page.getByTestId('op-check-notes-textarea').fill('draft workspace note');
+  await expect(page.getByTestId('op-check-workspace-dirty-indicator')).toBeVisible();
+
+  await page.getByTestId('op-check-workspace-next').click();
+  await expect(page.getByRole('heading', { name: 'Patient Alpha' }).first()).toBeVisible();
+
+  await page.evaluate(() => {
+    window.confirm = () => true;
+  });
+
+  await page.getByTestId('op-check-workspace-next').click();
+  await expect(page.getByRole('heading', { name: 'Patient Beta' }).first()).toBeVisible();
+
+  await page.getByTestId('op-check-section-toggle-prep').click();
+  await expect(page.getByTestId('op-check-section-content-prep')).toHaveCount(0);
+  await page.getByTestId('op-check-section-toggle-prep').click();
+  await expect(page.getByTestId('op-check-section-content-prep')).toBeVisible();
+
+  await page.getByTestId('op-check-workspace-close').click();
+  await expect(page.getByTestId('op-check-workspace-modal')).toHaveCount(0);
+
+  await page.getByTestId('op-check-calendar-day-' + tomorrowKey).click();
+  await page.getByTestId('op-check-calendar-day-' + todayKey).click();
+  await expect(page.getByTestId('op-check-workspace-modal')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Patient Beta' }).first()).toBeVisible();
+
   expect(runtimeErrors).toEqual([]);
 });

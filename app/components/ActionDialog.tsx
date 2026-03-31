@@ -54,6 +54,7 @@ export default function ActionDialog({
 }: Props) {
   const [value, setValue] = useState(initialValue);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  const valueRef = useRef(initialValue);
   const titleId = useId();
   const descriptionId = useId();
 
@@ -61,6 +62,10 @@ export default function ActionDialog({
     if (!open) return;
     setValue(initialValue);
   }, [initialValue, open]);
+
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
 
   useEffect(() => {
     if (!open) return;
@@ -71,6 +76,14 @@ export default function ActionDialog({
         inputRef.current?.select?.();
       }
     }, 10);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [inputType, mode, open]);
+
+  useEffect(() => {
+    if (!open) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -89,16 +102,15 @@ export default function ActionDialog({
         !busy
       ) {
         event.preventDefault();
-        onConfirm(value);
+        onConfirm(valueRef.current);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {
-      window.clearTimeout(timer);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [busy, inputType, mode, onCancel, onConfirm, open, value]);
+  }, [busy, inputType, mode, onCancel, onConfirm, open]);
 
   const canConfirm = useMemo(() => {
     if (busy) return false;
