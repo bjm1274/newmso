@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
 import {
@@ -82,6 +82,9 @@ type PatientCheckState = {
   notes: string;
   status: string;
   applied_template_ids: string[];
+  surgery_started_at?: string | null;
+  surgery_ended_at?: string | null;
+  ward_message_sent_at?: string | null;
 };
 
 type QueryResult<T> = {
@@ -422,6 +425,13 @@ export default function OperationCheckView({
   const [wardStaffs, setWardStaffs] = useState<{ id: string; name: string; department?: string | null; position?: string | null }[]>([]);
   const [sendingMsg, setSendingMsg] = useState(false);
 
+  const [statusFilterTab, setStatusFilterTab] = useState<'전체' | '준비중' | '준비완료' | '수술중' | '완료'>('전체');
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [deductingInventory, setDeductingInventory] = useState(false);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const savePatientCheckRef = useRef<() => Promise<void>>(async () => {});
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setSchemaError('');
@@ -576,12 +586,18 @@ export default function OperationCheckView({
     return schedulePosts.filter((post) => {
       const sameDate = !selectedDate || post.schedule_date === selectedDate;
       if (!sameDate) return false;
+      // #7 상태 필터
+      if (statusFilterTab !== '전체') {
+        const savedRow = patientChecks.find((r) => String(r.schedule_post_id || '') === post.id);
+        const currentStatus = String(savedRow?.status || '준비중');
+        if (currentStatus !== statusFilterTab) return false;
+      }
       if (!search) return true;
       return [post.patient_name, post.surgery_name, post.chart_no, post.schedule_room].some((value) =>
         normalizeLookupValue(value).includes(search)
       );
     });
-  }, [deferredSearchTerm, schedulePosts, selectedDate]);
+  }, [deferredSearchTerm, patientChecks, schedulePosts, selectedDate, statusFilterTab]);
 
   const scheduleCalendarData = useMemo(() => {
     const toKey = (date: Date) =>
@@ -700,6 +716,9 @@ export default function OperationCheckView({
           applied_template_ids: Array.isArray(existingCheck.applied_template_ids)
             ? existingCheck.applied_template_ids.map((value) => String(value))
             : applicableTemplates.map((template) => String(template.id)),
+          surgery_started_at: (existingCheck as Record<string, unknown>).surgery_started_at as string | null ?? null,
+          surgery_ended_at: (existingCheck as Record<string, unknown>).surgery_ended_at as string | null ?? null,
+          ward_message_sent_at: (existingCheck as Record<string, unknown>).ward_message_sent_at as string | null ?? null,
         };
       }
 
@@ -897,6 +916,28 @@ export default function OperationCheckView({
     }
   }, [buildDefaultPatientCheck, checkForm, selectedSchedule, user?.company, user?.company_id, user?.id, user?.name]);
 
+  // savePatientCheckRef 항상 최신 함수로 동기화
+  useEffect(() => {
+    savePatientCheckRef.current = savePatientCheck;
+  }, [savePatientCheck]);
+
+  // #3 수술중 상태일 때 소모품 변경 3초 후 자동저장
+  const consumableKey = checkForm?.status === '수술중'
+    ? JSON.stringify(checkForm.consumable_items)
+    : null;
+  useEffect(() => {
+    if (!consumableKey) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      void savePatientCheckRef.current();
+    }, 3000);
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  // consumableKey 변경 시만 실행 (savePatientCheckRef는 ref이므로 deps 불필요)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [consumableKey]);
+
   const updateTemplateEditorList = useCallback(
     (
       key: 'prep_items' | 'consumable_items',
@@ -1005,9 +1046,24 @@ export default function OperationCheckView({
 
   const quickStatusChange = useCallback(async (newStatus: string) => {
     if (!checkForm || !selectedSchedule) return;
+
+    // #1 준비완료 전 미체크 항목 경고
+    if (newStatus === '준비완료') {
+      const unchecked = checkForm.prep_items.filter((item) => item.name && !item.checked);
+      if (unchecked.length > 0) {
+        const proceed = window.confirm(
+          `준비 체크 미완료 항목이 ${unchecked.length}개 있습니다.\n\n미완료 항목:\n${unchecked.map((i) => `  · ${i.name}`).join('\n')}\n\n그래도 준비완료로 변경하시겠습니까?`
+        );
+        if (!proceed) return;
+      }
+    }
+
     setSavingCheck(true);
     try {
-      const payload = {
+      const now = new Date().toISOString();
+      const capturedConsumables = checkForm.consumable_items;
+
+      const basePayload = {
         schedule_post_id: checkForm.schedule_post_id,
         company_id: String(selectedSchedule.company_id || user?.company_id || '').trim() || null,
         company_name: String(selectedSchedule.company || user?.company || '전체').trim() || '전체',
@@ -1028,13 +1084,28 @@ export default function OperationCheckView({
         created_by_name: String(user?.name || '').trim() || null,
         updated_by: String(user?.id || '').trim() || null,
         updated_by_name: String(user?.name || '').trim() || null,
-        updated_at: new Date().toISOString(),
+        updated_at: now,
+        // #6 타임스탬프 자동 기록
+        surgery_started_at: newStatus === '수술중'
+          ? (checkForm.surgery_started_at || now)
+          : (checkForm.surgery_started_at || null),
+        surgery_ended_at: newStatus === '완료' ? now : (checkForm.surgery_ended_at || null),
+        ward_message_sent_at: checkForm.ward_message_sent_at || null,
       };
-      const { data, error } = await supabase
-        .from('op_patient_checks')
-        .upsert(payload, { onConflict: 'schedule_post_id' })
-        .select('*')
-        .single();
+
+      const { data, error } = await withMissingColumnsFallback<OpPatientCheck>(
+        async (omittedColumns) => {
+          const payload = { ...basePayload };
+          omittedColumns.forEach((col) => delete (payload as Record<string, unknown>)[col]);
+          return supabase
+            .from('op_patient_checks')
+            .upsert(payload, { onConflict: 'schedule_post_id' })
+            .select('*')
+            .single() as unknown as Promise<{ data: OpPatientCheck | null; error: unknown }>;
+        },
+        ['surgery_started_at', 'surgery_ended_at', 'ward_message_sent_at'],
+      );
+
       if (error) throw error;
       const nextRow = data as OpPatientCheck;
       setPatientChecks((prev) => {
@@ -1043,12 +1114,29 @@ export default function OperationCheckView({
       });
       setCheckForm(buildDefaultPatientCheck(selectedSchedule, nextRow));
       toast(`상태가 "${newStatus}"(으)로 변경되었습니다.`, 'success');
+
+      // #8 완료 시 재고 차감 프롬프트 (비동기로 별도 실행)
+      if (newStatus === '완료') {
+        const itemsWithQty = capturedConsumables.filter(
+          (item) => item.name && item.quantity && Number(item.quantity) > 0
+        );
+        if (itemsWithQty.length > 0) {
+          setTimeout(() => {
+            const proceed = window.confirm(
+              `수술 완료 처리되었습니다.\n\n사용된 소모품 ${itemsWithQty.length}종의 재고를 자동으로 차감하시겠습니까?\n\n${itemsWithQty.map((i) => `  · ${i.name} ${i.quantity}${i.unit || ''}`).join('\n')}`
+            );
+            if (proceed) void deductInventoryItems(itemsWithQty);
+          }, 300);
+        }
+      }
     } catch (err) {
       console.error('상태 변경 실패', err);
       toast('상태 변경 중 오류가 발생했습니다.', 'error');
     } finally {
       setSavingCheck(false);
     }
+  // deductInventoryItems는 아래에서 선언되므로 ref로 처리
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buildDefaultPatientCheck, checkForm, selectedSchedule, user?.company, user?.company_id, user?.id, user?.name]);
 
   const openWardMsgModal = useCallback(async () => {
@@ -1113,7 +1201,30 @@ export default function OperationCheckView({
           if (!msgErr) successCount++;
         }
       }
-      toast(`병동팀 ${successCount}명에게 메시지를 보냈습니다.`, 'success');
+      if (successCount > 0) {
+        // ward_message_sent_at 기록
+        if (checkForm?.schedule_post_id) {
+          const now = new Date().toISOString();
+          await withMissingColumnsFallback(
+            async (omittedColumns) => {
+              if (omittedColumns.has('ward_message_sent_at')) return { data: null, error: null };
+              return supabase
+                .from('op_patient_checks')
+                .upsert(
+                  { schedule_post_id: checkForm.schedule_post_id, ward_message_sent_at: now },
+                  { onConflict: 'schedule_post_id' }
+                )
+                .select('id')
+                .single();
+            },
+            ['ward_message_sent_at'],
+          );
+          setCheckForm((prev) => (prev ? { ...prev, ward_message_sent_at: now } : prev));
+        }
+        toast(`병동팀 ${successCount}명에게 메시지를 보냈습니다.`, 'success');
+      } else {
+        toast('메시지 전송에 실패했습니다. 다시 시도해 주세요.', 'error');
+      }
       setShowWardMsgModal(false);
     } catch (err) {
       console.error('메시지 전송 실패', err);
@@ -1121,7 +1232,36 @@ export default function OperationCheckView({
     } finally {
       setSendingMsg(false);
     }
-  }, [wardMsgTargets, wardMsgText, user?.id, user?.company_id]);
+  }, [checkForm, wardMsgTargets, wardMsgText, user?.id, user?.company_id]);
+
+  // #8 소모품 재고 차감
+  const deductInventoryItems = useCallback(async (items: ChecklistItemDraft[]) => {
+    setDeductingInventory(true);
+    try {
+      let successCount = 0;
+      for (const item of items) {
+        const match = inventoryNameMap[normalizeLookupValue(item.name)];
+        if (!match) continue;
+        const newQty = Math.max(0, (match.quantity || 0) - Number(item.quantity || 0));
+        const { error } = await supabase
+          .from('inventory_items')
+          .update({ quantity: newQty })
+          .eq('id', match.id);
+        if (!error) {
+          setInventoryItems((prev) =>
+            prev.map((inv) => (inv.id === match.id ? { ...inv, quantity: newQty } : inv))
+          );
+          successCount++;
+        }
+      }
+      toast(`소모품 ${successCount}종 재고를 차감했습니다.`, 'success');
+    } catch (err) {
+      console.error('재고 차감 실패', err);
+      toast('재고 차감 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setDeductingInventory(false);
+    }
+  }, [inventoryNameMap]);
 
   const removeTemplate = useCallback(async (templateId: string) => {
     if (typeof window !== 'undefined' && !window.confirm('이 템플릿을 삭제하시겠습니까?')) return;
@@ -1188,6 +1328,44 @@ export default function OperationCheckView({
                   className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-medium"
                 />
 
+                {kind === 'consumable' ? (
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = [...items];
+                        const cur = Number(next[index].quantity || 0);
+                        if (cur > 0) next[index] = { ...item, quantity: String(cur - 1) };
+                        onChange(next);
+                      }}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] text-base font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                    >
+                      −
+                    </button>
+                    <input
+                      value={item.quantity || ''}
+                      onChange={(event) => {
+                        const next = [...items];
+                        next[index] = { ...item, quantity: event.target.value };
+                        onChange(next);
+                      }}
+                      placeholder="0"
+                      className="w-12 rounded-[var(--radius-md)] border border-[var(--border)] px-2 py-2 text-center text-sm font-bold"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = [...items];
+                        const cur = Number(next[index].quantity || 0);
+                        next[index] = { ...item, quantity: String(cur + 1) };
+                        onChange(next);
+                      }}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--accent)]/40 bg-[var(--toss-blue-light)] text-base font-bold text-[var(--accent)] hover:bg-[var(--accent)]/20"
+                    >
+                      +
+                    </button>
+                  </div>
+                ) : (
                 <input
                   value={item.quantity || ''}
                   onChange={(event) => {
@@ -1198,6 +1376,7 @@ export default function OperationCheckView({
                   placeholder="수량"
                   className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
                 />
+                )}
 
                 <input
                   value={item.unit || ''}
@@ -1566,6 +1745,36 @@ export default function OperationCheckView({
                   {filteredSchedules.length}명
                 </span>
               </div>
+              {/* #7 상태 필터 탭 */}
+              <div className="mb-2 flex flex-wrap gap-1">
+                {(['전체', '준비중', '준비완료', '수술중', '완료'] as const).map((tab) => {
+                  const count = tab === '전체'
+                    ? schedulePosts.filter((p) => p.schedule_date === selectedDate).length
+                    : schedulePosts.filter((p) => {
+                        if (p.schedule_date !== selectedDate) return false;
+                        const savedRow = patientChecks.find((r) => String(r.schedule_post_id || '') === p.id);
+                        return (String(savedRow?.status || '준비중')) === tab;
+                      }).length;
+                  return (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setStatusFilterTab(tab)}
+                      className={`rounded-[var(--radius-md)] px-2 py-1 text-[10px] font-bold transition-colors ${
+                        statusFilterTab === tab
+                          ? tab === '수술중'
+                            ? 'bg-orange-500 text-white'
+                            : tab === '완료'
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-[var(--accent)] text-white'
+                          : 'border border-[var(--border)] text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
+                      }`}
+                    >
+                      {tab} {count > 0 && <span className="opacity-80">({count})</span>}
+                    </button>
+                  );
+                })}
+              </div>
 
               <div className="max-h-[70vh] space-y-2 overflow-y-auto pr-1 custom-scrollbar">
                 {filteredSchedules.length === 0 ? (
@@ -1826,7 +2035,44 @@ export default function OperationCheckView({
                         >
                           {savingCheck ? '저장 중...' : '환자별 OP체크 저장'}
                         </button>
+                        {/* #4 청구내역 출력 버튼 */}
+                        <button
+                          type="button"
+                          onClick={() => setPrintModalOpen(true)}
+                          className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                        >
+                          청구내역 출력
+                        </button>
                       </div>
+
+                      {/* #6 수술 시간 기록 + #5 병동 메시지 발송 시각 표시 */}
+                      {(checkForm.surgery_started_at || checkForm.surgery_ended_at || checkForm.ward_message_sent_at) && (
+                        <div className="flex flex-wrap gap-2 text-[11px] font-medium text-[var(--toss-gray-3)]">
+                          {checkForm.ward_message_sent_at && (
+                            <span className="rounded-full bg-blue-50 px-2 py-1 text-blue-700">
+                              병동 메시지 {new Date(checkForm.ward_message_sent_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} 발송
+                            </span>
+                          )}
+                          {checkForm.surgery_started_at && (
+                            <span className="rounded-full bg-orange-50 px-2 py-1 text-orange-700">
+                              수술 시작 {new Date(checkForm.surgery_started_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                          {checkForm.surgery_ended_at && (
+                            <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
+                              수술 종료 {new Date(checkForm.surgery_ended_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                          {checkForm.surgery_started_at && checkForm.surgery_ended_at && (
+                            <span className="rounded-full bg-[var(--muted)] px-2 py-1">
+                              총 {Math.round((new Date(checkForm.surgery_ended_at).getTime() - new Date(checkForm.surgery_started_at).getTime()) / 60000)}분
+                            </span>
+                          )}
+                          {deductingInventory && (
+                            <span className="rounded-full bg-amber-50 px-2 py-1 text-amber-700">재고 차감 중...</span>
+                          )}
+                        </div>
+                      )}
 
                       <div className="flex flex-wrap gap-2 text-[11px] font-medium text-[var(--toss-gray-3)]">
                         <span className="rounded-full bg-[var(--muted)] px-2 py-1">
@@ -2209,6 +2455,91 @@ export default function OperationCheckView({
               </div>
             </div>
           </aside>
+        </div>
+      )}
+
+      {/* #4 청구내역 출력 모달 */}
+      {printModalOpen && checkForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={(e) => { if (e.target === e.currentTarget) setPrintModalOpen(false); }}>
+          <div className="w-full max-w-2xl rounded-[var(--radius-xl)] border border-[var(--border)] bg-white shadow-lg">
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4 print:hidden">
+              <h3 className="text-base font-bold text-gray-900">청구내역 출력</h3>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white"
+                >
+                  프린트
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPrintModalOpen(false)}
+                  className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-bold text-gray-500 hover:bg-gray-50"
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+            <div className="p-6 text-gray-900">
+              {/* 환자 정보 헤더 */}
+              <div className="mb-5 border-b-2 border-gray-800 pb-4">
+                <h2 className="text-xl font-bold">수술 소모품 사용 내역서</h2>
+                <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                  <div><span className="font-semibold text-gray-500">환자명</span> <span className="ml-2 font-bold">{checkForm.patient_name}</span></div>
+                  {checkForm.chart_no && <div><span className="font-semibold text-gray-500">차트번호</span> <span className="ml-2 font-bold">{checkForm.chart_no}</span></div>}
+                  <div><span className="font-semibold text-gray-500">수술명</span> <span className="ml-2 font-bold">{checkForm.surgery_name}</span></div>
+                  {checkForm.anesthesia_type && <div><span className="font-semibold text-gray-500">마취방법</span> <span className="ml-2">{checkForm.anesthesia_type}</span></div>}
+                  <div><span className="font-semibold text-gray-500">수술일</span> <span className="ml-2">{formatDateLabel(checkForm.schedule_date)}</span></div>
+                  <div><span className="font-semibold text-gray-500">수술실</span> <span className="ml-2">{checkForm.schedule_room || '-'}</span></div>
+                  {checkForm.surgery_started_at && <div><span className="font-semibold text-gray-500">수술 시작</span> <span className="ml-2">{new Date(checkForm.surgery_started_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span></div>}
+                  {checkForm.surgery_ended_at && <div><span className="font-semibold text-gray-500">수술 종료</span> <span className="ml-2">{new Date(checkForm.surgery_ended_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span></div>}
+                </div>
+              </div>
+
+              {/* 소모품 테이블 */}
+              <h3 className="mb-2 text-base font-bold">사용 소모품 목록</h3>
+              {(() => {
+                const used = checkForm.consumable_items.filter((i) => i.name && i.checked);
+                if (used.length === 0) {
+                  return <p className="text-sm text-gray-400">체크된 소모품이 없습니다.</p>;
+                }
+                return (
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="border border-gray-300 px-3 py-2 text-left font-semibold">품목명</th>
+                        <th className="border border-gray-300 px-3 py-2 text-center font-semibold w-16">수량</th>
+                        <th className="border border-gray-300 px-3 py-2 text-center font-semibold w-16">단위</th>
+                        <th className="border border-gray-300 px-3 py-2 text-left font-semibold">메모</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {used.map((item) => (
+                        <tr key={item.id} className="even:bg-gray-50">
+                          <td className="border border-gray-300 px-3 py-2">{item.name}</td>
+                          <td className="border border-gray-300 px-3 py-2 text-center font-bold">{item.quantity || '-'}</td>
+                          <td className="border border-gray-300 px-3 py-2 text-center">{item.unit || '-'}</td>
+                          <td className="border border-gray-300 px-3 py-2 text-gray-500">{item.note || ''}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              })()}
+
+              {checkForm.notes && (
+                <div className="mt-4 rounded border border-gray-200 bg-gray-50 p-3">
+                  <p className="text-xs font-semibold text-gray-500">메모</p>
+                  <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">{checkForm.notes}</p>
+                </div>
+              )}
+
+              <div className="mt-6 text-right text-xs text-gray-400">
+                출력일시: {new Date().toLocaleString('ko-KR')}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
