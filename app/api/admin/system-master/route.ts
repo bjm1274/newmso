@@ -7,6 +7,7 @@ import { isNamedSystemMasterAccount } from '@/lib/system-master';
 import { runBackup } from '@/lib/backup-cron';
 import { processPendingChatPushJobs } from '@/lib/chat-push-dispatch';
 import { processDueTodoRemindersServer } from '@/lib/todo-reminder-cron';
+import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -69,6 +70,106 @@ type IntegrityIssue = {
   samples: string[];
 };
 
+type LooseRecord = Record<string, unknown>;
+type QueryErrorLike = {
+  code?: string | null;
+  message?: string | null;
+  details?: string | null;
+} | null | undefined;
+
+function isLooseRecord(value: unknown): value is LooseRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function toLooseRecordArray<T extends LooseRecord = LooseRecord>(value: unknown): T[] {
+  return Array.isArray(value) ? (value.filter(isLooseRecord) as T[]) : [];
+}
+
+type StaffRow = Partial<StaffMember> & LooseRecord;
+type ChatRoomRow = Partial<ChatRoom> & LooseRecord;
+type ChatMessageRow = Partial<ChatMessage> & LooseRecord;
+type AuditLogRow = LooseRecord & {
+  id?: string | null;
+  action?: string | null;
+  target_type?: string | null;
+  target_id?: string | null;
+  user_id?: string | null;
+  user_name?: string | null;
+  details?: LooseRecord | null;
+  created_at?: string | null;
+};
+type PayrollRow = LooseRecord & {
+  id?: string | null;
+  staff_id?: string | null;
+  year_month?: string | null;
+  status?: string | null;
+  net_pay?: number | null;
+  created_at?: string | null;
+};
+type ApprovalRow = LooseRecord & {
+  id?: string | null;
+  title?: string | null;
+  status?: string | null;
+  current_approver_id?: string | null;
+};
+
+const STAFF_SYSTEM_MASTER_SELECT = [
+  'id',
+  'name',
+  'employee_no',
+  'company',
+  'department',
+  'position',
+  'role',
+  'status',
+  'email',
+  'phone',
+  'resident_no',
+  'bank_name',
+  'bank_account',
+  'base_salary',
+].join(', ');
+
+const AUDIT_LOG_SELECT = [
+  'id',
+  'action',
+  'target_type',
+  'target_id',
+  'user_id',
+  'user_name',
+  'details',
+  'created_at',
+].join(', ');
+
+const PAYROLL_RECORD_SELECT = [
+  'id',
+  'staff_id',
+  'year_month',
+  'status',
+  'net_pay',
+  'created_at',
+].join(', ');
+
+const CHAT_ROOM_ADMIN_SELECT = [
+  'id',
+  'name',
+  'type',
+  'members',
+  'created_at',
+  'last_message_at',
+].join(', ');
+
+const CHAT_MESSAGE_ADMIN_SELECT = [
+  'id',
+  'room_id',
+  'sender_id',
+  'content',
+  'file_url',
+  'is_deleted',
+  'created_at',
+  'edited_at',
+].join(', ');
+
 function getAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -86,20 +187,20 @@ function clampLimit(value: string | null, fallback: number, max: number) {
   return Math.min(parsed, max);
 }
 
-function sanitizeStaffRow(row: Record<string, any>) {
-  const safe = { ...row };
+function sanitizeStaffRow(row: LooseRecord): StaffRow {
+  const safe = { ...row } as StaffRow;
   delete safe.password;
   delete safe.passwd;
   return safe;
 }
 
-function getStaffLabel(staff: Record<string, any> | undefined) {
+function getStaffLabel(staff: StaffRow | undefined) {
   if (!staff) return '-';
   const pieces = [staff.name, staff.employee_no ? `#${staff.employee_no}` : null].filter(Boolean);
   return pieces.join(' ');
 }
 
-function getRoomLabel(room: Record<string, any>, staffMap: Map<string, Record<string, any>>) {
+function getRoomLabel(room: ChatRoomRow, staffMap: Map<string, StaffRow>) {
   if (!room) return '채팅방';
   if (room.id === NOTICE_ROOM_ID) return '공지메시지';
   if (room.name) return room.name;
@@ -113,7 +214,7 @@ function getRoomLabel(room: Record<string, any>, staffMap: Map<string, Record<st
   return memberNames.length > 0 ? memberNames.join(', ') : '채팅방';
 }
 
-function getAuditCategory(log: Record<string, any>) {
+function getAuditCategory(log: AuditLogRow) {
   const action = String(log.action || '').toLowerCase();
   const targetType = String(log.target_type || '').toLowerCase();
 
@@ -157,12 +258,13 @@ function matchSearch(value: unknown, keyword: string) {
     .includes(keyword.toLowerCase());
 }
 
-function normalizeAuditLog(log: Record<string, any>, staffMap: Map<string, Record<string, any>>) {
+function normalizeAuditLog(log: AuditLogRow, staffMap: Map<string, StaffRow>) {
   const details = log.details && typeof log.details === 'object' ? log.details : {};
   const targetStaff = log.target_id ? staffMap.get(String(log.target_id)) : undefined;
-  const changedFields = Array.isArray((details as Record<string, any>).changed_fields)
-    ? (details as Record<string, any>).changed_fields
-    : Object.keys((details as Record<string, any>).after || (details as Record<string, any>).requested_changes || {});
+  const detailRecord = details as LooseRecord;
+  const changedFields = Array.isArray(detailRecord.changed_fields)
+    ? detailRecord.changed_fields
+    : Object.keys((detailRecord.after as LooseRecord | undefined) || (detailRecord.requested_changes as LooseRecord | undefined) || {});
 
   return {
     ...log,
@@ -174,7 +276,7 @@ function normalizeAuditLog(log: Record<string, any>, staffMap: Map<string, Recor
   };
 }
 
-function normalizeChatRoom(room: Record<string, any>, staffMap: Map<string, Record<string, any>>) {
+function normalizeChatRoom(room: ChatRoomRow, staffMap: Map<string, StaffRow>) {
   const memberNames = Array.isArray(room.members)
     ? room.members
         .map((memberId: string) => getStaffLabel(staffMap.get(String(memberId))))
@@ -194,9 +296,9 @@ function normalizeChatRoom(room: Record<string, any>, staffMap: Map<string, Reco
 }
 
 function normalizeMessage(
-  message: Record<string, any>,
-  rooms: Map<string, Record<string, any>>,
-  staffMap: Map<string, Record<string, any>>,
+  message: ChatMessageRow,
+  rooms: Map<string, ChatRoomRow>,
+  staffMap: Map<string, StaffRow>,
 ) {
   const sender = message.sender_id ? staffMap.get(String(message.sender_id)) : undefined;
   const room = rooms.get(String(message.room_id));
@@ -215,14 +317,14 @@ function normalizeMessage(
   };
 }
 
-function isMissingColumnError(error: any, columnName: string) {
+function isMissingColumnError(error: QueryErrorLike, columnName: string) {
   if (!error) return false;
   const code = String(error?.code || '');
   const message = String(error?.message || error?.details || '').toLowerCase();
   return code === '42703' && message.includes(columnName.toLowerCase());
 }
 
-function isMissingRelationError(error: any, relationName?: string) {
+function isMissingRelationError(error: QueryErrorLike, relationName?: string) {
   if (!error) return false;
   const code = String(error?.code || '');
   const message = String(error?.message || error?.details || '').toLowerCase();
@@ -230,7 +332,7 @@ function isMissingRelationError(error: any, relationName?: string) {
 }
 
 async function safeHeadCount(
-  queryFactory: () => PromiseLike<{ count?: number | null; error?: any }>,
+  queryFactory: () => PromiseLike<{ count?: number | null; error?: QueryErrorLike }>,
   relationName?: string,
 ) {
   const result = await queryFactory();
@@ -242,7 +344,7 @@ async function safeHeadCount(
 }
 
 async function safeRows<T>(
-  queryFactory: () => PromiseLike<{ data?: T[] | null; error?: any }>,
+  queryFactory: () => PromiseLike<{ data?: T[] | null; error?: QueryErrorLike }>,
   relationName?: string,
 ) {
   const result = await queryFactory();
@@ -279,7 +381,7 @@ async function listRecentBackups(limit = 8): Promise<BackupSummaryRow[]> {
   }
 }
 
-function buildUsageSummary(logs: Record<string, any>[]) {
+function buildUsageSummary(logs: AuditLogRow[]) {
   const grouped = new Map<
     string,
     { label: string; count: number; latestAt: string; topAction: string; actionCounts: Map<string, number> }
@@ -590,9 +692,11 @@ async function cleanupPushSubscriptionsInternal(supabase: ReturnType<typeof getA
   };
 }
 
-function buildPermissionChangeSummary(details: Record<string, any>) {
-  const beforePermissions = (details?.before?.permissions || {}) as Record<string, boolean>;
-  const afterPermissions = (details?.after?.permissions || {}) as Record<string, boolean>;
+function buildPermissionChangeSummary(details: LooseRecord) {
+  const before = isLooseRecord(details?.before) ? (details.before as LooseRecord) : {};
+  const after = isLooseRecord(details?.after) ? (details.after as LooseRecord) : {};
+  const beforePermissions = (isLooseRecord(before.permissions) ? before.permissions : {}) as Record<string, boolean>;
+  const afterPermissions = (isLooseRecord(after.permissions) ? after.permissions : {}) as Record<string, boolean>;
   const allKeys = Array.from(new Set([...Object.keys(beforePermissions), ...Object.keys(afterPermissions)]));
   const enabled: string[] = [];
   const disabled: string[] = [];
@@ -608,17 +712,17 @@ function buildPermissionChangeSummary(details: Record<string, any>) {
   return {
     enabled,
     disabled,
-    beforeRole: details?.before?.role || null,
-    afterRole: details?.after?.role || null,
+    beforeRole: String(before.role || '').trim() || null,
+    afterRole: String(after.role || '').trim() || null,
   };
 }
 
 function buildIntegrityChecks(params: {
-  staffRows: Record<string, any>[];
-  payrollRows: Record<string, any>[];
+  staffRows: StaffRow[];
+  payrollRows: PayrollRow[];
   subscriptionRows: PushSubscriptionRow[];
-  roomRows: Record<string, any>[];
-  approvalRows: Record<string, any>[];
+  roomRows: ChatRoomRow[];
+  approvalRows: ApprovalRow[];
 }): IntegrityIssue[] {
   const { staffRows, payrollRows, subscriptionRows, roomRows, approvalRows } = params;
   const validStaffIds = new Set(staffRows.map((row) => String(row.id)));
@@ -733,7 +837,7 @@ export async function GET(request: NextRequest) {
 
     const { data: staffRows, error: staffError } = await supabase
       .from('staff_members')
-      .select('*')
+      .select(STAFF_SYSTEM_MASTER_SELECT)
       .order('employee_no', { ascending: true })
       .limit(500);
 
@@ -741,8 +845,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '직원 데이터를 불러오는 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
-    const safeStaffRows = (staffRows || []).map((row: any) => sanitizeStaffRow(row));
-    const staffMap = new Map<string, Record<string, any>>(safeStaffRows.map((staff: Record<string, any>) => [String(staff.id), staff]));
+    const safeStaffRows = toLooseRecordArray<StaffRow>(staffRows).map((row) => sanitizeStaffRow(row));
+    const staffMap = new Map<string, StaffRow>(safeStaffRows.map((staff) => [String(staff.id), staff]));
 
     if (scope === 'overview') {
       const [staffCountRes, auditCountRes, payrollCountRes, roomCountRes, messageCountRes, auditRes, payrollRes, roomRes, messageRes] =
@@ -752,15 +856,16 @@ export async function GET(request: NextRequest) {
           supabase.from('payroll_records').select('id', { head: true, count: 'exact' }),
           supabase.from('chat_rooms').select('id', { head: true, count: 'exact' }),
           supabase.from('messages').select('id', { head: true, count: 'exact' }),
-          supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(40),
-          supabase.from('payroll_records').select('*').order('created_at', { ascending: false }).limit(80),
-          supabase.from('chat_rooms').select('*').order('created_at', { ascending: false }).limit(80),
-          supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(80),
+          supabase.from('audit_logs').select(AUDIT_LOG_SELECT).order('created_at', { ascending: false }).limit(40),
+          supabase.from('payroll_records').select(PAYROLL_RECORD_SELECT).order('created_at', { ascending: false }).limit(80),
+          supabase.from('chat_rooms').select(CHAT_ROOM_ADMIN_SELECT).order('created_at', { ascending: false }).limit(80),
+          supabase.from('messages').select(CHAT_MESSAGE_ADMIN_SELECT).order('created_at', { ascending: false }).limit(80),
         ]);
 
-      const rooms = roomRes.data || [];
-      const roomMap = new Map<string, Record<string, any>>(rooms.map((room: Record<string, any>) => [String(room.id), room]));
-      const payrollItems = (payrollRes.data || []).map((record: Record<string, any>) => {
+      const rooms = toLooseRecordArray<ChatRoomRow>(roomRes.data);
+      const roomMap = new Map<string, ChatRoomRow>(rooms.map((room) => [String(room.id), room]));
+      const payrollRows = toLooseRecordArray<PayrollRow>(payrollRes.data);
+      const payrollItems = payrollRows.map((record) => {
         const staff = staffMap.get(String(record.staff_id));
         return {
           ...record,
@@ -779,18 +884,22 @@ export async function GET(request: NextRequest) {
           roomCount: roomCountRes.count || 0,
           messageCount: messageCountRes.count || 0,
         },
-        recentAudits: (auditRes.data || []).map((log: Record<string, any>) => normalizeAuditLog(log, staffMap)),
+        recentAudits: toLooseRecordArray<AuditLogRow>(auditRes.data).map((log) =>
+          normalizeAuditLog(log, staffMap),
+        ),
         sensitiveStaffs: safeStaffRows,
         recentPayrolls: payrollItems,
-        chatRooms: rooms.map((room: Record<string, any>) => normalizeChatRoom(room, staffMap)),
-        recentMessages: (messageRes.data || []).map((message: Record<string, any>) => normalizeMessage(message, roomMap, staffMap)),
+        chatRooms: rooms.map((room) => normalizeChatRoom(room, staffMap)),
+        recentMessages: toLooseRecordArray<ChatMessageRow>(messageRes.data).map((message) =>
+          normalizeMessage(message, roomMap, staffMap),
+        ),
       });
     }
 
     if (scope === 'audit') {
       const { data: auditRows, error: auditError } = await supabase
         .from('audit_logs')
-        .select('*')
+        .select(AUDIT_LOG_SELECT)
         .order('created_at', { ascending: false })
         .limit(limit);
 
@@ -798,19 +907,19 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: auditError.message }, { status: 500 });
       }
 
-      const filtered = (auditRows || [])
-        .map((log: Record<string, any>) => normalizeAuditLog(log, staffMap))
-        .filter((log: Record<string, any>) => category === 'all' || log.category === category)
-        .filter((log: Record<string, any>) => matchSearch(log, keyword));
+      const filtered = toLooseRecordArray<AuditLogRow>(auditRows)
+        .map((log) => normalizeAuditLog(log, staffMap))
+        .filter((log) => category === 'all' || log.category === category)
+        .filter((log) => matchSearch(log, keyword));
 
       return NextResponse.json({ logs: filtered });
     }
 
     if (scope === 'chats') {
       const [roomRes, messageRes] = await Promise.all([
-        supabase.from('chat_rooms').select('*').order('created_at', { ascending: false }),
+        supabase.from('chat_rooms').select(CHAT_ROOM_ADMIN_SELECT).order('created_at', { ascending: false }),
         (() => {
-          let query = supabase.from('messages').select('*').order('created_at', { ascending: false });
+          let query = supabase.from('messages').select(CHAT_MESSAGE_ADMIN_SELECT).order('created_at', { ascending: false });
           if (roomId) query = query.eq('room_id', roomId);
           if (keyword) query = query.ilike('content', `%${keyword}%`);
           return query;
@@ -824,35 +933,35 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: '메시지 데이터를 불러오는 중 오류가 발생했습니다.' }, { status: 500 });
       }
 
-      const rooms = roomRes.data || [];
-      const roomMap = new Map<string, Record<string, any>>(rooms.map((room: Record<string, any>) => [String(room.id), room]));
+      const rooms = toLooseRecordArray<ChatRoomRow>(roomRes.data);
+      const roomMap = new Map<string, ChatRoomRow>(rooms.map((room) => [String(room.id), room]));
       const normalizedRooms = rooms
-        .map((room: Record<string, any>) => normalizeChatRoom(room, staffMap))
-        .sort((left: Record<string, any>, right: Record<string, any>) => {
+        .map((room) => normalizeChatRoom(room, staffMap))
+        .sort((left, right) => {
           const leftTime = new Date(String(left.last_activity_at || left.created_at || 0)).getTime();
           const rightTime = new Date(String(right.last_activity_at || right.created_at || 0)).getTime();
           return rightTime - leftTime;
         });
 
-      const filteredMessages = (messageRes.data || [])
-        .filter((message: Record<string, any>) => !keyword || matchSearch(message, keyword))
-        .map((message: Record<string, any>) => normalizeMessage(message, roomMap, staffMap));
+      const filteredMessages = toLooseRecordArray<ChatMessageRow>(messageRes.data)
+        .filter((message) => !keyword || matchSearch(message, keyword))
+        .map((message) => normalizeMessage(message, roomMap, staffMap));
 
       return NextResponse.json({ rooms: normalizedRooms, messages: filteredMessages });
     }
 
     if (scope === 'operations') {
       const [auditRes, staffIdRes, backupRows, queueSummary, restoreRuns, dueTodoCount, repeatingTodoCount, reminderLogCount24h, wikiDocumentCount, wikiVersionCount, recentWikiVersions, recentPushFailures, subscriptionRows] = await Promise.all([
-        supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(400),
+        supabase.from('audit_logs').select(AUDIT_LOG_SELECT).order('created_at', { ascending: false }).limit(400),
         supabase.from('staff_members').select('id'),
         listRecentBackups(10),
         collectPushQueueHealth(supabase),
         safeRows(() => supabase.from('backup_restore_runs').select('id,file_name,status,total_tables,total_rows,requested_by_name,started_at,finished_at,result_summary').order('started_at', { ascending: false }).limit(10), 'backup_restore_runs'),
-        safeHeadCount(() => supabase.from('todos').select('*', { count: 'exact', head: true }).eq('is_complete', false).not('reminder_at', 'is', null).lte('reminder_at', new Date().toISOString()), 'todos'),
-        safeHeadCount(() => supabase.from('todos').select('*', { count: 'exact', head: true }).eq('is_complete', false).neq('repeat_type', 'none'), 'todos'),
-        safeHeadCount(() => supabase.from('todo_reminder_logs').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()), 'todo_reminder_logs'),
-        safeHeadCount(() => supabase.from('wiki_documents').select('*', { count: 'exact', head: true }).eq('is_archived', false), 'wiki_documents'),
-        safeHeadCount(() => supabase.from('wiki_document_versions').select('*', { count: 'exact', head: true }), 'wiki_document_versions'),
+        safeHeadCount(() => supabase.from('todos').select('id', { count: 'exact', head: true }).eq('is_complete', false).not('reminder_at', 'is', null).lte('reminder_at', new Date().toISOString()), 'todos'),
+        safeHeadCount(() => supabase.from('todos').select('id', { count: 'exact', head: true }).eq('is_complete', false).neq('repeat_type', 'none'), 'todos'),
+        safeHeadCount(() => supabase.from('todo_reminder_logs').select('id', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()), 'todo_reminder_logs'),
+        safeHeadCount(() => supabase.from('wiki_documents').select('id', { count: 'exact', head: true }).eq('is_archived', false), 'wiki_documents'),
+        safeHeadCount(() => supabase.from('wiki_document_versions').select('id', { count: 'exact', head: true }), 'wiki_document_versions'),
         safeRows(() => supabase.from('wiki_document_versions').select('id,document_id,title,version_no,created_at,change_summary').order('created_at', { ascending: false }).limit(5), 'wiki_document_versions'),
         loadRecentPushFailures(supabase),
         loadPushSubscriptionDiagnostics(supabase),
@@ -861,7 +970,9 @@ export async function GET(request: NextRequest) {
       if (auditRes.error) return NextResponse.json({ error: auditRes.error.message }, { status: 500 });
       if (staffIdRes.error) return NextResponse.json({ error: staffIdRes.error.message }, { status: 500 });
 
-      const validStaffIds = new Set((staffIdRes.data || []).map((row: { id: string | null }) => String(row.id || '')));
+      const validStaffIds = new Set(
+        toLooseRecordArray(staffIdRes.data).map((row) => String(row.id || '')),
+      );
       const duplicateEndpointInfo = groupDuplicateEndpoints(subscriptionRows);
       const orphanSubscriptions = subscriptionRows.filter((row) => {
         const staffId = String(row.staff_id || '').trim();
@@ -897,8 +1008,8 @@ export async function GET(request: NextRequest) {
 
       const latestBackup = backupRows[0] || null;
       const backupAgeHours = latestBackup ? (Date.now() - new Date(latestBackup.created_at).getTime()) / (1000 * 60 * 60) : null;
-      const failedRestoreRuns = (restoreRuns as Array<Record<string, any>>).filter((run) => String(run.status || '') === 'failed');
-      const latestRestoreRun = (restoreRuns as Array<Record<string, any>>)[0] || null;
+      const failedRestoreRuns = (restoreRuns as LooseRecord[]).filter((run) => String(run.status || '') === 'failed');
+      const latestRestoreRun = (restoreRuns as LooseRecord[])[0] || null;
       const versionGap = Math.max(0, Number(wikiDocumentCount || 0) - Number(wikiVersionCount || 0));
       const failureItems = [
         queueSummary.deadLettered > 0
@@ -975,7 +1086,7 @@ export async function GET(request: NextRequest) {
         latestBackup,
         restoreRuns,
         cronJobs: OPERATION_CRONS,
-        usageSummary: buildUsageSummary(auditRes.data || []),
+        usageSummary: buildUsageSummary(toLooseRecordArray<AuditLogRow>(auditRes.data)),
         todoAutomation: {
           dueReminders: dueTodoCount,
           repeatingOpenTodos: repeatingTodoCount,
@@ -993,7 +1104,7 @@ export async function GET(request: NextRequest) {
     if (scope === 'permission-diffs') {
       const { data: auditRows, error: auditError } = await supabase
         .from('audit_logs')
-        .select('*')
+        .select(AUDIT_LOG_SELECT)
         .eq('target_type', 'staff_permission')
         .order('created_at', { ascending: false })
         .limit(limit);
@@ -1002,13 +1113,13 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: auditError.message }, { status: 500 });
       }
 
-      const logs = (auditRows || [])
-        .map((log: Record<string, any>) => normalizeAuditLog(log, staffMap))
-        .map((log: Record<string, any>) => ({
+      const logs = toLooseRecordArray<AuditLogRow>(auditRows)
+        .map((log) => normalizeAuditLog(log, staffMap))
+        .map((log) => ({
           ...log,
           permission_summary: buildPermissionChangeSummary(log.details || {}),
         }))
-        .filter((log: Record<string, any>) => matchSearch(log, keyword));
+        .filter((log) => matchSearch(log, keyword));
 
       return NextResponse.json({ logs });
     }
@@ -1028,10 +1139,10 @@ export async function GET(request: NextRequest) {
 
       const issues = buildIntegrityChecks({
         staffRows: safeStaffRows,
-        payrollRows: payrollRes.data || [],
-        subscriptionRows: (subscriptionRes.data || []) as PushSubscriptionRow[],
-        roomRows: roomRes.data || [],
-        approvalRows: approvalRes.data || [],
+        payrollRows: toLooseRecordArray<PayrollRow>(payrollRes.data),
+        subscriptionRows: toLooseRecordArray<PushSubscriptionRow>(subscriptionRes.data),
+        roomRows: toLooseRecordArray<ChatRoomRow>(roomRes.data),
+        approvalRows: toLooseRecordArray<ApprovalRow>(approvalRes.data),
       });
 
       return NextResponse.json({
@@ -1082,8 +1193,8 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: pollRowsError.message }, { status: 500 });
     }
 
-    const messageIds = (messageRows || []).map((row: Record<string, any>) => String(row.id)).filter(Boolean);
-    const pollIds = (pollRows || []).map((row: Record<string, any>) => String(row.id)).filter(Boolean);
+    const messageIds = (messageRows || []).map((row) => String(row.id)).filter(Boolean);
+    const pollIds = (pollRows || []).map((row) => String(row.id)).filter(Boolean);
 
     if (pollIds.length > 0) {
       const { error } = await supabase.from('poll_votes').delete().in('poll_id', pollIds);

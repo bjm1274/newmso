@@ -5,7 +5,9 @@ import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { bindPageRefresh } from '@/lib/realtime-maintenance';
+import { CHAT_MESSAGE_SELECT, CHAT_ROOM_SELECT, POLL_SELECT } from '@/lib/chat-query-columns';
 import SmartDatePicker from './공통/SmartDatePicker';
+import { buildMessengerImageAlt, MessengerAvatar, MessengerStatusUserRow } from './메신저공통';
 import type { StaffMember, ChatRoom, ChatMessage } from '@/types';
 
 type PollItem = {
@@ -282,6 +284,39 @@ type MessageRetryPayload = {
   albumTotal?: number | null;
 };
 
+type ChatMessageInsertPayload = {
+  room_id: string;
+  sender_id: string | null;
+  content: string;
+  file_url: string | null;
+  file_name: string | null;
+  file_size_bytes: number | null;
+  file_kind: 'image' | 'video' | 'file' | null;
+  reply_to_id: string | null;
+  album_id: string | null;
+  album_index: number | null;
+  album_total: number | null;
+};
+
+function buildChatMessageInsertPayload(
+  senderId: string | null | undefined,
+  payload: MessageRetryPayload,
+): ChatMessageInsertPayload {
+  return {
+    room_id: payload.roomId,
+    sender_id: senderId ? String(senderId) : null,
+    content: payload.content,
+    file_url: payload.fileUrl,
+    file_name: payload.fileName,
+    file_size_bytes: payload.fileSizeBytes,
+    file_kind: payload.fileKind,
+    reply_to_id: payload.replyToId,
+    album_id: payload.albumId ?? null,
+    album_index: payload.albumIndex ?? null,
+    album_total: payload.albumTotal ?? null,
+  };
+}
+
 type SendMessageOptions = {
   fileUrl?: string;
   fileSizeBytes?: number;
@@ -422,7 +457,12 @@ function AttachmentListCard({
       return (
         <div className={`space-y-1 ${className}`}>
           <div className="relative group inline-block">
-            <button type="button" className="block" onClick={onPreview}>
+            <button
+              type="button"
+              className="block"
+              onClick={onPreview}
+              aria-label={`${name || '첨부 이미지'} 미리보기`}
+            >
               <img
                 src={url}
                 alt={name}
@@ -499,6 +539,7 @@ function AttachmentListCard({
     <div
       role={isClickable ? 'button' : undefined}
       tabIndex={isClickable ? 0 : -1}
+      aria-label={isClickable ? `${name || '첨부 파일'} 열기` : undefined}
       onClick={() => onActivate?.()}
       onKeyDown={(event) => {
         if (!isClickable) return;
@@ -518,6 +559,7 @@ function AttachmentListCard({
             event.stopPropagation();
             onPreview();
           }}
+          aria-label={`${name || '첨부 파일'} 미리보기`}
           className={`shrink-0 overflow-hidden rounded-xl border border-[var(--border)] ${
             kind === 'image' || kind === 'video'
               ? 'w-14 h-14 bg-black/80'
@@ -819,7 +861,7 @@ export default function ChatView({
   const deferredGlobalSearchQuery = useDeferredValue(globalSearchQuery);
 
 
-  const chatRoomsRef = useRef<any[]>([]);
+  const chatRoomsRef = useRef<ChatRoom[]>([]);
   const deliveryStatesRef = useRef<Record<string, DeliveryState>>({});
   const presenceChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -843,7 +885,7 @@ export default function ChatView({
   const [mentionQuery, setMentionQuery] = useState('');
   const [showMentionList, setShowMentionList] = useState(false);
 
-  const [unreadModalMsg, setUnreadModalMsg] = useState<any | null>(null);
+  const [unreadModalMsg, setUnreadModalMsg] = useState<ChatMessage | null>(null);
   const [unreadUsers, setUnreadUsers] = useState<StaffMember[]>([]);
   const [unreadLoading, setUnreadLoading] = useState(false);
   const [globalRealtimeState, setGlobalRealtimeState] = useState<ChatRealtimeState>('connecting');
@@ -857,12 +899,20 @@ export default function ChatView({
   const isMso = user?.company === 'SY INC.' || permissions.mso === true || user?.role === 'admin';
   const canWriteNotice = isMso || Boolean(user?.position && CAN_WRITE_NOTICE_POSITIONS.includes(user.position));
   const allKnownStaffs = useMemo(() => {
-    const merged = new Map<string, any>();
+    const merged = new Map<string, StaffMember>();
     [...chatDirectoryStaffs, ...(Array.isArray(staffs) ? staffs : [])].forEach(( staff: StaffMember) => {
       if (!staff?.id) return;
       const staffId = String(staff.id);
-      const previous = merged.get(staffId) || {};
-      merged.set(staffId, normalizeProfileUser({ ...previous, ...staff }));
+      const previous = merged.get(staffId);
+      const normalized = normalizeProfileUser({ ...(previous ?? {}), ...staff }) as Partial<StaffMember> | null;
+      merged.set(staffId, {
+        ...staff,
+        ...(normalized ?? {}),
+        id: staffId,
+        name: String(normalized?.name ?? staff.name ?? ''),
+        company: String(normalized?.company ?? staff.company ?? ''),
+        photo_url: normalized?.photo_url ?? staff.photo_url ?? null,
+      });
     });
     return Array.from(merged.values());
   }, [chatDirectoryStaffs, staffs]);
@@ -1543,6 +1593,51 @@ export default function ChatView({
     }
   }, []);
 
+  const persistRoomMembers = useCallback(async (roomId: string, members: string[]) => {
+    const { error } = await supabase
+      .from('chat_rooms')
+      .update({ members })
+      .eq('id', roomId);
+
+    if (error) {
+      throw error;
+    }
+  }, []);
+
+  const updateRoomMembersLocally = useCallback((roomId: string, members: string[]) => {
+    setChatRooms((prev) =>
+      prev.map((room: ChatRoom) =>
+        String(room.id) === String(roomId)
+          ? { ...room, members }
+          : room
+      )
+    );
+  }, []);
+
+  const insertRoomSystemMessage = useCallback(async (roomId: string, content: string) => {
+    const { data, error } = await supabase
+      .from('messages')
+      .insert([
+        {
+          room_id: roomId,
+          sender_id: effectiveChatUserId || user?.id || null,
+          content,
+        },
+      ])
+      .select('id, room_id')
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    if (data?.id && data?.room_id) {
+      void triggerChatPush(String(data.room_id), String(data.id));
+    }
+
+    return data;
+  }, [effectiveChatUserId, triggerChatPush, user?.id]);
+
   const emitTypingState = useCallback((isTyping: boolean) => {
     if (!typingChannelRef.current || !selectedRoomId || !effectiveChatUserId) return;
     typingChannelRef.current.send({
@@ -1814,7 +1909,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     return () => window.removeEventListener('keydown', handleWindowKeyDown);
   }, [applyAttachmentZoom, attachmentPreview, closeAttachmentPreview, nudgeAttachmentZoom]);
 
-  const [threadRoot, setThreadRoot] = useState<any | null>(null);
+  const [threadRoot, setThreadRoot] = useState<ChatMessage | null>(null);
 
   const [slashCommand, setSlashCommand] = useState<'annual_leave' | 'purchase' | null>(null);
   const [showSlashModal, setShowSlashModal] = useState(false);
@@ -2183,12 +2278,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
-        const { data } = await supabase
+        const { data } = (await supabase
           .from('messages')
-          .select('*')
+          .select(CHAT_MESSAGE_SELECT)
           .eq('id', targetMessageId)
-          .maybeSingle();
-        if (data) return data as ChatMessage;
+          .maybeSingle()) as { data: ChatMessage | null; error: unknown };
+        if (data) return data;
       } catch {
         // ignore and retry below
       }
@@ -2292,7 +2387,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const fetchData = useCallback(async () => {
     if (!selectedRoomId) return;
     const roomIdForFetch = String(selectedRoomId);
-    const { data: roomRows } = await supabase.from('chat_rooms').select('*');
+    const { data: roomRows } = (await supabase.from('chat_rooms').select(CHAT_ROOM_SELECT)) as {
+      data: ChatRoom[] | null;
+      error: unknown;
+    };
     const repairedRooms = await repairDirectRooms(roomRows || []);
     const selectedRoomRecord =
       repairedRooms.find(( room: ChatRoom) => String(room.id) === roomIdForFetch) || null;
@@ -2335,10 +2433,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
     const query = supabase
       .from('messages')
-      .select('*')
+      .select(CHAT_MESSAGE_SELECT)
       .in('room_id', roomIdsToLoad)
       .order('created_at', { ascending: true });
-    const { data: msgs } = await query;
+    const { data: msgs } = (await query) as { data: ChatMessage[] | null; error: unknown };
     if (msgs) {
       const enrichedMessages = msgs.map((msg: ChatMessage) => {
         const matchedStaff = resolveStaffProfile(msg.sender_id);
@@ -2420,7 +2518,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       setPinnedIds(nextPinnedIds);
       writeStoredPinnedIds(roomIdForFetch, nextPinnedIds);
       if (nextPinnedIds.length > 0) {
-        const pinnedLookup = new Map<string, any>();
+        const pinnedLookup = new Map<string, ChatMessage>();
         (msgs || []).forEach((msg: ChatMessage) => {
           const messageId = String(msg.id);
           if (!nextPinnedIds.includes(messageId)) return;
@@ -2431,10 +2529,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         });
         const missingPinnedIds = nextPinnedIds.filter((messageId) => !pinnedLookup.has(messageId));
         if (missingPinnedIds.length > 0) {
-          const { data: pinnedRows, error: pinnedRowsError } = await supabase
+          const { data: pinnedRows, error: pinnedRowsError } = (await supabase
             .from('messages')
-            .select('*')
-            .in('id', missingPinnedIds);
+            .select(CHAT_MESSAGE_SELECT)
+            .in('id', missingPinnedIds)) as { data: ChatMessage[] | null; error: unknown };
           if (pinnedRowsError) throw pinnedRowsError;
           (pinnedRows || []).forEach((msg: ChatMessage) => {
             pinnedLookup.set(String(msg.id), {
@@ -2446,7 +2544,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         setPersistedPinnedMessages(
           nextPinnedIds
             .map((messageId) => pinnedLookup.get(messageId))
-            .filter(Boolean)
+            .filter((message): message is ChatMessage => Boolean(message))
         );
       } else {
         setPersistedPinnedMessages([]);
@@ -2467,7 +2565,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       });
       setReactions(reactMap);
 
-      const { data: dbPolls } = await supabase.from('polls').select('*').eq('room_id', roomIdForFetch);
+      const { data: dbPolls } = (await supabase
+        .from('polls')
+        .select(POLL_SELECT)
+        .eq('room_id', roomIdForFetch)) as { data: PollItem[] | null; error: unknown };
       if (dbPolls?.length) {
         setPolls(dbPolls);
       } else {
@@ -2547,7 +2648,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           .update({ name: NOTICE_ROOM_NAME, type: 'notice', members: noticeRoomMemberIds })
           .eq('id', NOTICE_ROOM_ID);
       }
-      const { data: rooms } = await supabase.from('chat_rooms').select('*');
+      const { data: rooms } = (await supabase.from('chat_rooms').select(CHAT_ROOM_SELECT)) as {
+        data: ChatRoom[] | null;
+        error: unknown;
+      };
       await syncChatRoomsState(rooms || []);
     };
     loadRooms();
@@ -2562,7 +2666,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   useEffect(() => {
     const channel = supabase.channel('chat-rooms-list')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, () => {
-        supabase.from('chat_rooms').select('*').then(async ({ data: rooms }) => {
+        supabase.from('chat_rooms').select(CHAT_ROOM_SELECT).then(async (result) => {
+          const rooms = (result as { data: ChatRoom[] | null; error: unknown }).data;
           if (!rooms) return;
           await syncChatRoomsState(rooms);
         });
@@ -3007,7 +3112,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const visibleRooms = useMemo(
     () => {
-      const dedupedRooms = new Map<string, any>();
+      const dedupedRooms = new Map<string, ChatRoom>();
       chatRooms.forEach(( room: ChatRoom) => {
         if (!isRoomAccessibleToCurrentUser(room)) return;
         const roomKey = getDirectRoomMembersKey(room) || `room:${room.id}`;
@@ -3250,11 +3355,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const selectedPeer = useMemo(() => {
     if (!selectedRoom || selectedRoom.type !== 'direct') return null;
-    return roomMembers.find((member: StaffMember) => String(member.id) !== effectiveChatUserId) || null;
+    return roomMembers.find((member) => String(member?.id ?? '') !== effectiveChatUserId) || null;
   }, [selectedRoom, roomMembers, effectiveChatUserId]);
 
   const selectedPeerIsOnline = useMemo(
-    () => (selectedPeer ? isStaffCurrentlyOnline(selectedPeer) : false),
+    () => (selectedPeer ? isStaffCurrentlyOnline(selectedPeer as StaffMember) : false),
     [selectedPeer, isStaffCurrentlyOnline]
   );
   const realtimeConnectionMeta = useMemo(() => {
@@ -3355,31 +3460,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         (id: unknown) => String(id) !== String(effectiveChatUserId || user?.id || '')
       );
 
-      await supabase
-        .from('chat_rooms')
-        .update({ members: newMembers })
-        .eq('id', selectedRoom.id);
+      await persistRoomMembers(String(selectedRoom.id), newMembers);
 
       const leaverName = user?.name || '이름 없음';
       const leaveContent = `[퇴장] ${leaverName}님이 채팅방을 나갔습니다.`;
       let leaveNoticeFailed = false;
 
       try {
-        const { data: leaveMessage, error: leaveMessageError } = await supabase
-          .from('messages')
-          .insert([
-            {
-              room_id: selectedRoom.id,
-              sender_id: effectiveChatUserId || user?.id,
-              content: leaveContent,
-            },
-          ])
-          .select('id, room_id')
-          .single();
-        if (leaveMessageError) throw leaveMessageError;
-        if (leaveMessage?.id && leaveMessage?.room_id) {
-          void triggerChatPush(String(leaveMessage.room_id), String(leaveMessage.id));
-        }
+        await insertRoomSystemMessage(String(selectedRoom.id), leaveContent);
       } catch (leaveNoticeError) {
         leaveNoticeFailed = true;
         console.error('leave room system message error', leaveNoticeError);
@@ -3419,10 +3507,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         (id: unknown) => String(id) !== String(memberId)
       );
 
-      await supabase
-        .from('chat_rooms')
-        .update({ members: newMembers })
-        .eq('id', selectedRoom.id);
+      await persistRoomMembers(String(selectedRoom.id), newMembers);
 
       const removedName =
         resolveRoomMemberProfile(selectedRoom, String(memberId))?.name ||
@@ -3430,27 +3515,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         '이름 없음';
       const removerName = user?.name || '이름 없음';
       const systemContent = `[제거] ${removerName}님이 ${removedName}님을 채팅방에서 제거했습니다.`;
-      const { data: removedMessage } = await supabase
-        .from('messages')
-        .insert([
-          {
-            room_id: selectedRoom.id,
-            sender_id: effectiveChatUserId || user?.id,
-            content: systemContent,
-          },
-        ])
-        .select('id, room_id')
-        .single();
+      await insertRoomSystemMessage(String(selectedRoom.id), systemContent);
 
-      if (removedMessage?.id && removedMessage?.room_id) {
-        void triggerChatPush(String(removedMessage.room_id), String(removedMessage.id));
-      }
-
-      setChatRooms((prev) =>
-        prev.map(( room: ChatRoom) =>
-          room.id === selectedRoom.id ? { ...room, members: newMembers } : room
-        )
-      );
+      updateRoomMembersLocally(String(selectedRoom.id), newMembers);
       await fetchData();
       toast('참여자를 제거했습니다.');
     } catch (error) {
@@ -3563,21 +3630,15 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       albumIndex: resolvedAlbumIndex,
       albumTotal: resolvedAlbumTotal,
     };
+    const insertPayload = buildChatMessageInsertPayload(
+      effectiveChatUserId || user?.id,
+      retrySnapshot,
+    );
 
     const optimisticId = retryMessageId || `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const optimisticMessage = {
       id: optimisticId,
-      room_id: roomId,
-      sender_id: effectiveChatUserId || user!.id,
-      content,
-      file_url: resolvedFileUrl,
-      file_name: resolvedFileName,
-      file_size_bytes: resolvedFileSizeBytes,
-      file_kind: resolvedFileKind,
-      reply_to_id: resolvedReplyToId,
-      album_id: resolvedAlbumId,
-      album_index: resolvedAlbumIndex,
-      album_total: resolvedAlbumTotal,
+      ...insertPayload,
       created_at: new Date().toISOString(),
       is_deleted: false,
       staff: { name: user!.name, photo_url: getProfilePhotoUrl(user!) },
@@ -3629,20 +3690,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     }
     emitTypingState(false);
 
-    const payload: Record<string, unknown> = {
-      room_id: roomId,
-      sender_id: effectiveChatUserId || user!.id,
-      content,
-      file_url: resolvedFileUrl,
-      file_name: resolvedFileName,
-      file_size_bytes: resolvedFileSizeBytes,
-      file_kind: resolvedFileKind,
-      reply_to_id: resolvedReplyToId,
-      album_id: resolvedAlbumId,
-      album_index: resolvedAlbumIndex,
-      album_total: resolvedAlbumTotal,
-    };
-    const { data: inserted, error } = await insertChatMessage<ChatMessage>(payload);
+    const { data: inserted, error } = await insertChatMessage<ChatMessage>(insertPayload);
     if (!error && inserted) {
       const optimisticMsg = {
         ...inserted,
@@ -4040,12 +4088,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const createGroupChat = async () => {
     if (!groupName.trim() || selectedMembers.length === 0) return toast('방 이름과 멤버를 선택해 주세요.', 'warning');
     if (!effectiveChatUserId) return toast('연결된 직원 계정을 찾지 못했습니다.', 'error');
-    const { data: room, error } = await supabase.from('chat_rooms').insert([{
+    const { data: room, error } = (await supabase.from('chat_rooms').insert([{
       name: groupName,
       type: 'group',
       created_by: effectiveChatUserId,
       members: [effectiveChatUserId, ...selectedMembers]
-    }]).select().single();
+    }]).select(CHAT_ROOM_SELECT).single()) as { data: ChatRoom | null; error: unknown };
 
     if (!error && room) {
       setGroupName('');
@@ -4058,7 +4106,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   };
 
   const groupedStaffs = useMemo(() => {
-    const grouped: Record<string, Record<string, any[]>> = {};
+    const grouped: Record<string, Record<string, StaffMember[]>> = {};
     allKnownStaffs.forEach(( s: StaffMember) => {
       if (s.status === '퇴사' || s.status === '퇴직') return;
       const company = s.company || '기타';
@@ -4090,10 +4138,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     }
 
     try {
-      const { data: rooms, error } = await supabase
+      const { data: rooms, error } = (await supabase
         .from('chat_rooms')
-        .select('*')
-        .eq('type', 'direct');
+        .select(CHAT_ROOM_SELECT)
+        .eq('type', 'direct')) as { data: ChatRoom[] | null; error: unknown };
       if (error) throw error;
 
       const repairedRooms = await repairDirectRooms(rooms || []);
@@ -4119,11 +4167,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         );
         setRoom(foundRoom.id);
       } else {
-        const { data: room, error: insertError } = await supabase
+        const { data: room, error: insertError } = (await supabase
           .from('chat_rooms')
           .insert([{ name: `${staff.name}`, type: 'direct', members: [effectiveChatUserId, otherId] }])
-          .select('*')
-          .single();
+          .select(CHAT_ROOM_SELECT)
+          .single()) as { data: ChatRoom | null; error: unknown };
         if (insertError) throw insertError;
         if (room) {
           setChatRooms((prev) =>
@@ -4202,7 +4250,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     const q = mentionQuery.trim();
     if (!q) return base.slice(0, 8);
     return base
-      .filter(( s: StaffMember) =>
+      .filter((s) =>
         (s.name || '').toLowerCase().includes(q.toLowerCase())
       )
       .slice(0, 8);
@@ -4374,14 +4422,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         return;
       }
       // 대화내용 + 파일URL(파일명·사진명) 통합 OR 검색
-      const { data, error } = await supabase
+      const { data, error } = (await supabase
         .from('messages')
-        .select('*')
+        .select(CHAT_MESSAGE_SELECT)
         .in('room_id', visibleRoomIds)
         .eq('is_deleted', false)
         .or(`content.ilike.%${q}%,file_url.ilike.%${q}%`)
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(100)) as { data: ChatMessage[] | null; error: unknown };
 
       if (error) throw error;
       const messageRows = Array.isArray(data) ? data : [];
@@ -4396,7 +4444,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         .in('id', relatedRoomIds);
       if (roomError) throw roomError;
 
-      const roomMap = new Map<string, any>();
+      const roomMap = new Map<string, ChatRoom>();
       (roomRows || []).forEach(( room: ChatRoom) => {
         roomMap.set(String(room.id), room);
       });
@@ -4859,9 +4907,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             <div className="space-y-0.5 pl-2 pt-0.5 pb-1">
                               {(members as StaffMember[]).map((s: StaffMember) => (
                                 <div key={s.id} className="flex items-center gap-2.5 px-2 py-2 bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border-subtle)] dark:border-zinc-800/50 rounded-xl hover:border-blue-400/50 dark:hover:border-blue-500/50 transition-all group cursor-default">
-                                  <div className="w-7 h-7 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-lg flex items-center justify-center text-[11px] font-bold text-[var(--toss-gray-3)] overflow-hidden shrink-0">
-                                    {s.photo_url ? <img src={s.photo_url} alt={s.name} className="w-full h-full object-cover" /> : s.name?.[0]}
-                                  </div>
+                                  <MessengerAvatar
+                                    name={s.name}
+                                    photoUrl={s.photo_url}
+                                    className="h-7 w-7 shrink-0 overflow-hidden rounded-lg bg-[var(--tab-bg)] text-[11px] font-bold text-[var(--toss-gray-3)] dark:bg-zinc-800"
+                                    decorative
+                                  />
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-1">
                                       <p className="text-[11px] font-bold text-foreground truncate">{s.name}</p>
@@ -5051,11 +5102,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       <div className={`flex items-end gap-2 ${isMineAlbum ? 'flex-row-reverse' : 'flex-row'}`}>
                         {/* 아바타 */}
                         {!isMineAlbum && (
-                          <div className="w-8 h-8 shrink-0 rounded-full overflow-hidden bg-[var(--muted)] flex items-center justify-center text-[11px] font-bold text-[var(--toss-gray-4)] mb-1">
-                            {(albumItem.staff as { photo_url?: string | null } | null)?.photo_url
-                              ? <img src={(albumItem.staff as { photo_url?: string | null }).photo_url!} alt="" className="w-full h-full object-cover" />
-                              : senderName.slice(0, 1)}
-                          </div>
+                          <MessengerAvatar
+                            name={senderName}
+                            photoUrl={(albumItem.staff as { photo_url?: string | null } | null)?.photo_url || null}
+                            className="mb-1 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--muted)] text-[11px] font-bold text-[var(--toss-gray-4)]"
+                            decorative
+                          />
                         )}
                         <div className={`flex flex-col gap-1 max-w-[75%] ${isMineAlbum ? 'items-end' : 'items-start'}`}>
                           {!isMineAlbum && (
@@ -5070,6 +5122,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                 className={`relative overflow-hidden bg-[var(--muted)] ${count === 3 && idx === 2 ? 'col-span-2' : ''} ${count === 5 && idx === 3 ? 'col-span-1' : ''}`}
                                 style={{ aspectRatio: count === 1 ? '4/3' : '1/1' }}
                                 onClick={() => openAttachmentPreview(m.file_url, m.file_name, 'image')}
+                                aria-label={`${m.file_name || `앨범 사진 ${idx + 1}`} 미리보기`}
                               >
                                 <img
                                   src={m.file_url || ''}
@@ -5102,7 +5155,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 const readersCount = readCounts[msg.id] || 0;
                 const totalRecipients = Math.max(
                   0,
-                  roomMembers.filter((member: StaffMember) => String(member.id) !== String(msg.sender_id || '')).length
+                  roomMembers.filter((member) => String(member?.id ?? '') !== String(msg.sender_id || '')).length
                 );
                 const unreadRecipients = Math.max(0, totalRecipients - readersCount);
                 const deliveryStateInfo = deliveryStates[msg.id];
@@ -5396,9 +5449,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               <div className="flex gap-1.5 flex-wrap">
                 {albumPreviewUrls.map((url, i) => (
                   <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden shrink-0">
-                    <img src={url} alt="" className="w-full h-full object-cover" />
+                    <img
+                      src={url}
+                      alt={buildMessengerImageAlt(pendingAlbumFiles[i]?.name, `업로드 예정 사진 ${i + 1}`)}
+                      className="w-full h-full object-cover"
+                    />
                     <button
                       onClick={() => removeAlbumFile(i)}
+                      aria-label={`앨범 미리보기 ${i + 1} 제거`}
                       className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/60 rounded-full flex items-center justify-center text-white text-[9px] font-bold hover:bg-red-600 transition-colors"
                     >✕</button>
                   </div>
@@ -5406,6 +5464,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 {/* 추가 버튼 */}
                 <button
                   onClick={() => albumFileInputRef.current?.click()}
+                  aria-label="앨범에 사진 추가"
                   className="w-16 h-16 rounded-lg border-2 border-dashed border-[var(--border)] flex items-center justify-center text-[var(--toss-gray-3)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors text-xl shrink-0"
                   title="사진 추가"
                 >+</button>
@@ -5486,6 +5545,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={fileUploading}
+              aria-label="사진 또는 파일 첨부"
               title="사진/파일 첨부"
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] transition-colors hover:text-[var(--accent)] disabled:opacity-50 md:h-8 md:w-8"
             >
@@ -5521,7 +5581,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               />
               {showMentionList && mentionCandidates.length > 0 && (
                 <div className="absolute left-0 bottom-full mb-1 w-full max-h-48 overflow-y-auto bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] shadow-sm z-20 text-xs">
-                  {mentionCandidates.map(( m: StaffMember) => (
+                  {mentionCandidates.map((m) => (
                     <button
                       key={m.id}
                       type="button"
@@ -5609,7 +5669,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     {sharedMediaPreviewMessages.map((m) => (
                       <div key={m.id} className="aspect-square bg-[var(--tab-bg)] dark:bg-zinc-800 relative group cursor-pointer" onClick={() => m.file_url && openAttachmentPreview(m.file_url, m.file_name || null, m.file_kind === 'video' ? 'video' : m.file_kind === 'image' ? 'image' : 'file')}>
                         {m.file_kind === 'image' ? (
-                          <img src={m.file_url || ''} alt="Attached image" className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
+                          <img
+                            src={m.file_url || ''}
+                            alt={buildMessengerImageAlt(m.file_name, '공유된 이미지')}
+                            className="w-full h-full object-cover hover:opacity-90 transition-opacity"
+                          />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-xl">🎬</div>
                         )}
@@ -5707,9 +5771,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       return (
                         <div data-testid={`chat-room-member-${memberId}`} key={memberId} className="flex items-center justify-between group">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-[10px] font-bold text-emerald-600">
-                              {s?.photo_url ? <img src={s.photo_url} alt={`${s.name}'s profile`} className="w-full h-full rounded-full object-cover" /> : (s?.name?.[0] || '?')}
-                            </div>
+                            <MessengerAvatar
+                              name={s?.name}
+                              photoUrl={s?.photo_url}
+                              className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-600 dark:bg-emerald-900/30"
+                              decorative
+                            />
                             <div>
                               <p className="text-xs font-bold text-foreground">{s?.name || '이름 없음'}</p>
                               <p className="text-[10px] text-[var(--toss-gray-4)] font-medium">{[s?.department, s?.position].filter(Boolean).join(' · ')}</p>
@@ -6342,15 +6409,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     ) : (
                       <div className="grid grid-cols-1 gap-1">
                         {unreadUsers.map((u: StaffMember) => (
-                          <div key={u.id} className="flex items-center gap-3 p-2 rounded-xl bg-[var(--tab-bg)] dark:bg-zinc-800/30">
-                            <div className="w-7 h-7 rounded-lg bg-[var(--tab-bg)] dark:bg-zinc-700 flex items-center justify-center text-[10px] font-bold text-[var(--toss-gray-3)] overflow-hidden">
-                              {u.photo_url ? <img src={u.photo_url} alt={`${u.name}'s profile`} className="w-full h-full object-cover" /> : u.name[0]}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[11px] font-bold text-foreground truncate">{u.name}</p>
-                              <p className="text-[9px] font-bold text-[var(--toss-gray-3)] truncate">{(u.department || '')} {u.position}</p>
-                            </div>
-                          </div>
+                          <MessengerStatusUserRow key={u.id} staff={u} />
                         ))}
                       </div>
                     )}
@@ -6365,15 +6424,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     ) : (
                       <div className="grid grid-cols-1 gap-1">
                         {readUsers.map((u: StaffMember) => (
-                          <div key={u.id} className="flex items-center gap-3 p-2 rounded-xl bg-[var(--tab-bg)] dark:bg-zinc-800/30">
-                            <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-[10px] font-bold text-emerald-600 overflow-hidden">
-                              {u.photo_url ? <img src={u.photo_url} alt={`${u.name}'s profile`} className="w-full h-full object-cover" /> : u.name[0]}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[11px] font-bold text-foreground truncate">{u.name}</p>
-                              <p className="text-[9px] font-bold text-[var(--toss-gray-3)] truncate">{(u.department || '')} {u.position}</p>
-                            </div>
-                          </div>
+                          <MessengerStatusUserRow key={u.id} staff={u} tone="success" />
                         ))}
                       </div>
                     )}
@@ -6567,36 +6618,19 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     );
                     const newMembers = Array.from(setIds);
 
-                    await supabase
-                      .from('chat_rooms')
-                      .update({ members: newMembers })
-                      .eq('id', selectedRoom.id);
+                    await persistRoomMembers(String(selectedRoom.id), newMembers);
 
                     const invitedNames = addMemberSelectingIds
                       .map((id) => resolveStaffProfile(id)?.name || '이름 없음')
                       .join(', ');
                     const inviterName = user?.name || '이름 없음';
                     const systemContent = `[초대] ${inviterName}님이 ${invitedNames}님을 초대했습니다.`;
-                    const { data: inviteMessage, error: inviteMessageError } = await supabase.from('messages').insert([{
-                      room_id: selectedRoom.id,
-                      sender_id: effectiveChatUserId || user?.id,
-                      content: systemContent,
-                    }]).select('id, room_id').single();
-                    if (inviteMessageError) throw inviteMessageError;
-                    if (inviteMessage?.id && inviteMessage?.room_id) {
-                      void triggerChatPush(String(inviteMessage.room_id), String(inviteMessage.id));
-                    }
+                    await insertRoomSystemMessage(String(selectedRoom.id), systemContent);
 
-                    setChatRooms((prev) =>
-                      prev.map(( room: ChatRoom) =>
-                        room.id === selectedRoom.id
-                          ? { ...room, members: newMembers }
-                          : room
-                      )
-                    );
+                    updateRoomMembersLocally(String(selectedRoom.id), newMembers);
                     setShowAddMemberModal(false);
                     setAddMemberSelectingIds([]);
-                    fetchData();
+                    await fetchData();
                     toast('참여자가 추가되었습니다.');
                   } catch (e) {
                     console.error('add members error', e);
@@ -6747,9 +6781,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             className="w-full text-left p-3 bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-xl hover:border-[var(--accent)] hover:shadow-sm transition-all"
                           >
                             <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-xl bg-[var(--tab-bg)] dark:bg-zinc-800 overflow-hidden flex items-center justify-center text-[12px] font-bold text-[var(--toss-gray-3)] shrink-0">
-                                {staff.photo_url ? <img src={staff.photo_url} alt={staff.name} className="w-full h-full object-cover" /> : staff.name?.[0]}
-                              </div>
+                              <MessengerAvatar
+                                name={staff.name}
+                                photoUrl={staff.photo_url}
+                                className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--tab-bg)] text-[12px] font-bold text-[var(--toss-gray-3)] dark:bg-zinc-800"
+                                decorative
+                              />
                               <div className="min-w-0 flex-1">
                                 <p className="text-[12px] font-bold text-foreground truncate">{staff.name}</p>
                                 <p className="text-[10px] text-[var(--toss-gray-3)] truncate">{[staff.company, staff.department, staff.position].filter(Boolean).join(' · ')}</p>

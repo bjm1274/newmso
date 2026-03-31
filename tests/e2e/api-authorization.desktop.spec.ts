@@ -79,6 +79,32 @@ test('deposit API rejects authenticated users without extra menu access', async 
   expect(result.payload?.error).toBe('권한이 없습니다.');
 });
 
+test('deposit API rejects users without explicit deposit permission even when extra menu access is allowed', async ({ page }) => {
+  const restrictedUser = buildRestrictedUser({
+    menu_추가기능: true,
+    extra_입금실시간조회: false,
+  });
+
+  await seedSession(page, { user: restrictedUser });
+  await mockSessionRoute(page, restrictedUser);
+  await page.goto('/');
+
+  const result = await page.evaluate(async () => {
+    const response = await fetch('/api/payments/virtual-account-deposits', {
+      method: 'GET',
+      cache: 'no-store',
+    });
+
+    return {
+      status: response.status,
+      payload: await response.json().catch(() => null),
+    };
+  });
+
+  expect(result.status).toBe(403);
+  expect(result.payload?.error).toBe('권한이 없습니다.');
+});
+
 test('discharge review API rejects authenticated users without extra feature access', async ({ page }) => {
   const restrictedUser = buildRestrictedUser({
     menu_추가기능: false,
@@ -115,6 +141,36 @@ test('discharge review API rejects authenticated users without extra feature acc
 test('consultation transcription API rejects authenticated users without extra feature access', async ({ page }) => {
   const restrictedUser = buildRestrictedUser({
     menu_추가기능: false,
+    extra_수술상담: false,
+  });
+
+  await seedSession(page, { user: restrictedUser });
+  await mockSessionRoute(page, restrictedUser);
+  await page.goto('/');
+
+  const result = await page.evaluate(async () => {
+    const response = await fetch('/api/consultation/transcribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        audio: 'dGVzdA==',
+        mimeType: 'audio/webm',
+      }),
+    });
+
+    return {
+      status: response.status,
+      payload: await response.json().catch(() => null),
+    };
+  });
+
+  expect(result.status).toBe(403);
+  expect(result.payload?.error).toBe('Forbidden');
+});
+
+test('consultation transcription API rejects users without explicit consultation permission even when extra menu access is allowed', async ({ page }) => {
+  const restrictedUser = buildRestrictedUser({
+    menu_추가기능: true,
     extra_수술상담: false,
   });
 

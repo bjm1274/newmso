@@ -23,6 +23,7 @@ import MainContent from './기능부품/조직도서브/조직도본문';
 import NotificationSystem from './기능부품/알림시스템';
 import ChatAlertBanner from './기능부품/채팅알림배너';
 import PermissionPromptModal from './기능부품/권한요청모달';
+import OfflineStatusBanner from '@/app/components/OfflineStatusBanner';
 import type { ErpUser, ERPData, StaffMember } from '@/types';
 
 function canAccessAdminSubMenu(user: ErpUser | null, subMenuId: string) {
@@ -900,9 +901,12 @@ function MainPageContent() {
 
   return (
     <div
-      className="flex h-[100dvh] w-full flex-col overflow-hidden bg-[var(--background)] md:flex-row"
+      className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[var(--background)] md:flex-row"
       data-testid="main-shell"
     >
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[80] p-2 md:p-3">
+        <OfflineStatusBanner />
+      </div>
       <Sidebar
         user={user}
         mainMenu={mainMenu}

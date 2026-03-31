@@ -5,129 +5,192 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 const TYPE_ICONS: Record<string, string> = {
-  approval: '📋',
+  approval: '📝',
   inventory: '📦',
   payroll: '💰',
-  education: '📚',
-  mention: '📣',
+  education: '🎓',
+  mention: '💬',
+  attendance: '🕒',
   인사: '👥',
+  board: '📌',
   default: '🔔',
 };
 
-export default function GlobalNotificationBell({ user, onOpenFull }: { user: any; onOpenFull: () => void }) {
+type NotificationBellUser = {
+  id?: string | null;
+};
+
+type NotificationItem = {
+  id: string;
+  user_id?: string | null;
+  type?: string | null;
+  title?: string | null;
+  body?: string | null;
+  is_read?: boolean | null;
+  metadata?: {
+    room_id?: string | null;
+    [key: string]: unknown;
+  } | null;
+  created_at?: string | null;
+};
+
+const NOTIFICATION_SELECT = 'id, user_id, type, title, body, is_read, metadata, created_at';
+
+export default function GlobalNotificationBell({
+  user,
+  onOpenFull,
+}: {
+  user: NotificationBellUser | null;
+  onOpenFull: () => void;
+}) {
   const [open, setOpen] = useState(false);
-  const [list, setList] = useState<any[]>([]);
+  const [list, setList] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [toastNoti, setToastNoti] = useState<any>(null); // 신규 수신 시 노출할 토스트 상태
+  const [toastNotification, setToastNotification] = useState<NotificationItem | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   useEffect(() => {
     if (!user?.id) return;
 
-    // 알림 권한 요청 (웹/모바일 푸시용)
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      if (Notification.permission === 'default') {
-        Notification.requestPermission();
-      }
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      void Notification.requestPermission();
     }
 
     const fetchList = async () => {
       const { data } = await supabase
         .from('notifications')
-        .select('*')
+        .select(NOTIFICATION_SELECT)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(10);
-      setList(data || []);
-      const unread = (data || []).filter((n: any) => !n.is_read).length;
-      setUnreadCount(unread);
+
+      const nextList = Array.isArray(data) ? (data as NotificationItem[]) : [];
+      setList(nextList);
+      setUnreadCount(nextList.filter((item) => !item.is_read).length);
     };
 
-    fetchList();
+    void fetchList();
 
     const channel = supabase
       .channel('global-notifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${String(user.id)}` }, (payload) => {
-        const newNoti: any = payload.new;
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${String(user.id)}` },
+        (payload) => {
+          const newNotification = payload.new as NotificationItem;
 
-        // 브라우저 네이티브 푸시 알림 발생 (웹/모바일 호환)
-        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-          try {
-            new Notification(newNoti.title || '새로운 알림', {
-              body: newNoti.body || '확인하지 않은 시스템 알림이 있습니다.',
-              icon: '/sy-logo.png',
-            });
-          } catch {
-            // 브라우저 알림 권한 거부 또는 미지원 환경 - 앱 내 토스트로 대체
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification(newNotification.title || '새 알림', {
+                body: newNotification.body || '확인할 새 알림이 있습니다.',
+                icon: '/sy-logo.png',
+              });
+            } catch {
+              // ignore browser notification failures
+            }
           }
+
+          setToastNotification(newNotification);
+          window.setTimeout(() => setToastNotification(null), 5000);
+          void fetchList();
         }
-
-        // 앱 내장 Toast 알림 팝업 (권한 미부여 또는 네이티브 알림 불가 환경 대비)
-        setToastNoti(newNoti);
-        setTimeout(() => setToastNoti(null), 5000); // 5초 후 토스트 닫기
-
-        // in-app 알림 목록 갱신
-        fetchList();
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${String(user.id)}` }, () => {
-        // 읽음 처리 등 업데이트 발생 시 리스트만 갱신
-        fetchList();
-      })
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${String(user.id)}` },
+        () => {
+          void fetchList();
+        }
+      )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user?.id]);
 
   useEffect(() => {
-    const onOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    const onOutside = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
     };
+
     document.addEventListener('click', onOutside);
     return () => document.removeEventListener('click', onOutside);
   }, []);
 
   const markRead = useCallback(async (id: string) => {
     await supabase.from('notifications').update({ is_read: true }).eq('id', id);
-    setList(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
-    setUnreadCount(prev => Math.max(0, prev - 1));
+    setList((prev) => prev.map((item) => (item.id === id ? { ...item, is_read: true } : item)));
+    setUnreadCount((prev) => Math.max(0, prev - 1));
   }, []);
 
-  const handleNotificationClick = useCallback((n: any) => {
-    if (!n.is_read) markRead(n.id);
-    setOpen(false);
-    setToastNoti(null);
+  const handleNotificationClick = useCallback((notification: NotificationItem) => {
+    if (!notification.is_read) {
+      void markRead(notification.id);
+    }
 
-    if (n.metadata?.room_id) {
-      router.push(`/main?open_chat_room=${n.metadata.room_id}`);
-    } else if (n.type === 'approval') {
-      router.push(`/main?open_menu=전자결재`);
-    } else if (n.type === 'inventory') {
-      router.push(`/main?open_menu=재고관리`);
-    } else if (n.type === 'payroll' || n.type === 'education' || n.type === '인사' || n.type === 'attendance') {
-      router.push(`/main?open_menu=인사관리`);
-    } else if (n.type === 'board') {
-      if ((n.title || '').includes('경조사') || (n.body || '').includes('경조사')) {
-        router.push(`/main?open_menu=게시판&open_board=경조사`);
-      } else {
-        router.push(`/main?open_menu=게시판`);
-      }
+    setOpen(false);
+    setToastNotification(null);
+
+    if (notification.metadata?.room_id) {
+      router.push(`/main?open_chat_room=${notification.metadata.room_id}`);
+      return;
+    }
+
+    if (notification.type === 'approval') {
+      router.push('/main?open_menu=전자결재');
+      return;
+    }
+
+    if (notification.type === 'inventory') {
+      router.push('/main?open_menu=재고관리');
+      return;
+    }
+
+    if (
+      notification.type === 'payroll' ||
+      notification.type === 'education' ||
+      notification.type === '인사' ||
+      notification.type === 'attendance'
+    ) {
+      router.push('/main?open_menu=인사관리');
+      return;
+    }
+
+    if (notification.type === 'board') {
+      const isCondolenceBoard =
+        String(notification.title || '').includes('경조사') ||
+        String(notification.body || '').includes('경조사');
+      router.push(isCondolenceBoard ? '/main?open_menu=게시판&open_board=경조사' : '/main?open_menu=게시판');
     }
   }, [markRead, router]);
 
   return (
     <>
-      {/* Toast Notification Layer */}
-      {toastNoti && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] w-[90%] max-w-[360px] cursor-pointer" onClick={() => handleNotificationClick(toastNoti)}>
-          <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-2xl rounded-[16px] p-4 flex gap-3 animate-in slide-in-from-top-10 fade-in duration-300">
-            <span className="text-2xl shrink-0">{TYPE_ICONS[toastNoti.type] || TYPE_ICONS.default}</span>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-[var(--foreground)] truncate">{toastNoti.title || '새로운 알림'}</p>
-              <p className="text-[11px] text-[var(--toss-gray-3)] line-clamp-2 mt-0.5">{toastNoti.body}</p>
+      {toastNotification && (
+        <div
+          className="fixed left-1/2 top-4 z-[9999] w-[90%] max-w-[360px] -translate-x-1/2 cursor-pointer"
+          onClick={() => handleNotificationClick(toastNotification)}
+        >
+          <div className="flex gap-3 rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-2xl animate-in slide-in-from-top-10 fade-in duration-300">
+            <span className="shrink-0 text-2xl">{TYPE_ICONS[toastNotification.type || ''] || TYPE_ICONS.default}</span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-bold text-[var(--foreground)]">{toastNotification.title || '새 알림'}</p>
+              <p className="mt-0.5 line-clamp-2 text-[11px] text-[var(--toss-gray-3)]">{toastNotification.body}</p>
             </div>
-            <button type="button" onClick={(e) => { e.stopPropagation(); setToastNoti(null); }} className="text-[var(--toss-gray-2)] hover:text-[var(--toss-gray-4)] p-1 shrink-0 bg-transparent border-0 self-start">
-              ✕
+            <button
+              type="button"
+              aria-label="알림 닫기"
+              onClick={(event) => {
+                event.stopPropagation();
+                setToastNotification(null);
+              }}
+              className="self-start border-0 bg-transparent p-1 text-[var(--toss-gray-2)] hover:text-[var(--toss-gray-4)]"
+            >
+              ×
             </button>
           </div>
         </div>
@@ -136,56 +199,73 @@ export default function GlobalNotificationBell({ user, onOpenFull }: { user: any
       <div className="relative" ref={ref}>
         <button
           type="button"
-          onClick={() => setOpen(!open)}
-          className="relative min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-[12px] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)] hover:text-[var(--foreground)] transition-all touch-manipulation"
+          onClick={() => setOpen((prev) => !prev)}
+          className="relative flex min-h-[44px] min-w-[44px] touch-manipulation items-center justify-center rounded-[12px] p-2 text-[var(--toss-gray-3)] transition-all hover:bg-[var(--toss-gray-1)] hover:text-[var(--foreground)]"
           aria-label="알림"
         >
           <span className="text-xl">🔔</span>
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-red-500/100 text-white text-[10px] font-black rounded-full">
+            <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
         </button>
+
         {open && (
           <>
             <div className="fixed inset-0 z-[190] md:hidden" onClick={() => setOpen(false)} />
-            <div className="absolute right-0 bottom-[calc(100%+12px)] md:bottom-auto top-auto md:top-full md:left-0 md:right-auto mt-0 md:mt-1 w-[calc(100vw-32px)] sm:w-[320px] max-h-[60vh] md:max-h-[400px] bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[20px] md:rounded-[16px] shadow-2xl z-[200] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2 md:slide-in-from-top-2 duration-200">
-              <div className="p-4 md:p-3 border-b border-[var(--toss-border)] flex items-center justify-between shrink-0">
-                <span className="text-xs font-black text-[var(--foreground)]">시스템 알림</span>
-                {unreadCount > 0 && <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">안읽음 {unreadCount}건</span>}
+            <div className="absolute bottom-[calc(100%+12px)] right-0 z-[200] mt-0 flex max-h-[60vh] w-[calc(100vw-32px)] flex-col overflow-hidden rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200 sm:w-[320px] md:left-0 md:right-auto md:top-full md:mt-1 md:max-h-[400px] md:rounded-[16px] md:slide-in-from-top-2">
+              <div className="flex shrink-0 items-center justify-between border-b border-[var(--toss-border)] p-4 md:p-3">
+                <span className="text-xs font-black text-[var(--foreground)]">실시간 알림</span>
+                {unreadCount > 0 && (
+                  <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">읽지 않음 {unreadCount}건</span>
+                )}
               </div>
-              <div className="overflow-y-auto flex-1 max-h-[60vh] md:max-h-[320px] custom-scrollbar">
+
+              <div className="custom-scrollbar max-h-[60vh] flex-1 overflow-y-auto md:max-h-[320px]">
                 {list.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-[var(--toss-gray-3)] font-bold">알림이 없습니다.</div>
+                  <div className="p-6 text-center text-xs font-bold text-[var(--toss-gray-3)]">알림이 없습니다.</div>
                 ) : (
-                  list.slice(0, 8).map((n: any) => (
+                  list.slice(0, 8).map((notification) => (
                     <button
-                      key={n.id}
+                      key={notification.id}
                       type="button"
-                      onClick={() => handleNotificationClick(n)}
-                      className={`w-full text-left px-3 py-2.5 border-b border-[var(--toss-gray-1)] transition-colors hover:bg-[var(--toss-gray-1)] ${!n.is_read ? 'bg-[var(--toss-blue-light)]/50' : ''}`}
+                      onClick={() => handleNotificationClick(notification)}
+                      className={`w-full border-b border-[var(--toss-gray-1)] px-3 py-2.5 text-left transition-colors hover:bg-[var(--toss-gray-1)] ${!notification.is_read ? 'bg-[var(--toss-blue-light)]/50' : ''}`}
                     >
                       <div className="flex gap-2">
-                        <span className="text-base shrink-0">{TYPE_ICONS[n.type] || TYPE_ICONS.default}</span>
+                        <span className="shrink-0 text-base">{TYPE_ICONS[notification.type || ''] || TYPE_ICONS.default}</span>
                         <div className="min-w-0 flex-1">
-                          <p className="text-[11px] font-bold text-[var(--foreground)] truncate">{n.title}</p>
-                          <p className="text-[10px] text-[var(--toss-gray-3)] line-clamp-2">{n.body}</p>
-                          <p className="text-[9px] text-[var(--toss-gray-3)] mt-0.5">{new Date(n.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                          <p className="truncate text-[11px] font-bold text-[var(--foreground)]">{notification.title}</p>
+                          <p className="line-clamp-2 text-[10px] text-[var(--toss-gray-3)]">{notification.body}</p>
+                          <p className="mt-0.5 text-[9px] text-[var(--toss-gray-3)]">
+                            {notification.created_at
+                              ? new Date(notification.created_at).toLocaleString('ko-KR', {
+                                  month: 'numeric',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })
+                              : ''}
+                          </p>
                         </div>
-                        {!n.is_read && <span className="w-1.5 h-1.5 bg-[var(--toss-blue)] rounded-full shrink-0 mt-1.5" />}
+                        {!notification.is_read && <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--toss-blue)]" />}
                       </div>
                     </button>
                   ))
                 )}
               </div>
-              <div className="p-2 border-t border-[var(--toss-border)] shrink-0 bg-[var(--toss-card)]">
+
+              <div className="shrink-0 border-t border-[var(--toss-border)] bg-[var(--toss-card)] p-2">
                 <button
                   type="button"
-                  onClick={() => { onOpenFull(); setOpen(false); }}
-                  className="w-full py-3 md:py-2 rounded-[12px] text-xs font-bold text-[var(--toss-blue)] hover:bg-[var(--toss-blue-light)] transition-colors"
+                  onClick={() => {
+                    onOpenFull();
+                    setOpen(false);
+                  }}
+                  className="w-full rounded-[12px] py-3 text-xs font-bold text-[var(--toss-blue)] transition-colors hover:bg-[var(--toss-blue-light)] md:py-2"
                 >
-                  전체 보기 (내 정보 → 알림)
+                  전체 보기
                 </button>
               </div>
             </div>

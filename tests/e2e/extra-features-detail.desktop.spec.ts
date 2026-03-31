@@ -45,6 +45,16 @@ const extraFeaturesUser = {
   },
 };
 
+const restrictedExtraFeaturesUser = {
+  ...fakeUser,
+  permissions: {
+    ...fakeUser.permissions,
+    'extra_\uC785\uAE08\uC2E4\uC2DC\uAC04\uC870\uD68C': false,
+    'extra_\uC218\uC220\uC0C1\uB2F4': false,
+    'extra_OP\uCCB4\uD06C': false,
+  },
+};
+
 const partnerCompanyStaff = {
   ...fakeUser,
   id: '99999999-9999-9999-9999-999999999999',
@@ -111,6 +121,34 @@ test('extra features cards open one by one in a practical click-through flow', a
     await page.getByTestId('extra-back-button').click();
     await expect(page.getByTestId('extra-features-list')).toBeVisible();
   }
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('restricted users do not see deposit, surgery consultation, or op check cards', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    staffMembers: [restrictedExtraFeaturesUser, partnerCompanyStaff],
+  });
+  await seedSession(page, {
+    user: restrictedExtraFeaturesUser,
+    localStorage: {
+      erp_last_menu: '추가기능',
+    },
+  });
+
+  await page.goto(
+    `/main?open_menu=${encodeURIComponent('추가기능')}&open_subview=${encodeURIComponent('입금실시간조회')}`
+  );
+
+  await expect(page.getByTestId('extra-view')).toBeVisible();
+  await expect(page.getByTestId('extra-features-list')).toBeVisible();
+  await expect(page.getByTestId('extra-card-realtime-deposit')).toHaveCount(0);
+  await expect(page.getByTestId('extra-card-surgery-consultation')).toHaveCount(0);
+  await expect(page.getByTestId('extra-card-op-check')).toHaveCount(0);
+  await expect(page.getByTestId('realtime-deposit-view')).toHaveCount(0);
+  await expect(page.getByTestId('op-check-view')).toHaveCount(0);
 
   expect(runtimeErrors).toEqual([]);
 });

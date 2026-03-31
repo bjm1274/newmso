@@ -24,7 +24,7 @@ const extraFeaturesUser = {
   ...fakeUser,
   permissions: {
     ...fakeUser.permissions,
-    extra_OP泥댄겕: true,
+    'extra_OP\uCCB4\uD06C': true,
   },
 };
 
@@ -35,7 +35,7 @@ const msoExtraFeaturesUser = {
   permissions: {
     ...fakeUser.permissions,
     mso: true,
-    extra_OP泥댄겕: true,
+    'extra_OP\uCCB4\uD06C': true,
   },
 };
 
@@ -65,6 +65,11 @@ async function prepareExtraFeature(
   await expect(page.getByTestId('main-shell')).toBeVisible();
   await page.getByTestId('sidebar-menu-extra').click();
   await expect(page.getByTestId('extra-view')).toBeVisible();
+  const allTab = page.getByRole('button', { name: '전체' }).first();
+  if (await allTab.isVisible().catch(() => false)) {
+    await allTab.click();
+  }
+  await expect(page.getByTestId('extra-card-op-check')).toBeVisible();
   await page.getByTestId('extra-card-op-check').click();
   await expect(page.getByTestId('op-check-view')).toBeVisible();
 }
@@ -78,6 +83,7 @@ test('op check links schedules, applies templates, and saves a patient record', 
   const todayKey = getTodayKey();
 
   await prepareExtraFeature(page, {
+    staffMembers: [extraFeaturesUser],
     boardPosts: [
       {
         id: 'schedule-post-1',
@@ -146,7 +152,8 @@ test('op check links schedules, applies templates, and saves a patient record', 
     ],
   });
 
-  await page.getByTestId('op-check-schedule-card-schedule-post-1').click();
+  await page.getByTestId('op-check-calendar-day-' + todayKey).click();
+  await expect(page.getByTestId('op-check-workspace-modal')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Patient Alpha' })).toBeVisible();
   await expect(page.locator('input[value="Knee set"]').first()).toBeVisible();
   await expect(page.locator('input[value="Screw set"]').first()).toBeVisible();
@@ -170,6 +177,7 @@ test('op check stays available when optional surgery template and inventory sour
   const todayKey = getTodayKey();
 
   await prepareExtraFeature(page, {
+    staffMembers: [extraFeaturesUser],
     boardPosts: [
       {
         id: 'schedule-post-optional-fallback',
@@ -205,6 +213,7 @@ test('op check follows the selected company scope for MSO users', async ({ page 
   await prepareExtraFeature(
     page,
     {
+      staffMembers: [msoExtraFeaturesUser],
       boardPosts: [
         {
           id: 'schedule-post-selected-company',
@@ -245,7 +254,105 @@ test('op check follows the selected company scope for MSO users', async ({ page 
 
   await expect(page.getByTestId('op-check-calendar-day-' + todayKey)).toContainText('Scoped Patient');
   await expect(page.getByTestId('op-check-schedule-card-schedule-post-selected-company')).toBeVisible();
+  await page.getByTestId('op-check-schedule-card-schedule-post-selected-company').click();
   await expect(page.getByRole('heading', { name: 'Scoped Patient' })).toBeVisible();
 
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('op check ward messages use dropdown recipients, keep favorites, and send successfully', async ({
+  page,
+}) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const todayKey = getTodayKey();
+  const noticeRoomId = '00000000-0000-0000-0000-000000000000';
+  const favoriteStaffId = 'ward-staff-1';
+  const favoriteStorageKey = `erp_op_check_ward_message_favorites:${extraFeaturesUser.id}:${extraFeaturesUser.company_id}`;
+
+  await prepareExtraFeature(page, {
+    boardPosts: [
+      {
+        id: 'schedule-post-ward-message',
+        board_type: '수술일정',
+        title: '수술명',
+        content: 'CH-033\n[[BOARD_META]]{"status":"게시중"}[[/BOARD_META]]',
+        patient_name: 'Ward Patient',
+        schedule_date: todayKey,
+        schedule_time: '11:00',
+        schedule_room: 'Room 5',
+        company: extraFeaturesUser.company,
+        company_id: extraFeaturesUser.company_id,
+      },
+    ],
+    staffMembers: [
+      extraFeaturesUser,
+      {
+        id: favoriteStaffId,
+        name: '김규빈',
+        department: '병동팀',
+        position: '사원',
+        company: extraFeaturesUser.company,
+        company_id: extraFeaturesUser.company_id,
+      },
+      {
+        id: 'ward-staff-2',
+        name: '김민정',
+        department: '외래검사팀',
+        position: '사원',
+        company: extraFeaturesUser.company,
+        company_id: extraFeaturesUser.company_id,
+      },
+    ],
+    chatRooms: [
+      {
+        id: noticeRoomId,
+        name: '공지메시지',
+        type: 'notice',
+        members: [extraFeaturesUser.id],
+        created_at: '2026-03-08T00:00:00.000Z',
+        last_message_at: '2026-03-08T00:00:00.000Z',
+      },
+      {
+        id: 'direct-room-ward-1',
+        name: '김규빈',
+        type: 'direct',
+        members: [extraFeaturesUser.id, favoriteStaffId],
+        created_at: '2026-03-08T00:00:00.000Z',
+        last_message_at: '2026-03-08T00:00:00.000Z',
+      },
+    ],
+  });
+
+  await page.getByTestId('op-check-schedule-card-schedule-post-ward-message').click();
+  await page.getByRole('button', { name: '병동팀 메시지 보내기' }).first().click();
+
+  await expect(page.getByTestId('op-check-ward-recipient-option-' + favoriteStaffId)).toHaveCount(0);
+  await expect(page.getByTestId('op-check-ward-message-textarea')).toHaveValue(/CH-033/);
+  await expect(page.getByTestId('op-check-ward-message-textarea')).not.toHaveValue(/BOARD_META/);
+
+  await page.getByTestId('op-check-ward-recipient-dropdown-button').click();
+  await page.getByTestId('op-check-ward-recipient-search').fill('김규');
+  await page.getByTestId('op-check-ward-recipient-option-' + favoriteStaffId).click();
+  await expect(page.getByTestId('op-check-ward-selected-recipient-' + favoriteStaffId)).toBeVisible();
+
+  await page
+    .getByTestId('op-check-ward-selected-recipient-' + favoriteStaffId)
+    .getByRole('button', { name: '즐겨찾기' })
+    .click();
+
+  await page.getByTestId('op-check-ward-message-close').click();
+  await page.getByRole('button', { name: '병동팀 메시지 보내기' }).first().click();
+  await expect(page.getByTestId('op-check-ward-favorite-chip-' + favoriteStaffId)).toBeVisible();
+
+  await page.getByTestId('op-check-ward-favorite-chip-' + favoriteStaffId).click();
+  await expect(page.getByTestId('op-check-ward-message-send')).toContainText('1명');
+  await page.getByTestId('op-check-ward-message-send').click();
+
+  await expect(page.getByText(/병동 메시지 .* 발송/)).toBeVisible();
+  const favoriteIds = await page.evaluate((storageKey) => {
+    const raw = window.localStorage.getItem(storageKey);
+    return raw ? JSON.parse(raw) : [];
+  }, favoriteStorageKey);
+  expect(favoriteIds).toContain(favoriteStaffId);
   expect(runtimeErrors).toEqual([]);
 });
