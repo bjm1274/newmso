@@ -364,7 +364,7 @@ test("chat clears unread badges across the whole 1:1 conversation when one direc
     .toBe(false);
 });
 
-test("chat opens a room already aligned to the latest messages", async ({ page }) => {
+test("chat opens a room and re-clicking the room list keeps the view aligned to the latest messages", async ({ page }) => {
   const longMessages = Array.from({ length: 40 }, (_, index) => ({
     id: `msg-long-${index + 1}`,
     room_id: "room-1",
@@ -420,6 +420,31 @@ test("chat opens a room already aligned to the latest messages", async ({ page }
   await expect(page.getByTestId("chat-view")).toBeVisible();
   await page.getByTestId("chat-room-room-1").click();
   await expect(page.getByTestId("chat-message-msg-long-40")).toBeVisible();
+
+  await expect
+    .poll(async () =>
+      page.getByTestId("chat-message-list").evaluate((node) => {
+        const el = node as HTMLDivElement;
+        return Math.abs(el.scrollHeight - el.clientHeight - el.scrollTop) <= 24;
+      }),
+    )
+    .toBe(true);
+
+  await page.getByTestId("chat-message-list").evaluate((node) => {
+    const el = node as HTMLDivElement;
+    el.scrollTop = 0;
+  });
+
+  await expect
+    .poll(async () =>
+      page.getByTestId("chat-message-list").evaluate((node) => {
+        const el = node as HTMLDivElement;
+        return el.scrollTop <= 4;
+      }),
+    )
+    .toBe(true);
+
+  await page.getByTestId("chat-room-room-1").click();
 
   await expect
     .poll(async () =>
