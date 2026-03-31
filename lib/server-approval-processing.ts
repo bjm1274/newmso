@@ -8,6 +8,7 @@ import {
 } from '@/app/main/inventory-utils';
 import { syncApprovalToDocumentRepository } from '@/lib/approval-document-archive';
 import { ensureApprovedAnnualLeaveRequest, isAnnualLeaveType, syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
+import { extractLeaveRequestMeta } from '@/lib/leave-notice';
 import { isMissingColumnError } from '@/lib/supabase-compat';
 
 type ApprovalRow = Record<string, unknown>;
@@ -292,15 +293,16 @@ export async function processFinalApprovalEffects(
 
   if (item.type === '연차/휴가') {
     const senderId = String(item.sender_id || '');
-    const startStr = String(itemMetaData?.startDate || itemMetaData?.start || '');
-    const endStr = String(itemMetaData?.endDate || itemMetaData?.end || startStr);
+    const leaveSummary = extractLeaveRequestMeta(itemMetaData);
+    const startStr = leaveSummary?.startDate || '';
+    const endStr = leaveSummary?.endDate || startStr;
 
     if (senderId && startStr) {
       try {
         const start = new Date(startStr);
         const end = new Date(endStr || startStr);
         const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-        const leaveType = String(itemMetaData?.leaveType || '연차');
+        const leaveType = leaveSummary?.leaveType || '연차';
         const leaveStatus = normalizeLeaveAttendanceStatus(leaveType);
 
         await ensureApprovedAnnualLeaveRequest(
@@ -309,7 +311,14 @@ export async function processFinalApprovalEffects(
             leaveType,
             startDate: startStr,
             endDate: endStr,
-            reason: String(item.title || ''),
+            reason: leaveSummary?.reason || String(item.title || ''),
+            approvalId: String(item.id || '').trim() || null,
+            companyId: String(item.company_id || '').trim() || null,
+            companyName: String(item.sender_company || '').trim() || null,
+            delegateId: leaveSummary?.delegateId || null,
+            delegateName: leaveSummary?.delegateName || null,
+            delegateDepartment: leaveSummary?.delegateDepartment || null,
+            delegatePosition: leaveSummary?.delegatePosition || null,
           },
           supabase,
         );

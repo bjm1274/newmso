@@ -865,6 +865,10 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       reason: String(metaData.reason || approval?.title || ''),
       status: approvalStatus.approved,
       approval_id: approval.id,
+      delegate_id: String(metaData.delegateId || '').trim() || null,
+      delegate_name: String(metaData.delegateName || '').trim() || null,
+      delegate_department: String(metaData.delegateDepartment || '').trim() || null,
+      delegate_position: String(metaData.delegatePosition || '').trim() || null,
     });
 
     const start = new Date(startDate);

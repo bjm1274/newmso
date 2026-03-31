@@ -1,8 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import type { StaffMember } from '@/types';
 import SmartDatePicker from '../공통/SmartDatePicker';
+
+const DEFAULT_LEAVE_TYPE = '연차 (1.0)';
 
 export default function AttendanceForms({
   user,
@@ -10,29 +13,96 @@ export default function AttendanceForms({
   formType,
   setExtraData,
   setFormTitle,
+  initialExtraData,
 }: Record<string, unknown>) {
-  const _user = (user ?? {}) as Record<string, unknown>;
-  const _staffs = ((staffs as Record<string, unknown>[]) ?? []);
-  const _setExtraData = setExtraData as (v: Record<string, unknown>) => void;
-  const _setFormTitle = setFormTitle as (v: string) => void;
+  const currentUser = (user ?? {}) as Record<string, unknown>;
+  const staffRows = ((staffs as StaffMember[]) ?? []);
+  const updateExtraData = setExtraData as (value: Record<string, unknown>) => void;
+  const updateFormTitle = setFormTitle as (value: string) => void;
+  const seedExtraData = (initialExtraData ?? {}) as Record<string, unknown>;
+
   const [attendanceRows, setAttendanceRows] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState('');
   const [localStartDate, setLocalStartDate] = useState('');
   const [localEndDate, setLocalEndDate] = useState('');
-  const [vType, setVType] = useState('연차 (1.0)');
+  const [leaveType, setLeaveType] = useState(DEFAULT_LEAVE_TYPE);
+  const [selectedDelegateId, setSelectedDelegateId] = useState('');
+
+  const initialLeaveType =
+    String(seedExtraData.leaveType || seedExtraData.vType || DEFAULT_LEAVE_TYPE).trim() || DEFAULT_LEAVE_TYPE;
+  const initialStartDate = String(seedExtraData.startDate || seedExtraData.start || '').trim();
+  const initialEndDate = String(seedExtraData.endDate || seedExtraData.end || '').trim();
+  const initialDelegateId = String(seedExtraData.delegateId || seedExtraData.delegate_id || '').trim();
+
+  const leaveDelegateOptions = useMemo(() => {
+    const currentUserId = String(currentUser.id || '').trim();
+    const currentCompanyId = String(currentUser.company_id || '').trim();
+    const currentCompanyName = String(currentUser.company || '').trim();
+
+    return staffRows
+      .filter((staff) => {
+        const staffId = String(staff?.id || '').trim();
+        if (!staffId || staffId === currentUserId) return false;
+        if (String(staff?.status || '').trim() === '퇴사') return false;
+        if (currentCompanyId) {
+          return String(staff?.company_id || '').trim() === currentCompanyId;
+        }
+        if (currentCompanyName) {
+          return String(staff?.company || '').trim() === currentCompanyName;
+        }
+        return true;
+      })
+      .sort((left, right) => {
+        const leftDepartment = String(left?.department || left?.team || '').trim();
+        const rightDepartment = String(right?.department || right?.team || '').trim();
+        return (
+          leftDepartment.localeCompare(rightDepartment, 'ko-KR') ||
+          String(left?.name || '').localeCompare(String(right?.name || ''), 'ko-KR')
+        );
+      });
+  }, [currentUser.company, currentUser.company_id, currentUser.id, staffRows]);
+
+  const selectedDelegate = leaveDelegateOptions.find((staff) => String(staff.id) === selectedDelegateId);
 
   useEffect(() => {
     if (formType !== '연차/휴가') return;
-    _setExtraData({ vType, startDate: localStartDate, endDate: localEndDate });
-  }, [vType, localStartDate, localEndDate, formType]);
+    if (leaveType !== initialLeaveType) setLeaveType(initialLeaveType);
+    if (localStartDate !== initialStartDate) setLocalStartDate(initialStartDate);
+    if (localEndDate !== initialEndDate) setLocalEndDate(initialEndDate);
+    if (selectedDelegateId !== initialDelegateId) setSelectedDelegateId(initialDelegateId);
+  }, [
+    formType,
+    initialDelegateId,
+    initialEndDate,
+    initialLeaveType,
+    initialStartDate,
+    leaveType,
+    localEndDate,
+    localStartDate,
+    selectedDelegateId,
+  ]);
+
+  useEffect(() => {
+    if (formType !== '연차/휴가') return;
+    updateExtraData({
+      vType: leaveType,
+      leaveType,
+      startDate: localStartDate,
+      endDate: localEndDate,
+      delegateId: selectedDelegateId,
+      delegateName: selectedDelegate?.name || '',
+      delegateDepartment: String(selectedDelegate?.department || selectedDelegate?.team || '').trim(),
+      delegatePosition: String(selectedDelegate?.position || '').trim(),
+    });
+  }, [formType, leaveType, localEndDate, localStartDate, selectedDelegate, selectedDelegateId, updateExtraData]);
 
   useEffect(() => {
     const load = async () => {
       const { data: attendance } = await supabase
         .from('attendance')
         .select('*')
-        .eq('staff_id', _user.id as string)
+        .eq('staff_id', currentUser.id as string)
         .order('date', { ascending: false });
       const { data: workSchedules } = await supabase.from('work_schedules').select('*');
 
@@ -41,11 +111,10 @@ export default function AttendanceForms({
     };
 
     load();
-  }, [_user.id]);
+  }, [currentUser.id]);
 
-  /** 초과근무 분수를 10분 단위 내림으로 반환. 10분 미만이면 0 반환. */
   const calculateOT = (record: any): number => {
-    const staff = _staffs.find((item: any) => item.id === _user.id);
+    const staff = staffRows.find((item) => item.id === currentUser.id);
     const schedule = schedules.find((item: any) => item.id === staff?.schedule_id);
     if (!record?.check_out || !schedule?.end_time) return 0;
 
@@ -60,21 +129,21 @@ export default function AttendanceForms({
 
     const diffMinutes = Math.floor((actualOut.getTime() - scheduledOut.getTime()) / (1000 * 60));
     if (diffMinutes < 10) return 0;
-    return Math.floor(diffMinutes / 10) * 10; // 10분 단위 내림 (분 단위 반환)
+    return Math.floor(diffMinutes / 10) * 10;
   };
 
   const formatOTLabel = (minutes: number) => {
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    if (h > 0 && m > 0) return `${h}시간 ${m}분`;
-    if (h > 0) return `${h}시간`;
-    return `${m}분`;
+    const hour = Math.floor(minutes / 60);
+    const minute = minutes % 60;
+    if (hour > 0 && minute > 0) return `${hour}시간 ${minute}분`;
+    if (hour > 0) return `${hour}시간`;
+    return `${minute}분`;
   };
 
   return (
     <div
       data-testid="approval-attendance-form-view"
-      className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm animate-in fade-in duration-300"
+      className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm animate-in fade-in duration-300"
     >
       {formType === '연차/휴가' ? (
         <>
@@ -85,20 +154,42 @@ export default function AttendanceForms({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 items-start gap-3 bg-[var(--tab-bg)]/30 p-4 md:grid-cols-3 md:gap-3">
+          <div className="grid grid-cols-1 items-start gap-3 bg-[var(--tab-bg)]/30 p-4 md:grid-cols-2 xl:grid-cols-4 md:gap-3">
             <div className="space-y-1.5">
               <label className="ml-1 text-[11px] font-bold uppercase text-[var(--accent)]">
                 휴가 종류
               </label>
               <select
                 data-testid="approval-leave-type-select"
-                value={vType}
+                value={leaveType}
                 className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30"
-                onChange={(event) => setVType(event.target.value)}
+                onChange={(event) => setLeaveType(event.target.value)}
               >
                 <option>연차 (1.0)</option>
                 <option>반차 (0.5)</option>
                 <option>병가</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="ml-1 text-[11px] font-bold uppercase text-[var(--accent)]">
+                업무대행자
+              </label>
+              <select
+                data-testid="approval-leave-delegate-select"
+                value={selectedDelegateId}
+                className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30"
+                onChange={(event) => setSelectedDelegateId(event.target.value)}
+              >
+                <option value="">업무대행자 선택</option>
+                {leaveDelegateOptions.map((staff) => {
+                  const departmentLabel = String(staff.department || staff.team || '').trim();
+                  return (
+                    <option key={staff.id} value={staff.id}>
+                      {departmentLabel ? `${staff.name} (${departmentLabel})` : staff.name}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -140,7 +231,7 @@ export default function AttendanceForms({
             </p>
           </div>
 
-          <div className="grid max-h-60 grid-cols-1 gap-2 overflow-y-auto bg-[var(--tab-bg)]/30 p-3 pr-2 custom-scrollbar md:grid-cols-2 md:gap-3">
+          <div className="custom-scrollbar grid max-h-60 grid-cols-1 gap-2 overflow-y-auto bg-[var(--tab-bg)]/30 p-3 pr-2 md:grid-cols-2 md:gap-3">
             {attendanceRows.map((row, index) => {
               const overtimeMinutes = calculateOT(row);
               if (overtimeMinutes <= 0) return null;
@@ -152,13 +243,13 @@ export default function AttendanceForms({
                   data-testid={`approval-overtime-record-${index}`}
                   onClick={() => {
                     setSelectedDate(row.date);
-                    _setExtraData({
+                    updateExtraData({
                       date: row.date,
                       minutes: overtimeMinutes,
                       hours: Math.round((overtimeMinutes / 60) * 100) / 100,
                       amount: Math.floor((overtimeMinutes / 60) * 15000),
                     });
-                    _setFormTitle(`[추가수당청구] ${row.date} 연장근무 ${formatOTLabel(overtimeMinutes)}`);
+                    updateFormTitle(`[추가수당청구] ${row.date} 연장근무 ${formatOTLabel(overtimeMinutes)}`);
                   }}
                   className={`flex items-center justify-between rounded-[var(--radius-lg)] border-2 p-3 text-left transition-all ${
                     selectedDate === row.date

@@ -1402,6 +1402,11 @@ export default function ChatView({
     if (selectedRoomIdRef.current !== roomId) return;
 
     const listEl = messageListRef.current;
+    const hasRenderedTimelineItems = Boolean(
+      listEl?.querySelector('[data-testid^="chat-message-row-"], [data-testid^="chat-poll-"]')
+    );
+    if (!hasRenderedTimelineItems) return;
+
     if (listEl) {
       listEl.scrollTop = listEl.scrollHeight;
     } else {
@@ -5321,22 +5326,22 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           </p>
                         )}
                         <div
-                          className={`mt-0.5 hidden items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 md:flex ${isMine ? 'flex-row-reverse' : ''}`}
+                          className={`mt-0.5 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:opacity-100 ${isMine ? 'flex-row-reverse' : ''}`}
                           onClick={e => e.stopPropagation()}
                         >
                           <button
                             type="button"
                             onClick={() => { startReplyToMessage(msg); }}
-                            className="p-1 px-2 rounded-lg hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-blue-500 transition-colors"
+                            className="touch-manipulation min-h-[32px] p-1 px-2 rounded-lg hover:bg-[var(--tab-bg)] active:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-blue-500 transition-colors"
                           >
                             답장
                           </button>
                           <button
                             type="button"
                             onClick={() => { openMessageActions(msg); }}
-                            className="p-1 px-2 rounded-lg hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] transition-colors"
+                            className="touch-manipulation min-h-[32px] p-1 px-2 rounded-lg hover:bg-[var(--tab-bg)] active:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] transition-colors"
                           >
-                            더보기
+                            ···
                           </button>
                         </div>
                       </div>
@@ -5711,7 +5716,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             </div>
                           </div>
                           {isOwner && String(memberId) !== String(effectiveChatUserId || user?.id || '') && (
-                            <button data-testid={`chat-remove-member-${memberId}`} onClick={() => { void removeRoomMember(String(memberId)); }} className="opacity-0 group-hover:opacity-100 p-1 text-red-500 text-[10px] font-bold hover:bg-red-500/10 dark:hover:bg-red-900/20 rounded-md transition-all">내보내기</button>
+                            <button data-testid={`chat-remove-member-${memberId}`} onClick={() => { void removeRoomMember(String(memberId)); }} className="touch-manipulation opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 min-h-[36px] px-2 py-1 text-red-500 text-[10px] font-bold hover:bg-red-500/10 active:bg-red-500/10 dark:hover:bg-red-900/20 rounded-md transition-all">내보내기</button>
                           )}
                         </div>
                       );

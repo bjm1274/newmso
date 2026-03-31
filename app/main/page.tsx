@@ -925,9 +925,9 @@ function MainPageContent() {
                       key={sub.id}
                       onClick={() => handleSubViewChange(sub.id)}
                       data-testid={buildSubMenuTestId(mainMenu, sub.id)}
-                      className={`flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all duration-150 whitespace-nowrap md:flex md:items-center md:gap-1.5 ${subView === sub.id
+                      className={`touch-manipulation flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-2 md:py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all duration-150 whitespace-nowrap md:flex md:items-center md:gap-1.5 ${subView === sub.id
                         ? 'bg-[var(--accent)] text-white shadow-sm'
-                        : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]'
+                        : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] active:bg-[var(--muted)] active:text-[var(--foreground)]'
                       }`}
                     >
                       <span className="hidden md:inline text-[12px] shrink-0" style={{ opacity: subView === sub.id ? 1 : 0.65 }}>{sub.icon || '·'}</span>
@@ -943,9 +943,9 @@ function MainPageContent() {
                 key={sub.id}
                 onClick={() => handleSubViewChange(sub.id)}
                 data-testid={buildSubMenuTestId(mainMenu, sub.id)}
-                className={`flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all duration-150 whitespace-nowrap md:flex md:items-center md:gap-1.5 ${subView === sub.id
+                className={`touch-manipulation flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-2 md:py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all duration-150 whitespace-nowrap md:flex md:items-center md:gap-1.5 ${subView === sub.id
                   ? 'bg-[var(--accent)] text-white shadow-sm'
-                  : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]'
+                  : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] active:bg-[var(--muted)] active:text-[var(--foreground)]'
                 }`}
               >
                 <span className="hidden md:inline text-[12px] shrink-0" style={{ opacity: subView === sub.id ? 1 : 0.65 }}>{sub.icon || '·'}</span>

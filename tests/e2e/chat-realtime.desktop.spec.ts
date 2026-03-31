@@ -410,7 +410,6 @@ test("chat opens a room and re-clicking the room list keeps the view aligned to 
   await seedSession(page, {
     localStorage: {
       erp_last_menu: "\uCC44\uD305",
-      erp_chat_last_room: "room-1",
     },
   });
 
@@ -418,7 +417,71 @@ test("chat opens a room and re-clicking the room list keeps the view aligned to 
     `/main?${new URLSearchParams({ open_menu: "\uCC44\uD305" }).toString()}`,
   );
   await expect(page.getByTestId("chat-view")).toBeVisible();
+  await page.evaluate(() => {
+    (window as typeof window & { __chatFirstVisibleRows?: string[] | null }).__chatFirstVisibleRows = null;
+
+    const installRecorder = () => {
+      const list = document.querySelector('[data-testid="chat-message-list"]') as HTMLDivElement | null;
+      if (!list) return false;
+
+      let captured = false;
+      const capture = () => {
+        if (captured) return;
+        const listRect = list.getBoundingClientRect();
+        const visibleRows = Array.from(
+          list.querySelectorAll('[data-testid^="chat-message-row-"]')
+        )
+          .filter((node) => {
+            const rect = (node as HTMLElement).getBoundingClientRect();
+            return rect.bottom > listRect.top && rect.top < listRect.bottom;
+          })
+          .map((node) => (node as HTMLElement).dataset.testid || "");
+
+        if (visibleRows.length === 0) return;
+
+        captured = true;
+        (window as typeof window & { __chatFirstVisibleRows?: string[] | null }).__chatFirstVisibleRows = visibleRows;
+        observer.disconnect();
+        list.removeEventListener("scroll", capture);
+      };
+
+      const observer = new MutationObserver(() => {
+        window.requestAnimationFrame(capture);
+      });
+      observer.observe(list, { childList: true, subtree: true });
+      list.addEventListener("scroll", capture, { passive: true });
+      window.requestAnimationFrame(capture);
+      return true;
+    };
+
+    if (installRecorder()) return;
+
+    const timer = window.setInterval(() => {
+      if (!installRecorder()) return;
+      window.clearInterval(timer);
+    }, 16);
+  });
   await page.getByTestId("chat-room-room-1").click();
+  await expect
+    .poll(async () =>
+      page.evaluate(() =>
+        (window as typeof window & { __chatFirstVisibleRows?: string[] | null }).__chatFirstVisibleRows || []
+      ),
+    )
+    .not.toEqual([]);
+  const firstVisibleRows = await page.evaluate(() =>
+    (window as typeof window & { __chatFirstVisibleRows?: string[] | null }).__chatFirstVisibleRows || []
+  );
+  expect(
+    firstVisibleRows.some((testId: string) =>
+      ["chat-message-row-msg-long-38", "chat-message-row-msg-long-39", "chat-message-row-msg-long-40"].includes(testId)
+    )
+  ).toBe(true);
+  expect(
+    firstVisibleRows.some((testId: string) =>
+      ["chat-message-row-msg-long-1", "chat-message-row-msg-long-2", "chat-message-row-msg-long-3"].includes(testId)
+    )
+  ).toBe(false);
   await expect(page.getByTestId("chat-message-msg-long-40")).toBeVisible();
 
   await expect
