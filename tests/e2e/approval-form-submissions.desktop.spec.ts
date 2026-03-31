@@ -287,6 +287,115 @@ test('supply request template load keeps saved reference users', async ({ page }
   expect(runtimeErrors).toEqual([]);
 });
 
+test('supply request stats stay collapsed by default and only show the current department', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    staffMembers: [composeUser, approver, supportStaff],
+    approvals: [
+      {
+        id: 'approval-supply-stats-ward-1',
+        type: '물품신청',
+        title: '병동 통계 1',
+        content: '병동 거즈 신청',
+        sender_id: composeUser.id,
+        sender_name: composeUser.name,
+        sender_company: composeUser.company,
+        company_id: composeUser.company_id,
+        status: '승인',
+        created_at: '2026-03-18T09:00:00.000Z',
+        meta_data: {
+          form_slug: 'purchase',
+          form_name: '물품신청',
+          items: [
+            { name: '병동 거즈', qty: 3, dept: '병동팀', purpose: '처치 준비' },
+          ],
+        },
+      },
+      {
+        id: 'approval-supply-stats-ward-2',
+        type: '물품신청',
+        title: '병동 통계 2',
+        content: '병동 거즈 추가 신청',
+        sender_id: composeUser.id,
+        sender_name: composeUser.name,
+        sender_company: composeUser.company,
+        company_id: composeUser.company_id,
+        status: '승인',
+        created_at: '2026-03-20T09:00:00.000Z',
+        meta_data: {
+          form_slug: 'purchase',
+          form_name: '물품신청',
+          items: [
+            { name: '병동 거즈', qty: 5, dept: '병동팀', purpose: '처치 준비' },
+          ],
+        },
+      },
+      {
+        id: 'approval-supply-stats-surgery-1',
+        type: '물품신청',
+        title: '수술 통계',
+        content: '수술 포셉 신청',
+        sender_id: composeUser.id,
+        sender_name: composeUser.name,
+        sender_company: composeUser.company,
+        company_id: composeUser.company_id,
+        status: '승인',
+        created_at: '2026-03-21T09:00:00.000Z',
+        meta_data: {
+          form_slug: 'purchase',
+          form_name: '물품신청',
+          items: [
+            { name: '수술 포셉', qty: 2, dept: '수술팀', purpose: '수술 준비' },
+          ],
+        },
+      },
+    ],
+    companies: [
+      { id: 'hospital-1', name: String(composeUser.company), type: 'HOSPITAL', is_active: true },
+      { id: 'mso-company-id', name: 'SY INC.', type: 'MSO', is_active: true },
+    ],
+    inventoryItems: [
+      {
+        id: 'inventory-stats-1',
+        item_name: '병동 거즈',
+        quantity: 12,
+        stock: 12,
+        min_quantity: 2,
+        unit: 'BOX',
+        company: 'SY INC.',
+        company_id: 'mso-company-id',
+        department: '경영지원팀',
+        category: '소모품',
+        created_at: '2026-03-16T09:00:00.000Z',
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    user: composeUser,
+    localStorage: {
+      erp_last_menu: '전자결재',
+      erp_last_subview: '작성하기',
+      erp_permission_prompt_shown: '1',
+    },
+  });
+
+  await openCompose(page);
+  await page.getByTestId('approval-form-type-3').click();
+  await expect(page.getByTestId('supplies-add-row-button')).toBeVisible();
+  await expect(page.getByTestId('supplies-stats-panel')).toHaveCount(0);
+  await expect(page.getByTestId('supplies-stats-summary')).toContainText('병동팀');
+
+  await page.getByTestId('supplies-stats-toggle').click();
+  const statsPanel = page.getByTestId('supplies-stats-panel');
+  await expect(statsPanel).toBeVisible();
+  await expect(statsPanel.getByText('병동 거즈')).toBeVisible();
+  await expect(statsPanel.getByText('수술 포셉')).toHaveCount(0);
+
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('shared approval forms submit with real field input', async ({ page }) => {
   test.setTimeout(180_000);
 

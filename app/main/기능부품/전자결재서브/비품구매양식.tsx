@@ -37,7 +37,8 @@ type SuppliesFormProps = {
   user?: Record<string, unknown> | null;
 };
 
-const MONTHLY_STATS_LIMIT = 8;
+const MONTHLY_STATS_VISIBLE_LIMIT = 8;
+const MONTHLY_STATS_FETCH_LIMIT = 200;
 const DEPARTMENTS = ['병동부', '수술부', '외래부', '검사실', '총무부', '원무부', '진료부', '관리팀', '영양팀'];
 
 function defaultRow(overrides: Partial<Omit<SupplyRow, 'suggestions'>> = {}): SupplyRow {
@@ -111,6 +112,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
   const [inventory, setInventory] = useState<any[]>([]);
   const [monthlySuggestions, setMonthlySuggestions] = useState<SupplyRequestMonthlySuggestion[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [statsExpanded, setStatsExpanded] = useState(false);
 
   const inventoryCatalog = useMemo(() => {
     const merged = new Map<string, InventoryCatalogItem>();
@@ -183,7 +185,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
 
       const nextSuggestions = buildSupplyRequestMonthlySuggestions(
         (data || []).filter((row) => String(row?.status || '').trim() !== '반려'),
-        MONTHLY_STATS_LIMIT,
+        MONTHLY_STATS_FETCH_LIMIT,
       );
       setMonthlySuggestions(nextSuggestions);
       setStatsLoading(false);
@@ -217,6 +219,54 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
       inventory_source_department: INVENTORY_SUPPORT_DEPARTMENT,
     });
   }, [items, setExtraData]);
+
+  const departmentOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        [
+          ...DEPARTMENTS,
+          String(user?.department || '').trim(),
+          String(user?.team || '').trim(),
+          ...items.map((item) => String(item.dept || '').trim()),
+          ...monthlySuggestions.map((suggestion) => String(suggestion.dept || '').trim()),
+        ].filter(Boolean),
+      ),
+    );
+  }, [items, monthlySuggestions, user?.department, user?.team]);
+
+  const statsTargetDepartment = useMemo(() => {
+    const normalizedBulkDept = String(bulkDept || '').trim();
+    if (normalizedBulkDept) return normalizedBulkDept;
+
+    const currentUserDepartment = String(user?.department || user?.team || '').trim();
+    if (currentUserDepartment) return currentUserDepartment;
+
+    return items
+      .map((item) => String(item.dept || '').trim())
+      .find(Boolean) || '';
+  }, [bulkDept, items, user?.department, user?.team]);
+
+  const scopedMonthlySuggestions = useMemo(() => {
+    const normalizedDepartment = statsTargetDepartment.toLowerCase();
+    if (!normalizedDepartment) return [];
+
+    return monthlySuggestions
+      .filter((suggestion) => String(suggestion.dept || '').trim().toLowerCase() === normalizedDepartment)
+      .slice(0, MONTHLY_STATS_VISIBLE_LIMIT);
+  }, [monthlySuggestions, statsTargetDepartment]);
+
+  const statsSummaryText = useMemo(() => {
+    if (!statsTargetDepartment) {
+      return '사용 부서를 선택하면 해당 부서 기준 통계를 볼 수 있습니다.';
+    }
+    if (statsLoading) {
+      return `${statsTargetDepartment} 기준 최근 30일 통계를 불러오는 중입니다.`;
+    }
+    if (scopedMonthlySuggestions.length === 0) {
+      return `${statsTargetDepartment} 기준 최근 30일 통계가 없습니다.`;
+    }
+    return `${statsTargetDepartment} 기준 추천 ${scopedMonthlySuggestions.length}개`;
+  }, [scopedMonthlySuggestions.length, statsLoading, statsTargetDepartment]);
 
   const handleSearch = (index: number, value: string) => {
     const keyword = value.trim().toLowerCase();
@@ -289,8 +339,13 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
   };
 
   const applyMonthlyStats = () => {
-    if (monthlySuggestions.length === 0) {
-      toast('최근 30일 기준 추천 물품 통계가 아직 없습니다.', 'warning');
+    if (!statsTargetDepartment) {
+      toast('사용 부서를 선택하면 부서별 통계를 불러올 수 있습니다.', 'warning');
+      return;
+    }
+
+    if (scopedMonthlySuggestions.length === 0) {
+      toast(`${statsTargetDepartment} 부서의 최근 30일 추천 통계가 아직 없습니다.`, 'warning');
       return;
     }
 
@@ -298,7 +353,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
       const meaningfulRows = prev.filter(hasMeaningfulRow);
       const nextRows = meaningfulRows.length > 0 ? [...meaningfulRows] : [];
 
-      monthlySuggestions.forEach((suggestion) => {
+      scopedMonthlySuggestions.forEach((suggestion) => {
         const matchedInventory = inventoryCatalog.find(
           (entry) => entry.name.toLowerCase() === suggestion.name.toLowerCase(),
         );
@@ -334,7 +389,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
       return nextRows.length > 0 ? nextRows : [defaultRow()];
     });
 
-    toast('최근 사용 통계 기준으로 자주 신청한 물품을 채웠습니다.', 'success');
+    toast(`${statsTargetDepartment} 부서 통계 기준으로 자주 신청한 물품을 채웠습니다.`, 'success');
   };
 
   return (
@@ -369,7 +424,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
             type="button"
             data-testid="supplies-stats-fill-button"
             onClick={applyMonthlyStats}
-            disabled={statsLoading || monthlySuggestions.length === 0}
+            disabled={statsLoading || scopedMonthlySuggestions.length === 0}
             className="inline-flex items-center justify-center gap-1 rounded-full bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-40"
           >
             통계치 입력
@@ -384,7 +439,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
               className="min-h-[44px] rounded-[var(--radius-md)] border-none bg-[var(--card)] px-3 py-2 text-[13px] font-bold text-[var(--foreground)] shadow-sm outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
             >
               <option value="">선택...</option>
-              {DEPARTMENTS.map((department) => (
+              {departmentOptions.map((department) => (
                 <option key={department} value={department}>
                   {department}
                 </option>
@@ -402,54 +457,79 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
         </div>
       </div>
 
-      {(statsLoading || monthlySuggestions.length > 0) ? (
-        <div className="border-b border-[var(--border)] bg-[var(--background)]/35 px-3 py-3">
-          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-            <div>
-              <p className="text-[12px] font-black text-[var(--foreground)]">통계치 입력</p>
-              <p className="mt-1 text-[11px] font-semibold leading-relaxed text-[var(--toss-gray-3)]">
-                최근 30일 물품신청 기준으로 자주 쓰는 품목을 평균 수량으로 추천합니다.
-              </p>
-            </div>
-            {!statsLoading && monthlySuggestions.length > 0 ? (
-              <p className="text-[11px] font-semibold text-[var(--accent)]">추천 {monthlySuggestions.length}개</p>
-            ) : null}
+      <div className="border-b border-[var(--border)] bg-[var(--background)]/35 px-3 py-3">
+        <button
+          type="button"
+          data-testid="supplies-stats-toggle"
+          aria-expanded={statsExpanded}
+          onClick={() => setStatsExpanded((prev) => !prev)}
+          className="flex w-full items-center justify-between gap-3 text-left"
+        >
+          <div className="min-w-0">
+            <p className="text-[12px] font-black text-[var(--foreground)]">부서별 통계치 입력</p>
+            <p
+              data-testid="supplies-stats-summary"
+              className="mt-1 text-[11px] font-semibold leading-relaxed text-[var(--toss-gray-3)]"
+            >
+              {statsSummaryText}
+            </p>
           </div>
+          <span className="shrink-0 rounded-full bg-[var(--card)] px-3 py-1.5 text-[11px] font-bold text-[var(--accent)] shadow-sm">
+            {statsExpanded ? '접기' : '펼치기'}
+          </span>
+        </button>
 
-          {statsLoading ? (
-            <div className="mt-3 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)] px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)]">
-              추천 품목을 불러오는 중입니다.
-            </div>
-          ) : (
-            <div className="mt-3 grid gap-2 md:grid-cols-2">
-              {monthlySuggestions.map((suggestion, index) => (
-                <div
-                  key={suggestion.key}
-                  data-testid={`supplies-stats-item-${index}`}
-                  className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-[12px] font-black text-[var(--foreground)]">{suggestion.name}</p>
-                      <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                        {suggestion.dept || '부서 미지정'}
-                        {suggestion.purpose ? ` · ${suggestion.purpose}` : ''}
-                      </p>
+        {statsExpanded ? (
+          <div data-testid="supplies-stats-panel" className="mt-3">
+            {!statsTargetDepartment ? (
+              <div
+                data-testid="supplies-stats-empty"
+                className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)] px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)]"
+              >
+                사용 부서를 먼저 선택하면 해당 부서 기준 추천 통계를 볼 수 있습니다.
+              </div>
+            ) : statsLoading ? (
+              <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)] px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                {statsTargetDepartment} 기준 추천 품목을 불러오는 중입니다.
+              </div>
+            ) : scopedMonthlySuggestions.length === 0 ? (
+              <div
+                data-testid="supplies-stats-empty"
+                className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)] px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)]"
+              >
+                {statsTargetDepartment} 기준 최근 30일 추천 통계가 없습니다.
+              </div>
+            ) : (
+              <div className="grid gap-2 md:grid-cols-2">
+                {scopedMonthlySuggestions.map((suggestion, index) => (
+                  <div
+                    key={suggestion.key}
+                    data-testid={`supplies-stats-item-${index}`}
+                    className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-[12px] font-black text-[var(--foreground)]">{suggestion.name}</p>
+                        <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                          {suggestion.dept || '부서 미지정'}
+                          {suggestion.purpose ? ` · ${suggestion.purpose}` : ''}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-[var(--toss-blue-light)] px-2.5 py-1 text-[11px] font-black text-[var(--accent)]">
+                        평균 {suggestion.average_qty}개
+                      </span>
                     </div>
-                    <span className="shrink-0 rounded-full bg-[var(--toss-blue-light)] px-2.5 py-1 text-[11px] font-black text-[var(--accent)]">
-                      평균 {suggestion.average_qty}개
-                    </span>
+                    <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                      <span className="rounded-full bg-[var(--muted)] px-2 py-1">문서 {suggestion.document_count}건</span>
+                      <span className="rounded-full bg-[var(--muted)] px-2 py-1">합계 {suggestion.total_qty}개</span>
+                    </div>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                    <span className="rounded-full bg-[var(--muted)] px-2 py-1">문서 {suggestion.document_count}건</span>
-                    <span className="rounded-full bg-[var(--muted)] px-2 py-1">합계 {suggestion.total_qty}개</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : null}
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </div>
 
       <div className="bg-[var(--tab-bg)]/20 p-2 md:p-3">
         <div className="space-y-3 md:hidden">
@@ -546,7 +626,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
                       className="h-12 w-full rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-3 text-sm font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                     >
                       <option value="">부서 선택</option>
-                      {DEPARTMENTS.map((department) => (
+                      {departmentOptions.map((department) => (
                         <option key={department} value={department}>
                           {department}
                         </option>
@@ -677,7 +757,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
                       className="h-10 w-full max-w-[88px] rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-1.5 text-[10px] font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                     >
                       <option value="">부서 선택</option>
-                      {DEPARTMENTS.map((department) => (
+                      {departmentOptions.map((department) => (
                         <option key={department} value={department}>
                           {department}
                         </option>
