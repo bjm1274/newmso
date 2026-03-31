@@ -143,6 +143,8 @@ type ExtraFeaturesProps = {
   user?: any;
   staffs?: any[];
   posts?: any[];
+  selectedCo?: string | null;
+  selectedCompanyId?: string | null;
   onSearchSelect?: (type: string, id: string) => void;
   onOpenOrgChart?: () => void;
 };
@@ -201,6 +203,8 @@ export default function ExtraFeatures({
   user,
   staffs = [],
   posts = [],
+  selectedCo,
+  selectedCompanyId,
   onSearchSelect,
 }: ExtraFeaturesProps) {
   const [subView, setSubView] = useState<string | null>(null);
@@ -451,7 +455,12 @@ export default function ExtraFeatures({
   if (subView === 'OP체크') {
     return (
       <FeatureShell onBack={() => setSubView(null)} maxWidth="max-w-7xl">
-        <OperationCheckView user={user || {}} staffs={staffs} />
+        <OperationCheckView
+          user={user || {}}
+          staffs={staffs}
+          selectedCo={selectedCo}
+          selectedCompanyId={selectedCompanyId}
+        />
       </FeatureShell>
     );
   }

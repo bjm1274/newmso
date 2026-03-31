@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { toast } from '@/lib/toast';
 import { Suspense, useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -122,6 +122,7 @@ function MainPageContent() {
       openMyPageTab: searchParams.get('open_mypage_tab')?.trim() || null,
       openPost: searchParams.get('open_post')?.trim() || null,
       openBoard: searchParams.get('open_board')?.trim() || null,
+      openApprovalId: searchParams.get('open_approval_id')?.trim() || null,
       openInventoryView: searchParams.get('open_inventory_view')?.trim() || null,
       openInventoryApproval: searchParams.get('open_inventory_approval')?.trim() || null,
       shareId: searchParams.get('share_id')?.trim() || null,
@@ -531,10 +532,11 @@ function MainPageContent() {
     const targetSubView = navigationIntent.openSubView;
     const openMyPageTab = navigationIntent.openMyPageTab;
     const openPost = navigationIntent.openPost;
+    const openApprovalId = navigationIntent.openApprovalId;
     const openInventoryView = navigationIntent.openInventoryView;
     const openInventoryApproval = navigationIntent.openInventoryApproval;
     if (!user) return;
-    if (targetMenu || targetSubView || openMyPageTab || openPost || openInventoryView || openInventoryApproval) {
+    if (targetMenu || targetSubView || openMyPageTab || openPost || openApprovalId || openInventoryView || openInventoryApproval) {
       const savedSubView =
         typeof window !== 'undefined' ? window.localStorage.getItem('erp_last_subview') : null;
       const resolvedNavigation = targetMenu
@@ -547,6 +549,12 @@ function MainPageContent() {
 
       if (resolvedMenu) setMainMenu(resolvedMenu);
       if (resolvedSubView) setSubView(resolvedSubView);
+      if (openApprovalId) {
+        setInitialApprovalIntent({
+          approvalId: openApprovalId,
+          ...(resolvedSubView ? { viewMode: resolvedSubView } : {}),
+        });
+      }
       if (targetMenu === '내정보' && openMyPageTab) {
         setInitialMyPageTab(openMyPageTab);
       }
@@ -571,6 +579,7 @@ function MainPageContent() {
     }
   }, [
     navigationIntent.openBoard,
+    navigationIntent.openApprovalId,
     navigationIntent.openInventoryApproval,
     navigationIntent.openInventoryView,
     navigationIntent.openMenu,
@@ -660,43 +669,18 @@ function MainPageContent() {
     setLoading(true);
     const u = currentUser ?? user;
     try {
-      const isMso = u?.company === 'SY INC.' || u?.permissions?.mso === true;
-      const filterCompanyName =
-        isMso
-          ? selectedCo && selectedCo !== '전체'
-            ? selectedCo
-            : null
-          : u?.company ?? null;
-      const filterCompanyId = isMso
-        ? (() => {
-            if (!filterCompanyName) return null;
-            const matchedCompanyId = companyIdByName.get(filterCompanyName) ?? null;
-            return matchedCompanyId ?? companyIdFilter ?? null;
-          })()
-        : u?.company_id;
-
       const { data: staffData } = await withMissingColumnFallback(
         async () => {
-          let staffQuery = supabase
+          return supabase
             .from('staff_members')
             .select('*')
             .order('employee_no', { ascending: true });
-          if (filterCompanyId) {
-            staffQuery = staffQuery.eq('company_id', filterCompanyId);
-          } else if (filterCompanyName) {
-            staffQuery = staffQuery.eq('company', filterCompanyName);
-          }
-          return staffQuery;
         },
         async () => {
-          let staffQuery = supabase
+          return supabase
             .from('staff_members')
             .select('*')
             .order('employee_no', { ascending: true });
-          if (filterCompanyName) {
-            staffQuery = staffQuery.eq('company', filterCompanyName);
-          }
-          return staffQuery;
         }
       );
 
@@ -706,20 +690,10 @@ function MainPageContent() {
 
       const { data: postData } = await withMissingColumnFallback(
         async () => {
-          let postQuery = supabase.from('board_posts').select('*').order('created_at', { ascending: false });
-          if (filterCompanyId) {
-            postQuery = postQuery.eq('company_id', filterCompanyId);
-          } else if (filterCompanyName) {
-            postQuery = postQuery.eq('company', filterCompanyName);
-          }
-          return postQuery;
+          return supabase.from('board_posts').select('*').order('created_at', { ascending: false });
         },
         async () => {
-          let postQuery = supabase.from('board_posts').select('*').order('created_at', { ascending: false });
-          if (filterCompanyName) {
-            postQuery = postQuery.eq('company', filterCompanyName);
-          }
-          return postQuery;
+          return supabase.from('board_posts').select('*').order('created_at', { ascending: false });
         }
       );
 
@@ -754,7 +728,7 @@ function MainPageContent() {
     } finally {
       setLoading(false);
     }
-  }, [companyIdByName, persistClientUser, selectedCo, user]);
+  }, [persistClientUser, user]);
 
   // 현재 메인 메뉴에 해당하는 서브메뉴 목록
   const isSystemMaster = hasSystemMasterPermission(user);
@@ -986,7 +960,7 @@ function MainPageContent() {
           user={user as Parameters<typeof NotificationSystem>[0]['user']}
           onOpenChatRoom={(roomId: string) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); }}
           onOpenMessage={(roomId: string, messageId: string) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); setInitialOpenMessageId(messageId); }}
-          onOpenApproval={() => setMainMenu('전자결재')}
+          onOpenApproval={handleOpenApproval}
           onOpenInventory={(intent: { view?: string | null; approvalId?: string | null } | undefined) => {
             setMainMenu('재고관리');
             setSubView(intent?.view || '현황');

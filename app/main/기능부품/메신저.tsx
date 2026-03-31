@@ -1276,6 +1276,19 @@ export default function ChatView({
           // ignore
         }
       }
+      // DB 동기화 (비동기, 실패 시 localStorage만 유지)
+      if (roomPrefsUserId) {
+        const merged = next[roomId] || {};
+        void supabase.from('chat_room_prefs').upsert({
+          user_id: roomPrefsUserId,
+          room_id: roomId,
+          pinned: merged.pinned ?? false,
+          hidden: merged.hidden ?? false,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,room_id' }).then(({ error }) => {
+          if (error) console.debug('chat_room_prefs DB sync skip:', error.message);
+        });
+      }
       return next;
     });
   }, [roomPrefsUserId]);
@@ -1571,6 +1584,7 @@ export default function ChatView({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    // 1) localStorage에서 즉시 로드 (빠른 초기화)
     try {
       const raw = window.localStorage.getItem(getRoomPrefsStorageKey(roomPrefsUserId));
       setRoomPrefs(raw ? JSON.parse(raw) : {});
@@ -1583,6 +1597,27 @@ export default function ChatView({
       setPinnedRoomOrder(Array.isArray(parsedPinnedOrder) ? parsedPinnedOrder.map((value) => String(value)) : []);
     } catch {
       setPinnedRoomOrder([]);
+    }
+    // 2) DB에서 최신 설정 로드 (chat_room_prefs 테이블이 없으면 graceful skip)
+    if (roomPrefsUserId) {
+      void supabase
+        .from('chat_room_prefs')
+        .select('room_id, pinned, hidden')
+        .eq('user_id', roomPrefsUserId)
+        .then(({ data, error }) => {
+          if (error || !Array.isArray(data) || data.length === 0) return;
+          const dbPrefs: Record<string, RoomPreference> = {};
+          data.forEach((row: Record<string, unknown>) => {
+            const rid = String(row.room_id || '');
+            if (rid) dbPrefs[rid] = { pinned: Boolean(row.pinned), hidden: Boolean(row.hidden) };
+          });
+          if (Object.keys(dbPrefs).length > 0) {
+            setRoomPrefs(dbPrefs);
+            try {
+              window.localStorage.setItem(getRoomPrefsStorageKey(roomPrefsUserId), JSON.stringify(dbPrefs));
+            } catch { /* ignore */ }
+          }
+        });
     }
   }, [roomPrefsUserId]);
 
@@ -1812,8 +1847,18 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           cursorMap[c.room_id as string] = c.last_read_at as string | null;
         });
 
+        // 현재 열린 대화방 ID 세트 사전 계산 — DB 조회 없이 즉시 0 처리 (race condition 방지)
+        const activeRoomId = pendingBottomAlignRoomIdRef.current || selectedRoomIdRef.current;
+        const openConversationRoomIds = getConversationRoomIdSet(
+          activeRoomId,
+          myRooms as ChatRoom[]
+        );
         const countEntries = await Promise.all(
           roomIds.map(async (roomId) => {
+            // 현재 열린 방은 항상 0 — 커서 미반영 race condition 방지
+            if (openConversationRoomIds.has(roomId) || roomId === activeRoomId) {
+              return [roomId, 0] as const;
+            }
             const last = cursorMap[roomId];
             let query = supabase
               .from('messages')
@@ -1827,16 +1872,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           })
         );
         const counts = Object.fromEntries(countEntries);
-        const activeRoomId = pendingBottomAlignRoomIdRef.current || selectedRoomIdRef.current;
-        const openConversationRoomIds = getConversationRoomIdSet(
-          activeRoomId,
-          myRooms as ChatRoom[]
-        );
-        if (openConversationRoomIds.size > 0) {
-          openConversationRoomIds.forEach((roomId) => {
-            counts[roomId] = 0;
-          });
-        }
+        // myRooms에 없는 활성 방도 0 보장
+        if (activeRoomId) counts[activeRoomId] = 0;
+        openConversationRoomIds.forEach((id) => { counts[id] = 0; });
         setRoomUnreadCounts(counts);
       } catch (e) {
         console.error('채팅방별 안읽은 메시지 계산 실패:', e);
@@ -2633,7 +2671,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, () => fetchData())
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'room_read_cursors', filter: `room_id=eq.${selectedRoomId}` }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'room_read_cursors', filter: `room_id=eq.${selectedRoomId}` }, (payload: Record<string, unknown>) => {
+        // 자신의 커서 업데이트는 낙관적으로 처리됨 — full refetch 생략하여 메시지 수신 지연 방지
+        const updatedUserId = (payload.new as Record<string, unknown> | null)?.user_id;
+        if (updatedUserId && String(updatedUserId) === String(user?.id || '')) return;
+        fetchData();
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reads' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_bookmarks', filter: `user_id=eq.${effectiveTodoUserId || user?.id}` }, () => fetchData())

@@ -56,6 +56,19 @@ const templateReferenceStaff = {
   role: 'staff',
 };
 
+const externalReferenceStaff = {
+  ...fakeUser,
+  id: 'approval-external-reference-1',
+  employee_no: 'APR-023',
+  name: '타법인 참조자',
+  company: '다른병원',
+  company_id: 'hospital-2',
+  department: '행정팀',
+  team: '행정팀',
+  position: '사원',
+  role: 'staff',
+};
+
 const supportDirector = {
   ...fakeUser,
   id: 'approval-support-director-1',
@@ -240,6 +253,39 @@ test('hospital compose includes SY INC. approvers in approval line options acros
 
   await approverSelect.selectOption(supportDirectorWithLegacyCompanyName.id);
   await expect(page.getByText(`1. ${supportDirectorWithLegacyCompanyName.name} ${supportDirectorWithLegacyCompanyName.position}`)).toBeVisible();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('approval reference select includes staff from other companies', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    staffMembers: [composeUser, approver, supportStaff, externalReferenceStaff],
+    approvals: [],
+    companies: [
+      { id: 'hospital-1', name: String(composeUser.company), type: 'HOSPITAL', is_active: true },
+      { id: 'hospital-2', name: String(externalReferenceStaff.company), type: 'HOSPITAL', is_active: true },
+      { id: 'mso-company-id', name: 'SY INC.', type: 'MSO', is_active: true },
+    ],
+  });
+
+  await seedSession(page, {
+    user: composeUser,
+    localStorage: {
+      erp_permission_prompt_shown: '1',
+    },
+  });
+
+  await openCompose(page);
+
+  const ccSelect = page.getByTestId('approval-cc-select');
+  const externalOption = ccSelect.locator('option', { hasText: externalReferenceStaff.name });
+  await expect(externalOption).toHaveCount(1);
+  await expect(externalOption).toContainText(String(externalReferenceStaff.company));
+
+  await ccSelect.selectOption(externalReferenceStaff.id);
+  await expect(page.getByText(`CC ${externalReferenceStaff.name}`)).toBeVisible();
 
   expect(runtimeErrors).toEqual([]);
 });

@@ -49,6 +49,36 @@ interface SalaryRecord {
   advance_pay?: number;
 }
 
+type SalaryHistoryItem = { year_month: string; net_pay: number };
+
+function SalaryTrendChart({ history }: { history: SalaryHistoryItem[] }) {
+  if (history.length < 2) return null;
+  const maxPay = Math.max(...history.map((h) => h.net_pay));
+  const minPay = Math.min(...history.map((h) => h.net_pay));
+  const range = maxPay - minPay || maxPay;
+
+  return (
+    <div className="mx-4 mt-3 mb-0 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3">
+      <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">최근 급여 추이</p>
+      <div className="flex h-14 items-end gap-1">
+        {history.map((item) => {
+          const heightPct = range > 0 ? ((item.net_pay - minPay) / range) * 70 + 30 : 60;
+          const label = item.year_month.slice(5, 7) + '월';
+          return (
+            <div key={item.year_month} className="flex flex-1 flex-col items-center gap-0.5">
+              <span className="text-[9px] text-[var(--accent)] font-semibold">
+                {(item.net_pay / 10000).toFixed(0)}만
+              </span>
+              <div className="w-full rounded-t-sm bg-[var(--accent)]/70 transition-all" style={{ height: `${heightPct}%` }} title={`${item.year_month}: ${item.net_pay.toLocaleString()}원`} />
+              <span className="text-[9px] text-[var(--toss-gray-3)]">{label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function SalarySlipContainer({ user }: Record<string, unknown>) {
   const _user = normalizeStaffLike((user ?? {}) as Record<string, unknown>);
   const [resolvedUser, setResolvedUser] = useState<Record<string, unknown>>(_user);
@@ -58,6 +88,7 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
   const [verifying, setVerifying] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [salaryData, setSalaryData] = useState<Record<string, unknown> | null>(null);
+  const [salaryHistory, setSalaryHistory] = useState<SalaryHistoryItem[]>([]);
   const effectiveUserId = getStaffLikeId(resolvedUser);
 
   useEffect(() => {
@@ -165,6 +196,28 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
     fetchSalaryRecord();
   }, [effectiveUserId, selectedYearMonth]);
 
+  // 급여 추이: 최근 6개월 net_pay 조회 (잠금 해제 후)
+  useEffect(() => {
+    if (!unlocked || !effectiveUserId) return;
+    const fetchHistory = async () => {
+      const { data } = await supabase
+        .from('payroll_records')
+        .select('year_month, net_pay')
+        .eq('staff_id', effectiveUserId)
+        .order('year_month', { ascending: false })
+        .limit(6);
+      if (Array.isArray(data) && data.length > 0) {
+        setSalaryHistory(
+          [...data]
+            .reverse()
+            .map((r) => ({ year_month: String(r.year_month || ''), net_pay: Number(r.net_pay || 0) }))
+            .filter((r) => r.net_pay > 0)
+        );
+      }
+    };
+    void fetchHistory();
+  }, [unlocked, effectiveUserId]);
+
   const handlePrint = () => { window.print(); };
 
   /* 암호 미확인 시 비밀번호 입력 화면 */
@@ -250,6 +303,8 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
             🖨️ A4 한 장에 맞춰 인쇄
           </button>
         </div>
+
+        {salaryHistory.length >= 2 && <SalaryTrendChart history={salaryHistory} />}
 
         <div className="flex-1 overflow-auto bg-[var(--muted)] p-4 sm:p-5 lg:p-5 flex justify-center custom-scrollbar">
           <div id="print-section" className="w-full max-w-7xl print:max-w-none print:w-full mx-auto shadow-sm print:shadow-none bg-[var(--card)] print:bg-transparent overflow-visible">

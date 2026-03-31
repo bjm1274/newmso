@@ -20,6 +20,7 @@ type OrderRecord = {
   status: string;
   total_amount: number;
   notes: string | null;
+  expected_delivery_date?: string | null;
   requestTitle?: string | null;
   requesterName?: string | null;
   sourceApprovalId?: string | null;
@@ -43,11 +44,26 @@ function normalizePurchaseOrderRecord(order: any): OrderRecord {
     status: String(order?.status || '대기'),
     total_amount: Number(order?.total_amount || 0),
     notes: typeof order?.notes === 'string' ? order.notes : null,
+    expected_delivery_date: typeof order?.expected_delivery_date === 'string' ? order.expected_delivery_date : null,
     sourceApprovalId: items[0]?.source_supply_approval_id ? String(items[0].source_supply_approval_id) : null,
     sourceRequestIndex: Number.isInteger(Number(items[0]?.source_supply_request_index))
       ? Number(items[0].source_supply_request_index)
       : null,
   };
+}
+
+function calcDday(dateStr: string | null | undefined): { label: string; tone: string } | null {
+  if (!dateStr) return null;
+  const target = new Date(dateStr);
+  if (Number.isNaN(target.getTime())) return null;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const targetDay = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  const diffDays = Math.round((targetDay.getTime() - today.getTime()) / 86400000);
+  if (diffDays < 0) return { label: `D+${Math.abs(diffDays)} 지연`, tone: 'bg-red-500/10 text-red-600' };
+  if (diffDays === 0) return { label: 'D-day 오늘', tone: 'bg-orange-500/10 text-orange-600' };
+  if (diffDays <= 3) return { label: `D-${diffDays} 임박`, tone: 'bg-orange-500/10 text-orange-500' };
+  return { label: `D-${diffDays}`, tone: 'bg-[var(--muted)] text-[var(--toss-gray-3)]' };
 }
 
 function normalizeApprovalOrderRecord(approval: any): OrderRecord {
@@ -100,6 +116,8 @@ export default function PurchaseOrderManagement({
   const [loading, setLoading] = useState(false);
   const [lowStockItems, setLowStockItems] = useState<any[]>([]);
   const [highlightedOrderId, setHighlightedOrderId] = useState<string | null>(null);
+  const [editingDeliveryDateId, setEditingDeliveryDateId] = useState<string | null>(null);
+  const [deliveryDateInput, setDeliveryDateInput] = useState('');
 
   useEffect(() => {
     void fetchPurchaseOrders();
@@ -248,6 +266,26 @@ export default function PurchaseOrderManagement({
       await fetchPurchaseOrders();
     } catch (err) {
       toast('발주서 승인 처리에 실패했습니다.', 'error');
+    }
+  };
+
+  const handleSaveDeliveryDate = async (orderId: string) => {
+    if (!deliveryDateInput) { setEditingDeliveryDateId(null); return; }
+    try {
+      const { error } = await supabase
+        .from('purchase_orders')
+        .update({ expected_delivery_date: deliveryDateInput })
+        .eq('id', orderId);
+      if (error) throw error;
+      setOrderRecords((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, expected_delivery_date: deliveryDateInput } : o))
+      );
+      toast('입고 예정일이 저장되었습니다.', 'success');
+    } catch {
+      toast('저장에 실패했습니다.', 'error');
+    } finally {
+      setEditingDeliveryDateId(null);
+      setDeliveryDateInput('');
     }
   };
 
@@ -407,8 +445,58 @@ export default function PurchaseOrderManagement({
                     </div>
                   </div>
 
+                  {/* 입고 예정일 / D-day */}
+                  {order.sourceType === 'purchase_order' && (
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      {editingDeliveryDateId === order.id ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="date"
+                            value={deliveryDateInput}
+                            onChange={(e) => setDeliveryDateInput(e.target.value)}
+                            className="border border-[var(--border)] rounded-[var(--radius-md)] px-2 py-1 text-[11px] bg-[var(--card)] text-[var(--foreground)]"
+                          />
+                          <button
+                            onClick={() => handleSaveDeliveryDate(order.id)}
+                            className="px-2 py-1 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-[11px] font-semibold"
+                          >저장</button>
+                          <button
+                            onClick={() => setEditingDeliveryDateId(null)}
+                            className="px-2 py-1 bg-[var(--muted)] text-[var(--toss-gray-3)] rounded-[var(--radius-md)] text-[11px]"
+                          >취소</button>
+                        </div>
+                      ) : (
+                        <>
+                          {order.expected_delivery_date ? (
+                            <>
+                              <span className="text-[11px] text-[var(--toss-gray-3)]">
+                                입고예정: {order.expected_delivery_date}
+                              </span>
+                              {calcDday(order.expected_delivery_date) && (
+                                <span className={`px-2 py-0.5 rounded-[var(--radius-md)] text-[11px] font-bold ${calcDday(order.expected_delivery_date)!.tone}`}>
+                                  {calcDday(order.expected_delivery_date)!.label}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-[11px] text-[var(--toss-gray-3)]">입고 예정일 미설정</span>
+                          )}
+                          <button
+                            onClick={() => {
+                              setEditingDeliveryDateId(order.id);
+                              setDeliveryDateInput(order.expected_delivery_date || '');
+                            }}
+                            className="px-2 py-0.5 rounded-[var(--radius-md)] text-[11px] border border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
+                          >
+                            {order.expected_delivery_date ? '수정' : '날짜 설정'}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+
                   {order.notes && (
-                    <p className="text-[11px] leading-5 text-[var(--toss-gray-3)] whitespace-pre-line">
+                    <p className="text-[11px] leading-5 text-[var(--toss-gray-3)] whitespace-pre-line mt-2">
                       {order.notes}
                     </p>
                   )}
