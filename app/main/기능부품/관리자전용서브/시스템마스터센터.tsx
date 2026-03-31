@@ -332,6 +332,13 @@ function prettyJson(value: unknown) {
   }
 }
 
+function formatDateTime(value: unknown) {
+  const raw = String(value || '').trim();
+  if (!raw) return '-';
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? raw : parsed.toLocaleString('ko-KR');
+}
+
 function formatPushPlatformLabel(platform: unknown) {
   const normalized = String(platform || '').trim();
   if (!normalized || normalized === 'unknown') return '미분류';
@@ -357,7 +364,7 @@ export default function SystemMasterCenter({
   onRefresh,
   initialTab,
 }: {
-  user?: SystemMasterUser;
+  user?: unknown;
   staffs?: StaffMember[];
   onRefresh?: () => void;
   initialTab?: MasterTabId;
@@ -384,7 +391,9 @@ export default function SystemMasterCenter({
   const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null);
   const [opsActionLoading, setOpsActionLoading] = useState<string>('');
 
-  const isSystemMaster = hasSystemMasterPermission(user);
+  const systemMasterUser =
+    typeof user === 'object' && user !== null ? (user as SystemMasterUser) : null;
+  const isSystemMaster = hasSystemMasterPermission(systemMasterUser as Record<string, unknown> | null);
 
   useEffect(() => {
     if (!initialTab || !isSystemMaster) return;
@@ -750,11 +759,11 @@ export default function SystemMasterCenter({
                       <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-2.5 py-1 text-[10px] font-bold text-[var(--accent)]">{log.action}</span>
                       <span className="text-xs font-semibold text-[var(--foreground)]">{log.target_label}</span>
                       <span className="text-[11px] text-[var(--toss-gray-3)]">{log.actor_label || '-'}</span>
-                      <span className="text-[11px] text-[var(--toss-gray-3)]">{new Date(log.created_at).toLocaleString('ko-KR')}</span>
+                      <span className="text-[11px] text-[var(--toss-gray-3)]">{formatDateTime(log.created_at)}</span>
                     </div>
-                    {log.changed_fields?.length > 0 && (
+                    {(log.changed_fields?.length ?? 0) > 0 && (
                       <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">
-                        변경 필드: {log.changed_fields.join(', ')}
+                        변경 필드: {log.changed_fields?.join(', ')}
                       </p>
                     )}
                   </div>
@@ -862,7 +871,7 @@ export default function SystemMasterCenter({
                   <p className="mt-1 text-xs text-[var(--toss-gray-3)]">푸시 큐, 구독 정리, 백업 지연 같은 운영 이슈를 즉시 확인합니다.</p>
                 </div>
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                  마지막 갱신 {operations.checkedAt ? new Date(String(operations.checkedAt)).toLocaleString('ko-KR') : '-'}
+                  마지막 갱신 {formatDateTime(operations.checkedAt)}
                 </p>
               </div>
               <div className="mt-4 space-y-3">
@@ -976,7 +985,7 @@ export default function SystemMasterCenter({
                         {(operations.subscriptions?.recentSubscriptions || []).slice(0, 4).map((entry) => (
                           <div key={String(entry.id)} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2">
                             <p className="text-[11px] font-semibold text-[var(--foreground)]">{formatPushPlatformLabel(entry.platform)} · {entry.has_fcm ? 'FCM 포함' : 'Web Push'}</p>
-                            <p className="mt-1 text-[10px] text-[var(--toss-gray-3)]">{entry.created_at ? new Date(String(entry.created_at)).toLocaleString('ko-KR') : '-'}</p>
+                            <p className="mt-1 text-[10px] text-[var(--toss-gray-3)]">{formatDateTime(entry.created_at)}</p>
                           </div>
                         ))}
                       </div>
@@ -1026,7 +1035,7 @@ export default function SystemMasterCenter({
                 {(operations.recentBackups || []).map((backup) => (
                   <div key={backup.name} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
                     <p className="text-sm font-bold text-[var(--foreground)]">{backup.name}</p>
-                    <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{new Date(backup.created_at).toLocaleString('ko-KR')}</p>
+                    <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{formatDateTime(backup.created_at)}</p>
                   </div>
                 ))}
               </div>
@@ -1043,13 +1052,13 @@ export default function SystemMasterCenter({
                         {run.status === 'completed' ? '완료' : run.status === 'failed' ? '실패' : '진행'}
                       </span>
                     </div>
-                    <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{run.started_at ? new Date(run.started_at).toLocaleString('ko-KR') : '-'}</p>
+                    <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{formatDateTime(run.started_at)}</p>
                   </div>
                 ))}
                 {(operations.wiki?.recentVersions || []).slice(0, 2).map((version) => (
                   <div key={version.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
                     <p className="text-sm font-bold text-[var(--foreground)]">{version.title}</p>
-                    <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">버전 {Number(version.version_no || 0).toLocaleString('ko-KR')} · {version.created_at ? new Date(version.created_at).toLocaleString('ko-KR') : '-'}</p>
+                    <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">버전 {Number(version.version_no || 0).toLocaleString('ko-KR')} · {formatDateTime(version.created_at)}</p>
                   </div>
                 ))}
               </div>
@@ -1066,7 +1075,7 @@ export default function SystemMasterCenter({
                         {Number(entry.count || 0).toLocaleString('ko-KR')}건
                       </span>
                     </div>
-                    <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">최근 액션 {entry.topAction || '-'} · {entry.latestAt ? new Date(entry.latestAt).toLocaleString('ko-KR') : '-'}</p>
+                    <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">최근 액션 {entry.topAction || '-'} · {formatDateTime(entry.latestAt)}</p>
                   </div>
                 ))}
               </div>
@@ -1121,11 +1130,11 @@ export default function SystemMasterCenter({
                     </div>
                     <h4 className="mt-3 text-sm font-bold text-[var(--foreground)]">{log.target_label}</h4>
                     <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
-                      실행자 {log.actor_label || '-'} · {new Date(log.created_at).toLocaleString('ko-KR')}
+                      실행자 {log.actor_label || '-'} · {formatDateTime(log.created_at)}
                     </p>
-                    {log.changed_fields?.length > 0 && (
+                    {(log.changed_fields?.length ?? 0) > 0 && (
                       <p className="mt-2 text-[11px] font-semibold text-[var(--foreground)]">
-                        변경 필드: {log.changed_fields.join(', ')}
+                        변경 필드: {log.changed_fields?.join(', ')}
                       </p>
                     )}
                   </div>
@@ -1179,7 +1188,7 @@ export default function SystemMasterCenter({
                       <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-2.5 py-1 text-[10px] font-bold text-[var(--accent)]">{log.target_label}</span>
                       <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-4)]">{log.actor_label || '-'}</span>
                     </div>
-                    <p className="mt-3 text-[11px] text-[var(--toss-gray-3)]">{new Date(log.created_at).toLocaleString('ko-KR')}</p>
+                    <p className="mt-3 text-[11px] text-[var(--toss-gray-3)]">{formatDateTime(log.created_at)}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {(log.permission_summary?.enabled || []).map((key: string) => (
                         <span key={`on-${key}`} className="rounded-full bg-green-500/20 px-2.5 py-1 text-[10px] font-bold text-green-700">+ {key}</span>
@@ -1312,14 +1321,14 @@ export default function SystemMasterCenter({
                       const flagged = message.content && hasBanned(message.content, bannedWords);
                       return (
                         <tr key={message.id} className={`border-t border-[var(--border)] align-top ${flagged ? 'bg-red-500/10' : ''}`}>
-                          <td className="w-[230px] px-4 py-4 align-top text-[var(--toss-gray-4)] whitespace-nowrap">{new Date(message.created_at).toLocaleString('ko-KR')}</td>
+                          <td className="w-[230px] px-4 py-4 align-top text-[var(--toss-gray-4)] whitespace-nowrap">{formatDateTime(message.created_at)}</td>
                           <td className="w-[180px] px-4 py-4 align-top">
-                            <p className="truncate whitespace-nowrap break-keep font-semibold text-[var(--foreground)]" title={message.room_label}>{message.room_label}</p>
+                            <p className="truncate whitespace-nowrap break-keep font-semibold text-[var(--foreground)]" title={message.room_label || undefined}>{message.room_label}</p>
                             {message.edited_at && <p className="mt-1 text-[11px] text-amber-600">수정됨</p>}
                             {message.is_deleted && <p className="mt-1 text-[11px] text-red-500">삭제 처리</p>}
                           </td>
                           <td className="w-[180px] px-4 py-4 align-top">
-                            <p className="truncate whitespace-nowrap break-keep font-semibold text-[var(--foreground)]" title={message.sender_name}>{message.sender_name}</p>
+                            <p className="truncate whitespace-nowrap break-keep font-semibold text-[var(--foreground)]" title={message.sender_name || undefined}>{message.sender_name}</p>
                             <p className="mt-1 truncate whitespace-nowrap break-keep text-[11px] text-[var(--toss-gray-3)]" title={message.sender_company || '-'}>{message.sender_company || '-'}</p>
                           </td>
                           <td className="break-words px-4 py-4 align-top leading-6 text-[var(--foreground)]">
@@ -1373,7 +1382,7 @@ export default function SystemMasterCenter({
               <div>
                 <h3 className="text-base font-bold text-[var(--foreground)]">DB 정합성 점검 도구</h3>
                 <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
-                  마지막 점검 시각: {integrityReport?.checkedAt ? new Date(String(integrityReport.checkedAt)).toLocaleString('ko-KR') : '-'}
+                  마지막 점검 시각: {formatDateTime(integrityReport?.checkedAt)}
                 </p>
               </div>
               <button
@@ -1484,7 +1493,7 @@ export default function SystemMasterCenter({
               {' '}시스템마스터 계정 전용 기능입니다. 자동 부여 규칙과 별개로 직원별 연차 총량과 사용량을 직접 조정합니다.
             </p>
           </div>
-          <AnnualLeaveManualGrant user={user} staffs={staffs} onRefresh={onRefresh} />
+          <AnnualLeaveManualGrant user={systemMasterUser} staffs={staffs} onRefresh={onRefresh} />
         </section>
       )}
     </div>
