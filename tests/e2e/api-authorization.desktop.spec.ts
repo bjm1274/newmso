@@ -16,6 +16,16 @@ function mockSessionRoute(page: Page, user: Record<string, unknown>) {
   });
 }
 
+function buildRestrictedUser(permissionOverrides: Record<string, boolean>) {
+  return {
+    ...fakeUser,
+    permissions: {
+      ...fakeUser.permissions,
+      ...permissionOverrides,
+    },
+  };
+}
+
 test('verify-password rejects identifiers from a different user', async ({ page }) => {
   await seedSession(page, { user: fakeUser });
   await mockSessionRoute(page, fakeUser);
@@ -44,14 +54,10 @@ test('verify-password rejects identifiers from a different user', async ({ page 
 });
 
 test('deposit API rejects authenticated users without extra menu access', async ({ page }) => {
-  const restrictedUser = {
-    ...fakeUser,
-    permissions: {
-      ...fakeUser.permissions,
-      menu_추가기능: false,
-      extra_입금실시간조회: false,
-    },
-  };
+  const restrictedUser = buildRestrictedUser({
+    menu_추가기능: false,
+    extra_입금실시간조회: false,
+  });
 
   await seedSession(page, { user: restrictedUser });
   await mockSessionRoute(page, restrictedUser);
@@ -71,4 +77,98 @@ test('deposit API rejects authenticated users without extra menu access', async 
 
   expect(result.status).toBe(403);
   expect(result.payload?.error).toBe('권한이 없습니다.');
+});
+
+test('discharge review API rejects authenticated users without extra feature access', async ({ page }) => {
+  const restrictedUser = buildRestrictedUser({
+    menu_추가기능: false,
+    extra_퇴원심사: false,
+  });
+
+  await seedSession(page, { user: restrictedUser });
+  await mockSessionRoute(page, restrictedUser);
+  await page.goto('/');
+
+  const result = await page.evaluate(async () => {
+    const response = await fetch('/api/discharge-review', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        patientName: '테스트 환자',
+        admissionDate: '2026-03-01',
+        dischargeDate: '2026-03-02',
+        checkedItems: [],
+        allItems: [],
+      }),
+    });
+
+    return {
+      status: response.status,
+      payload: await response.json().catch(() => null),
+    };
+  });
+
+  expect(result.status).toBe(403);
+  expect(result.payload?.error).toBe('Forbidden');
+});
+
+test('consultation transcription API rejects authenticated users without extra feature access', async ({ page }) => {
+  const restrictedUser = buildRestrictedUser({
+    menu_추가기능: false,
+    extra_수술상담: false,
+  });
+
+  await seedSession(page, { user: restrictedUser });
+  await mockSessionRoute(page, restrictedUser);
+  await page.goto('/');
+
+  const result = await page.evaluate(async () => {
+    const response = await fetch('/api/consultation/transcribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        audio: 'dGVzdA==',
+        mimeType: 'audio/webm',
+      }),
+    });
+
+    return {
+      status: response.status,
+      payload: await response.json().catch(() => null),
+    };
+  });
+
+  expect(result.status).toBe(403);
+  expect(result.payload?.error).toBe('Forbidden');
+});
+
+test('board upload API rejects authenticated users without board write access', async ({ page }) => {
+  const restrictedUser = buildRestrictedUser({
+    menu_게시판: true,
+    board_공지사항_read: true,
+    board_공지사항_write: false,
+  });
+
+  await seedSession(page, { user: restrictedUser });
+  await mockSessionRoute(page, restrictedUser);
+  await page.goto('/');
+
+  const result = await page.evaluate(async () => {
+    const formData = new FormData();
+    formData.append('boardType', '공지사항');
+    formData.append('file', new File(['test'], 'memo.txt', { type: 'text/plain' }));
+
+    const response = await fetch('/api/board/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    return {
+      status: response.status,
+      payload: await response.json().catch(() => null),
+    };
+  });
+
+  expect(result.status).toBe(403);
+  expect(result.payload?.error).toBe('Forbidden');
 });

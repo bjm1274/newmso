@@ -74,6 +74,10 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(self.__erpPushShared.handleNotificationClick(event));
 });
 
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil(self.__erpPushShared.handlePushSubscriptionChange(event));
+});
+
 self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });

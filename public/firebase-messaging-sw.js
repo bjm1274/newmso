@@ -20,3 +20,7 @@ messaging.onBackgroundMessage((payload) => {
 self.addEventListener('notificationclick', (event) => {
   event.waitUntil(self.__erpPushShared.handleNotificationClick(event));
 });
+
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil(self.__erpPushShared.handlePushSubscriptionChange(event));
+});

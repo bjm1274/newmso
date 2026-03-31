@@ -71,6 +71,7 @@ const DEFAULT_CFG = { icon: '🔔', bg: 'bg-[var(--toss-gray-4)]', progress: 'bg
 const getTypeCfg = (type: string) => TYPE_CFG[type] || DEFAULT_CFG;
 
 const ACTIVE_CHAT_ROOM_SESSION_KEY = 'erp_chat_active_room';
+export const PUSH_STATUS_CHANGED_EVENT = 'erp-push-status-changed';
 
 function toNotificationText(value: unknown, fallback = '') {
   if (typeof value === 'string') return value;
@@ -150,14 +151,33 @@ function getPushDeviceIdKey(staffId?: string) {
   return `erp_push_device_id:${staffId || 'guest'}`;
 }
 
-function setPushSubscriptionActiveState(staffId: string | undefined, isActive: boolean) {
+function dispatchPushStatusChanged(staffId: string | undefined, active: boolean) {
   if (typeof window === 'undefined') return;
   try {
+    window.dispatchEvent(new CustomEvent(PUSH_STATUS_CHANGED_EVENT, {
+      detail: {
+        staffId: staffId || null,
+        active,
+      },
+    }));
+  } catch {
+    // ignore
+  }
+}
+
+function setPushSubscriptionActiveState(staffId: string | undefined, isActive: boolean) {
+  if (typeof window === 'undefined') return;
+  const storageKey = getPushSubscriptionActiveKey(staffId);
+  try {
+    const wasActive = window.localStorage.getItem(storageKey) === '1';
     if (isActive) {
-      window.localStorage.setItem(getPushSubscriptionActiveKey(staffId), '1');
-      return;
+      window.localStorage.setItem(storageKey, '1');
+    } else {
+      window.localStorage.removeItem(storageKey);
     }
-    window.localStorage.removeItem(getPushSubscriptionActiveKey(staffId));
+    if (wasActive !== isActive) {
+      dispatchPushStatusChanged(staffId, isActive);
+    }
   } catch {
     // ignore
   }
@@ -170,6 +190,59 @@ function hasPushSubscriptionActive(staffId?: string) {
   } catch {
     return false;
   }
+}
+
+export type PushConnectionStatus = {
+  supported: boolean;
+  secureContext: boolean;
+  permission: NotificationPermission | 'unsupported';
+  active: boolean;
+  hasSubscription: boolean;
+  requiresGesture: boolean;
+  standalone: boolean;
+};
+
+export async function getPushConnectionStatus(staffId?: string): Promise<PushConnectionStatus> {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+    return {
+      supported: false,
+      secureContext: false,
+      permission: 'unsupported',
+      active: false,
+      hasSubscription: false,
+      requiresGesture: false,
+      standalone: false,
+    };
+  }
+
+  const hasNotificationApi = typeof Notification !== 'undefined';
+  const hasServiceWorkerApi = 'serviceWorker' in navigator;
+  const supported = hasNotificationApi && hasServiceWorkerApi;
+  const secureContext = Boolean(window.isSecureContext);
+  const permission: NotificationPermission | 'unsupported' =
+    hasNotificationApi ? Notification.permission : 'unsupported';
+
+  let hasSubscription = false;
+  if (hasServiceWorkerApi && typeof navigator.serviceWorker.getRegistration === 'function') {
+    try {
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (registration?.pushManager) {
+        hasSubscription = Boolean(await registration.pushManager.getSubscription());
+      }
+    } catch {
+      hasSubscription = false;
+    }
+  }
+
+  return {
+    supported,
+    secureContext,
+    permission,
+    active: hasPushSubscriptionActive(staffId) || hasSubscription,
+    hasSubscription,
+    requiresGesture: supported && requiresUserGestureForPushPermission(),
+    standalone: isStandaloneWebApp(),
+  };
 }
 
 function getOrCreatePushDeviceId(staffId?: string) {
@@ -850,6 +923,28 @@ export default function NotificationSystem({
   }, [addToast, claimCrossTabDisplayNotificationAsync, effectiveUserId, syncBadge]);
 
   useEffect(() => {
+    if (!effectiveUserId) return;
+    if (typeof window === 'undefined' || typeof document === 'undefined' || typeof Notification === 'undefined') return;
+    if (Notification.permission !== 'granted') return;
+    if (hasPushSubscriptionActive(effectiveUserId)) return;
+
+    const resyncPushSubscription = () => {
+      if (document.visibilityState === 'hidden') return;
+      void initNotificationService({
+        staffId: effectiveUserId,
+        requestPermission: false,
+      });
+    };
+
+    window.addEventListener('focus', resyncPushSubscription);
+    document.addEventListener('visibilitychange', resyncPushSubscription);
+    return () => {
+      window.removeEventListener('focus', resyncPushSubscription);
+      document.removeEventListener('visibilitychange', resyncPushSubscription);
+    };
+  }, [effectiveUserId]);
+
+  useEffect(() => {
     onActionRef.current = (notif: ToastItem) => {
       removeToast(notif.id);
       const t = notif.type;
@@ -1313,18 +1408,36 @@ export default function NotificationSystem({
           body?: unknown;
           tag?: unknown;
           data?: unknown;
+          active?: unknown;
+          notificationId?: unknown;
         };
       } | null;
 
-      if (!message || message.type !== 'erp-push-preview' || !message.payload) return;
-      emitIncomingNotification(buildNotificationRowFromPushPreview(message.payload));
+      if (!message?.type) return;
+
+      if (message.type === 'erp-push-preview' && message.payload) {
+        emitIncomingNotification(buildNotificationRowFromPushPreview(message.payload));
+        return;
+      }
+
+      if (message.type === 'erp-push-subscription-refresh') {
+        setPushSubscriptionActiveState(
+          effectiveUserId,
+          message.payload?.active !== false
+        );
+        return;
+      }
+
+      if (message.type === 'erp-notification-read-sync') {
+        void syncBadge();
+      }
     };
 
     navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
     return () => {
       navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
     };
-  }, [emitIncomingNotification]);
+  }, [effectiveUserId, emitIncomingNotification, syncBadge]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !effectiveUserId) return;

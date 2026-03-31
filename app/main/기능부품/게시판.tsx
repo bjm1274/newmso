@@ -1374,6 +1374,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const uploadBoardAttachment = useCallback(async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('boardType', activeBoard);
 
     const response = await fetch('/api/board/upload', {
       method: 'POST',
@@ -1393,7 +1394,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
           (file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'file')
       ),
     };
-  }, []);
+  }, [activeBoard]);
 
   const handleNewPost = async () => {
     if (!canCreatePost) {
