@@ -5,6 +5,74 @@ test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
 });
 
+test('mobile chat room list opens the selected room at the latest message', async ({ page }) => {
+  const longMessages = Array.from({ length: 40 }, (_, index) => ({
+    id: `msg-mobile-long-${index + 1}`,
+    room_id: 'room-mobile-long',
+    sender_id: index % 2 === 0 ? fakeUser.id : 'peer-mobile-1',
+    content: `mobile long message ${index + 1}`,
+    created_at: `2026-03-08T10:${String(index).padStart(2, '0')}:00.000Z`,
+    is_deleted: false,
+    staff: { name: index % 2 === 0 ? fakeUser.name : 'Mobile Chat Peer', photo_url: null },
+  }));
+
+  await mockSupabase(page, {
+    chatRooms: [
+      {
+        id: '00000000-0000-0000-0000-000000000000',
+        name: 'Notice',
+        type: 'notice',
+        members: [],
+        created_at: '2026-03-08T00:00:00.000Z',
+        last_message_at: '2026-03-08T00:00:00.000Z',
+      },
+      {
+        id: 'room-mobile-long',
+        name: 'Mobile Long Room',
+        type: 'group',
+        members: [fakeUser.id, 'peer-mobile-1'],
+        created_at: '2026-03-08T09:00:00.000Z',
+        last_message_at: '2026-03-08T10:39:00.000Z',
+        last_message_preview: 'mobile long message 40',
+      },
+    ],
+    staffMembers: [
+      fakeUser,
+      {
+        ...fakeUser,
+        id: 'peer-mobile-1',
+        name: 'Mobile Chat Peer',
+        employee_no: 'E2E-CHAT-MOBILE-001',
+      },
+    ],
+    messages: longMessages,
+  });
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '채팅',
+    },
+  });
+
+  await page.goto(`/main?${new URLSearchParams({ open_menu: '채팅' }).toString()}`);
+  await expect(page.getByTestId('chat-view')).toBeVisible();
+  const backToRoomListButton = page.getByRole('button', { name: '뒤로' });
+  if (await backToRoomListButton.isVisible().catch(() => false)) {
+    await backToRoomListButton.click();
+  }
+
+  await page.getByTestId('chat-room-room-mobile-long').click();
+  await expect(page.getByTestId('chat-message-msg-mobile-long-40')).toBeVisible();
+
+  await expect
+    .poll(async () =>
+      page.getByTestId('chat-message-list').evaluate((node) => {
+        const el = node as HTMLDivElement;
+        return Math.abs(el.scrollHeight - el.clientHeight - el.scrollTop) <= 24;
+      }),
+    )
+    .toBe(true);
+});
+
 test('mobile main shell shows the bottom tab bar', async ({ page }) => {
   await mockSupabase(page);
   await seedSession(page);

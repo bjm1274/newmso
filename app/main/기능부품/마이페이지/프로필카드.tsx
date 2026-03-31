@@ -15,6 +15,14 @@ import { calculateApprovedAnnualLeaveUsage } from '@/lib/annual-leave-ledger';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { useActionDialog } from '@/app/components/useActionDialog';
 
+function toSafeText(value: unknown, fallback = '') {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+  return fallback;
+}
+
 export default function MyProfileCard({
   user: initialUser,
   onOpenApproval,
@@ -38,10 +46,10 @@ export default function MyProfileCard({
   const [editForm, setEditForm] = useState<{ email: string; phone: string; extension: string; address: string; bank_name: string; bank_account: string }>({
     email: ((_iu)?.email as string) || '',
     phone: ((_iu)?.phone as string) || '',
-    extension: ((_iu)?.extension as string) || ((_iu.permissions as Record<string, unknown>)?.extension as string) || '',
+    extension: toSafeText((_iu)?.extension) || toSafeText((_iu.permissions as Record<string, unknown>)?.extension) || '',
     address: ((_iu)?.address as string) || '',
-    bank_name: ((_iu)?.bank_name as string) || ((_iu.permissions as Record<string, unknown>)?.bank_name as string) || '',
-    bank_account: ((_iu)?.bank_account as string) || ((_iu.permissions as Record<string, unknown>)?.bank_account as string) || '',
+    bank_name: toSafeText((_iu)?.bank_name) || toSafeText((_iu.permissions as Record<string, unknown>)?.bank_name) || '',
+    bank_account: toSafeText((_iu)?.bank_account) || toSafeText((_iu.permissions as Record<string, unknown>)?.bank_account) || '',
   });
   // 다크모드 토글은 사용하지 않도록 제거 (항상 라이트 모드)
 
@@ -100,10 +108,10 @@ export default function MyProfileCard({
       setEditForm({
         email: (user.email as string) || '',
         phone: (user.phone as string) || '',
-        extension: (user.extension as string) || ((user.permissions as Record<string, unknown>)?.extension as string) || '',
+        extension: toSafeText(user.extension) || toSafeText((user.permissions as Record<string, unknown>)?.extension) || '',
         address: (user.address as string) || '',
-        bank_name: (user.bank_name as string) || ((user.permissions as Record<string, unknown>)?.bank_name as string) || '',
-        bank_account: (user.bank_account as string) || ((user.permissions as Record<string, unknown>)?.bank_account as string) || '',
+        bank_name: toSafeText(user.bank_name) || toSafeText((user.permissions as Record<string, unknown>)?.bank_name) || '',
+        bank_account: toSafeText(user.bank_account) || toSafeText((user.permissions as Record<string, unknown>)?.bank_account) || '',
       });
     }
   }, [user]);
@@ -392,10 +400,10 @@ export default function MyProfileCard({
     setEditForm({
       email: updatedUser.email || '',
       phone: updatedUser.phone || '',
-      extension: updatedUser.extension || updatedUser.permissions?.extension || '',
+      extension: toSafeText(updatedUser.extension) || toSafeText(updatedUser.permissions?.extension) || '',
       address: updatedUser.address || '',
-      bank_name: updatedUser.bank_name || updatedUser.permissions?.bank_name || '',
-      bank_account: updatedUser.bank_account || updatedUser.permissions?.bank_account || '',
+      bank_name: toSafeText(updatedUser.bank_name) || toSafeText(updatedUser.permissions?.bank_name) || '',
+      bank_account: toSafeText(updatedUser.bank_account) || toSafeText(updatedUser.permissions?.bank_account) || '',
     });
     localStorage.setItem('erp_user', JSON.stringify(updatedUser));
     broadcastProfileUpdate(updatedUser);
@@ -801,11 +809,12 @@ export default function MyProfileCard({
 }
 
 function InfoItem({ label, value, isMasked }: { label?: unknown; value?: unknown; isMasked?: unknown }) {
+  const displayValue = toSafeText(value, '-');
   return (
     <div className="flex flex-col gap-1">
       <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-wide">{label as string}</span>
       <span className={`text-[15px] font-bold leading-snug ${isMasked ? 'text-[var(--toss-gray-3)] tracking-widest' : 'text-[var(--foreground)]'}`}>
-        {(value as string) || '-'}
+        {displayValue || '-'}
       </span>
     </div>
   );
@@ -818,7 +827,7 @@ function EditableItem({ label, value, onChange, placeholder, testId }: { label?:
       <input
         type="text"
         data-testid={testId as string}
-        value={value as string}
+        value={toSafeText(value)}
         onChange={(e) => (onChange as (v: string) => void)(e.target.value)}
         placeholder={placeholder as string}
         className="w-full px-3 py-2.5 rounded-[var(--radius-lg)] border border-[var(--border)] text-[14px] font-semibold text-[var(--foreground)] bg-[var(--input-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)]"

@@ -1185,6 +1185,48 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     }
   };
 
+  const handleRoomListClick = (roomId: string) => {
+    const normalizedRoomId = String(roomId || '').trim();
+    const isSameRoom = normalizedRoomId !== '' && String(selectedRoomIdRef.current || '') === normalizedRoomId;
+
+    setRoom(normalizedRoomId || null);
+
+    if (!normalizedRoomId || typeof window === 'undefined') return;
+
+    const alignToLatestFromListClick = () => {
+      if (selectedRoomIdRef.current !== normalizedRoomId) return;
+
+      const listEl = messageListRef.current;
+      if (listEl) {
+        listEl.scrollTop = listEl.scrollHeight;
+      } else {
+        scrollRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+      }
+
+      if (!isMobileChatViewport()) {
+        composerRef.current?.scrollIntoView({
+          behavior: 'auto',
+          block: 'end',
+          inline: 'nearest',
+        });
+      }
+
+      isNearBottomRef.current = true;
+      setShowScrollToLatest(false);
+
+      if (isSameRoom && pendingBottomAlignRoomIdRef.current === normalizedRoomId) {
+        pendingBottomAlignRoomIdRef.current = null;
+      }
+    };
+
+    window.requestAnimationFrame(() => {
+      alignToLatestFromListClick();
+      window.requestAnimationFrame(alignToLatestFromListClick);
+    });
+    window.setTimeout(alignToLatestFromListClick, 120);
+    window.setTimeout(alignToLatestFromListClick, 260);
+  };
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -4593,7 +4635,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     <div
                       key={roomId}
                       data-testid={`chat-room-${roomId}`}
-                      onClick={() => setRoom(room.id)}
+                      onClick={() => handleRoomListClick(room.id)}
                       className={`group p-2.5 rounded-xl cursor-pointer transition-all flex items-center justify-between gap-2.5 border relative overflow-hidden ${isSelected
                         ? 'bg-zinc-800 border-zinc-700 shadow-sm'
                         : 'bg-[var(--card)] dark:bg-zinc-900 border-transparent hover:border-[var(--border)] dark:hover:border-zinc-800'

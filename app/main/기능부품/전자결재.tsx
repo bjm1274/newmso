@@ -26,8 +26,12 @@ import type { StaffMember } from '@/types';
 import {
   buildSupplyRequestWorkflowItems,
   fetchSupportInventoryRows,
+  getItemName,
+  getItemQuantity,
   INVENTORY_SUPPORT_COMPANY,
   INVENTORY_SUPPORT_DEPARTMENT,
+  normalizeSupplyRequestItems,
+  resolveInventoryDepartment,
   summarizeSupplyRequestWorkflow,
 } from '@/app/main/inventory-utils';
 import AttendanceForms from './전자결재서브/근태신청양식';
@@ -84,6 +88,23 @@ type ApprovalCcUser = {
 };
 
 type ApprovalReferenceDefaultsMap = Record<string, ApprovalCcUser[]>;
+
+type SupplyInventoryReviewRow = {
+  key: string;
+  name: string;
+  requestedQty: number;
+  supportStock: number;
+  supportShortageQty: number;
+  surgeryStock: number;
+  surgeryShortageQty: number;
+  matchedDepartments: string[];
+};
+
+type SupplyInventoryReviewState = {
+  items: Array<{ name: string; qty: number; dept: string; purpose: string }>;
+  rows: SupplyInventoryReviewRow[];
+  notice?: string | null;
+};
 
 function resolveApprovalStaffLine(line: unknown, staffs: StaffMember[] = []) {
   if (!Array.isArray(line)) return [] as StaffMember[];
@@ -338,6 +359,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const [approverLine, setApproverLine] = useState<StaffMember[]>([]);
   const [ccLine, setCcLine] = useState<ApprovalCcUser[]>([]);
   const [extraData, setExtraData] = useState<Record<string, unknown>>({});
+  const [supplyInventoryReview, setSupplyInventoryReview] = useState<SupplyInventoryReviewState | null>(null);
   const [customFormTypes, setCustomFormTypes] = useState<{ name: string; slug: string }[]>([]);
   const [formTemplateDesigns, setFormTemplateDesigns] = useState<Record<string, Record<string, unknown>>>({});
   const [lastDraftByType, setLastDraftByType] = useState<Record<string, Record<string, unknown> | null>>({});
@@ -370,6 +392,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const fetchApprovalsRef = useRef<() => void>(() => {});
   const { dialog, openConfirm, openPrompt } = useActionDialog();
   const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
+  const surgeryStockDepartmentAliases = useMemo(() => ['수술실', '수술팀'], []);
   const visibleApprovalViews = useMemo(
     () => APPROVAL_VIEWS.filter((view) => canAccessApprovalSection(user, view)),
     [user]
@@ -568,6 +591,109 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       </div>
     );
   }, [getSupplyRequestItems]);
+
+  const buildSupplyInventoryReviewRows = useCallback(
+    (
+      items: Array<{ name: string; qty: number; dept: string; purpose: string }>,
+      supportInventoryRows: any[] = [],
+      surgeryInventoryRows: any[] = [],
+    ) => {
+      const companyName = String(user?.company || '').trim();
+
+      return items.map((item, index) => {
+        const matchedSupportRows = supportInventoryRows.filter((row) => {
+          const rowName = String(getItemName(row) || '').trim().toLowerCase();
+          return rowName === item.name.trim().toLowerCase();
+        });
+
+        const matchedRows = surgeryInventoryRows.filter((row) => {
+          const rowName = String(getItemName(row) || '').trim().toLowerCase();
+          const rowDepartment = String(resolveInventoryDepartment(row) || row?.department || '').trim();
+          const rowCompany = String(row?.company || '').trim();
+
+          return (
+            rowName === item.name.trim().toLowerCase() &&
+            surgeryStockDepartmentAliases.includes(rowDepartment) &&
+            (!companyName || !rowCompany || rowCompany === companyName)
+          );
+        });
+
+        const supportStock = matchedSupportRows.reduce((sum, row) => sum + getItemQuantity(row), 0);
+        const surgeryStock = matchedRows.reduce((sum, row) => sum + getItemQuantity(row), 0);
+        const matchedDepartments = Array.from(
+          new Set(
+            matchedRows
+              .map((row) => String(resolveInventoryDepartment(row) || row?.department || '').trim())
+              .filter(Boolean),
+          ),
+        );
+
+        return {
+          key: `${item.name}-${index}`,
+          name: item.name,
+          requestedQty: item.qty,
+          supportStock,
+          supportShortageQty: Math.max(item.qty - supportStock, 0),
+          surgeryStock,
+          surgeryShortageQty: Math.max(item.qty - surgeryStock, 0),
+          matchedDepartments,
+        } satisfies SupplyInventoryReviewRow;
+      });
+    },
+    [surgeryStockDepartmentAliases, user?.company],
+  );
+
+  const prepareSupplyInventoryReview = useCallback(
+    async (items: Array<{ name: string; qty: number; dept: string; purpose: string }>) => {
+      const companyName = String(user?.company || '').trim();
+      const notices: string[] = [];
+      let supportInventoryRows: any[] = [];
+      let surgeryInventoryRows: any[] = [];
+
+      const [supportResult, surgeryResult] = await Promise.all([
+        fetchSupportInventoryRows(),
+        (async () => {
+          try {
+            let query = supabase.from('inventory').select('*');
+            if (companyName) {
+              query = query.eq('company', companyName);
+            }
+            const { data, error } = await query;
+            if (error) {
+              throw error;
+            }
+            return { data: data || [], error: null as Error | null };
+          } catch (error) {
+            return { data: [] as any[], error: error as Error };
+          }
+        })(),
+      ]);
+
+      if (supportResult.error) {
+        console.error('SY INC 경영지원팀 재고 조회 실패:', supportResult.error);
+        notices.push('SY INC 경영지원팀 재고를 불러오지 못했습니다.');
+      } else {
+        supportInventoryRows = supportResult.data || [];
+      }
+
+      if (surgeryResult.error) {
+        console.error('수술실 재고 확인용 재고 조회 실패:', surgeryResult.error);
+        notices.push('수술실 현재 재고를 불러오지 못했습니다.');
+      } else {
+        surgeryInventoryRows = surgeryResult.data || [];
+      }
+
+      setSupplyInventoryReview({
+        items,
+        rows: buildSupplyInventoryReviewRows(items, supportInventoryRows, surgeryInventoryRows),
+        notice:
+          notices.length > 0
+            ? `${notices.join(' ')} 재고 데이터 없이도 최종 신청은 진행할 수 있습니다.`
+            : null,
+      });
+    },
+    [buildSupplyInventoryReviewRows, user?.company],
+  );
 
   const formatLeaveDateLabel = useCallback((value: unknown) => {
     const raw = String(value || '').trim();
@@ -1713,6 +1839,7 @@ window.onload = () => window.print();
     setFormTitle('');
     setFormContent('');
     setExtraData({});
+    setSupplyInventoryReview(null);
   }, [formType, viewMode]);
 
   const loadLastDraft = useCallback(() => {
@@ -2493,7 +2620,7 @@ window.onload = () => window.print();
     toast('기안을 회수했고 작성하기에서 바로 수정할 수 있습니다.', 'success');
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (options?: { skipSupplyInventoryReview?: boolean }) => {
     const trimmedTitle = formTitle.trim();
     if (!user?.id) {
       toast("로그인한 직원 계정으로만 기안할 수 있습니다.");
@@ -2533,9 +2660,35 @@ window.onload = () => window.print();
       }
     }
 
+    const normalizedSupplyItems =
+      formType === '물품신청'
+        ? normalizeSupplyRequestItems(Array.isArray(extraData?.items) ? (extraData.items as any[]) : [])
+        : [];
+
+    if (formType === '물품신청') {
+      if (normalizedSupplyItems.length === 0) {
+        toast('신청할 물품을 1개 이상 입력해주세요.', 'warning');
+        return;
+      }
+
+      if (!options?.skipSupplyInventoryReview) {
+        await prepareSupplyInventoryReview(normalizedSupplyItems);
+        return;
+      }
+    }
+
     const requiredCc = formType === '물품신청' ? ['관리팀', '행정팀'] : ['행정팀'];
     const extraCc = Array.isArray(extraData?.cc_departments) ? extraData.cc_departments as string[] : [];
     const cc_departments = Array.from(new Set([...extraCc, ...requiredCc]));
+    const nextExtraData =
+      formType === '물품신청'
+        ? {
+            ...extraData,
+            items: normalizedSupplyItems,
+            inventory_source_company: INVENTORY_SUPPORT_COMPANY,
+            inventory_source_department: INVENTORY_SUPPORT_DEPARTMENT,
+          }
+        : extraData;
 
     // 문서번호 자동 채번: 연도월-타임스탬프(충돌 방지)
     const selectedCustomForm = customFormTypes.find((item) => item.slug === formType);
@@ -2568,7 +2721,7 @@ window.onload = () => window.print();
       title: formTitle,
       content: formContent || '',
       meta_data: {
-        ...extraData,
+        ...nextExtraData,
         ...(formType === '연차/휴가' ? { reason: formContent || '' } : {}),
         form_slug: resolvedFormSlug,
         form_name: resolvedFormName,
@@ -2809,6 +2962,168 @@ window.onload = () => window.print();
       data-testid="approval-view"
     >
       {dialog}
+      {supplyInventoryReview ? (
+        <div
+          data-testid="approval-supply-review-modal"
+          className="fixed inset-0 z-[410] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
+          onClick={() => setSupplyInventoryReview(null)}
+        >
+          <div
+            className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--card)] shadow-sm"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-[var(--border)] px-5 py-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-black tracking-tight text-[var(--foreground)]">
+                    재고 연동 최종 확인
+                  </h2>
+                  <p className="mt-1 text-sm leading-relaxed text-[var(--toss-gray-4)]">
+                    최종 제출 전에 SY INC 경영지원팀 보유 재고와 수술실 현재 재고를 함께 확인해 주세요.
+                  </p>
+                </div>
+                <span className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-black text-[var(--accent)]">
+                  신청 품목 {supplyInventoryReview.items.length}개
+                </span>
+              </div>
+              {supplyInventoryReview.notice ? (
+                <p className="mt-3 rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold leading-relaxed text-amber-700">
+                  {supplyInventoryReview.notice}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              <div className="hidden overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] md:block">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-[var(--muted)]">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">물품명</th>
+                      <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">신청 수량</th>
+                      <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">SY INC 경영지원팀 재고</th>
+                      <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">수술실 현재고</th>
+                      <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">상태</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {supplyInventoryReview.rows.map((row) => (
+                      <tr key={row.key} className="border-t border-[var(--border)]">
+                        <td className="px-4 py-3">
+                          <div>
+                            <p className="font-bold text-[var(--foreground)]">{row.name}</p>
+                            <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                              {row.matchedDepartments.length > 0 ? row.matchedDepartments.join(', ') : '수술실 재고 없음'}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 font-black text-[var(--foreground)]">{row.requestedQty}</td>
+                        <td className="px-4 py-3">
+                          <div className="font-black text-indigo-600">{row.supportStock}</div>
+                          <div className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                            부족 {row.supportShortageQty}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 font-black text-[var(--accent)]">{row.surgeryStock}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                              row.supportShortageQty > 0
+                                ? 'bg-amber-50 text-amber-700'
+                                : row.surgeryShortageQty > 0
+                                  ? 'bg-rose-50 text-rose-600'
+                                  : 'bg-emerald-50 text-emerald-600'
+                            }`}
+                          >
+                            {row.supportShortageQty > 0
+                              ? `경영지원팀 부족 ${row.supportShortageQty}`
+                              : row.surgeryShortageQty > 0
+                                ? `수술실 부족 ${row.surgeryShortageQty}`
+                                : '재고 확인 완료'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="space-y-3 md:hidden">
+                {supplyInventoryReview.rows.map((row) => (
+                  <div
+                    key={row.key}
+                    className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-[var(--foreground)]">{row.name}</p>
+                        <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                          {row.matchedDepartments.length > 0 ? row.matchedDepartments.join(', ') : '수술실 재고 없음'}
+                        </p>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                          row.supportShortageQty > 0
+                            ? 'bg-amber-50 text-amber-700'
+                            : row.surgeryShortageQty > 0
+                              ? 'bg-rose-50 text-rose-600'
+                              : 'bg-emerald-50 text-emerald-600'
+                        }`}
+                      >
+                        {row.supportShortageQty > 0
+                          ? `경영지원팀 부족 ${row.supportShortageQty}`
+                          : row.surgeryShortageQty > 0
+                            ? `수술실 부족 ${row.surgeryShortageQty}`
+                            : '확인 완료'}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+                      <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2 py-2">
+                        <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">신청</p>
+                        <p className="mt-1 text-sm font-black text-[var(--foreground)]">{row.requestedQty}</p>
+                      </div>
+                      <div className="rounded-[var(--radius-md)] bg-indigo-50 px-2 py-2">
+                        <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">SY INC 재고</p>
+                        <p className="mt-1 text-sm font-black text-indigo-600">{row.supportStock}</p>
+                        <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">부족 {row.supportShortageQty}</p>
+                      </div>
+                      <div className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-2 py-2">
+                        <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">수술실 현재고</p>
+                        <p className="mt-1 text-sm font-black text-[var(--accent)]">{row.surgeryStock}</p>
+                      </div>
+                      <div className="rounded-[var(--radius-md)] bg-rose-50 px-2 py-2">
+                        <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">수술실 부족</p>
+                        <p className="mt-1 text-sm font-black text-rose-600">{row.surgeryShortageQty}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-2 border-t border-[var(--border)] bg-[var(--background)]/40 px-5 py-4">
+              <button
+                type="button"
+                data-testid="approval-supply-review-cancel"
+                onClick={() => setSupplyInventoryReview(null)}
+                className="flex-1 rounded-[16px] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-bold text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--muted)]"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                data-testid="approval-supply-review-confirm"
+                onClick={() => {
+                  setSupplyInventoryReview(null);
+                  void handleSubmit({ skipSupplyInventoryReview: true });
+                }}
+                className="flex-1 rounded-[16px] bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white transition-colors hover:opacity-95"
+              >
+                재고 확인 후 최종 신청
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {/* 상세 메뉴(기안함·결재함·작성하기)는 메인 좌측 사이드바에서 전자결재 호버/클릭 시 플라이아웃으로 선택 */}
       {/* 메인 콘텐츠 */}
       <main className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-4 md:p-5 bg-[var(--page-bg)] custom-scrollbar">
@@ -3004,6 +3319,7 @@ window.onload = () => window.print();
                     key={suppliesLoadKey}
                     setExtraData={setExtraData}
                     initialItems={Array.isArray(extraData.items) ? (extraData.items as unknown[]) : undefined}
+                    user={user}
                   />
                 ) : formType === '수리요청서' ? (
                   <RepairRequestForm setExtraData={setExtraData} />
@@ -3043,7 +3359,9 @@ window.onload = () => window.print();
                   />
                   <button
                     data-testid="approval-submit-button"
-                    onClick={handleSubmit}
+                    onClick={() => {
+                      void handleSubmit();
+                    }}
                     disabled={!hasApproverSelection}
                     className="w-full py-4 md:py-5 bg-[var(--accent)] text-white rounded-[var(--radius-md)] font-bold text-sm shadow-sm hover:opacity-95 active:scale-[0.99] transition-all disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:opacity-45 disabled:active:scale-100"
                   >

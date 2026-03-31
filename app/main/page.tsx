@@ -48,6 +48,17 @@ function buildSubMenuTestId(mainMenuId: string, subMenuId: string) {
   return `submenu-${slug}`;
 }
 
+const CHAT_ROOM_KEY = 'erp_chat_last_room';
+const CHAT_ACTIVE_ROOM_KEY = 'erp_chat_active_room';
+const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
+const MYPAGE_TAB_KEY = 'erp_mypage_tab';
+const HR_TAB_KEY = 'erp_hr_tab';
+const HR_COMPANY_KEY = 'erp_hr_company';
+const HR_STATUS_KEY = 'erp_hr_status';
+const HR_WORKSPACE_KEY = 'erp_hr_workspace';
+const INV_VIEW_KEY = 'erp_inventory_view';
+const APPROVAL_VIEW_KEY = 'erp_approval_view';
+
 function MainPageFallback() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--background)] p-6 text-center">
@@ -68,6 +79,7 @@ function MainPageContent() {
   const [loading, setLoading] = useState(true);
   const [companies, setCompanies] = useState<{ id: string; name: string; type: string }[]>([]);
   const [selectedCompanyId, setSelectedCompanyIdState] = useState<string | null>(null);
+  const [menuResetVersion, setMenuResetVersion] = useState(0);
 
   // 초기 상태를 로컬 스토리지에서 시도 (기본: 내 정보)
   const [mainMenu, setMainMenu] = useState('내정보');
@@ -811,10 +823,72 @@ function MainPageContent() {
     }
   }, [currentSubMenus, mainMenu, resolveLegacyNavigation, subView, user]);
 
+  const clearMenuNavigationTargets = useCallback(() => {
+    setInitialMyPageTab(null);
+    setInitialBoardView(null);
+    setInitialOpenChatRoomId(null);
+    setInitialOpenMessageId(null);
+    setShareTarget(null);
+    setInitialOpenPostId(null);
+    setInitialApprovalIntent(null);
+    setInitialInventoryWorkflowApprovalId(null);
+  }, []);
+
+  const resetPersistedMenuState = useCallback((menu: string) => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      switch (menu) {
+        case '내정보':
+          window.localStorage.removeItem(MYPAGE_TAB_KEY);
+          break;
+        case '채팅':
+          window.localStorage.removeItem(CHAT_ROOM_KEY);
+          window.localStorage.removeItem(CHAT_FOCUS_KEY);
+          window.sessionStorage.removeItem(CHAT_ACTIVE_ROOM_KEY);
+          break;
+        case '전자결재':
+          window.localStorage.removeItem(APPROVAL_VIEW_KEY);
+          break;
+        case '인사관리':
+          window.localStorage.removeItem(HR_TAB_KEY);
+          window.localStorage.removeItem(HR_COMPANY_KEY);
+          window.localStorage.removeItem(HR_STATUS_KEY);
+          window.localStorage.removeItem(HR_WORKSPACE_KEY);
+          break;
+        case '재고관리':
+          window.localStorage.removeItem(INV_VIEW_KEY);
+          break;
+        default:
+          break;
+      }
+    } catch {
+      // ignore storage failures during menu reset
+    }
+  }, []);
+
   const handleMenuChange = useCallback((menu: string, sub?: string) => {
+    const isSameMenu = menu === mainMenu;
+
+    if (isSameMenu) {
+      clearMenuNavigationTargets();
+      resetPersistedMenuState(menu);
+      setMenuResetVersion((prev) => prev + 1);
+
+      if (sub !== undefined) {
+        setSubView(sub);
+        return;
+      }
+
+      if (currentSubMenus.length > 0) {
+        setSubView(currentSubMenus[0].id);
+      }
+      return;
+    }
+
     setMainMenu(menu);
     if (sub !== undefined) setSubView(sub);
-  }, []);
+  }, [clearMenuNavigationTargets, currentSubMenus, mainMenu, resetPersistedMenuState]);
 
   const handleSubViewChange = useCallback((nextSubView: string) => {
     setSubView(nextSubView);
@@ -902,9 +976,6 @@ function MainPageContent() {
         {/* 채팅·전자결재·연차촉진·출퇴근 실시간 알림 통합 배너 (웹·모바일 즉시 표시) */}
         <ChatAlertBanner
           onOpenChat={(roomId) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); }}
-          onOpenApproval={() => setMainMenu('전자결재')}
-          onOpenNotifications={() => { setMainMenu('알림'); setInitialMyPageTab(null); }}
-          onOpenInventory={() => setMainMenu('재고관리')}
         />
         {/* 전역 알림 및 푸시 처리 (채팅 탭을 열지 않아도 작동) */}
         <NotificationSystem
@@ -930,6 +1001,7 @@ function MainPageContent() {
           </div>
         )}
         <MainContent
+          key={`${mainMenu}-${menuResetVersion}`}
           user={user}
           mainMenu={mainMenu}
           data={data}

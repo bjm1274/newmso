@@ -856,3 +856,15 @@ select.premium:focus {
   0%   { transform: scale(0.8); opacity: 0.8; }
   100% { transform: scale(1.8); opacity: 0; }
 }
+
+@keyframes chatPreviewProgress {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+.chat-preview-progress {
+  animation-name: chatPreviewProgress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  transform-origin: left center;
+}

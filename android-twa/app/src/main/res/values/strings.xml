@@ -2,4 +2,30 @@
 <resources>
     <string name="app_name">SY INC. ERP</string>
     <string name="asset_statements">[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"web","site":"https://erp.pchos.kr"}}]</string>
+    <string name="share_target">{
+        \"action\": \"https://erp.pchos.kr/share-target\",
+        \"method\": \"POST\",
+        \"enctype\": \"multipart/form-data\",
+        \"params\": {
+            \"title\": \"title\",
+            \"text\": \"text\",
+            \"url\": \"url\",
+            \"files\": [{
+                \"name\": \"files\",
+                \"accept\": [
+                    \"image/*\",
+                    \"video/*\",
+                    \"application/pdf\",
+                    \".doc\",
+                    \".docx\",
+                    \".xls\",
+                    \".xlsx\",
+                    \".ppt\",
+                    \".pptx\",
+                    \".txt\",
+                    \".zip\"
+                ]
+            }]
+        }
+    }</string>
 </resources>
