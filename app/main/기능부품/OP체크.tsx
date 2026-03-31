@@ -470,10 +470,10 @@ export default function OperationCheckView({
               .order('schedule_time', { ascending: true });
           },
         ),
-        withOptionalQueryFallback(
-          async () =>
-            withMissingColumnsFallback(
-              async (omittedColumns) => {
+        withOptionalQueryFallback<SurgeryTemplateRow[]>(
+          async (): Promise<QueryResult<SurgeryTemplateRow[]>> =>
+            withMissingColumnsFallback<SurgeryTemplateRow[]>(
+              async (omittedColumns): Promise<QueryResult<SurgeryTemplateRow[]>> => {
                 const selectedColumns = ['id', 'name', 'sort_order', 'is_active']
                   .filter((columnName) => !omittedColumns.has(columnName))
                   .join(', ');
@@ -484,7 +484,8 @@ export default function OperationCheckView({
                 if (!omittedColumns.has('sort_order')) {
                   query = query.order('sort_order', { ascending: true });
                 }
-                return query.order('name', { ascending: true });
+                const result = await query.order('name', { ascending: true });
+                return result as QueryResult<SurgeryTemplateRow[]>;
               },
               ['sort_order', 'is_active'],
             ),
@@ -494,17 +495,18 @@ export default function OperationCheckView({
             columnNames: ['sort_order', 'is_active'],
           },
         ),
-        withOptionalQueryFallback(
-          async () =>
-            withMissingColumnsFallback(
-              async (omittedColumns) => {
+        withOptionalQueryFallback<InventoryItem[]>(
+          async (): Promise<QueryResult<InventoryItem[]>> =>
+            withMissingColumnsFallback<InventoryItem[]>(
+              async (omittedColumns): Promise<QueryResult<InventoryItem[]>> => {
                 const selectedColumns = ['id', 'name', 'unit', 'quantity', 'company', 'company_id', 'department']
                   .filter((columnName) => !omittedColumns.has(columnName))
                   .join(', ');
-                return supabase
+                const result = await supabase
                   .from('inventory_items')
                   .select(selectedColumns)
                   .order('name', { ascending: true });
+                return result as QueryResult<InventoryItem[]>;
               },
               ['unit', 'quantity', 'company', 'company_id', 'department'],
             ),

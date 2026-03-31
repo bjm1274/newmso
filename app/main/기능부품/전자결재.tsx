@@ -34,6 +34,7 @@ import {
   resolveInventoryDepartment,
   summarizeSupplyRequestWorkflow,
 } from '@/app/main/inventory-utils';
+import { extractLeaveRequestMeta } from '@/lib/leave-notice';
 import AttendanceForms from './전자결재서브/근태신청양식';
 import SuppliesForm from './전자결재서브/비품구매양식';
 import AdminForms from './전자결재서브/관리행정양식';
@@ -886,16 +887,18 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
   }, []);
 
   const getLeaveRequestSummary = useCallback((metaData: Record<string, unknown> | null | undefined) => {
-    if (!metaData) return null;
-    const startDate = String(metaData.startDate || metaData.start || '').trim();
-    const endDate = String(metaData.endDate || metaData.end || startDate).trim();
-    const leaveType = String(metaData.leaveType || '연차').trim() || '연차';
-    if (!startDate) return null;
+    const leaveMeta = extractLeaveRequestMeta(metaData);
+    if (!leaveMeta) return null;
+    const { startDate, endDate, leaveType, reason, delegateName, delegateDepartment, delegatePosition, delegateLabel } = leaveMeta;
     return {
       startDate,
       endDate,
       leaveType,
-      reason: String(metaData.reason || '').trim(),
+      reason,
+      delegateName,
+      delegateDepartment,
+      delegatePosition,
+      delegateLabel,
       dateLabel:
         startDate === endDate
           ? formatLeaveDateLabel(startDate)
@@ -919,6 +922,10 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
             <tr>
               <th>휴가구분</th>
               <td>${escapeHtml(leaveSummary.leaveType)}</td>
+            </tr>
+            <tr>
+              <th>업무대행</th>
+              <td>${escapeHtml(leaveSummary.delegateLabel || '-')}</td>
             </tr>
             <tr>
               <th>사유</th>
@@ -947,6 +954,10 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
           <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 px-4 py-3">
             <span className="font-bold text-[var(--toss-gray-4)]">휴가구분</span>
             <span className="font-semibold text-[var(--foreground)]">{leaveSummary.leaveType}</span>
+          </div>
+          <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 px-4 py-3">
+            <span className="font-bold text-[var(--toss-gray-4)]">업무대행</span>
+            <span className="text-[var(--toss-gray-4)]">{leaveSummary.delegateLabel || '-'}</span>
           </div>
           <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 px-4 py-3">
             <span className="font-bold text-[var(--toss-gray-4)]">사유</span>
@@ -2528,8 +2539,9 @@ window.onload = () => window.print();
 
         if (item.type === '연차/휴가') {
           const senderId = String(item.sender_id || '');
-          const startStr = String(itemMetaData?.startDate || itemMetaData?.start || '');
-          const endStr = String(itemMetaData?.endDate || itemMetaData?.end || startStr);
+          const leaveSummary = extractLeaveRequestMeta(itemMetaData);
+          const startStr = leaveSummary?.startDate || '';
+          const endStr = leaveSummary?.endDate || startStr;
           if (!senderId || !startStr) {
             toast("최종 승인 처리가 완료되었습니다.", 'success');
             fetchApprovals();
@@ -2543,7 +2555,7 @@ window.onload = () => window.print();
             return;
           }
           const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-          const leaveType = String(itemMetaData?.leaveType || '연차');
+          const leaveType = leaveSummary?.leaveType || '연차';
           const leaveStatus = normalizeLeaveAttendanceStatus(leaveType);
 
           // 1. 인사관리 휴가신청 테이블(leave_requests) 동기화
@@ -2553,7 +2565,14 @@ window.onload = () => window.print();
               leaveType,
               startDate: startStr,
               endDate: endStr,
-              reason: String(item.title || ''),
+              reason: leaveSummary?.reason || String(item.title || ''),
+              approvalId: String(item.id || '').trim() || null,
+              companyId: String(item.company_id || user?.company_id || '').trim() || null,
+              companyName: String(item.sender_company || user?.company || '').trim() || null,
+              delegateId: leaveSummary?.delegateId || null,
+              delegateName: leaveSummary?.delegateName || null,
+              delegateDepartment: leaveSummary?.delegateDepartment || null,
+              delegatePosition: leaveSummary?.delegatePosition || null,
             });
           } catch (e) { /* 테이블 부재 시 무시 */ }
 
@@ -2892,15 +2911,27 @@ window.onload = () => window.print();
     const requiredCc = formType === '물품신청' ? ['관리팀', '행정팀'] : ['행정팀'];
     const extraCc = Array.isArray(extraData?.cc_departments) ? extraData.cc_departments as string[] : [];
     const cc_departments = Array.from(new Set([...extraCc, ...requiredCc]));
-    const nextExtraData =
-      formType === '물품신청'
-        ? {
-            ...extraData,
-            items: normalizedSupplyItems,
-            inventory_source_company: INVENTORY_SUPPORT_COMPANY,
-            inventory_source_department: INVENTORY_SUPPORT_DEPARTMENT,
-          }
-        : extraData;
+    let nextExtraData = extraData;
+
+    if (formType === '물품신청') {
+      nextExtraData = {
+        ...extraData,
+        items: normalizedSupplyItems,
+        inventory_source_company: INVENTORY_SUPPORT_COMPANY,
+        inventory_source_department: INVENTORY_SUPPORT_DEPARTMENT,
+      };
+    } else if (formType === '연차/휴가') {
+      const leaveMeta = extractLeaveRequestMeta(extraData);
+      nextExtraData = {
+        ...extraData,
+        vType: leaveMeta?.leaveType || String(extraData.vType || '연차 (1.0)').trim() || '연차 (1.0)',
+        leaveType: leaveMeta?.leaveType || String(extraData.leaveType || extraData.vType || '연차 (1.0)').trim() || '연차 (1.0)',
+        delegateId: leaveMeta?.delegateId || String(extraData.delegateId || '').trim(),
+        delegateName: leaveMeta?.delegateName || String(extraData.delegateName || '').trim(),
+        delegateDepartment: leaveMeta?.delegateDepartment || String(extraData.delegateDepartment || '').trim(),
+        delegatePosition: leaveMeta?.delegatePosition || String(extraData.delegatePosition || '').trim(),
+      };
+    }
 
     // 문서번호 자동 채번: 연도월-타임스탬프(충돌 방지)
     const selectedCustomForm = customFormTypes.find((item) => item.slug === formType);
@@ -3045,6 +3076,9 @@ window.onload = () => window.print();
       leaveSummary?.startDate,
       leaveSummary?.endDate,
       leaveSummary?.leaveType,
+      leaveSummary?.delegateName,
+      leaveSummary?.delegateDepartment,
+      leaveSummary?.delegatePosition,
       leaveSummary?.reason,
       ccUsers.map((ccUser) => `${ccUser.name} ${ccUser.position || ''}`).join(' '),
     ]
@@ -3523,7 +3557,14 @@ window.onload = () => window.print();
 
               <div className="min-h-[200px] animate-in fade-in duration-500">
                 {['연차/휴가', '연장근무'].includes(formType) ? (
-                  <AttendanceForms user={user} staffs={staffs} formType={formType} setExtraData={setExtraData} setFormTitle={setFormTitle} />
+                  <AttendanceForms
+                    user={user}
+                    staffs={staffs}
+                    formType={formType}
+                    setExtraData={setExtraData}
+                    setFormTitle={setFormTitle}
+                    initialExtraData={extraData}
+                  />
                 ) : formType === '물품신청' ? (
                   <SuppliesForm
                     key={suppliesLoadKey}

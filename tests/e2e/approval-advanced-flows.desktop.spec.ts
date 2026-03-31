@@ -484,6 +484,10 @@ test('annual leave approvals show the requested date range and sync leave record
           leaveType: '연차',
           startDate: leaveStartDate,
           endDate: leaveEndDate,
+          delegateId: 'delegate-staff-1',
+          delegateName: 'Delegate Nurse',
+          delegateDepartment: 'Ward Team',
+          delegatePosition: 'Nurse',
           reason: '개인 일정',
         },
       },
@@ -521,6 +525,7 @@ test('annual leave approvals show the requested date range and sync leave record
   await approvalCard.click();
   await expect(page.getByText('휴가 정보')).toBeVisible();
   await expect(page.getByText(/2026\. 3\. 20\..*2026\. 3\. 21\./).nth(1)).toBeVisible();
+  await expect(page.getByText('Delegate Nurse')).toBeVisible();
   await expect(page.getByText('개인 일정', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: '승인' }).last().click();
@@ -562,6 +567,7 @@ test('annual leave approvals show the requested date range and sync leave record
           approvalStatus: approvals?.[0]?.status ?? null,
           leaveApproved: approvedRow?.status === '승인',
           leaveType: approvedRow?.leave_type ?? null,
+          delegateName: approvedRow?.delegate_name ?? null,
           legacyStartStatus: legacyStart?.status ?? null,
           legacyEndStatus: legacyEnd?.status ?? null,
           modernStartStatus: modernStart?.status ?? null,
@@ -577,6 +583,7 @@ test('annual leave approvals show the requested date range and sync leave record
     .toMatchObject({
       approvalStatus: '승인',
       leaveApproved: true,
+      delegateName: 'Delegate Nurse',
       leaveType: '연차',
       legacyStartStatus: '연차휴가',
       legacyEndStatus: '연차휴가',

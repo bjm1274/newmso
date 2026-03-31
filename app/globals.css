@@ -561,6 +561,20 @@ select.premium:focus {
   100% { transform: rotate(0deg); }
 }
 
+/* ── Mobile touch improvements ──────────────────── */
+/* 모든 버튼/링크 더블탭 줌 방지 + 빠른 탭 반응 */
+button, a, [role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* hover 지원 안 되는 기기(모바일)에서만 active: 피드백 */
+@media (hover: none) {
+  button:active, a:active, [role="button"]:active {
+    opacity: 0.7;
+  }
+}
+
 /* ── Safe area ───────────────────────────────────── */
 .safe-pb {
   padding-bottom: env(safe-area-inset-bottom);
@@ -724,6 +738,14 @@ select.premium:focus {
 
 .icon-btn:active {
   transform: scale(0.93);
+}
+
+/* 모바일에서 icon-btn 최소 44px 터치 타겟 */
+@media (hover: none) {
+  .icon-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 
 /* ── Focus ring ──────────────────────────────────── */
