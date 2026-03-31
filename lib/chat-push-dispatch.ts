@@ -469,6 +469,7 @@ export async function dispatchChatPushForMessage(params: {
   const uniqueSubscriptions = new Map<string, PushSubscriptionRow>();
   for (const row of (subscriptionRes.data || []) as PushSubscriptionRow[]) {
     if (!row.endpoint || !row.staff_id || row.staff_id === senderId) continue;
+    if (!row.p256dh || !row.auth || !/^https?:\/\//i.test(String(row.endpoint))) continue;
     if (!uniqueSubscriptions.has(row.endpoint)) {
       uniqueSubscriptions.set(row.endpoint, row);
     }
@@ -503,38 +504,66 @@ export async function dispatchChatPushForMessage(params: {
   }
 
   // staff_id 기준으로 FCM 토큰이 있는 사용자 집합 구성 — Web Push + FCM 이중 발송 방지
-  const staffIdsWithFcmToken = new Set(
-    (subscriptionRes.data || [])
-      .filter((r: PushSubscriptionRow) => r.fcm_token && r.staff_id && r.staff_id !== senderId)
-      .map((r: PushSubscriptionRow) => String(r.staff_id))
-  );
-
   let sent = 0;
   let failed = 0;
   const expiredIds: string[] = [];
+  const successfulFcmTokens = new Set<string>();
+  const payloadData = {
+    room_id: params.roomId,
+    message_id: params.messageId,
+    created_at: message.created_at,
+    type: 'message',
+  };
+  const webPushPayload = JSON.stringify({
+    title,
+    body: previewBody,
+    tag: `chat-msg-${params.messageId}`,
+    data: payloadData,
+  });
 
-  // Web Push + FCM 병렬 전송
+  const fcmPromise = (async () => {
+    if (uniqueFcmTokens.length === 0) return;
+    try {
+      const fcmResult = await sendFcmBatch(uniqueFcmTokens, {
+        title,
+        body: previewBody,
+        data: payloadData,
+      });
+      fcmResult.success.forEach((token) => successfulFcmTokens.add(String(token)));
+      sent += fcmResult.success.length;
+      if (fcmResult.expired.length > 0) {
+        await supabase
+          .from('push_subscriptions')
+          .update({ fcm_token: null })
+          .in('fcm_token', fcmResult.expired);
+      }
+    } catch (fcmErr) {
+      console.error('[FCM] batch send failed, falling back to web push where possible:', fcmErr);
+    }
+  })();
+
+  // FCM 성공 토큰을 먼저 확정한 뒤에만 Web Push 대상을 계산해야
+  // 동일 기기로 FCM + Web Push가 중복 발송되지 않는다.
+  await fcmPromise;
+
   const webPushPromise = (async () => {
     if (pushDisabled) return;
-    const payload = JSON.stringify({
-      title,
-      body: previewBody,
-      tag: `chat-msg-${params.messageId}`,
-      data: {
-        room_id: params.roomId,
-        message_id: params.messageId,
-        created_at: message.created_at,
-        type: 'message',
-      },
+    const payload = webPushPayload;
+
+    const targets = Array.from(uniqueSubscriptions.values()).filter((subscription) => {
+      const fcmToken = String(subscription.fcm_token || '').trim();
+      return !fcmToken || !successfulFcmTokens.has(fcmToken);
     });
 
-    const targets = Array.from(uniqueSubscriptions.values()).filter(
-      (sub) => !sub.fcm_token && !staffIdsWithFcmToken.has(String(sub.staff_id))
-    );
+    if (targets.length === 0) return;
 
-    // 구독자별 Web Push 병렬 전송
     const results = await Promise.allSettled(
-      targets.map((subscription) => sendWebPushNotification(subscription, payload).then(() => ({ ok: true as const, id: subscription.id })))
+      targets.map((subscription) =>
+        sendWebPushNotification(subscription, payload).then(() => ({
+          ok: true as const,
+          id: subscription.id,
+        }))
+      )
     );
     for (let i = 0; i < results.length; i++) {
       const r = results[i];
@@ -551,42 +580,19 @@ export async function dispatchChatPushForMessage(params: {
     }
   })();
 
-  const fcmPromise = (async () => {
-    if (uniqueFcmTokens.length === 0) return;
-    try {
-      const fcmResult = await sendFcmBatch(uniqueFcmTokens, {
-        title,
-        body: previewBody,
-        data: {
-          room_id: params.roomId,
-          message_id: params.messageId,
-          type: 'message',
-        },
-      });
-      sent += fcmResult.success.length;
-      if (fcmResult.expired.length > 0) {
-        await supabase
-          .from('push_subscriptions')
-          .update({ fcm_token: null })
-          .in('fcm_token', fcmResult.expired);
-      }
-    } catch (fcmErr) {
-      console.error('[FCM] 배치 전송 오류:', fcmErr);
-    }
-  })();
-
-  // 알림 저장 + Web Push + FCM 동시 완료 대기
-  await Promise.all([notificationInsertPromise, webPushPromise, fcmPromise]);
+  // 알림 저장은 FCM과 병렬로 시작해두고, Web Push는 FCM 결과 반영 후 마무리한다.
+  await Promise.all([notificationInsertPromise, webPushPromise]);
 
   if (expiredIds.length > 0) {
     await supabase.from('push_subscriptions').delete().in('id', expiredIds);
   }
 
-  const hasWebPushOnlyTargets =
-    uniqueSubscriptions.size > 0 &&
-    uniqueFcmTokens.length === 0;
+  const hasUndeliveredWebPushTargets = Array.from(uniqueSubscriptions.values()).some((subscription) => {
+    const fcmToken = String(subscription.fcm_token || '').trim();
+    return !fcmToken || !successfulFcmTokens.has(fcmToken);
+  });
 
-  if (pushDisabled && hasWebPushOnlyTargets) {
+  if (pushDisabled && hasUndeliveredWebPushTargets) {
     await updateChatPushJobByMessageId(supabase, params.messageId, {
       processing_started_at: null,
       last_error: 'web-push-disabled',
@@ -605,7 +611,7 @@ export async function dispatchChatPushForMessage(params: {
   await updateChatPushJobByMessageId(supabase, params.messageId, {
     processed_at: new Date().toISOString(),
     processing_started_at: null,
-    last_error: pushDisabled ? 'web-push-disabled' : null,
+    last_error: pushDisabled && hasUndeliveredWebPushTargets ? 'web-push-disabled' : null,
   });
 
   return {
