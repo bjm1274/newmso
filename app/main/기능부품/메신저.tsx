@@ -679,13 +679,26 @@ interface ChatViewProps {
   user: StaffMember | null;
   onRefresh?: () => void;
   staffs?: StaffMember[];
+  forceChatListOnMount?: boolean;
+  onConsumeForceChatListOnMount?: () => void;
   initialOpenChatRoomId?: string | null;
   initialOpenMessageId?: string | null;
   onConsumeOpenChatRoomId?: () => void;
   shareTarget?: { id: string; fileCount: number; text: string | null; url: string | null; title: string | null } | null;
   onConsumeShareTarget?: () => void;
 }
-export default function ChatView({ user, onRefresh, staffs = [], initialOpenChatRoomId, initialOpenMessageId, onConsumeOpenChatRoomId, shareTarget, onConsumeShareTarget }: ChatViewProps) {
+export default function ChatView({
+  user,
+  onRefresh,
+  staffs = [],
+  forceChatListOnMount,
+  onConsumeForceChatListOnMount,
+  initialOpenChatRoomId,
+  initialOpenMessageId,
+  onConsumeOpenChatRoomId,
+  shareTarget,
+  onConsumeShareTarget,
+}: ChatViewProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const pendingScrollMsgIdRef = useRef<string | null>(null);
   const pendingBottomAlignRoomIdRef = useRef<string | null>(null);
@@ -2190,6 +2203,18 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       onConsumeOpenChatRoomId?.();
     }
   }, [initialOpenChatRoomId, initialOpenMessageId]);
+
+  useEffect(() => {
+    if (!forceChatListOnMount || initialOpenChatRoomId) return;
+    pendingScrollMsgIdRef.current = null;
+    pendingBottomAlignRoomIdRef.current = null;
+    isNearBottomRef.current = true;
+    setShowScrollToLatest(false);
+    setViewMode('chat');
+    setShowDrawer(false);
+    setRoom(null);
+    onConsumeForceChatListOnMount?.();
+  }, [forceChatListOnMount, initialOpenChatRoomId, onConsumeForceChatListOnMount]);
 
   useEffect(() => {
     const targetMsgId = pendingScrollMsgIdRef.current;
@@ -4644,13 +4669,16 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       {isSelected && (
                         <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></div>
                       )}
-                      <div className="flex items-start gap-3 min-w-0 flex-1">
-                        <div className={`relative w-8 h-8 rounded-lg flex items-center justify-center text-sm ${isNoticeChannel ? 'bg-blue-100 text-blue-600' : 'bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)]'}`}>
-                          {isNoticeChannel ? '📢' : '💬'}
-                          {!isNoticeChannel && isPeerOnline && (
-                            <span className="absolute -right-0.5 -bottom-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-white dark:border-zinc-900" />
-                          )}
-                        </div>
+                        <div className="flex items-start gap-3 min-w-0 flex-1">
+                          <div
+                            data-testid={`chat-room-icon-${roomId}`}
+                            className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[13px] leading-none ${isNoticeChannel ? 'bg-blue-100 text-blue-600' : 'bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)]'}`}
+                          >
+                            {isNoticeChannel ? '📢' : '💬'}
+                            {!isNoticeChannel && isPeerOnline && (
+                              <span className="absolute -right-0.5 -bottom-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-white dark:border-zinc-900" />
+                            )}
+                          </div>
                         <div className="flex flex-col min-w-0 py-0.5">
                           <div className="flex items-start gap-1.5 min-w-0">
                             {unread > 0 && (

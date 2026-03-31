@@ -2526,6 +2526,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                   const rowNumber = visiblePosts.length - idx;
                   const isSchedule = activeBoard === '수술일정' || activeBoard === 'MRI일정';
                   const isPendingScheduledNotice = isScheduledNoticePending(post, noticeVisibilityTick);
+                  const hasAttachments = (Array.isArray(post.attachments) ? post.attachments : []).length > 0;
                   return (
                     <div
                       key={post.id || idx}
@@ -2592,46 +2593,63 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                           )}
                         </div>
                       ) : (
-                        <div className="flex items-center gap-3 text-[11px] md:text-xs">
+                        <div className="flex items-center gap-2 md:gap-3 text-[11px] md:text-xs">
                           <div className="w-8 text-center text-[11px] font-bold text-[var(--toss-gray-3)] shrink-0">
                             {rowNumber}
                           </div>
-                          <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                            <p className="font-bold text-[var(--foreground)] truncate group-hover:text-[var(--accent)]">
-                              {post.title}
-                            </p>
-                            <span className={`shrink-0 rounded-[var(--radius-md)] px-2 py-1 text-[11px] font-semibold ${getBoardStatusTone(post.status)}`}>
-                              {normalizeBoardPostStatus(post.status)}
-                            </span>
-                            {isPendingScheduledNotice && (
-                              <span className="shrink-0 rounded-[var(--radius-md)] bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700">
-                                예약
-                              </span>
-                            )}
-                            {(Array.isArray(post.attachments) ? post.attachments : []).length > 0 && (
-                              <span className="shrink-0 text-[var(--toss-gray-3)]" title="첨부파일 있음">📎</span>
-                            )}
-                            {false && (
-                              <span className="px-2 py-1 rounded-[var(--radius-md)] bg-violet-50 text-violet-700 text-[11px] font-semibold">
-                                조영제 필요
-                              </span>
-                            )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <p className="min-w-0 flex-1 font-bold text-[var(--foreground)] truncate group-hover:text-[var(--accent)]">
+                                {post.title}
+                              </p>
+                              <div className="shrink-0 flex items-center gap-1 whitespace-nowrap">
+                                <span
+                                  data-testid={`board-post-status-pill-${post.id}`}
+                                  className={`shrink-0 rounded-[var(--radius-md)] px-2 py-1 text-[11px] font-semibold ${getBoardStatusTone(post.status)}`}
+                                >
+                                  {normalizeBoardPostStatus(post.status)}
+                                </span>
+                                {isPendingScheduledNotice && (
+                                  <span className="shrink-0 rounded-[var(--radius-md)] bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700">
+                                    예약
+                                  </span>
+                                )}
+                                {hasAttachments && (
+                                  <span
+                                    data-testid={`board-post-attachment-indicator-${post.id}`}
+                                    className="shrink-0 leading-none text-[var(--toss-gray-3)]"
+                                    title="첨부파일 있음"
+                                    aria-label="첨부파일 있음"
+                                  >
+                                    📎
+                                  </span>
+                                )}
+                                {false && (
+                                  <span className="px-2 py-1 rounded-[var(--radius-md)] bg-violet-50 text-violet-700 text-[11px] font-semibold">
+                                    조영제 필요
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
                           <div className="hidden md:flex w-32 text-[11px] font-bold text-[var(--toss-gray-3)] justify-center shrink-0">
                             {post.author_name || '익명'}
                           </div>
-                          <div className="w-20 md:w-24 text-[11px] font-bold text-[var(--toss-gray-3)] text-center shrink-0">
+                          <div
+                            data-testid={`board-post-date-${post.id}`}
+                            className="w-[72px] md:w-24 text-[10px] md:text-[11px] font-bold text-[var(--toss-gray-3)] text-center shrink-0"
+                          >
                             {isPendingScheduledNotice && post.scheduled_publish_at
                               ? new Date(post.scheduled_publish_at).toLocaleDateString()
                               : new Date(post.created_at ?? '').toLocaleDateString()}
                           </div>
-                          <div className="w-14 text-[11px] font-bold text-[var(--toss-gray-3)] text-center shrink-0">
+                          <div className="w-12 md:w-14 text-[10px] md:text-[11px] font-bold text-[var(--toss-gray-3)] text-center shrink-0">
                             조회 {(post.views as number) ?? 0}
                           </div>
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); handleLike(post); }}
-                            className={`w-14 text-[11px] font-bold text-center shrink-0 transition ${myLikedPostIds.has(String(post.id ?? '').trim()) ? 'text-red-500' : 'text-[var(--toss-gray-3)] hover:text-red-400'}`}
+                            className={`w-12 md:w-14 text-[10px] md:text-[11px] font-bold text-center shrink-0 transition ${myLikedPostIds.has(String(post.id ?? '').trim()) ? 'text-red-500' : 'text-[var(--toss-gray-3)] hover:text-red-400'}`}
                           >
                             {myLikedPostIds.has(String(post.id ?? '').trim()) ? '♥' : '♡'} {(post.likes_count as number) ?? 0}
                           </button>

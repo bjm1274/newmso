@@ -192,9 +192,13 @@ test('approval submission stays blocked until an approver is selected', async ({
 
 test('hospital supply request compose includes SY INC. approvers in approval line options', async ({ page }) => {
   const runtimeErrors = trackRuntimeErrors(page);
+  const supportDirectorWithLegacyCompanyName = {
+    ...supportDirector,
+    company: 'SYINC',
+  };
 
   await mockSupabase(page, {
-    staffMembers: [composeUser, approver, supportStaff, supportDirector],
+    staffMembers: [composeUser, approver, supportStaff, supportDirectorWithLegacyCompanyName],
     approvals: [],
     companies: [
       { id: 'hospital-1', name: String(composeUser.company), type: 'HOSPITAL', is_active: true },
@@ -212,14 +216,14 @@ test('hospital supply request compose includes SY INC. approvers in approval lin
   await openCompose(page);
 
   const approverSelect = page.getByTestId('approval-approver-select');
-  await expect(approverSelect.locator('option', { hasText: supportDirector.name })).toHaveCount(0);
+  await expect(approverSelect.locator('option', { hasText: supportDirectorWithLegacyCompanyName.name })).toHaveCount(0);
 
   await page.getByTestId('approval-form-type-3').click();
   await expect(page.getByTestId('supplies-add-row-button')).toBeVisible();
-  await expect(approverSelect.locator('option', { hasText: supportDirector.name })).toHaveCount(1);
+  await expect(approverSelect.locator('option', { hasText: supportDirectorWithLegacyCompanyName.name })).toHaveCount(1);
 
-  await approverSelect.selectOption(supportDirector.id);
-  await expect(page.getByText(`1. ${supportDirector.name} ${supportDirector.position}`)).toBeVisible();
+  await approverSelect.selectOption(supportDirectorWithLegacyCompanyName.id);
+  await expect(page.getByText(`1. ${supportDirectorWithLegacyCompanyName.name} ${supportDirectorWithLegacyCompanyName.position}`)).toBeVisible();
 
   expect(runtimeErrors).toEqual([]);
 });
