@@ -312,6 +312,11 @@ export async function dispatchChatPushForMessage(params: {
   ]);
 
   if (messageRes.error || roomRes.error || !messageRes.data || !roomRes.data) {
+    await updateChatPushJobByMessageId(supabase, params.messageId, {
+      processed_at: new Date().toISOString(),
+      processing_started_at: null,
+      last_error: 'message-or-room-not-found',
+    });
     return {
       sent: 0,
       failed: 0,
@@ -488,6 +493,7 @@ export async function dispatchChatPushForMessage(params: {
     await Promise.all([
       notificationInsertPromise,
       updateChatPushJobByMessageId(supabase, params.messageId, {
+        processed_at: new Date().toISOString(),
         processing_started_at: null,
         last_error: 'no-active-subscriptions',
       }),
@@ -654,6 +660,23 @@ export async function processPendingChatPushJobs(limit = 25) {
       processed += 1;
       sent += result.sent;
       failed += result.failed;
+      if (result.reason === 'web-push-disabled') {
+        skipped += 1;
+        if (queueSelection.supportsRetryColumns) {
+          await updateChatPushJobById(
+            supabase,
+            job.id,
+            buildQueueFailurePatch(nextAttemptCount, result.reason, true),
+          );
+        } else {
+          await updateChatPushJobById(supabase, job.id, {
+            processed_at: new Date().toISOString(),
+            processing_started_at: null,
+            last_error: result.reason,
+          });
+        }
+        continue;
+      }
       if (result.reason) skipped += 1;
     } catch (error: any) {
       failed += 1;

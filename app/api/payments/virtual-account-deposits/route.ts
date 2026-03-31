@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { readSessionFromRequest } from '@/lib/server-session';
+import {
+  getDepositCompanyScope,
+  readAuthorizedDepositUser,
+} from '@/lib/server-deposit-access';
 import { normalizeDepositDraft } from '@/lib/virtual-account-deposits';
 
 export const runtime = 'nodejs';
@@ -47,16 +50,43 @@ function applyStateFilter(
   return rows.filter((row) => String(row[key] || '') === normalized);
 }
 
+async function authorizeDepositRequest(request: NextRequest) {
+  const access = await readAuthorizedDepositUser(request);
+  if (!access.user) {
+    return {
+      user: null,
+      scope: null,
+      response: NextResponse.json(
+        { error: access.status === 401 ? 'Unauthorized' : '권한이 없습니다.' },
+        { status: access.status ?? 401 }
+      ),
+    };
+  }
+
+  const scope = getDepositCompanyScope(access.user);
+  if (!scope) {
+    return {
+      user: null,
+      scope: null,
+      response: NextResponse.json({ error: '회사 정보가 없습니다.' }, { status: 403 }),
+    };
+  }
+
+  return {
+    user: access.user,
+    scope,
+    response: null,
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const session = await readSessionFromRequest(request);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const access = await authorizeDepositRequest(request);
+    if (access.response) return access.response;
 
     const supabase = getAdminClient();
     const url = new URL(request.url);
-    const companyId = String(session.user.company_id || '').trim();
+    const { companyId, isSystemMaster } = access.scope;
     let query = supabase
       .from('virtual_account_deposits')
       .select('*')
@@ -64,7 +94,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(300);
 
-    if (companyId && session.user.is_system_master !== true) {
+    if (companyId && !isSystemMaster) {
       query = query.eq('company_id', companyId);
     }
 
@@ -86,10 +116,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await readSessionFromRequest(request);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const access = await authorizeDepositRequest(request);
+    if (access.response) return access.response;
 
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     if (!body) return NextResponse.json({ error: '요청 데이터가 없습니다.' }, { status: 400 });
@@ -104,7 +132,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '입금자명을 입력해주세요.' }, { status: 400 });
     }
 
-    const companyId = String(session.user.company_id || '').trim() || null;
+    const { companyId } = access.scope;
     const now = new Date().toISOString();
     const dedupeKey = `manual:${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -138,7 +166,7 @@ export async function POST(request: NextRequest) {
         matched_target_type: null,
         matched_target_id: null,
         matched_note: String(body.matched_note || '').trim() || null,
-        raw_payload: { source: 'manual', entered_by: session.user.id, ...body },
+        raw_payload: { source: 'manual', entered_by: access.user.id, ...body },
         created_at: now,
         updated_at: now,
       })
@@ -157,17 +185,15 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await readSessionFromRequest(request);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const access = await authorizeDepositRequest(request);
+    if (access.response) return access.response;
 
     const url = new URL(request.url);
     const id = url.searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'ID가 필요합니다.' }, { status: 400 });
 
     const supabase = getAdminClient();
-    const companyId = String(session.user.company_id || '').trim();
+    const { companyId, isSystemMaster } = access.scope;
 
     // 수동 등록된 건만 삭제 가능
     let q = supabase.from('virtual_account_deposits')
@@ -175,7 +201,7 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id)
       .eq('provider', 'manual');
 
-    if (companyId && session.user.is_system_master !== true) {
+    if (companyId && !isSystemMaster) {
       q = q.eq('company_id', companyId) as typeof q;
     }
 
@@ -190,10 +216,8 @@ export async function DELETE(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await readSessionFromRequest(request);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const access = await authorizeDepositRequest(request);
+    if (access.response) return access.response;
 
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     const id = String(body?.id || '').trim();
@@ -203,14 +227,14 @@ export async function PATCH(request: NextRequest) {
 
     const updates = normalizeDepositDraft(body || {});
     const supabase = getAdminClient();
-    const companyId = String(session.user.company_id || '').trim();
+    const { companyId, isSystemMaster } = access.scope;
 
     let existingQuery = supabase
       .from('virtual_account_deposits')
       .select('id, company_id')
       .eq('id', id);
 
-    if (companyId && session.user.is_system_master !== true) {
+    if (companyId && !isSystemMaster) {
       existingQuery = existingQuery.eq('company_id', companyId);
     }
 
