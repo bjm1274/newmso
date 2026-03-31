@@ -54,6 +54,7 @@ const APPROVAL_REFERENCE_ALL_KEY = 'all';
 const ALL_DOCUMENT_FILTER = '전체 문서';
 
 const APPROVAL_VIEWS = ['기안함', '결재함', '참조 문서함', '작성하기'] as const;
+const APPROVER_POSITIONS = ['팀장', '간호과장', '실장', '부장', '본부장', '총무부장', '진료부장', '간호부장', '이사', '병원장', '원장', '대표'];
 const BUILTIN_FORM_TYPE_DEFINITIONS = [
   { slug: 'leave', name: '연차/휴가' },
   { slug: 'annual_plan', name: '연차계획서' },
@@ -276,6 +277,17 @@ function normalizeComposeFormType(value?: string) {
   return value;
 }
 
+function normalizeApprovalCompanyToken(value: unknown) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9가-힣]/g, '');
+}
+
+function matchesInventorySupportCompanyName(value: unknown) {
+  return normalizeApprovalCompanyToken(value) === normalizeApprovalCompanyToken(INVENTORY_SUPPORT_COMPANY);
+}
+
 function isAttendanceCorrectionApprovalSchemaError(error: unknown) {
   return ['attendance_date', 'requested_at', 'approval_status', 'approved_by', 'approved_at'].some((column) =>
     isMissingColumnError(error, column)
@@ -458,18 +470,41 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
     const loadSupportApprovers = async () => {
       try {
-        const { data, error } = await supabase
-          .from('staff_members')
-          .select('*')
-          .eq('company', INVENTORY_SUPPORT_COMPANY)
-          .order('employee_no', { ascending: true });
+        const [{ data: companyRows, error: companyError }, { data: staffRows, error: staffError }] = await Promise.all([
+          supabase.from('companies').select('id, name, type'),
+          supabase
+            .from('staff_members')
+            .select('*')
+            .in('position', APPROVER_POSITIONS)
+            .order('employee_no', { ascending: true }),
+        ]);
 
-        if (error) throw error;
+        if (companyError) throw companyError;
+        if (staffError) throw staffError;
         if (!active) return;
 
+        const supportCompanyIds = new Set(
+          (Array.isArray(companyRows) ? companyRows : [])
+            .filter((company) => {
+              const type = String(company?.type || '').trim().toUpperCase();
+              return type === 'MSO' || matchesInventorySupportCompanyName(company?.name);
+            })
+            .map((company) => String(company?.id || '').trim())
+            .filter(Boolean)
+        );
+
         setSupportApproverStaffs(
-          Array.isArray(data)
-            ? (data.filter((staff) => APPROVER_POSITIONS.includes(String(staff?.position || ''))) as StaffMember[])
+          Array.isArray(staffRows)
+            ? (staffRows.filter((staff) => {
+                const supportCompanyId = String((staff as Record<string, unknown>)?.company_id || '').trim();
+                return (
+                  APPROVER_POSITIONS.includes(String(staff?.position || '')) &&
+                  (
+                    matchesInventorySupportCompanyName(staff?.company) ||
+                    (supportCompanyId !== '' && supportCompanyIds.has(supportCompanyId))
+                  )
+                );
+              }) as StaffMember[])
             : []
         );
       } catch (error) {
@@ -990,7 +1025,6 @@ window.onload = () => window.print();
   }, [approvalDirectoryStaffs, renderLeaveRequestInfoHtml, renderSupplyRequestItemsHtml, resolveApprovalTemplateDesign, resolveApprovalTemplateMeta]);
 
   // 결재자 후보: 부서장 이상(팀장·부장·병원장 등)만 표시 (staffs는 이미 메인에서 회사별로 불러옴)
-  const APPROVER_POSITIONS = ['팀장', '간호과장', '실장', '부장', '본부장', '총무부장', '진료부장', '간호부장', '이사', '병원장', '원장', '대표'];
   const approverCandidates = useMemo(() => {
     const source = isSupplyRequestCompose ? approvalDirectoryStaffs : staffs;
     if (!Array.isArray(source)) return [];
