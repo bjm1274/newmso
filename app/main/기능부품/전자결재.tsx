@@ -3931,21 +3931,21 @@ window.onload = () => window.print();
                           const win = window.open('', '_blank')!;
                           win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>결재문서</title><style>body{font-family:'Malgun Gothic',sans-serif;padding:30px;max-width:800px;margin:0 auto}h1{font-size:20px;text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:20px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;font-size:12px}.meta div{border:1px solid #ccc;padding:8px;border-radius:4px}.content{border:1px solid #ccc;padding:15px;min-height:200px;font-size:13px;line-height:1.6;border-radius:4px}.approval-line{margin-top:20px;display:flex;gap:10px}.sig-box{border:1px solid #ccc;padding:10px;min-width:80px;text-align:center;font-size:11px}@media print{button{display:none}}</style></head><body><h1>결 재 문 서</h1><div class="meta"><div><strong>문서번호:</strong> ${itemDocNumber || '-'}</div><div><strong>기안일:</strong> ${new Date(itemCreatedAt).toLocaleDateString('ko-KR')}</div><div><strong>기안자:</strong> ${itemSenderName}</div><div><strong>소속:</strong> ${itemSenderCompany}</div><div><strong>문서종류:</strong> ${itemType}</div><div><strong>상태:</strong> ${itemStatus}</div></div><h3 style="font-size:16px;margin-bottom:10px">${itemTitle}</h3><div class="content">${((item.content as string) || '').replace(/\n/g, '<br>')}</div><div class="approval-line">${((item.approver_line as string[]) || []).map((id: string, i: number) => `<div class="sig-box">${i + 1}단계<br><br><br>(인)</div>`).join('')}</div><script>window.onload=()=>window.print()</script></body></html>`);
                           win.document.close();
-                        }} className="px-2 py-1 bg-[var(--tab-bg)] text-[var(--toss-gray-4)] border border-[var(--border)] rounded-md text-[10px] font-semibold hover:bg-[var(--muted)]">PDF</button>
+                        }} className="touch-manipulation min-h-[36px] px-3 py-1.5 bg-[var(--tab-bg)] text-[var(--toss-gray-4)] border border-[var(--border)] rounded-md text-[10px] font-semibold hover:bg-[var(--muted)] active:bg-[var(--muted)]">PDF</button>
                         {canUserRecallItem(item) && (
                           <button
                             type="button"
                             data-testid={`approval-recall-${itemId}`}
                             onClick={() => handleRecallAction(item)}
-                            className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-md text-[10px] font-semibold shadow-sm hover:bg-amber-100 active:scale-[0.98] transition-all"
+                            className="touch-manipulation min-h-[36px] px-3 py-1.5 bg-amber-500/10 text-amber-700 border border-amber-500/20 rounded-md text-[10px] font-semibold shadow-sm hover:bg-amber-500/20 active:bg-amber-500/20 active:scale-[0.98] transition-all"
                           >
                             회수/수정
                           </button>
                         )}
                         {(viewMode === '결재함' || (viewMode === '기안함' && itemStatus === '대기')) && canUserApproveItem(item) && (
                           <>
-                            <button type="button" onClick={() => handleApproveAction(item)} className="px-2 py-1 bg-[var(--accent)] text-white rounded-md text-[10px] font-semibold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인</button>
-                            <button type="button" onClick={() => handleRejectAction(item)} className="px-2 py-1 bg-red-500/10 text-red-600 border border-red-500/20 rounded-md text-[10px] font-semibold shadow-sm hover:bg-red-500/20 active:scale-[0.98] transition-all">반려</button>
+                            <button type="button" onClick={() => handleApproveAction(item)} className="touch-manipulation min-h-[36px] px-3 py-1.5 bg-[var(--accent)] text-white rounded-md text-[10px] font-semibold shadow-sm hover:opacity-95 active:opacity-80 active:scale-[0.98] transition-all">승인</button>
+                            <button type="button" onClick={() => handleRejectAction(item)} className="touch-manipulation min-h-[36px] px-3 py-1.5 bg-red-500/10 text-red-600 border border-red-500/20 rounded-md text-[10px] font-semibold shadow-sm hover:bg-red-500/20 active:bg-red-500/20 active:scale-[0.98] transition-all">반려</button>
                           </>
                         )}
                       </div>

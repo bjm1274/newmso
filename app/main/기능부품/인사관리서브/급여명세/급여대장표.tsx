@@ -90,7 +90,7 @@ export default function PayrollTable({ staffs = [], payrollRecords = [], yearMon
 
       {/* PC: 메인 급여 테이블 §5 */}
       <div className="hidden md:block bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm overflow-hidden flex-1 flex flex-col min-h-[500px]">
-        <div className="overflow-y-auto flex-1 custom-scrollbar">
+        <div className="overflow-y-auto overflow-x-auto flex-1 custom-scrollbar">
           <table className="w-full text-left border-collapse min-w-[300px]">
             <thead>
               <tr className="bg-[var(--tab-bg)] text-xs font-semibold text-[var(--toss-gray-4)] sticky top-0 z-10 shadow-sm">

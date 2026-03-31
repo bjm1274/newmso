@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
 import SmartDatePicker from '../공통/SmartDatePicker';
@@ -63,7 +63,25 @@ export default function AttendanceForms({
       });
   }, [currentUser.company, currentUser.company_id, currentUser.id, staffRows]);
 
-  const selectedDelegate = leaveDelegateOptions.find((staff) => String(staff.id) === selectedDelegateId);
+  const buildLeaveExtraData = useCallback((
+    nextLeaveType = leaveType,
+    nextStartDate = localStartDate,
+    nextEndDate = localEndDate,
+    nextDelegateId = selectedDelegateId,
+  ) => {
+    const delegate = leaveDelegateOptions.find((staff) => String(staff.id) === nextDelegateId);
+
+    return {
+      vType: nextLeaveType,
+      leaveType: nextLeaveType,
+      startDate: nextStartDate,
+      endDate: nextEndDate,
+      delegateId: nextDelegateId,
+      delegateName: delegate?.name || '',
+      delegateDepartment: String(delegate?.department || delegate?.team || '').trim(),
+      delegatePosition: String(delegate?.position || '').trim(),
+    };
+  }, [leaveDelegateOptions, leaveType, localEndDate, localStartDate, selectedDelegateId]);
 
   useEffect(() => {
     if (formType !== '연차/휴가') return;
@@ -71,7 +89,11 @@ export default function AttendanceForms({
     if (localStartDate !== initialStartDate) setLocalStartDate(initialStartDate);
     if (localEndDate !== initialEndDate) setLocalEndDate(initialEndDate);
     if (selectedDelegateId !== initialDelegateId) setSelectedDelegateId(initialDelegateId);
+    updateExtraData(
+      buildLeaveExtraData(initialLeaveType, initialStartDate, initialEndDate, initialDelegateId),
+    );
   }, [
+    buildLeaveExtraData,
     formType,
     initialDelegateId,
     initialEndDate,
@@ -82,20 +104,6 @@ export default function AttendanceForms({
     localStartDate,
     selectedDelegateId,
   ]);
-
-  useEffect(() => {
-    if (formType !== '연차/휴가') return;
-    updateExtraData({
-      vType: leaveType,
-      leaveType,
-      startDate: localStartDate,
-      endDate: localEndDate,
-      delegateId: selectedDelegateId,
-      delegateName: selectedDelegate?.name || '',
-      delegateDepartment: String(selectedDelegate?.department || selectedDelegate?.team || '').trim(),
-      delegatePosition: String(selectedDelegate?.position || '').trim(),
-    });
-  }, [formType, leaveType, localEndDate, localStartDate, selectedDelegate, selectedDelegateId, updateExtraData]);
 
   useEffect(() => {
     const load = async () => {
@@ -163,7 +171,13 @@ export default function AttendanceForms({
                 data-testid="approval-leave-type-select"
                 value={leaveType}
                 className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30"
-                onChange={(event) => setLeaveType(event.target.value)}
+                onChange={(event) => {
+                  const nextLeaveType = event.target.value;
+                  setLeaveType(nextLeaveType);
+                  updateExtraData(
+                    buildLeaveExtraData(nextLeaveType, localStartDate, localEndDate, selectedDelegateId),
+                  );
+                }}
               >
                 <option>연차 (1.0)</option>
                 <option>반차 (0.5)</option>
@@ -179,7 +193,13 @@ export default function AttendanceForms({
                 data-testid="approval-leave-delegate-select"
                 value={selectedDelegateId}
                 className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30"
-                onChange={(event) => setSelectedDelegateId(event.target.value)}
+                onChange={(event) => {
+                  const nextDelegateId = event.target.value;
+                  setSelectedDelegateId(nextDelegateId);
+                  updateExtraData(
+                    buildLeaveExtraData(leaveType, localStartDate, localEndDate, nextDelegateId),
+                  );
+                }}
               >
                 <option value="">업무대행자 선택</option>
                 {leaveDelegateOptions.map((staff) => {
@@ -200,7 +220,12 @@ export default function AttendanceForms({
               <SmartDatePicker
                 data-testid="approval-leave-start-date"
                 value={localStartDate}
-                onChange={setLocalStartDate}
+                onChange={(value) => {
+                  setLocalStartDate(value);
+                  updateExtraData(
+                    buildLeaveExtraData(leaveType, value, localEndDate, selectedDelegateId),
+                  );
+                }}
                 className="w-full"
                 inputClassName={`h-10 rounded-[var(--radius-md)] border bg-[var(--card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30 ${!localStartDate ? 'border-red-300' : 'border-[var(--border)]'}`}
               />
@@ -213,7 +238,12 @@ export default function AttendanceForms({
               <SmartDatePicker
                 data-testid="approval-leave-end-date"
                 value={localEndDate}
-                onChange={setLocalEndDate}
+                onChange={(value) => {
+                  setLocalEndDate(value);
+                  updateExtraData(
+                    buildLeaveExtraData(leaveType, localStartDate, value, selectedDelegateId),
+                  );
+                }}
                 className="w-full"
                 inputClassName={`h-10 rounded-[var(--radius-md)] border bg-[var(--card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30 ${!localEndDate ? 'border-red-300' : 'border-[var(--border)]'}`}
               />

@@ -910,7 +910,7 @@ function MainPageContent() {
       />
 
       {currentSubMenus.length > 0 && (
-        <aside className="no-scrollbar flex w-full shrink-0 flex-row overflow-x-auto border-b border-[var(--border)] bg-[var(--card)] px-2 py-1.5 md:sticky md:top-0 md:max-h-[100dvh] md:w-[var(--submenu-width)] md:flex-col md:overflow-x-visible md:overflow-y-auto md:border-r md:border-b-0 md:px-2 md:py-3 md:gap-0.5">
+        <aside className="no-scrollbar scroll-smooth snap-x snap-mandatory flex w-full shrink-0 flex-row gap-0.5 overflow-x-auto border-b border-[var(--border)] bg-[var(--card)] px-2 py-1.5 md:sticky md:top-0 md:max-h-[100dvh] md:w-[var(--submenu-width)] md:flex-col md:snap-none md:overflow-x-visible md:overflow-y-auto md:border-r md:border-b-0 md:px-2 md:py-3 md:gap-0.5">
           {(() => {
             if (mainMenu === '관리자' || mainMenu === '재고관리') {
               const groups = currentSubMenuGroups;
