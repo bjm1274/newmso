@@ -35,7 +35,7 @@ export default function EducationStatus({ selectedCo, summary, onOpenRoster }: E
         </p>
       </div>
 
-      <div className={`bg-[var(--card)] border p-4 shadow-sm transition-all ${summary.urgentStaffCount > 0 ? 'border-red-200 bg-red-50/30' : 'border-[var(--border)]'}`}>
+      <div className={`bg-[var(--card)] border p-4 shadow-sm transition-all ${summary.urgentStaffCount > 0 ? 'border-red-500/20 bg-red-500/10/30' : 'border-[var(--border)]'}`}>
         <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase mb-1 tracking-widest">미이수 인원</p>
         <div className="flex items-center justify-between mt-4 gap-4">
           <div>
@@ -52,7 +52,7 @@ export default function EducationStatus({ selectedCo, summary, onOpenRoster }: E
           <button
             type="button"
             onClick={onOpenRoster}
-            className="text-[11px] font-semibold text-[var(--accent)] border border-blue-100 px-3 py-1.5 bg-[var(--card)] hover:bg-blue-50 transition-all shadow-sm"
+            className="text-[11px] font-semibold text-[var(--accent)] border border-blue-100 px-3 py-1.5 bg-[var(--card)] hover:bg-blue-500/10 transition-all shadow-sm"
           >
             전체 명단 확인
           </button>

@@ -125,9 +125,9 @@ export default function UnpaidAllowanceAlert({ staffs, selectedCo, user }: Props
   };
 
   const severityColor = (s: string) =>
-    s === '높음' ? 'bg-red-100 text-red-700 border-red-200' :
+    s === '높음' ? 'bg-red-500/20 text-red-700 border-red-500/20' :
     s === '중간' ? 'bg-amber-100 text-amber-700 border-amber-200' :
-    'bg-blue-50 text-blue-700 border-blue-200';
+    'bg-blue-500/10 text-blue-700 border-blue-500/20';
 
   const fmt = (n: number) => n.toLocaleString('ko-KR');
 

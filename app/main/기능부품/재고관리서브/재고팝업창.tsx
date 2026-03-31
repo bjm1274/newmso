@@ -50,7 +50,7 @@ export function AddItemModal({ isOpen, onClose: _onClose, onComplete: _onComplet
         {/* [NEW] 단가 입력 추가 */}
         <div>
           <label className="text-xs font-bold text-[var(--accent)] ml-1">단가 (필수)</label>
-          <input type="number" className="w-full p-3 bg-blue-50 border border-blue-100 rounded-[var(--radius-lg)] text-sm font-bold" placeholder="개당 가격" value={newItem.price} onChange={e => setNewItem({ ...newItem, price: Number(e.target.value) })} />
+          <input type="number" className="w-full p-3 bg-blue-500/10 border border-blue-100 rounded-[var(--radius-lg)] text-sm font-bold" placeholder="개당 가격" value={newItem.price} onChange={e => setNewItem({ ...newItem, price: Number(e.target.value) })} />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -60,7 +60,7 @@ export function AddItemModal({ isOpen, onClose: _onClose, onComplete: _onComplet
           </div>
           <div>
             <label className="text-xs font-bold text-red-400 ml-1">최소 유지</label>
-            <input type="number" className="w-full p-3 bg-red-50 text-red-500 rounded-[var(--radius-lg)] text-sm font-bold" value={newItem.safety_stock} onChange={e => setNewItem({ ...newItem, safety_stock: Number(e.target.value) })} />
+            <input type="number" className="w-full p-3 bg-red-500/10 text-red-500 rounded-[var(--radius-lg)] text-sm font-bold" value={newItem.safety_stock} onChange={e => setNewItem({ ...newItem, safety_stock: Number(e.target.value) })} />
           </div>
         </div>
 
@@ -108,13 +108,13 @@ export function StockProcessModal({ isOpen: _isOpen, onClose: _onClose, onComple
     <div className="absolute inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-5" onClick={onClose}>
       <div className="bg-[var(--card)] w-full max-w-sm rounded-2xl p-5 shadow-sm text-center space-y-4" onClick={e => e.stopPropagation()}>
         <h2 className="text-2xl font-semibold text-[var(--foreground)]">{modalItem.name as string}</h2>
-        <div className={`p-4 rounded-2xl ${modalData.type === 'in' ? 'bg-blue-50' : 'bg-orange-50'}`}>
+        <div className={`p-4 rounded-2xl ${modalData.type === 'in' ? 'bg-blue-500/10' : 'bg-orange-500/10'}`}>
           {modalData.type === 'in' && (<div className="space-y-2 mb-4 text-left"><div><label className="text-xs font-bold text-[var(--toss-gray-3)] ml-1">LOT</label><input className="w-full p-2 bg-[var(--card)] rounded-[var(--radius-lg)] text-sm font-bold border" value={lotInput} onChange={e => setLotInput(e.target.value)} /></div><div><label className="text-xs font-bold text-[var(--toss-gray-3)] ml-1">유통기한</label><SmartDatePicker value={expInput} onChange={val => setExpInput(val)} className="w-full h-9 px-2 bg-[var(--card)] rounded-[var(--radius-lg)] text-sm font-bold border" /></div></div>)}
           {modalData.type === 'out' && (<div className="mb-4 text-left"><label className="text-xs font-bold text-[var(--toss-gray-3)] ml-1">사용 부서</label><select value={targetDept} onChange={e => setTargetDept(e.target.value)} className="w-full p-2 bg-[var(--card)] rounded-[var(--radius-lg)] text-sm font-bold border"><option value="">선택...</option>{depts.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>)}
           <label className="block text-xs font-bold mb-2">수량</label>
           <div className="flex items-center justify-center gap-4"><button onClick={() => setQtyInput(q => Math.max(1, q - 1))} className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--card)] font-semibold">-</button><input type="number" value={qtyInput} onChange={(e) => setQtyInput(Number(e.target.value))} className="w-20 text-center bg-transparent text-3xl font-semibold outline-none" /><button onClick={() => setQtyInput(q => q + 1)} className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--card)] font-semibold">+</button></div>
         </div>
-        <button onClick={handleStockProcess} className={`w-full py-4 text-white rounded-[var(--radius-md)] font-bold shadow-sm ${modalData.type === 'in' ? 'bg-[var(--accent)]' : 'bg-orange-500'}`}>확인</button>
+        <button onClick={handleStockProcess} className={`w-full py-4 text-white rounded-[var(--radius-md)] font-bold shadow-sm ${modalData.type === 'in' ? 'bg-[var(--accent)]' : 'bg-orange-500/100'}`}>확인</button>
       </div>
     </div>
   );

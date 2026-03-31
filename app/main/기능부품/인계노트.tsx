@@ -1126,12 +1126,12 @@ export default function HandoverNotes({ user }: Props) {
     const isMutating = noteMutationId === note.id;
 
     return (
-      <div key={note.id} className={`rounded-[var(--radius-xl)] border px-4 py-3 shadow-sm ${note.is_completed ? 'border-[var(--border)] bg-[var(--page-bg)]' : note.priority === 'High' ? 'border-red-200 bg-red-50/60' : 'border-[var(--border)] bg-[var(--card)]'}`}>
+      <div key={note.id} className={`rounded-[var(--radius-xl)] border px-4 py-3 shadow-sm ${note.is_completed ? 'border-[var(--border)] bg-[var(--page-bg)]' : note.priority === 'High' ? 'border-red-500/20 bg-red-500/10/60' : 'border-[var(--border)] bg-[var(--card)]'}`}>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
               <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-2.5 py-1 text-[var(--accent)]">{note.shift}</span>
-              <span className={`rounded-[var(--radius-md)] px-2.5 py-1 ${note.priority === 'High' ? 'bg-red-100 text-red-600' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-3)]'}`}>{note.priority === 'High' ? '중요' : '일반'}</span>
+              <span className={`rounded-[var(--radius-md)] px-2.5 py-1 ${note.priority === 'High' ? 'bg-red-500/20 text-red-600' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-3)]'}`}>{note.priority === 'High' ? '중요' : '일반'}</span>
               <span className={`rounded-[var(--radius-md)] px-2.5 py-1 ${note.note_scope === 'patient' ? 'bg-emerald-100 text-emerald-700' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'}`}>{note.note_scope === 'patient' ? '환자별' : '공통'}</span>
               {note.note_scope === 'patient' ? <span className="rounded-[var(--radius-md)] bg-emerald-50 px-2.5 py-1 text-emerald-700">{formatPatientBedLabel(note)}</span> : null}
               <span className="text-[var(--toss-gray-3)]">{note.author_name || '이름 없음'} · {createdLabel(note.created_at)}</span>
@@ -1729,7 +1729,7 @@ export default function HandoverNotes({ user }: Props) {
                 {roomDirty ? <span className="rounded-[var(--radius-md)] bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">수정됨</span> : null}
                 {roomStatus === 'saving' ? <span className="rounded-[var(--radius-md)] bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">저장 중</span> : null}
                 {roomStatus === 'saved' ? <span className="rounded-[var(--radius-md)] bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">저장됨</span> : null}
-                {roomStatus === 'error' ? <span className="rounded-[var(--radius-md)] bg-red-100 px-2.5 py-1 text-[11px] font-semibold text-red-600">저장 실패</span> : null}
+                {roomStatus === 'error' ? <span className="rounded-[var(--radius-md)] bg-red-500/20 px-2.5 py-1 text-[11px] font-semibold text-red-600">저장 실패</span> : null}
                 <button
                   type="button"
                   onClick={() => void handleSaveRoomConfigs()}
@@ -1811,7 +1811,7 @@ export default function HandoverNotes({ user }: Props) {
                          <button
                            type="button"
                            onClick={() => replaceRooms(roomConfigs.filter((item) => item.id !== room.id))}
-                            className="rounded-[var(--radius-md)] bg-red-50 px-2 py-1.5 text-[11px] font-semibold text-red-600 transition hover:bg-red-100"
+                            className="rounded-[var(--radius-md)] bg-red-500/10 px-2 py-1.5 text-[11px] font-semibold text-red-600 transition hover:bg-red-500/20"
                          >
                            호수 삭제
                          </button>

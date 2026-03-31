@@ -87,7 +87,7 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--border)]">
         <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
           연차 종합 대시보드
-          {selectedCo !== '전체' && <span className="px-2 py-0.5 bg-blue-50 text-[var(--accent)] text-[10px] rounded-[var(--radius-md)]">{selectedCo as string}</span>}
+          {selectedCo !== '전체' && <span className="px-2 py-0.5 bg-blue-500/10 text-[var(--accent)] text-[10px] rounded-[var(--radius-md)]">{selectedCo as string}</span>}
         </h3>
         <div className="flex gap-0.5 bg-[var(--tab-bg)] rounded-[var(--radius-md)] p-0.5">
           <button
@@ -240,7 +240,7 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
 
                 {/* 연차 촉진 알림 연동 배너 (개인별 뷰에서 잔여 연차가 있을 때) */}
                 {remain > 0 && s.id && (currentUser as Record<string, unknown> | undefined)?.id === (s.id as string) && (
-                  <div className="px-4 py-3 bg-red-50/50 border-t border-red-100 flex items-center justify-between text-xs mt-3 rounded-[var(--radius-md)]">
+                  <div className="px-4 py-3 bg-red-500/10/50 border-t border-red-100 flex items-center justify-between text-xs mt-3 rounded-[var(--radius-md)]">
                     <div>
                       <span className="font-semibold text-red-600">🚨 연차 사용 촉진 안내</span>
                       <p className="text-[11px] text-red-500 font-medium mt-0.5">미사용 연차 {remain}일에 대해 연차사용계획서를 의무 제출해야 합니다.</p>

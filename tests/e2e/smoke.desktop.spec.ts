@@ -1346,10 +1346,7 @@ test("inventory registration creates a new inventory item through the form tab",
   await page
     .getByTestId("inventory-registration-item-name")
     .fill("멸균거즈");
-  await expect(page.getByTestId("inventory-registration-unit-box")).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(page.getByTestId("inventory-registration-unit")).toHaveValue("BOX");
   await page
     .getByTestId("inventory-registration-category")
     .selectOption("소모품");
@@ -2296,7 +2293,7 @@ test("employee and admin can complete a realistic monthly operations lifecycle",
   await page.getByTestId("inventory-registration-item-name").fill("E2E 가상물품");
   await page.getByTestId("inventory-registration-category").selectOption("소모품");
   await page.getByTestId("inventory-registration-quantity").fill("10");
-  await page.getByTestId("inventory-registration-unit-ea").click();
+  await page.getByTestId("inventory-registration-unit").selectOption("EA");
   await page
     .getByTestId("inventory-registration-company")
     .selectOption(hospital.name);

@@ -101,7 +101,7 @@ export default function WagePeakCalculator({ staffs = [], selectedCo, user }: { 
           <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-2">임금피크 적용 직원 ({peakAge}세 이상)</p>
           <div className="space-y-2">
             {peakTargets.map(s => (
-              <div key={s.id} className="flex items-center justify-between p-4 bg-orange-50 border border-orange-200 rounded-[var(--radius-lg)]">
+              <div key={s.id} className="flex items-center justify-between p-4 bg-orange-500/10 border border-orange-500/20 rounded-[var(--radius-lg)]">
                 <div>
                   <p className="text-sm font-bold text-[var(--foreground)]">{s.name} <span className="text-xs text-orange-600">({s.age}세)</span></p>
                   <p className="text-[10px] text-[var(--toss-gray-3)]">{s.position} · {s.department}</p>
@@ -132,13 +132,13 @@ export default function WagePeakCalculator({ staffs = [], selectedCo, user }: { 
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
                 {enriched.map(s => (
-                  <tr key={s.id} className={`${s.isPeakTarget ? 'bg-orange-50/50' : 'hover:bg-[var(--muted)]/30'}`}>
+                  <tr key={s.id} className={`${s.isPeakTarget ? 'bg-orange-500/10/50' : 'hover:bg-[var(--muted)]/30'}`}>
                     <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{s.name}</td>
                     <td className="px-3 py-2 text-xs">{s.age > 0 ? s.age + '세' : '-'}</td>
                     <td className="px-3 py-2 text-xs text-[var(--toss-gray-3)]">{s.position}</td>
                     <td className="px-3 py-2 text-xs text-right">{s.base.toLocaleString()}</td>
                     <td className="px-3 py-2 text-xs text-center">
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${s.isPeakTarget ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${s.isPeakTarget ? 'bg-orange-500/20 text-orange-700' : 'bg-green-500/20 text-green-700'}`}>
                         {Math.round(s.rate * 100)}%
                       </span>
                     </td>

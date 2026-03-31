@@ -272,7 +272,7 @@ export default function ContractPreview({ staff, contract }: Props) {
     return (
       <div className="mt-4 mb-2 bg-[var(--tab-bg)]/80 border border-[var(--border)] rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-[11px] font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md">임금 구성항목</span>
+          <span className="text-[11px] font-black text-blue-700 bg-blue-500/10 px-2.5 py-1 rounded-md">임금 구성항목</span>
         </div>
         {/* 테이블 헤더 */}
         <div className="grid grid-cols-12 gap-1 pb-1.5 border-b-2 border-[var(--border)] mb-1">
@@ -346,7 +346,7 @@ export default function ContractPreview({ staff, contract }: Props) {
       if (trimmed.startsWith('[') && trimmed.endsWith(']') && !trimmed.includes('임금')) {
         result.push(
           <div key={i} className="mt-5 mb-2">
-            <span className="text-[11px] font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md">
+            <span className="text-[11px] font-black text-blue-700 bg-blue-500/10 px-2.5 py-1 rounded-md">
               {trimmed.replace(/[\[\]]/g, '')}
             </span>
           </div>
@@ -403,7 +403,7 @@ export default function ContractPreview({ staff, contract }: Props) {
       {/* 상단 툴바 */}
       <div className="sticky top-0 z-20 flex items-center justify-between px-5 py-3 bg-white/80 backdrop-blur-md border-b border-slate-200 print:hidden">
         <div className="flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full bg-blue-500" />
+          <div className="w-2 h-2 rounded-full bg-blue-500/100" />
           <span className="text-[13px] font-bold text-slate-800">{staff.name}</span>
           <span className="text-[11px] text-slate-400">근로계약서</span>
         </div>
@@ -419,7 +419,7 @@ export default function ContractPreview({ staff, contract }: Props) {
           )}
           <button
             onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-[var(--muted)] transition-colors"
           >
             <span>🖨️</span> 인쇄
           </button>
@@ -468,7 +468,7 @@ export default function ContractPreview({ staff, contract }: Props) {
                       { label: '대 표 자', value: (company?.ceo_name as string) || '-' },
                     ].map(({ label, value }) => (
                       <div key={label} className="flex text-[10.5px]">
-                        <span className="w-[72px] shrink-0 px-3 py-2 bg-slate-50 text-slate-500 font-bold">{label}</span>
+                        <span className="w-[72px] shrink-0 px-3 py-2 bg-[var(--muted)] text-slate-500 font-bold">{label}</span>
                         <span className="flex-1 px-3 py-2 text-slate-800 font-semibold leading-snug">{value}</span>
                       </div>
                     ))}
@@ -489,7 +489,7 @@ export default function ContractPreview({ staff, contract }: Props) {
                       { label: '부서/직위', value: [staff.department, staff.position].filter(Boolean).join(' · ') || '-' },
                     ].map(({ label, value }) => (
                       <div key={label} className="flex text-[10.5px]">
-                        <span className="w-[72px] shrink-0 px-3 py-2 bg-blue-50 text-blue-700 font-bold">{label}</span>
+                        <span className="w-[72px] shrink-0 px-3 py-2 bg-blue-500/10 text-blue-700 font-bold">{label}</span>
                         <span className="flex-1 px-3 py-2 text-slate-800 font-semibold leading-snug">{value}</span>
                       </div>
                     ))}
@@ -528,7 +528,7 @@ export default function ContractPreview({ staff, contract }: Props) {
 
               {/* ── 동의 문구 ── */}
               <div className="mt-12 mb-8">
-                <div className="border border-slate-200 rounded-xl px-6 py-4 bg-slate-50 text-center">
+                <div className="border border-slate-200 rounded-xl px-6 py-4 bg-[var(--muted)] text-center">
                   <p className="text-[11.5px] font-bold text-slate-600 leading-relaxed">
                     상기 근로계약의 내용을 충분히 이해하고 이에 동의하여 본 계약을 체결합니다.
                   </p>
@@ -573,7 +573,7 @@ export default function ContractPreview({ staff, contract }: Props) {
                 </div>
 
                 {/* 근로자 서명 */}
-                <div className="rounded-xl border border-blue-200 overflow-hidden">
+                <div className="rounded-xl border border-blue-500/20 overflow-hidden">
                   <div className="px-4 py-2 bg-blue-600 text-white text-center">
                     <span className="text-[10px] font-black tracking-[0.2em]">근 로 자</span>
                   </div>

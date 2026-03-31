@@ -60,9 +60,9 @@ function calcDday(dateStr: string | null | undefined): { label: string; tone: st
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const targetDay = new Date(target.getFullYear(), target.getMonth(), target.getDate());
   const diffDays = Math.round((targetDay.getTime() - today.getTime()) / 86400000);
-  if (diffDays < 0) return { label: `D+${Math.abs(diffDays)} 지연`, tone: 'bg-red-500/10 text-red-600' };
-  if (diffDays === 0) return { label: 'D-day 오늘', tone: 'bg-orange-500/10 text-orange-600' };
-  if (diffDays <= 3) return { label: `D-${diffDays} 임박`, tone: 'bg-orange-500/10 text-orange-500' };
+  if (diffDays < 0) return { label: `D+${Math.abs(diffDays)} 지연`, tone: 'bg-red-500/100/10 text-red-600' };
+  if (diffDays === 0) return { label: 'D-day 오늘', tone: 'bg-orange-500/100/10 text-orange-600' };
+  if (diffDays <= 3) return { label: `D-${diffDays} 임박`, tone: 'bg-orange-500/100/10 text-orange-500' };
   return { label: `D-${diffDays}`, tone: 'bg-[var(--muted)] text-[var(--toss-gray-3)]' };
 }
 
@@ -100,8 +100,8 @@ function normalizeApprovalOrderRecord(approval: any): OrderRecord {
 
 function getStatusTone(status: string, sourceType: OrderRecord['sourceType']) {
   if (status === '승인') return 'bg-emerald-50 text-emerald-600';
-  if (status === '반려') return 'bg-red-50 text-red-600';
-  if (sourceType === 'approval') return 'bg-orange-50 text-orange-600';
+  if (status === '반려') return 'bg-red-500/10 text-red-600';
+  if (sourceType === 'approval') return 'bg-orange-500/10 text-orange-600';
   return 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]';
 }
 
@@ -310,7 +310,7 @@ export default function PurchaseOrderManagement({
         </div>
 
         {lowStockItems.length === 0 ? (
-          <div className="text-center py-10 bg-green-50 rounded-[var(--radius-md)] border border-dashed border-green-200">
+          <div className="text-center py-10 bg-green-500/10 rounded-[var(--radius-md)] border border-dashed border-green-500/20">
             <p className="text-sm font-semibold text-green-600">현재 모든 품목이 안전재고 이상입니다.</p>
           </div>
         ) : (
@@ -318,7 +318,7 @@ export default function PurchaseOrderManagement({
             {lowStockItems.map((item: any) => (
               <div
                 key={item.id}
-                className="p-4 bg-orange-50 border border-orange-100 rounded-[var(--radius-md)] flex justify-between items-center"
+                className="p-4 bg-orange-500/10 border border-orange-100 rounded-[var(--radius-md)] flex justify-between items-center"
               >
                 <div>
                   <p className="text-sm font-semibold text-[var(--foreground)]">{getItemName(item)}</p>
@@ -404,7 +404,7 @@ export default function PurchaseOrderManagement({
                       )}
                     </div>
                     {order.sourceType === 'approval' ? (
-                      <div className="rounded-[var(--radius-md)] bg-orange-50 px-3 py-2 text-[11px] font-semibold text-orange-600">
+                      <div className="rounded-[var(--radius-md)] bg-orange-500/10 px-3 py-2 text-[11px] font-semibold text-orange-600">
                         {order.status === '승인' ? '전자결재 승인 완료' : '전자결재 승인 대기'}
                       </div>
                     ) : (

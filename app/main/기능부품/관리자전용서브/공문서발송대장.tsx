@@ -186,7 +186,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
 
       {/* 메시지 */}
       {message && (
-        <div className={`px-4 py-3 rounded-xl text-sm font-bold ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+        <div className={`px-4 py-3 rounded-xl text-sm font-bold ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-500/10 text-red-700 border border-red-500/20'}`}>
           {message.text}
         </div>
       )}
@@ -201,7 +201,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
           <p className="text-xs font-bold text-emerald-500">수신 확인</p>
           <p className="text-2xl font-extrabold text-emerald-600 mt-1">{receivedCount}<span className="text-sm ml-1">건</span></p>
         </div>
-        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
+        <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-4">
           <p className="text-xs font-bold text-orange-500">수신 미확인</p>
           <p className="text-2xl font-extrabold text-orange-600 mt-1">{unreceivedCount}<span className="text-sm ml-1">건</span></p>
         </div>
@@ -209,7 +209,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
 
       {/* 등록/수정 폼 */}
       {showForm && (
-        <div className="bg-blue-50 border border-[var(--accent)]/30 rounded-[var(--radius-md)] p-4 space-y-3">
+        <div className="bg-blue-500/10 border border-[var(--accent)]/30 rounded-[var(--radius-md)] p-4 space-y-3">
           <h3 className="text-sm font-bold text-[var(--accent)]">{editingDoc ? '공문 수정' : '공문 등록'}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <div>
@@ -349,7 +349,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
                     <td className="px-4 py-2">
                       <button
                         onClick={() => handleToggleReceived(doc)}
-                        className={`px-2 py-1 text-[10px] font-extrabold rounded-lg transition-all ${doc.is_received ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-orange-100 text-orange-700 hover:bg-orange-200'}`}
+                        className={`px-2 py-1 text-[10px] font-extrabold rounded-lg transition-all ${doc.is_received ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-orange-500/20 text-orange-700 hover:bg-orange-200'}`}
                       >
                         {doc.is_received ? '✓ 확인' : '미확인'}
                       </button>
@@ -357,8 +357,8 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
                     <td className="px-4 py-3 text-[var(--toss-gray-3)] max-w-[120px] truncate">{doc.note || '-'}</td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
-                        <button onClick={() => openEdit(doc)} className="px-2 py-1 text-[10px] font-bold bg-blue-50 text-[var(--accent)] rounded-lg hover:bg-blue-100 transition-colors">수정</button>
-                        <button onClick={() => handleDelete(doc.id!)} className="px-2 py-1 text-[10px] font-bold bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition-colors">삭제</button>
+                        <button onClick={() => openEdit(doc)} className="px-2 py-1 text-[10px] font-bold bg-blue-500/10 text-[var(--accent)] rounded-lg hover:bg-blue-500/20 transition-colors">수정</button>
+                        <button onClick={() => handleDelete(doc.id!)} className="px-2 py-1 text-[10px] font-bold bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors">삭제</button>
                       </div>
                     </td>
                   </tr>

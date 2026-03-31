@@ -12,7 +12,7 @@ type Category = {
   children?: Category[];
 };
 
-const CAT_COLORS = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-red-500', 'bg-teal-500', 'bg-pink-500', 'bg-indigo-500'];
+const CAT_COLORS = ['bg-blue-500/100', 'bg-green-500/100', 'bg-purple-500/100', 'bg-orange-500/100', 'bg-red-500/100', 'bg-teal-500', 'bg-pink-500/100', 'bg-indigo-500/100'];
 
 function buildCategoryTree(cats: Category[]): Category[] {
   const map: Record<string, Category> = {};
@@ -46,9 +46,9 @@ function CategoryNode({ cat, onEdit, onDelete, onAdd, depth = 0 }: {
           <span className="text-[9px] text-[var(--toss-gray-3)]">(하위 {cat.children?.length || 0}개)</span>
         </div>
         <div className="hidden group-hover:flex gap-1">
-          <button data-testid={`category-add-child-${cat.id}`} onClick={() => onAdd(cat.id)} className="px-2 py-0.5 text-[10px] bg-green-50 text-green-700 font-bold rounded">+ 하위</button>
-          <button data-testid={`category-edit-${cat.id}`} onClick={() => onEdit(cat)} className="px-2 py-0.5 text-[10px] bg-blue-50 text-blue-600 font-bold rounded">편집</button>
-          <button data-testid={`category-delete-${cat.id}`} onClick={() => onDelete(cat.id)} className="px-2 py-0.5 text-[10px] bg-red-50 text-red-500 font-bold rounded">삭제</button>
+          <button data-testid={`category-add-child-${cat.id}`} onClick={() => onAdd(cat.id)} className="px-2 py-0.5 text-[10px] bg-green-500/10 text-green-700 font-bold rounded">+ 하위</button>
+          <button data-testid={`category-edit-${cat.id}`} onClick={() => onEdit(cat)} className="px-2 py-0.5 text-[10px] bg-blue-500/10 text-blue-600 font-bold rounded">편집</button>
+          <button data-testid={`category-delete-${cat.id}`} onClick={() => onDelete(cat.id)} className="px-2 py-0.5 text-[10px] bg-red-500/10 text-red-500 font-bold rounded">삭제</button>
         </div>
       </div>
       {expanded && cat.children?.map(child => (
@@ -131,7 +131,7 @@ export default function CategoryManager({ user }: { user: any }) {
           <h2 className="text-base font-bold text-[var(--foreground)]">재고 카테고리 트리 관리</h2>
         </div>
         <div className="flex gap-2">
-          <button onClick={importFromInventory} data-testid="category-import-from-inventory" className="px-3 py-1.5 bg-purple-500 text-white rounded-[var(--radius-md)] text-xs font-bold">재고에서 가져오기</button>
+          <button onClick={importFromInventory} data-testid="category-import-from-inventory" className="px-3 py-1.5 bg-purple-500/100 text-white rounded-[var(--radius-md)] text-xs font-bold">재고에서 가져오기</button>
           <button onClick={() => openAdd()} data-testid="category-add-button" className="px-3 py-1.5 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-xs font-bold">+ 카테고리 추가</button>
         </div>
       </div>
@@ -141,7 +141,7 @@ export default function CategoryManager({ user }: { user: any }) {
           <p className="text-[var(--toss-gray-3)] font-bold text-sm">카테고리가 없습니다.</p>
           <div className="flex gap-2">
             <button onClick={() => openAdd()} data-testid="category-add-empty-button" className="px-4 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-sm font-bold">직접 추가</button>
-            <button onClick={importFromInventory} className="px-4 py-2 bg-purple-500 text-white rounded-[var(--radius-md)] text-sm font-bold">재고에서 가져오기</button>
+            <button onClick={importFromInventory} className="px-4 py-2 bg-purple-500/100 text-white rounded-[var(--radius-md)] text-sm font-bold">재고에서 가져오기</button>
           </div>
         </div>
       ) : (

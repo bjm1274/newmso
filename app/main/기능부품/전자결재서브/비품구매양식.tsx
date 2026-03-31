@@ -416,7 +416,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
             data-testid="supplies-remove-row-button"
             onClick={removeLastItemRow}
             disabled={items.length <= 1}
-            className="inline-flex items-center justify-center rounded-[var(--radius-md)] bg-red-50 px-3 py-1.5 text-[11px] font-bold text-red-500 transition-colors hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center justify-center rounded-[var(--radius-md)] bg-red-500/10 px-3 py-1.5 text-[11px] font-bold text-red-500 transition-colors hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
             항목 삭제
           </button>
@@ -543,7 +543,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
                 {item.currentStock !== null ? (
                   <span
                     className={`shrink-0 rounded-[var(--radius-md)] px-2 py-1 text-[10px] font-bold ${
-                      item.currentStock <= 5 ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'
+                      item.currentStock <= 5 ? 'bg-red-500/10 text-red-600' : 'bg-blue-500/10 text-blue-600'
                     }`}
                   >
                     SY INC 재고 {item.currentStock} {item.unit}
@@ -583,8 +583,8 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
                             <span
                               className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${
                                 suggestion.stock <= suggestion.min_stock
-                                  ? 'bg-red-100 text-red-600'
-                                  : 'bg-green-100 text-green-600'
+                                  ? 'bg-red-500/20 text-red-600'
+                                  : 'bg-green-500/20 text-green-600'
                               }`}
                             >
                               재고 {suggestion.stock} {suggestion.unit}
@@ -684,7 +684,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
                       {item.currentStock !== null ? (
                         <span
                           className={`pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 rounded-[var(--radius-md)] px-1.5 py-0.5 text-[10px] font-bold ${
-                            item.currentStock <= 5 ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'
+                            item.currentStock <= 5 ? 'bg-red-500/10 text-red-600' : 'bg-blue-500/10 text-blue-600'
                           }`}
                         >
                           재고 {item.currentStock} {item.unit}
@@ -710,8 +710,8 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
                               <span
                                 className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${
                                   suggestion.stock <= suggestion.min_stock
-                                    ? 'bg-red-100 text-red-600'
-                                    : 'bg-green-100 text-green-600'
+                                    ? 'bg-red-500/20 text-red-600'
+                                    : 'bg-green-500/20 text-green-600'
                                 }`}
                               >
                                 재고 {suggestion.stock} {suggestion.unit}

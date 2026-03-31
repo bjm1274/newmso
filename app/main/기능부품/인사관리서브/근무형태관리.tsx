@@ -780,7 +780,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                     <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">근무 조건 분석</p>
                     <p className="mt-1 text-[12px] font-semibold text-[var(--foreground)]">예상 주간 근로시간 {estimatedWeeklyHours}시간</p>
                   </div>
-                  <span className={`rounded-[var(--radius-md)] px-3 py-1 text-[10px] font-bold ${showContractSettings ? 'bg-orange-100 text-orange-700' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'}`}>
+                  <span className={`rounded-[var(--radius-md)] px-3 py-1 text-[10px] font-bold ${showContractSettings ? 'bg-orange-500/20 text-orange-700' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'}`}>
                     {showContractSettings ? '추가 약정 대상' : '일반 근무'}
                   </span>
                 </div>
@@ -790,7 +790,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
               </div>
 
               {showContractSettings && (
-                <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-4">
+                <div className="rounded-xl border border-orange-500/20 bg-orange-500/10 p-4 space-y-4">
                   <div>
                     <p className="text-[11px] font-black uppercase tracking-[0.18em] text-orange-700">추가 약정 설정</p>
                     <p className="mt-1 text-[11px] font-semibold text-orange-600">
@@ -805,7 +805,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                         min={0}
                         value={newShift.monthly_night_days}
                         onChange={e => setNewShift({ ...newShift, monthly_night_days: Number(e.target.value) || 0 })}
-                        className="w-full p-3 bg-[var(--card)] border border-orange-200 font-semibold text-xs radius-toss"
+                        className="w-full p-3 bg-[var(--card)] border border-orange-500/20 font-semibold text-xs radius-toss"
                       />
                     </label>
                     <label className="flex flex-col gap-1">
@@ -816,7 +816,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                         step={0.5}
                         value={newShift.additional_work_hours}
                         onChange={e => setNewShift({ ...newShift, additional_work_hours: Number(e.target.value) || 0 })}
-                        className="w-full p-3 bg-[var(--card)] border border-orange-200 font-semibold text-xs radius-toss"
+                        className="w-full p-3 bg-[var(--card)] border border-orange-500/20 font-semibold text-xs radius-toss"
                       />
                     </label>
                     <label className="flex flex-col gap-1">
@@ -827,14 +827,14 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                         step={10000}
                         value={newShift.extra_contract_allowance}
                         onChange={e => setNewShift({ ...newShift, extra_contract_allowance: Number(e.target.value) || 0 })}
-                        className="w-full p-3 bg-[var(--card)] border border-orange-200 font-semibold text-xs radius-toss"
+                        className="w-full p-3 bg-[var(--card)] border border-orange-500/20 font-semibold text-xs radius-toss"
                       />
                     </label>
                   </div>
                 </div>
               )}
 
-              <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/30">
+              <div className="bg-indigo-500/10 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/30">
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"

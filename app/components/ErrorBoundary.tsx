@@ -30,7 +30,7 @@ export default class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-[200px] flex flex-col items-center justify-center p-8 bg-red-50 border border-red-100 rounded-2xl">
+        <div className="min-h-[200px] flex flex-col items-center justify-center p-8 bg-red-500/10 border border-red-100 rounded-2xl">
           <span className="text-4xl mb-4">⚠️</span>
           <h3 className="text-lg font-black text-[var(--foreground)] mb-2">오류가 발생했습니다</h3>
           <p className="text-sm text-[var(--toss-gray-3)] font-bold mb-4">{this.state.error?.message}</p>

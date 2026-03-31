@@ -217,7 +217,7 @@ export default function OnboardingChecklist({
               </span>
             ) : null}
             {type === '입사' && joinedDayDiff !== null ? (
-              <span className="rounded-full bg-blue-50 px-2 py-1 font-semibold text-blue-700">
+              <span className="rounded-full bg-blue-500/10 px-2 py-1 font-semibold text-blue-700">
                 입사 D+{joinedDayDiff}
               </span>
             ) : null}

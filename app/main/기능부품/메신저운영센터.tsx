@@ -464,8 +464,8 @@ export default function MessengerOperationsCenter({
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              {row.isImportant && <span className="rounded-[var(--radius-md)] bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-600">중요공지</span>}
-                              {row.isOverSla && <span className="rounded-[var(--radius-md)] bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600">SLA 초과</span>}
+                              {row.isImportant && <span className="rounded-[var(--radius-md)] bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold text-orange-600">중요공지</span>}
+                              {row.isOverSla && <span className="rounded-[var(--radius-md)] bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-600">SLA 초과</span>}
                               <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">{formatDateLabel(row.created_at)}</span>
                             </div>
                             <p className="mt-2 line-clamp-2 text-sm font-semibold text-[var(--foreground)]">{row.content}</p>
@@ -484,7 +484,7 @@ export default function MessengerOperationsCenter({
                               type="button"
                               onClick={() => markAsImportant(row)}
                               disabled={busyId === row.id}
-                              className="rounded-[var(--radius-md)] border border-orange-200 bg-orange-50 px-3 py-2 text-[11px] font-bold text-orange-600 disabled:opacity-50"
+                              className="rounded-[var(--radius-md)] border border-orange-500/20 bg-orange-500/10 px-3 py-2 text-[11px] font-bold text-orange-600 disabled:opacity-50"
                             >
                               중요공지 지정
                             </button>
@@ -523,7 +523,7 @@ export default function MessengerOperationsCenter({
                               ? 'bg-emerald-100 text-emerald-600'
                               : row.status === '부재중'
                                 ? 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'
-                                : 'bg-blue-100 text-blue-600'
+                                : 'bg-blue-500/20 text-blue-600'
                           }`}
                         >
                           {row.status}
@@ -633,7 +633,7 @@ export default function MessengerOperationsCenter({
                         type="button"
                         onClick={() => removeDriveLink(link.id)}
                         disabled={busyId === link.id}
-                        className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-bold text-red-600"
+                        className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/10 px-3 py-2 text-[11px] font-bold text-red-600"
                       >
                         삭제
                       </button>

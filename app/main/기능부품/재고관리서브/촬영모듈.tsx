@@ -112,7 +112,7 @@ export default function PhotoModule({ user, inventory, fetchInventory }: Record<
           ) : (
             <>
               <button onClick={capturePhoto} disabled={loading} className="flex-1 py-5 bg-green-600 text-white rounded-[var(--radius-md)] font-semibold text-sm shadow-sm hover:scale-[0.98] transition-all">📸 촬영 및 인식</button>
-              <button onClick={stopCamera} className="px-5 py-5 bg-[var(--muted)] text-[var(--toss-gray-3)] rounded-[var(--radius-md)] font-semibold text-sm hover:bg-red-50 hover:text-red-500 transition-all">✕</button>
+              <button onClick={stopCamera} className="px-5 py-5 bg-[var(--muted)] text-[var(--toss-gray-3)] rounded-[var(--radius-md)] font-semibold text-sm hover:bg-red-500/10 hover:text-red-500 transition-all">✕</button>
             </>
           )}
         </div>

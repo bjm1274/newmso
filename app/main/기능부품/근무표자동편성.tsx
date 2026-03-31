@@ -2422,16 +2422,16 @@ function getShiftBadgeClass(name: string) {
     return 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)] border-[var(--border)]';
   }
   if (normalized.includes('휴가') || normalized.includes('연차')) {
-    return 'bg-green-50 text-green-700 border-green-200';
+    return 'bg-green-500/10 text-green-700 border-green-500/20';
   }
   if (normalized.includes('데이') || normalized.includes('day') || normalized.includes('주간') || normalized.includes('상근') || /(?:^|[^a-z])d$/.test(normalized)) {
-    return 'bg-blue-50 text-blue-700 border-blue-200';
+    return 'bg-blue-500/10 text-blue-700 border-blue-500/20';
   }
   if (normalized.includes('이브') || normalized.includes('evening') || normalized.includes('eve') || /(?:^|[^a-z])e$/.test(normalized)) {
-    return 'bg-orange-50 text-orange-700 border-orange-200';
+    return 'bg-orange-500/10 text-orange-700 border-orange-500/20';
   }
   if (normalized.includes('나이트') || normalized.includes('night') || normalized.includes('야간') || /(?:^|[^a-z])n$/.test(normalized)) {
-    return 'bg-purple-50 text-purple-700 border-purple-200';
+    return 'bg-purple-500/10 text-purple-700 border-purple-500/20';
   }
   return 'bg-emerald-50 text-emerald-700 border-emerald-200';
 }
@@ -4000,7 +4000,7 @@ export default function AutoRosterPlanner({
                   onClick={() => setSelectedSnapshotId(snapshot.id)}
                   className={`w-full rounded-[var(--radius-lg)] border px-4 py-3 text-left transition-colors ${
                     snapshot.id === selectedSnapshotId
-                      ? 'border-[var(--accent)] bg-blue-50'
+                      ? 'border-[var(--accent)] bg-blue-500/10'
                       : 'border-[var(--border)] bg-[var(--muted)] hover:border-[var(--accent)]/40'
                   }`}
                 >
@@ -4117,7 +4117,7 @@ export default function AutoRosterPlanner({
             <span className="rounded-[var(--radius-md)] border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-semibold text-rose-700">
               인원 부족 {rosterWarningReport.headcountCount}건
             </span>
-            <span className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-700">
+            <span className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/10 px-3 py-1 text-[11px] font-semibold text-red-700">
               인력 부족 {rosterWarningReport.coverageCount}건
             </span>
             <span className="rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700">
@@ -4142,10 +4142,10 @@ export default function AutoRosterPlanner({
                 onClick={() => jumpToRosterWarningTarget(item.targetTestId)}
                 className={`w-full rounded-[var(--radius-xl)] border px-4 py-3 text-left transition-colors ${
                   item.tone === 'red'
-                    ? 'border-red-200 bg-red-50'
+                    ? 'border-red-500/20 bg-red-500/10'
                     : item.tone === 'amber'
                       ? 'border-amber-200 bg-amber-50'
-                      : 'border-yellow-200 bg-yellow-50'
+                      : 'border-yellow-500/20 bg-yellow-500/10'
                 }`}
                 data-testid={`roster-warning-item-${item.id}`}
               >
@@ -5746,7 +5746,7 @@ export default function AutoRosterPlanner({
 
   if (!canAccess) {
     return (
-      <div className="rounded-[var(--radius-xl)] border border-red-100 bg-red-50 p-4 text-sm font-semibold text-red-600">
+      <div className="rounded-[var(--radius-xl)] border border-red-100 bg-red-500/10 p-4 text-sm font-semibold text-red-600">
         부서장 이상만 교대근무 자동생성 기능을 사용할 수 있습니다.
       </div>
     );
@@ -6170,7 +6170,7 @@ export default function AutoRosterPlanner({
                                 deleteGenerationRule(rule.id);
                               }
                             }}
-                            className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600"
+                            className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-600"
                             data-testid={`generation-rule-delete-${rule.id}`}
                           >
                             삭제
@@ -6353,7 +6353,7 @@ export default function AutoRosterPlanner({
                       type="button"
                       onClick={() => removePatternGroup(group.id)}
                       disabled={patternDraft.staffGroups.length === 1}
-                      className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       그룹 삭제
                     </button>
@@ -6482,7 +6482,7 @@ export default function AutoRosterPlanner({
                                 deletePatternProfile(profile.id);
                               }
                             }}
-                            className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600"
+                            className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-600"
                             data-testid={`pattern-profile-delete-${profile.id}`}
                           >
                             삭제
@@ -6902,7 +6902,7 @@ export default function AutoRosterPlanner({
               <button
                 type="button"
                 onClick={() => setManualEditMode((prev) => !prev)}
-                className={`rounded-[var(--radius-md)] px-3 py-1 text-[11px] font-bold ${manualEditMode ? 'bg-orange-100 text-orange-700' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}
+                className={`rounded-[var(--radius-md)] px-3 py-1 text-[11px] font-bold ${manualEditMode ? 'bg-orange-500/20 text-orange-700' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}
               >
                 {manualEditMode ? '수동 수정 중' : '수동 수정'}
               </button>
@@ -6954,7 +6954,7 @@ export default function AutoRosterPlanner({
                       };
                       const coverageToneClass =
                         coverage.status === 'warning'
-                          ? 'border-red-200 bg-red-50 text-red-700'
+                          ? 'border-red-500/20 bg-red-500/10 text-red-700'
                           : coverage.status === 'extra'
                             ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                             : 'border-sky-200 bg-sky-50 text-sky-700';
@@ -7689,7 +7689,7 @@ export default function AutoRosterPlanner({
             <button
               type="button"
               onClick={() => setManualEditMode((prev) => !prev)}
-              className={`rounded-[var(--radius-md)] px-3 py-1 text-[11px] font-bold ${manualEditMode ? 'bg-orange-100 text-orange-700' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}
+              className={`rounded-[var(--radius-md)] px-3 py-1 text-[11px] font-bold ${manualEditMode ? 'bg-orange-500/20 text-orange-700' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}
             >
               {manualEditMode ? '수동 수정 중' : '수동 수정'}
             </button>

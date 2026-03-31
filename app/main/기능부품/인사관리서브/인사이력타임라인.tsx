@@ -64,7 +64,7 @@ export default function StaffHistoryTimeline({ staffId, staffName }: Props) {
           </p>
         </div>
         <div className="flex gap-2 shrink-0">
-          <span className="px-2 py-1 rounded-full bg-blue-50 text-blue-700 text-[11px] font-semibold">
+          <span className="px-2 py-1 rounded-full bg-blue-500/10 text-blue-700 text-[11px] font-semibold">
             발령 {summary.appointments}
           </span>
           <span className="px-2 py-1 rounded-full bg-violet-50 text-violet-700 text-[11px] font-semibold">

@@ -66,7 +66,7 @@ export default function MinWageChecker({ staffs = [], selectedCo, user }: { staf
       </div>
 
       {/* 기준 안내 */}
-      <div className="bg-blue-50 border border-blue-200 rounded-[var(--radius-lg)] p-4 flex flex-wrap gap-4">
+      <div className="bg-blue-500/10 border border-blue-500/20 rounded-[var(--radius-lg)] p-4 flex flex-wrap gap-4">
         <div>
           <p className="text-[10px] font-semibold text-blue-600">{checkYear}년 최저임금 (시급)</p>
           <p className="text-xl font-bold text-blue-700">{minWageHourly.toLocaleString()}원</p>
@@ -98,7 +98,7 @@ export default function MinWageChecker({ staffs = [], selectedCo, user }: { staf
       </div>
 
       {violations.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-[var(--radius-lg)] p-4">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-[var(--radius-lg)] p-4">
           <p className="text-sm font-bold text-red-600 mb-2">최저임금 미달 경고</p>
           <p className="text-xs text-red-500">
             {violations.map(v => v.name).join(', ')} 등 {violations.length}명의 직원이 {checkYear}년 최저임금({minWageMonthly.toLocaleString()}원)에 미달합니다.
@@ -110,7 +110,7 @@ export default function MinWageChecker({ staffs = [], selectedCo, user }: { staf
       {/* 필터 */}
       <div className="flex items-center gap-2">
         <button onClick={() => setShowViolationOnly(v => !v)}
-          className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${showViolationOnly ? 'bg-red-500 text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>
+          className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${showViolationOnly ? 'bg-red-500/100 text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>
           미달만 보기
         </button>
         <span className="text-xs text-[var(--toss-gray-3)]">{displayed.length}명</span>
@@ -129,7 +129,7 @@ export default function MinWageChecker({ staffs = [], selectedCo, user }: { staf
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
               {displayed.map(c => (
-                <tr key={c.id} className={c.isViolation ? 'bg-red-50' : 'hover:bg-[var(--muted)]/30'}>
+                <tr key={c.id} className={c.isViolation ? 'bg-red-500/10' : 'hover:bg-[var(--muted)]/30'}>
                   <td className="px-3 py-2.5 text-xs font-bold text-[var(--foreground)]">{c.name}</td>
                   <td className="px-3 py-2.5 text-xs text-[var(--toss-gray-3)]">{c.position}</td>
                   <td className="px-3 py-2.5 text-xs text-[var(--toss-gray-3)]">{c.department}</td>
@@ -142,9 +142,9 @@ export default function MinWageChecker({ staffs = [], selectedCo, user }: { staf
                     {c.base === 0 ? (
                       <span className="px-2 py-0.5 rounded-[var(--radius-md)] text-[9px] font-bold bg-[var(--tab-bg)] text-[var(--toss-gray-4)]">미등록</span>
                     ) : c.isViolation ? (
-                      <span className="px-2 py-0.5 rounded-[var(--radius-md)] text-[9px] font-bold bg-red-100 text-red-600">미달</span>
+                      <span className="px-2 py-0.5 rounded-[var(--radius-md)] text-[9px] font-bold bg-red-500/20 text-red-600">미달</span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded-[var(--radius-md)] text-[9px] font-bold bg-green-100 text-green-700">준수</span>
+                      <span className="px-2 py-0.5 rounded-[var(--radius-md)] text-[9px] font-bold bg-green-500/20 text-green-700">준수</span>
                     )}
                   </td>
                 </tr>

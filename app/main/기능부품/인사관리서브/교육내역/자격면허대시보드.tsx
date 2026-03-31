@@ -281,11 +281,11 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
               {filtered.map((item: LicenseItem) => {
                 const statusToneClass =
                   item.statusTone === 'success'
-                    ? 'bg-green-50 text-green-700'
+                    ? 'bg-green-500/10 text-green-700'
                     : item.statusTone === 'warning'
-                      ? 'bg-orange-50 text-orange-600'
+                      ? 'bg-orange-500/10 text-orange-600'
                       : item.statusTone === 'danger'
-                        ? 'bg-red-50 text-red-600 animate-pulse'
+                        ? 'bg-red-500/10 text-red-600 animate-pulse'
                         : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]';
 
                 const daysLeft = item.daysLeft ?? null;

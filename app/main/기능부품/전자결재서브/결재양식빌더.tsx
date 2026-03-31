@@ -175,7 +175,7 @@ export default function ApprovalFormBuilder({ user }: Props) {
                     <div className="flex gap-1 ml-auto">
                       <button onClick={() => moveField(field.id, 'up')} disabled={idx === 0} className="text-xs px-2 py-0.5 bg-[var(--muted)] rounded disabled:opacity-30">▲</button>
                       <button onClick={() => moveField(field.id, 'down')} disabled={idx === fields.length - 1} className="text-xs px-2 py-0.5 bg-[var(--muted)] rounded disabled:opacity-30">▼</button>
-                      <button onClick={() => removeField(field.id)} className="text-xs px-2 py-0.5 bg-red-50 text-red-500 rounded hover:bg-red-100">삭제</button>
+                      <button onClick={() => removeField(field.id)} className="text-xs px-2 py-0.5 bg-red-500/10 text-red-500 rounded hover:bg-red-500/20">삭제</button>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -245,7 +245,7 @@ export default function ApprovalFormBuilder({ user }: Props) {
                 <p className="text-sm font-bold text-[var(--foreground)]">{form.name}</p>
                 <p className="text-[11px] text-[var(--toss-gray-3)]">필드 {(form.fields || []).length}개 · {new Date(form.created_at).toLocaleDateString('ko-KR')}</p>
               </div>
-              <button onClick={() => handleDelete(form.id)} className="px-3 py-1.5 text-xs font-bold text-red-500 bg-red-50 rounded-[var(--radius-md)] hover:bg-red-100">삭제</button>
+              <button onClick={() => handleDelete(form.id)} className="px-3 py-1.5 text-xs font-bold text-red-500 bg-red-500/10 rounded-[var(--radius-md)] hover:bg-red-500/20">삭제</button>
             </div>
           ))}
         </div>

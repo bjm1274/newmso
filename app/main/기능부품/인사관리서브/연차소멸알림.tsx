@@ -112,8 +112,8 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
   };
 
   const cardColor = (item: LeaveInfo) => {
-    if (item.daysLeft <= 0) return 'border-red-300 bg-red-50';
-    if (item.daysLeft <= 7) return 'border-red-200 bg-red-50/60';
+    if (item.daysLeft <= 0) return 'border-red-300 bg-red-500/10';
+    if (item.daysLeft <= 7) return 'border-red-500/20 bg-red-500/10/60';
     if (item.daysLeft <= 30) return 'border-amber-200 bg-amber-50/60';
     return 'border-[var(--border)] bg-[var(--card)]';
   };

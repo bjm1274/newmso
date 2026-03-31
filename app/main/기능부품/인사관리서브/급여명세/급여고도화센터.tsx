@@ -853,7 +853,7 @@ export default function PayrollAdvancedCenter({
                       <p className="text-sm font-bold text-[var(--foreground)]">{item.title}</p>
                       <p className="text-[11px] text-[var(--toss-gray-3)]">{item.dueDate} · {item.owner}</p>
                     </div>
-                    <span className={`rounded-[var(--radius-md)] px-3 py-1 text-[11px] font-bold ${item.status === '완료' ? 'bg-emerald-100 text-emerald-600' : item.status === '진행' ? 'bg-blue-100 text-blue-600' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'}`}>{item.status}</span>
+                    <span className={`rounded-[var(--radius-md)] px-3 py-1 text-[11px] font-bold ${item.status === '완료' ? 'bg-emerald-100 text-emerald-600' : item.status === '진행' ? 'bg-blue-500/20 text-blue-600' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'}`}>{item.status}</span>
                   </button>
                 ))}
               </div>
@@ -865,7 +865,7 @@ export default function PayrollAdvancedCenter({
                   <textarea value={step1Comment} onChange={(event) => setStep1Comment(event.target.value)} placeholder="검토 의견" className="mt-3 h-20 w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none" />
                   <div className="mt-3 flex gap-2">
                     <button onClick={() => updateApproval('step1', '승인', step1Comment)} disabled={savingKey === 'step1'} className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-50">승인</button>
-                    <button onClick={() => updateApproval('step1', '보류', step1Comment)} disabled={savingKey === 'step1'} className="rounded-[var(--radius-md)] border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-bold text-orange-600 disabled:opacity-50">보류</button>
+                    <button onClick={() => updateApproval('step1', '보류', step1Comment)} disabled={savingKey === 'step1'} className="rounded-[var(--radius-md)] border border-orange-500/20 bg-orange-500/10 px-4 py-2 text-sm font-bold text-orange-600 disabled:opacity-50">보류</button>
                   </div>
                   <p className="mt-3 text-[11px] font-semibold text-[var(--toss-gray-3)]">현재 상태: {currentApproval.step1Status}</p>
                 </div>
@@ -876,7 +876,7 @@ export default function PayrollAdvancedCenter({
                   <textarea value={step2Comment} onChange={(event) => setStep2Comment(event.target.value)} placeholder="최종 의견" className="mt-3 h-20 w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none" />
                   <div className="mt-3 flex gap-2">
                     <button onClick={() => updateApproval('step2', '승인', step2Comment)} disabled={savingKey === 'step2'} className="rounded-[var(--radius-md)] bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">승인</button>
-                    <button onClick={() => updateApproval('step2', '보류', step2Comment)} disabled={savingKey === 'step2'} className="rounded-[var(--radius-md)] border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-bold text-orange-600 disabled:opacity-50">보류</button>
+                    <button onClick={() => updateApproval('step2', '보류', step2Comment)} disabled={savingKey === 'step2'} className="rounded-[var(--radius-md)] border border-orange-500/20 bg-orange-500/10 px-4 py-2 text-sm font-bold text-orange-600 disabled:opacity-50">보류</button>
                   </div>
                   <p className="mt-3 text-[11px] font-semibold text-[var(--toss-gray-3)]">현재 상태: {currentApproval.step2Status}</p>
                 </div>

@@ -93,7 +93,7 @@ export default function ContractList({ selectedCo, staffs, contracts = [], onSel
             {filtered.map((s) => {
               const contract = contracts.find((c) => c.staff_id === s.id);
               const status = contract?.status || '미발송';
-              const statusColor = status === '서명완료' ? 'text-emerald-500 bg-emerald-50' : status === '서명대기' ? 'text-blue-500 bg-blue-50' : 'text-[var(--toss-gray-3)] bg-[var(--tab-bg)]';
+              const statusColor = status === '서명완료' ? 'text-emerald-500 bg-emerald-50' : status === '서명대기' ? 'text-blue-500 bg-blue-500/10' : 'text-[var(--toss-gray-3)] bg-[var(--tab-bg)]';
 
               return (
                 <tr

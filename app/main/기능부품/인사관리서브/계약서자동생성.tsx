@@ -28,8 +28,8 @@ interface ContractForm {
 }
 
 const CONTRACT_TEMPLATES: Record<ContractType, { title: string; description: string; color: string }> = {
-  근로계약: { title: '근로 계약서', description: '정규직·계약직 근로자와의 표준 근로계약', color: 'bg-blue-50 border-blue-200 text-blue-700' },
-  위임계약: { title: '위임 계약서', description: '업무 위임 및 대리 수행 계약', color: 'bg-purple-50 border-purple-200 text-purple-700' },
+  근로계약: { title: '근로 계약서', description: '정규직·계약직 근로자와의 표준 근로계약', color: 'bg-blue-500/10 border-blue-500/20 text-blue-700' },
+  위임계약: { title: '위임 계약서', description: '업무 위임 및 대리 수행 계약', color: 'bg-purple-500/10 border-purple-500/20 text-purple-700' },
   용역계약: { title: '용역 계약서', description: '외부 용역 서비스 제공 계약', color: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
 };
 
@@ -223,7 +223,7 @@ export default function ContractAutoGenerator({ staffs, selectedCo, user }: Prop
       {message && (
         <div
           data-testid="contract-generator-message"
-          className={`px-4 py-3 rounded-xl text-sm font-bold ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}
+          className={`px-4 py-3 rounded-xl text-sm font-bold ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-500/10 text-red-700 border border-red-500/20'}`}
         >
           {message.text}
         </div>

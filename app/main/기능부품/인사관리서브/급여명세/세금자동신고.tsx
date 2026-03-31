@@ -232,7 +232,7 @@ export default function TaxAutoReport({ selectedCo = '전체' }: Record<string, 
       </div>
 
       {errorMessage && (
-        <div className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+        <div className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-600">
           {errorMessage}
         </div>
       )}

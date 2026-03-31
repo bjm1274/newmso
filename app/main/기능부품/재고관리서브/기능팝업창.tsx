@@ -81,7 +81,7 @@ export function BillModal({ isOpen, onClose: _onClose, inventory: _inventory }: 
           <div className="absolute inset-0 bg-[var(--card)]/95 z-50 flex flex-col items-center justify-center p-5 backdrop-blur-md rounded-2xl">
             <div className="w-full max-w-md space-y-4">
               <h2 className="text-2xl font-semibold text-[var(--foreground)] border-b pb-4 mb-4">🏢 신규 업체 등록</h2>
-              <div><label className="text-xs font-bold text-[var(--accent)] ml-1">별칭</label><input className="w-full p-3 bg-blue-50 border border-blue-100 rounded-[var(--radius-lg)] font-bold" placeholder="예: 거래처A" value={newPartner.alias} onChange={e => setNewPartner({ ...newPartner, alias: e.target.value })} /></div>
+              <div><label className="text-xs font-bold text-[var(--accent)] ml-1">별칭</label><input className="w-full p-3 bg-blue-500/10 border border-blue-100 rounded-[var(--radius-lg)] font-bold" placeholder="예: 거래처A" value={newPartner.alias} onChange={e => setNewPartner({ ...newPartner, alias: e.target.value })} /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="text-xs font-bold text-[var(--toss-gray-3)] ml-1">등록번호</label><input className="w-full p-3 bg-[var(--muted)] rounded-[var(--radius-lg)] text-sm" value={newPartner.reg_num} onChange={e => setNewPartner({ ...newPartner, reg_num: e.target.value })} /></div>
                 <div><label className="text-xs font-bold text-[var(--toss-gray-3)] ml-1">상호</label><input className="w-full p-3 bg-[var(--muted)] rounded-[var(--radius-lg)] text-sm" value={newPartner.sangho} onChange={e => setNewPartner({ ...newPartner, sangho: e.target.value })} /></div>
@@ -98,7 +98,7 @@ export function BillModal({ isOpen, onClose: _onClose, inventory: _inventory }: 
         <div className="text-center mb-4 relative">
           <h1 className="text-3xl font-serif font-bold underline decoration-double">거 래 명 세 서</h1>
           <div className="absolute top-0 right-0 flex gap-2 no-print">
-            <button onClick={() => setIsRegisterMode(true)} className="bg-orange-500 text-white px-3 py-2 rounded font-bold text-xs hover:bg-orange-600">+ 업체등록</button>
+            <button onClick={() => setIsRegisterMode(true)} className="bg-orange-500/100 text-white px-3 py-2 rounded font-bold text-xs hover:bg-orange-600">+ 업체등록</button>
             <button onClick={() => window.print()} className="bg-[var(--accent)] text-white px-4 py-2 rounded font-bold text-sm">인쇄</button>
             <button onClick={onClose} className="bg-[var(--toss-gray-2)] text-[var(--foreground)] px-4 py-2 rounded font-bold text-sm">닫기</button>
           </div>
@@ -111,15 +111,15 @@ export function BillModal({ isOpen, onClose: _onClose, inventory: _inventory }: 
               <div className="absolute top-2 right-2 flex flex-wrap gap-1 opacity-20 group-hover:opacity-100 transition-opacity no-print max-w-[200px] justify-end z-10">
                 <button onClick={() => applyPreset(role, PRESET_A)} className="bg-[var(--muted)] text-[11px] px-2 py-1 border rounded hover:bg-[var(--toss-blue-light)]">본원</button>
                 <button onClick={() => applyPreset(role, PRESET_B)} className="bg-[var(--muted)] text-[11px] px-2 py-1 border rounded hover:bg-[var(--toss-blue-light)]">기본</button>
-                {customPresets.map((cp, idx) => (<button key={idx} onClick={() => applyPreset(role, cp)} className="bg-yellow-50 text-orange-700 text-[11px] px-2 py-1 border border-yellow-200 rounded hover:bg-yellow-100">{cp.alias}</button>))}
+                {customPresets.map((cp, idx) => (<button key={idx} onClick={() => applyPreset(role, cp)} className="bg-yellow-500/10 text-orange-700 text-[11px] px-2 py-1 border border-yellow-500/20 rounded hover:bg-yellow-500/20">{cp.alias}</button>))}
               </div>
               <div className="text-center text-red-500 font-bold mb-2">[{role === 'supplier' ? '공급자' : '공급받는자'}]</div>
               <div className="grid grid-cols-[60px_1fr] gap-1 text-sm">
-                <div className="font-bold text-center border p-1 bg-red-50">등록번호</div><input className="border p-1 w-full" value={(billData as any)[role].reg_num || ''} onChange={e => setBillData({ ...billData, [role]: { ...(billData as any)[role], reg_num: e.target.value } })} />
-                <div className="font-bold text-center border p-1 bg-red-50">상호</div><input className="border p-1 w-full" value={(billData as any)[role].sangho || ''} onChange={e => setBillData({ ...billData, [role]: { ...(billData as any)[role], sangho: e.target.value } })} />
-                <div className="font-bold text-center border p-1 bg-red-50">대표자</div><input className="border p-1 w-full" value={(billData as any)[role].ceo || ''} onChange={e => setBillData({ ...billData, [role]: { ...(billData as any)[role], ceo: e.target.value } })} />
-                <div className="font-bold text-center border p-1 bg-red-50">주소</div><input className="border p-1 w-full" value={(billData as any)[role].addr || ''} onChange={e => setBillData({ ...billData, [role]: { ...(billData as any)[role], addr: e.target.value } })} />
-                <div className="font-bold text-center border p-1 bg-red-50">전화번호</div><input className="border p-1 w-full" value={(billData as any)[role].phone || ''} onChange={e => setBillData({ ...billData, [role]: { ...(billData as any)[role], phone: e.target.value } })} />
+                <div className="font-bold text-center border p-1 bg-red-500/10">등록번호</div><input className="border p-1 w-full" value={(billData as any)[role].reg_num || ''} onChange={e => setBillData({ ...billData, [role]: { ...(billData as any)[role], reg_num: e.target.value } })} />
+                <div className="font-bold text-center border p-1 bg-red-500/10">상호</div><input className="border p-1 w-full" value={(billData as any)[role].sangho || ''} onChange={e => setBillData({ ...billData, [role]: { ...(billData as any)[role], sangho: e.target.value } })} />
+                <div className="font-bold text-center border p-1 bg-red-500/10">대표자</div><input className="border p-1 w-full" value={(billData as any)[role].ceo || ''} onChange={e => setBillData({ ...billData, [role]: { ...(billData as any)[role], ceo: e.target.value } })} />
+                <div className="font-bold text-center border p-1 bg-red-500/10">주소</div><input className="border p-1 w-full" value={(billData as any)[role].addr || ''} onChange={e => setBillData({ ...billData, [role]: { ...(billData as any)[role], addr: e.target.value } })} />
+                <div className="font-bold text-center border p-1 bg-red-500/10">전화번호</div><input className="border p-1 w-full" value={(billData as any)[role].phone || ''} onChange={e => setBillData({ ...billData, [role]: { ...(billData as any)[role], phone: e.target.value } })} />
               </div>
             </div>
           ))}
@@ -158,7 +158,7 @@ export function BillModal({ isOpen, onClose: _onClose, inventory: _inventory }: 
                       <div className="absolute top-full left-0 w-full bg-[var(--card)] border border-[var(--border)] shadow-sm z-20 max-h-40 overflow-y-auto text-left">
                         {suggestions.map((s: Record<string, unknown>) => (
                           <div key={s.id as string} onClick={() => selectItem(i, s)}
-                            className="p-2 hover:bg-blue-50 cursor-pointer border-b border-[var(--border)] last:border-0">
+                            className="p-2 hover:bg-blue-500/10 cursor-pointer border-b border-[var(--border)] last:border-0">
                             <div className="font-bold text-xs">{s.name as string}</div>
                             <div className="text-[11px] text-[var(--toss-gray-3)]">{s.spec as string} | ₩{(s.price as number)?.toLocaleString()}</div>
                           </div>
@@ -178,7 +178,7 @@ export function BillModal({ isOpen, onClose: _onClose, inventory: _inventory }: 
           </tbody>
           <tfoot><tr className="bg-[var(--muted)] font-bold"><td colSpan={4} className="border p-1 text-center">합 계</td><td colSpan={2} className="border p-1 text-right pr-2">₩ {billData.items.reduce((s, i) => s + (i.supply_price || 0) + (i.tax || 0), 0).toLocaleString()}</td></tr></tfoot>
         </table>
-        <div className="text-center no-print"><button onClick={addRow} className="text-xs text-blue-500 font-bold p-2 hover:bg-blue-50 rounded">+ 품목 줄 추가</button></div>
+        <div className="text-center no-print"><button onClick={addRow} className="text-xs text-blue-500 font-bold p-2 hover:bg-blue-500/10 rounded">+ 품목 줄 추가</button></div>
       </div>
     </div>
   );

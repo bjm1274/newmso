@@ -121,13 +121,13 @@ export default function RetirementPensionManager({ staffs = [], selectedCo, user
           const type = s.pension?.pension_type || '미가입';
           const contribution = s.pension?.monthly_contribution || (type.startsWith('DC') ? s.autoDC : 0);
           return (
-            <div key={s.id} className={`flex items-center justify-between p-4 bg-[var(--card)] border rounded-[var(--radius-lg)] shadow-sm ${!s.pension || type === '미가입' ? 'border-orange-200' : 'border-[var(--border)]'}`}>
+            <div key={s.id} className={`flex items-center justify-between p-4 bg-[var(--card)] border rounded-[var(--radius-lg)] shadow-sm ${!s.pension || type === '미가입' ? 'border-orange-500/20' : 'border-[var(--border)]'}`}>
               <div className="flex items-center gap-3">
                 <div className={`w-2 h-12 rounded-full ${type.startsWith('DC') ? 'bg-blue-400' : type.startsWith('DB') ? 'bg-purple-400' : 'bg-gray-300'}`} />
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-bold text-[var(--foreground)]">{s.name}</p>
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${type.startsWith('DC') ? 'bg-blue-100 text-blue-700' : type.startsWith('DB') ? 'bg-purple-100 text-purple-700' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'}`}>{type}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${type.startsWith('DC') ? 'bg-blue-500/20 text-blue-700' : type.startsWith('DB') ? 'bg-purple-500/20 text-purple-700' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'}`}>{type}</span>
                   </div>
                   <p className="text-[10px] text-[var(--toss-gray-3)]">{s.position} · {s.yearsWorked}년 근속</p>
                   {s.pension?.fund_name && <p className="text-[10px] text-[var(--toss-gray-3)]">{s.pension.fund_name}</p>}
@@ -137,7 +137,7 @@ export default function RetirementPensionManager({ staffs = [], selectedCo, user
                 <p className="text-sm font-bold text-[var(--accent)]">{contribution.toLocaleString()}원/월</p>
                 {s.pension?.total_accumulated ? <p className="text-[10px] text-[var(--toss-gray-3)]">적립: {s.pension.total_accumulated.toLocaleString()}원</p> : null}
                 {type.startsWith('DC') && <p className="text-[9px] text-[var(--toss-gray-3)]">기준: 월급의 {(DC_RATE * 100).toFixed(2)}%</p>}
-                <button onClick={() => openEdit(s)} className="mt-1 px-2 py-0.5 text-[10px] bg-blue-50 text-blue-600 font-bold rounded-md hover:bg-blue-100">
+                <button onClick={() => openEdit(s)} className="mt-1 px-2 py-0.5 text-[10px] bg-blue-500/10 text-blue-600 font-bold rounded-md hover:bg-blue-500/20">
                   {s.pension ? '편집' : '등록'}
                 </button>
               </div>

@@ -36,15 +36,15 @@ interface ReturnRecord {
 
 const AS_STATUS_COLORS: Record<AsStatus, string> = {
   접수: 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]',
-  처리중: 'bg-blue-50 text-blue-600',
-  완료: 'bg-green-50 text-green-600',
-  반품: 'bg-red-50 text-red-600',
+  처리중: 'bg-blue-500/10 text-blue-600',
+  완료: 'bg-green-500/10 text-green-600',
+  반품: 'bg-red-500/10 text-red-600',
 };
 
 const RETURN_STATUS_COLORS: Record<ReturnStatus, string> = {
   요청: 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]',
-  승인: 'bg-blue-50 text-blue-600',
-  완료: 'bg-green-50 text-green-600',
+  승인: 'bg-blue-500/10 text-blue-600',
+  완료: 'bg-green-500/10 text-green-600',
 };
 
 const generateId = () => crypto.randomUUID();
@@ -479,7 +479,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                         <button
                           onClick={() => deleteAsRecord(record.id)}
                           data-testid={`as-delete-${record.id}`}
-                          className="px-2 py-1 bg-red-50 text-red-600 text-[11px] font-semibold rounded-md hover:bg-red-100"
+                          className="px-2 py-1 bg-red-500/10 text-red-600 text-[11px] font-semibold rounded-md hover:bg-red-500/20"
                         >
                           삭제
                         </button>
@@ -559,7 +559,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                         <button
                           onClick={() => deleteReturnRecord(record.id)}
                           data-testid={`return-delete-${record.id}`}
-                          className="px-2 py-1 bg-red-50 text-red-600 text-[11px] font-semibold rounded-md hover:bg-red-100"
+                          className="px-2 py-1 bg-red-500/10 text-red-600 text-[11px] font-semibold rounded-md hover:bg-red-500/20"
                         >
                           삭제
                         </button>
@@ -587,7 +587,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                 <div key={`${item.type}_${item.id}`} className="px-4 py-3.5 flex items-start justify-between gap-4 hover:bg-[var(--toss-blue-light)]/30 transition-all">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${item.type === 'as' ? 'bg-purple-50 text-purple-600' : 'bg-orange-50 text-orange-600'}`}>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${item.type === 'as' ? 'bg-purple-500/10 text-purple-600' : 'bg-orange-500/10 text-orange-600'}`}>
                         {item.type === 'as' ? 'AS' : '반품'}
                       </span>
                       <p className="text-xs font-semibold text-[var(--foreground)] truncate">{item.title.replace(/^\[AS\] |\[반품\] /, '')}</p>

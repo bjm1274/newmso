@@ -16,15 +16,15 @@ const TABS = [
 ] as const;
 
 const TYPE_CFG: Record<string, { icon: string; bg: string; text: string; border: string }> = {
-  message: { icon: '💬', bg: 'bg-blue-50 dark:bg-blue-950/30', text: 'text-blue-600', border: 'border-blue-300' },
-  mention: { icon: '📣', bg: 'bg-indigo-50 dark:bg-indigo-950/30', text: 'text-indigo-600', border: 'border-indigo-300' },
+  message: { icon: '💬', bg: 'bg-blue-500/10 dark:bg-blue-950/30', text: 'text-blue-600', border: 'border-blue-300' },
+  mention: { icon: '📣', bg: 'bg-indigo-500/10 dark:bg-indigo-950/30', text: 'text-indigo-600', border: 'border-indigo-300' },
   approval: { icon: '📋', bg: 'bg-violet-50 dark:bg-violet-950/30', text: 'text-violet-600', border: 'border-violet-300' },
   payroll: { icon: '💰', bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600', border: 'border-emerald-300' },
-  inventory: { icon: '📦', bg: 'bg-orange-50 dark:bg-orange-950/30', text: 'text-orange-600', border: 'border-orange-300' },
+  inventory: { icon: '📦', bg: 'bg-orange-500/10 dark:bg-orange-950/30', text: 'text-orange-600', border: 'border-orange-300' },
   attendance: { icon: '⏰', bg: 'bg-teal-50 dark:bg-teal-950/30', text: 'text-teal-600', border: 'border-teal-300' },
-  board: { icon: '📌', bg: 'bg-pink-50 dark:bg-pink-950/30', text: 'text-pink-600', border: 'border-pink-300' },
+  board: { icon: '📌', bg: 'bg-pink-500/10 dark:bg-pink-950/30', text: 'text-pink-600', border: 'border-pink-300' },
   인사: { icon: '👥', bg: 'bg-cyan-50 dark:bg-cyan-950/30', text: 'text-cyan-700', border: 'border-cyan-300' },
-  education: { icon: '📚', bg: 'bg-purple-50 dark:bg-purple-950/30', text: 'text-purple-600', border: 'border-purple-300' },
+  education: { icon: '📚', bg: 'bg-purple-500/10 dark:bg-purple-950/30', text: 'text-purple-600', border: 'border-purple-300' },
   notification: { icon: '🔔', bg: 'bg-[var(--tab-bg)] dark:bg-slate-800/30', text: 'text-[var(--toss-gray-4)]', border: 'border-[var(--border)]' },
 };
 const DEFAULT_CFG = { icon: '🔔', bg: 'bg-[var(--tab-bg)] dark:bg-slate-800/30', text: 'text-[var(--toss-gray-4)]', border: 'border-[var(--border)]' };
@@ -336,7 +336,7 @@ export default function NotificationInbox({ user: _rawUser, onRefresh }: Record<
                   <span>{tab.icon}</span>
                   <span>{tab.label}</span>
                   {badge > 0 && (
-                    <span className={`text-[9px] font-black px-1 py-0 rounded-[var(--radius-md)] ${activeTab === tab.id ? 'bg-[var(--card)]/30 text-white' : 'bg-red-500 text-white'}`}>{badge}</span>
+                    <span className={`text-[9px] font-black px-1 py-0 rounded-[var(--radius-md)] ${activeTab === tab.id ? 'bg-[var(--card)]/30 text-white' : 'bg-red-500/100 text-white'}`}>{badge}</span>
                   )}
                 </button>
               );
@@ -402,7 +402,7 @@ export default function NotificationInbox({ user: _rawUser, onRefresh }: Record<
 
                             {/* 삭제 버튼 (hover 시 표시) */}
                             <button type="button" onClick={e => deleteNotif(n.id, e)}
-                              className="absolute right-5 top-3.5 w-6 h-6 flex items-center justify-center rounded-full text-[var(--toss-gray-3)] hover:text-red-500 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 text-xs"
+                              className="absolute right-5 top-3.5 w-6 h-6 flex items-center justify-center rounded-full text-[var(--toss-gray-3)] hover:text-red-500 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100 text-xs"
                               aria-label="삭제">✕</button>
                           </div>
                         );

@@ -249,7 +249,7 @@ export default function PopupManager() {
         <div className="grid grid-cols-2 gap-2 mt-4">
           <button
             onClick={() => setShowPreview(true)}
-            className="w-full py-2.5 bg-orange-50 text-orange-600 border border-orange-100 text-[11px] font-semibold shadow-sm uppercase tracking-widest"
+            className="w-full py-2.5 bg-orange-500/10 text-orange-600 border border-orange-100 text-[11px] font-semibold shadow-sm uppercase tracking-widest"
           >
             👁️ 홈페이지 실시간 시뮬레이션
           </button>
@@ -315,7 +315,7 @@ export default function PopupManager() {
                         onClick={() => void handleDeletePopup(popup)}
                         disabled={deletingPopupId === popup.id}
                         data-testid={`popup-delete-button-${popup.id}`}
-                        className="shrink-0 px-3 py-2 bg-red-50 border border-red-200 text-red-600 text-[11px] font-bold hover:bg-red-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                        className="shrink-0 px-3 py-2 bg-red-500/10 border border-red-500/20 text-red-600 text-[11px] font-bold hover:bg-red-500/20 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         {deletingPopupId === popup.id ? '삭제 중...' : '삭제'}
                       </button>

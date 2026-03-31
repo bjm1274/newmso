@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 
 interface Props {
-  user: any;
+  user: Record<string, unknown>;
   setMainMenu?: (menu: string) => void;
   onOpenApproval?: (options?: Record<string, unknown>) => void;
   selectedCo?: string | null;
@@ -32,6 +32,11 @@ type TodayAttendance = {
 type AnnualLeaveSummary = {
   remaining: number;
   total: number;
+};
+
+type BirthdayStaffItem = {
+  name: string;
+  daysUntil: number;
 };
 
 const MANAGER_POSITIONS = ['과장', '간호과장', '실장', '수간호사', '파트장', '센터장', '부장', '본부장', '이사', '원장', '병원장', '대표'];
@@ -113,13 +118,15 @@ export default function RoleDashboard({
   const [pendingApprovalItems, setPendingApprovalItems] = useState<PendingApprovalItem[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [lowStockCount, setLowStockCount] = useState(0);
+  const [expiringCount, setExpiringCount] = useState(0);
   const [todayAttendance, setTodayAttendance] = useState<TodayAttendance>({ in: null, out: null, status: null });
   const [annualLeave, setAnnualLeave] = useState<AnnualLeaveSummary | null>(null);
   const [teamCount, setTeamCount] = useState(0);
   const [teamCheckedIn, setTeamCheckedIn] = useState(0);
+  const [birthdayStaff, setBirthdayStaff] = useState<BirthdayStaffItem[]>([]);
 
-  const isAdmin = user?.role === 'admin' || user?.company === 'SY INC.' || user?.permissions?.mso;
-  const isManager = MANAGER_POSITIONS.includes(user?.position);
+  const isAdmin = user?.role === 'admin' || user?.company === 'SY INC.' || (user?.permissions as Record<string, unknown>)?.mso;
+  const isManager = MANAGER_POSITIONS.includes(user?.position as string);
 
   const fetchPending = useCallback(async () => {
     if (!user?.id) return;
@@ -262,9 +269,60 @@ export default function RoleDashboard({
       }
     };
 
+    const fetchBirthdayStaff = async () => {
+      const { data, error } = await withMissingColumnsFallback(
+        async (omittedColumns) => {
+          if (omittedColumns.has('birth_date')) {
+            return { data: [] as Record<string, unknown>[], error: null };
+          }
+          return supabase
+            .from('staff_members')
+            .select('name, birth_date')
+            .eq('status', '재직')
+            .not('birth_date', 'is', null);
+        },
+        ['birth_date'],
+      );
+
+      if (error || !data) return;
+
+      const today = new Date();
+      const todayMonth = today.getMonth() + 1;
+      const todayDay = today.getDate();
+
+      const upcoming: BirthdayStaffItem[] = [];
+      for (const staff of data as Record<string, unknown>[]) {
+        const birthDate = staff.birth_date as string | null;
+        const name = staff.name as string | null;
+        if (!birthDate || !name) continue;
+
+        const parts = birthDate.split('-');
+        if (parts.length < 3) continue;
+        const birthMonth = parseInt(parts[1], 10);
+        const birthDay = parseInt(parts[2], 10);
+        if (isNaN(birthMonth) || isNaN(birthDay)) continue;
+
+        const thisYearBirthday = new Date(today.getFullYear(), birthMonth - 1, birthDay);
+        let diff = Math.floor((thisYearBirthday.getTime() - new Date(today.getFullYear(), todayMonth - 1, todayDay).getTime()) / (1000 * 60 * 60 * 24));
+
+        if (diff < 0) {
+          const nextYearBirthday = new Date(today.getFullYear() + 1, birthMonth - 1, birthDay);
+          diff = Math.floor((nextYearBirthday.getTime() - new Date(today.getFullYear(), todayMonth - 1, todayDay).getTime()) / (1000 * 60 * 60 * 24));
+        }
+
+        if (diff >= 0 && diff <= 3) {
+          upcoming.push({ name, daysUntil: diff });
+        }
+      }
+
+      upcoming.sort((a, b) => a.daysUntil - b.daysUntil);
+      setBirthdayStaff(upcoming.slice(0, 3));
+    };
+
     void fetchPending();
     fetchToday();
     fetchLeave();
+    fetchBirthdayStaff();
 
     if (isAdmin || isManager) {
       const fetchLowStock = async () => {
@@ -274,6 +332,30 @@ export default function RoleDashboard({
           .lt('quantity', 5);
 
         setLowStockCount(count || 0);
+      };
+
+      const fetchExpiringItems = async () => {
+        try {
+          const today = new Date();
+          const in30Days = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+          const todayStr = today.toISOString().slice(0, 10);
+          const in30DaysStr = in30Days.toISOString().slice(0, 10);
+
+          const { count, error } = await supabase
+            .from('inventory')
+            .select('*', { count: 'exact', head: true })
+            .gte('expiration_date', todayStr)
+            .lte('expiration_date', in30DaysStr);
+
+          if (error) {
+            console.warn('Failed to load expiring items (column may not exist):', error);
+            setExpiringCount(0);
+            return;
+          }
+          setExpiringCount(count || 0);
+        } catch {
+          setExpiringCount(0);
+        }
       };
 
       const fetchTeam = async () => {
@@ -298,6 +380,7 @@ export default function RoleDashboard({
       };
 
       fetchLowStock();
+      fetchExpiringItems();
       fetchTeam();
     }
   }, [fetchPending, isAdmin, isManager, user?.department, user?.id]);
@@ -367,6 +450,8 @@ export default function RoleDashboard({
           pendingApprovals={pendingApprovals}
           pendingApprovalItems={pendingApprovalItems}
           lowStockCount={lowStockCount}
+          expiringCount={expiringCount}
+          birthdayStaff={birthdayStaff}
           setMainMenu={setMainMenu}
           openApprovalInbox={openApprovalInbox}
         />
@@ -374,11 +459,13 @@ export default function RoleDashboard({
         <ManagerDashboard
           teamCount={teamCount}
           teamCheckedIn={teamCheckedIn}
-          department={user?.department}
+          department={user?.department as string | undefined}
           pendingApprovals={pendingApprovals}
           pendingApprovalItems={pendingApprovalItems}
           todayAttendance={todayAttendance}
           lowStockCount={lowStockCount}
+          expiringCount={expiringCount}
+          birthdayStaff={birthdayStaff}
           setMainMenu={setMainMenu}
           openApprovalInbox={openApprovalInbox}
           formatTime={formatTime}
@@ -389,6 +476,7 @@ export default function RoleDashboard({
           annualLeave={annualLeave}
           pendingApprovals={pendingApprovals}
           pendingApprovalItems={pendingApprovalItems}
+          birthdayStaff={birthdayStaff}
           setMainMenu={setMainMenu}
           openApprovalInbox={openApprovalInbox}
           formatTime={formatTime}
@@ -521,7 +609,7 @@ function _LegacyManagerDashboard({
         type="button"
         className={`rounded-[var(--radius-lg)] border p-4 text-left transition-all ${
           pendingApprovals > 0
-            ? 'border-orange-200 bg-orange-50 hover:bg-orange-100'
+            ? 'border-orange-500/20 bg-orange-500/10 hover:bg-orange-500/20'
             : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
         }`}
         onClick={openApprovalInbox}
@@ -540,7 +628,7 @@ function _LegacyManagerDashboard({
         type="button"
         className={`rounded-[var(--radius-lg)] border p-4 text-left transition-all ${
           lowStockCount > 0
-            ? 'border-red-200 bg-red-50 hover:bg-red-100'
+            ? 'border-red-500/20 bg-red-500/10 hover:bg-red-500/20'
             : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
         }`}
         onClick={() => setMainMenu?.('재고관리')}
@@ -549,6 +637,21 @@ function _LegacyManagerDashboard({
         <p className={`text-lg font-bold ${lowStockCount > 0 ? 'text-red-600' : 'text-[var(--foreground)]'}`}>{lowStockCount}건</p>
         <p className="text-[11px] text-[var(--accent)]">바로가기</p>
       </button>
+    </div>
+  );
+}
+
+function BirthdayBanner({ items }: { items: BirthdayStaffItem[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-2 space-y-0.5">
+      {items.map((item) => (
+        <p key={item.name} className="text-[11px] text-[var(--toss-gray-3)]">
+          {item.daysUntil === 0
+            ? `🎂 오늘 생일: ${item.name}`
+            : `🎂 ${item.daysUntil}일 후 생일: ${item.name}`}
+        </p>
+      ))}
     </div>
   );
 }
@@ -588,6 +691,7 @@ function UserDashboard({
   annualLeave,
   pendingApprovals,
   pendingApprovalItems,
+  birthdayStaff,
   setMainMenu,
   openApprovalInbox,
   formatTime,
@@ -596,6 +700,7 @@ function UserDashboard({
   annualLeave: AnnualLeaveSummary | null;
   pendingApprovals: number;
   pendingApprovalItems: PendingApprovalItem[];
+  birthdayStaff: BirthdayStaffItem[];
   setMainMenu?: (menu: string) => void;
   openApprovalInbox: () => void;
   formatTime: (value: string | null) => string;
@@ -644,6 +749,8 @@ function UserDashboard({
           <PendingApprovalPreview items={pendingApprovalItems} onOpen={openApprovalInbox} />
         </div>
       )}
+
+      <BirthdayBanner items={birthdayStaff} />
     </div>
   );
 }
@@ -656,6 +763,8 @@ function ManagerDashboard({
   pendingApprovalItems,
   todayAttendance,
   lowStockCount,
+  expiringCount,
+  birthdayStaff,
   setMainMenu,
   openApprovalInbox,
   formatTime,
@@ -667,6 +776,8 @@ function ManagerDashboard({
   pendingApprovalItems: PendingApprovalItem[];
   todayAttendance: TodayAttendance;
   lowStockCount: number;
+  expiringCount: number;
+  birthdayStaff: BirthdayStaffItem[];
   setMainMenu?: (menu: string) => void;
   openApprovalInbox: () => void;
   formatTime: (value: string | null) => string;
@@ -694,7 +805,7 @@ function ManagerDashboard({
           type="button"
           className={`rounded-[var(--radius-lg)] border p-4 text-left transition-all ${
             pendingApprovals > 0
-              ? 'border-orange-200 bg-orange-500/10 hover:bg-orange-500/20'
+              ? 'border-orange-500/20 bg-orange-500/100/10 hover:bg-orange-500/100/20'
               : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
           }`}
           onClick={openApprovalInbox}
@@ -716,7 +827,7 @@ function ManagerDashboard({
           type="button"
           className={`rounded-[var(--radius-lg)] border p-4 text-left transition-all ${
             lowStockCount > 0
-              ? 'border-red-200 bg-red-500/10 hover:bg-red-500/20'
+              ? 'border-red-500/20 bg-red-500/100/10 hover:bg-red-500/100/20'
               : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
           }`}
           onClick={() => setMainMenu?.('재고관리')}
@@ -727,12 +838,26 @@ function ManagerDashboard({
         </button>
       </div>
 
+      {expiringCount > 0 && (
+        <button
+          type="button"
+          className="w-full rounded-[var(--radius-lg)] border border-red-500/20 bg-red-500/100/10 px-4 py-3 text-left transition-all hover:bg-red-500/100/20"
+          onClick={() => setMainMenu?.('재고관리')}
+        >
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">유통기한 임박</p>
+          <p className="mt-0.5 text-lg font-bold text-red-600">{expiringCount}건</p>
+          <p className="text-[11px] text-red-500">30일 이내 만료 · 바로가기</p>
+        </button>
+      )}
+
       {pendingApprovalItems.length > 0 && (
         <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5">
           <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">결재 대기 목록</p>
           <PendingApprovalPreview items={pendingApprovalItems} onOpen={openApprovalInbox} />
         </div>
       )}
+
+      <BirthdayBanner items={birthdayStaff} />
     </div>
   );
 }
@@ -741,12 +866,16 @@ function AdminDashboard({
   pendingApprovals,
   pendingApprovalItems,
   lowStockCount,
+  expiringCount,
+  birthdayStaff,
   setMainMenu,
   openApprovalInbox,
 }: {
   pendingApprovals: number;
   pendingApprovalItems: PendingApprovalItem[];
   lowStockCount: number;
+  expiringCount: number;
+  birthdayStaff: BirthdayStaffItem[];
   setMainMenu?: (menu: string) => void;
   openApprovalInbox: () => void;
 }) {
@@ -767,6 +896,15 @@ function AdminDashboard({
         active={lowStockCount > 0}
         onValueClick={() => setMainMenu?.('재고관리')}
       />
+      {expiringCount > 0 && (
+        <AdminActionCard
+          title="유통기한 임박"
+          value={`${expiringCount}건`}
+          icon="⚠️"
+          active={true}
+          onValueClick={() => setMainMenu?.('재고관리')}
+        />
+      )}
       </div>
       {pendingApprovalItems.length > 0 && (
         <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5">
@@ -774,6 +912,7 @@ function AdminDashboard({
           <PendingApprovalPreview items={pendingApprovalItems} onOpen={openApprovalInbox} />
         </div>
       )}
+      <BirthdayBanner items={birthdayStaff} />
     </div>
   );
 }

@@ -152,7 +152,7 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
 
       {/* 메시지 */}
       {message && (
-        <div className={`px-3 py-2 rounded-[var(--radius-md)] text-sm font-bold ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+        <div className={`px-3 py-2 rounded-[var(--radius-md)] text-sm font-bold ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-500/10 text-red-700 border border-red-500/20'}`}>
           {message.text}
         </div>
       )}
@@ -163,7 +163,7 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
           <p className="text-xs font-bold text-[var(--toss-gray-3)]">전체 조기퇴근</p>
           <p className="text-xl font-extrabold text-[var(--foreground)] mt-1">{records.length}<span className="text-sm ml-1">건</span></p>
         </div>
-        <div className="bg-red-50 border border-red-200 rounded-[var(--radius-md)] p-3">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-[var(--radius-md)] p-3">
           <p className="text-xs font-bold text-red-400">미신청 조기퇴근</p>
           <p className="text-xl font-extrabold text-red-600 mt-1">{unapprovedCount}<span className="text-sm ml-1">건</span></p>
         </div>
@@ -231,7 +231,7 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
                   </thead>
                   <tbody className="divide-y divide-[var(--border)]">
                     {displayRecords.map((rec) => (
-                      <tr key={rec.id} className={`hover:bg-[var(--muted)]/50 transition-colors ${!rec.is_approved ? 'bg-red-50/30' : ''}`}>
+                      <tr key={rec.id} className={`hover:bg-[var(--muted)]/50 transition-colors ${!rec.is_approved ? 'bg-red-500/10/30' : ''}`}>
                         <td className="px-4 py-3 font-bold text-[var(--foreground)]">{rec.work_date}</td>
                         <td className="px-4 py-3 font-bold text-[var(--foreground)]">{rec.staff_name}</td>
                         <td className="px-4 py-3 text-[var(--toss-gray-4)]">{rec.dept || '-'}</td>
@@ -242,13 +242,13 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
                           {rec.is_approved ? (
                             <span className="px-2 py-0.5 text-[10px] font-extrabold bg-emerald-100 text-emerald-700 rounded-[var(--radius-md)]">승인</span>
                           ) : (
-                            <span className="px-2 py-0.5 text-[10px] font-extrabold bg-red-100 text-red-700 rounded-[var(--radius-md)]">미신청</span>
+                            <span className="px-2 py-0.5 text-[10px] font-extrabold bg-red-500/20 text-red-700 rounded-[var(--radius-md)]">미신청</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-[var(--toss-gray-3)]">{rec.note || '-'}</td>
                         <td className="px-4 py-3">
                           {!rec.is_approved && (
-                            <button onClick={() => handleApprove(rec.id)} className="px-2 py-1 text-[10px] font-bold bg-blue-50 text-[var(--accent)] rounded-md hover:bg-blue-100 transition-colors">
+                            <button onClick={() => handleApprove(rec.id)} className="px-2 py-1 text-[10px] font-bold bg-blue-500/10 text-[var(--accent)] rounded-md hover:bg-blue-500/20 transition-colors">
                               승인
                             </button>
                           )}

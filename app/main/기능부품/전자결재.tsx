@@ -3290,7 +3290,7 @@ window.onload = () => window.print();
                         <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">신청</p>
                         <p className="mt-1 text-sm font-black text-[var(--foreground)]">{`${row.requestedQty} ${row.unit}`}</p>
                       </div>
-                      <div className="rounded-[var(--radius-md)] bg-indigo-50 px-2 py-2">
+                      <div className="rounded-[var(--radius-md)] bg-indigo-500/10 px-2 py-2">
                         <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">SY INC 재고</p>
                         <p className="mt-1 text-sm font-black text-indigo-600">{`${row.supportStock} ${row.unit}`}</p>
                         <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">부족 {row.supportShortageQty}</p>
@@ -3468,7 +3468,7 @@ window.onload = () => window.print();
                     <p className="text-[11px] font-bold text-[var(--toss-gray-4)]">참조자</p>
                     <div className="flex gap-2 flex-wrap">
                     {ccLine.map((c, i) => (
-                      <div key={i} className="bg-yellow-50 border border-yellow-200 px-3 py-1.5 rounded-[var(--radius-md)] text-[11px] font-bold text-yellow-700 flex items-center gap-1.5">
+                      <div key={i} className="bg-yellow-500/10 border border-yellow-500/20 px-3 py-1.5 rounded-[var(--radius-md)] text-[11px] font-bold text-yellow-700 flex items-center gap-1.5">
                         CC {c.name} <button data-testid={`approval-selected-cc-remove-${i}`} onClick={() => setCcLine(prev => prev.filter((_, idx) => idx !== i))} className="text-yellow-400 hover:text-red-500">✕</button>
                       </div>
                     ))}
@@ -3728,7 +3728,7 @@ window.onload = () => window.print();
                     type="button"
                     disabled={selectedApprovalIds.length === 0}
                     onClick={handleBulkReject}
-                    className="px-5 py-2.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-xs font-bold shadow-sm hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="px-5 py-2.5 bg-red-500/10 text-red-600 border border-red-500/20 rounded-full text-xs font-bold shadow-sm hover:bg-red-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     일괄 반려
                   </button>
@@ -3814,7 +3814,7 @@ window.onload = () => window.print();
                             >
                               {templateMeta.name || itemType}
                             </span>
-                            <span className={`px-1.5 py-[2px] rounded-md text-[10px] font-semibold ${itemStatus === '승인' ? 'bg-green-100 text-green-600' : itemStatus === '반려' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-500'}`}>{itemStatus}</span>
+                            <span className={`px-1.5 py-[2px] rounded-md text-[10px] font-semibold ${itemStatus === '승인' ? 'bg-green-500/20 text-green-600' : itemStatus === '반려' ? 'bg-red-500/20 text-red-600' : 'bg-orange-500/20 text-orange-500'}`}>{itemStatus}</span>
                             <span className="px-1.5 py-[2px] bg-[var(--toss-blue-light)] rounded-md text-[10px] font-semibold text-[var(--accent)]">{itemSenderCompany}</span>
                             {isApprovalEditLockedItem(item) && (
                               <span className="px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600">
@@ -3843,7 +3843,7 @@ window.onload = () => window.print();
                             <div className="mt-0.5 flex flex-wrap gap-0.5">
                               <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-[var(--muted)] text-[var(--toss-gray-3)]">결재선 {steps.length}명</span>
                               {itemStatus === '승인' ? (
-                                <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-green-50 text-green-600">최종 승인</span>
+                                <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-green-500/10 text-green-600">최종 승인</span>
                               ) : currentStep ? (
                                 <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-amber-100 text-amber-700">현재 {currentStep.step}. {currentStep.name}</span>
                               ) : null}
@@ -3851,7 +3851,7 @@ window.onload = () => window.print();
                           )}
                           {cardCcUsers.length > 0 && (
                             <div className="mt-0.5 flex flex-wrap gap-0.5">
-                              <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-yellow-50 text-yellow-700 border border-yellow-200">
+                              <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-yellow-500/10 text-yellow-700 border border-yellow-500/20">
                                 참조 {cardCcUsers.length}명
                               </span>
                               <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-[var(--muted)] text-[var(--toss-gray-3)]">
@@ -3866,7 +3866,7 @@ window.onload = () => window.print();
                       {(delegateSnapshot.delegatedToName || delaySnapshot.notificationCount > 0 || (lockSnapshot.revision ?? 1) > 1) && (
                         <div className="flex flex-wrap gap-1 px-8 pb-1 text-[10px] font-semibold">
                           {delegateSnapshot.delegatedToName && (
-                            <span className="inline-flex items-center rounded-md border border-indigo-200 bg-indigo-50 px-1.5 py-[2px] text-indigo-700">
+                            <span className="inline-flex items-center rounded-md border border-indigo-200 bg-indigo-500/10 px-1.5 py-[2px] text-indigo-700">
                               {delegateSnapshot.delegatedFromName ? `${delegateSnapshot.delegatedFromName} → ${delegateSnapshot.delegatedToName}` : `대결 ${delegateSnapshot.delegatedToName}`}
                             </span>
                           )}
@@ -3904,7 +3904,7 @@ window.onload = () => window.print();
                         {(viewMode === '결재함' || (viewMode === '기안함' && itemStatus === '대기')) && canUserApproveItem(item) && (
                           <>
                             <button type="button" onClick={() => handleApproveAction(item)} className="px-2 py-1 bg-[var(--accent)] text-white rounded-md text-[10px] font-semibold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인</button>
-                            <button type="button" onClick={() => handleRejectAction(item)} className="px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded-md text-[10px] font-semibold shadow-sm hover:bg-red-100 active:scale-[0.98] transition-all">반려</button>
+                            <button type="button" onClick={() => handleRejectAction(item)} className="px-2 py-1 bg-red-500/10 text-red-600 border border-red-500/20 rounded-md text-[10px] font-semibold shadow-sm hover:bg-red-500/20 active:scale-[0.98] transition-all">반려</button>
                           </>
                         )}
                       </div>
@@ -3991,12 +3991,12 @@ window.onload = () => window.print();
                 <h3 className="font-bold text-[var(--foreground)] text-lg mb-2">{detailTitle || '(제목 없음)'}</h3>
                 <p className="text-[11px] text-[var(--toss-gray-3)] mb-4">기안자: {detailSenderName} · {new Date(detailCreatedAt).toLocaleString('ko-KR')}</p>
                 {detailCcUsers.length > 0 && (
-                  <div className="mb-4 flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-yellow-200 bg-yellow-50 px-3 py-2">
+                  <div className="mb-4 flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-yellow-500/20 bg-yellow-500/10 px-3 py-2">
                     <span className="text-[11px] font-bold text-yellow-700">참조자</span>
                     {detailCcUsers.map((ccUser) => (
                       <span
                         key={ccUser.id}
-                        className="inline-flex items-center rounded-full border border-yellow-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-yellow-800"
+                        className="inline-flex items-center rounded-full border border-yellow-500/20 bg-white px-2.5 py-1 text-[11px] font-semibold text-yellow-800"
                       >
                         {ccUser.name}
                         {ccUser.position ? ` ${ccUser.position}` : ''}
@@ -4089,7 +4089,7 @@ window.onload = () => window.print();
                   {canUserApproveItem(item) ? (
                     <div className="flex gap-3">
                       <button type="button" onClick={async () => { await handleApproveAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-[var(--accent)] text-white rounded-[var(--radius-lg)] text-sm font-bold">승인</button>
-                      <button type="button" onClick={async () => { await handleRejectAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-red-50 border border-red-200 text-red-600 rounded-[var(--radius-lg)] text-sm font-bold hover:bg-red-100 transition-all">반려</button>
+                      <button type="button" onClick={async () => { await handleRejectAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-[var(--radius-lg)] text-sm font-bold hover:bg-red-500/20 transition-all">반려</button>
                     </div>
                   ) : canUserRecallItem(item) ? (
                     <div className="flex gap-3">

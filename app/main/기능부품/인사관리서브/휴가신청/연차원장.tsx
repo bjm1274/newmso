@@ -183,7 +183,7 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
               승인된 연차 사용일수와 직원별 연차 총량/잔여일수를 한눈에 확인합니다.
             </p>
           </div>
-          <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-[11px] font-bold text-blue-600">
+          <div className="rounded-xl border border-blue-100 bg-blue-500/10 px-3 py-2 text-[11px] font-bold text-blue-600">
             직원 {summaryRows.length}명
           </div>
         </div>
@@ -315,7 +315,7 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
                         {row.afterStatus}
                       </span>
                       {row.rollbackApplied && (
-                        <span className="rounded-full bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-600">
+                        <span className="rounded-full bg-red-500/10 px-2 py-1 text-[11px] font-semibold text-red-600">
                           롤백 적용
                         </span>
                       )}

@@ -63,7 +63,7 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
                         <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-1">법정 의무 건강검진 일정 관리 및 이력 추적</p>
                     </div>
                     <div className="flex items-center gap-2">
-                        {checkupDue.length > 0 && <span className="px-3 py-1.5 bg-red-100 text-red-700 text-[11px] font-bold rounded-xl">🚨 미수검 {checkupDue.length}명</span>}
+                        {checkupDue.length > 0 && <span className="px-3 py-1.5 bg-red-500/20 text-red-700 text-[11px] font-bold rounded-xl">🚨 미수검 {checkupDue.length}명</span>}
                         <button onClick={() => setShowForm(!showForm)} className="px-5 py-2.5 bg-[var(--accent)] text-white text-[11px] font-bold rounded-xl shadow-md hover:opacity-90 transition-all">{showForm ? '취소' : '+ 검진 등록'}</button>
                     </div>
                 </div>
@@ -88,7 +88,7 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
                     </form>
                 )}
                 {checkupDue.length > 0 && (
-                    <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-5">
                         <h3 className="text-[11px] font-bold text-red-800 mb-3">🚨 검진 미수검 대상자 (1년 내 기록 없음)</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                             {checkupDue.slice(0, 12).map((s: any) => (
@@ -117,7 +117,7 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
                                     <td className="px-4 py-3">{r.checkup_type}</td>
                                     <td className="px-4 py-3 text-[var(--toss-gray-4)]">{r.scheduled_date}</td>
                                     <td className="px-4 py-3 text-[var(--toss-gray-4)]">{r.hospital || '-'}</td>
-                                    <td className="px-4 py-3 text-center"><span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${r.status === '완료' ? 'bg-emerald-100 text-emerald-700' : r.status === '미수검' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{r.status}</span></td>
+                                    <td className="px-4 py-3 text-center"><span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${r.status === '완료' ? 'bg-emerald-100 text-emerald-700' : r.status === '미수검' ? 'bg-red-500/20 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{r.status}</span></td>
                                     <td className="px-4 py-3 text-center">{r.status === '예정' && <button onClick={() => markComplete(r.id)} className="px-3 py-1.5 bg-emerald-500 text-white text-[10px] font-bold rounded-lg">완료</button>}</td>
                                 </tr>
                             ))}

@@ -27,8 +27,8 @@ type ShiftType = {
 };
 
 const SHIFT_TYPES: ShiftType[] = [
-  { id: 'D', name: '데이', color: 'bg-orange-100 text-orange-700 border-orange-200', hours: 8 },
-  { id: 'E', name: '이브닝', color: 'bg-blue-100 text-blue-700 border-blue-200', hours: 8 },
+  { id: 'D', name: '데이', color: 'bg-orange-500/20 text-orange-700 border-orange-500/20', hours: 8 },
+  { id: 'E', name: '이브닝', color: 'bg-blue-500/20 text-blue-700 border-blue-500/20', hours: 8 },
   { id: 'N', name: '나이트', color: 'bg-slate-800 text-slate-100 border-slate-700', hours: 8 },
   { id: 'OFF', name: '오프', color: 'bg-[var(--tab-bg)] text-[var(--toss-gray-3)] border-[var(--border)]', hours: 0 },
 ];

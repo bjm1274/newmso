@@ -271,10 +271,10 @@ export default function SealManager({ user, selectedCo }: Props) {
                   <p className="text-[11px] text-[var(--toss-gray-4)]">{seal.type}</p>
                   <p className="text-[10px] text-[var(--toss-gray-3)] mt-0.5">{new Date(seal.created_at).toLocaleDateString('ko-KR')}</p>
                   <div className="flex gap-2 mt-2">
-                    <button onClick={() => handleToggleActive(seal)} className={`text-[10px] font-bold px-2 py-0.5 rounded-[var(--radius-md)] ${seal.is_active ? 'bg-green-100 text-green-700' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'}`}>
+                    <button onClick={() => handleToggleActive(seal)} className={`text-[10px] font-bold px-2 py-0.5 rounded-[var(--radius-md)] ${seal.is_active ? 'bg-green-500/20 text-green-700' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'}`}>
                       {seal.is_active ? '활성' : '비활성'}
                     </button>
-                    <button onClick={() => handleDelete(seal.id)} className="text-[10px] font-bold px-2 py-0.5 rounded-[var(--radius-md)] bg-red-50 text-red-500">삭제</button>
+                    <button onClick={() => handleDelete(seal.id)} className="text-[10px] font-bold px-2 py-0.5 rounded-[var(--radius-md)] bg-red-500/10 text-red-500">삭제</button>
                   </div>
                 </div>
               </div>

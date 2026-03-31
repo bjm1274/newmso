@@ -137,7 +137,7 @@ function BannedWordManager({ onClose }: { onClose: () => void }) {
         <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto mb-4 p-2 bg-[var(--page-bg)] rounded-[var(--radius-md)] border border-[var(--border)]">
           {words.length === 0 && <p className="text-xs text-[var(--toss-gray-3)]">등록된 금지어 없음</p>}
           {words.map((w) => (
-            <span key={w} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs font-semibold rounded-full">
+            <span key={w} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-500/20 text-red-700 text-xs font-semibold rounded-full">
               {w}
               <button onClick={() => remove(w)} className="hover:text-red-900 font-bold">×</button>
             </span>
@@ -351,7 +351,7 @@ export default function ChatMonitor({ staffs: propStaffs }: { staffs?: Staff[] }
                 <p className="text-sm font-bold text-[var(--foreground)]">{getRoomLabel(selectedRoom)}</p>
                 <span className="text-[10px] text-[var(--toss-gray-3)] bg-[var(--muted)] px-2 py-0.5 rounded-full">{selectedRoom.members?.length || 0}명</span>
                 {flaggedCount > 0 && (
-                  <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-bold text-red-600 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-full">
                     🚫 금지어 {flaggedCount}건
                   </span>
                 )}
@@ -364,7 +364,7 @@ export default function ChatMonitor({ staffs: propStaffs }: { staffs?: Staff[] }
                 />
                 <button
                   onClick={() => setShowFlaggedOnly((v) => !v)}
-                  className={`px-2.5 py-1 text-xs font-bold rounded-[var(--radius-md)] border transition ${showFlaggedOnly ? 'bg-red-500 text-white border-red-500' : 'border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]'}`}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-[var(--radius-md)] border transition ${showFlaggedOnly ? 'bg-red-500/100 text-white border-red-500' : 'border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]'}`}
                 >
                   🚫 금지어만
                 </button>
@@ -402,7 +402,7 @@ export default function ChatMonitor({ staffs: propStaffs }: { staffs?: Staff[] }
               const isMine = msg.sender_id === selectedStaff?.id;
               const isFlagged = !!(msg.content && containsBanned(msg.content, bannedWords));
               return (
-                <div key={msg.id} className={`flex gap-2 group ${isMine ? 'flex-row-reverse' : ''} ${isFlagged ? 'bg-red-50 -mx-2 px-2 rounded-lg' : ''}`}>
+                <div key={msg.id} className={`flex gap-2 group ${isMine ? 'flex-row-reverse' : ''} ${isFlagged ? 'bg-red-500/10 -mx-2 px-2 rounded-lg' : ''}`}>
                   {!isMine && <Avatar name={senderName} size="sm" />}
                   <div className={`flex flex-col gap-0.5 max-w-[70%] ${isMine ? 'items-end' : 'items-start'}`}>
                     {!isMine && (
@@ -414,7 +414,7 @@ export default function ChatMonitor({ staffs: propStaffs }: { staffs?: Staff[] }
                     <div className={`flex items-end gap-1.5 ${isMine ? 'flex-row-reverse' : ''}`}>
                       <div className={`px-2.5 py-1.5 rounded-xl text-xs leading-relaxed ${
                         isFlagged
-                          ? 'bg-red-100 border border-red-300 text-[var(--foreground)] rounded-tl-sm'
+                          ? 'bg-red-500/20 border border-red-300 text-[var(--foreground)] rounded-tl-sm'
                           : isMine
                             ? 'bg-[var(--accent)] text-white rounded-tr-sm'
                             : 'bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)] rounded-tl-sm'
@@ -434,7 +434,7 @@ export default function ChatMonitor({ staffs: propStaffs }: { staffs?: Staff[] }
                         onClick={() => deleteMessage(msg)}
                         disabled={deletingId === msg.id}
                         className={`opacity-0 group-hover:opacity-100 transition-opacity shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-[10px] font-bold
-                          ${isFlagged ? 'bg-red-500 text-white opacity-100' : 'bg-[var(--muted)] text-[var(--toss-gray-3)] hover:bg-red-500 hover:text-white'}`}
+                          ${isFlagged ? 'bg-red-500/100 text-white opacity-100' : 'bg-[var(--muted)] text-[var(--toss-gray-3)] hover:bg-red-500/100 hover:text-white'}`}
                         title="메시지 삭제"
                       >
                         {deletingId === msg.id ? '…' : '🗑'}

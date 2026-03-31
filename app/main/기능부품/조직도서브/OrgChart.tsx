@@ -53,12 +53,12 @@ const DEPARTMENT_ACCENTS = [
 ];
 
 const DIVISION_STYLES = [
-  { headerClass: 'bg-blue-600 text-white', borderClass: 'border-blue-200', bgClass: 'bg-blue-50' },
+  { headerClass: 'bg-blue-600 text-white', borderClass: 'border-blue-500/20', bgClass: 'bg-blue-500/10' },
   { headerClass: 'bg-emerald-600 text-white', borderClass: 'border-emerald-200', bgClass: 'bg-emerald-50' },
   { headerClass: 'bg-amber-500 text-white', borderClass: 'border-amber-200', bgClass: 'bg-amber-50' },
   { headerClass: 'bg-violet-600 text-white', borderClass: 'border-violet-200', bgClass: 'bg-violet-50' },
   { headerClass: 'bg-rose-500 text-white', borderClass: 'border-rose-200', bgClass: 'bg-rose-50' },
-  { headerClass: 'bg-slate-500 text-white', borderClass: 'border-slate-200', bgClass: 'bg-slate-50' },
+  { headerClass: 'bg-[var(--muted)]0 text-white', borderClass: 'border-slate-200', bgClass: 'bg-[var(--muted)]' },
 ];
 
 const LEADER_KEYWORDS = [

@@ -157,7 +157,7 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
               </div>
               <div>
                 <h2 className="text-xl font-bold text-foreground">
-                  전문 근태 통합 관리 <span className="ml-1 px-2 py-0.5 rounded-[var(--radius-md)] bg-blue-50 text-blue-600 text-[10px] font-bold border border-blue-100">{selectedCo}</span>
+                  전문 근태 통합 관리 <span className="ml-1 px-2 py-0.5 rounded-[var(--radius-md)] bg-blue-500/10 text-blue-600 text-[10px] font-bold border border-blue-100">{selectedCo}</span>
                 </h2>
               </div>
             </div>
@@ -246,10 +246,10 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
                       const statusMap: Record<string, { label: string, color: string, bg: string }> = {
                         present: { label: '정상 출근', color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/30 ring-emerald-200' },
                         absent: { label: '결근', color: 'text-rose-700 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-900/30 ring-rose-200' },
-                        late: { label: '지각', color: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-900/30 ring-orange-200' },
+                        late: { label: '지각', color: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-500/10 dark:bg-orange-900/30 ring-orange-200' },
                         early_leave: { label: '조퇴', color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/30 ring-amber-200' },
-                        sick_leave: { label: '병가', color: 'text-purple-700 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/30 ring-purple-200' },
-                        annual_leave: { label: '연차', color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/30 ring-blue-200' },
+                        sick_leave: { label: '병가', color: 'text-purple-700 dark:text-purple-400', bg: 'bg-purple-500/10 dark:bg-purple-900/30 ring-purple-200' },
+                        annual_leave: { label: '연차', color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-500/10 dark:bg-blue-900/30 ring-blue-200' },
                         holiday: { label: '휴일', color: 'text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]', bg: 'bg-[var(--tab-bg)] dark:bg-zinc-800 ring-zinc-200' },
                         half_leave: { label: '반차', color: 'text-cyan-700 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-900/30 ring-cyan-200' }
                       };
@@ -331,7 +331,7 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
                       });
                     });
                   }}
-                  className="px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 font-bold text-[11px] rounded-xl shadow-sm hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all self-start md:self-auto shrink-0 flex items-center gap-2"
+                  className="px-4 py-2 bg-blue-500/10 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-500/20 dark:border-blue-800/50 font-bold text-[11px] rounded-xl shadow-sm hover:bg-blue-500/20 dark:hover:bg-blue-900/50 transition-all self-start md:self-auto shrink-0 flex items-center gap-2"
                 >
                   <span className="text-sm">🏢</span> 통상근무(평일) 일괄 채우기
                 </button>
@@ -344,8 +344,8 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
                   const isActive = activeTool === sh.id;
                   let colorClass = 'bg-[var(--tab-bg)] dark:bg-zinc-900 text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] border-[var(--border)] dark:border-zinc-700 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800';
                   if (sh.name.includes('Day') || sh.name.includes('데이') || sh.name === 'D') colorClass = 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/40';
-                  if (sh.name.includes('Evening') || sh.name.includes('이브') || sh.name === 'E') colorClass = 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 dark:hover:bg-orange-900/40';
-                  if (sh.name.includes('Night') || sh.name.includes('나이트') || sh.name === 'N') colorClass = 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/40';
+                  if (sh.name.includes('Evening') || sh.name.includes('이브') || sh.name === 'E') colorClass = 'bg-orange-500/10 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 border-orange-500/20 dark:border-orange-800/50 hover:bg-orange-500/20 dark:hover:bg-orange-900/40';
+                  if (sh.name.includes('Night') || sh.name.includes('나이트') || sh.name === 'N') colorClass = 'bg-blue-500/10 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-500/20 dark:border-blue-800/50 hover:bg-blue-500/20 dark:hover:bg-blue-900/40';
                   if (sh.name.includes('Off') || sh.name.includes('오프') || sh.name === 'O') colorClass = 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800/50 hover:bg-rose-100 dark:hover:bg-rose-900/40';
 
                   return (
@@ -362,7 +362,7 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
                 <button
                   type="button"
                   onClick={() => setActiveTool(activeTool === 'eraser' ? null : 'eraser')}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-md)] text-[11px] font-bold transition-all border ${activeTool === 'eraser' ? 'bg-red-500 border-red-500 text-white ring-2 ring-offset-2 ring-red-500 scale-105 shadow-md' : 'bg-[var(--card)] dark:bg-zinc-800 text-red-500 border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-900/20'}`}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-md)] text-[11px] font-bold transition-all border ${activeTool === 'eraser' ? 'bg-red-500/100 border-red-500 text-white ring-2 ring-offset-2 ring-red-500 scale-105 shadow-md' : 'bg-[var(--card)] dark:bg-zinc-800 text-red-500 border-red-500/20 dark:border-red-900/50 hover:bg-red-500/10 dark:hover:bg-red-900/20'}`}
                 >
                   <span className="text-sm">🧹</span> 지우개
                 </button>
@@ -405,18 +405,18 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
                         const shiftObj = workShifts.find(w => w.id === value);
                         const isWeekend = new Date(dStr).getDay() === 0 || new Date(dStr).getDay() === 6;
 
-                        let cellColor = isWeekend ? 'bg-red-50/30 dark:bg-red-900/5 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800/50' : 'hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800/50';
+                        let cellColor = isWeekend ? 'bg-red-500/10/30 dark:bg-red-900/5 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800/50' : 'hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800/50';
                         if (shiftObj) {
                           if (shiftObj.name.includes('Day') || shiftObj.name.includes('데이') || shiftObj.name === 'D') cellColor = 'bg-emerald-100/50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-bold';
-                          else if (shiftObj.name.includes('Evening') || shiftObj.name.includes('이브') || shiftObj.name === 'E') cellColor = 'bg-orange-100/50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 font-bold';
-                          else if (shiftObj.name.includes('Night') || shiftObj.name.includes('나이트') || shiftObj.name === 'N') cellColor = 'bg-blue-100/50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-bold';
+                          else if (shiftObj.name.includes('Evening') || shiftObj.name.includes('이브') || shiftObj.name === 'E') cellColor = 'bg-orange-500/20/50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 font-bold';
+                          else if (shiftObj.name.includes('Night') || shiftObj.name.includes('나이트') || shiftObj.name === 'N') cellColor = 'bg-blue-500/20/50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-bold';
                           else if (shiftObj.name.includes('Off') || shiftObj.name.includes('오프') || shiftObj.name === 'O') cellColor = 'bg-rose-100/50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 font-bold';
                           else cellColor = 'bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] font-bold';
                         }
                         return (
                           <td
                             key={d}
-                            className={`p-1 border-r border-[var(--border)] dark:border-zinc-800 min-w-[44px] cursor-pointer select-none transition-colors border-b-0 border-t-0 active:bg-blue-50 dark:active:bg-blue-900/20 active:ring-inset active:ring-2 active:ring-blue-400 ${cellColor}`}
+                            className={`p-1 border-r border-[var(--border)] dark:border-zinc-800 min-w-[44px] cursor-pointer select-none transition-colors border-b-0 border-t-0 active:bg-blue-500/10 dark:active:bg-blue-900/20 active:ring-inset active:ring-2 active:ring-blue-400 ${cellColor}`}
                             onMouseDown={() => {
                               if (activeTool === 'eraser') setAssignment(s.id, dStr, null);
                               else if (activeTool) setAssignment(s.id, dStr, activeTool);
@@ -465,7 +465,7 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
                         </th>
                       );
                     })}
-                    <th className="px-4 py-4 text-center text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10">출근</th>
+                    <th className="px-4 py-4 text-center text-blue-600 dark:text-blue-400 bg-blue-500/10/50 dark:bg-blue-900/10">출근</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
@@ -491,17 +491,17 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
 
                           if (status === 'annual_leave' || status === 'sick_leave') {
                             label = status === 'annual_leave' ? '연' : '병';
-                            cellClass = 'text-blue-600 bg-blue-50 dark:bg-blue-900/20';
+                            cellClass = 'text-blue-600 bg-blue-500/10 dark:bg-blue-900/20';
                           } else if (status === 'holiday' || isWeekend) {
                             label = '휴';
-                            cellClass = 'text-red-400 bg-red-50/50 dark:bg-red-900/10';
+                            cellClass = 'text-red-400 bg-red-500/10/50 dark:bg-red-900/10';
                           } else if (status === 'present' || att) {
                             label = '출';
                             cellClass = 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20';
                             workDays++;
                           } else if (status === 'late' || status === 'early_leave') {
                             label = status === 'late' ? '지' : '조';
-                            cellClass = 'text-orange-600 bg-orange-50 dark:bg-orange-900/20';
+                            cellClass = 'text-orange-600 bg-orange-500/10 dark:bg-orange-900/20';
                             workDays++;
                           } else if (status === 'absent') {
                             label = '결';
@@ -521,7 +521,7 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
                             </td>
                           );
                         })}
-                        <td className="px-4 py-3 text-center bg-blue-50/30 dark:bg-blue-900/10 font-bold text-blue-600 dark:text-blue-400 text-sm">
+                        <td className="px-4 py-3 text-center bg-blue-500/10/30 dark:bg-blue-900/10 font-bold text-blue-600 dark:text-blue-400 text-sm">
                           {workDays}
                         </td>
                       </tr>
@@ -612,7 +612,7 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
               <div className="space-y-4">
                 {[
                   { label: '정상 출근', count: stats.present, color: 'bg-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
-                  { label: '지각', count: stats.late, color: 'bg-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/20' },
+                  { label: '지각', count: stats.late, color: 'bg-orange-500/100', bg: 'bg-orange-500/10 dark:bg-orange-900/20' },
                   { label: '조퇴', count: stats.earlyLeave, color: 'bg-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' },
                   { label: '결근', count: stats.absent, color: 'bg-rose-500', bg: 'bg-rose-50 dark:bg-rose-900/20' }
                 ].map(stat => {
@@ -669,7 +669,7 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
                         key={o.id}
                         type="button"
                         onClick={() => setBulkRangeType(o.id as any)}
-                        className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all border ${bulkRangeType === o.id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 ring-1 ring-blue-500' : 'bg-transparent text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] border-[var(--border)] dark:border-zinc-700 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800'
+                        className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all border ${bulkRangeType === o.id ? 'bg-blue-500/10 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-500/20 dark:border-blue-800 ring-1 ring-blue-500' : 'bg-transparent text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] border-[var(--border)] dark:border-zinc-700 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800'
                           }`}
                       >
                         {o.label}
@@ -809,7 +809,7 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
                       <div className="flex flex-col h-full">
                         <span className={`text-sm font-bold flex justify-between items-center ${isSunday ? 'text-rose-500' : 'text-foreground'}`}>
                           {day}
-                          {day === 14 && <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>}
+                          {day === 14 && <span className="w-1.5 h-1.5 rounded-full bg-blue-500/100"></span>}
                         </span>
 
                         <div className="mt-auto space-y-1.5">

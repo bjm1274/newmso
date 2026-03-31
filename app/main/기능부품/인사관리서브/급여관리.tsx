@@ -342,7 +342,7 @@ function RunPayrollWizard({ staffs, selectedCo, onRefresh }: { staffs?: Staff[];
             onClick={() => setMode('regular')}
             className="group flex flex-col items-start p-4 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] hover:border-[var(--accent)] hover:shadow-sm transition-all text-left"
           >
-            <div className="w-12 h-12 bg-blue-50 text-[var(--accent)] rounded-[var(--radius-xl)] flex items-center justify-center text-2xl mb-4 shadow-inner group-hover:scale-110 transition-transform">📅</div>
+            <div className="w-12 h-12 bg-blue-500/10 text-[var(--accent)] rounded-[var(--radius-xl)] flex items-center justify-center text-2xl mb-4 shadow-inner group-hover:scale-110 transition-transform">📅</div>
             <h3 className="text-lg font-bold text-[var(--foreground)] mb-2">정규 급여 정산</h3>
             <p className="text-xs text-[var(--toss-gray-3)] leading-relaxed">매월 정기적으로 지급되는 일반 급여를 정산합니다. 결근/지각 자동 차감 및 4대보험이 재계산됩니다.</p>
           </button>

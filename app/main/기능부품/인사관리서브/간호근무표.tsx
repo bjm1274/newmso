@@ -39,8 +39,8 @@ const TRAINING_TOKEN = 'TRAINING';
 
 const SPECIAL_SHIFT_OPTIONS: ShiftOption[] = [
   { token: OFF_TOKEN, label: '휴무', shortLabel: '휴', color: 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]', hours: '-' },
-  { token: LEAVE_TOKEN, label: '휴가', shortLabel: '휴가', color: 'bg-green-100 text-green-600', hours: '-' },
-  { token: TRAINING_TOKEN, label: '교육', shortLabel: '교육', color: 'bg-yellow-100 text-yellow-700', hours: '-' },
+  { token: LEAVE_TOKEN, label: '휴가', shortLabel: '휴가', color: 'bg-green-500/20 text-green-600', hours: '-' },
+  { token: TRAINING_TOKEN, label: '교육', shortLabel: '교육', color: 'bg-yellow-500/20 text-yellow-700', hours: '-' },
 ];
 
 const PATTERN_OPTIONS = [
@@ -93,11 +93,11 @@ function sortWorkShifts(list: WorkShift[]) {
 function getShiftColorClass(name: string) {
   const normalized = normalizeShiftName(name);
   if (normalized.includes('휴무') || normalized.includes('off') || normalized.includes('비번') || normalized.includes('오프')) return 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]';
-  if (normalized.includes('휴가') || normalized.includes('연차')) return 'bg-green-100 text-green-600';
-  if (normalized.includes('교육')) return 'bg-yellow-100 text-yellow-700';
-  if (normalized.includes('데이') || normalized.includes('day') || normalized.includes('주간') || normalized.includes('상근')) return 'bg-blue-100 text-blue-700';
-  if (normalized.includes('이브') || normalized.includes('evening') || normalized.includes('eve') || normalized.includes('오후')) return 'bg-orange-100 text-orange-700';
-  if (normalized.includes('나이트') || normalized.includes('night') || normalized.includes('야간')) return 'bg-purple-100 text-purple-700';
+  if (normalized.includes('휴가') || normalized.includes('연차')) return 'bg-green-500/20 text-green-600';
+  if (normalized.includes('교육')) return 'bg-yellow-500/20 text-yellow-700';
+  if (normalized.includes('데이') || normalized.includes('day') || normalized.includes('주간') || normalized.includes('상근')) return 'bg-blue-500/20 text-blue-700';
+  if (normalized.includes('이브') || normalized.includes('evening') || normalized.includes('eve') || normalized.includes('오후')) return 'bg-orange-500/20 text-orange-700';
+  if (normalized.includes('나이트') || normalized.includes('night') || normalized.includes('야간')) return 'bg-purple-500/20 text-purple-700';
   return 'bg-emerald-100 text-emerald-700';
 }
 
@@ -117,17 +117,17 @@ function getShiftShortLabel(name: string) {
 function getLegacyShiftInfo(code: string): ShiftOption | null {
   switch (code) {
     case 'D':
-      return { token: code, label: '데이', shortLabel: 'D', color: 'bg-blue-100 text-blue-700', hours: '-' };
+      return { token: code, label: '데이', shortLabel: 'D', color: 'bg-blue-500/20 text-blue-700', hours: '-' };
     case 'E':
-      return { token: code, label: '이브닝', shortLabel: 'E', color: 'bg-orange-100 text-orange-700', hours: '-' };
+      return { token: code, label: '이브닝', shortLabel: 'E', color: 'bg-orange-500/20 text-orange-700', hours: '-' };
     case 'N':
-      return { token: code, label: '나이트', shortLabel: 'N', color: 'bg-purple-100 text-purple-700', hours: '-' };
+      return { token: code, label: '나이트', shortLabel: 'N', color: 'bg-purple-500/20 text-purple-700', hours: '-' };
     case 'O':
       return { token: code, label: '휴무', shortLabel: '휴', color: 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]', hours: '-' };
     case 'H':
-      return { token: code, label: '휴가', shortLabel: '휴가', color: 'bg-green-100 text-green-600', hours: '-' };
+      return { token: code, label: '휴가', shortLabel: '휴가', color: 'bg-green-500/20 text-green-600', hours: '-' };
     case 'S':
-      return { token: code, label: '교육', shortLabel: '교육', color: 'bg-yellow-100 text-yellow-700', hours: '-' };
+      return { token: code, label: '교육', shortLabel: '교육', color: 'bg-yellow-500/20 text-yellow-700', hours: '-' };
     default:
       return null;
   }
@@ -681,10 +681,10 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: Sta
             <select value={dept} onChange={(e) => setDept(e.target.value)} className="px-3 py-1.5 border border-[var(--border)] rounded-[var(--radius-md)] text-xs font-bold bg-[var(--card)] outline-none">
               {depts.map((item) => <option key={item}>{item}</option>)}
             </select>
-            <button onClick={openWizard} disabled={generating || scopedStaffs.length === 0} className="px-3 py-1.5 bg-purple-500 text-white rounded-[var(--radius-md)] text-xs font-bold disabled:opacity-50">
+            <button onClick={openWizard} disabled={generating || scopedStaffs.length === 0} className="px-3 py-1.5 bg-purple-500/100 text-white rounded-[var(--radius-md)] text-xs font-bold disabled:opacity-50">
               생성 마법사
             </button>
-            <button onClick={() => setEditMode((value) => !value)} className={`px-3 py-1.5 rounded-[var(--radius-md)] text-xs font-bold ${editMode ? 'bg-orange-500 text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>
+            <button onClick={() => setEditMode((value) => !value)} className={`px-3 py-1.5 rounded-[var(--radius-md)] text-xs font-bold ${editMode ? 'bg-orange-500/100 text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>
               {editMode ? '편집 중' : '편집'}
             </button>
             {editMode && <button onClick={saveSchedule} disabled={saving} className="px-3 py-1.5 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-xs font-bold disabled:opacity-50">{saving ? '저장 중...' : '저장'}</button>}

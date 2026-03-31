@@ -422,7 +422,7 @@ export default function DocumentRepository({
                 <button
                   type="button"
                   onClick={() => handleDelete(selected)}
-                  className="px-3 py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] border border-red-100 text-red-600 hover:bg-red-50"
+                  className="px-3 py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] border border-red-100 text-red-600 hover:bg-red-500/10"
                 >
                   선택 문서 삭제
                 </button>
@@ -502,7 +502,7 @@ export default function DocumentRepository({
             </div>
           )}
           {isReadOnlySelected && (
-            <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl">
+            <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl">
               <p className="text-[11px] font-bold text-blue-700 leading-relaxed">
                 전자결재에서 자동 보관된 문서입니다. 문서보관함에서는 읽기 전용으로만 확인할 수 있습니다.
               </p>

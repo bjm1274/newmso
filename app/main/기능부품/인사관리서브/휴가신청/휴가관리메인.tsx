@@ -323,7 +323,7 @@ export default function LeaveManagement({
                         </td>
                         <td className="px-5 py-5">
                           <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${l.leave_type === '연차' ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]' :
-                            l.leave_type === '병가' ? 'bg-red-100 text-red-600' :
+                            l.leave_type === '병가' ? 'bg-red-500/20 text-red-600' :
                               'bg-[var(--muted)] text-[var(--toss-gray-4)]'
                             }`}>
                             {l.leave_type}
@@ -332,9 +332,9 @@ export default function LeaveManagement({
                         <td className="px-5 py-5 text-[var(--toss-gray-3)]">{l.start_date} ~ {l.end_date}</td>
                         <td className="px-5 py-5 text-[var(--toss-gray-3)] max-w-xs truncate">{l.reason}</td>
                         <td className="px-5 py-5">
-                          <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${l.status === '승인' ? 'bg-green-100 text-green-600' :
-                            l.status === '반려' ? 'bg-red-100 text-red-600' :
-                              'bg-orange-100 text-orange-600'
+                          <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${l.status === '승인' ? 'bg-green-500/20 text-green-600' :
+                            l.status === '반려' ? 'bg-red-500/20 text-red-600' :
+                              'bg-orange-500/20 text-orange-600'
                             }`}>
                             {l.status}
                           </span>
@@ -343,7 +343,7 @@ export default function LeaveManagement({
                           {l.status === '대기' && (
                             <div className="flex justify-end gap-2">
                               <button type="button" onClick={() => handleStatusUpdate(l.id, '승인')} className="px-3 py-2 min-h-[36px] bg-[var(--accent)] text-white text-[11px] font-semibold rounded-[var(--radius-lg)] shadow-sm hover:scale-[0.98] transition-all">승인</button>
-                              <button type="button" onClick={() => handleStatusUpdate(l.id, '반려')} className="px-3 py-2 min-h-[36px] bg-red-50 border border-red-200 text-[11px] font-semibold text-red-600 rounded-[var(--radius-lg)] hover:bg-red-100 transition-all">반려</button>
+                              <button type="button" onClick={() => handleStatusUpdate(l.id, '반려')} className="px-3 py-2 min-h-[36px] bg-red-500/10 border border-red-500/20 text-[11px] font-semibold text-red-600 rounded-[var(--radius-lg)] hover:bg-red-500/20 transition-all">반려</button>
                             </div>
                           )}
                         </td>
@@ -450,7 +450,7 @@ export default function LeaveManagement({
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-sm font-bold text-[var(--foreground)]">{staff?.name}</span>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${l.leave_type === '연차' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${l.leave_type === '연차' ? 'bg-blue-500/10 text-blue-600' : 'bg-purple-500/10 text-purple-600'}`}>
                             {l.leave_type}
                           </span>
                         </div>
@@ -464,7 +464,7 @@ export default function LeaveManagement({
                         <button
                           type="button"
                           onClick={() => handleStatusUpdate(l.id, '반려')}
-                          className="flex-1 md:flex-none px-5 py-2.5 bg-red-50 text-red-600 rounded-xl text-[11px] font-bold border border-red-100 hover:bg-red-100 transition-all"
+                          className="flex-1 md:flex-none px-5 py-2.5 bg-red-500/10 text-red-600 rounded-xl text-[11px] font-bold border border-red-100 hover:bg-red-500/20 transition-all"
                         >
                           반려
                         </button>

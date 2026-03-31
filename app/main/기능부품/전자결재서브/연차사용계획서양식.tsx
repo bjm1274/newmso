@@ -65,9 +65,9 @@ export default function AnnualLeavePlanForm({
       data-testid="annual-leave-plan-view"
       className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm animate-in fade-in duration-500"
     >
-      <div className="flex items-center justify-between border-b border-indigo-100 bg-indigo-50 p-3">
+      <div className="flex items-center justify-between border-b border-indigo-100 bg-indigo-500/10 p-3">
         <div>
-          <p className="rounded-[var(--radius-md)] bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-500">
+          <p className="rounded-[var(--radius-md)] bg-blue-500/10 px-2 py-0.5 text-xs font-bold text-blue-500">
             {_user.name as string}님의 연차사용계획서
           </p>
           <p className="mt-0.5 text-[11px] font-semibold text-indigo-500/70">
@@ -95,7 +95,7 @@ export default function AnnualLeavePlanForm({
                   value={item.date}
                   onChange={(value) => updateDate(index, value)}
                   data-testid={`annual-leave-plan-date-${index}`}
-                  inputClassName={`w-full h-[41px] rounded-[var(--radius-md)] px-2.5 text-xs font-bold border ${!item.date ? 'bg-red-50 border-red-300' : 'bg-[var(--muted)] border-transparent'}`}
+                  inputClassName={`w-full h-[41px] rounded-[var(--radius-md)] px-2.5 text-xs font-bold border ${!item.date ? 'bg-red-500/10 border-red-300' : 'bg-[var(--muted)] border-transparent'}`}
                 />
               </div>
               <div className="flex-[1.5]">
@@ -114,7 +114,7 @@ export default function AnnualLeavePlanForm({
                   type="button"
                   data-testid={`annual-leave-plan-remove-row-${index}`}
                   onClick={() => removeDateRow(index)}
-                  className="mt-4 rounded-[var(--radius-md)] px-2 py-1 text-xs text-red-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                  className="mt-4 rounded-[var(--radius-md)] px-2 py-1 text-xs text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-500"
                 >
                   삭제
                 </button>
@@ -127,7 +127,7 @@ export default function AnnualLeavePlanForm({
           type="button"
           data-testid="annual-leave-plan-add-row"
           onClick={addDateRow}
-          className="flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] border-2 border-dashed border-indigo-200 py-2 text-[11px] font-bold text-indigo-500 transition-all hover:border-indigo-300 hover:bg-indigo-50"
+          className="flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] border-2 border-dashed border-indigo-200 py-2 text-[11px] font-bold text-indigo-500 transition-all hover:border-indigo-300 hover:bg-indigo-500/10"
         >
           <span>사용 예정일 추가</span>
         </button>

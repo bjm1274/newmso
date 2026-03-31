@@ -26,7 +26,7 @@ export default function WorkforcePrediction({ staffs }: Record<string, unknown>)
           <h3 className="text-base font-bold text-[var(--foreground)] tracking-tight">AI Workforce Forecaster</h3>
           <p className="text-[11px] text-[var(--accent)] font-bold uppercase tracking-widest mt-0.5">Next Week Demand Prediction</p>
         </div>
-        <div className="bg-blue-50 px-3 py-1.5 rounded-[var(--radius-md)] border border-blue-100">
+        <div className="bg-blue-500/10 px-3 py-1.5 rounded-[var(--radius-md)] border border-blue-100">
           <span className="text-[11px] font-semibold text-[var(--accent)]">AI Confidence: 94.2%</span>
         </div>
       </div>
@@ -42,7 +42,7 @@ export default function WorkforcePrediction({ staffs }: Record<string, unknown>)
       ) : (
         <div className="grid grid-cols-6 gap-4">
           {predictionData.map((data, i) => (
-            <div key={i} className={`p-4 border-2 rounded-2xl flex flex-col items-center gap-2 transition-all ${data.status === 'SHORTAGE' ? 'border-red-100 bg-red-50/50' : 'border-[var(--border-subtle)] bg-gray-25'}`}>
+            <div key={i} className={`p-4 border-2 rounded-2xl flex flex-col items-center gap-2 transition-all ${data.status === 'SHORTAGE' ? 'border-red-100 bg-red-500/10/50' : 'border-[var(--border-subtle)] bg-gray-25'}`}>
               <span className="text-xs font-semibold text-[var(--toss-gray-3)]">{data.day}요일</span>
               <div className="flex flex-col items-center">
                 <span className={`text-2xl font-semibold ${data.status === 'SHORTAGE' ? 'text-red-600' : 'text-[var(--foreground)]'}`}>{data.predictedDemand}</span>
@@ -50,7 +50,7 @@ export default function WorkforcePrediction({ staffs }: Record<string, unknown>)
               </div>
               <div className="w-full h-1.5 bg-[var(--muted)] rounded-full mt-2 overflow-hidden">
                 <div
-                  className={`h-full transition-all duration-1000 ${data.status === 'SHORTAGE' ? 'bg-red-500' : 'bg-green-500'}`}
+                  className={`h-full transition-all duration-1000 ${data.status === 'SHORTAGE' ? 'bg-red-500/100' : 'bg-green-500/100'}`}
                   style={{ width: `${(data.currentStaff / data.predictedDemand) * 100}%` }}
                 />
               </div>

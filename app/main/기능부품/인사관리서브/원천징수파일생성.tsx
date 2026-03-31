@@ -32,7 +32,7 @@ export default function TaxFileGenerator({ staffs, selectedCo }: { staffs: any[]
     return (
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 shadow-sm animate-in fade-in duration-500" data-testid="payroll-utility-tax-file">
             <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-[var(--radius-md)] bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-base">
+                <div className="w-9 h-9 rounded-[var(--radius-md)] bg-indigo-500/10 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-base">
                     📑
                 </div>
                 <div>

@@ -12,14 +12,14 @@ function getToneClasses(tone: FeaturePermissionItem['tone'], active: boolean) {
   }
 
   if (tone === 'critical') {
-    return 'bg-red-50 border-red-200';
+    return 'bg-red-500/10 border-red-500/20';
   }
 
   if (tone === 'warning') {
     return 'bg-amber-50 border-amber-200';
   }
 
-  return 'bg-blue-50 border-blue-200';
+  return 'bg-blue-500/10 border-blue-500/20';
 }
 
 function getToggleClasses(tone: FeaturePermissionItem['tone'], active: boolean) {
@@ -28,7 +28,7 @@ function getToggleClasses(tone: FeaturePermissionItem['tone'], active: boolean) 
   }
 
   if (tone === 'critical') {
-    return 'bg-red-500 ring-red-100';
+    return 'bg-red-500/100 ring-red-100';
   }
 
   if (tone === 'warning') {
@@ -697,7 +697,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                     value={(selectedStaff.role as string) || 'staff'}
                     onChange={(e) => handleRoleChange(selectedStaff.id as string, e.target.value)}
                     className={`w-full px-2.5 py-2 border rounded-[var(--radius-md)] text-[11px] font-bold ${
-                      selectedStaff.role === 'admin' ? 'border-red-200 text-red-600 bg-red-50' : 'border-[var(--border)]'
+                      selectedStaff.role === 'admin' ? 'border-red-500/20 text-red-600 bg-red-500/10' : 'border-[var(--border)]'
                     }`}
                   >
                     <option value="staff">일반 직원 (기본)</option>
@@ -765,7 +765,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                       {currentApprovalReferenceUsers.map((staff) => (
                         <span
                           key={`${selectedApprovalReferenceFormKey}-${staff.id}`}
-                          className="inline-flex items-center gap-1 rounded-[var(--radius-md)] border border-yellow-200 bg-yellow-50 px-2.5 py-1.5 text-[10px] font-bold text-yellow-800"
+                          className="inline-flex items-center gap-1 rounded-[var(--radius-md)] border border-yellow-500/20 bg-yellow-500/10 px-2.5 py-1.5 text-[10px] font-bold text-yellow-800"
                         >
                           {staff.name}
                           {staff.position ? ` ${staff.position}` : ''}
@@ -1009,7 +1009,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                   )}
                 </div>
 
-                <div className="bg-red-50 p-3 rounded-[var(--radius-md)] shadow-sm border border-red-200">
+                <div className="bg-red-500/10 p-3 rounded-[var(--radius-md)] shadow-sm border border-red-500/20">
                   <p className="mb-2 text-[13px] font-semibold text-red-600">보안 및 계정 관리</p>
                   <button
                     type="button"

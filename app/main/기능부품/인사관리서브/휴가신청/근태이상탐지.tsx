@@ -25,11 +25,11 @@ type AttendanceAnomalyPanelProps = {
 function getTone(severity: AttendanceAnomaly['severity']) {
   switch (severity) {
     case 'critical':
-      return 'border-red-200 bg-red-50 text-red-700';
+      return 'border-red-500/20 bg-red-500/10 text-red-700';
     case 'warning':
-      return 'border-orange-200 bg-orange-50 text-orange-700';
+      return 'border-orange-500/20 bg-orange-500/10 text-orange-700';
     default:
-      return 'border-blue-200 bg-blue-50 text-blue-700';
+      return 'border-blue-500/20 bg-blue-500/10 text-blue-700';
   }
 }
 
@@ -160,15 +160,15 @@ export default function AttendanceAnomalyPanel({ staffs, selectedCo }: Attendanc
       </div>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 shadow-sm">
+        <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 shadow-sm">
           <p className="text-[11px] font-bold text-red-600">Critical</p>
           <p className="mt-2 text-2xl font-bold text-red-700">{summary.critical}</p>
         </div>
-        <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 shadow-sm">
+        <div className="rounded-2xl border border-orange-500/20 bg-orange-500/10 p-4 shadow-sm">
           <p className="text-[11px] font-bold text-orange-600">Warning</p>
           <p className="mt-2 text-2xl font-bold text-orange-700">{summary.warning}</p>
         </div>
-        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
+        <div className="rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4 shadow-sm">
           <p className="text-[11px] font-bold text-blue-600">Review</p>
           <p className="mt-2 text-2xl font-bold text-blue-700">{summary.review}</p>
         </div>
@@ -195,7 +195,7 @@ export default function AttendanceAnomalyPanel({ staffs, selectedCo }: Attendanc
           ))}
 
           {!loading && anomalies.length === 0 && (
-            <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center text-sm font-semibold text-green-700">
+            <div className="rounded-xl border border-green-500/20 bg-green-500/10 p-6 text-center text-sm font-semibold text-green-700">
               선택 월 기준으로 감지된 근태 이상 징후가 없습니다.
             </div>
           )}

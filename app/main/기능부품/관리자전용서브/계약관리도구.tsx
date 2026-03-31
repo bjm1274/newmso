@@ -128,7 +128,7 @@ export default function ContractManager() {
                 setTemplate(DEFAULT_CONTRACT_TEMPLATE);
               }
             }}
-            className="px-4 py-1.5 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] text-[11px] font-bold hover:bg-red-50 hover:text-red-500 transition-colors border border-[var(--border)]"
+            className="px-4 py-1.5 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] text-[11px] font-bold hover:bg-red-500/10 hover:text-red-500 transition-colors border border-[var(--border)]"
           >
             기본 양식 로드
           </button>

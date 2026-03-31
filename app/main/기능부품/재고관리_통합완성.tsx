@@ -1200,7 +1200,7 @@ export default function IntegratedInventoryManagement({
                         <span className="rounded-[var(--radius-md)] bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-600">
                           불출 가능 {pendingSupplyApprovalSummary.issue_ready_count}건
                         </span>
-                        <span className="rounded-[var(--radius-md)] bg-orange-50 px-3 py-1 text-[11px] font-bold text-orange-600">
+                        <span className="rounded-[var(--radius-md)] bg-orange-500/10 px-3 py-1 text-[11px] font-bold text-orange-600">
                           발주 필요 {pendingSupplyApprovalSummary.order_required_count}건
                         </span>
                       </div>
@@ -1237,7 +1237,7 @@ export default function IntegratedInventoryManagement({
                                 <span className="rounded-[var(--radius-md)] bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-600">
                                   불출 가능 {workflowSummary.issue_ready_count}건
                                 </span>
-                                <span className="rounded-[var(--radius-md)] bg-orange-50 px-2.5 py-1 text-[10px] font-bold text-orange-600">
+                                <span className="rounded-[var(--radius-md)] bg-orange-500/10 px-2.5 py-1 text-[10px] font-bold text-orange-600">
                                   발주 필요 {workflowSummary.order_required_count}건
                                 </span>
                               </div>
@@ -1284,10 +1284,10 @@ export default function IntegratedInventoryManagement({
                                         isIssued
                                           ? 'bg-emerald-50 text-emerald-600'
                                           : isOrdered
-                                            ? 'bg-orange-50 text-orange-600'
+                                            ? 'bg-orange-500/10 text-orange-600'
                                             : workflowItem.recommended_action === 'issue'
-                                              ? 'bg-blue-50 text-[var(--accent)]'
-                                              : 'bg-red-50 text-red-600'
+                                              ? 'bg-blue-500/10 text-[var(--accent)]'
+                                              : 'bg-red-500/10 text-red-600'
                                       }`}>
                                         {isIssued
                                           ? '불출 완료'
@@ -1357,7 +1357,7 @@ export default function IntegratedInventoryManagement({
                         <span className="rounded-[var(--radius-md)] bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-600">
                           불출 완료 {completedSupplyApprovalSummary.issued_count}건
                         </span>
-                        <span className="rounded-[var(--radius-md)] bg-orange-50 px-3 py-1 text-[11px] font-bold text-orange-600">
+                        <span className="rounded-[var(--radius-md)] bg-orange-500/10 px-3 py-1 text-[11px] font-bold text-orange-600">
                           발주 전환 {completedSupplyApprovalSummary.ordered_count}건
                         </span>
                       </div>
@@ -1426,7 +1426,7 @@ export default function IntegratedInventoryManagement({
                                     </div>
                                     <div className="flex items-center">
                                       <span className={`rounded-[var(--radius-md)] px-3 py-1 text-[10px] font-bold ${
-                                        isIssued ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'
+                                        isIssued ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-500/10 text-orange-600'
                                       }`}>
                                         {isIssued ? '불출 완료' : '발주 처리'}
                                       </span>
@@ -1483,7 +1483,7 @@ export default function IntegratedInventoryManagement({
                   <button
                     type="button"
                     onClick={() => openInventoryView('발주')}
-                    className="rounded-[var(--radius-lg)] border border-red-100 bg-red-50 px-4 py-3.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
+                    className="rounded-[var(--radius-lg)] border border-red-100 bg-red-500/10 px-4 py-3.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
                   >
                     <p className="text-[11px] font-bold text-red-500">우선 처리</p>
                     <p className="mt-1.5 text-sm font-bold text-red-700">발주 관리로 이동</p>
@@ -1492,7 +1492,7 @@ export default function IntegratedInventoryManagement({
                   <button
                     type="button"
                     onClick={() => openInventoryView('유통기한')}
-                    className="rounded-[var(--radius-lg)] border border-orange-100 bg-orange-50 px-4 py-3.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
+                    className="rounded-[var(--radius-lg)] border border-orange-100 bg-orange-500/10 px-4 py-3.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
                   >
                     <p className="text-[11px] font-bold text-orange-500">품질 점검</p>
                     <p className="mt-1.5 text-sm font-bold text-orange-700">유효기간 센터 열기</p>
@@ -1516,7 +1516,7 @@ export default function IntegratedInventoryManagement({
                         <h3 className="text-base font-bold text-[var(--foreground)]">우선 확인 품목</h3>
                         <p className="mt-1 text-xs text-[var(--toss-gray-3)]">재고부족과 유통기한 임박 품목을 먼저 확인하세요.</p>
                       </div>
-                      <span className="rounded-[var(--radius-md)] bg-red-50 px-3 py-1 text-[11px] font-bold text-red-600">
+                      <span className="rounded-[var(--radius-md)] bg-red-500/10 px-3 py-1 text-[11px] font-bold text-red-600">
                         {urgentActionItems.length}건
                       </span>
                     </div>
@@ -1544,7 +1544,7 @@ export default function IntegratedInventoryManagement({
                                 <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{item.company || '-'} · {itemDept || '부서 미지정'}</p>
                               </div>
                               <span className={`rounded-[var(--radius-md)] px-2.5 py-1 text-[10px] font-bold ${
-                                quantity <= minQuantity ? 'bg-red-50 text-red-600' : 'bg-orange-50 text-orange-600'
+                                quantity <= minQuantity ? 'bg-red-500/10 text-red-600' : 'bg-orange-500/10 text-orange-600'
                               }`}>
                                 {quantity <= minQuantity ? '재고부족' : '기한임박'}
                               </span>
@@ -1618,7 +1618,7 @@ export default function IntegratedInventoryManagement({
                                 <div className="flex gap-1 mt-0.5">
                                   {lotNumber && <span className="text-[7px] font-semibold bg-[var(--muted)] text-[var(--toss-gray-4)] px-1 py-0.5 rounded">LOT: {lotNumber}</span>}
                                   {serialNumber && <span className="text-[7px] font-semibold bg-emerald-50 text-emerald-600 px-1 py-0.5 rounded">S/N: {serialNumber}</span>}
-                                  {isUdi && <span className="text-[7px] font-semibold bg-purple-50 text-purple-500 px-1 py-0.5 rounded uppercase">UDI</span>}
+                                  {isUdi && <span className="text-[7px] font-semibold bg-purple-500/10 text-purple-500 px-1 py-0.5 rounded uppercase">UDI</span>}
                                 </div>
                               </td>
                               <td className="px-5 py-3.5 text-center">
@@ -1636,7 +1636,7 @@ export default function IntegratedInventoryManagement({
                                 {isExpiryImminent && <p className="text-[7px] font-semibold text-orange-400 animate-pulse">임박</p>}
                               </td>
                               <td className="px-5 py-3.5">
-                                <span className={`px-2 py-0.5 rounded-full text-[8px] font-semibold ${quantity <= minQuantity ? 'bg-red-50 text-red-600' : isExpiryImminent ? 'bg-orange-50 text-orange-600' : 'bg-green-50 text-green-600'}`}>
+                                <span className={`px-2 py-0.5 rounded-full text-[8px] font-semibold ${quantity <= minQuantity ? 'bg-red-500/10 text-red-600' : isExpiryImminent ? 'bg-orange-500/10 text-orange-600' : 'bg-green-500/10 text-green-600'}`}>
                                   {quantity <= minQuantity ? '재고부족' : isExpiryImminent ? '기한임박' : '정상'}
                                 </span>
                               </td>
@@ -1659,7 +1659,7 @@ export default function IntegratedInventoryManagement({
                                       }
                                     }
                                   }}
-                                  className="px-3 py-1.5 bg-red-50 text-red-600 text-[11px] font-semibold rounded-md hover:bg-red-100"
+                                  className="px-3 py-1.5 bg-red-500/10 text-red-600 text-[11px] font-semibold rounded-md hover:bg-red-500/20"
                                 >
                                   삭제
                                 </button>

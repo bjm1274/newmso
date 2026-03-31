@@ -110,9 +110,9 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
   }, [stats]);
 
   const gradeColor = (grade: StaffStat['grade']) => {
-    if (grade === '경고') return 'text-red-600 bg-red-50';
+    if (grade === '경고') return 'text-red-600 bg-red-500/10';
     if (grade === '주의') return 'text-amber-600 bg-amber-50';
-    return 'text-green-600 bg-green-50';
+    return 'text-green-600 bg-green-500/10';
   };
 
   const handleSendAlert = async () => {

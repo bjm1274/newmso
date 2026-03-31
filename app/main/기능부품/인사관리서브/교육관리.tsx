@@ -281,7 +281,7 @@ export default function EducationMain({ staffs, selectedCo }: Record<string, unk
           </div>
           <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar">
             {activeAlerts.map((item: any, index) => (
-              <div key={index} className={`p-3 border-l-4 ${item.type === 'URGENT' ? 'border-red-500 bg-red-500/10' : 'border-orange-400 bg-orange-500/10'}`}>
+              <div key={index} className={`p-3 border-l-4 ${item.type === 'URGENT' ? 'border-red-500 bg-red-500/100/10' : 'border-orange-400 bg-orange-500/100/10'}`}>
                 <p className="text-[11px] font-semibold text-[var(--foreground)]">
                   {activeTab === '의무교육' ? `${item.name} (${item.education})` : `${item.name} (${item.licenseName})`}
                 </p>

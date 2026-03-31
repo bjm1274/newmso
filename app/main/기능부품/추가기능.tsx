@@ -334,8 +334,8 @@ export default function ExtraFeatures({
   );
 
   const getCardStyle = useCallback((id: string) => {
-    if (id === '인계노트') return 'bg-red-50 text-red-500 group-hover:bg-red-100';
-    if (id === '퇴원심사') return 'bg-purple-50 text-purple-500 group-hover:bg-purple-100';
+    if (id === '인계노트') return 'bg-red-500/10 text-red-500 group-hover:bg-red-500/20';
+    if (id === '퇴원심사') return 'bg-purple-500/10 text-purple-500 group-hover:bg-purple-500/20';
     if (id === '조직도') return 'bg-sky-50 text-sky-600 group-hover:bg-sky-100';
     return 'bg-[var(--muted)] group-hover:bg-[var(--toss-blue-light)]';
   }, []);

@@ -132,7 +132,7 @@ export default function TaxFreeLimitChecker({ staffs, selectedCo, user }: Props)
                     const val = (amounts as any)[key] || 0;
                     const over = val > limit;
                     return (
-                      <td key={key} className={`p-2 text-right border border-[var(--border)] ${over ? 'bg-red-50 text-red-600 font-bold' : 'text-[var(--foreground)]'}`}>
+                      <td key={key} className={`p-2 text-right border border-[var(--border)] ${over ? 'bg-red-500/10 text-red-600 font-bold' : 'text-[var(--foreground)]'}`}>
                         <div>{fmt(val)}</div>
                         {over && <div className="text-[9px] text-red-500">초과 {fmt(val - limit)}원</div>}
                       </td>

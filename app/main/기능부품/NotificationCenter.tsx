@@ -320,7 +320,7 @@ export default function NotificationCenter({
           🔔
         </span>
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 min-w-[17px] h-[17px] px-1 flex items-center justify-center bg-red-500 text-white text-[9px] font-black rounded-full border-[2px] border-[var(--card)] leading-none">
+          <span className="absolute top-1 right-1 min-w-[17px] h-[17px] px-1 flex items-center justify-center bg-red-500/100 text-white text-[9px] font-black rounded-full border-[2px] border-[var(--card)] leading-none">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
@@ -337,7 +337,7 @@ export default function NotificationCenter({
             <div className="flex items-center gap-2">
               <h3 className="font-bold text-[13px] text-[var(--foreground)] tracking-tight">알림</h3>
               {unreadCount > 0 && (
-                <span className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none">
+                <span className="bg-red-500/100 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none">
                   {unreadCount}
                 </span>
               )}

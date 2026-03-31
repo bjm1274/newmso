@@ -125,7 +125,7 @@ export default function CongratulationsCondolences({ staffs = [], selectedCo }: 
                             {filteredRecords.length === 0 ? <tr><td colSpan={6} className="px-4 py-10 text-center text-[var(--toss-gray-3)] font-bold">경조사 이력이 없습니다</td></tr> : filteredRecords.map((r: any) => (
                                 <tr key={r.id} className="border-b border-[var(--border)] hover:bg-[var(--muted)]/50">
                                     <td className="px-4 py-3 font-bold text-[var(--foreground)]">{r.staff_name}<br /><span className="text-[9px] text-[var(--toss-gray-3)]">{r.department}</span></td>
-                                    <td className="px-4 py-3"><span className={`px-2 py-1 rounded-lg text-[11px] font-bold ${r.event_type?.includes('사망') ? 'bg-[var(--foreground)] text-white' : r.event_type === '생일' ? 'bg-blue-500/15 text-blue-700' : 'bg-pink-500/15 text-pink-700'}`}>{r.event_type}</span></td>
+                                    <td className="px-4 py-3"><span className={`px-2 py-1 rounded-lg text-[11px] font-bold ${r.event_type?.includes('사망') ? 'bg-[var(--foreground)] text-white' : r.event_type === '생일' ? 'bg-blue-500/100/15 text-blue-700' : 'bg-pink-500/100/15 text-pink-700'}`}>{r.event_type}</span></td>
                                     <td className="px-4 py-3 text-[var(--toss-gray-4)]">{r.event_date}</td>
                                     <td className="px-4 py-3 text-[var(--toss-gray-4)]">{r.relation} {r.recipient ? `(${r.recipient})` : ''}</td>
                                     <td className="px-4 py-3 text-right font-bold text-[var(--foreground)]">{(r.amount || 0).toLocaleString()}원</td>

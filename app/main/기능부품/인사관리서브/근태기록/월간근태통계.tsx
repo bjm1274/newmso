@@ -39,7 +39,7 @@ export default function MonthlyStats({ stats }: Record<string, unknown>) {
             {/* 상세 수당 내역 */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* 1. 근무 형태 가산 (이브/나이트 등) */}
-                <div className="p-4 bg-purple-50 rounded-[var(--radius-md)] border border-purple-100">
+                <div className="p-4 bg-purple-500/10 rounded-[var(--radius-md)] border border-purple-100">
                     <p className="text-[11px] text-purple-600 font-semibold mb-1">직무/교대 가산 ({s.staff.work_schedules?.allowance_rate || 1.0}배)</p>
                     <div className="flex justify-between items-end">
                         <span className="text-lg font-semibold text-purple-900">+{s.shift_allowance?.toLocaleString()}원</span>
@@ -47,7 +47,7 @@ export default function MonthlyStats({ stats }: Record<string, unknown>) {
                 </div>
 
                 {/* 2. 결재 승인 연장 수당 (전자결재 연동) */}
-                <div className="p-4 bg-blue-50 rounded-[var(--radius-md)] border border-blue-100">
+                <div className="p-4 bg-blue-500/10 rounded-[var(--radius-md)] border border-blue-100">
                     <div className="flex justify-between items-start">
                         <p className="text-[11px] text-[var(--accent)] font-semibold mb-1">승인된 연장 수당</p>
                         {s.approved_ot_hours > 0 && <span className="text-[11px] bg-[var(--accent)] text-white px-1.5 py-0.5 rounded font-bold">결재완료</span>}
@@ -59,7 +59,7 @@ export default function MonthlyStats({ stats }: Record<string, unknown>) {
                 </div>
 
                 {/* 3. 근태 공제 (지각/결근) */}
-                <div className="p-4 bg-red-50 rounded-[var(--radius-md)] border border-red-100">
+                <div className="p-4 bg-red-500/10 rounded-[var(--radius-md)] border border-red-100">
                     <p className="text-[11px] text-red-600 font-semibold mb-1">근태 공제 (지각/결근)</p>
                     <div className="flex justify-between items-end">
                         <span className="text-xs text-[var(--toss-gray-3)] font-bold">{s.late_count || 0}회 / {s.absent_days || 0}일</span>

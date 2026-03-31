@@ -3,11 +3,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const STATUS_COLORS: Record<string, string> = {
-  '대기': 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  '진행중': 'bg-blue-100 text-blue-700 border-blue-200',
-  '승인': 'bg-green-100 text-green-700 border-green-200',
-  '반려': 'bg-red-100 text-red-600 border-red-200',
-  '기안': 'bg-purple-100 text-purple-700 border-purple-200',
+  '대기': 'bg-yellow-500/20 text-yellow-700 border-yellow-500/20',
+  '진행중': 'bg-blue-500/20 text-blue-700 border-blue-500/20',
+  '승인': 'bg-green-500/20 text-green-700 border-green-500/20',
+  '반려': 'bg-red-500/20 text-red-600 border-red-500/20',
+  '기안': 'bg-purple-500/20 text-purple-700 border-purple-500/20',
 };
 
 function getDaysInMonth(year: number, month: number) { return new Date(year, month, 0).getDate(); }

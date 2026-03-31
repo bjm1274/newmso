@@ -281,13 +281,13 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
               <div className="mt-3 flex justify-end gap-2">
                 <button
                   onClick={() => startEditSupplier(supplier)}
-                  className="px-3 py-1.5 rounded-[var(--radius-md)] text-[11px] font-semibold bg-blue-50 text-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
+                  className="px-3 py-1.5 rounded-[var(--radius-md)] text-[11px] font-semibold bg-blue-500/10 text-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
                 >
                   수정
                 </button>
                 <button
                   onClick={() => handleDeleteSupplier(supplier.id as string)}
-                  className="px-3 py-1.5 rounded-[var(--radius-md)] text-[11px] font-semibold bg-red-50 text-red-600 hover:bg-red-100"
+                  className="px-3 py-1.5 rounded-[var(--radius-md)] text-[11px] font-semibold bg-red-500/10 text-red-600 hover:bg-red-500/20"
                 >
                   삭제
                 </button>
@@ -408,7 +408,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="p-4 bg-blue-50/50 rounded-[var(--radius-md)] border border-blue-100">
+              <div className="p-4 bg-blue-500/10/50 rounded-[var(--radius-md)] border border-blue-100">
                 <p className="text-[11px] font-semibold text-blue-500 uppercase tracking-widest mb-4">공급자 정보 (업체 선택)</p>
                 <select
                   value={invoiceData.supplier.sangho || ''}
@@ -530,7 +530,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                                   <button
                                     key={i.id as string}
                                     onClick={() => selectItem(idx, i)}
-                                    className="w-full text-left p-3 text-[11px] font-bold hover:bg-blue-50 border-b border-[var(--border-subtle)]"
+                                    className="w-full text-left p-3 text-[11px] font-bold hover:bg-blue-500/10 border-b border-[var(--border-subtle)]"
                                   >
                                     {i.item_name as string}
                                   </button>

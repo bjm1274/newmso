@@ -265,7 +265,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
                     <button
                       type="button"
                       onClick={() => handleRemoveItem(item.id)}
-                      className="text-[11px] font-semibold text-red-500 px-2 py-1 rounded-[var(--radius-md)] hover:bg-red-50"
+                      className="text-[11px] font-semibold text-red-500 px-2 py-1 rounded-[var(--radius-md)] hover:bg-red-500/10"
                     >
                       삭제
                     </button>

@@ -134,14 +134,14 @@ export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: S
           <div>
             <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">연차사용촉진 자동화 시스템</h2>
           </div>
-          <div className="px-4 py-2 bg-blue-50 rounded-[var(--radius-lg)]">
+          <div className="px-4 py-2 bg-blue-500/10 rounded-[var(--radius-lg)]">
             <p className="text-[11px] font-semibold text-[var(--accent)]">현재 촉진 시기: <span className="text-sm">1차 촉진 (7월)</span></p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-4">
           {promotionTargets.filter(t => t.actionRequired || t.status === '계획 제출 완료').map((staff: any) => (
-            <div key={staff.id} className={`p-4 border rounded-[var(--radius-lg)] flex flex-col md:flex-row justify-between items-center gap-4 transition-all ${staff.status === '계획 제출 완료' ? 'bg-indigo-50/30 border-indigo-100 opacity-80' : 'bg-[var(--muted)] border-[var(--border)]'}`}>
+            <div key={staff.id} className={`p-4 border rounded-[var(--radius-lg)] flex flex-col md:flex-row justify-between items-center gap-4 transition-all ${staff.status === '계획 제출 완료' ? 'bg-indigo-500/10/30 border-indigo-100 opacity-80' : 'bg-[var(--muted)] border-[var(--border)]'}`}>
               <div className="flex items-center gap-4">
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold shadow-sm border ${staff.status === '계획 제출 완료' ? 'bg-[var(--card)] text-indigo-500 border-indigo-100' : 'bg-[var(--card)] text-[var(--accent)] border-[var(--border)]'}`}>
                   {staff.name[0]}
@@ -159,7 +159,7 @@ export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: S
                 </div>
                 <div className="text-center">
                   <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">상태</p>
-                  <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${staff.status === '계획 제출 완료' ? 'bg-indigo-100 text-indigo-600' : 'bg-orange-100 text-orange-600'}`}>{staff.status}</span>
+                  <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${staff.status === '계획 제출 완료' ? 'bg-indigo-100 text-indigo-600' : 'bg-orange-500/20 text-orange-600'}`}>{staff.status}</span>
                 </div>
                 {staff.actionRequired ? (
                   <button
@@ -178,14 +178,14 @@ export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: S
             </div>
           ))}
           {promotionTargets.filter(t => t.actionRequired).length === 0 && promotionTargets.filter(t => t.status === '계획 제출 완료').length === 0 && (
-            <div className="text-center py-20 bg-green-50 rounded-[var(--radius-lg)] border border-dashed border-green-200">
+            <div className="text-center py-20 bg-green-500/10 rounded-[var(--radius-lg)] border border-dashed border-green-500/20">
               <p className="text-sm font-semibold text-green-600">✅ 현재 연차사용촉진 대상자가 없습니다.</p>
             </div>
           )}
         </div>
       </div>
 
-      <div className="bg-orange-50 p-4 rounded-[var(--radius-lg)] border border-orange-100">
+      <div className="bg-orange-500/10 p-4 rounded-[var(--radius-lg)] border border-orange-100">
         <h3 className="text-sm font-semibold text-orange-800 mb-4">⚖️ 근로기준법 제61조 (연차 유급휴가의 사용 촉진)</h3>
         <ul className="space-y-3 text-[11px] text-orange-700 font-bold leading-relaxed">
           <li>• 1차 촉진: 연차 유급휴가 발생일로부터 1년이 끝나기 6개월 전을 기준으로 10일 이내에 서면으로 통보</li>

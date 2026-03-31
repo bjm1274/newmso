@@ -51,7 +51,7 @@ export default function SharedCalendar({ user }: Record<string, unknown>) {
             <div key={i} className="min-h-[60px] p-1 border border-[var(--border-subtle)] rounded-[var(--radius-md)]">
               <p className="text-xs font-bold text-[var(--toss-gray-4)]">{d}</p>
               {dayEvents.slice(0, 2).map((e, j) => (
-                <p key={j} className="text-[11px] font-bold truncate bg-blue-50 text-[var(--accent)] rounded px-0.5 mt-0.5">{e.title}</p>
+                <p key={j} className="text-[11px] font-bold truncate bg-blue-500/10 text-[var(--accent)] rounded px-0.5 mt-0.5">{e.title}</p>
               ))}
             </div>
           );

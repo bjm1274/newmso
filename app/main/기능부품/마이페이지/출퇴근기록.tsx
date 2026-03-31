@@ -830,12 +830,12 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
             {currentTime.toLocaleTimeString('ko-KR')}
           </h2>
           <div className="flex flex-wrap items-center gap-2 mt-1">
-            <span className={`w-2 h-2 rounded-full animate-pulse ${todayLog ? (todayLog.check_out ? 'bg-[var(--toss-gray-3)]' : 'bg-green-500') : 'bg-red-500'}`}></span>
+            <span className={`w-2 h-2 rounded-full animate-pulse ${todayLog ? (todayLog.check_out ? 'bg-[var(--toss-gray-3)]' : 'bg-green-500/100') : 'bg-red-500/100'}`}></span>
             <span className="text-sm font-bold mr-1">
               {todayLog ? (todayLog.check_out ? '퇴근 완료' : '근무 중') : '출근 전'}
             </span>
             {distance !== null && (
-              <span className={`px-2 py-0.5 rounded-full text-[11px] ${distance <= ALLOWED_RADIUS_METER ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+              <span className={`px-2 py-0.5 rounded-full text-[11px] ${distance <= ALLOWED_RADIUS_METER ? 'bg-green-500/100/20 text-green-400' : 'bg-red-500/100/20 text-red-400'}`}>
                 병원 거리: {distance}m {distance <= ALLOWED_RADIUS_METER ? '✅' : '❌'}
               </span>
             )}
@@ -859,7 +859,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
               data-testid="commute-check-out-button"
               onClick={() => handleCommute('out')}
               disabled={isProcessing}
-              className="px-5 py-3 sm:px-10 sm:py-5 w-full sm:w-auto bg-red-600 hover:bg-red-500 rounded-[var(--radius-md)] font-semibold text-base sm:text-lg shadow-sm active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-5 py-3 sm:px-10 sm:py-5 w-full sm:w-auto bg-red-600 hover:bg-red-500/100 rounded-[var(--radius-md)] font-semibold text-base sm:text-lg shadow-sm active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span>{isProcessing ? '위치 확인 처리 중...' : '퇴근하기 🌙'}</span>
               <span className="text-[11px] font-normal opacity-70">GPS 인증 필요</span>
@@ -940,7 +940,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
                   <div
                     className={`w-14 h-14 rounded-[var(--radius-md)] flex flex-col items-center justify-center font-semibold ${
                       displayStatus === '지각'
-                        ? 'bg-red-100 text-red-600'
+                        ? 'bg-red-500/20 text-red-600'
                         : displayStatus === '조퇴'
                         ? 'bg-amber-100 text-amber-700'
                         : 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
@@ -1014,14 +1014,14 @@ function AttendanceCalendar({ logs, currentMonth }: { logs: CommuteLog[]; curren
     const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
     if (log) {
       const status = getDisplayStatus(log);
-      if (status === '지각') return 'bg-orange-500/15 text-orange-600 font-semibold';
-      if (status === '연차' || status === '반차') return 'bg-purple-500/15 text-purple-600 font-semibold';
-      if (status === '병가') return 'bg-blue-500/15 text-blue-600 font-semibold';
-      return 'bg-green-500/15 text-green-700 font-semibold';
+      if (status === '지각') return 'bg-orange-500/100/15 text-orange-600 font-semibold';
+      if (status === '연차' || status === '반차') return 'bg-purple-500/100/15 text-purple-600 font-semibold';
+      if (status === '병가') return 'bg-blue-500/100/15 text-blue-600 font-semibold';
+      return 'bg-green-500/100/15 text-green-700 font-semibold';
     }
     const dayOfWeek = new Date(year, month, day).getDay();
     if (dayOfWeek === 0 || dayOfWeek === 6) return 'text-[var(--toss-gray-3)]'; // weekend - no attendance OK
-    if (new Date(year, month, day) < today) return 'bg-red-500/10 text-red-400'; // past weekday no record
+    if (new Date(year, month, day) < today) return 'bg-red-500/100/10 text-red-400'; // past weekday no record
     return 'text-[var(--toss-gray-4)]';
   };
 
@@ -1045,10 +1045,10 @@ function AttendanceCalendar({ logs, currentMonth }: { logs: CommuteLog[]; curren
         ))}
       </div>
       <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-[var(--toss-gray-3)]">
-        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-green-500/30" />정상</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-orange-500/30" />지각</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-purple-500/30" />연차/반차</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-red-500/20" />미출근</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-green-500/100/30" />정상</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-orange-500/100/30" />지각</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-purple-500/100/30" />연차/반차</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-red-500/100/20" />미출근</span>
       </div>
     </div>
   );

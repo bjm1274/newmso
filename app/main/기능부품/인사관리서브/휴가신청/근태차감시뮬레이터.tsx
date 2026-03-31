@@ -203,11 +203,11 @@ export default function AttendanceDeductionSimulator({
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
           <h4 className="text-sm font-bold text-[var(--foreground)]">차감 계산 결과</h4>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+            <div className="rounded-xl border border-blue-100 bg-blue-500/10 p-4">
               <p className="text-[11px] font-bold text-blue-600">총 차감액</p>
               <p className="mt-2 text-2xl font-bold text-blue-700">₩ {result.total.toLocaleString()}</p>
             </div>
-            <div className="rounded-xl border border-orange-100 bg-orange-50 p-4">
+            <div className="rounded-xl border border-orange-100 bg-orange-500/10 p-4">
               <p className="text-[11px] font-bold text-orange-600">지각 차감</p>
               <p className="mt-2 text-xl font-bold text-orange-700">₩ {result.detail.late.toLocaleString()}</p>
             </div>
@@ -215,7 +215,7 @@ export default function AttendanceDeductionSimulator({
               <p className="text-[11px] font-bold text-amber-600">조퇴 차감</p>
               <p className="mt-2 text-xl font-bold text-amber-700">₩ {result.detail.early_leave.toLocaleString()}</p>
             </div>
-            <div className="rounded-xl border border-red-100 bg-red-50 p-4">
+            <div className="rounded-xl border border-red-100 bg-red-500/10 p-4">
               <p className="text-[11px] font-bold text-red-600">결근 차감</p>
               <p className="mt-2 text-xl font-bold text-red-700">₩ {result.detail.absent.toLocaleString()}</p>
             </div>

@@ -144,14 +144,14 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
     const ratio = executed / budget;
     if (ratio >= 1) {
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-md)] text-xs font-bold bg-red-100 text-red-600">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-md)] text-xs font-bold bg-red-500/20 text-red-600">
           초과
         </span>
       );
     }
     if (ratio >= 0.9) {
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-md)] text-xs font-bold bg-orange-100 text-orange-600">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-md)] text-xs font-bold bg-orange-500/20 text-orange-600">
           90% 초과
         </span>
       );
@@ -443,7 +443,7 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
                       <div className="mt-2">
                         <div className="w-full bg-[var(--muted)] rounded-full h-1.5">
                           <div
-                            className={`h-1.5 rounded-full transition-all ${ratio >= 1 ? 'bg-red-500' : ratio >= 0.9 ? 'bg-orange-400' : 'bg-[var(--accent)]'}`}
+                            className={`h-1.5 rounded-full transition-all ${ratio >= 1 ? 'bg-red-500/100' : ratio >= 0.9 ? 'bg-orange-400' : 'bg-[var(--accent)]'}`}
                             style={{ width: `${Math.min(100, ratio * 100).toFixed(1)}%` }}
                           />
                         </div>

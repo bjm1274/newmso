@@ -135,7 +135,7 @@ function getRunStatusMeta(status: string) {
     case 'completed':
       return { label: '완료', className: 'bg-emerald-100 text-emerald-700' };
     case 'failed':
-      return { label: '실패', className: 'bg-red-100 text-red-700' };
+      return { label: '실패', className: 'bg-red-500/20 text-red-700' };
     case 'running':
       return { label: '진행 중', className: 'bg-amber-100 text-amber-700' };
     default:
@@ -729,7 +729,7 @@ export default function DataBackup({ user }: Props) {
             </div>
           </div>
         ) : restoreFile && !previewLoading ? (
-          <div className="rounded-[18px] border border-red-200 bg-red-50 px-4 py-3 text-[12px] font-semibold text-red-600">
+          <div className="rounded-[18px] border border-red-500/20 bg-red-500/10 px-4 py-3 text-[12px] font-semibold text-red-600">
             파일을 읽지 못했습니다. 유효한 JSON 백업 파일인지 확인해 주세요.
           </div>
         ) : null}
