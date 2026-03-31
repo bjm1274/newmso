@@ -427,6 +427,15 @@ select:not(.no-style) {
   line-height: 1.5;
 }
 
+/* iOS 자동 줌 방지: 입력 필드 font-size 최소 16px (모바일) */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not(.no-style),
+  textarea:not(.no-style),
+  select:not(.no-style) {
+    font-size: 1rem; /* 16px - iOS zoom 방지 */
+  }
+}
+
 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not(.no-style)::placeholder,
 textarea:not(.no-style)::placeholder {
   color: var(--zinc-400);

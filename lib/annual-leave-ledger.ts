@@ -203,7 +203,8 @@ export async function ensureApprovedAnnualLeaveRequest(params: {
     return matched.id;
   }
 
-  const { data: inserted, error: insertError } = await withMissingColumnsFallback(
+  const insertResult: { data: { id: string | null } | null; error: unknown } =
+    await withMissingColumnsFallback<{ id: string | null }>(
     (omittedColumns) =>
       client
         .from('leave_requests')
@@ -221,9 +222,11 @@ export async function ensureApprovedAnnualLeaveRequest(params: {
         })
         .select('id')
         .single(),
-    optionalColumnNames,
-  );
+      optionalColumnNames,
+    );
 
+  const inserted = insertResult.data;
+  const insertError = insertResult.error;
   if (insertError) throw insertError;
   return inserted?.id ?? null;
 }

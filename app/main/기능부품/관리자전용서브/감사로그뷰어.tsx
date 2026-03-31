@@ -28,6 +28,7 @@ export default function AuditLogViewer() {
         ) : logs.length === 0 ? (
           <div className="p-5 text-center text-[var(--toss-gray-3)]">기록이 없습니다.</div>
         ) : (
+          <div className="overflow-x-auto -mx-1">
           <table className="w-full text-left text-xs">
             <thead className="bg-[var(--muted)] text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">
               <tr>
@@ -48,6 +49,7 @@ export default function AuditLogViewer() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>
