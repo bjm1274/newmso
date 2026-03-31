@@ -808,7 +808,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
               : '재직 중인 직원만 표시됩니다.'}
           </p>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
+        <div className="flex flex-wrap items-center justify-end gap-2 shrink-0 overflow-x-auto">
           <div className="flex items-center gap-2">
             <input
               type="text"
@@ -820,7 +820,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                 }
               }}
               placeholder="직원 검색"
-              className="h-10 w-[140px] rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 text-[12px] font-semibold text-[var(--foreground)] outline-none transition focus:border-[var(--accent)] md:w-[170px]"
+              className="h-10 w-full sm:w-[140px] rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 text-[12px] font-semibold text-[var(--foreground)] outline-none transition focus:border-[var(--accent)] md:w-[170px]"
             />
             <button
               type="button"
@@ -1003,24 +1003,24 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
               <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[var(--border)]">
                 <div>
                   <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">부서</p>
-                  <p className="text-xs font-bold text-[var(--foreground)]">{직원.department}</p>
+                  <p className="text-[13px] font-bold text-[var(--foreground)]">{직원.department}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">근무형태</p>
-                  <p className="text-xs font-bold text-[var(--foreground)]">{근무형태목록.find(s => s.id === 직원.shift_id)?.name || '-'}</p>
+                  <p className="text-[13px] font-bold text-[var(--foreground)]">{근무형태목록.find(s => s.id === 직원.shift_id)?.name || '-'}</p>
                 </div>
                 <div>
                   <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">연락처</p>
-                  <p className="text-xs font-bold text-[var(--foreground)] break-all">{직원연락요약(직원)}</p>
+                  <p className="text-[13px] font-bold text-[var(--foreground)] break-all">{직원연락요약(직원)}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">고용형태</p>
-                  <p className="text-xs font-bold text-[var(--foreground)]">{직원고용형태(직원)}</p>
+                  <p className="text-[13px] font-bold text-[var(--foreground)]">{직원고용형태(직원)}</p>
                 </div>
               </div>
               <div className="pt-4 border-t border-[var(--border)]">
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">면허/자격</p>
-                <p className="text-xs font-bold text-[var(--foreground)] break-words">{직원면허요약(직원)}</p>
+                <p className="text-[13px] font-bold text-[var(--foreground)] break-words">{직원면허요약(직원)}</p>
               </div>
               <div className="flex gap-2">
                 <button
@@ -1093,11 +1093,11 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       </h4>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">성명 *</label>
+                          <label className="text-[12px] font-bold text-[var(--toss-gray-4)] ml-1">성명 *</label>
                           <input data-testid="new-staff-name-input" type="text" value={신규직원.성명} onChange={e => 신규직원설정({ ...신규직원, 성명: e.target.value })} className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30" placeholder="성명을 입력하세요" />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">주민번호</label>
+                          <label className="text-[12px] font-bold text-[var(--toss-gray-4)] ml-1">주민번호</label>
                           <input
                             type="text"
                             value={신규직원.주민번호}
@@ -1120,7 +1120,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">연락처 (개인)</label>
+                        <label className="text-[12px] font-bold text-[var(--toss-gray-4)] ml-1">연락처 (개인)</label>
                         <input
                           type="text"
                           inputMode="numeric"
@@ -1151,7 +1151,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">주소</label>
+                        <label className="text-[12px] font-bold text-[var(--toss-gray-4)] ml-1">주소</label>
                         <input type="text" value={신규직원.주소} onChange={e => 신규직원설정({ ...신규직원, 주소: e.target.value })} className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30" placeholder="상세 주소 입력" />
                       </div>
                     </div>
@@ -1162,7 +1162,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         부가 정보
                       </h4>
                       <div className="space-y-2">
-                        <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">내선번호</label>
+                        <label className="text-[12px] font-bold text-[var(--toss-gray-4)] ml-1">내선번호</label>
                         <input type="text" value={신규직원.내선번호} onChange={e => 신규직원설정({ ...신규직원, 내선번호: e.target.value })} placeholder="1234" className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30" />
                       </div>
                       <div className="p-5 bg-amber-50 rounded-[var(--radius-xl)] border border-amber-100 space-y-4">
@@ -1208,14 +1208,14 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       </h4>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">사업체</label>
+                          <label className="text-[12px] font-bold text-[var(--toss-gray-4)] ml-1">사업체</label>
                           <select value={신규직원.사업체} onChange={e => 신규직원설정({ ...신규직원, 사업체: e.target.value, 팀: 팀목록가져오기(e.target.value)[0] ?? '', 근무형태ID: '' })} className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none" data-testid="new-staff-company-select">
                             <option value="">사업체 선택</option>
                             {availableCompanyOptions.map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">부서/팀</label>
+                          <label className="text-[12px] font-bold text-[var(--toss-gray-4)] ml-1">부서/팀</label>
                           <select data-testid="new-staff-team-select" value={신규직원.팀} onChange={e => 신규직원설정({ ...신규직원, 팀: e.target.value })} className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none">
                             <option value="">팀 선택 안함</option>
                             {팀목록가져오기(신규직원.사업체).map(팀 => <option key={팀} value={팀}>{팀}</option>)}
@@ -1223,7 +1223,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">직함</label>
+                        <label className="text-[12px] font-bold text-[var(--toss-gray-4)] ml-1">직함</label>
                         <select data-testid="new-staff-position-select" value={신규직원.직함} onChange={e => 신규직원설정({ ...신규직원, 직함: e.target.value })} className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none">
                           <option value="">직함 선택</option>
                           {['사원', '주임', '대리', '팀장', '간호과장', '간호부장', '실장', '부장', '진료부장', '총무부장', '이사', '원장', '병원장'].map(pos => (
@@ -1240,7 +1240,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       </h4>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">입사일 *</label>
+                          <label className="text-[12px] font-bold text-[var(--toss-gray-4)] ml-1">입사일 *</label>
                           <SmartDatePicker
                             value={신규직원.입사일}
                             onChange={val => 신규직원설정({ ...신규직원, 입사일: val || '' })}
@@ -1249,7 +1249,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">고용형태</label>
+                          <label className="text-[12px] font-bold text-[var(--toss-gray-4)] ml-1">고용형태</label>
                           <div className="flex gap-1 p-1 bg-[var(--muted)] rounded-[var(--radius-md)]">
                             {['정규직', '계약직'].map(type => (
                               <button
@@ -1324,7 +1324,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       )}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">지정 스케줄 (근무형태)</label>
+                          <label className="text-[12px] font-bold text-[var(--toss-gray-4)] ml-1">지정 스케줄 (근무형태)</label>
                           <button
                             type="button"
                             onClick={() => { 새근무형태표시설정(v => !v); 새근무형태설정({ name: '', start_time: '09:00', end_time: '18:00', break_start_time: '12:00', break_end_time: '13:00' }); }}

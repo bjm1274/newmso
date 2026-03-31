@@ -56,21 +56,21 @@ export default function CongratulationsCondolences({ staffs = [], selectedCo }: 
             </header>
             <div className="flex-1 overflow-y-auto p-4 md:p-5 space-y-4 custom-scrollbar bg-[var(--page-bg)]">
                 {/* 요약 카드 */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm">
-                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">전체 건수</p>
+                        <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1">전체 건수</p>
                         <p className="text-2xl font-black text-[var(--foreground)]">{filteredRecords.length}<span className="text-sm ml-1 font-bold text-[var(--toss-gray-3)]">건</span></p>
                     </div>
                     <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm">
-                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">총 지급액</p>
+                        <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1">총 지급액</p>
                         <p className="text-2xl font-black text-[var(--foreground)]">{totalAmount.toLocaleString()}<span className="text-sm ml-1 font-bold text-[var(--toss-gray-3)]">원</span></p>
                     </div>
                     <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm">
-                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">{new Date().getFullYear()}년 건수</p>
+                        <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1">{new Date().getFullYear()}년 건수</p>
                         <p className="text-2xl font-black text-[var(--accent)]">{thisYear.length}<span className="text-sm ml-1 font-bold text-[var(--toss-gray-3)]">건</span></p>
                     </div>
                     <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm">
-                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">{new Date().getFullYear()}년 지급</p>
+                        <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1">{new Date().getFullYear()}년 지급</p>
                         <p className="text-2xl font-black text-emerald-600">{yearTotal.toLocaleString()}<span className="text-sm ml-1 font-bold text-[var(--toss-gray-3)]">원</span></p>
                     </div>
                 </div>
@@ -104,9 +104,9 @@ export default function CongratulationsCondolences({ staffs = [], selectedCo }: 
                 )}
 
                 {/* 필터 */}
-                <div className="flex gap-1 bg-[var(--card)] border border-[var(--border)] rounded-xl p-1 w-fit">
+                <div className="flex gap-1 bg-[var(--card)] border border-[var(--border)] rounded-xl p-1 w-fit overflow-x-auto">
                     {['전체', ...EVENT_TYPES].map(t => (
-                        <button key={t} onClick={() => setFilter(t)} className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all ${filter === t ? 'bg-[var(--accent)] text-white' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}>{t}</button>
+                        <button key={t} onClick={() => setFilter(t)} className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all ${filter === t ? 'bg-[var(--accent)] text-white' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}>{t}</button>
                     ))}
                 </div>
 
@@ -125,7 +125,7 @@ export default function CongratulationsCondolences({ staffs = [], selectedCo }: 
                             {filteredRecords.length === 0 ? <tr><td colSpan={6} className="px-4 py-10 text-center text-[var(--toss-gray-3)] font-bold">경조사 이력이 없습니다</td></tr> : filteredRecords.map((r: any) => (
                                 <tr key={r.id} className="border-b border-[var(--border)] hover:bg-[var(--muted)]/50">
                                     <td className="px-4 py-3 font-bold text-[var(--foreground)]">{r.staff_name}<br /><span className="text-[9px] text-[var(--toss-gray-3)]">{r.department}</span></td>
-                                    <td className="px-4 py-3"><span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${r.event_type?.includes('사망') ? 'bg-gray-800 text-white' : r.event_type === '생일' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}`}>{r.event_type}</span></td>
+                                    <td className="px-4 py-3"><span className={`px-2 py-1 rounded-lg text-[11px] font-bold ${r.event_type?.includes('사망') ? 'bg-[var(--foreground)] text-white' : r.event_type === '생일' ? 'bg-blue-500/15 text-blue-700' : 'bg-pink-500/15 text-pink-700'}`}>{r.event_type}</span></td>
                                     <td className="px-4 py-3 text-[var(--toss-gray-4)]">{r.event_date}</td>
                                     <td className="px-4 py-3 text-[var(--toss-gray-4)]">{r.relation} {r.recipient ? `(${r.recipient})` : ''}</td>
                                     <td className="px-4 py-3 text-right font-bold text-[var(--foreground)]">{(r.amount || 0).toLocaleString()}원</td>

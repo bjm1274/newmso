@@ -1641,10 +1641,10 @@ export default function IntegratedInventoryManagement({
                                 </span>
                               </td>
                               <td data-testid={`inventory-actions-${item.id}`} className="px-5 py-3.5 text-right space-x-1">
-                                <button data-testid={`inventory-stock-in-${item.id}`} onClick={() => { setStockModal({ item, type: 'in', targetCompany: item.company || '전체', targetDept: itemDepartment || '전체' }); setStockAmount(1); }} className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--accent)] text-[11px] font-semibold rounded-md hover:bg-[var(--toss-blue-light)]">입고</button>
-                                <button data-testid={`inventory-stock-out-${item.id}`} onClick={() => { setStockModal({ item, type: 'out', targetCompany: item.company || '전체', targetDept: itemDepartment || '전체' }); setStockAmount(1); }} className="px-2 py-1 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-md hover:bg-[var(--muted)]/80">출고</button>
+                                <button data-testid={`inventory-stock-in-${item.id}`} onClick={() => { setStockModal({ item, type: 'in', targetCompany: item.company || '전체', targetDept: itemDepartment || '전체' }); setStockAmount(1); }} className="px-3 py-1.5 bg-[var(--toss-blue-light)] text-[var(--accent)] text-[11px] font-semibold rounded-md hover:bg-[var(--toss-blue-light)]">입고</button>
+                                <button data-testid={`inventory-stock-out-${item.id}`} onClick={() => { setStockModal({ item, type: 'out', targetCompany: item.company || '전체', targetDept: itemDepartment || '전체' }); setStockAmount(1); }} className="px-3 py-1.5 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-md hover:bg-[var(--muted)]/80">출고</button>
                                 {quantity <= minQuantity && (
-                                  <button data-testid={`inventory-reorder-${item.id}`} onClick={() => handleAutoApprovalRequest(item)} className="px-2 py-1 bg-orange-600 text-white text-[11px] font-semibold rounded-md shadow-sm">발주</button>
+                                  <button data-testid={`inventory-reorder-${item.id}`} onClick={() => handleAutoApprovalRequest(item)} className="px-3 py-1.5 bg-orange-600 text-white text-[11px] font-semibold rounded-md shadow-sm">발주</button>
                                 )}
                                 <button
                                   data-testid={`inventory-delete-${item.id}`}
@@ -1659,7 +1659,7 @@ export default function IntegratedInventoryManagement({
                                       }
                                     }
                                   }}
-                                  className="px-2 py-1 bg-red-50 text-red-600 text-[11px] font-semibold rounded-md hover:bg-red-100"
+                                  className="px-3 py-1.5 bg-red-50 text-red-600 text-[11px] font-semibold rounded-md hover:bg-red-100"
                                 >
                                   삭제
                                 </button>

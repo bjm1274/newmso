@@ -49,6 +49,7 @@ const EXTRA_FEATURE_PERMISSION_KEYS: Record<string, string> = {
   직원평가: 'extra_직원평가',
   입금실시간조회: 'extra_입금실시간조회',
   수술상담: 'extra_수술상담',
+  OP체크: 'extra_OP체크',
 };
 
 const BOARD_PERMISSION_KEYS: Record<string, { read: string; write: string }> = {
@@ -137,6 +138,7 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   extra_조직도: ['menu_조직도'],
   extra_입금실시간조회: ['menu_추가기능'],
   extra_수술상담: ['menu_추가기능'],
+  extra_OP체크: ['menu_추가기능'],
   extra_인계노트: ['handover_read'],
   approval_기안함: ['approval'],
   approval_결재함: ['approval'],
