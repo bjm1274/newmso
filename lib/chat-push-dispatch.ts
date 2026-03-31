@@ -40,6 +40,14 @@ type NotificationInsertRow = {
   created_at: string;
 };
 
+type ExistingChatNotificationRow = {
+  id: string;
+  user_id: string;
+  type: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string | null;
+};
+
 type QueueJobRow = {
   id: string;
   message_id: string;
@@ -208,6 +216,27 @@ function buildDeterministicNotificationId(userId: string, messageId: string) {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
 
+function choosePreferredChatNotification(rows: ExistingChatNotificationRow[]) {
+  if (rows.length === 0) return null;
+
+  const sorted = [...rows].sort((left, right) => {
+    const leftHasDedupe = String(left.metadata?.dedupe_key || '').trim() ? 1 : 0;
+    const rightHasDedupe = String(right.metadata?.dedupe_key || '').trim() ? 1 : 0;
+    if (leftHasDedupe !== rightHasDedupe) return rightHasDedupe - leftHasDedupe;
+
+    const leftCreatedAt = new Date(String(left.created_at || 0)).getTime();
+    const rightCreatedAt = new Date(String(right.created_at || 0)).getTime();
+    if (leftCreatedAt !== rightCreatedAt) return leftCreatedAt - rightCreatedAt;
+
+    return String(left.id).localeCompare(String(right.id));
+  });
+
+  return {
+    keep: sorted[0]!,
+    staleIds: sorted.slice(1).map((row) => String(row.id)),
+  };
+}
+
 async function getMutedUserIds(supabase: SupabaseClient, roomId: string) {
   try {
     const { data, error } = await supabase
@@ -361,24 +390,52 @@ export async function dispatchChatPushForMessage(params: {
         : senderName;
 
   const previewBody = buildPreview(message);
-  const notificationRows: NotificationInsertRow[] = targetIds.map((targetId) => ({
-    id: buildDeterministicNotificationId(targetId, params.messageId),
-    user_id: targetId,
-    type: 'message',
-    title,
-    body: previewBody,
-    metadata: {
-      room_id: params.roomId,
-      id: params.messageId,
-      sender_name: senderName,
-      room_name: room.name || '',
+  const { data: existingNotificationData, error: existingNotificationError } = await supabase
+    .from('notifications')
+    .select('id,user_id,type,metadata,created_at')
+    .in('user_id', targetIds)
+    .in('type', ['message', 'mention'])
+    .filter('metadata->>message_id', 'eq', params.messageId);
+
+  if (existingNotificationError) {
+    console.warn('chat notification legacy lookup failed', existingNotificationError);
+  }
+
+  const existingNotificationsByUser = new Map<string, ExistingChatNotificationRow[]>();
+  for (const row of (existingNotificationData || []) as ExistingChatNotificationRow[]) {
+    const targetUserId = String(row.user_id || '').trim();
+    if (!targetUserId) continue;
+    existingNotificationsByUser.set(targetUserId, [
+      ...(existingNotificationsByUser.get(targetUserId) || []),
+      row,
+    ]);
+  }
+
+  const staleNotificationIds = new Set<string>();
+  const notificationRows: NotificationInsertRow[] = targetIds.map((targetId) => {
+    const preferred = choosePreferredChatNotification(existingNotificationsByUser.get(targetId) || []);
+    preferred?.staleIds.forEach((id) => staleNotificationIds.add(id));
+
+    return {
+      id: preferred?.keep?.id || buildDeterministicNotificationId(targetId, params.messageId),
+      user_id: targetId,
       type: 'message',
-      created_at: message.created_at,
-      dedupe_key: `chat:${params.messageId}:${targetId}`,
-    },
-    read_at: null,
-    created_at: message.created_at || new Date().toISOString(),
-  }));
+      title,
+      body: previewBody,
+      metadata: {
+        room_id: params.roomId,
+        id: params.messageId,
+        message_id: params.messageId,
+        sender_name: senderName,
+        room_name: room.name || '',
+        type: 'message',
+        created_at: message.created_at,
+        dedupe_key: `chat:${params.messageId}:${targetId}`,
+      },
+      read_at: null,
+      created_at: message.created_at || new Date().toISOString(),
+    };
+  });
 
   // 알림 DB 저장은 백그라운드로 — push 전송과 병렬 실행
   const notificationInsertPromise =
@@ -386,8 +443,19 @@ export async function dispatchChatPushForMessage(params: {
       ? supabase
           .from('notifications')
           .upsert(notificationRows, { onConflict: 'id' })
-          .then(({ error }) => {
+          .then(async ({ error }) => {
             if (error) console.error('chat notification insert failed', error);
+
+            if (staleNotificationIds.size === 0) return;
+
+            const { error: cleanupError } = await supabase
+              .from('notifications')
+              .delete()
+              .in('id', Array.from(staleNotificationIds));
+
+            if (cleanupError) {
+              console.error('chat notification cleanup failed', cleanupError);
+            }
           })
       : Promise.resolve();
 
