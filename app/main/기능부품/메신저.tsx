@@ -2612,6 +2612,21 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     }
   }, [selectedRoomId, user?.id, effectiveChatUserId, effectiveTodoUserId, repairDirectRooms, syncChatRoomsState, resolveStaffProfile, alignRoomToLatest, getEffectiveRoomMemberIds, isRoomAccessibleToCurrentUser]);
 
+  const applyRoomMemberChange = useCallback(async ({
+    roomId,
+    members,
+    systemContent,
+  }: {
+    roomId: string;
+    members: string[];
+    systemContent: string;
+  }) => {
+    await persistRoomMembers(roomId, members);
+    await insertRoomSystemMessage(roomId, systemContent);
+    updateRoomMembersLocally(roomId, members);
+    await fetchData();
+  }, [fetchData, insertRoomSystemMessage, persistRoomMembers, updateRoomMembersLocally]);
+
   const roomNotifyRef = useRef(true);
   useEffect(() => { roomNotifyRef.current = roomNotifyOn; }, [roomNotifyOn]);
 
@@ -3507,18 +3522,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         (id: unknown) => String(id) !== String(memberId)
       );
 
-      await persistRoomMembers(String(selectedRoom.id), newMembers);
-
       const removedName =
         resolveRoomMemberProfile(selectedRoom, String(memberId))?.name ||
         resolveStaffProfile(memberId)?.name ||
         '이름 없음';
       const removerName = user?.name || '이름 없음';
       const systemContent = `[제거] ${removerName}님이 ${removedName}님을 채팅방에서 제거했습니다.`;
-      await insertRoomSystemMessage(String(selectedRoom.id), systemContent);
-
-      updateRoomMembersLocally(String(selectedRoom.id), newMembers);
-      await fetchData();
+      await applyRoomMemberChange({
+        roomId: String(selectedRoom.id),
+        members: newMembers,
+        systemContent,
+      });
       toast('참여자를 제거했습니다.');
     } catch (error) {
       console.error('remove member error', error);
@@ -6618,19 +6632,18 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     );
                     const newMembers = Array.from(setIds);
 
-                    await persistRoomMembers(String(selectedRoom.id), newMembers);
-
                     const invitedNames = addMemberSelectingIds
                       .map((id) => resolveStaffProfile(id)?.name || '이름 없음')
                       .join(', ');
                     const inviterName = user?.name || '이름 없음';
                     const systemContent = `[초대] ${inviterName}님이 ${invitedNames}님을 초대했습니다.`;
-                    await insertRoomSystemMessage(String(selectedRoom.id), systemContent);
-
-                    updateRoomMembersLocally(String(selectedRoom.id), newMembers);
+                    await applyRoomMemberChange({
+                      roomId: String(selectedRoom.id),
+                      members: newMembers,
+                      systemContent,
+                    });
                     setShowAddMemberModal(false);
                     setAddMemberSelectingIds([]);
-                    await fetchData();
                     toast('참여자가 추가되었습니다.');
                   } catch (e) {
                     console.error('add members error', e);

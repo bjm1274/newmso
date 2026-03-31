@@ -8,7 +8,14 @@ import {
   withMissingColumnFallback,
   withMissingColumnsFallback,
 } from '@/lib/supabase-compat';
-import type { BoardPost, InventoryItem, OpCheckItem, OpCheckTemplate, OpPatientCheck } from '@/types';
+import type {
+  BoardPost,
+  InventoryItem,
+  OpCheckItem,
+  OpCheckTemplate,
+  OpPatientCheck,
+  StaffMember,
+} from '@/types';
 
 const SCHEDULE_META_PREFIX = '[[SCHEDULE_META]]';
 const SCHEDULE_META_SUFFIX = '[[/SCHEDULE_META]]';
@@ -19,6 +26,8 @@ const MIGRATION_FILE = 'supabase_migrations/20260331_op_check_foundation.sql';
 const WARD_MESSAGE_FAVORITES_STORAGE_PREFIX = 'erp_op_check_ward_message_favorites';
 
 type TemplateScope = 'surgery' | 'anesthesia';
+type WorkspaceSortKey = 'time' | 'status' | 'room' | 'name';
+type WorkspaceSectionKey = 'prep' | 'consumable' | 'notes';
 
 type LinkedSchedulePost = {
   id: string;
@@ -49,6 +58,8 @@ type WardStaffRow = {
   name: string;
   department?: string | null;
   position?: string | null;
+  company?: string | null;
+  company_id?: string | null;
 };
 
 type ChatRoomMemberLookupRow = {
@@ -117,6 +128,31 @@ function normalizeLookupValue(value: unknown) {
     .toLowerCase();
 }
 
+function filterWardStaffsByCompany<T extends { company?: string | null; company_id?: string | null }>(
+  data: T[] | null | undefined,
+  companyId: unknown,
+  companyName: unknown,
+): T[] {
+  const normalizedCompanyId = String(companyId || '').trim();
+  const normalizedCompanyName = normalizeLookupValue(companyName);
+
+  return (data || []).filter((staff) => {
+    const staffCompanyId = String(staff.company_id || '').trim();
+    const staffCompanyName = normalizeLookupValue(staff.company);
+
+    if (normalizedCompanyId) {
+      if (staffCompanyId) return staffCompanyId === normalizedCompanyId;
+      return Boolean(normalizedCompanyName) && staffCompanyName === normalizedCompanyName;
+    }
+
+    if (normalizedCompanyName) {
+      return staffCompanyName === normalizedCompanyName;
+    }
+
+    return true;
+  });
+}
+
 function normalizeDateValue(value: unknown) {
   const raw = String(value || '').trim();
   if (!raw) return '';
@@ -170,14 +206,23 @@ function extractScheduleMetaFromContent(value: unknown) {
 }
 
 function normalizeWardStaffList(data: WardStaffRow[] | null | undefined, senderId: string) {
-  return (data || [])
-    .map((staff) => ({
+  const deduped = new Map<string, WardStaffRow>();
+
+  (data || []).forEach((staff) => {
+    const normalized = {
       id: String(staff.id || '').trim(),
       name: stripHiddenMetaBlocks(staff.name),
       department: stripHiddenMetaBlocks(staff.department),
       position: stripHiddenMetaBlocks(staff.position),
-    }))
-    .filter((staff) => staff.id && staff.name && staff.id !== senderId);
+      company: stripHiddenMetaBlocks(staff.company),
+      company_id: String(staff.company_id || '').trim() || null,
+    };
+
+    if (!normalized.id || !normalized.name || normalized.id === senderId) return;
+    deduped.set(normalized.id, normalized);
+  });
+
+  return Array.from(deduped.values());
 }
 
 function getWardFavoriteStorageKey(userId: unknown, companyId: unknown) {
@@ -297,6 +342,111 @@ function formatChecklistItems(items: ChecklistItemDraft[]) {
       source_label: String(item.source_label || '').trim(),
     }))
     .filter((item) => item.name);
+}
+
+function serializeChecklistItemsForDiff(items: ChecklistItemDraft[]) {
+  return items
+    .map((item) => ({
+      name: String(item.name || '').trim(),
+      quantity: String(item.quantity || '').trim(),
+      unit: String(item.unit || '').trim(),
+      note: String(item.note || '').trim(),
+      checked: Boolean(item.checked),
+      source_label: String(item.source_label || '').trim(),
+    }))
+    .filter((item) => item.name || item.quantity || item.unit || item.note || item.checked || item.source_label)
+    .sort((left, right) => {
+      const nameDiff = normalizeLookupValue(left.name).localeCompare(normalizeLookupValue(right.name), 'ko');
+      if (nameDiff !== 0) return nameDiff;
+      const quantityDiff = left.quantity.localeCompare(right.quantity, 'ko');
+      if (quantityDiff !== 0) return quantityDiff;
+      const unitDiff = left.unit.localeCompare(right.unit, 'ko');
+      if (unitDiff !== 0) return unitDiff;
+      const noteDiff = left.note.localeCompare(right.note, 'ko');
+      if (noteDiff !== 0) return noteDiff;
+      return left.source_label.localeCompare(right.source_label, 'ko');
+    });
+}
+
+function buildPatientCheckSignature(state: PatientCheckState | null) {
+  if (!state) return '';
+
+  return JSON.stringify({
+    schedule_post_id: String(state.schedule_post_id || '').trim(),
+    patient_name: String(state.patient_name || '').trim(),
+    chart_no: String(state.chart_no || '').trim(),
+    surgery_name: String(state.surgery_name || '').trim(),
+    surgery_template_id: String(state.surgery_template_id || '').trim(),
+    anesthesia_type: String(state.anesthesia_type || '').trim(),
+    schedule_date: String(state.schedule_date || '').trim(),
+    schedule_time: String(state.schedule_time || '').trim(),
+    schedule_room: String(state.schedule_room || '').trim(),
+    prep_items: serializeChecklistItemsForDiff(state.prep_items),
+    consumable_items: serializeChecklistItemsForDiff(state.consumable_items),
+    notes: String(state.notes || '').trim(),
+    status: String(state.status || '').trim(),
+    applied_template_ids: Array.isArray(state.applied_template_ids)
+      ? state.applied_template_ids
+          .map((value) => String(value || '').trim())
+          .filter(Boolean)
+          .sort((left, right) => left.localeCompare(right, 'ko'))
+      : [],
+    surgery_started_at: state.surgery_started_at || null,
+    surgery_ended_at: state.surgery_ended_at || null,
+    ward_message_sent_at: state.ward_message_sent_at || null,
+  });
+}
+
+function getScheduleStatusOrder(status: unknown) {
+  const normalizedStatus = String(status || '').trim();
+  const matchedIndex = STATUS_OPTIONS.findIndex((item) => item === normalizedStatus);
+  return matchedIndex >= 0 ? matchedIndex : 0;
+}
+
+function sortSchedulesForWorkspace(
+  posts: LinkedSchedulePost[],
+  patientChecksByScheduleId: Record<string, OpPatientCheck>,
+  sortKey: WorkspaceSortKey,
+) {
+  return [...posts].sort((left, right) => {
+    if (sortKey === 'status') {
+      const statusDiff =
+        getScheduleStatusOrder(patientChecksByScheduleId[left.id]?.status) -
+        getScheduleStatusOrder(patientChecksByScheduleId[right.id]?.status);
+      if (statusDiff !== 0) return statusDiff;
+    }
+
+    if (sortKey === 'room') {
+      const roomDiff = String(left.schedule_room || '').localeCompare(String(right.schedule_room || ''), 'ko');
+      if (roomDiff !== 0) return roomDiff;
+    }
+
+    if (sortKey === 'name') {
+      const nameDiff = String(left.patient_name || '').localeCompare(String(right.patient_name || ''), 'ko');
+      if (nameDiff !== 0) return nameDiff;
+    }
+
+    return compareSchedules(left, right);
+  });
+}
+
+function summarizeChecklistItems(items: ChecklistItemDraft[]) {
+  const validItems = items.filter((item) => String(item.name || '').trim());
+  if (validItems.length === 0) return '등록된 항목 없음';
+  const checkedCount = validItems.filter((item) => Boolean(item.checked)).length;
+  return `${checkedCount}/${validItems.length} 완료`;
+}
+
+function isInteractiveKeyboardTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  const tagName = target.tagName.toLowerCase();
+  return (
+    target.isContentEditable ||
+    tagName === 'input' ||
+    tagName === 'textarea' ||
+    tagName === 'select' ||
+    tagName === 'button'
+  );
 }
 
 function findMatchingSurgeryTemplate(surgeryTemplates: SurgeryTemplateRow[], surgeryName: string) {
@@ -441,13 +591,14 @@ async function withOptionalQueryFallback<T>(
 
 export default function OperationCheckView({
   user,
+  staffs,
   selectedCo,
   selectedCompanyId,
 }: {
   user?: Record<string, any>;
+  staffs?: StaffMember[];
   selectedCo?: string | null;
   selectedCompanyId?: string | null;
-  staffs?: any[];
 }) {
   const [activeTab, setActiveTab] = useState<'patients' | 'templates'>('patients');
   const [loading, setLoading] = useState(true);
@@ -478,6 +629,13 @@ export default function OperationCheckView({
   const [wardRecipientSearch, setWardRecipientSearch] = useState('');
   const [sendingMsg, setSendingMsg] = useState(false);
   const [dayWorkspaceOpen, setDayWorkspaceOpen] = useState(false);
+  const [workspaceSort, setWorkspaceSort] = useState<WorkspaceSortKey>('time');
+  const [lastViewedScheduleIdsByDate, setLastViewedScheduleIdsByDate] = useState<Record<string, string>>({});
+  const [workspaceSections, setWorkspaceSections] = useState<Record<WorkspaceSectionKey, boolean>>({
+    prep: true,
+    consumable: true,
+    notes: true,
+  });
 
   const [statusFilterTab, setStatusFilterTab] = useState<'전체' | '준비중' | '준비완료' | '수술중' | '완료'>('전체');
   const [printModalOpen, setPrintModalOpen] = useState(false);
@@ -719,14 +877,29 @@ export default function OperationCheckView({
     [patientChecks]
   );
 
+  const getSortedSchedulesForDate = useCallback(
+    (dateKey: string) => {
+      if (!dateKey) return [] as LinkedSchedulePost[];
+      return sortSchedulesForWorkspace(
+        schedulePosts.filter((post) => post.schedule_date === dateKey),
+        patientChecksByScheduleId,
+        workspaceSort,
+      );
+    },
+    [patientChecksByScheduleId, schedulePosts, workspaceSort],
+  );
+
+  const selectedDateSchedules = useMemo(
+    () => getSortedSchedulesForDate(selectedDate),
+    [getSortedSchedulesForDate, selectedDate],
+  );
+
   const filteredSchedules = useMemo(() => {
     const search = normalizeLookupValue(deferredSearchTerm);
-    return schedulePosts.filter((post) => {
-      const sameDate = !selectedDate || post.schedule_date === selectedDate;
-      if (!sameDate) return false;
+    return selectedDateSchedules.filter((post) => {
       // #7 상태 필터
       if (statusFilterTab !== '전체') {
-        const savedRow = patientChecks.find((r) => String(r.schedule_post_id || '') === post.id);
+        const savedRow = patientChecksByScheduleId[post.id];
         const currentStatus = String(savedRow?.status || '준비중');
         if (currentStatus !== statusFilterTab) return false;
       }
@@ -735,7 +908,7 @@ export default function OperationCheckView({
         normalizeLookupValue(value).includes(search)
       );
     });
-  }, [deferredSearchTerm, patientChecks, schedulePosts, selectedDate, statusFilterTab]);
+  }, [deferredSearchTerm, patientChecksByScheduleId, selectedDateSchedules, statusFilterTab]);
 
   const scheduleCalendarData = useMemo(() => {
     const toKey = (date: Date) =>
@@ -758,6 +931,7 @@ export default function OperationCheckView({
       }
       eventsByDate[post.schedule_date].push(post);
     });
+    Object.values(eventsByDate).forEach((posts) => posts.sort(compareSchedules));
 
     const year = calendarMonth.getFullYear();
     const month = calendarMonth.getMonth();
@@ -788,42 +962,94 @@ export default function OperationCheckView({
     setCalendarMonth(new Date(`${preferredDate}T00:00:00`));
   }, [schedulePosts, selectedDate]);
 
-  useEffect(() => {
-    if (selectedScheduleId && filteredSchedules.some((post) => post.id === selectedScheduleId)) return;
-    setSelectedScheduleId(filteredSchedules[0]?.id || null);
-  }, [filteredSchedules, selectedScheduleId]);
-
   const selectedSchedule = useMemo(
     () => schedulePosts.find((post) => post.id === selectedScheduleId) || null,
     [schedulePosts, selectedScheduleId]
   );
 
-  const handleScheduleSelection = useCallback(
-    (post: LinkedSchedulePost, openWorkspace = false) => {
-      setSelectedDate(post.schedule_date);
-      if (post.schedule_date) {
-        setCalendarMonth(new Date(`${post.schedule_date}T00:00:00`));
+  const rememberLastViewedSchedule = useCallback((post: LinkedSchedulePost | null) => {
+    if (!post?.schedule_date || !post.id) return;
+    setLastViewedScheduleIdsByDate((prev) =>
+      prev[post.schedule_date] === post.id
+        ? prev
+        : {
+            ...prev,
+            [post.schedule_date]: post.id,
+          },
+    );
+  }, []);
+
+  const getPreferredScheduleForDate = useCallback(
+    (dateKey: string, daySchedules: LinkedSchedulePost[], preferredScheduleId?: string | null) => {
+      const candidateSchedules =
+        daySchedules.length > 0
+          ? sortSchedulesForWorkspace(daySchedules, patientChecksByScheduleId, workspaceSort)
+          : getSortedSchedulesForDate(dateKey);
+
+      for (const candidateId of [preferredScheduleId, lastViewedScheduleIdsByDate[dateKey]]) {
+        const matchedSchedule = candidateSchedules.find((post) => post.id === candidateId);
+        if (matchedSchedule) return matchedSchedule;
       }
-      setSelectedScheduleId(post.id);
-      if (openWorkspace) {
-        setDayWorkspaceOpen(true);
-      }
+
+      return candidateSchedules[0] || null;
     },
-    []
+    [getSortedSchedulesForDate, lastViewedScheduleIdsByDate, patientChecksByScheduleId, workspaceSort],
   );
 
-  const handleCalendarDaySelection = useCallback(
-    (dateKey: string, daySchedules: LinkedSchedulePost[]) => {
+  const applyDateAndScheduleSelection = useCallback(
+    (
+      dateKey: string,
+      nextSchedule: LinkedSchedulePost | null,
+      options?: {
+        openWorkspace?: boolean;
+      },
+    ) => {
       setSelectedDate(dateKey);
       if (dateKey) {
         setCalendarMonth(new Date(`${dateKey}T00:00:00`));
       }
-      const firstSchedule = daySchedules[0] || null;
-      setSelectedScheduleId(firstSchedule?.id || null);
-      setDayWorkspaceOpen(Boolean(firstSchedule));
+      setSelectedScheduleId(nextSchedule?.id || null);
+      if (nextSchedule) {
+        rememberLastViewedSchedule(nextSchedule);
+      }
+      if (typeof options?.openWorkspace === 'boolean') {
+        setDayWorkspaceOpen(options.openWorkspace && Boolean(nextSchedule));
+      }
     },
-    []
+    [rememberLastViewedSchedule],
   );
+
+  useEffect(() => {
+    if (!selectedDate) {
+      if (selectedScheduleId) setSelectedScheduleId(null);
+      return;
+    }
+
+    if (
+      selectedSchedule &&
+      selectedSchedule.schedule_date === selectedDate &&
+      selectedDateSchedules.some((post) => post.id === selectedSchedule.id)
+    ) {
+      rememberLastViewedSchedule(selectedSchedule);
+      return;
+    }
+
+    const nextSchedule = getPreferredScheduleForDate(selectedDate, selectedDateSchedules);
+    const nextScheduleId = nextSchedule?.id || null;
+    if (nextScheduleId === selectedScheduleId) return;
+
+    setSelectedScheduleId(nextScheduleId);
+    if (nextSchedule) {
+      rememberLastViewedSchedule(nextSchedule);
+    }
+  }, [
+    getPreferredScheduleForDate,
+    rememberLastViewedSchedule,
+    selectedDate,
+    selectedDateSchedules,
+    selectedSchedule,
+    selectedScheduleId,
+  ]);
 
   const buildDefaultPatientCheck = useCallback(
     (schedule: LinkedSchedulePost, existingCheck?: OpPatientCheck | null): PatientCheckState => {
@@ -908,6 +1134,26 @@ export default function OperationCheckView({
     [opTemplates, surgeryTemplates]
   );
 
+  const selectedScheduleBaseline = useMemo(() => {
+    if (!selectedSchedule) return null;
+    return buildDefaultPatientCheck(selectedSchedule, patientChecksByScheduleId[selectedSchedule.id] || null);
+  }, [buildDefaultPatientCheck, patientChecksByScheduleId, selectedSchedule]);
+
+  const checkFormIsDirty = useMemo(() => {
+    if (!checkForm || !selectedScheduleBaseline) return false;
+    return buildPatientCheckSignature(checkForm) !== buildPatientCheckSignature(selectedScheduleBaseline);
+  }, [checkForm, selectedScheduleBaseline]);
+
+  const confirmWorkspaceTransition = useCallback(
+    (actionLabel: string) => {
+      if (!checkFormIsDirty || typeof window === 'undefined') return true;
+      return window.confirm(
+        `저장되지 않은 OP체크 변경사항이 있습니다.\n\n${actionLabel} 전에 저장하지 않은 내용이 사라질 수 있습니다.\n계속하시겠습니까?`,
+      );
+    },
+    [checkFormIsDirty],
+  );
+
   useEffect(() => {
     if (!selectedSchedule) {
       setCheckForm(null);
@@ -930,6 +1176,171 @@ export default function OperationCheckView({
       document.body.style.overflow = previousOverflow;
     };
   }, [dayWorkspaceOpen]);
+
+  useEffect(() => {
+    if (!checkFormIsDirty || typeof window === 'undefined') return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [checkFormIsDirty]);
+
+  const workspaceSchedules = useMemo(() => {
+    if (selectedScheduleId && filteredSchedules.some((post) => post.id === selectedScheduleId)) {
+      return filteredSchedules;
+    }
+    return selectedDateSchedules;
+  }, [filteredSchedules, selectedDateSchedules, selectedScheduleId]);
+
+  const workspaceSelectedIndex = useMemo(
+    () => workspaceSchedules.findIndex((post) => post.id === selectedScheduleId),
+    [selectedScheduleId, workspaceSchedules],
+  );
+
+  const selectedScheduleHiddenByFilters = useMemo(
+    () =>
+      Boolean(
+        selectedScheduleId &&
+          selectedDateSchedules.some((post) => post.id === selectedScheduleId) &&
+          !filteredSchedules.some((post) => post.id === selectedScheduleId),
+      ),
+    [filteredSchedules, selectedDateSchedules, selectedScheduleId],
+  );
+
+  const prepSummaryText = useMemo(
+    () => (checkForm ? summarizeChecklistItems(checkForm.prep_items) : '등록된 항목 없음'),
+    [checkForm],
+  );
+
+  const consumableSummaryText = useMemo(
+    () => (checkForm ? summarizeChecklistItems(checkForm.consumable_items) : '등록된 항목 없음'),
+    [checkForm],
+  );
+
+  const notesSummaryText = useMemo(() => {
+    const trimmedNotes = String(checkForm?.notes || '').trim();
+    if (!trimmedNotes) return '메모 없음';
+    return trimmedNotes.length > 80 ? `${trimmedNotes.slice(0, 80)}...` : trimmedNotes;
+  }, [checkForm?.notes]);
+
+  const toggleWorkspaceSection = useCallback((sectionKey: WorkspaceSectionKey) => {
+    setWorkspaceSections((prev) => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey],
+    }));
+  }, []);
+
+  const handleWorkspaceClose = useCallback(() => {
+    setDayWorkspaceOpen(false);
+  }, []);
+
+  const handleWorkspaceStep = useCallback(
+    (offset: number) => {
+      const nextSchedule = workspaceSchedules[workspaceSelectedIndex + offset];
+      if (!nextSchedule) return;
+      handleScheduleSelection(nextSchedule, true);
+    },
+    [handleScheduleSelection, workspaceSchedules, workspaceSelectedIndex],
+  );
+
+  const handleDateFilterChange = useCallback(
+    (nextDate: string) => {
+      const nextSchedules = getSortedSchedulesForDate(nextDate);
+      const currentScheduleIdForDate =
+        selectedSchedule && selectedSchedule.schedule_date === nextDate ? selectedSchedule.id : null;
+      const nextSchedule = getPreferredScheduleForDate(nextDate, nextSchedules, currentScheduleIdForDate);
+      const willChangePatient = (nextSchedule?.id || null) !== currentScheduleIdForDate;
+      const willChangeDate = nextDate !== selectedDate;
+
+      if ((willChangeDate || willChangePatient) && !confirmWorkspaceTransition(`${formatDateLabel(nextDate)} 일정 보기`)) {
+        return;
+      }
+
+      applyDateAndScheduleSelection(nextDate, nextSchedule, {
+        openWorkspace: dayWorkspaceOpen,
+      });
+    },
+    [
+      applyDateAndScheduleSelection,
+      confirmWorkspaceTransition,
+      dayWorkspaceOpen,
+      getPreferredScheduleForDate,
+      getSortedSchedulesForDate,
+      selectedDate,
+      selectedSchedule,
+    ],
+  );
+
+  const handleTodaySelection = useCallback(() => {
+    const today = new Date();
+    const todayKey = today.toISOString().slice(0, 10);
+    handleDateFilterChange(todayKey);
+  }, [handleDateFilterChange]);
+
+  const handleWorkspaceOpen = useCallback(() => {
+    const currentScheduleIdForDate =
+      selectedSchedule && selectedSchedule.schedule_date === selectedDate ? selectedSchedule.id : null;
+    const nextSchedule = getPreferredScheduleForDate(
+      selectedDate,
+      filteredSchedules.length > 0 ? filteredSchedules : selectedDateSchedules,
+      currentScheduleIdForDate,
+    );
+    if (!nextSchedule) return;
+    handleScheduleSelection(nextSchedule, true);
+  }, [filteredSchedules, getPreferredScheduleForDate, handleScheduleSelection, selectedDate, selectedDateSchedules, selectedSchedule]);
+
+  const handleTabChange = useCallback(
+    (nextTab: 'patients' | 'templates') => {
+      if (nextTab === activeTab) return;
+      if (activeTab === 'patients' && nextTab !== 'patients' && !confirmWorkspaceTransition('템플릿 설정으로 이동하기')) {
+        return;
+      }
+      setActiveTab(nextTab);
+    },
+    [activeTab, confirmWorkspaceTransition],
+  );
+
+  useEffect(() => {
+    if (!dayWorkspaceOpen || activeTab !== 'patients' || typeof window === 'undefined') return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (isInteractiveKeyboardTarget(event.target)) return;
+
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+        if (workspaceSelectedIndex <= 0) return;
+        event.preventDefault();
+        handleWorkspaceStep(-1);
+      }
+
+      if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+        if (workspaceSelectedIndex < 0 || workspaceSelectedIndex >= workspaceSchedules.length - 1) return;
+        event.preventDefault();
+        handleWorkspaceStep(1);
+      }
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        handleWorkspaceClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [
+    activeTab,
+    dayWorkspaceOpen,
+    handleWorkspaceClose,
+    handleWorkspaceStep,
+    workspaceSchedules.length,
+    workspaceSelectedIndex,
+  ]);
 
   const inventoryNameMap = useMemo(
     () =>
@@ -1354,17 +1765,47 @@ export default function OperationCheckView({
     setWardRecipientSearch('');
     setWardRecipientPickerOpen(false);
     try {
-      const companyId = String(selectedSchedule.company_id || user?.company_id || '').trim();
+      const companyId = String(
+        selectedSchedule.company_id || selectedCompanyId || user?.company_id || '',
+      ).trim();
       const senderId = String(user?.id || '').trim();
-      const { data } = companyId
-        ? await supabase.from('staff_members').select('id, name, department, position').eq('company_id', companyId).order('name')
-        : await supabase.from('staff_members').select('id, name, department, position').order('name');
-      setWardStaffs(normalizeWardStaffList((data || []) as WardStaffRow[], senderId));
+      const companyName = String(
+        selectedSchedule.company || selectedCo || user?.company || '',
+      ).trim();
+      const hasPrefetchedStaffs = Array.isArray(staffs) && staffs.length > 0;
+      if (hasPrefetchedStaffs) {
+        setWardStaffs(
+          normalizeWardStaffList(
+            filterWardStaffsByCompany(staffs, companyId, companyName) as WardStaffRow[],
+            senderId,
+          ),
+        );
+      } else {
+        const { data } = await supabase
+          .from('staff_members')
+          .select('id, name, department, position, company, company_id')
+          .order('name');
+        setWardStaffs(
+          normalizeWardStaffList(
+            filterWardStaffsByCompany((data || []) as WardStaffRow[], companyId, companyName),
+            senderId,
+          ),
+        );
+      }
     } catch (e) {
       console.error('직원 목록 로딩 실패', e);
     }
     setShowWardMsgModal(true);
-  }, [checkForm, selectedSchedule, user?.company_id, user?.id]);
+  }, [
+    checkForm,
+    selectedCo,
+    selectedCompanyId,
+    selectedSchedule,
+    staffs,
+    user?.company,
+    user?.company_id,
+    user?.id,
+  ]);
 
   const sendWardMessage = useCallback(async () => {
     const normalizedMessage = stripHiddenMetaBlocks(wardMsgText).trim();
@@ -1768,11 +2209,6 @@ export default function OperationCheckView({
       </div>
     ),
     []
-  );
-
-  const selectedDateSchedules = useMemo(
-    () => schedulePosts.filter((post) => post.schedule_date === selectedDate),
-    [schedulePosts, selectedDate],
   );
 
   const renderStatusFilterTabs = useCallback(
