@@ -1154,6 +1154,42 @@ export default function OperationCheckView({
     [checkFormIsDirty],
   );
 
+  const handleScheduleSelection = useCallback(
+    (post: LinkedSchedulePost, openWorkspace = false) => {
+      const changingPatient = selectedScheduleId !== post.id;
+      if (
+        changingPatient &&
+        !confirmWorkspaceTransition(`"${stripHiddenMetaBlocks(post.patient_name) || '선택한 환자'}" 환자로 이동하기`)
+      ) {
+        return;
+      }
+
+      applyDateAndScheduleSelection(post.schedule_date, post, {
+        openWorkspace: openWorkspace || dayWorkspaceOpen,
+      });
+    },
+    [applyDateAndScheduleSelection, confirmWorkspaceTransition, dayWorkspaceOpen, selectedScheduleId]
+  );
+
+  const handleCalendarDaySelection = useCallback(
+    (dateKey: string, daySchedules: LinkedSchedulePost[]) => {
+      const currentScheduleIdForDate =
+        selectedSchedule && selectedSchedule.schedule_date === dateKey ? selectedSchedule.id : null;
+      const nextSchedule = getPreferredScheduleForDate(dateKey, daySchedules, currentScheduleIdForDate);
+      const willChangePatient = (nextSchedule?.id || null) !== currentScheduleIdForDate;
+      const willChangeDate = dateKey !== selectedDate;
+
+      if ((willChangeDate || willChangePatient) && !confirmWorkspaceTransition(`${formatDateLabel(dateKey)} 일정 열기`)) {
+        return;
+      }
+
+      applyDateAndScheduleSelection(dateKey, nextSchedule, {
+        openWorkspace: Boolean(nextSchedule),
+      });
+    },
+    [applyDateAndScheduleSelection, confirmWorkspaceTransition, getPreferredScheduleForDate, selectedDate, selectedSchedule]
+  );
+
   useEffect(() => {
     if (!selectedSchedule) {
       setCheckForm(null);
@@ -2332,6 +2368,87 @@ export default function OperationCheckView({
     </div>
   ) : (
     <>
+      <div className="sticky top-0 z-20 rounded-[var(--radius-xl)] border border-[var(--border)] bg-white/95 p-4 shadow-lg backdrop-blur">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
+              {formatDateLabel(checkForm.schedule_date)} · 수술실 {checkForm.schedule_room || '미정'} · 시간 {checkForm.schedule_time || '미정'}
+            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <h3 className="text-xl font-bold text-[var(--foreground)]">{checkForm.patient_name}</h3>
+              <span className="rounded-full bg-[var(--accent)]/10 px-2.5 py-1 text-[11px] font-bold text-[var(--accent)]">
+                {checkForm.status}
+              </span>
+              {checkFormIsDirty ? (
+                <span
+                  data-testid="op-check-workspace-dirty-indicator"
+                  className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800"
+                >
+                  미저장 변경
+                </span>
+              ) : (
+                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+                  저장됨
+                </span>
+              )}
+              {selectedScheduleHiddenByFilters ? (
+                <span className="rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700">
+                  현재 환자는 필터에서 숨김
+                </span>
+              ) : null}
+            </div>
+            <p className="mt-1 truncate text-sm font-semibold text-[var(--accent)]">
+              {checkForm.surgery_name}
+              {checkForm.chart_no ? ` · 차트 ${checkForm.chart_no}` : ''}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              data-testid="op-check-workspace-prev"
+              onClick={() => handleWorkspaceStep(-1)}
+              disabled={workspaceSelectedIndex <= 0}
+              className="rounded-full border border-[var(--border)] px-3 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] disabled:opacity-50"
+            >
+              이전 환자
+            </button>
+            <button
+              type="button"
+              data-testid="op-check-workspace-next"
+              onClick={() => handleWorkspaceStep(1)}
+              disabled={workspaceSelectedIndex < 0 || workspaceSelectedIndex >= workspaceSchedules.length - 1}
+              className="rounded-full border border-[var(--border)] px-3 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] disabled:opacity-50"
+            >
+              다음 환자
+            </button>
+            <button
+              type="button"
+              onClick={() => void openWardMsgModal()}
+              className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+            >
+              병동팀 메시지 보내기
+            </button>
+            <button
+              type="button"
+              onClick={() => setPrintModalOpen(true)}
+              className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+            >
+              청구내역 출력
+            </button>
+            <button
+              type="button"
+              data-testid="op-check-record-save"
+              onClick={() => void savePatientCheck()}
+              disabled={savingCheck}
+              className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+            >
+              {savingCheck ? '저장 중...' : '환자별 OP체크 저장'}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <p className="mb-3 text-[11px] font-semibold text-[var(--toss-gray-3)]">수술 진행 상황</p>
         <div className="flex items-center gap-0">
@@ -2497,25 +2614,9 @@ export default function OperationCheckView({
               >
                 기본 항목 다시 불러오기
               </button>
-              <button
-                type="button"
-                data-testid="op-check-record-save"
-                onClick={() => void savePatientCheck()}
-                disabled={savingCheck}
-                className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
-              >
-                {savingCheck ? '저장 중...' : '환자별 OP체크 저장'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setPrintModalOpen(true)}
-                className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
-              >
-                청구내역 출력
-              </button>
             </div>
 
-            {(checkForm.surgery_started_at || checkForm.surgery_ended_at || checkForm.ward_message_sent_at) && (
+            {(checkForm.surgery_started_at || checkForm.surgery_ended_at || checkForm.ward_message_sent_at || deductingInventory) && (
               <div className="flex flex-wrap gap-2 text-[11px] font-medium text-[var(--toss-gray-3)]">
                 {checkForm.ward_message_sent_at && (
                   <span className="rounded-full bg-blue-50 px-2 py-1 text-blue-700">
@@ -2566,23 +2667,41 @@ export default function OperationCheckView({
       </div>
 
       <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <h4 className="text-base font-bold text-[var(--foreground)]">수술 전 준비 체크</h4>
             <p className="text-[12px] font-medium text-[var(--toss-gray-3)]">
-              수술명과 마취 유형 템플릿을 바탕으로 필요한 준비사항을 환자별로 확인합니다.
+              {workspaceSections.prep
+                ? '수술명과 마취 유형 템플릿을 바탕으로 필요한 준비사항을 환자별로 확인합니다.'
+                : prepSummaryText}
             </p>
           </div>
-          <button
-            type="button"
-            data-testid="op-check-prep-add"
-            onClick={() => updateCheckFormList('prep_items', (items) => [...items, createChecklistItem('patient-prep')])}
-            className="rounded-full border border-[var(--border)] px-4 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
-          >
-            준비항목 추가
-          </button>
+          <div className="flex items-center gap-2">
+            {workspaceSections.prep ? (
+              <button
+                type="button"
+                data-testid="op-check-prep-add"
+                onClick={() => updateCheckFormList('prep_items', (items) => [...items, createChecklistItem('patient-prep')])}
+                className="rounded-full border border-[var(--border)] px-4 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+              >
+                준비항목 추가
+              </button>
+            ) : null}
+            <button
+              type="button"
+              data-testid="op-check-section-toggle-prep"
+              onClick={() => toggleWorkspaceSection('prep')}
+              className="rounded-full border border-[var(--border)] px-4 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+            >
+              {workspaceSections.prep ? '접기' : '펼치기'}
+            </button>
+          </div>
         </div>
-        {renderItemRows(checkForm.prep_items, 'prep', (next) => updateCheckFormList('prep_items', () => next))}
+        {workspaceSections.prep ? (
+          <div data-testid="op-check-section-content-prep">
+            {renderItemRows(checkForm.prep_items, 'prep', (next) => updateCheckFormList('prep_items', () => next))}
+          </div>
+        ) : null}
       </div>
 
       <div
@@ -2592,7 +2711,7 @@ export default function OperationCheckView({
             : 'border-[var(--border)] bg-[var(--card)]'
         }`}
       >
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <h4 className={`text-base font-bold ${checkForm?.status === '수술중' ? 'text-orange-700' : 'text-[var(--foreground)]'}`}>
               수술 중 의료소모품 사용 체크
@@ -2603,33 +2722,66 @@ export default function OperationCheckView({
               )}
             </h4>
             <p className="text-[12px] font-medium text-[var(--toss-gray-3)]">
-              실제 사용한 소모품을 체크하고 수량과 메모를 남겨 관리합니다.
+              {workspaceSections.consumable ? '실제 사용한 소모품을 체크하고 수량과 메모를 남겨 관리합니다.' : consumableSummaryText}
             </p>
           </div>
-          <button
-            type="button"
-            data-testid="op-check-consumable-add"
-            onClick={() =>
-              updateCheckFormList('consumable_items', (items) => [...items, createChecklistItem('patient-consumable')])
-            }
-            className="rounded-full border border-[var(--border)] px-4 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
-          >
-            소모품 추가
-          </button>
+          <div className="flex items-center gap-2">
+            {workspaceSections.consumable ? (
+              <button
+                type="button"
+                data-testid="op-check-consumable-add"
+                onClick={() =>
+                  updateCheckFormList('consumable_items', (items) => [...items, createChecklistItem('patient-consumable')])
+                }
+                className="rounded-full border border-[var(--border)] px-4 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+              >
+                소모품 추가
+              </button>
+            ) : null}
+            <button
+              type="button"
+              data-testid="op-check-section-toggle-consumable"
+              onClick={() => toggleWorkspaceSection('consumable')}
+              className="rounded-full border border-[var(--border)] px-4 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+            >
+              {workspaceSections.consumable ? '접기' : '펼치기'}
+            </button>
+          </div>
         </div>
-        {renderItemRows(checkForm.consumable_items, 'consumable', (next) =>
-          updateCheckFormList('consumable_items', () => next)
-        )}
+        {workspaceSections.consumable ? (
+          <div data-testid="op-check-section-content-consumable">
+            {renderItemRows(checkForm.consumable_items, 'consumable', (next) =>
+              updateCheckFormList('consumable_items', () => next)
+            )}
+          </div>
+        ) : null}
       </div>
 
       <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">환자별 메모</label>
-        <textarea
-          value={checkForm.notes}
-          onChange={(event) => setCheckForm((prev) => (prev ? { ...prev, notes: event.target.value } : prev))}
-          placeholder="수술 전/중 특이사항, 추가 준비 요청, 소모품 사용 메모를 남겨주세요."
-          className="mt-2 min-h-[120px] w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-4 py-3 text-sm font-medium"
-        />
+        <div className="flex items-center justify-between gap-3">
+          <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">환자별 메모</label>
+          <button
+            type="button"
+            data-testid="op-check-section-toggle-notes"
+            onClick={() => toggleWorkspaceSection('notes')}
+            className="rounded-full border border-[var(--border)] px-4 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+          >
+            {workspaceSections.notes ? '접기' : '펼치기'}
+          </button>
+        </div>
+        {workspaceSections.notes ? (
+          <div data-testid="op-check-section-content-notes">
+            <textarea
+              data-testid="op-check-notes-textarea"
+              value={checkForm.notes}
+              onChange={(event) => setCheckForm((prev) => (prev ? { ...prev, notes: event.target.value } : prev))}
+              placeholder="수술 전/중 특이사항, 추가 준비 요청, 소모품 사용 메모를 남겨주세요."
+              className="mt-2 min-h-[120px] w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-4 py-3 text-sm font-medium"
+            />
+          </div>
+        ) : (
+          <p className="mt-2 text-sm font-medium text-[var(--toss-gray-3)]">{notesSummaryText}</p>
+        )}
       </div>
     </>
   );
@@ -2674,7 +2826,7 @@ export default function OperationCheckView({
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => setActiveTab('patients')}
+              onClick={() => handleTabChange('patients')}
               className={`rounded-full px-4 py-2 text-sm font-bold transition-colors ${
                 activeTab === 'patients'
                   ? 'bg-[var(--accent)] text-white'
@@ -2685,7 +2837,7 @@ export default function OperationCheckView({
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('templates')}
+              onClick={() => handleTabChange('templates')}
               className={`rounded-full px-4 py-2 text-sm font-bold transition-colors ${
                 activeTab === 'templates'
                   ? 'bg-[var(--accent)] text-white'
@@ -2742,16 +2894,7 @@ export default function OperationCheckView({
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        const today = new Date();
-                        const todayKey = today.toISOString().slice(0, 10);
-                        setCalendarMonth(new Date(today.getFullYear(), today.getMonth(), 1));
-                        setSelectedDate(todayKey);
-                        const firstTodayEvent = scheduleCalendarData.eventsByDate[todayKey]?.[0];
-                        if (firstTodayEvent) {
-                          setSelectedScheduleId(firstTodayEvent.id);
-                        }
-                      }}
+                      onClick={handleTodaySelection}
                       className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
                     >
                       오늘
@@ -2849,13 +2992,7 @@ export default function OperationCheckView({
                       data-testid="op-check-date-filter"
                       type="date"
                       value={selectedDate}
-                      onChange={(event) => {
-                        const nextDate = event.target.value;
-                        setSelectedDate(nextDate);
-                        if (nextDate) {
-                          setCalendarMonth(new Date(`${nextDate}T00:00:00`));
-                        }
-                      }}
+                      onChange={(event) => handleDateFilterChange(event.target.value)}
                       className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-xs font-medium"
                     />
                   </div>
@@ -2867,11 +3004,8 @@ export default function OperationCheckView({
                     <button
                       type="button"
                       data-testid="op-check-workspace-open"
-                      onClick={() => {
-                        if (!filteredSchedules[0]) return;
-                        handleScheduleSelection(filteredSchedules[0], true);
-                      }}
-                      disabled={!filteredSchedules[0]}
+                      onClick={handleWorkspaceOpen}
+                      disabled={!selectedDateSchedules[0]}
                       className="rounded-full bg-[var(--accent)] px-4 py-2 text-[11px] font-bold text-white disabled:opacity-50"
                     >
                       작업창 열기
@@ -2896,16 +3030,27 @@ export default function OperationCheckView({
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  <label className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-white px-3 py-2 text-[11px] font-bold text-[var(--toss-gray-4)]">
+                    정렬
+                    <select
+                      data-testid="op-check-workspace-sort"
+                      value={workspaceSort}
+                      onChange={(event) => setWorkspaceSort(event.target.value as WorkspaceSortKey)}
+                      className="bg-transparent text-[11px] font-bold outline-none"
+                    >
+                      <option value="time">시간순</option>
+                      <option value="status">상태순</option>
+                      <option value="room">수술실순</option>
+                      <option value="name">이름순</option>
+                    </select>
+                  </label>
                   <span className="rounded-full bg-[var(--muted)] px-3 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)]">
                     검색 반영 {filteredSchedules.length}명
                   </span>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (!filteredSchedules[0]) return;
-                      handleScheduleSelection(filteredSchedules[0], true);
-                    }}
-                    disabled={!filteredSchedules[0]}
+                    onClick={handleWorkspaceOpen}
+                    disabled={!selectedDateSchedules[0]}
                     className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)] disabled:opacity-50"
                   >
                     첫 환자 열기
@@ -3217,16 +3362,16 @@ export default function OperationCheckView({
 
       {dayWorkspaceOpen && activeTab === 'patients' && (
         <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/45 p-3 md:p-5"
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/45 p-0 md:p-5"
           onClick={(event) => {
             if (event.target === event.currentTarget) {
-              setDayWorkspaceOpen(false);
+              handleWorkspaceClose();
             }
           }}
         >
           <div
             data-testid="op-check-workspace-modal"
-            className="flex h-[92vh] w-full max-w-[1600px] flex-col overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-2xl"
+            className="flex h-[100dvh] w-full max-w-none flex-col overflow-hidden rounded-none border border-[var(--border)] bg-[var(--card)] shadow-2xl md:h-[92vh] md:max-w-[1600px] md:rounded-[var(--radius-xl)]"
           >
             <div className="flex flex-col gap-3 border-b border-[var(--border)] px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
@@ -3243,9 +3388,20 @@ export default function OperationCheckView({
                   placeholder="환자명, 수술명, 차트번호"
                   className="min-w-[240px] rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-medium"
                 />
+                <select
+                  data-testid="op-check-workspace-sort-modal"
+                  value={workspaceSort}
+                  onChange={(event) => setWorkspaceSort(event.target.value as WorkspaceSortKey)}
+                  className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-bold text-[var(--toss-gray-4)]"
+                >
+                  <option value="time">시간순</option>
+                  <option value="status">상태순</option>
+                  <option value="room">수술실순</option>
+                  <option value="name">이름순</option>
+                </select>
                 <button
                   type="button"
-                  onClick={() => setDayWorkspaceOpen(false)}
+                  onClick={handleWorkspaceClose}
                   data-testid="op-check-workspace-close"
                   className="rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
                 >
@@ -3265,11 +3421,11 @@ export default function OperationCheckView({
                     <button
                       type="button"
                       onClick={() => {
-                        if (filteredSchedules[0]) {
-                          handleScheduleSelection(filteredSchedules[0], false);
+                        if (workspaceSchedules[0]) {
+                          handleScheduleSelection(workspaceSchedules[0], false);
                         }
                       }}
-                      disabled={!filteredSchedules[0]}
+                      disabled={!workspaceSchedules[0]}
                       className="rounded-full border border-[var(--border)] px-3 py-1.5 text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)] disabled:opacity-50"
                     >
                       첫 환자 선택
