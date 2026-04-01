@@ -25,9 +25,33 @@ type RoomBoardDraft = {
 type HandoverSnapshot = { dateKey: string; createdAt: string | null; rooms: HandoverRoomConfig[] };
 type ScannerControlsLike = { stop: () => void };
 type Props = { user?: StaffMember | null; selectedCo?: string | null; selectedCompanyId?: string | null };
+type MobileBleTaskAttempt = {
+  label: string;
+  query: string;
+  ok: boolean;
+  upstream: unknown;
+};
+type MobileBlePreflightResult = {
+  ok: boolean;
+  normalizedBaseUrl?: string;
+  deviceId?: string;
+  license?: unknown;
+  trigger?: unknown;
+  taskReady?: boolean;
+  task?: unknown;
+  taskAttempts?: MobileBleTaskAttempt[];
+  browserBle?: {
+    primaryServiceUuid?: string;
+    characteristicUuids?: string[];
+  };
+  error?: string;
+};
 
 const ROOM_DRAFT_STORAGE_KEY = 'erp-zhsunyco-room-board-drafts';
+const MOBILE_USERNAME_STORAGE_KEY = 'erp-zhsunyco-mobile-user-name';
 const CAMERA_BARCODE_HINT = '카메라를 바코드에 가까이 대고 잠시 멈추면 자동 등록됩니다.';
+const ROOM_BOARD_PREVIEW_SLOT_COUNT = 4;
+const ZHSUNYCO_MOBILE_BASE_URL = 'http://www.zhsunyco.com.cn';
 
 function compareDateKeys(left?: string | null, right?: string | null) {
   return String(left || '').localeCompare(String(right || ''), 'ko-KR', {
@@ -95,6 +119,97 @@ async function copyText(text: string, successMessage: string) {
   }
 }
 
+function getBoardPreviewSlots(draft: RoomBoardDraft) {
+  const normalized = Array.from({ length: ROOM_BOARD_PREVIEW_SLOT_COUNT }, (_, index) => {
+    const slot = draft.patientSlots[index];
+    return {
+      bedNumber: slot?.bedNumber ?? index + 1,
+      patientName: String(slot?.patientName || '').trim(),
+      age: String(slot?.age || '').trim(),
+      gender: String(slot?.gender || '').trim(),
+    };
+  });
+
+  return normalized;
+}
+
+function formatPreviewPatientMeta(slot: RoomBoardPatientSlot) {
+  const values = [slot.age ? `${slot.age}세` : '', slot.gender].filter(Boolean);
+  return values.length > 0 ? values.join(' / ') : '나이 · 성별 미입력';
+}
+
+function stringifyDiagnosticValue(value: unknown) {
+  if (value == null) return '-';
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function extractDiagnosticMessage(value: unknown) {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    const error = typeof record.error === 'string' ? record.error : '';
+    const message = typeof record.message === 'string' ? record.message : '';
+    if (error) return error;
+    if (message) return message;
+    if (record.error_code === 0) return '정상';
+  }
+  return '응답 확인 필요';
+}
+
+function RoomBoardPreview({ draft }: { draft: RoomBoardDraft }) {
+  const slots = getBoardPreviewSlots(draft);
+
+  return (
+    <div className="overflow-hidden rounded-[28px] border-[10px] border-neutral-200 bg-neutral-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_18px_48px_rgba(15,23,42,0.12)]">
+      <div className="aspect-[5/3] bg-neutral-50 text-neutral-900">
+        <div className="grid h-full grid-rows-[auto_1fr]">
+          <div className="flex items-center justify-between border-b border-neutral-300 bg-neutral-200 px-5 py-3">
+            <div className="text-2xl font-black tracking-tight">{draft.roomNumber}호</div>
+            <div className="text-sm font-semibold text-neutral-600">입원환자 정보</div>
+          </div>
+
+          <div className="grid h-full grid-cols-2 grid-rows-2">
+            {slots.map((slot, index) => {
+              const borderClass = [
+                index % 2 === 0 ? 'border-r' : '',
+                index < 2 ? 'border-b' : '',
+              ]
+                .filter(Boolean)
+                .join(' ');
+
+              return (
+                <div
+                  key={`${draft.roomNumber}-${slot.bedNumber}-${index}`}
+                  className={`flex flex-col justify-between border-neutral-300 p-4 ${borderClass}`}
+                >
+                  <div>
+                    <div className="text-[11px] font-bold tracking-[0.16em] text-neutral-500">{slot.bedNumber}번 환자</div>
+                    <div className="mt-3 text-3xl font-black tracking-tight text-neutral-900">
+                      {slot.patientName || '공란'}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-2">
+                    <div className="rounded-2xl border border-neutral-300 bg-white px-3 py-2">
+                      <div className="text-[10px] font-bold tracking-[0.14em] text-neutral-500">나이 / 성별</div>
+                      <div className="mt-1 text-base font-semibold text-neutral-800">{formatPreviewPatientMeta(slot)}</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ZhsunycoEslSync(_props: Props) {
   const permissionMap = (_props.user?.permissions as Record<string, unknown> | undefined) || undefined;
   const canManageDeviceRegistration = Boolean(_props.user?.role === 'admin' || permissionMap?.admin === true || permissionMap?.mso === true);
@@ -107,6 +222,11 @@ export default function ZhsunycoEslSync(_props: Props) {
   const [cameraScanOpen, setCameraScanOpen] = useState(false);
   const [cameraScanBusy, setCameraScanBusy] = useState(false);
   const [cameraScanStatus, setCameraScanStatus] = useState(CAMERA_BARCODE_HINT);
+  const [previewRoomNumber, setPreviewRoomNumber] = useState('');
+  const [mobileUserName, setMobileUserName] = useState('');
+  const [mobilePassword, setMobilePassword] = useState('');
+  const [mobileBleChecking, setMobileBleChecking] = useState(false);
+  const [mobileBlePreflight, setMobileBlePreflight] = useState<MobileBlePreflightResult | null>(null);
   const deviceRegistrationInputRef = useRef<HTMLInputElement | null>(null);
   const deviceRegistrationVideoRef = useRef<HTMLVideoElement | null>(null);
   const cameraScanControlsRef = useRef<ScannerControlsLike | null>(null);
@@ -116,6 +236,11 @@ export default function ZhsunycoEslSync(_props: Props) {
       const rawDrafts = localStorage.getItem(ROOM_DRAFT_STORAGE_KEY);
       if (rawDrafts) {
         setRoomDrafts(JSON.parse(rawDrafts) as Record<string, RoomBoardDraft>);
+      }
+
+      const savedMobileUserName = localStorage.getItem(MOBILE_USERNAME_STORAGE_KEY);
+      if (savedMobileUserName) {
+        setMobileUserName(savedMobileUserName);
       }
     } catch {
       // ignore local storage failures
@@ -129,6 +254,19 @@ export default function ZhsunycoEslSync(_props: Props) {
       // ignore local storage failures
     }
   }, [roomDrafts]);
+
+  useEffect(() => {
+    try {
+      const nextValue = mobileUserName.trim();
+      if (nextValue) {
+        localStorage.setItem(MOBILE_USERNAME_STORAGE_KEY, nextValue);
+      } else {
+        localStorage.removeItem(MOBILE_USERNAME_STORAGE_KEY);
+      }
+    } catch {
+      // ignore local storage failures
+    }
+  }, [mobileUserName]);
 
   const loadRooms = useCallback(async () => {
     setLoadingRooms(true);
@@ -202,6 +340,7 @@ export default function ZhsunycoEslSync(_props: Props) {
 
   const selectedRoom = useMemo(() => rooms.find((room) => room.roomNumber === selectedRoomNumber) || null, [rooms, selectedRoomNumber]);
   const selectedDraft = useMemo(() => (selectedRoomNumber ? roomDrafts[selectedRoomNumber] || null : null), [roomDrafts, selectedRoomNumber]);
+  const previewDraft = useMemo(() => (previewRoomNumber ? roomDrafts[previewRoomNumber] || null : null), [previewRoomNumber, roomDrafts]);
   const preparedRooms = useMemo(
     () => rooms.map((room) => roomDrafts[room.roomNumber]).filter((draft): draft is RoomBoardDraft => Boolean(draft)).filter((draft) => Boolean(draft.updatedAt)),
     [roomDrafts, rooms],
@@ -411,6 +550,73 @@ export default function ZhsunycoEslSync(_props: Props) {
     toast(`${roomNumber}호 전송 준비를 해제했습니다.`, 'success');
   }, []);
 
+  const openPreview = useCallback((roomNumber?: string) => {
+    const nextRoomNumber = String(roomNumber || selectedRoomNumber || '').trim();
+    if (!nextRoomNumber) return;
+    setPreviewRoomNumber(nextRoomNumber);
+    setMobileBlePreflight(null);
+  }, [selectedRoomNumber]);
+
+  const closePreview = useCallback(() => {
+    setPreviewRoomNumber('');
+    setMobileBlePreflight(null);
+  }, []);
+
+  const runMobileBlePreflight = useCallback(async (draft: RoomBoardDraft) => {
+    if (!draft.deviceId.trim()) {
+      toast('기기 바코드를 먼저 등록해 주세요.', 'error');
+      return;
+    }
+
+    if (!mobileUserName.trim() || !mobilePassword.trim()) {
+      toast('제조사 모바일 계정과 비밀번호를 입력해 주세요.', 'error');
+      return;
+    }
+
+    setMobileBleChecking(true);
+    setMobileBlePreflight(null);
+
+    try {
+      const response = await fetch('/api/esl/zhsunyco', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'mobileBlePreflight',
+          config: {
+            baseUrl: ZHSUNYCO_MOBILE_BASE_URL,
+            userName: mobileUserName.trim(),
+            password: mobilePassword,
+          },
+          payload: {
+            deviceId: draft.deviceId.trim(),
+          },
+        }),
+      });
+
+      const parsed = (await response.json().catch(() => null)) as MobileBlePreflightResult | null;
+      if (!response.ok || !parsed?.ok) {
+        const errorMessage = parsed?.error || '제조사 전송 상태를 확인하지 못했습니다.';
+        throw new Error(errorMessage);
+      }
+
+      setMobileBlePreflight(parsed);
+
+      if (parsed.taskReady) {
+        toast('제조사 서버에서 BLE 작업을 확인했습니다.', 'success');
+      } else {
+        toast('제조사 서버에서 아직 BLE 작업을 만들지 않았습니다.', 'error');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '제조사 전송 상태 확인에 실패했습니다.';
+      setMobileBlePreflight({ ok: false, error: message });
+      toast(message, 'error');
+    } finally {
+      setMobileBleChecking(false);
+    }
+  }, [mobilePassword, mobileUserName]);
+
   return (
     <div className="space-y-4">
       <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] px-5 py-4 shadow-sm">
@@ -443,6 +649,14 @@ export default function ZhsunycoEslSync(_props: Props) {
                     기기바코드 삭제
                   </button>
                 ) : null}
+                <button
+                  type="button"
+                  onClick={() => openPreview()}
+                  disabled={!selectedDraft}
+                  className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] disabled:opacity-60"
+                >
+                  4분할 미리보기
+                </button>
                 <button
                   type="button"
                   onClick={resetSelectedRoomFromSource}
@@ -587,6 +801,13 @@ export default function ZhsunycoEslSync(_props: Props) {
                         </button>
                         <button
                           type="button"
+                          onClick={() => openPreview(draft.roomNumber)}
+                          className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)]"
+                        >
+                          미리보기
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => void copyText(buildRoomSummaryText(draft), `${draft.roomNumber}호 전송 메모를 복사했습니다.`)}
                           className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)]"
                         >
@@ -624,6 +845,151 @@ export default function ZhsunycoEslSync(_props: Props) {
             )}
           </section>
       </section>
+
+      {previewDraft ? (
+        <div
+          className="fixed inset-0 z-[190] flex items-center justify-center bg-black/45 p-4"
+          onClick={closePreview}
+        >
+          <div
+            className="w-full max-w-6xl rounded-[var(--radius-xl)] bg-[var(--card)] p-5 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-lg font-bold text-[var(--foreground)]">{previewDraft.roomNumber}호 7.5인치 최종 미리보기</div>
+                <div className="mt-1 text-sm text-[var(--toss-gray-3)]">4인실 기준 4분할 화면과 제조사 BLE 작업 상태를 함께 확인합니다.</div>
+              </div>
+              <button
+                type="button"
+                onClick={closePreview}
+                className="rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--foreground)]"
+              >
+                닫기
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
+              <div className="space-y-3">
+                <RoomBoardPreview draft={previewDraft} />
+                <div className="flex flex-wrap gap-2 text-[12px] text-[var(--toss-gray-3)]">
+                  <div className="rounded-full border border-[var(--border)] bg-[var(--muted)] px-3 py-1">기기 바코드 {previewDraft.deviceId || '미등록'}</div>
+                  <div className="rounded-full border border-[var(--border)] bg-[var(--muted)] px-3 py-1">
+                    {previewDraft.updatedAt ? `전송 준비 ${new Date(previewDraft.updatedAt).toLocaleString('ko-KR')}` : '전송 준비 전'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)]/20 p-4">
+                <div className="text-base font-bold text-[var(--foreground)]">제조사 BLE 전송 상태</div>
+                <div className="mt-2 text-sm text-[var(--toss-gray-3)]">
+                  현재 제조사 앱은 클라우드 태스크를 받아 BLE로 쓰는 구조라서, 먼저 서버가 이 기기의 전송 작업을 만들 수 있는지 확인합니다.
+                </div>
+
+                <div className="mt-4 grid gap-3">
+                  <label className="space-y-1">
+                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">제조사 계정</span>
+                    <input
+                      value={mobileUserName}
+                      onChange={(event) => setMobileUserName(event.target.value)}
+                      placeholder="WoPda / Zhsunyco 로그인 계정"
+                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
+                    />
+                  </label>
+
+                  <label className="space-y-1">
+                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">제조사 비밀번호</span>
+                    <input
+                      type="password"
+                      value={mobilePassword}
+                      onChange={(event) => setMobilePassword(event.target.value)}
+                      placeholder="계정 비밀번호"
+                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
+                    />
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => void runMobileBlePreflight(previewDraft)}
+                    disabled={mobileBleChecking}
+                    className="rounded-[var(--radius-md)] bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    {mobileBleChecking ? '전송 상태 확인 중...' : '전송 상태 확인'}
+                  </button>
+                </div>
+
+                {mobileBlePreflight ? (
+                  <div className="mt-4 space-y-3">
+                    <div
+                      className={`rounded-[var(--radius-lg)] border px-3 py-3 text-sm ${
+                        mobileBlePreflight.taskReady
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                          : 'border-amber-200 bg-amber-50 text-amber-900'
+                      }`}
+                    >
+                      {mobileBlePreflight.taskReady
+                        ? '제조사 서버가 BLE 작업을 반환했습니다. 다만 실제 브라우저 write 프로토콜은 아직 별도 확인이 필요합니다.'
+                        : mobileBlePreflight.error || '제조사 서버가 아직 이 기기의 BLE 작업을 만들지 않았습니다. 보통 첫 바인딩이나 기기 등록이 선행되어야 합니다.'}
+                    </div>
+
+                    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-1">
+                      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2">
+                        <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">라이선스</div>
+                        <div className="mt-1 text-[12px] font-semibold text-[var(--foreground)]">
+                          {extractDiagnosticMessage(mobileBlePreflight.license)}
+                        </div>
+                      </div>
+                      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2">
+                        <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">트리거</div>
+                        <div className="mt-1 text-[12px] font-semibold text-[var(--foreground)]">
+                          {extractDiagnosticMessage(mobileBlePreflight.trigger)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {mobileBlePreflight.taskAttempts?.length ? (
+                      <div className="space-y-2">
+                        {mobileBlePreflight.taskAttempts.map((attempt) => (
+                          <div key={`${attempt.label}-${attempt.query}`} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="text-[12px] font-bold text-[var(--foreground)]">{attempt.label}</div>
+                              <div
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                  attempt.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'
+                                }`}
+                              >
+                                {attempt.ok ? 'TASK READY' : extractDiagnosticMessage(attempt.upstream)}
+                              </div>
+                            </div>
+                            {attempt.query ? (
+                              <div className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{attempt.query}</div>
+                            ) : null}
+                            <pre className="mt-2 max-h-32 overflow-auto rounded-[var(--radius-md)] bg-slate-950 px-3 py-2 text-[11px] text-slate-100">
+                              {stringifyDiagnosticValue(attempt.upstream)}
+                            </pre>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {mobileBlePreflight.browserBle ? (
+                      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
+                        <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">APK에서 확인한 BLE 식별자</div>
+                        <div className="mt-2 text-[11px] text-[var(--foreground)]">
+                          서비스 {mobileBlePreflight.browserBle.primaryServiceUuid || '-'}
+                        </div>
+                        <div className="mt-1 break-all text-[11px] text-[var(--toss-gray-3)]">
+                          {(mobileBlePreflight.browserBle.characteristicUuids || []).join(', ') || '-'}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {deviceRegistrationOpen && selectedDraft ? (
         <div

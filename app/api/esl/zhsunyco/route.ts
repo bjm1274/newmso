@@ -14,6 +14,10 @@ type RouteConfig = {
   customerStoreCode?: string;
 };
 
+type MobileBlePreflightPayload = {
+  deviceId?: string;
+};
+
 type UpstreamJson = {
   code?: number;
   message?: string;
@@ -42,7 +46,8 @@ type RouteBody =
   | { action: 'pushGoods'; config?: RouteConfig; payload?: ZhsunycoGoodsPayloadRow[] }
   | { action: 'bindDevice'; config?: RouteConfig; payload?: BindDevicePayload }
   | { action: 'mobileTest'; config?: RouteConfig }
-  | { action: 'mobileTemplates'; config?: RouteConfig };
+  | { action: 'mobileTemplates'; config?: RouteConfig }
+  | { action: 'mobileBlePreflight'; config?: RouteConfig; payload?: MobileBlePreflightPayload };
 
 type AuthHeader =
   | {
@@ -277,6 +282,68 @@ export async function POST(request: NextRequest) {
         normalizedBaseUrl: config.baseUrl,
         templates: Array.isArray(templateResult.json?.list) ? templateResult.json.list : [],
         upstream: templateResult.json ?? templateResult.rawText,
+      });
+    }
+
+    if (body.action === 'mobileBlePreflight') {
+      const { token, loginResult } = await loginToMobileCloud(config.baseUrl, config);
+      const payload = isObject(body.payload) ? (body.payload as MobileBlePreflightPayload) : {};
+      const deviceId = String(payload.deviceId || '').trim();
+
+      const queryVariants = [
+        { label: '기본 조회', query: '' },
+        ...(deviceId
+          ? [
+              { label: 'esl_code', query: `?${new URLSearchParams({ esl_code: deviceId }).toString()}` },
+              { label: 'deviceId', query: `?${new URLSearchParams({ deviceId }).toString()}` },
+              { label: 'code', query: `?${new URLSearchParams({ code: deviceId }).toString()}` },
+            ]
+          : []),
+      ];
+
+      const [licenseResult, triggerResult, ...taskResults] = await Promise.all([
+        fetchUpstream(`${config.baseUrl}/mobile/query/license`, { method: 'GET' }, { mode: 'token', value: token }),
+        fetchUpstream(`${config.baseUrl}/mobile/trigger/task`, { method: 'GET' }, { mode: 'token', value: token }),
+        ...queryVariants.map((variant) =>
+          fetchUpstream(`${config.baseUrl}/mobile/getTask/ble${variant.query}`, { method: 'GET' }, { mode: 'token', value: token }),
+        ),
+      ]);
+
+      const taskAttempts = taskResults.map((result, index) => {
+        const variant = queryVariants[index];
+        const errorCode = Number(result.json?.error_code);
+        const ok = result.response.ok && (!Number.isFinite(errorCode) || errorCode === 0);
+        return {
+          label: variant?.label || `시도 ${index + 1}`,
+          query: variant?.query || '',
+          ok,
+          upstream: result.json ?? result.rawText,
+        };
+      });
+
+      const readyTask = taskAttempts.find((attempt) => attempt.ok) || null;
+
+      return NextResponse.json({
+        ok: true,
+        normalizedBaseUrl: config.baseUrl,
+        deviceId,
+        login: loginResult.json ?? loginResult.rawText,
+        license: licenseResult.json ?? licenseResult.rawText,
+        trigger: triggerResult.json ?? triggerResult.rawText,
+        taskReady: Boolean(readyTask),
+        task: readyTask?.upstream ?? null,
+        taskAttempts,
+        browserBle: {
+          primaryServiceUuid: '3e3d1158-5656-4217-b715-266f37eb5000',
+          characteristicUuids: [
+            '30323032-4c53-4545-4c42-4b4e494c4f57',
+            '31323032-4c53-4545-4c42-4b4e494c4f57',
+            '32323032-4c53-4545-4c42-4b4e494c4f57',
+            '33323032-4c53-4545-4c42-4b4e494c4f57',
+            '34323032-4c53-4545-4c42-4b4e494c4f57',
+            '35323032-4c53-4545-4c42-4b4e494c4f57',
+          ],
+        },
       });
     }
 

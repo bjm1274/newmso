@@ -17,6 +17,14 @@ import {
   normalizeMainMenuForUser,
 } from '@/lib/access-control';
 import { hasSystemMasterPermission } from '@/lib/system-master';
+import { getDisplayedAdminSubView } from './admin-menu-config';
+import {
+  getNavigationEntryType,
+  getSavedSubViewForMenu,
+  persistTopLevelNavigationState,
+  readStoredMainNavigationState,
+  resetPersistedMenuState,
+} from './navigation-state';
 
 import Sidebar, { SUB_MENUS } from './기능부품/조직도서브/조직도측면창';
 import MainContent from './기능부품/조직도서브/조직도본문';
@@ -34,13 +42,6 @@ function canAccessAdminSubMenu(user: ErpUser | null, subMenuId: string) {
   return canAccessAdminSection(user, subMenuId);
 }
 
-const ADMIN_PARENT_SUBVIEW_MAP: Record<string, string> = {
-  알림자동화: '운영설정',
-  수술검사템플릿: '운영설정',
-  팝업관리: '운영설정',
-  급여이상치: '감사센터',
-};
-
 function isLegacyOfficialDocumentAdminTarget(menuId?: string | null, subViewId?: string | null) {
   return menuId === '관리자' && subViewId === '공문서대장';
 }
@@ -50,7 +51,7 @@ function getDisplayedSubView(mainMenuId: string, subViewId: string) {
     return subViewId;
   }
 
-  return ADMIN_PARENT_SUBVIEW_MAP[subViewId] || subViewId;
+  return getDisplayedAdminSubView(subViewId);
 }
 
 function buildSubMenuTestId(mainMenuId: string, subMenuId: string) {
@@ -66,41 +67,6 @@ function buildSubMenuTestId(mainMenuId: string, subMenuId: string) {
     .replace(/^-|-$/g, '');
 
   return `submenu-${slug}`;
-}
-
-const CHAT_ROOM_KEY = 'erp_chat_last_room';
-const CHAT_ACTIVE_ROOM_KEY = 'erp_chat_active_room';
-const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
-const MYPAGE_TAB_KEY = 'erp_mypage_tab';
-const HR_TAB_KEY = 'erp_hr_tab';
-const HR_COMPANY_KEY = 'erp_hr_company';
-const HR_STATUS_KEY = 'erp_hr_status';
-const HR_WORKSPACE_KEY = 'erp_hr_workspace';
-const INV_VIEW_KEY = 'erp_inventory_view';
-const APPROVAL_VIEW_KEY = 'erp_approval_view';
-const ADMIN_SUBVIEW_KEY = 'erp_admin_subview';
-
-function getSavedSubViewForMenu(targetMenu?: string | null) {
-  if (typeof window === 'undefined' || !targetMenu) {
-    return null;
-  }
-
-  const genericSubView = window.localStorage.getItem('erp_last_subview');
-
-  switch (targetMenu) {
-    case '내정보':
-      return window.localStorage.getItem(MYPAGE_TAB_KEY) || genericSubView;
-    case '인사관리':
-      return window.localStorage.getItem(HR_TAB_KEY) || genericSubView;
-    case '재고관리':
-      return window.localStorage.getItem(INV_VIEW_KEY) || genericSubView;
-    case '전자결재':
-      return window.localStorage.getItem(APPROVAL_VIEW_KEY) || genericSubView;
-    case '관리자':
-      return window.localStorage.getItem(ADMIN_SUBVIEW_KEY) || genericSubView;
-    default:
-      return genericSubView;
-  }
 }
 
 function MainPageFallback() {
@@ -429,14 +395,8 @@ function MainPageContent() {
           // ignore
         }
 
-        const savedCo = localStorage.getItem('erp_last_co');
-        const savedMenu = localStorage.getItem('erp_last_menu');
-        const savedSubView = localStorage.getItem('erp_last_subview');
-        const navigationEntry =
-          typeof window !== 'undefined' && typeof window.performance?.getEntriesByType === 'function'
-            ? (window.performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined)
-            : undefined;
-        const navigationType = navigationEntry?.type ?? 'navigate';
+        const { savedCo, savedMenu, savedSubView } = readStoredMainNavigationState();
+        const navigationType = getNavigationEntryType();
         const shouldRestoreSavedMenuState =
           navigationType === 'reload' || navigationType === 'back_forward';
         const shouldHonorNavigationIntent = !(
@@ -784,12 +744,7 @@ function MainPageContent() {
   // 2. 상태 변경 시마다 로컬 스토리지 업데이트
   useEffect(() => {
     if (user) {
-      localStorage.setItem('erp_last_menu', mainMenu);
-      localStorage.setItem('erp_last_subview', subView);
-      localStorage.setItem('erp_last_co', selectedCo);
-      if (mainMenu === '관리자') {
-        localStorage.setItem(ADMIN_SUBVIEW_KEY, subView);
-      }
+      persistTopLevelNavigationState(mainMenu, subView, selectedCo);
     }
   }, [mainMenu, subView, selectedCo, user]);
 
@@ -961,42 +916,6 @@ function MainPageContent() {
     setInitialOpenPostId(null);
     setInitialApprovalIntent(null);
     setInitialInventoryWorkflowApprovalId(null);
-  }, []);
-
-  const resetPersistedMenuState = useCallback((menu: string) => {
-    if (typeof window === 'undefined') return;
-
-    try {
-      switch (menu) {
-        case '내정보':
-          window.localStorage.removeItem(MYPAGE_TAB_KEY);
-          break;
-        case '채팅':
-          window.localStorage.removeItem(CHAT_ROOM_KEY);
-          window.localStorage.removeItem(CHAT_FOCUS_KEY);
-          window.sessionStorage.removeItem(CHAT_ACTIVE_ROOM_KEY);
-          break;
-        case '전자결재':
-          window.localStorage.removeItem(APPROVAL_VIEW_KEY);
-          break;
-        case '관리자':
-          window.localStorage.removeItem(ADMIN_SUBVIEW_KEY);
-          break;
-        case '인사관리':
-          window.localStorage.removeItem(HR_TAB_KEY);
-          window.localStorage.removeItem(HR_COMPANY_KEY);
-          window.localStorage.removeItem(HR_STATUS_KEY);
-          window.localStorage.removeItem(HR_WORKSPACE_KEY);
-          break;
-        case '재고관리':
-          window.localStorage.removeItem(INV_VIEW_KEY);
-          break;
-        default:
-          break;
-      }
-    } catch {
-      // ignore storage failures during menu reset
-    }
   }, []);
 
   const handleMenuChange = useCallback((menu: string, sub?: string) => {
