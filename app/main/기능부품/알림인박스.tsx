@@ -4,6 +4,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import {
+  resolveApprovalNotificationId,
+  resolveInventoryNotificationApprovalId,
+  toNotificationMetadataRecord,
+} from '@/lib/notification-metadata';
+import {
   flushPushRetryQueue,
   getPushConnectionStatus,
   initNotificationService,
@@ -59,7 +64,7 @@ function timeAgo(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' });
 }
 
-function buildApprovalNotificationHref(metadata: Record<string, any>) {
+function buildApprovalNotificationHref(metadata: Record<string, unknown>) {
   const params = new URLSearchParams({
     open_menu: '전자결재',
   });
@@ -68,7 +73,7 @@ function buildApprovalNotificationHref(metadata: Record<string, any>) {
     params.set('open_subview', metadata.approval_view.trim());
   }
 
-  const approvalId = String(metadata?.approval_id || '').trim();
+  const approvalId = resolveApprovalNotificationId(metadata);
   if (approvalId) {
     params.set('open_approval_id', approvalId);
   }
@@ -76,7 +81,7 @@ function buildApprovalNotificationHref(metadata: Record<string, any>) {
   return `/main?${params.toString()}`;
 }
 
-function buildBoardNotificationHref(metadata: Record<string, any>) {
+function buildBoardNotificationHref(metadata: Record<string, unknown>) {
   const params = new URLSearchParams({
     open_menu: '게시판',
   });
@@ -93,7 +98,7 @@ function buildBoardNotificationHref(metadata: Record<string, any>) {
   return `/main?${params.toString()}`;
 }
 
-function buildInventoryNotificationHref(metadata: Record<string, any>) {
+function buildInventoryNotificationHref(metadata: Record<string, unknown>) {
   const params = new URLSearchParams({
     open_menu: '재고관리',
   });
@@ -102,7 +107,7 @@ function buildInventoryNotificationHref(metadata: Record<string, any>) {
     typeof metadata?.inventory_view === 'string' && metadata.inventory_view.trim()
       ? metadata.inventory_view.trim()
       : '';
-  const approvalId = String(metadata?.inventory_approval || metadata?.approval_id || '').trim();
+  const approvalId = resolveInventoryNotificationApprovalId(metadata);
 
   if (inventoryView || approvalId) {
     params.set('open_inventory_view', inventoryView || '현황');
@@ -499,7 +504,7 @@ export default function NotificationInbox({ user: _rawUser, onRefresh }: Record<
 
   const handleClick = (n: any) => {
     if (!n.read_at) markAsRead(n.id);
-    const meta = n.metadata || {};
+    const meta = toNotificationMetadataRecord(n.metadata);
     if (n.type === 'message' || n.type === 'mention') router.push(meta.room_id ? `/main?open_chat_room=${meta.room_id}` : '/main?open_menu=채팅');
     else if (n.type === 'approval') {
       router.push(buildApprovalNotificationHref(meta));

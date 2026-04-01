@@ -16,6 +16,9 @@ const BOARD_AUTO_CHAT_TYPES = new Set(['공지사항', '경조사']);
 
 const BOARD_IDS = ['공지사항', '자유게시판', '익명소리함', '경조사', '수술일정', 'MRI일정', '직원제안함', '사내위키'];
 const BOARD_POST_OPTIONAL_COLUMNS = [
+  // 초기 스키마에 없거나 나중에 추가된 컬럼 (없어도 쿼리 정상 동작)
+  'board_id',         // 일부 환경에 없을 수 있음 (사용하지 않는 레거시 컬럼)
+  'updated_at',       // 일부 환경에 없을 수 있음
   'company_id',
   'tags',
   'attachments',
@@ -35,7 +38,6 @@ const BOARD_POST_OPTIONAL_COLUMNS = [
 ];
 const BOARD_POST_REQUIRED_SELECT_COLUMNS = [
   'id',
-  'board_id',
   'board_type',
   'title',
   'content',
@@ -43,7 +45,6 @@ const BOARD_POST_REQUIRED_SELECT_COLUMNS = [
   'author_name',
   'company',
   'created_at',
-  'updated_at',
   'views',
   'is_anonymous',
   'poll',
@@ -805,6 +806,8 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   }, [activeBoard, scheduleHour, scheduleMinute, schedulePeriod]);
 
   const fetchPosts = async () => {
+    // 유저 정보가 아직 로드되지 않은 경우(인증 초기화 중) posts를 초기화하지 않음
+    if (!user) return;
     if (!canAccessBoard(user, activeBoard, 'read')) {
       setPosts([]);
       return;
