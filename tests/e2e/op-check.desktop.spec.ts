@@ -268,6 +268,7 @@ test('op check ward messages use dropdown recipients, keep favorites, and send s
   const noticeRoomId = '00000000-0000-0000-0000-000000000000';
   const favoriteStaffId = 'ward-staff-1';
   const favoriteStorageKey = `erp_op_check_ward_message_favorites:${extraFeaturesUser.id}:${extraFeaturesUser.company_id}`;
+  const recentStorageKey = `erp_op_check_ward_message_recents:${extraFeaturesUser.id}:${extraFeaturesUser.company_id}`;
 
   await prepareExtraFeature(page, {
     boardPosts: [
@@ -326,9 +327,13 @@ test('op check ward messages use dropdown recipients, keep favorites, and send s
   await page.getByTestId('op-check-schedule-card-schedule-post-ward-message').click();
   await page.getByRole('button', { name: '병동팀 메시지 보내기' }).first().click();
 
+  await expect(page.getByTestId('op-check-ward-validation-text')).toContainText('받는 사람을 1명 이상 선택하세요');
+  await expect(page.getByTestId('op-check-ward-recommended-chip-' + favoriteStaffId)).toBeVisible();
   await expect(page.getByTestId('op-check-ward-recipient-option-' + favoriteStaffId)).toHaveCount(0);
   await expect(page.getByTestId('op-check-ward-message-textarea')).toHaveValue(/CH-033/);
   await expect(page.getByTestId('op-check-ward-message-textarea')).not.toHaveValue(/BOARD_META/);
+  await page.getByTestId('op-check-ward-template-move-request').click();
+  await expect(page.getByTestId('op-check-ward-message-textarea')).toHaveValue(/\[수술실 이동 요청\]/);
 
   await page.getByTestId('op-check-ward-recipient-dropdown-button').click();
   await page.getByTestId('op-check-ward-recipient-search').fill('김규');
@@ -353,7 +358,57 @@ test('op check ward messages use dropdown recipients, keep favorites, and send s
     const raw = window.localStorage.getItem(storageKey);
     return raw ? JSON.parse(raw) : [];
   }, favoriteStorageKey);
+  await page.getByRole('button', { name: '병동팀 메시지 보내기' }).first().click();
+  await expect(page.getByTestId('op-check-ward-recent-chip-' + favoriteStaffId)).toBeVisible();
+  const recentIds = await page.evaluate((storageKey) => {
+    const raw = window.localStorage.getItem(storageKey);
+    return raw ? JSON.parse(raw) : [];
+  }, recentStorageKey);
   expect(favoriteIds).toContain(favoriteStaffId);
+  expect(recentIds).toContain(favoriteStaffId);
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('op check ward recipient dropdown falls back to the full staff list when company metadata does not match', async ({
+  page,
+}) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const todayKey = getTodayKey();
+
+  await prepareExtraFeature(page, {
+    boardPosts: [
+      {
+        id: 'schedule-post-ward-fallback',
+        board_type: '수술일정',
+        title: 'Fallback Surgery',
+        content: 'CH-044',
+        patient_name: 'Fallback Ward Patient',
+        schedule_date: todayKey,
+        schedule_time: '14:00',
+        schedule_room: 'Room 4',
+        company: extraFeaturesUser.company,
+        company_id: extraFeaturesUser.company_id,
+      },
+    ],
+    staffMembers: [
+      extraFeaturesUser,
+      {
+        id: 'ward-fallback-staff-1',
+        name: '김병동',
+        department: '병동팀1',
+        position: '사원',
+        company: '다른회사명',
+        company_id: 'different-company-id',
+      },
+    ],
+  });
+
+  await page.getByTestId('op-check-schedule-card-schedule-post-ward-fallback').click();
+  await page.getByRole('button', { name: '병동팀 메시지 보내기' }).first().click();
+  await page.getByTestId('op-check-ward-recipient-dropdown-button').click();
+  await page.getByTestId('op-check-ward-recipient-search').fill('병동팀');
+  await expect(page.getByTestId('op-check-ward-recipient-option-ward-fallback-staff-1')).toBeVisible();
+
   expect(runtimeErrors).toEqual([]);
 });
 

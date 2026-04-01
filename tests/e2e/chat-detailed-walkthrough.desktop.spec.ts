@@ -44,6 +44,8 @@ const peerTwo = {
   position: '주임',
 };
 
+const noticeRoomId = '00000000-0000-0000-0000-000000000000';
+
 test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
 });
@@ -159,6 +161,62 @@ test('chat detailed walkthrough opens each internal menu in practical order', as
   await page.getByTestId('chat-tab-chat').click();
   await page.getByTestId('chat-toggle-hidden-rooms').click();
   await page.getByTestId('chat-toggle-hidden-rooms').click();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('chat still renders room messages when optional message columns are missing', async ({
+  page,
+}) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    staffMembers: [fakeUser, peerOne],
+    missingMessageColumns: ['sender_name', 'message_type', 'album_id', 'is_deleted'],
+    chatRooms: [
+      {
+        id: noticeRoomId,
+        name: '공지메시지',
+        type: 'notice',
+        members: [fakeUser.id],
+        created_at: '2026-03-08T00:00:00.000Z',
+        last_message_at: '2026-03-08T00:00:00.000Z',
+      },
+      {
+        id: 'room-fallback',
+        name: '스키마 대응 채팅방',
+        type: 'group',
+        members: [fakeUser.id, peerOne.id],
+        created_at: '2026-03-08T09:00:00.000Z',
+        last_message_at: '2026-03-08T10:00:00.000Z',
+        last_message_preview: '운영 스키마 대응 메시지',
+        created_by: fakeUser.id,
+      },
+    ],
+    messages: [
+      {
+        id: 'msg-fallback-1',
+        room_id: 'room-fallback',
+        sender_id: peerOne.id,
+        content: '운영 스키마 대응 메시지',
+        created_at: '2026-03-08T10:00:00.000Z',
+        staff: { name: peerOne.name, photo_url: null },
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '\uCC44\uD305',
+      erp_chat_last_room: 'room-fallback',
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent('\uCC44\uD305')}`);
+
+  await expect(page.getByTestId('chat-view')).toBeVisible();
+  await expect(page.getByTestId('chat-room-room-fallback')).toBeVisible();
+  await expect(page.getByTestId('chat-message-msg-fallback-1')).toContainText('운영 스키마 대응 메시지');
 
   expect(runtimeErrors).toEqual([]);
 });

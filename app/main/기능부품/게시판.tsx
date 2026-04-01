@@ -4,7 +4,7 @@ import { useDeferredValue, useState, useEffect, useMemo, useRef, useCallback } f
 import { canAccessBoard, isAdminUser, isPrivilegedUser } from '@/lib/access-control';
 import { getStaffLikeId, resolveStaffLike } from '@/lib/staff-identity';
 import { supabase } from '@/lib/supabase';
-import { withMissingColumnFallback } from '@/lib/supabase-compat';
+import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import SmartDatePicker from './공통/SmartDatePicker';
 import WikiDashboard from './게시판서브/사내위키';
 import type { StaffMember, BoardPost, ScheduleItem, AttachmentItem } from '@/types';
@@ -33,6 +33,27 @@ const BOARD_POST_OPTIONAL_COLUMNS = [
   'surgery_transfusion',
   'mri_contrast_required',
 ];
+const BOARD_POST_REQUIRED_SELECT_COLUMNS = [
+  'id',
+  'board_id',
+  'board_type',
+  'title',
+  'content',
+  'author_id',
+  'author_name',
+  'company',
+  'created_at',
+  'updated_at',
+  'views',
+  'is_anonymous',
+  'poll',
+  'poll_votes',
+  'is_pinned',
+] as const;
+const BOARD_TEMPLATE_REQUIRED_SELECT_COLUMNS = ['id', 'name'] as const;
+const BOARD_TEMPLATE_OPTIONAL_COLUMNS = ['sort_order', 'body_part'] as const;
+const BOARD_COMMENT_SELECT = 'id, post_id, author_id, author_name, content, parent_comment_id, created_at';
+const BOARD_CHAT_ROOM_SELECT = 'id';
 const SCHEDULE_META_PREFIX = '[[SCHEDULE_META]]';
 const SCHEDULE_META_SUFFIX = '[[/SCHEDULE_META]]';
 const ATTACHMENTS_META_PREFIX = '[[ATTACHMENTS_META]]';
@@ -65,6 +86,38 @@ type BoardReadRow = {
 };
 
 type StaffSummary = Pick<StaffMember, 'id' | 'name' | 'company' | 'company_id' | 'department' | 'position' | 'status'>;
+type QueryResult<T> = {
+  data: T | null;
+  error: unknown;
+};
+type BoardPostRow = BoardPost & {
+  board_type?: string | null;
+  views?: number | null;
+  poll?: Record<string, unknown> | null;
+  poll_votes?: Record<string, string[]> | null;
+  is_anonymous?: boolean | null;
+  is_pinned?: boolean | null;
+};
+type BoardTemplateRow = {
+  id: string;
+  name: string;
+  sort_order?: number | null;
+  body_part?: string | null;
+};
+type BoardLikeRow = {
+  post_id?: string | null;
+};
+type BoardChatRoomRow = {
+  id: string;
+};
+
+function buildSelectColumns(
+  requiredColumns: readonly string[],
+  optionalColumns: readonly string[] = [],
+  omittedColumns?: ReadonlySet<string>,
+) {
+  return [...requiredColumns, ...optionalColumns.filter((column) => !omittedColumns?.has(column))].join(', ');
+}
 
 function inferAttachmentType(nameOrUrl: string, explicitType?: string | null) {
   const normalizedExplicitType = String(explicitType || '').trim().toLowerCase();
@@ -455,7 +508,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const [scheduleMinute, setScheduleMinute] = useState('');
   const [loading, setLoading] = useState(false);
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
-  const [comments, setComments] = useState<Record<string, Record<string, unknown>[]>>({});
+  const [comments, setComments] = useState<Record<string, BoardCommentRow[]>>({});
   const [newComment, setNewComment] = useState('');
   const [myLikedPostIds, setMyLikedPostIds] = useState<Set<string>>(new Set());
   const [postReadMap, setPostReadMap] = useState<Record<string, Set<string>>>({});
@@ -469,8 +522,8 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   );
 
   // 수술/검사명 프리셋 (Supabase surgery_templates / mri_templates)
-  const [surgeryTemplates, setSurgeryTemplates] = useState<Record<string, unknown>[]>([]);
-  const [mriTemplates, setMriTemplates] = useState<Record<string, unknown>[]>([]);
+  const [surgeryTemplates, setSurgeryTemplates] = useState<BoardTemplateRow[]>([]);
+  const [mriTemplates, setMriTemplates] = useState<BoardTemplateRow[]>([]);
 
   // 수술/MRI 부위 필터 (사람 모형: 아래팔/위팔 기준만, 손·손가락·팔꿈치 제외)
   const BODY_PARTS = [
@@ -757,13 +810,16 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       return;
     }
 
-    const { data } = await withMissingColumnFallback(
-      async () => {
-        return supabase.from('board_posts').select('*').eq('board_type', activeBoard).order('created_at', { ascending: false });
+    const { data } = await withMissingColumnsFallback<BoardPostRow[]>(
+      async (omittedColumns): Promise<QueryResult<BoardPostRow[]>> => {
+        const result = await supabase
+          .from('board_posts')
+          .select(buildSelectColumns(BOARD_POST_REQUIRED_SELECT_COLUMNS, BOARD_POST_OPTIONAL_COLUMNS, omittedColumns))
+          .eq('board_type', activeBoard)
+          .order('created_at', { ascending: false });
+        return result as unknown as QueryResult<BoardPostRow[]>;
       },
-      async () => {
-        return supabase.from('board_posts').select('*').eq('board_type', activeBoard).order('created_at', { ascending: false });
-      }
+      [...BOARD_POST_OPTIONAL_COLUMNS]
     );
     if (data) {
       if (activeBoard === '익명소리함') {
@@ -771,10 +827,10 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         if (!isAdmin) {
           setPosts([]);
         } else {
-          setPosts((data as BoardPost[]).map((post) => normalizeBoardPost(post)));
+          setPosts((data as BoardPostRow[]).map((post) => normalizeBoardPost(post)));
         }
       } else {
-        setPosts((data as BoardPost[]).map((post) => normalizeBoardPost(post)));
+        setPosts((data as BoardPostRow[]).map((post) => normalizeBoardPost(post)));
       }
     }
   };
@@ -804,8 +860,38 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     const loadTemplates = async () => {
       try {
         const [{ data: s }, { data: m }] = await Promise.all([
-          supabase.from('surgery_templates').select('*').order('sort_order', { ascending: true }),
-          supabase.from('mri_templates').select('*').order('sort_order', { ascending: true }),
+          withMissingColumnsFallback<BoardTemplateRow[]>(
+            async (omittedColumns): Promise<QueryResult<BoardTemplateRow[]>> => {
+              const selectedColumns = buildSelectColumns(
+                BOARD_TEMPLATE_REQUIRED_SELECT_COLUMNS,
+                BOARD_TEMPLATE_OPTIONAL_COLUMNS,
+                omittedColumns,
+              );
+              let query = supabase.from('surgery_templates').select(selectedColumns);
+              if (!omittedColumns.has('sort_order')) {
+                query = query.order('sort_order', { ascending: true });
+              }
+              const result = await query.order('name', { ascending: true });
+              return result as unknown as QueryResult<BoardTemplateRow[]>;
+            },
+            [...BOARD_TEMPLATE_OPTIONAL_COLUMNS],
+          ),
+          withMissingColumnsFallback<BoardTemplateRow[]>(
+            async (omittedColumns): Promise<QueryResult<BoardTemplateRow[]>> => {
+              const selectedColumns = buildSelectColumns(
+                BOARD_TEMPLATE_REQUIRED_SELECT_COLUMNS,
+                BOARD_TEMPLATE_OPTIONAL_COLUMNS,
+                omittedColumns,
+              );
+              let query = supabase.from('mri_templates').select(selectedColumns);
+              if (!omittedColumns.has('sort_order')) {
+                query = query.order('sort_order', { ascending: true });
+              }
+              const result = await query.order('name', { ascending: true });
+              return result as unknown as QueryResult<BoardTemplateRow[]>;
+            },
+            [...BOARD_TEMPLATE_OPTIONAL_COLUMNS],
+          ),
         ]);
         setSurgeryTemplates(s || []);
         setMriTemplates(m || []);
@@ -846,9 +932,9 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     const keywords = keywordMap[resolvedBodyPart] || [];
     if (keywords.length === 0) return currentTemplates;
 
-    return currentTemplates.filter((t: Record<string, unknown>) => {
+    return currentTemplates.filter((t) => {
       if (t.body_part) return t.body_part === resolvedBodyPart;
-      const name = (t.name || '') as string;
+      const name = String(t.name || '');
       return keywords.some((k) => name.includes(k));
     });
   }, [currentTemplates, resolvedBodyPart]);
@@ -861,8 +947,8 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       supabase.from('board_post_likes').select('post_id').eq('user_id', effectiveBoardUserId).then(({ data }) => {
         setMyLikedPostIds(
           new Set(
-            (data || [])
-              .map((r: any) => String(r.post_id ?? '').trim())
+            ((data || []) as BoardLikeRow[])
+              .map((row) => String(row.post_id ?? '').trim())
               .filter(Boolean)
           )
         );
@@ -910,10 +996,10 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const fetchComments = async (postId: string) => {
     const { data } = await supabase
       .from('board_post_comments')
-      .select('*')
+      .select(BOARD_COMMENT_SELECT)
       .eq('post_id', postId)
       .order('created_at', { ascending: true });
-    setComments((prev) => ({ ...prev, [postId]: data || [] }));
+    setComments((prev) => ({ ...prev, [postId]: (data || []) as BoardCommentRow[] }));
   };
 
   // 상세 게시글이 변경될 때 자동으로 댓글 불러오기
@@ -936,9 +1022,9 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     try {
       const { data: existing } = await supabase
         .from('chat_rooms')
-        .select('*')
+        .select(BOARD_CHAT_ROOM_SELECT)
         .eq('name', roomName)
-        .maybeSingle();
+        .maybeSingle() as unknown as { data: BoardChatRoomRow | null };
       let roomId = existing?.id;
       if (!roomId) {
         const { data: created, error } = await supabase
@@ -950,8 +1036,8 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
               members: [effectiveBoardUserId],
             },
           ])
-          .select()
-          .single();
+          .select(BOARD_CHAT_ROOM_SELECT)
+          .single() as unknown as { data: BoardChatRoomRow | null; error: unknown };
         if (error || !created) {
           toast('관련 채팅방 생성 중 오류가 발생했습니다.', 'error');
           return;
@@ -1050,7 +1136,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       return;
     }
     if (data) {
-      setComments((prev) => ({ ...prev, [postId]: [...(prev[postId] || []), data] }));
+      setComments((prev) => ({ ...prev, [postId]: [...(prev[postId] || []), data as BoardCommentRow] }));
       setNewComment('');
       setReplyParentId(null);
     } else {
@@ -1061,7 +1147,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const handleDeleteComment = async (postId: string, commentId: string) => {
     if (!effectiveBoardUserId) return;
     const list = comments[postId] || [];
-    const comment = list.find((c: Record<string, unknown>) => c.id === commentId);
+    const comment = list.find((c) => c.id === commentId);
     if (!comment) return;
     const isSysAdmin = isPrivilegedUser(user);
     if (String(comment.author_id) !== effectiveBoardUserId && !isSysAdmin) {
@@ -1079,7 +1165,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     }
     setComments((prev) => {
       const postComments = (prev[postId] || []).filter(
-        (c: Record<string, unknown>) => c.id !== commentId && String(c.parent_comment_id) !== String(commentId)
+        (c) => c.id !== commentId && String(c.parent_comment_id) !== String(commentId)
       );
       return { ...prev, [postId]: postComments };
     });
@@ -1097,7 +1183,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const [selectedPostDetail, setSelectedPostDetail] = useState<BoardPost | null>(null);
   const selectedPost = selectedPostDetail || selectedPostFromList;
   const selectedPostComments = useMemo(
-    () => (selectedPost ? ((comments[selectedPost.id] || []) as BoardCommentRow[]) : []),
+    () => (selectedPost ? comments[selectedPost.id] || [] : []),
     [comments, selectedPost]
   );
   const selectedPostCommentTree = useMemo(() => {
@@ -1149,7 +1235,17 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       return;
     }
     (async () => {
-      const { data } = await supabase.from('board_posts').select('*').eq('id', selectedPostId).maybeSingle();
+      const { data } = await withMissingColumnsFallback<BoardPostRow>(
+        async (omittedColumns): Promise<QueryResult<BoardPostRow>> => {
+          const result = await supabase
+            .from('board_posts')
+            .select(buildSelectColumns(BOARD_POST_REQUIRED_SELECT_COLUMNS, BOARD_POST_OPTIONAL_COLUMNS, omittedColumns))
+            .eq('id', selectedPostId)
+            .maybeSingle();
+          return result as unknown as QueryResult<BoardPostRow>;
+        },
+        [...BOARD_POST_OPTIONAL_COLUMNS],
+      );
       if (data) {
         const normalized = normalizeBoardPost(data);
         if (!isScheduledNoticePending(normalized, noticeVisibilityTick) || canScheduleNoticePost) {
@@ -1765,9 +1861,9 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                             ? '자주 쓰는 수술명 선택 (부위 선택 또는 사람 모형에서 선택 가능)'
                             : '자주 쓰는 검사명 선택 (부위 선택 또는 사람 모형에서 선택 가능)'}
                         </option>
-                        {filteredTemplates.map((t: Record<string, unknown>) => (
-                          <option key={t.id as React.Key} value={t.name as string}>
-                            { t.name as string }
+                        {filteredTemplates.map((t) => (
+                          <option key={t.id} value={t.name}>
+                            {t.name}
                           </option>
                         ))}
                       </select>
@@ -2306,18 +2402,18 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                       </p>
                     ) : (
                       <ul className="space-y-1">
-                        {filteredTemplates.map((t: Record<string, unknown>) => (
-                          <li key={t.id as React.Key}>
+                        {filteredTemplates.map((t) => (
+                          <li key={t.id}>
                             <button
                               type="button"
                               onClick={() => {
-                                setTitle(t.name as string);
+                                setTitle(t.name || '');
                                 setShowBodyPicker(false);
                               }}
                               className="w-full text-left px-3 py-2 rounded-[var(--radius-md)] text-[12px] font-bold text-[var(--foreground)] hover:bg-[var(--card)] hover:shadow-sm flex items-center gap-2"
                             >
                               <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
-                              <span className="flex-1 truncate">{ t.name as string }</span>
+                              <span className="flex-1 truncate">{t.name}</span>
                             </button>
                           </li>
                         ))}

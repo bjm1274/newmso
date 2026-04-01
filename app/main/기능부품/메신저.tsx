@@ -5,7 +5,13 @@ import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { bindPageRefresh } from '@/lib/realtime-maintenance';
-import { CHAT_MESSAGE_SELECT, CHAT_ROOM_SELECT, POLL_SELECT } from '@/lib/chat-query-columns';
+import {
+  buildChatMessageSelect,
+  CHAT_MESSAGE_OPTIONAL_COLUMNS,
+  CHAT_MESSAGE_SELECT,
+  CHAT_ROOM_SELECT,
+  POLL_SELECT,
+} from '@/lib/chat-query-columns';
 import SmartDatePicker from './공통/SmartDatePicker';
 import { buildMessengerImageAlt, MessengerAvatar, MessengerStatusUserRow } from './메신저공통';
 import type { StaffMember, ChatRoom, ChatMessage } from '@/types';
@@ -44,6 +50,15 @@ const CHAT_PINNED_ROOM_ORDER_KEY = 'erp_chat_pinned_room_order';
 // 현재 `messages` 기반 채팅과 직접 호환되지 않는다. 읽음 계산은
 // `room_read_cursors`로 이미 처리하므로, 충돌만 일으키는 legacy 쓰기는 비활성화한다.
 const MESSAGE_READ_WRITES_ENABLED = false;
+
+async function selectChatMessagesWithFallback<TData>(
+  execute: (selectClause: string) => PromiseLike<{ data: TData | null; error: unknown }>,
+) {
+  return withMissingColumnsFallback<TData>(
+    (omittedColumns) => execute(buildChatMessageSelect(omittedColumns)),
+    [...CHAT_MESSAGE_OPTIONAL_COLUMNS],
+  );
+}
 
 function sortChatRoomsWithNoticeFirst(rooms: ChatRoom[]): ChatRoom[] {
   const notice = rooms.find(( r: ChatRoom) => r.id === NOTICE_ROOM_ID);
@@ -2278,11 +2293,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
-        const { data } = (await supabase
-          .from('messages')
-          .select(CHAT_MESSAGE_SELECT)
-          .eq('id', targetMessageId)
-          .maybeSingle()) as { data: ChatMessage | null; error: unknown };
+        const { data } = await selectChatMessagesWithFallback<ChatMessage>((selectClause) =>
+          supabase
+            .from('messages')
+            .select(selectClause)
+            .eq('id', targetMessageId)
+            .maybeSingle() as PromiseLike<{ data: ChatMessage | null; error: unknown }>
+        );
         if (data) return data;
       } catch {
         // ignore and retry below
@@ -2431,12 +2448,21 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       )
     );
 
-    const query = supabase
-      .from('messages')
-      .select(CHAT_MESSAGE_SELECT)
-      .in('room_id', roomIdsToLoad)
-      .order('created_at', { ascending: true });
-    const { data: msgs } = (await query) as { data: ChatMessage[] | null; error: unknown };
+    const { data: msgs, error: messagesError } = await selectChatMessagesWithFallback<ChatMessage[]>(
+      (selectClause) =>
+        supabase
+          .from('messages')
+          .select(selectClause)
+          .in('room_id', roomIdsToLoad)
+          .order('created_at', { ascending: true }) as PromiseLike<{
+            data: ChatMessage[] | null;
+            error: unknown;
+          }>
+    );
+    if (messagesError) {
+      console.error('채팅 메시지 불러오기 실패:', messagesError);
+      return;
+    }
     if (msgs) {
       const enrichedMessages = msgs.map((msg: ChatMessage) => {
         const matchedStaff = resolveStaffProfile(msg.sender_id);
@@ -2529,10 +2555,16 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         });
         const missingPinnedIds = nextPinnedIds.filter((messageId) => !pinnedLookup.has(messageId));
         if (missingPinnedIds.length > 0) {
-          const { data: pinnedRows, error: pinnedRowsError } = (await supabase
-            .from('messages')
-            .select(CHAT_MESSAGE_SELECT)
-            .in('id', missingPinnedIds)) as { data: ChatMessage[] | null; error: unknown };
+          const { data: pinnedRows, error: pinnedRowsError } = await selectChatMessagesWithFallback<ChatMessage[]>(
+            (selectClause) =>
+              supabase
+                .from('messages')
+                .select(selectClause)
+                .in('id', missingPinnedIds) as PromiseLike<{
+                  data: ChatMessage[] | null;
+                  error: unknown;
+                }>
+          );
           if (pinnedRowsError) throw pinnedRowsError;
           (pinnedRows || []).forEach((msg: ChatMessage) => {
             pinnedLookup.set(String(msg.id), {
@@ -4436,14 +4468,29 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         return;
       }
       // 대화내용 + 파일URL(파일명·사진명) 통합 OR 검색
-      const { data, error } = (await supabase
-        .from('messages')
-        .select(CHAT_MESSAGE_SELECT)
-        .in('room_id', visibleRoomIds)
-        .eq('is_deleted', false)
-        .or(`content.ilike.%${q}%,file_url.ilike.%${q}%`)
-        .order('created_at', { ascending: false })
-        .limit(100)) as { data: ChatMessage[] | null; error: unknown };
+      const { data, error } = await withMissingColumnsFallback<ChatMessage[]>(
+        (omittedColumns) => {
+          const searchableColumns = ['content'];
+          if (!omittedColumns.has('file_url')) {
+            searchableColumns.push('file_url');
+          }
+
+          let query = supabase
+            .from('messages')
+            .select(buildChatMessageSelect(omittedColumns))
+            .in('room_id', visibleRoomIds)
+            .or(searchableColumns.map((column) => `${column}.ilike.%${q}%`).join(','))
+            .order('created_at', { ascending: false })
+            .limit(100);
+
+          if (!omittedColumns.has('is_deleted')) {
+            query = query.eq('is_deleted', false);
+          }
+
+          return query as PromiseLike<{ data: ChatMessage[] | null; error: unknown }>;
+        },
+        [...CHAT_MESSAGE_OPTIONAL_COLUMNS],
+      );
 
       if (error) throw error;
       const messageRows = Array.isArray(data) ? data : [];
