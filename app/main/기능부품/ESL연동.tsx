@@ -20,9 +20,9 @@ type RoomBoardDraft = {
   roomNumber: string;
   roomTitle: string;
   wardLabel: string;
-  headerNote: string;
-  templateName: string;
   deviceId: string;
+  templateName: string;
+  headerNote: string;
   updatedAt: string | null;
   patientSlots: RoomBoardPatientSlot[];
 };
@@ -52,11 +52,6 @@ const WOLINK_OPTIONAL_SERVICE_UUIDS = [
   '3e3d1158-5656-4217-b715-266f37eb5000',
 ] as const;
 
-function todayKey() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-}
-
 function compareDateKeys(left?: string | null, right?: string | null) {
   return String(left || '').localeCompare(String(right || ''), 'ko-KR', {
     numeric: true,
@@ -68,11 +63,11 @@ function buildRoomDraft(room: HandoverRoomConfig, previous?: RoomBoardDraft | nu
   const previousSlots = new Map((previous?.patientSlots || []).map((slot) => [slot.bedNumber, slot]));
   return {
     roomNumber: room.roomNumber,
-    roomTitle: previous?.roomTitle || `${room.roomNumber}호 입원환자 정보`,
+    roomTitle: previous?.roomTitle || '',
     wardLabel: previous?.wardLabel || '',
-    headerNote: previous?.headerNote || '',
-    templateName: previous?.templateName || '',
     deviceId: previous?.deviceId || '',
+    templateName: previous?.templateName || '',
+    headerNote: previous?.headerNote || '',
     updatedAt: previous?.updatedAt || null,
     patientSlots: room.beds.map((bed) => {
       const existing = previousSlots.get(bed.bedNumber);
@@ -90,11 +85,7 @@ function buildRoomSummaryText(draft: RoomBoardDraft) {
   const lines = [
     '[병실 안내판 전송 메모]',
     `병실: ${draft.roomNumber}호`,
-    `제목: ${draft.roomTitle || '-'}`,
-    `병동/부서: ${draft.wardLabel || '-'}`,
-    `레이아웃 메모: ${draft.templateName || '-'}`,
     `기기 바코드: ${draft.deviceId || '-'}`,
-    draft.headerNote ? `상단 메모: ${draft.headerNote}` : '',
     '',
     ...draft.patientSlots.map((slot) => {
       const parts = [
@@ -113,10 +104,6 @@ function buildRoomJson(draft: RoomBoardDraft) {
   return JSON.stringify(
     {
       roomNumber: draft.roomNumber,
-      roomTitle: draft.roomTitle,
-      wardLabel: draft.wardLabel,
-      headerNote: draft.headerNote,
-      templateName: draft.templateName,
       deviceId: draft.deviceId,
       updatedAt: draft.updatedAt,
       patients: draft.patientSlots,
@@ -136,7 +123,8 @@ async function copyText(text: string, successMessage: string) {
 }
 
 export default function ZhsunycoEslSync(_props: Props) {
-  const [selectedDate, setSelectedDate] = useState(todayKey);
+  const permissionMap = (_props.user?.permissions as Record<string, unknown> | undefined) || undefined;
+  const canManageDeviceRegistration = Boolean(_props.user?.role === 'admin' || permissionMap?.admin === true || permissionMap?.mso === true);
   const [rooms, setRooms] = useState<HandoverRoomConfig[]>([]);
   const [roomDrafts, setRoomDrafts] = useState<Record<string, RoomBoardDraft>>({});
   const [selectedRoomNumber, setSelectedRoomNumber] = useState('');
@@ -188,8 +176,7 @@ export default function ZhsunycoEslSync(_props: Props) {
       });
 
       const matched = Array.from(latestByDate.values())
-        .sort((left, right) => compareDateKeys(right.dateKey, left.dateKey))
-        .find((snapshot) => compareDateKeys(snapshot.dateKey, selectedDate) <= 0);
+        .sort((left, right) => compareDateKeys(right.dateKey, left.dateKey))[0];
 
       const nextRooms = matched?.rooms || [];
       setRooms(nextRooms);
@@ -207,7 +194,7 @@ export default function ZhsunycoEslSync(_props: Props) {
     } finally {
       setLoadingRooms(false);
     }
-  }, [selectedDate]);
+  }, []);
 
   useEffect(() => {
     void loadRooms();
@@ -224,7 +211,7 @@ export default function ZhsunycoEslSync(_props: Props) {
   const selectedRoom = useMemo(() => rooms.find((room) => room.roomNumber === selectedRoomNumber) || null, [rooms, selectedRoomNumber]);
   const selectedDraft = useMemo(() => (selectedRoomNumber ? roomDrafts[selectedRoomNumber] || null : null), [roomDrafts, selectedRoomNumber]);
   const preparedRooms = useMemo(
-    () => rooms.map((room) => roomDrafts[room.roomNumber]).filter((draft): draft is RoomBoardDraft => Boolean(draft)).filter((draft) => draft.updatedAt || draft.templateName.trim() || draft.deviceId.trim()),
+    () => rooms.map((room) => roomDrafts[room.roomNumber]).filter((draft): draft is RoomBoardDraft => Boolean(draft)).filter((draft) => Boolean(draft.updatedAt)),
     [roomDrafts, rooms],
   );
 
@@ -252,6 +239,40 @@ export default function ZhsunycoEslSync(_props: Props) {
     }));
     toast('인계노트 기준 환자 정보를 다시 채웠습니다.', 'success');
   }, [selectedRoom]);
+
+  const registerSelectedRoomDevice = useCallback(() => {
+    if (!selectedDraft) return;
+    if (!canManageDeviceRegistration) {
+      toast('기기 바코드는 관리자만 등록할 수 있습니다.', 'error');
+      return;
+    }
+
+    const suggestedValue = String(bleDeviceName || bleDeviceId || selectedDraft.deviceId || '').trim();
+    const input = window.prompt(`${selectedDraft.roomNumber}호에 연결할 기기 바코드를 입력해 주세요.`, suggestedValue);
+    if (input === null) return;
+
+    const nextValue = input.trim();
+    if (!nextValue) {
+      toast('기기 바코드를 입력해 주세요.', 'error');
+      return;
+    }
+
+    updateSelectedDraft((draft) => ({ ...draft, deviceId: nextValue }));
+    toast(`${selectedDraft.roomNumber}호 기기 바코드를 등록했습니다.`, 'success');
+  }, [bleDeviceId, bleDeviceName, canManageDeviceRegistration, selectedDraft, updateSelectedDraft]);
+
+  const clearSelectedRoomDevice = useCallback(() => {
+    if (!selectedDraft) return;
+    if (!canManageDeviceRegistration) {
+      toast('기기 바코드는 관리자만 삭제할 수 있습니다.', 'error');
+      return;
+    }
+    if (!selectedDraft.deviceId.trim()) return;
+    if (!window.confirm(`${selectedDraft.roomNumber}호에 등록된 기기 바코드를 삭제할까요?`)) return;
+
+    updateSelectedDraft((draft) => ({ ...draft, deviceId: '' }));
+    toast(`${selectedDraft.roomNumber}호 기기 바코드를 삭제했습니다.`, 'success');
+  }, [canManageDeviceRegistration, selectedDraft, updateSelectedDraft]);
 
   const markSelectedRoomPrepared = useCallback(() => {
     if (!selectedDraft) return;
@@ -330,13 +351,6 @@ export default function ZhsunycoEslSync(_props: Props) {
       setBleServices(snapshots);
       setBleStatus(`BLE 연결 완료: ${device.name || device.id}`);
 
-      if (selectedRoomNumber) {
-        updateSelectedDraft((draft) => ({
-          ...draft,
-          deviceId: String(device.name || device.id || draft.deviceId),
-        }));
-      }
-
       toast('BLE 기기 스캔과 연결에 성공했습니다.', 'success');
       device.gatt?.disconnect();
     } catch (error) {
@@ -347,143 +361,91 @@ export default function ZhsunycoEslSync(_props: Props) {
     } finally {
       setBleBusy(false);
     }
-  }, [selectedRoomNumber, updateSelectedDraft]);
+  }, []);
 
   return (
     <div className="space-y-4">
-      <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <h2 className="text-lg font-bold text-[var(--foreground)]">입원실 안내판 ESL 준비</h2>
-          <label className="space-y-1">
-            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">병실 기준 날짜</span>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(event) => setSelectedDate(event.target.value)}
-              className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
-            />
-          </label>
-        </div>
+      <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] px-5 py-4 shadow-sm">
+        <h2 className="text-lg font-bold text-[var(--foreground)]">입원실 안내판 ESL 준비</h2>
       </section>
 
-      <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h3 className="text-base font-bold text-[var(--foreground)]">PC BLE 기기 스캔</h3>
-            <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
-              프로그램 안에서 ESL 기기를 직접 찾는 첫 단계입니다. 스캔한 기기가 있으면 현재 선택 병실의 기기칸에 자동으로
-              채워집니다.
-            </p>
-          </div>
+      <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-base font-bold text-[var(--foreground)]">PC BLE 기기 스캔</h3>
           <button
             type="button"
             onClick={() => void handleBleScan()}
             disabled={bleBusy}
-            className="rounded-[var(--radius-md)] bg-slate-900 px-4 py-2 text-[12px] font-semibold text-white disabled:opacity-60"
+            className="rounded-[var(--radius-md)] bg-slate-900 px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60"
           >
             {bleBusy ? '스캔 중...' : 'BLE 기기 스캔'}
           </button>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/15 p-4">
+        <div className="mt-3 grid gap-2 md:grid-cols-4">
+          <div className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/15 px-3 py-2.5">
             <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">상태</div>
-            <div className="mt-2 text-sm font-semibold text-[var(--foreground)]">{bleStatus}</div>
+            <div className="mt-1 text-sm font-semibold text-[var(--foreground)]">{bleStatus}</div>
           </div>
-          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/15 p-4">
+          <div className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/15 px-3 py-2.5">
             <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">기기 이름</div>
-            <div className="mt-2 break-all text-sm font-semibold text-[var(--foreground)]">{bleDeviceName || '-'}</div>
+            <div className="mt-1 break-all text-sm font-semibold text-[var(--foreground)]">{bleDeviceName || '-'}</div>
           </div>
-          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/15 p-4">
+          <div className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/15 px-3 py-2.5">
             <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">브라우저 기기 ID</div>
-            <div className="mt-2 break-all text-sm font-semibold text-[var(--foreground)]">{bleDeviceId || '-'}</div>
+            <div className="mt-1 break-all text-sm font-semibold text-[var(--foreground)]">{bleDeviceId || '-'}</div>
           </div>
-        </div>
-
-        <div className="mt-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/10 p-4">
-          <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">발견한 서비스 / 특성</div>
-          {bleServices.length === 0 ? (
-            <div className="mt-2 text-sm text-[var(--toss-gray-3)]">아직 연결된 BLE 서비스 정보가 없습니다.</div>
-          ) : (
-            <div className="mt-3 space-y-3">
-              {bleServices.map((service) => (
-                <div key={service.uuid} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-3">
-                  <div className="text-[12px] font-bold text-[var(--foreground)]">{service.uuid}</div>
-                  <div className="mt-2 space-y-1 text-[11px] text-[var(--toss-gray-3)]">
-                    {service.characteristics.map((characteristic) => (
-                      <div key={characteristic.uuid}>
-                        {characteristic.uuid}
-                        {characteristic.properties.length > 0 ? ` · ${characteristic.properties.join(', ')}` : ''}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-        <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="text-base font-bold text-[var(--foreground)]">병실 목록</h3>
-            <span className="rounded-full bg-[var(--muted)] px-3 py-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">
-              {rooms.length}개
-            </span>
-          </div>
-
-          <div className="mt-4 space-y-2">
-            {loadingRooms ? (
-              <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-4 py-6 text-sm text-[var(--toss-gray-3)]">
-                병실 데이터를 불러오는 중입니다.
-              </div>
-            ) : rooms.length === 0 ? (
-              <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-4 py-6 text-sm text-[var(--toss-gray-3)]">
-                선택한 날짜 기준 병실 설정이 없습니다.
-              </div>
+          <div className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/10 px-3 py-2.5">
+            <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">서비스 / 특성</div>
+            {bleServices.length === 0 ? (
+              <div className="mt-1 text-sm text-[var(--toss-gray-3)]">아직 연결 정보 없음</div>
             ) : (
-              rooms.map((room) => {
-                const draft = roomDrafts[room.roomNumber];
-                const selected = room.roomNumber === selectedRoomNumber;
-                return (
-                  <button
-                    key={room.roomNumber}
-                    type="button"
-                    onClick={() => setSelectedRoomNumber(room.roomNumber)}
-                    className={`w-full rounded-[var(--radius-lg)] border px-3 py-3 text-left transition ${
-                      selected ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/35' : 'border-[var(--border)] bg-[var(--muted)]/20'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-bold text-[var(--foreground)]">{room.roomNumber}호</span>
-                      <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">{room.capacity}병상</span>
+              <div className="mt-1 max-h-20 space-y-1 overflow-y-auto text-[11px] text-[var(--toss-gray-3)]">
+                {bleServices.map((service) => (
+                  <div key={service.uuid} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1.5">
+                    <div className="truncate font-semibold text-[var(--foreground)]">{service.uuid}</div>
+                    <div className="mt-0.5 space-y-0.5">
+                      {service.characteristics.map((characteristic) => (
+                        <div key={characteristic.uuid} className="truncate">
+                          {characteristic.uuid}
+                          {characteristic.properties.length > 0 ? ` · ${characteristic.properties.join(', ')}` : ''}
+                        </div>
+                      ))}
                     </div>
-                    <div className="mt-2 space-y-1 text-[11px] text-[var(--toss-gray-3)]">
-                      <div>레이아웃: {draft?.templateName || '-'}</div>
-                      <div>기기: {draft?.deviceId || '-'}</div>
-                      <div>
-                        환자: {room.beds.filter((bed) => String(bed.patientName || '').trim()).length}/{room.capacity}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>
+      </section>
 
-        <div className="space-y-4">
+      <section className="space-y-4">
           <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h3 className="text-base font-bold text-[var(--foreground)]">병실 데이터 편집</h3>
-                <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
-                  7.5인치 안내판 기준으로 환자 정보는 이름, 나이, 성별만 정리합니다. 이름은 인계노트에서 가져오고 나이와
-                  성별은 여기서 직접 입력하면 됩니다.
-                </p>
               </div>
               <div className="flex flex-wrap gap-2">
+                {canManageDeviceRegistration ? (
+                  <button
+                    type="button"
+                    onClick={registerSelectedRoomDevice}
+                    disabled={!selectedDraft}
+                    className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] disabled:opacity-60"
+                  >
+                    기기바코드 등록
+                  </button>
+                ) : null}
+                {canManageDeviceRegistration && selectedDraft?.deviceId ? (
+                  <button
+                    type="button"
+                    onClick={clearSelectedRoomDevice}
+                    className="rounded-[var(--radius-md)] border border-red-200 bg-red-500/5 px-3 py-2 text-[12px] font-semibold text-red-600"
+                  >
+                    기기바코드 삭제
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={resetSelectedRoomFromSource}
@@ -503,47 +465,44 @@ export default function ZhsunycoEslSync(_props: Props) {
               </div>
             </div>
 
+            <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
+              <label className="space-y-1">
+                <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">병실 선택</span>
+                <select
+                  value={selectedRoomNumber}
+                  onChange={(event) => setSelectedRoomNumber(event.target.value)}
+                  disabled={loadingRooms || rooms.length === 0}
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm disabled:opacity-60"
+                >
+                  {loadingRooms ? <option value="">병실 불러오는 중...</option> : null}
+                  {!loadingRooms && rooms.length === 0 ? <option value="">등록된 병실 없음</option> : null}
+                  {!loadingRooms &&
+                    rooms.map((room) => (
+                      <option key={room.roomNumber} value={room.roomNumber}>
+                        {room.roomNumber}호 · {room.capacity}병상
+                      </option>
+                    ))}
+                </select>
+              </label>
+
+              {selectedRoom ? (
+                <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/15 px-3 py-2 text-[12px] text-[var(--toss-gray-3)]">
+                  <div className="font-semibold text-[var(--foreground)]">{selectedRoom.roomNumber}호</div>
+                  <div className="mt-1">
+                    환자 {selectedRoom.beds.filter((bed) => String(bed.patientName || '').trim()).length}/{selectedRoom.capacity}
+                    명
+                  </div>
+                  <div className="mt-1 break-all">기기 바코드 {selectedDraft?.deviceId || '미등록'}</div>
+                </div>
+              ) : null}
+            </div>
+
             {!selectedDraft ? (
               <div className="mt-4 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-4 py-8 text-sm text-[var(--toss-gray-3)]">
-                왼쪽에서 병실을 선택해 주세요.
+                {loadingRooms ? '병실 데이터를 불러오는 중입니다.' : '편집할 병실을 선택해 주세요.'}
               </div>
             ) : (
               <div className="mt-4 space-y-4">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <input
-                    value={selectedDraft.roomTitle}
-                    onChange={(event) => updateSelectedDraft((draft) => ({ ...draft, roomTitle: event.target.value }))}
-                    placeholder="안내판 제목"
-                    className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
-                  />
-                  <input
-                    value={selectedDraft.wardLabel}
-                    onChange={(event) => updateSelectedDraft((draft) => ({ ...draft, wardLabel: event.target.value }))}
-                    placeholder="병동 / 부서"
-                    className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
-                  />
-                  <input
-                    value={selectedDraft.deviceId}
-                    onChange={(event) => updateSelectedDraft((draft) => ({ ...draft, deviceId: event.target.value }))}
-                    placeholder="기기 바코드"
-                    className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
-                  />
-                  <input
-                    value={selectedDraft.templateName}
-                    onChange={(event) => updateSelectedDraft((draft) => ({ ...draft, templateName: event.target.value }))}
-                    placeholder="레이아웃 메모(선택)"
-                    className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
-                  />
-                </div>
-
-                <textarea
-                  value={selectedDraft.headerNote}
-                  onChange={(event) => updateSelectedDraft((draft) => ({ ...draft, headerNote: event.target.value }))}
-                  rows={2}
-                  placeholder="상단 메모"
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
-                />
-
                 <div className="grid gap-3 lg:grid-cols-2">
                   {selectedDraft.patientSlots.map((slot, index) => (
                     <div
@@ -616,9 +575,9 @@ export default function ZhsunycoEslSync(_props: Props) {
                   <div key={draft.roomNumber} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/20 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <div className="text-sm font-bold text-[var(--foreground)]">{draft.roomNumber}호 · {draft.roomTitle}</div>
+                        <div className="text-sm font-bold text-[var(--foreground)]">{draft.roomNumber}호</div>
                         <div className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
-                          레이아웃 {draft.templateName || '-'} / 기기 {draft.deviceId || '-'}
+                          기기 {draft.deviceId || '-'}
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -667,7 +626,6 @@ export default function ZhsunycoEslSync(_props: Props) {
               </div>
             )}
           </section>
-        </div>
       </section>
 
     </div>
