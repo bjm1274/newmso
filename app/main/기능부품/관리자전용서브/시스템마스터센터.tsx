@@ -1,7 +1,12 @@
 ﻿'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AnnualLeaveManualGrant from './연차수동부여';
+import {
+  getFlaggedChatRooms,
+  includesBannedWord,
+  pickFirstFlaggedChatMessage,
+} from '@/lib/system-master-chat-filter';
 import { SYSTEM_MASTER_ACCOUNT_ID, hasSystemMasterPermission } from '@/lib/system-master';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
@@ -16,7 +21,6 @@ function loadBannedWords(): string[] {
   try { const r = localStorage.getItem(BANNED_WORDS_KEY); return r ? JSON.parse(r) : DEFAULT_BANNED; } catch { return DEFAULT_BANNED; }
 }
 function saveBannedWords(words: string[]) { localStorage.setItem(BANNED_WORDS_KEY, JSON.stringify(words)); }
-function hasBanned(content: string, banned: string[]) { const l = content.toLowerCase(); return banned.some((w) => l.includes(w.toLowerCase())); }
 function highlightBanned(content: string, banned: string[]): React.ReactNode[] {
   if (!banned.length) return [content];
   const pattern = banned.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
@@ -303,6 +307,8 @@ type SystemMasterActionId =
   | 'run_todo_reminders'
   | 'cleanup_push_subscriptions';
 
+const CHAT_FETCH_LIMIT = '500';
+
 function formatCurrency(value: unknown) {
   const amount = Number(value || 0);
   return `${amount.toLocaleString('ko-KR')}원`;
@@ -375,6 +381,7 @@ export default function SystemMasterCenter({
   const [auditLogs, setAuditLogs] = useState<SystemMasterAuditLog[]>([]);
   const [permissionDiffLogs, setPermissionDiffLogs] = useState<SystemMasterPermissionDiffLog[]>([]);
   const [chatRooms, setChatRooms] = useState<SystemMasterChatRoom[]>([]);
+  const [chatCatalogMessages, setChatCatalogMessages] = useState<SystemMasterChatMessage[]>([]);
   const [chatMessages, setChatMessages] = useState<SystemMasterChatMessage[]>([]);
   const [integrityReport, setIntegrityReport] = useState<SystemMasterIntegrityPayload | null>(null);
   const [auditCategory, setAuditCategory] = useState('all');
@@ -390,6 +397,8 @@ export default function SystemMasterCenter({
   const [deletingMsgId, setDeletingMsgId] = useState<string | null>(null);
   const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null);
   const [opsActionLoading, setOpsActionLoading] = useState<string>('');
+  const [chatJumpTarget, setChatJumpTarget] = useState<{ messageId: string; roomId: string } | null>(null);
+  const chatMessageRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
 
   const systemMasterUser =
     typeof user === 'object' && user !== null ? (user as SystemMasterUser) : null;
@@ -484,18 +493,30 @@ export default function SystemMasterCenter({
     setLoading(true);
     setError('');
     try {
-      const query = new URLSearchParams({
+      const catalogQuery = new URLSearchParams({
         scope: 'chats',
         keyword: chatKeyword,
-        limit: '200',
+        limit: CHAT_FETCH_LIMIT,
+      });
+      const roomQuery = new URLSearchParams({
+        scope: 'chats',
+        keyword: chatKeyword,
+        limit: CHAT_FETCH_LIMIT,
       });
       if (selectedRoomId) {
-        query.set('roomId', selectedRoomId);
+        roomQuery.set('roomId', selectedRoomId);
       }
 
-      const payload = await readJson<SystemMasterChatsPayload>(`/api/admin/system-master?${query.toString()}`);
-      setChatRooms(payload.rooms || []);
-      setChatMessages(payload.messages || []);
+      const [catalogPayload, roomPayload] = await Promise.all([
+        readJson<SystemMasterChatsPayload>(`/api/admin/system-master?${catalogQuery.toString()}`),
+        selectedRoomId
+          ? readJson<SystemMasterChatsPayload>(`/api/admin/system-master?${roomQuery.toString()}`)
+          : Promise.resolve<SystemMasterChatsPayload | null>(null),
+      ]);
+
+      setChatRooms(catalogPayload.rooms || []);
+      setChatCatalogMessages(catalogPayload.messages || []);
+      setChatMessages(roomPayload?.messages || catalogPayload.messages || []);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : '채팅 내역을 불러오지 못했습니다.');
     } finally {
@@ -557,17 +578,6 @@ export default function SystemMasterCenter({
     void loadIntegrityReport();
   }, [activeTab, isSystemMaster, loadIntegrityReport]);
 
-  useEffect(() => {
-    if (chatRooms.length === 0) {
-      if (selectedRoomId) setSelectedRoomId('');
-      return;
-    }
-
-    if (!selectedRoomId || !chatRooms.some((room) => room.id === selectedRoomId)) {
-      setSelectedRoomId(chatRooms[0].id);
-    }
-  }, [chatRooms, selectedRoomId]);
-
   const handleDeleteRoom = useCallback(async (room: SystemMasterChatRoom) => {
     if (!room?.id) return;
     if (!confirm(`"${room.room_label || '채팅방'}" 채팅방 자체를 삭제하시겠습니까?\n대화내역과 관련 데이터도 함께 삭제됩니다.`)) {
@@ -586,6 +596,7 @@ export default function SystemMasterCenter({
       }
 
       setChatRooms((prev) => prev.filter((item) => item.id !== room.id));
+      setChatCatalogMessages((prev) => prev.filter((message) => message.room_id !== room.id));
       setChatMessages((prev) => prev.filter((message) => message.room_id !== room.id));
       setSelectedRoomId((prev) => (prev === room.id ? '' : prev));
       toast('채팅방을 삭제했습니다.', 'success');
@@ -639,17 +650,65 @@ export default function SystemMasterCenter({
   );
 
   const flaggedChatMessageCount = useMemo(
-    () => chatMessages.filter((message) => message.content && hasBanned(message.content, bannedWords)).length,
-    [chatMessages, bannedWords],
+    () => chatCatalogMessages.filter((message) => includesBannedWord(message.content, bannedWords)).length,
+    [bannedWords, chatCatalogMessages],
+  );
+
+  const visibleChatRooms = useMemo(
+    () => (
+      showFlaggedOnly
+        ? getFlaggedChatRooms(chatRooms, chatCatalogMessages, bannedWords)
+        : chatRooms
+    ),
+    [bannedWords, chatCatalogMessages, chatRooms, showFlaggedOnly],
   );
 
   const visibleChatMessages = useMemo(
     () =>
       chatMessages.filter(
-        (message) => !showFlaggedOnly || (message.content && hasBanned(message.content, bannedWords)),
+        (message) => !showFlaggedOnly || includesBannedWord(message.content, bannedWords),
       ),
     [bannedWords, chatMessages, showFlaggedOnly],
   );
+
+  useEffect(() => {
+    if (visibleChatRooms.length === 0) {
+      if (selectedRoomId) setSelectedRoomId('');
+      return;
+    }
+
+    if (!selectedRoomId || !visibleChatRooms.some((room) => room.id === selectedRoomId)) {
+      setSelectedRoomId(visibleChatRooms[0].id);
+    }
+  }, [selectedRoomId, visibleChatRooms]);
+
+  useEffect(() => {
+    const targetMessageId = String(chatJumpTarget?.messageId || '').trim();
+    if (!targetMessageId) return;
+    if (!visibleChatMessages.some((message) => message.id === targetMessageId)) return;
+
+    const row = chatMessageRowRefs.current[targetMessageId];
+    if (!row) return;
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [chatJumpTarget, visibleChatMessages]);
+
+  const handleFocusFlaggedChats = useCallback(() => {
+    const target = pickFirstFlaggedChatMessage(chatCatalogMessages, bannedWords);
+    if (!target) {
+      toast('필터 단어가 포함된 채팅이 없습니다.', 'warning');
+      return;
+    }
+
+    const nextRoomId = String(target.room_id || '').trim();
+    const nextMessageId = String(target.id || '').trim();
+    setShowFlaggedOnly(true);
+    if (nextRoomId) {
+      setSelectedRoomId(nextRoomId);
+    }
+    if (nextRoomId && nextMessageId) {
+      setChatJumpTarget({ roomId: nextRoomId, messageId: nextMessageId });
+    }
+  }, [bannedWords, chatCatalogMessages]);
 
   const summaryCards = useMemo(() => {
     if (!overview?.summary) return [];
@@ -1223,24 +1282,32 @@ export default function SystemMasterCenter({
           <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-base font-bold text-[var(--foreground)]">채팅방 목록</h3>
-              <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">{chatRooms.length}개</span>
+              <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                {showFlaggedOnly ? `${visibleChatRooms.length}/${chatRooms.length}개` : `${chatRooms.length}개`}
+              </span>
             </div>
             <div className="mt-4 space-y-2">
-              {chatRooms.map((room) => (
-                <button
-                  key={room.id}
-                  type="button"
-                  onClick={() => setSelectedRoomId(room.id)}
-                  className={`w-full rounded-[var(--radius-lg)] border px-4 py-3 text-left transition-all ${
-                    selectedRoomId === room.id
-                      ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]'
-                      : 'border-[var(--border)] bg-[var(--page-bg)] hover:border-[var(--accent)]/40'
-                  }`}
-                >
-                  <p className="text-sm font-bold text-[var(--foreground)]">{room.room_label}</p>
-                  <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{room.member_labels?.join(', ') || '참여자 없음'}</p>
-                </button>
-              ))}
+              {visibleChatRooms.length === 0 ? (
+                <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-4 py-8 text-center text-sm text-[var(--toss-gray-3)]">
+                  {showFlaggedOnly ? '필터 단어가 포함된 채팅방이 없습니다.' : '표시할 채팅방이 없습니다.'}
+                </div>
+              ) : (
+                visibleChatRooms.map((room) => (
+                  <button
+                    key={room.id}
+                    type="button"
+                    onClick={() => setSelectedRoomId(room.id)}
+                    className={`w-full rounded-[var(--radius-lg)] border px-4 py-3 text-left transition-all ${
+                      selectedRoomId === room.id
+                        ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]'
+                        : 'border-[var(--border)] bg-[var(--page-bg)] hover:border-[var(--accent)]/40'
+                    }`}
+                  >
+                    <p className="text-sm font-bold text-[var(--foreground)]">{room.room_label}</p>
+                    <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{room.member_labels?.join(', ') || '참여자 없음'}</p>
+                  </button>
+                ))
+              )}
             </div>
           </article>
 
@@ -1270,7 +1337,13 @@ export default function SystemMasterCenter({
                 )}
                 {(() => {
                   return flaggedChatMessageCount > 0 ? (
-                    <span className="text-[11px] font-bold text-red-600 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-full">🔍 필터 단어 {flaggedChatMessageCount}건</span>
+                    <button
+                      type="button"
+                      onClick={handleFocusFlaggedChats}
+                      className="text-[11px] font-bold text-red-600 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-full transition hover:bg-red-500/15"
+                    >
+                      🔍 필터 단어 {flaggedChatMessageCount}건
+                    </button>
                   ) : null;
                 })()}
                 <button
@@ -1318,9 +1391,16 @@ export default function SystemMasterCenter({
                 <tbody>
                   {visibleChatMessages
                     .map((message) => {
-                      const flagged = message.content && hasBanned(message.content, bannedWords);
+                      const flagged = includesBannedWord(message.content, bannedWords);
+                      const isJumpTarget = chatJumpTarget?.messageId === message.id;
                       return (
-                        <tr key={message.id} className={`border-t border-[var(--border)] align-top ${flagged ? 'bg-red-500/10' : ''}`}>
+                        <tr
+                          key={message.id}
+                          ref={(element) => {
+                            chatMessageRowRefs.current[message.id] = element;
+                          }}
+                          className={`border-t border-[var(--border)] align-top ${flagged ? 'bg-red-500/10' : ''} ${isJumpTarget ? 'bg-red-500/20' : ''}`}
+                        >
                           <td className="w-[230px] px-4 py-4 align-top text-[var(--toss-gray-4)] whitespace-nowrap">{formatDateTime(message.created_at)}</td>
                           <td className="w-[180px] px-4 py-4 align-top">
                             <p className="truncate whitespace-nowrap break-keep font-semibold text-[var(--foreground)]" title={message.room_label || undefined}>{message.room_label}</p>
@@ -1353,7 +1433,12 @@ export default function SystemMasterCenter({
                                 setDeletingMsgId(message.id);
                                 const { error: delErr } = await supabase.from('messages').delete().eq('id', message.id);
                                 if (delErr) { toast('삭제 실패: ' + delErr.message, 'error'); }
-                                else { setChatMessages((prev) => prev.filter((item) => item.id !== message.id)); toast('삭제 완료', 'success'); }
+                                else {
+                                  setChatCatalogMessages((prev) => prev.filter((item) => item.id !== message.id));
+                                  setChatMessages((prev) => prev.filter((item) => item.id !== message.id));
+                                  setChatJumpTarget((prev) => (prev?.messageId === message.id ? null : prev));
+                                  toast('삭제 완료', 'success');
+                                }
                                 setDeletingMsgId(null);
                               }}
                               className={`px-2 py-1 text-[11px] font-bold rounded-[var(--radius-md)] transition ${
@@ -1368,6 +1453,13 @@ export default function SystemMasterCenter({
                         </tr>
                       );
                     })}
+                  {visibleChatMessages.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-10 text-center text-sm text-[var(--toss-gray-3)]">
+                        {showFlaggedOnly ? '필터 단어가 포함된 메시지가 없습니다.' : '조회된 메시지가 없습니다.'}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

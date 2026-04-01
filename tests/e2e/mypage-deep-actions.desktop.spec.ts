@@ -361,6 +361,8 @@ test('mypage commute shows an early checkout as 조퇴 and keeps correction requ
     shift_id: 'shift-day-0830',
   };
 
+  await installMutableDateMock(page, '2026-03-30T18:00:00+09:00');
+
   await mockSupabase(page, {
     staffMembers: [shiftUser],
     attendance: [
