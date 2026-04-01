@@ -175,14 +175,14 @@ async function main() {
       continue;
     }
 
-    const sourceResponse = await fetch(sourceUrl, {
-      signal: AbortSignal.timeout(60_000),
-    });
-    if (!sourceResponse.ok) {
-      throw new Error(`원본 파일 다운로드 실패 (${object.key}) - HTTP ${sourceResponse.status}`);
+    const { data: sourceBlob, error: downloadError } = await supabase.storage
+      .from(bucket)
+      .download(object.key);
+    if (downloadError || !sourceBlob) {
+      throw new Error(`원본 파일 다운로드 실패 (${object.key}) - ${downloadError?.message || 'blob is missing'}`);
     }
 
-    const bodyBuffer = Buffer.from(await sourceResponse.arrayBuffer());
+    const bodyBuffer = Buffer.from(await sourceBlob.arrayBuffer());
     await r2.send(
       new PutObjectCommand({
         Bucket: r2Bucket,

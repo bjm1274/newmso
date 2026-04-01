@@ -810,7 +810,6 @@ export default function OperationCheckView({
   });
 
   const [statusFilterTab, setStatusFilterTab] = useState<'전체' | ScheduleStatus>('전체');
-  const [workspaceStatusFilter, setWorkspaceStatusFilter] = useState<ScheduleStatus | null>(null);
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [deductingInventory, setDeductingInventory] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -1148,21 +1147,8 @@ export default function OperationCheckView({
       return currentStatus === statusFilterTab;
     });
   }, [patientChecksByScheduleId, searchFilteredSelectedDateSchedules, statusFilterTab]);
-
-  const workspaceFilteredSchedules = useMemo(() => {
-    if (!workspaceStatusFilter) return [] as LinkedSchedulePost[];
-
-    return searchFilteredSelectedDateSchedules.filter((post) => {
-      const savedRow = patientChecksByScheduleId[post.id];
-      const currentStatus = String(savedRow?.status || '준비중');
-      return currentStatus === workspaceStatusFilter;
-    });
-  }, [patientChecksByScheduleId, searchFilteredSelectedDateSchedules, workspaceStatusFilter]);
-
-  const workspacePatientStripSchedules = useMemo(
-    () => searchFilteredSelectedDateSchedules,
-    [searchFilteredSelectedDateSchedules],
-  );
+  const hasActiveScheduleFilters =
+    statusFilterTab !== '전체' || normalizeLookupValue(deferredSearchTerm).length > 0;
 
   const scheduleCalendarData = useMemo(() => {
     const toKey = (date: Date) =>
@@ -1468,11 +1454,6 @@ export default function OperationCheckView({
   }, [dayWorkspaceOpen]);
 
   useEffect(() => {
-    if (!dayWorkspaceOpen) return;
-    setWorkspaceStatusFilter(null);
-  }, [dayWorkspaceOpen, selectedDate]);
-
-  useEffect(() => {
     if (!checkFormIsDirty || typeof window === 'undefined') return;
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
@@ -1485,8 +1466,8 @@ export default function OperationCheckView({
   }, [checkFormIsDirty]);
 
   const workspaceSchedules = useMemo(
-    () => (workspaceStatusFilter ? workspaceFilteredSchedules : []),
-    [workspaceFilteredSchedules, workspaceStatusFilter],
+    () => (hasActiveScheduleFilters ? filteredSchedules : selectedDateSchedules),
+    [filteredSchedules, hasActiveScheduleFilters, selectedDateSchedules],
   );
 
   const workspaceSelectedIndex = useMemo(
@@ -1497,12 +1478,11 @@ export default function OperationCheckView({
   const selectedScheduleHiddenByFilters = useMemo(
     () =>
       Boolean(
-        workspaceStatusFilter &&
         selectedScheduleId &&
           selectedDateSchedules.some((post) => post.id === selectedScheduleId) &&
           !workspaceSchedules.some((post) => post.id === selectedScheduleId),
       ),
-    [selectedDateSchedules, selectedScheduleId, workspaceSchedules, workspaceStatusFilter],
+    [selectedDateSchedules, selectedScheduleId, workspaceSchedules],
   );
 
   const selectedDateStatusCounts = useMemo(() => {
@@ -1585,9 +1565,7 @@ export default function OperationCheckView({
     [selectedDateStatusCounts],
   );
 
-  const workspaceVisibleScheduleCount = workspaceStatusFilter
-    ? workspaceSchedules.length
-    : workspacePatientStripSchedules.length;
+  const workspaceVisibleScheduleCount = workspaceSchedules.length;
   const workspaceSelectedOrderLabel =
     workspaceSelectedIndex >= 0 ? `${workspaceSelectedIndex + 1} / ${workspaceVisibleScheduleCount}` : `0 / ${workspaceVisibleScheduleCount}`;
 
@@ -1616,12 +1594,12 @@ export default function OperationCheckView({
 
   const handleWorkspaceStatusSummaryClick = useCallback(
     (nextStatus: ScheduleStatus) => {
-      const nextFilter = workspaceStatusFilter === nextStatus ? null : nextStatus;
+      const nextTab = statusFilterTab === nextStatus ? '전체' : nextStatus;
 
-      if (dayWorkspaceOpen && selectedDate && nextFilter) {
+      if (dayWorkspaceOpen && selectedDate && nextTab !== '전체') {
         const matchingSchedules = searchFilteredSelectedDateSchedules.filter((post) => {
           const currentStatus = String(patientChecksByScheduleId[post.id]?.status || '준비중');
-          return currentStatus === nextFilter;
+          return currentStatus === nextTab;
         });
 
         if (
@@ -1647,7 +1625,7 @@ export default function OperationCheckView({
         }
       }
 
-      setWorkspaceStatusFilter(nextFilter);
+      setStatusFilterTab(nextTab);
     },
     [
       applyDateAndScheduleSelection,
@@ -1658,7 +1636,7 @@ export default function OperationCheckView({
       searchFilteredSelectedDateSchedules,
       selectedDate,
       selectedScheduleId,
-      workspaceStatusFilter,
+      statusFilterTab,
     ],
   );
 
@@ -2769,31 +2747,14 @@ export default function OperationCheckView({
     [filteredSchedules, handleScheduleSelection, patientChecksByScheduleId, selectedScheduleId],
   );
 
-  const workspaceDetailReady = Boolean(
-    workspaceStatusFilter &&
-      selectedSchedule &&
-      checkForm &&
-      workspaceSchedules.some((post) => post.id === selectedSchedule.id),
-  );
-  const workspaceEmptyTitle = !workspaceStatusFilter
-    ? '상단 상태를 먼저 선택해 주세요.'
-    : workspaceSchedules.length === 0
-      ? '선택한 상태의 환자가 없습니다.'
-      : '환자를 선택해 주세요.';
-  const workspaceEmptyDescription = !workspaceStatusFilter
-    ? '준비중, 준비완료, 수술중, 완료 중 하나를 누르면 해당 환자 정보가 열립니다.'
-    : workspaceSchedules.length === 0
-      ? '선택한 상태에 해당하는 수술 환자가 없어 작업창을 표시할 수 없습니다.'
-      : '위 환자 카드나 목록에서 대상자를 선택하면 OP체크 항목이 열립니다.';
-
-  const patientWorkspaceDetailContent = !workspaceDetailReady || !selectedSchedule || !checkForm ? (
+  const patientWorkspaceDetailContent = !selectedSchedule || !checkForm ? (
     <div
       data-testid="op-check-workspace-empty"
       className="empty-state rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--card)] p-10 text-center shadow-sm"
     >
-      <p className="text-base font-bold text-[var(--foreground)]">{workspaceEmptyTitle}</p>
+      <p className="text-base font-bold text-[var(--foreground)]">환자를 선택해 주세요.</p>
       <p className="mt-2 text-sm font-medium text-[var(--toss-gray-3)]">
-        {workspaceEmptyDescription}
+        해당 날짜 환자를 선택하면 OP체크 항목이 자동으로 준비됩니다.
       </p>
     </div>
   ) : (
@@ -3831,16 +3792,24 @@ export default function OperationCheckView({
                   <div className="mt-1 flex flex-wrap items-center gap-2">
                     <h3 className="text-lg font-bold text-[var(--foreground)]">{formatDateLabel(selectedDate)}</h3>
                     <span className="rounded-full bg-[var(--muted)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
-                      {workspaceStatusFilter ? `현재 환자 ${workspaceSelectedOrderLabel}` : '상태 선택 대기'}
+                      현재 환자 {workspaceSelectedOrderLabel}
                     </span>
                     <span className="rounded-full border border-[var(--border)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
-                      {workspaceStatusFilter ? `${workspaceStatusFilter} 대상 표시 중` : '상단 상태 박스를 눌러 주세요'}
+                      {statusFilterTab !== '전체' ? `${statusFilterTab} 대상 표시 중` : '전체 환자 표시 중'}
                     </span>
+                    {statusFilterTab !== '전체' ? (
+                      <button
+                        type="button"
+                        data-testid="op-check-workspace-status-filter-reset"
+                        onClick={() => setStatusFilterTab('전체')}
+                        className="rounded-full border border-[var(--border)] px-3 py-1 text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
+                      >
+                        전체 보기
+                      </button>
+                    ) : null}
                   </div>
                   <p className="text-sm font-medium text-[var(--toss-gray-3)]">
-                    {workspaceStatusFilter
-                      ? `선택한 ${workspaceStatusFilter} 환자 ${workspaceVisibleScheduleCount}명을 한 화면에서 빠르게 확인하고 처리합니다.`
-                      : '상단 상태 박스를 눌러야 해당 환자 정보가 열립니다.'}
+                    해당일 수술 환자 {workspaceVisibleScheduleCount}명을 한 화면에서 빠르게 확인하고 처리합니다.
                   </p>
                 </div>
 
@@ -3849,7 +3818,7 @@ export default function OperationCheckView({
                   className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:min-w-[448px] xl:self-center"
                 >
                   {workspaceStatusSummaryCards.map((card) => {
-                    const isSelected = workspaceStatusFilter === card.value;
+                    const isSelected = statusFilterTab === card.value;
                     return (
                       <button
                         key={card.value}
@@ -3922,41 +3891,34 @@ export default function OperationCheckView({
                   <div className="flex items-center justify-between gap-2">
                     <div>
                       <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">오늘 수술 환자</p>
-                      <p className="mt-1 text-sm font-bold text-[var(--foreground)]">{workspacePatientStripSchedules.length}명</p>
+                      <p className="mt-1 text-sm font-bold text-[var(--foreground)]">{workspaceVisibleScheduleCount}명</p>
                     </div>
                     <span className="rounded-full bg-[var(--muted)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
-                      {workspaceStatusFilter ? `${workspaceStatusFilter} 환자 선택 가능` : '상태 선택 후 환자 열기'}
+                      {statusFilterTab !== '전체' ? `${statusFilterTab} 환자 표시 중` : '전체 환자 표시 중'}
                     </span>
                   </div>
-                  {workspacePatientStripSchedules.length === 0 ? (
+                  {workspaceSchedules.length === 0 ? (
                     <div className="mt-3 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)]/35 px-3 py-5 text-center">
                       <p className="text-sm font-semibold text-[var(--toss-gray-3)]">오늘 표시할 수술 환자가 없습니다.</p>
                     </div>
                   ) : (
                     <div className="mt-3 overflow-x-auto pb-1 custom-scrollbar">
                       <div className="flex min-w-max gap-2">
-                        {workspacePatientStripSchedules.map((post) => {
+                        {workspaceSchedules.map((post) => {
                           const currentStatus = String(patientChecksByScheduleId[post.id]?.status || '준비중');
-                          const matchesWorkspaceStatus = !workspaceStatusFilter || currentStatus === workspaceStatusFilter;
-                          const isSelected =
-                            Boolean(workspaceStatusFilter) &&
-                            matchesWorkspaceStatus &&
-                            selectedScheduleId === post.id;
+                          const isSelected = selectedScheduleId === post.id;
 
                           return (
                             <button
                               key={post.id}
                               type="button"
                               data-testid={`op-check-workspace-patient-strip-card-${post.id}`}
-                              disabled={!workspaceStatusFilter || !matchesWorkspaceStatus}
                               onClick={() => handleScheduleSelection(post, false)}
                               className={`min-w-[172px] rounded-[var(--radius-lg)] border px-3 py-3 text-left transition-all ${
                                 isSelected
                                   ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/70 shadow-sm'
-                                  : matchesWorkspaceStatus && workspaceStatusFilter
-                                    ? 'border-[var(--border)] bg-white hover:border-[var(--accent)]/35 hover:bg-[var(--muted)]/30'
-                                    : 'border-[var(--border)] bg-[var(--muted)]/35 opacity-65'
-                              } disabled:cursor-not-allowed`}
+                                  : 'border-[var(--border)] bg-white hover:border-[var(--accent)]/35 hover:bg-[var(--muted)]/30'
+                              }`}
                             >
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0 flex-1">
@@ -3977,10 +3939,8 @@ export default function OperationCheckView({
                                 <span className="rounded-full bg-[var(--muted)] px-2 py-0.5 text-[10px] font-bold text-[var(--toss-gray-4)]">
                                   {currentStatus}
                                 </span>
-                                {!workspaceStatusFilter ? (
-                                  <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">상태 선택 필요</span>
-                                ) : !matchesWorkspaceStatus ? (
-                                  <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">다른 상태</span>
+                                {isSelected ? (
+                                  <span className="text-[10px] font-bold text-[var(--accent)]">선택됨</span>
                                 ) : null}
                               </div>
                             </button>
@@ -3992,15 +3952,15 @@ export default function OperationCheckView({
                 </div>
 
                 <p className="mb-3 text-[11px] font-medium text-[var(--toss-gray-3)]">
-                  {workspaceStatusFilter
+                  {statusFilterTab !== '전체'
                     ? '선택한 상태 환자만 아래 목록에서 이어서 확인할 수 있습니다.'
-                    : '상단 상태 박스를 눌러야 아래 목록과 상세 화면이 열립니다.'}
+                    : '같은 날짜 환자를 아래 목록에서 빠르게 바꿔가며 확인할 수 있습니다.'}
                 </p>
                 {renderFilteredScheduleList({
                   containerClassName: 'min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 custom-scrollbar',
-                  emptyMessage: workspaceStatusFilter
+                  emptyMessage: statusFilterTab !== '전체'
                     ? '현재 조건에 맞는 수술 환자가 없습니다.'
-                    : '상단 상태 박스를 눌러 대상자를 먼저 선택해 주세요.',
+                    : '선택한 날짜에 연결할 수술 환자가 없습니다.',
                   openWorkspaceOnSelect: false,
                   testIdPrefix: 'op-check-workspace-schedule-card',
                   schedules: workspaceSchedules,
