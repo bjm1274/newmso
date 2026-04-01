@@ -4215,7 +4215,7 @@ window.onload = () => window.print();
               onClick={(e) => e.stopPropagation()}
             >
               <div
-                className="p-3 md:p-4 border-b flex items-center justify-between"
+                className="px-3 py-2 md:px-4 md:py-3 border-b flex items-center justify-between"
                 style={{
                   borderColor: alphaColor(templateDesign.borderColor, 0.9),
                   background: `linear-gradient(135deg, ${alphaColor(templateDesign.primaryColor, 0.12)} 0%, rgba(255,255,255,0) 70%)`,
@@ -4232,92 +4232,69 @@ window.onload = () => window.print();
                 </div>
                 <button type="button" onClick={() => setSelectedApprovalId(null)} className="p-2 rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]">✕</button>
               </div>
-              <div className="p-4 md:p-4 overflow-y-auto flex-1">
-                <h3 className="font-bold text-[var(--foreground)] text-lg mb-2">{detailTitle || '(제목 없음)'}</h3>
-                <p className="text-[11px] text-[var(--toss-gray-3)] mb-4">기안자: {detailSenderName} · {new Date(detailCreatedAt).toLocaleString('ko-KR')}</p>
+              <div className="p-3 md:p-4 overflow-y-auto flex-1">
+                <h3 className="font-bold text-[var(--foreground)] text-[15px] mb-0.5">{detailTitle || '(제목 없음)'}</h3>
+                <p className="text-[10px] text-[var(--toss-gray-3)] mb-2.5">기안자: {detailSenderName} · {new Date(detailCreatedAt).toLocaleString('ko-KR')}</p>
                 {detailCcUsers.length > 0 && (
-                  <div className="mb-4 flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-yellow-500/20 bg-yellow-500/10 px-3 py-2">
-                    <span className="text-[11px] font-bold text-yellow-700">참조자</span>
+                  <div className="mb-2 flex flex-wrap items-center gap-1 rounded-[var(--radius-md)] border border-yellow-500/20 bg-yellow-500/10 px-2 py-1.5">
+                    <span className="text-[10px] font-bold text-yellow-700 shrink-0">참조자</span>
                     {detailCcUsers.map((ccUser) => (
                       <span
                         key={ccUser.id}
-                        className="inline-flex items-center rounded-full border border-yellow-500/20 bg-white px-2.5 py-1 text-[11px] font-semibold text-yellow-800"
+                        className="inline-flex items-center rounded-[var(--radius-md)] border border-yellow-500/20 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-yellow-800"
                       >
-                        {ccUser.name}
-                        {ccUser.position ? ` ${ccUser.position}` : ''}
+                        {ccUser.name}{ccUser.position ? ` ${ccUser.position}` : ''}
                       </span>
                     ))}
                   </div>
                 )}
                 {(detailLocked || detailHistory.length > 0 || detailDelegateSnapshot.delegatedToName || detailDelaySnapshot.overdue || detailDelaySnapshot.notificationCount > 0 || detailLockSnapshot.lockedAt) && (
-                  <div className="mb-4 space-y-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/60 px-3 py-3">
+                  <div className="mb-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/60 px-2.5 py-2 space-y-1.5">
                     {detailLocked && (
-                      <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-700">
-                        <span className="inline-flex items-center rounded-full bg-slate-200 px-2 py-0.5">수정 잠금</span>
-                        <span>최종 처리된 문서라 수정할 수 없습니다.</span>
+                      <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-600">
+                        <span className="rounded bg-slate-200 px-1.5 py-0.5">수정 잠금</span>
+                        <span className="text-[var(--toss-gray-3)]">최종 처리된 문서</span>
                       </div>
                     )}
-                    {(detailDelegateSnapshot.delegatedToName || detailDelaySnapshot.overdue || detailDelaySnapshot.notificationCount > 0 || detailLockSnapshot.lockedAt) && (
-                      <div className="grid gap-2 md:grid-cols-2">
-                        {detailDelegateSnapshot.delegatedToName && (
-                          <div className="rounded-[var(--radius-sm)] bg-[var(--card)] px-2.5 py-2 text-[11px] text-[var(--toss-gray-4)]">
-                            <p className="font-semibold text-[var(--foreground)]">대결 정보</p>
-                            <p className="mt-1">
-                              {detailDelegateSnapshot.delegatedFromName
-                                ? `${detailDelegateSnapshot.delegatedFromName} → ${detailDelegateSnapshot.delegatedToName}`
-                                : detailDelegateSnapshot.delegatedToName}
-                            </p>
-                            {detailDelegateSnapshot.delegatedAt && (
-                              <p className="mt-1 text-[10px] text-[var(--toss-gray-3)]">
-                                대결 시점 {new Date(detailDelegateSnapshot.delegatedAt).toLocaleString('ko-KR')}
-                              </p>
-                            )}
-                            <p className="mt-1 text-[10px] text-[var(--toss-gray-3)]">
-                              재알림 {detailDelaySnapshot.repeatHours}시간마다 · 최대 {detailDelaySnapshot.maxNotifications}회
-                            </p>
-                          </div>
+                    {detailDelegateSnapshot.delegatedToName && (
+                      <div className="flex items-center gap-1.5 text-[10px] text-[var(--toss-gray-4)]">
+                        <span className="font-semibold text-[var(--foreground)] shrink-0">대결</span>
+                        <span>
+                          {detailDelegateSnapshot.delegatedFromName
+                            ? `${detailDelegateSnapshot.delegatedFromName} → ${detailDelegateSnapshot.delegatedToName}`
+                            : detailDelegateSnapshot.delegatedToName}
+                        </span>
+                        {detailDelegateSnapshot.delegatedAt && (
+                          <span className="text-[var(--toss-gray-3)]">{new Date(detailDelegateSnapshot.delegatedAt).toLocaleDateString('ko-KR')}</span>
                         )}
-                        {(detailDelaySnapshot.overdue || detailDelaySnapshot.notificationCount > 0) && (
-                          <div className="rounded-[var(--radius-sm)] bg-[var(--card)] px-2.5 py-2 text-[11px] text-[var(--toss-gray-4)]">
-                            <p className="font-semibold text-[var(--foreground)]">결재 지연 상태</p>
-                            <p className="mt-1">
-                              기준 {detailDelaySnapshot.thresholdHours}시간
-                              {detailDelaySnapshot.elapsedHours > 0 ? ` · 경과 ${detailDelaySnapshot.elapsedHours}시간` : ''}
-                            </p>
-                            {detailDelaySnapshot.notificationCount > 0 && (
-                              <p className="mt-1 text-[10px] text-[var(--toss-gray-3)]">
-                                지연 알림 {detailDelaySnapshot.notificationCount}회
-                                {detailDelaySnapshot.lastNotifiedAt ? ` · 최근 ${new Date(detailDelaySnapshot.lastNotifiedAt).toLocaleString('ko-KR')}` : ''}
-                              </p>
-                            )}
-                          </div>
+                      </div>
+                    )}
+                    {(detailDelaySnapshot.overdue || detailDelaySnapshot.notificationCount > 0) && (
+                      <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--toss-gray-4)]">
+                        <span className="font-semibold text-rose-600 shrink-0">지연</span>
+                        <span>기준 {detailDelaySnapshot.thresholdHours}시간{detailDelaySnapshot.elapsedHours > 0 ? ` · 경과 ${detailDelaySnapshot.elapsedHours}시간` : ''}</span>
+                        {detailDelaySnapshot.notificationCount > 0 && (
+                          <span className="text-[var(--toss-gray-3)]">알림 {detailDelaySnapshot.notificationCount}회{detailDelaySnapshot.lastNotifiedAt ? ` · ${new Date(detailDelaySnapshot.lastNotifiedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}</span>
                         )}
-                        {detailLockSnapshot.lockedAt && (
-                          <div className="rounded-[var(--radius-sm)] bg-[var(--card)] px-2.5 py-2 text-[11px] text-[var(--toss-gray-4)] md:col-span-2">
-                            <p className="font-semibold text-[var(--foreground)]">잠금 이력</p>
-                            <p className="mt-1">
-                              Rev.{detailLockSnapshot.revision ?? 1}
-                              {detailLockSnapshot.lockedByName ? ` · ${detailLockSnapshot.lockedByName}` : ''}
-                              {detailLockSnapshot.lockedAt ? ` · ${new Date(detailLockSnapshot.lockedAt).toLocaleString('ko-KR')}` : ''}
-                            </p>
-                          </div>
-                        )}
+                      </div>
+                    )}
+                    {detailLockSnapshot.lockedAt && (
+                      <div className="flex items-center gap-1.5 text-[10px] text-[var(--toss-gray-4)]">
+                        <span className="font-semibold text-[var(--foreground)] shrink-0">Rev.{detailLockSnapshot.revision ?? 1}</span>
+                        {detailLockSnapshot.lockedByName && <span>{detailLockSnapshot.lockedByName}</span>}
+                        <span className="text-[var(--toss-gray-3)]">{new Date(detailLockSnapshot.lockedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                     )}
                     {detailHistory.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-[11px] font-bold text-[var(--foreground)]">문서 이력</p>
-                        <div className="space-y-1.5">
+                      <div>
+                        <p className="text-[10px] font-bold text-[var(--foreground)] mb-1">문서 이력</p>
+                        <div className="space-y-0.5">
                           {detailHistory.slice().reverse().map((entry, index) => (
-                            <div key={`${entry.at}-${entry.action}-${index}`} className="rounded-[var(--radius-sm)] bg-[var(--card)] px-2.5 py-2 text-[11px] text-[var(--toss-gray-4)]">
-                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                <span className="font-semibold text-[var(--foreground)]">{formatApprovalHistoryActionLabel(entry.action)}</span>
-                                <span>{entry.actor_name || entry.actor_id || '시스템'}</span>
-                                <span>{new Date(entry.at).toLocaleString('ko-KR')}</span>
-                              </div>
-                              {entry.note && (
-                                <p className="mt-1 text-[10px] text-[var(--toss-gray-3)]">{entry.note}</p>
-                              )}
+                            <div key={`${entry.at}-${entry.action}-${index}`} className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0 text-[10px] text-[var(--toss-gray-4)] py-0.5">
+                              <span className="font-semibold text-[var(--foreground)] shrink-0">{formatApprovalHistoryActionLabel(entry.action)}</span>
+                              <span className="shrink-0">{entry.actor_name || entry.actor_id || '시스템'}</span>
+                              <span className="text-[var(--toss-gray-3)]">{new Date(entry.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                              {entry.note && <span className="text-[var(--toss-gray-3)] w-full pl-0">{entry.note}</span>}
                             </div>
                           ))}
                         </div>
