@@ -615,9 +615,14 @@ export async function replaceSession(page: Page, options: SeedOptions = {}) {
     },
   ]);
 
+  // Avoid seeding through the login screen. Its unauthenticated session probe can race
+  // with the freshly written cookie and clear it before the next app navigation starts.
+  await page.goto('/api/auth/session', { waitUntil: 'domcontentloaded' });
+
   await page.evaluate(
     ({ seededUser, seededStorage, tokenKey, accessToken }) => {
       window.localStorage.clear();
+      window.sessionStorage.clear();
       window.localStorage.setItem('erp_user', JSON.stringify(seededUser));
       window.localStorage.setItem('erp_login_at', new Date().toISOString());
       Object.entries(seededStorage).forEach(([key, value]) => {

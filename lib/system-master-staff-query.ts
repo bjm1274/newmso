@@ -1,3 +1,5 @@
+import { isMissingColumnError } from './supabase-compat';
+
 type QueryErrorLike = {
   code?: string | null;
   message?: string | null;
@@ -38,21 +40,11 @@ export function isSystemMasterStaffMissingColumnError(
 ): boolean {
   if (!error) return false;
   const code = String(error.code || '').trim();
-  const message = String(error.message || error.details || '').toLowerCase();
-  const hint = String(error.hint || '').toLowerCase();
-  const needle = columnName.toLowerCase();
-  const missingColumnMessage =
-    message.includes(`column ${needle}`) ||
-    message.includes(`"${needle}"`) ||
-    message.includes(`'${needle}'`) ||
-    message.includes(`could not find the '${needle}' column`) ||
-    message.includes(`could not find the "${needle}" column`) ||
-    hint.includes(needle);
+  if (code && code !== '42703' && code !== 'PGRST204' && code !== 'PGRST200') {
+    return false;
+  }
 
-  return (
-    ((code === '42703' || code === 'PGRST204' || code === 'PGRST200' || !code) &&
-      missingColumnMessage)
-  );
+  return isMissingColumnError(error, columnName);
 }
 
 export function buildSystemMasterStaffSelect(omittedColumns: ReadonlySet<string>) {

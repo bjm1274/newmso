@@ -4,6 +4,7 @@ import {
   dismissDialogs,
   fakeUser,
   mockSupabase,
+  replaceSession,
   seedSession,
 } from "./helpers";
 test.beforeEach(async ({ page }) => {
@@ -21,12 +22,7 @@ async function loginWithSession(
     typeof localStorage === "object" && localStorage !== null && "localStorage" in localStorage
       ? (localStorage as { localStorage?: Record<string, string> }).localStorage ?? {}
       : (localStorage as Record<string, string>);
-  await page.goto("/login");
-  await page.context().clearCookies();
-  await page.evaluate(() => {
-    window.localStorage.clear();
-  });
-  await seedSession(page, {
+  await replaceSession(page, {
     user,
     localStorage: resolvedLocalStorage,
   });
@@ -623,7 +619,7 @@ test("admin view opens for an MSO session", async ({ page }) => {
   await mockSupabase(page, { staffMembers: [adminUser] });
   await seedSession(page, { user: adminUser });
   await page.goto(
-    `/main?${new URLSearchParams({ open_menu: "관리자" }).toString()}`,
+    `/main?${new URLSearchParams({ open_menu: "관리자", open_subview: "회사관리" }).toString()}`,
   );
   await expect(page).toHaveURL(/\/main$/);
   await expect(page.getByTestId("admin-view")).toBeVisible();
@@ -857,7 +853,7 @@ test("offboarding finalize flow completes the resignation for a pending staff me
   });
 
   await page.goto(
-    `/main?${new URLSearchParams({ open_menu: "인사관리" }).toString()}`,
+    `/main?${new URLSearchParams({ open_menu: "인사관리", open_subview: "오프보딩" }).toString()}`,
   );
 
   await expect(page.getByTestId("offboarding-view")).toBeVisible();
@@ -2083,9 +2079,10 @@ test("employee and admin can complete a realistic monthly operations lifecycle",
 
   await loginWithSession(page, adminUser, {
     erp_last_subview: "회사관리",
+    erp_admin_subview: "회사관리",
   });
   await page.goto(
-    `/main?${new URLSearchParams({ open_menu: "관리자" }).toString()}`,
+    `/main?${new URLSearchParams({ open_menu: "관리자", open_subview: "회사관리" }).toString()}`,
   );
 
   await expect(page.getByTestId("company-manager-view")).toBeVisible();

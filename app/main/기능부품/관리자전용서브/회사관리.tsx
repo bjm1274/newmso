@@ -50,7 +50,7 @@ type FormState = {
 const COMPANY_TABS: { id: CompanyManagerTabId; label: string }[] = [
   { id: 'company', label: '회사 기본정보' },
   { id: 'team', label: '팀 관리' },
-  { id: 'shift', label: '근무상태' },
+  { id: 'shift', label: '근무형태' },
   { id: 'attendanceRules', label: '근태 규칙' },
   { id: 'card', label: '법인카드' },
   { id: 'contract', label: '계약 설정' },
@@ -312,6 +312,7 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
             <button
               key={tab.id}
               type="button"
+              data-testid={`company-manager-tab-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
               className={`rounded-[var(--radius-md)] px-3 py-2 text-xs font-bold transition-all ${
                 activeTab === tab.id

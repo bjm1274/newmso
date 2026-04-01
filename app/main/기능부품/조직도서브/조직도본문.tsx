@@ -284,7 +284,15 @@ export default function MainContent({
 
       {mainMenu === '관리자' && (
         <div className="min-h-0 flex-1 overflow-x-hidden">
-          <AdminView user={user} staffs={data.staffs} depts={data.depts} onRefresh={onRefresh} initialTab={subView} onOpenApproval={onOpenApproval} />
+          <AdminView
+            key={`admin-${subView}`}
+            user={user}
+            staffs={data.staffs}
+            depts={data.depts}
+            onRefresh={onRefresh}
+            initialTab={subView}
+            onOpenApproval={onOpenApproval}
+          />
         </div>
       )}
 

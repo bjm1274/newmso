@@ -428,6 +428,7 @@ export default function InventoryTransfer({
         </div>
         <button
           data-testid="inventory-transfer-reset-button"
+          aria-label="새 요청"
           onClick={() => {
             resetForm();
             setActiveTab('request');
@@ -442,6 +443,7 @@ export default function InventoryTransfer({
         {[{ key: 'request', label: '이관 신청' }, { key: 'history', label: '이관 이력' }].map((tab) => (
           <button
             key={tab.key}
+            aria-label={tab.key === 'request' ? '요청 탭' : '이력 탭'}
             onClick={() => setActiveTab(tab.key as 'request' | 'history')}
             className={`px-4 py-1.5 rounded-[var(--radius-md)] text-xs font-bold transition-all ${activeTab === tab.key ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm' : 'text-[var(--toss-gray-3)]'}`}
           >
@@ -582,6 +584,7 @@ export default function InventoryTransfer({
 
           <button
             data-testid="inventory-transfer-submit"
+            aria-label="재고 이동 실행"
             onClick={handleTransfer}
             disabled={saving}
             className="px-4 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-sm font-bold disabled:opacity-50 hover:opacity-90"

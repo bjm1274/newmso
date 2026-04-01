@@ -2963,6 +2963,7 @@ export default function OperationCheckView({
             <>
               <button
                 type="button"
+                aria-label="병동팀 메시지 보내기"
                 onClick={() => void openWardMsgModal()}
                 className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white hover:opacity-90"
               >
@@ -3010,6 +3011,7 @@ export default function OperationCheckView({
           {checkForm?.status === '준비중' && (
             <button
               type="button"
+              aria-label="병동팀 메시지 보내기"
               onClick={() => void openWardMsgModal()}
               className="rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
             >
@@ -3278,7 +3280,7 @@ export default function OperationCheckView({
       {activeTab === 'patients' ? (
         <div
           data-testid="op-check-patient-top-grid"
-          className="grid gap-3 lg:mx-auto lg:max-w-[920px] lg:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]"
+          className="grid gap-3 lg:mx-auto lg:max-w-[920px] lg:grid-cols-[minmax(0,1.04fr)_minmax(0,0.46fr)_minmax(0,0.5fr)]"
         >
           <div
             data-testid="op-check-patient-calendar-card"
@@ -3767,7 +3769,7 @@ export default function OperationCheckView({
 
       {dayWorkspaceOpen && activeTab === 'patients' && (
         <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/45 p-0 md:p-4"
+          className="fixed inset-0 z-[320] flex items-center justify-center bg-black/45 p-0 md:p-4"
           onClick={(event) => {
             if (event.target === event.currentTarget) {
               handleWorkspaceClose();
