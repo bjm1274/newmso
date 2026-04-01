@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import {
@@ -23,30 +23,11 @@ type RoomBoardDraft = {
   patientSlots: RoomBoardPatientSlot[];
 };
 type HandoverSnapshot = { dateKey: string; createdAt: string | null; rooms: HandoverRoomConfig[] };
-type BleCharacteristicSnapshot = { uuid: string; properties: string[] };
-type BleServiceSnapshot = { uuid: string; characteristics: BleCharacteristicSnapshot[] };
-type BleCharacteristicLike = { uuid: string; properties: Record<string, boolean | undefined> };
-type BleServiceLike = { uuid: string; getCharacteristics: () => Promise<BleCharacteristicLike[]> };
-type BleServerLike = { getPrimaryServices: () => Promise<BleServiceLike[]> };
-type BleGattLike = { connect: () => Promise<BleServerLike>; disconnect: () => void };
-type BleDeviceLike = { name?: string; id?: string; gatt?: BleGattLike | null };
-type NavigatorWithBluetooth = Navigator & {
-  bluetooth: {
-    requestDevice: (options: { acceptAllDevices: boolean; optionalServices?: string[] }) => Promise<BleDeviceLike>;
-  };
-};
+type ScannerControlsLike = { stop: () => void };
 type Props = { user?: StaffMember | null; selectedCo?: string | null; selectedCompanyId?: string | null };
 
 const ROOM_DRAFT_STORAGE_KEY = 'erp-zhsunyco-room-board-drafts';
-const WOLINK_OPTIONAL_SERVICE_UUIDS = [
-  '30323032-4c53-4545-4c42-4b4e494c4f57',
-  '31323032-4c53-4545-4c42-4b4e494c4f57',
-  '32323032-4c53-4545-4c42-4b4e494c4f57',
-  '33323032-4c53-4545-4c42-4b4e494c4f57',
-  '34323032-4c53-4545-4c42-4b4e494c4f57',
-  '35323032-4c53-4545-4c42-4b4e494c4f57',
-  '3e3d1158-5656-4217-b715-266f37eb5000',
-] as const;
+const CAMERA_BARCODE_HINT = '카메라를 바코드에 가까이 대고 잠시 멈추면 자동 등록됩니다.';
 
 function compareDateKeys(left?: string | null, right?: string | null) {
   return String(left || '').localeCompare(String(right || ''), 'ko-KR', {
@@ -121,11 +102,14 @@ export default function ZhsunycoEslSync(_props: Props) {
   const [roomDrafts, setRoomDrafts] = useState<Record<string, RoomBoardDraft>>({});
   const [selectedRoomNumber, setSelectedRoomNumber] = useState('');
   const [loadingRooms, setLoadingRooms] = useState(true);
-  const [bleBusy, setBleBusy] = useState(false);
-  const [bleStatus, setBleStatus] = useState('BLE 기기 스캔 전');
-  const [bleDeviceName, setBleDeviceName] = useState('');
-  const [bleDeviceId, setBleDeviceId] = useState('');
-  const [bleServices, setBleServices] = useState<BleServiceSnapshot[]>([]);
+  const [deviceRegistrationOpen, setDeviceRegistrationOpen] = useState(false);
+  const [deviceRegistrationValue, setDeviceRegistrationValue] = useState('');
+  const [cameraScanOpen, setCameraScanOpen] = useState(false);
+  const [cameraScanBusy, setCameraScanBusy] = useState(false);
+  const [cameraScanStatus, setCameraScanStatus] = useState(CAMERA_BARCODE_HINT);
+  const deviceRegistrationInputRef = useRef<HTMLInputElement | null>(null);
+  const deviceRegistrationVideoRef = useRef<HTMLVideoElement | null>(null);
+  const cameraScanControlsRef = useRef<ScannerControlsLike | null>(null);
 
   useEffect(() => {
     try {
@@ -200,6 +184,22 @@ export default function ZhsunycoEslSync(_props: Props) {
     }
   }, [rooms, selectedRoomNumber]);
 
+  useEffect(() => {
+    if (!deviceRegistrationOpen) return;
+    const timer = window.setTimeout(() => {
+      deviceRegistrationInputRef.current?.focus();
+      deviceRegistrationInputRef.current?.select();
+    }, 20);
+    return () => window.clearTimeout(timer);
+  }, [deviceRegistrationOpen]);
+
+  useEffect(() => {
+    return () => {
+      cameraScanControlsRef.current?.stop();
+      cameraScanControlsRef.current = null;
+    };
+  }, []);
+
   const selectedRoom = useMemo(() => rooms.find((room) => room.roomNumber === selectedRoomNumber) || null, [rooms, selectedRoomNumber]);
   const selectedDraft = useMemo(() => (selectedRoomNumber ? roomDrafts[selectedRoomNumber] || null : null), [roomDrafts, selectedRoomNumber]);
   const preparedRooms = useMemo(
@@ -232,6 +232,131 @@ export default function ZhsunycoEslSync(_props: Props) {
     toast('인계노트 기준 환자 정보를 다시 채웠습니다.', 'success');
   }, [selectedRoom]);
 
+  const stopCameraBarcodeScan = useCallback(() => {
+    cameraScanControlsRef.current?.stop();
+    cameraScanControlsRef.current = null;
+
+    const video = deviceRegistrationVideoRef.current;
+    const stream = video?.srcObject;
+    if (stream && 'getTracks' in stream) {
+      (stream as MediaStream).getTracks().forEach((track) => track.stop());
+    }
+    if (video) {
+      video.srcObject = null;
+    }
+
+    setCameraScanOpen(false);
+    setCameraScanBusy(false);
+    setCameraScanStatus(CAMERA_BARCODE_HINT);
+  }, []);
+
+  const closeDeviceRegistration = useCallback(() => {
+    stopCameraBarcodeScan();
+    setDeviceRegistrationOpen(false);
+    setDeviceRegistrationValue('');
+  }, [stopCameraBarcodeScan]);
+
+  const saveSelectedRoomDevice = useCallback((deviceCode: string) => {
+    if (!selectedDraft) return false;
+    if (!canManageDeviceRegistration) {
+      toast('기기 바코드는 관리자만 등록할 수 있습니다.', 'error');
+      return false;
+    }
+
+    const nextValue = deviceCode.trim();
+    if (!nextValue) {
+      toast('기기 바코드를 스캔하거나 입력해 주세요.', 'error');
+      return false;
+    }
+
+    updateSelectedDraft((draft) => ({ ...draft, deviceId: nextValue }));
+    closeDeviceRegistration();
+    toast(`${selectedDraft.roomNumber}호 기기 바코드를 등록했습니다.`, 'success');
+    return true;
+  }, [canManageDeviceRegistration, closeDeviceRegistration, selectedDraft, updateSelectedDraft]);
+
+  const submitSelectedRoomDeviceRegistration = useCallback(() => {
+    void saveSelectedRoomDevice(deviceRegistrationValue);
+  }, [deviceRegistrationValue, saveSelectedRoomDevice]);
+
+  const startCameraBarcodeScan = useCallback(async () => {
+    if (!selectedDraft) return;
+    if (!canManageDeviceRegistration) {
+      toast('기기 바코드는 관리자만 등록할 수 있습니다.', 'error');
+      return;
+    }
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      toast('이 브라우저는 카메라 스캔을 지원하지 않습니다.', 'error');
+      return;
+    }
+    if (!deviceRegistrationVideoRef.current) {
+      toast('카메라 미리보기를 준비하지 못했습니다.', 'error');
+      return;
+    }
+
+    stopCameraBarcodeScan();
+    setCameraScanOpen(true);
+    setCameraScanBusy(true);
+    setCameraScanStatus('카메라 여는 중...');
+
+    try {
+      const { BrowserMultiFormatReader, BarcodeFormat } = await import('@zxing/browser');
+      const reader = new BrowserMultiFormatReader();
+      reader.possibleFormats = [
+        BarcodeFormat.CODE_128,
+        BarcodeFormat.CODE_39,
+        BarcodeFormat.CODE_93,
+        BarcodeFormat.CODABAR,
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.ITF,
+        BarcodeFormat.UPC_A,
+        BarcodeFormat.UPC_E,
+        BarcodeFormat.QR_CODE,
+      ];
+
+      const controls = await reader.decodeFromConstraints(
+        {
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        },
+        deviceRegistrationVideoRef.current,
+        (result, error, nextControls) => {
+          cameraScanControlsRef.current = nextControls;
+          if (result) {
+            const scannedText = String(result.getText() || '').trim();
+            if (!scannedText) return;
+            nextControls.stop();
+            cameraScanControlsRef.current = null;
+            setDeviceRegistrationValue(scannedText);
+            setCameraScanStatus(`인식 완료: ${scannedText}`);
+            saveSelectedRoomDevice(scannedText);
+            return;
+          }
+
+          const errorName = String((error as { name?: string } | undefined)?.name || '');
+          if (errorName && errorName !== 'NotFoundException' && errorName !== 'ChecksumException' && errorName !== 'FormatException') {
+            setCameraScanStatus('바코드 인식 중 오류가 발생했습니다. 다시 시도해 주세요.');
+          }
+        }
+      );
+
+      cameraScanControlsRef.current = controls;
+      setCameraScanStatus(CAMERA_BARCODE_HINT);
+    } catch (error) {
+      console.error('Failed to start barcode camera scan:', error);
+      stopCameraBarcodeScan();
+      toast('카메라 권한을 허용한 뒤 다시 시도해 주세요.', 'error');
+      setCameraScanStatus('카메라 권한이 필요합니다.');
+    } finally {
+      setCameraScanBusy(false);
+    }
+  }, [canManageDeviceRegistration, saveSelectedRoomDevice, selectedDraft, stopCameraBarcodeScan]);
+
   const registerSelectedRoomDevice = useCallback(() => {
     if (!selectedDraft) return;
     if (!canManageDeviceRegistration) {
@@ -239,19 +364,10 @@ export default function ZhsunycoEslSync(_props: Props) {
       return;
     }
 
-    const suggestedValue = String(bleDeviceName || bleDeviceId || selectedDraft.deviceId || '').trim();
-    const input = window.prompt(`${selectedDraft.roomNumber}호에 연결할 기기 바코드를 입력해 주세요.`, suggestedValue);
-    if (input === null) return;
-
-    const nextValue = input.trim();
-    if (!nextValue) {
-      toast('기기 바코드를 입력해 주세요.', 'error');
-      return;
-    }
-
-    updateSelectedDraft((draft) => ({ ...draft, deviceId: nextValue }));
-    toast(`${selectedDraft.roomNumber}호 기기 바코드를 등록했습니다.`, 'success');
-  }, [bleDeviceId, bleDeviceName, canManageDeviceRegistration, selectedDraft, updateSelectedDraft]);
+    const suggestedValue = String(selectedDraft.deviceId || '').trim();
+    setDeviceRegistrationValue(suggestedValue);
+    setDeviceRegistrationOpen(true);
+  }, [canManageDeviceRegistration, selectedDraft]);
 
   const clearSelectedRoomDevice = useCallback(() => {
     if (!selectedDraft) return;
@@ -269,11 +385,11 @@ export default function ZhsunycoEslSync(_props: Props) {
   const markSelectedRoomPrepared = useCallback(() => {
     if (!selectedDraft) return;
     if (!selectedDraft.deviceId.trim()) {
-      toast('기기 바코드를 먼저 입력해 주세요.', 'error');
+      toast('기기 바코드를 먼저 등록해 주세요.', 'error');
       return;
     }
     updateSelectedDraft((draft) => ({ ...draft, updatedAt: new Date().toISOString() }));
-    toast('직결 전송 대기 목록에 올렸습니다.', 'success');
+    toast('전송 준비 목록에 올렸습니다.', 'success');
   }, [selectedDraft, updateSelectedDraft]);
 
   const clearPreparedState = useCallback((roomNumber: string) => {
@@ -288,128 +404,13 @@ export default function ZhsunycoEslSync(_props: Props) {
         },
       };
     });
-    toast(`${roomNumber}호 전송 대기를 해제했습니다.`, 'success');
-  }, []);
-
-  const handleBleScan = useCallback(async () => {
-    if (typeof navigator === 'undefined' || !('bluetooth' in navigator)) {
-      toast('이 브라우저에서는 Web Bluetooth를 지원하지 않습니다.', 'error');
-      setBleStatus('Web Bluetooth 미지원');
-      return;
-    }
-
-    if (!window.isSecureContext) {
-      toast('BLE 스캔은 https 또는 localhost 환경에서만 동작합니다.', 'error');
-      setBleStatus('보안 컨텍스트 필요');
-      return;
-    }
-
-    setBleBusy(true);
-    setBleStatus('기기 선택 창 여는 중...');
-    setBleServices([]);
-
-    try {
-      const bluetoothNavigator = navigator as NavigatorWithBluetooth;
-      const device = await bluetoothNavigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: [...WOLINK_OPTIONAL_SERVICE_UUIDS],
-      });
-
-      setBleDeviceName(String(device.name || '').trim());
-      setBleDeviceId(String(device.id || '').trim());
-      setBleStatus('GATT 연결 중...');
-
-      const server = await device.gatt?.connect();
-      if (!server) {
-        throw new Error('BLE GATT 서버에 연결하지 못했습니다.');
-      }
-
-      const services = await server.getPrimaryServices();
-      const snapshots: BleServiceSnapshot[] = [];
-
-      for (const service of services) {
-        const characteristics = await service.getCharacteristics();
-        snapshots.push({
-          uuid: service.uuid,
-          characteristics: characteristics.map((characteristic) => ({
-            uuid: characteristic.uuid,
-            properties: Object.entries(characteristic.properties)
-              .filter(([, enabled]) => enabled === true)
-              .map(([key]) => key),
-          })),
-        });
-      }
-
-      setBleServices(snapshots);
-      setBleStatus(`BLE 연결 완료: ${device.name || device.id}`);
-
-      toast('BLE 기기 스캔과 연결에 성공했습니다.', 'success');
-      device.gatt?.disconnect();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'BLE 기기 스캔 또는 연결에 실패했습니다.';
-      setBleStatus(message);
-      toast(message, 'error');
-    } finally {
-      setBleBusy(false);
-    }
+    toast(`${roomNumber}호 전송 준비를 해제했습니다.`, 'success');
   }, []);
 
   return (
     <div className="space-y-4">
       <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] px-5 py-4 shadow-sm">
         <h2 className="text-lg font-bold text-[var(--foreground)]">입원실 안내판 ESL 준비</h2>
-      </section>
-
-      <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-base font-bold text-[var(--foreground)]">PC BLE 기기 스캔</h3>
-          <button
-            type="button"
-            onClick={() => void handleBleScan()}
-            disabled={bleBusy}
-            className="rounded-[var(--radius-md)] bg-slate-900 px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60"
-          >
-            {bleBusy ? '스캔 중...' : 'BLE 기기 스캔'}
-          </button>
-        </div>
-
-        <div className="mt-3 grid gap-2 md:grid-cols-4">
-          <div className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/15 px-3 py-2.5">
-            <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">상태</div>
-            <div className="mt-1 text-sm font-semibold text-[var(--foreground)]">{bleStatus}</div>
-          </div>
-          <div className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/15 px-3 py-2.5">
-            <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">기기 이름</div>
-            <div className="mt-1 break-all text-sm font-semibold text-[var(--foreground)]">{bleDeviceName || '-'}</div>
-          </div>
-          <div className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/15 px-3 py-2.5">
-            <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">브라우저 기기 ID</div>
-            <div className="mt-1 break-all text-sm font-semibold text-[var(--foreground)]">{bleDeviceId || '-'}</div>
-          </div>
-          <div className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/10 px-3 py-2.5">
-            <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">서비스 / 특성</div>
-            {bleServices.length === 0 ? (
-              <div className="mt-1 text-sm text-[var(--toss-gray-3)]">아직 연결 정보 없음</div>
-            ) : (
-              <div className="mt-1 max-h-20 space-y-1 overflow-y-auto text-[11px] text-[var(--toss-gray-3)]">
-                {bleServices.map((service) => (
-                  <div key={service.uuid} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1.5">
-                    <div className="truncate font-semibold text-[var(--foreground)]">{service.uuid}</div>
-                    <div className="mt-0.5 space-y-0.5">
-                      {service.characteristics.map((characteristic) => (
-                        <div key={characteristic.uuid} className="truncate">
-                          {characteristic.uuid}
-                          {characteristic.properties.length > 0 ? ` · ${characteristic.properties.join(', ')}` : ''}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
       </section>
 
       <section className="space-y-4">
@@ -452,7 +453,7 @@ export default function ZhsunycoEslSync(_props: Props) {
                   disabled={!selectedDraft}
                   className="rounded-[var(--radius-md)] bg-emerald-600 px-3 py-2 text-[12px] font-semibold text-white disabled:opacity-60"
                 >
-                  직결 전송 준비
+                  전송 준비
                 </button>
               </div>
             </div>
@@ -551,7 +552,7 @@ export default function ZhsunycoEslSync(_props: Props) {
 
           <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-base font-bold text-[var(--foreground)]">직결 전송 대기</h3>
+              <h3 className="text-base font-bold text-[var(--foreground)]">전송 준비 목록</h3>
               <span className="rounded-full bg-[var(--muted)] px-3 py-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">
                 {preparedRooms.length}건
               </span>
@@ -559,7 +560,7 @@ export default function ZhsunycoEslSync(_props: Props) {
 
             {preparedRooms.length === 0 ? (
               <div className="mt-4 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-4 py-6 text-sm text-[var(--toss-gray-3)]">
-                아직 직결 전송 준비한 병실이 없습니다.
+                아직 전송 준비한 병실이 없습니다.
               </div>
             ) : (
               <div className="mt-4 space-y-3">
@@ -619,6 +620,83 @@ export default function ZhsunycoEslSync(_props: Props) {
             )}
           </section>
       </section>
+
+      {deviceRegistrationOpen && selectedDraft ? (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/45 p-4"
+          onClick={closeDeviceRegistration}
+        >
+          <div
+            className="w-full max-w-md rounded-[var(--radius-xl)] bg-[var(--card)] p-5 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="text-base font-bold text-[var(--foreground)]">{selectedDraft.roomNumber}호 기기바코드 등록</div>
+            <div className="mt-2 text-sm text-[var(--toss-gray-3)]">카메라 스캔 또는 외부 스캐너 입력을 사용할 수 있습니다.</div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void startCameraBarcodeScan()}
+                disabled={cameraScanBusy}
+                className="rounded-[var(--radius-md)] bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {cameraScanBusy ? '카메라 여는 중...' : cameraScanOpen ? '카메라 다시 시작' : '카메라로 스캔'}
+              </button>
+              {cameraScanOpen ? (
+                <button
+                  type="button"
+                  onClick={stopCameraBarcodeScan}
+                  className="rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--foreground)]"
+                >
+                  카메라 닫기
+                </button>
+              ) : null}
+            </div>
+
+            {cameraScanOpen ? (
+              <div className="mt-4 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-black">
+                <video
+                  ref={deviceRegistrationVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="aspect-[4/3] w-full object-cover"
+                />
+              </div>
+            ) : null}
+
+            <div className="mt-2 text-[12px] text-[var(--toss-gray-3)]">{cameraScanStatus}</div>
+            <input
+              ref={deviceRegistrationInputRef}
+              value={deviceRegistrationValue}
+              onChange={(event) => setDeviceRegistrationValue(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  submitSelectedRoomDeviceRegistration();
+                }
+              }}
+              placeholder="바코드 스캔 대기 중"
+              className="mt-4 w-full rounded-[var(--radius-lg)] border-2 border-teal-700/80 px-4 py-3 text-base outline-none transition focus:border-teal-700"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeDeviceRegistration}
+                className="rounded-[var(--radius-md)] bg-cyan-100 px-4 py-2 text-sm font-semibold text-teal-800"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={submitSelectedRoomDeviceRegistration}
+                className="rounded-[var(--radius-md)] bg-teal-700 px-4 py-2 text-sm font-semibold text-white"
+              >
+                등록
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
     </div>
   );

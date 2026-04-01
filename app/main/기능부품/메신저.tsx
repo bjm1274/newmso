@@ -591,9 +591,6 @@ function AttachmentListCard({
               />
             </div>
           </div>
-          <p className={`max-w-[200px] md:max-w-[240px] truncate text-[10px] font-semibold ${tone === 'accent' ? 'text-white/85' : 'text-[var(--toss-gray-4)]'}`}>
-            {name}
-          </p>
         </div>
       );
     }
