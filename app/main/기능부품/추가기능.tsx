@@ -92,14 +92,18 @@ const OperationCheckView = dynamic(() => import('./OP체크'), {
   ssr: false,
   loading: () => <SubviewLoading label="OP체크" />,
 });
+const ZhsunycoEslSyncView = dynamic(() => import('./ESL연동'), {
+  ssr: false,
+  loading: () => <SubviewLoading label="ESL 연동" />,
+});
 const OrgChart = dynamic(() => import('./조직도서브/OrgChart'), {
   ssr: false,
   loading: () => <SubviewLoading label="조직도" />,
 });
 
 const EXTERNAL_LINKS = [
-  { id: 'km-park', label: 'KM Park', url: 'http://kmp0001103.iptime.org/login?redirectTo=undefined', icon: '🔗' },
-  { id: 'webfax', label: 'U+ 웹팩스', url: 'https://webfax.uplus.co.kr/m', icon: '📠' },
+  { id: 'km-park', label: '주차관제', url: 'http://kmp0001103.iptime.org/login?redirectTo=undefined', icon: '🔗' },
+  { id: 'webfax', label: '웹팩스', url: 'https://webfax.uplus.co.kr/m', icon: '📠' },
 ];
 
 type FeatureCard = {
@@ -118,6 +122,7 @@ const FEATURE_CARDS: FeatureCard[] = [
   { id: '마감보고', label: '마감보고', icon: '💰', subView: '마감보고' },
   { id: '직원평가', label: '직원평가', icon: '✍️', subView: '직원평가' },
   { id: '입금실시간조회', label: '입금 실시간 조회', icon: '🏦', subView: '입금실시간조회' },
+  { id: 'ESL연동', label: 'ESL 연동', icon: '📡', subView: 'ESL연동' },
   { id: '수술상담', label: '수술상담 AI 분석', icon: '🎙️', subView: '수술상담' },
   { id: 'OP체크', label: 'OP체크', icon: '🩺', subView: 'OP체크' },
 ];
@@ -131,6 +136,7 @@ const FEATURE_CARD_TEST_IDS = [
   'closing-report',
   'staff-evaluation',
   'realtime-deposit',
+  'esl-sync',
   'surgery-consultation',
   'op-check',
 ] as const;
@@ -451,6 +457,18 @@ export default function ExtraFeatures({
     );
   }
 
+  if (resolvedSubView === 'ESL연동') {
+    return (
+      <FeatureShell onBack={() => setSubView(null)} maxWidth="max-w-7xl">
+        <ZhsunycoEslSyncView
+          user={user || {}}
+          selectedCo={selectedCo}
+          selectedCompanyId={selectedCompanyId}
+        />
+      </FeatureShell>
+    );
+  }
+
   if (resolvedSubView === '수술상담') {
     return (
       <FeatureShell onBack={() => setSubView(null)} maxWidth="max-w-4xl">
@@ -537,7 +555,6 @@ export default function ExtraFeatures({
                 </div>
                 <div className="min-w-0 flex-1">
                   <h3 className="text-sm font-semibold text-[var(--foreground)]">{item.label}</h3>
-                  <p className="mt-0.5 truncate text-[11px] text-[var(--toss-gray-3)]">{item.url}</p>
                 </div>
                 <span className="text-[var(--toss-gray-3)] group-hover:text-[var(--accent)]">↗</span>
               </a>

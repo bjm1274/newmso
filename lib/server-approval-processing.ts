@@ -9,6 +9,7 @@ import {
 import { syncApprovalToDocumentRepository } from '@/lib/approval-document-archive';
 import { ensureApprovedAnnualLeaveRequest, isAnnualLeaveType, syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
 import { extractLeaveRequestMeta } from '@/lib/leave-notice';
+import { syncOfficialDocumentLogFromApproval } from '@/lib/official-document-approval';
 import { isMissingColumnError } from '@/lib/supabase-compat';
 
 type ApprovalRow = Record<string, unknown>;
@@ -414,6 +415,15 @@ export async function processFinalApprovalEffects(
     } catch (error) {
       warnings.push(`증명서 발급 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
     }
+  }
+
+  try {
+    const officialDocResult = await syncOfficialDocumentLogFromApproval(supabase, item);
+    if (officialDocResult) {
+      steps.push('official_document_log');
+    }
+  } catch (error) {
+    warnings.push(`공문서 발송대장 반영 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
   }
 
   const processedAt = new Date().toISOString();

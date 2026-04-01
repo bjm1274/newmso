@@ -2093,7 +2093,7 @@ export default function OperationCheckView({
         updated_by_name: String(user?.name || '').trim() || null,
         updated_at: now,
         // #6 타임스탬프 자동 기록
-        surgery_started_at: newStatus === '수술중'
+        surgery_started_at: (newStatus === '수술중' || newStatus === '완료')
           ? (checkForm.surgery_started_at || now)
           : (checkForm.surgery_started_at || null),
         surgery_ended_at: newStatus === '완료' ? now : (checkForm.surgery_ended_at || null),
@@ -2668,12 +2668,14 @@ export default function OperationCheckView({
       containerClassName,
       emptyMessage,
       openWorkspaceOnSelect,
+      layout = 'stack',
       testIdPrefix,
       schedules = filteredSchedules,
     }: {
       containerClassName: string;
       emptyMessage: string;
       openWorkspaceOnSelect: boolean;
+      layout?: 'stack' | 'row';
       testIdPrefix: string;
       schedules?: LinkedSchedulePost[];
     }) => (
@@ -2687,14 +2689,23 @@ export default function OperationCheckView({
             const savedRow = patientChecksByScheduleId[post.id];
             const currentStatus = String(savedRow?.status || '준비중');
             const selected = post.id === selectedScheduleId;
+            const isRowLayout = layout === 'row';
             const statusAccentClass =
-              currentStatus === '수술중'
-                ? 'border-l-orange-400'
-                : currentStatus === '완료'
-                  ? 'border-l-emerald-400'
-                  : currentStatus === '준비완료'
-                    ? 'border-l-[var(--accent)]'
-                    : 'border-l-[var(--border)]';
+              isRowLayout
+                ? currentStatus === '수술중'
+                  ? 'border-t-orange-400'
+                  : currentStatus === '완료'
+                    ? 'border-t-emerald-400'
+                    : currentStatus === '준비완료'
+                      ? 'border-t-[var(--accent)]'
+                      : 'border-t-[var(--border)]'
+                : currentStatus === '수술중'
+                  ? 'border-l-orange-400'
+                  : currentStatus === '완료'
+                    ? 'border-l-emerald-400'
+                    : currentStatus === '준비완료'
+                      ? 'border-l-[var(--accent)]'
+                      : 'border-l-[var(--border)]';
             const statusBadgeClass =
               currentStatus === '수술중'
                 ? 'bg-orange-50 text-orange-700'
@@ -2709,33 +2720,61 @@ export default function OperationCheckView({
                 type="button"
                 data-testid={`${testIdPrefix}-${post.id}`}
                 onClick={() => handleScheduleSelection(post, openWorkspaceOnSelect)}
-                className={`w-full rounded-[var(--radius-lg)] border border-l-4 p-3 text-left transition-all ${statusAccentClass} ${
-                  selected
-                    ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/60 shadow-sm'
-                    : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]/35 hover:bg-[var(--muted)]/40'
-                }`}
+                className={
+                  isRowLayout
+                    ? `min-w-[172px] max-w-[172px] flex-none snap-start rounded-[var(--radius-lg)] border border-t-4 px-3 py-2.5 text-left transition-all ${statusAccentClass} ${
+                        selected
+                          ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/70 shadow-sm'
+                          : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]/35 hover:bg-[var(--muted)]/40'
+                      }`
+                    : `w-full rounded-[var(--radius-lg)] border border-l-4 p-3 text-left transition-all ${statusAccentClass} ${
+                        selected
+                          ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/60 shadow-sm'
+                          : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]/35 hover:bg-[var(--muted)]/40'
+                      }`
+                }
               >
-                <div className="flex items-start justify-between gap-2">
+                <div className={`flex ${isRowLayout ? 'items-center justify-between gap-1.5' : 'items-start justify-between gap-2'}`}>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold text-[var(--foreground)]">{post.patient_name}</p>
-                    <p className="mt-0.5 truncate text-[11px] font-medium text-[var(--toss-gray-3)]">
+                    <p className={`truncate font-bold text-[var(--foreground)] ${isRowLayout ? 'text-[15px]' : 'text-sm'}`}>
+                      {post.patient_name}
+                    </p>
+                    <p
+                      className={`truncate font-medium text-[var(--toss-gray-3)] ${
+                        isRowLayout ? 'mt-1 text-[10px]' : 'mt-0.5 text-[11px]'
+                      }`}
+                    >
                       {post.surgery_name}
                     </p>
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">
+                  <div className={`flex shrink-0 ${isRowLayout ? 'flex-col items-end gap-1.5' : 'flex-col items-end gap-1'}`}>
+                    <span className={`font-bold text-[var(--toss-gray-4)] ${isRowLayout ? 'text-[10px]' : 'text-[11px]'}`}>
                       {post.schedule_time || '시간 미정'}
                     </span>
-                    <span className={`rounded-[var(--radius-md)] px-2 py-0.5 text-[10px] font-bold ${statusBadgeClass}`}>
+                    <span
+                      className={`rounded-[var(--radius-md)] font-bold ${statusBadgeClass} ${
+                        isRowLayout ? 'px-1.5 py-0.5 text-[9px]' : 'px-2 py-0.5 text-[10px]'
+                      }`}
+                    >
                       {savedRow ? currentStatus : '신규'}
                     </span>
                   </div>
                 </div>
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-[var(--toss-gray-3)]">
+                <div
+                  className={`flex flex-wrap items-center gap-1.5 font-medium text-[var(--toss-gray-3)] ${
+                    isRowLayout ? 'mt-2 text-[10px]' : 'mt-1.5 text-[11px]'
+                  }`}
+                >
                   <span>{post.schedule_room || '방 미정'}</span>
                   {post.chart_no ? <span>· 차트 {post.chart_no}</span> : null}
                   {post.surgery_fasting ? (
-                    <span className="rounded-[var(--radius-md)] bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-600">금식</span>
+                    <span
+                      className={`rounded-[var(--radius-md)] bg-rose-50 font-bold text-rose-600 ${
+                        isRowLayout ? 'px-1.5 py-0.5 text-[9px]' : 'px-1.5 py-0.5 text-[10px]'
+                      }`}
+                    >
+                      금식
+                    </span>
                   ) : null}
                 </div>
               </button>
@@ -2745,6 +2784,112 @@ export default function OperationCheckView({
       </div>
     ),
     [filteredSchedules, handleScheduleSelection, patientChecksByScheduleId, selectedScheduleId],
+  );
+
+  const patientWorkspaceTopPanel = !selectedSchedule || !checkForm ? (
+    <div className="rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--card)] p-4 text-center shadow-sm">
+      <p className="text-sm font-bold text-[var(--foreground)]">환자를 선택해 주세요.</p>
+      <p className="mt-1 text-[11px] font-medium text-[var(--toss-gray-3)]">수술환자 목록에서 바로 선택할 수 있습니다.</p>
+    </div>
+  ) : (
+    <div
+      data-testid="op-check-workspace-detail-header"
+      className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm"
+    >
+      <div className="flex flex-col gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-lg font-bold text-[var(--foreground)]">{checkForm.patient_name}</h3>
+            <span
+              className={`rounded-[var(--radius-md)] px-2 py-0.5 text-[11px] font-bold ${
+                checkForm.status === '수술중'
+                  ? 'bg-orange-100 text-orange-700'
+                  : checkForm.status === '완료'
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : checkForm.status === '준비완료'
+                      ? 'bg-[var(--accent)]/10 text-[var(--accent)]'
+                      : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
+              }`}
+            >
+              {checkForm.status}
+            </span>
+            <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2 py-0.5 text-[11px] font-bold text-[var(--toss-gray-4)]">
+              작업 순서 {workspaceSelectedOrderLabel}
+            </span>
+            {checkFormIsDirty ? (
+              <span
+                data-testid="op-check-workspace-dirty-indicator"
+                className="rounded-[var(--radius-md)] bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800"
+              >
+                미저장
+              </span>
+            ) : null}
+            {selectedScheduleHiddenByFilters ? (
+              <span className="rounded-[var(--radius-md)] bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-600">
+                필터 숨김
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-1 truncate text-[13px] font-medium text-[var(--toss-gray-3)]">{checkForm.surgery_name}</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-1.5">
+          <div className="rounded-[var(--radius-md)] bg-[var(--muted)]/35 px-2.5 py-2">
+            <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">수술 시간</p>
+            <p className="mt-1 text-sm font-bold text-[var(--foreground)]">{checkForm.schedule_time || '미정'}</p>
+          </div>
+          <div className="rounded-[var(--radius-md)] bg-[var(--muted)]/35 px-2.5 py-2">
+            <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">수술실</p>
+            <p className="mt-1 text-sm font-bold text-[var(--foreground)]">{checkForm.schedule_room || '미정'}</p>
+          </div>
+          <div className="rounded-[var(--radius-md)] bg-[var(--muted)]/35 px-2.5 py-2">
+            <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">차트번호</p>
+            <p className="mt-1 truncate text-sm font-bold text-[var(--foreground)]">{checkForm.chart_no || '-'}</p>
+          </div>
+          <div className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)]/70 px-2.5 py-2">
+            <p className="text-[10px] font-semibold text-[var(--accent)]">당일 현황</p>
+            <p className="mt-1 text-sm font-bold text-[var(--accent)]">{workspaceSelectedOrderLabel}</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            data-testid="op-check-workspace-prev"
+            onClick={() => handleWorkspaceStep(-1)}
+            disabled={workspaceSelectedIndex <= 0}
+            className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-[12px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] disabled:opacity-40"
+          >
+            ← 이전
+          </button>
+          <button
+            type="button"
+            data-testid="op-check-workspace-next"
+            onClick={() => handleWorkspaceStep(1)}
+            disabled={workspaceSelectedIndex < 0 || workspaceSelectedIndex >= workspaceSchedules.length - 1}
+            className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-[12px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] disabled:opacity-40"
+          >
+            다음 →
+          </button>
+          <button
+            type="button"
+            onClick={() => setPrintModalOpen(true)}
+            className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-[12px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+          >
+            출력
+          </button>
+          <button
+            type="button"
+            data-testid="op-check-record-save"
+            onClick={() => void savePatientCheck()}
+            disabled={savingCheck}
+            className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-[12px] font-bold text-white disabled:opacity-60"
+          >
+            {savingCheck ? '저장 중...' : '저장'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 
   const patientWorkspaceDetailContent = !selectedSchedule || !checkForm ? (
@@ -2759,120 +2904,6 @@ export default function OperationCheckView({
     </div>
   ) : (
     <>
-      <div
-        data-testid="op-check-workspace-detail-header"
-        className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] px-4 py-4 shadow-sm"
-      >
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-lg font-bold text-[var(--foreground)]">{checkForm.patient_name}</h3>
-                <span
-                  className={`rounded-[var(--radius-md)] px-2 py-0.5 text-[11px] font-bold ${
-                    checkForm.status === '수술중'
-                      ? 'bg-orange-100 text-orange-700'
-                      : checkForm.status === '완료'
-                        ? 'bg-emerald-50 text-emerald-700'
-                        : checkForm.status === '준비완료'
-                          ? 'bg-[var(--accent)]/10 text-[var(--accent)]'
-                          : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
-                  }`}
-                >
-                  {checkForm.status}
-                </span>
-                <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2 py-0.5 text-[11px] font-bold text-[var(--toss-gray-4)]">
-                  작업 순서 {workspaceSelectedOrderLabel}
-                </span>
-                {checkFormIsDirty ? (
-                  <span
-                    data-testid="op-check-workspace-dirty-indicator"
-                    className="rounded-[var(--radius-md)] bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800"
-                  >
-                    미저장
-                  </span>
-                ) : null}
-                {selectedScheduleHiddenByFilters ? (
-                  <span className="rounded-[var(--radius-md)] bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-600">
-                    필터 숨김
-                  </span>
-                ) : null}
-              </div>
-              <p className="mt-1 truncate text-[13px] font-medium text-[var(--toss-gray-3)]">
-                {checkForm.surgery_name}
-                {checkForm.chart_no ? ` · 차트 ${checkForm.chart_no}` : ''}
-                {' · '}수술실 {checkForm.schedule_room || '미정'}
-                {' · '}{checkForm.schedule_time || '시간 미정'}
-              </p>
-              <p className="mt-1 text-[11px] font-medium text-[var(--toss-gray-3)]">
-                같은 날짜 환자를 좌측 리스트에서 바로 전환하고, 저장과 상태 변경은 상단에서 바로 처리할 수 있습니다.
-              </p>
-            </div>
-
-            <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-              <button
-                type="button"
-                data-testid="op-check-workspace-prev"
-                onClick={() => handleWorkspaceStep(-1)}
-                disabled={workspaceSelectedIndex <= 0}
-                className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-[12px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] disabled:opacity-40"
-              >
-                ← 이전
-              </button>
-              <button
-                type="button"
-                data-testid="op-check-workspace-next"
-                onClick={() => handleWorkspaceStep(1)}
-                disabled={workspaceSelectedIndex < 0 || workspaceSelectedIndex >= workspaceSchedules.length - 1}
-                className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-[12px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] disabled:opacity-40"
-              >
-                다음 →
-              </button>
-              <button
-                type="button"
-                onClick={() => setPrintModalOpen(true)}
-                className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-[12px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
-              >
-                출력
-              </button>
-              <button
-                type="button"
-                data-testid="op-check-record-save"
-                onClick={() => void savePatientCheck()}
-                disabled={savingCheck}
-                className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-[12px] font-bold text-white disabled:opacity-60"
-              >
-                {savingCheck ? '저장 중...' : '저장'}
-              </button>
-            </div>
-          </div>
-
-          <div
-            data-testid="op-check-workspace-detail-meta"
-            className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4"
-          >
-            <div className="rounded-[var(--radius-lg)] bg-[var(--muted)]/35 px-3 py-3">
-              <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">수술 시간</p>
-              <p className="mt-1 text-base font-bold text-[var(--foreground)]">{checkForm.schedule_time || '시간 미정'}</p>
-            </div>
-            <div className="rounded-[var(--radius-lg)] bg-[var(--muted)]/35 px-3 py-3">
-              <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">수술실</p>
-              <p className="mt-1 text-base font-bold text-[var(--foreground)]">{checkForm.schedule_room || '미정'}</p>
-            </div>
-            <div className="rounded-[var(--radius-lg)] bg-[var(--muted)]/35 px-3 py-3">
-              <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">차트번호</p>
-              <p className="mt-1 text-base font-bold text-[var(--foreground)]">{checkForm.chart_no || '-'}</p>
-            </div>
-            <div className="rounded-[var(--radius-lg)] bg-[var(--toss-blue-light)]/70 px-3 py-3">
-              <p className="text-[11px] font-semibold text-[var(--accent)]">당일 환자 현황</p>
-              <p className="mt-1 text-base font-bold text-[var(--accent)]">
-                {workspaceVisibleScheduleCount}명 중 {workspaceSelectedOrderLabel}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div className="grid gap-4 xl:grid-cols-2">
       <div className="h-full rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <p className="mb-3 text-[11px] font-semibold text-[var(--toss-gray-3)]">수술 진행 상황</p>
@@ -2934,7 +2965,7 @@ export default function OperationCheckView({
                 onClick={() => void openWardMsgModal()}
                 className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white hover:opacity-90"
               >
-                병동팀 메시지 보내기
+                메시지 전송
               </button>
               <button
                 type="button"
@@ -2942,7 +2973,15 @@ export default function OperationCheckView({
                 disabled={savingCheck}
                 className="rounded-[var(--radius-md)] bg-orange-500 px-4 py-2 text-sm font-bold text-white hover:bg-orange-600 disabled:opacity-60"
               >
-                환자 인계완료 (수술 시작)
+                인계(수술시작)
+              </button>
+              <button
+                type="button"
+                onClick={() => void quickStatusChange('완료')}
+                disabled={savingCheck}
+                className="rounded-[var(--radius-md)] bg-emerald-500 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 disabled:opacity-60"
+              >
+                수술완료
               </button>
             </>
           )}
@@ -2956,9 +2995,9 @@ export default function OperationCheckView({
                 type="button"
                 onClick={() => void quickStatusChange('완료')}
                 disabled={savingCheck}
-                className="rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] disabled:opacity-60"
+                className="rounded-[var(--radius-md)] bg-emerald-500 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 disabled:opacity-60"
               >
-                수술 완료 처리
+                수술완료
               </button>
             </>
           )}
@@ -2973,7 +3012,7 @@ export default function OperationCheckView({
               onClick={() => void openWardMsgModal()}
               className="rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
             >
-              병동팀 메시지 보내기
+              메시지 전송
             </button>
           )}
         </div>
@@ -3217,9 +3256,6 @@ export default function OperationCheckView({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="text-xl font-bold text-[var(--foreground)]">OP체크</h2>
-            <p className="mt-1 text-sm font-medium text-[var(--toss-gray-3)]">
-              수술일정표 환자와 연동해 수술 전 준비사항과 수술 중 의료소모품 사용 내역을 관리합니다.
-            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -3244,38 +3280,30 @@ export default function OperationCheckView({
             >
               템플릿 설정
             </button>
-            <button
-              type="button"
-              onClick={() => void loadData()}
-              className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+            <div
+              data-testid="op-check-patient-search-card"
+              className={`w-full min-w-[220px] max-w-[320px] ${activeTab === 'patients' ? '' : 'hidden'}`}
             >
-              새로고침
-            </button>
+              <input
+                data-testid="op-check-search"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="환자명, 수술명, 차트번호"
+                className="w-full rounded-full border border-[var(--border)] px-4 py-2 text-sm font-medium"
+              />
+            </div>
           </div>
         </div>
       </div>
 
       {activeTab === 'patients' ? (
-        <div data-testid="op-check-patient-top-grid" className="grid gap-4 lg:grid-cols-3">
-          <div
-            data-testid="op-check-patient-search-card"
-            className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm"
-          >
-              <div className="grid gap-2">
-                <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">환자/수술 검색</label>
-                <input
-                  data-testid="op-check-search"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="환자명, 수술명, 차트번호"
-                  className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-medium"
-                />
-              </div>
-          </div>
-
+        <div
+          data-testid="op-check-patient-top-grid"
+          className="grid gap-3 lg:mx-auto lg:max-w-[920px] lg:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]"
+        >
           <div
             data-testid="op-check-patient-calendar-card"
-              className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm"
+              className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm"
             >
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between gap-3">
@@ -3425,34 +3453,25 @@ export default function OperationCheckView({
 
           <div
             data-testid="op-check-patient-summary-card"
-            className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm"
+            className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm"
           >
-            <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">선택 날짜 작업 요약</p>
-            <h3 className="mt-1 text-base font-bold text-[var(--foreground)]">{formatDateLabel(selectedDate)}</h3>
+            <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">작업 현황</p>
+            <p className="mt-1 text-[12px] font-medium text-[var(--toss-gray-3)]">
+              전체 {selectedDateSchedules.length}명
+            </p>
             <div className="mt-3 grid grid-cols-2 gap-1.5">
               {workspaceStatusSummaryCards.map((card) => (
-                <div key={card.value} className={`rounded-[var(--radius-md)] px-3 py-2 ${card.idleClass}`}>
+                <div key={card.value} className={`rounded-[var(--radius-md)] px-2.5 py-1.5 ${card.idleClass}`}>
                   <p className={`text-[10px] font-semibold ${card.labelClass}`}>{card.label}</p>
                   <p className="text-sm font-bold">{card.count}명</p>
                 </div>
               ))}
             </div>
-            <div className="mt-3 flex items-center justify-between gap-2">
-              <span className="text-[11px] font-medium text-[var(--toss-gray-3)]">전체 {selectedDateSchedules.length}명</span>
-              <button
-                type="button"
-                onClick={handleWorkspaceOpen}
-                disabled={!selectedDateSchedules[0]}
-                className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50"
-              >
-                작업창 열기
-              </button>
-            </div>
           </div>
 
           <div
             data-testid="op-check-patient-list-card"
-            className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm lg:col-span-3"
+            className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm lg:col-span-2"
           >
             <div className="mb-2 flex items-center justify-between px-1">
               <p className="text-sm font-bold text-[var(--foreground)]">선택 날짜 수술 환자</p>
@@ -3868,26 +3887,30 @@ export default function OperationCheckView({
               </select>
             </div>
 
-            <div className="grid min-h-0 flex-1 xl:grid-cols-[300px,1fr] 2xl:grid-cols-[340px,1fr]">
-              <aside className="flex min-h-0 flex-col border-b border-[var(--border)] bg-[var(--muted)]/20 p-3 xl:border-b-0 xl:border-r">
-                <div className="mb-2 flex items-center justify-between gap-2 px-1">
-                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                    {statusFilterTab !== '전체' ? `${statusFilterTab} 환자` : '수술 환자 목록'}
-                  </p>
-                  <span className="text-[11px] font-bold text-[var(--foreground)]">{workspaceVisibleScheduleCount}명</span>
-                </div>
-                {renderFilteredScheduleList({
-                  containerClassName: 'min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1 custom-scrollbar',
-                  emptyMessage: statusFilterTab !== '전체'
-                    ? '현재 조건에 맞는 수술 환자가 없습니다.'
-                    : '선택한 날짜에 연결할 수술 환자가 없습니다.',
-                  openWorkspaceOnSelect: false,
-                  testIdPrefix: 'op-check-workspace-schedule-card',
-                  schedules: workspaceSchedules,
-                })}
-              </aside>
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="grid gap-3 border-b border-[var(--border)] bg-[var(--muted)]/20 px-4 py-3 xl:grid-cols-[minmax(0,1fr)_380px]">
+                <aside className="min-w-0">
+                  <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                      {statusFilterTab !== '전체' ? `${statusFilterTab} 환자` : '수술 환자 목록'}
+                    </p>
+                    <span className="text-[11px] font-bold text-[var(--foreground)]">{workspaceVisibleScheduleCount}명</span>
+                  </div>
+                  {renderFilteredScheduleList({
+                    containerClassName: 'flex snap-x snap-mandatory gap-2 overflow-x-auto overflow-y-hidden pb-1 pr-1 scroll-smooth custom-scrollbar',
+                    emptyMessage: statusFilterTab !== '전체'
+                      ? '현재 조건에 맞는 수술 환자가 없습니다.'
+                      : '선택한 날짜에 연결할 수술 환자가 없습니다.',
+                    openWorkspaceOnSelect: false,
+                    layout: 'row',
+                    testIdPrefix: 'op-check-workspace-schedule-card',
+                    schedules: workspaceSchedules,
+                  })}
+                </aside>
+                {patientWorkspaceTopPanel}
+              </div>
 
-              <section className="min-h-0 overflow-y-auto bg-[var(--page-bg)] p-4 md:p-5">
+              <section className="min-h-0 flex-1 overflow-y-auto bg-[var(--page-bg)] p-4 md:p-5">
                 <div className="space-y-4">{patientWorkspaceDetailContent}</div>
               </section>
             </div>
@@ -3980,13 +4003,13 @@ export default function OperationCheckView({
         </div>
       )}
 
-      {/* 병동팀 메시지 모달 */}
+      {/* 메시지 전송 모달 */}
       {showWardMsgModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowWardMsgModal(false); }}>
           <div className="w-full max-w-lg rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-lg">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
               <div>
-                <h3 className="text-base font-bold text-[var(--foreground)]">병동팀 메시지 보내기</h3>
+                <h3 className="text-base font-bold text-[var(--foreground)]">메시지 전송</h3>
                 <p className="mt-0.5 text-[12px] font-medium text-[var(--toss-gray-3)]">
                   환자를 수술실로 올려달라고 병동팀에게 메시지를 보냅니다.
                 </p>

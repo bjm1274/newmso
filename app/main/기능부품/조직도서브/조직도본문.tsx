@@ -68,8 +68,8 @@ interface MainContentProps {
   initialOpenMessageId?: string | null;
   initialOpenPostId?: string | null;
   onConsumeOpenPostId?: () => void;
-  onOpenApproval?: () => void;
-  initialApprovalIntent?: string | null;
+  onOpenApproval?: (intent?: Record<string, unknown>) => void;
+  initialApprovalIntent?: Record<string, unknown> | null;
   onConsumeApprovalIntent?: () => void;
   initialInventoryWorkflowApprovalId?: string | null;
   onConsumeInitialInventoryWorkflowApprovalId?: () => void;
@@ -251,6 +251,7 @@ export default function MainContent({
         <div className="min-h-0 flex-1 overflow-x-hidden">
           <InventoryView
             user={user as never}
+            staffs={data.staffs}
             depts={data.depts}
             onRefresh={onRefresh}
             selectedCo={selectedCo ?? undefined}
@@ -283,7 +284,7 @@ export default function MainContent({
 
       {mainMenu === '관리자' && (
         <div className="min-h-0 flex-1 overflow-x-hidden">
-          <AdminView user={user} staffs={data.staffs} depts={data.depts} onRefresh={onRefresh} initialTab={subView} />
+          <AdminView user={user} staffs={data.staffs} depts={data.depts} onRefresh={onRefresh} initialTab={subView} onOpenApproval={onOpenApproval} />
         </div>
       )}
 

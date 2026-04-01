@@ -21,29 +21,23 @@ import IntegratedReport from './관리자전용서브/통합보고서';
 import SalaryAnomalyDetector from './관리자전용서브/급여이상치감지';
 import AccessAuditLog from './관리자전용서브/접근감사로그';
 import CompanyPnL from './관리자전용서브/법인손익현황';
-import OfficialDocumentLog from './관리자전용서브/공문서발송대장';
 import SystemMasterCenter from './관리자전용서브/시스템마스터센터';
-import AssetLoanSettingsAdminView from './관리자전용서브/비품대여물품설정';
 import { hasSystemMasterPermission } from '@/lib/system-master';
 
 type AnalysisTabId = '경영대시보드' | '재무대시보드' | '예산관리' | '통합보고서' | '법인손익';
-type AuditTabId = '감사로그' | '접근감사로그';
+type OperationsTabId = '알림자동화' | '수술검사템플릿' | '팝업관리';
+type AuditTabId = '감사로그' | '접근감사로그' | '급여이상치';
 type AdminOuterTabId =
   | '경영분석'
+  | '운영설정'
   | '감사센터'
   | '시스템마스터센터'
   | '엑셀등록'
-  | '알림자동화'
   | '회사관리'
   | '직원권한'
-  | '수술검사템플릿'
-  | '팝업관리'
   | '데이터백업'
   | '데이터초기화'
-  | '문서양식'
-  | '급여이상치'
-  | '공문서대장'
-  | '비품대여설정';
+  | '문서양식';
 
 const ANALYSIS_TABS: { id: AnalysisTabId; label: string; icon: string }[] = [
   { id: '경영대시보드', label: '경영대시보드', icon: '📊' },
@@ -53,24 +47,25 @@ const ANALYSIS_TABS: { id: AnalysisTabId; label: string; icon: string }[] = [
   { id: '법인손익', label: '법인손익', icon: '📈' },
 ];
 
+const OPERATIONS_TABS: { id: OperationsTabId; label: string; icon: string }[] = [
+  { id: '알림자동화', label: '알림 자동화', icon: '🔔' },
+  { id: '수술검사템플릿', label: '수술 / 검사 템플릿', icon: '🧪' },
+  { id: '팝업관리', label: '팝업 관리', icon: '🪟' },
+];
+
 const AUDIT_TABS: { id: AuditTabId; label: string; icon: string }[] = [
   { id: '접근감사로그', label: '접근감사로그', icon: '🔐' },
   { id: '감사로그', label: '감사로그', icon: '🧾' },
+  { id: '급여이상치', label: '급여 이상치', icon: '⚠️' },
 ];
 
 const DIRECT_ADMIN_TABS: AdminOuterTabId[] = [
   '엑셀등록',
-  '알림자동화',
   '회사관리',
   '직원권한',
-  '수술검사템플릿',
-  '팝업관리',
   '데이터백업',
   '데이터초기화',
   '문서양식',
-  '급여이상치',
-  '공문서대장',
-  '비품대여설정',
   '시스템마스터센터',
 ];
 
@@ -85,12 +80,14 @@ function canAccessAdminTab(user: any, tabId: AdminOuterTabId) {
 function normalizeAdminEntry(tabId?: string | null): {
   activeTab: AdminOuterTabId;
   analysisTab: AnalysisTabId;
+  operationsTab: OperationsTabId;
   auditTab: AuditTabId;
 } {
   if (tabId === '회사관리') {
     return {
       activeTab: '회사관리',
       analysisTab: '경영대시보드',
+      operationsTab: '알림자동화',
       auditTab: '접근감사로그',
     };
   }
@@ -99,6 +96,7 @@ function normalizeAdminEntry(tabId?: string | null): {
     return {
       activeTab: '경영분석',
       analysisTab: tabId as AnalysisTabId,
+      operationsTab: '알림자동화',
       auditTab: '접근감사로그',
     };
   }
@@ -107,14 +105,25 @@ function normalizeAdminEntry(tabId?: string | null): {
     return {
       activeTab: '감사센터',
       analysisTab: '경영대시보드',
+      operationsTab: '알림자동화',
       auditTab: tabId as AuditTabId,
     };
   }
 
-  if (tabId === '경영분석' || tabId === '감사센터') {
+  if (tabId && OPERATIONS_TABS.some((tab) => tab.id === tabId)) {
     return {
-      activeTab: tabId,
+      activeTab: '운영설정',
       analysisTab: '경영대시보드',
+      operationsTab: tabId as OperationsTabId,
+      auditTab: '접근감사로그',
+    };
+  }
+
+  if (tabId === '경영분석' || tabId === '감사센터' || tabId === '운영설정') {
+    return {
+      activeTab: tabId as AdminOuterTabId,
+      analysisTab: '경영대시보드',
+      operationsTab: '알림자동화',
       auditTab: '접근감사로그',
     };
   }
@@ -123,6 +132,7 @@ function normalizeAdminEntry(tabId?: string | null): {
     return {
       activeTab: '문서양식',
       analysisTab: '경영대시보드',
+      operationsTab: '알림자동화',
       auditTab: '접근감사로그',
     };
   }
@@ -131,6 +141,7 @@ function normalizeAdminEntry(tabId?: string | null): {
     return {
       activeTab: '시스템마스터센터',
       analysisTab: '경영대시보드',
+      operationsTab: '알림자동화',
       auditTab: '접근감사로그',
     };
   }
@@ -139,6 +150,7 @@ function normalizeAdminEntry(tabId?: string | null): {
     return {
       activeTab: tabId as AdminOuterTabId,
       analysisTab: '경영대시보드',
+      operationsTab: '알림자동화',
       auditTab: '접근감사로그',
     };
   }
@@ -146,6 +158,7 @@ function normalizeAdminEntry(tabId?: string | null): {
   return {
     activeTab: '경영분석',
     analysisTab: '경영대시보드',
+    operationsTab: '알림자동화',
     auditTab: '접근감사로그',
   };
 }
@@ -205,28 +218,32 @@ export default function AdminView(props: Record<string, unknown>) {
   const initialState = normalizeAdminEntry(initialTab);
   const [activeTab, setActiveTab] = useState<AdminOuterTabId>(initialState.activeTab);
   const [analysisTab, setAnalysisTab] = useState<AnalysisTabId>(initialState.analysisTab);
+  const [operationsTab, setOperationsTab] = useState<OperationsTabId>(initialState.operationsTab);
   const [auditTab, setAuditTab] = useState<AuditTabId>(initialState.auditTab);
   const [inventory, setInventory] = useState<any[]>([]);
 
   const isSystemMaster = hasSystemMasterPermission(user as any);
   const hasAdminMenuAccess = canAccessMainMenu(user as any, '관리자');
+  const visibleOperationsTabs = useMemo(
+    () => OPERATIONS_TABS.filter((tab) => canAccessAdminSection(user as any, tab.id)),
+    [user],
+  );
+  const visibleAuditTabs = useMemo(
+    () => AUDIT_TABS.filter((tab) => canAccessAdminSection(user as any, tab.id)),
+    [user],
+  );
   const visibleAdminTabs = useMemo(() => {
     const tabs: AdminOuterTabId[] = [];
 
     if (canAccessAdminTab(user, '경영분석')) tabs.push('경영분석');
+    if (canAccessAdminTab(user, '운영설정')) tabs.push('운영설정');
     if (canAccessAdminTab(user, '감사센터')) tabs.push('감사센터');
     if (canAccessAdminTab(user, '엑셀등록')) tabs.push('엑셀등록');
-    if (canAccessAdminTab(user, '알림자동화')) tabs.push('알림자동화');
     if (canAccessAdminTab(user, '회사관리')) tabs.push('회사관리');
     if (canAccessAdminTab(user, '직원권한')) tabs.push('직원권한');
-    if (canAccessAdminTab(user, '수술검사템플릿')) tabs.push('수술검사템플릿');
-    if (canAccessAdminTab(user, '팝업관리')) tabs.push('팝업관리');
     if (canAccessAdminTab(user, '데이터백업')) tabs.push('데이터백업');
     if (canAccessAdminTab(user, '데이터초기화')) tabs.push('데이터초기화');
     if (canAccessAdminTab(user, '문서양식')) tabs.push('문서양식');
-    if (canAccessAdminTab(user, '급여이상치')) tabs.push('급여이상치');
-    if (canAccessAdminTab(user, '공문서대장')) tabs.push('공문서대장');
-    if (canAccessAdminTab(user, '비품대여설정')) tabs.push('비품대여설정');
     if (isSystemMaster && canAccessAdminTab(user, '시스템마스터센터')) {
       tabs.push('시스템마스터센터');
     }
@@ -246,6 +263,7 @@ export default function AdminView(props: Record<string, unknown>) {
       : (fallbackAdminTab ?? requestedTab);
     setActiveTab(nextActiveTab);
     setAnalysisTab(nextState.analysisTab);
+    setOperationsTab(nextState.operationsTab);
     setAuditTab(nextState.auditTab);
   }, [fallbackAdminTab, initialTab, isSystemMaster, visibleAdminTabs]);
 
@@ -255,6 +273,18 @@ export default function AdminView(props: Record<string, unknown>) {
       setActiveTab(fallbackAdminTab);
     }
   }, [activeTab, fallbackAdminTab, visibleAdminTabs]);
+
+  useEffect(() => {
+    if (visibleOperationsTabs.length === 0) return;
+    if (visibleOperationsTabs.some((tab) => tab.id === operationsTab)) return;
+    setOperationsTab(visibleOperationsTabs[0].id);
+  }, [operationsTab, visibleOperationsTabs]);
+
+  useEffect(() => {
+    if (visibleAuditTabs.length === 0) return;
+    if (visibleAuditTabs.some((tab) => tab.id === auditTab)) return;
+    setAuditTab(visibleAuditTabs[0].id);
+  }, [auditTab, visibleAuditTabs]);
 
   useEffect(() => {
     if (!visibleAdminTabs.includes('경영분석')) return;
@@ -305,33 +335,44 @@ export default function AdminView(props: Record<string, unknown>) {
           </>
         )}
 
+        {activeTab === '운영설정' && (
+          <>
+            <InnerTabBar
+              title="운영설정"
+              description=""
+              tabs={visibleOperationsTabs}
+              activeTab={operationsTab}
+              onChange={(tabId) => setOperationsTab(tabId as OperationsTabId)}
+              testIdPrefix="admin-operations-tab"
+            />
+            {operationsTab === '알림자동화' && <NotificationAutomation user={user} />}
+            {operationsTab === '수술검사템플릿' && <SurgeryExamTemplateManager />}
+            {operationsTab === '팝업관리' && <PopupManager />}
+          </>
+        )}
+
         {activeTab === '감사센터' && (
           <>
             <InnerTabBar
               title="감사센터"
               description=""
-              tabs={AUDIT_TABS}
+              tabs={visibleAuditTabs}
               activeTab={auditTab}
               onChange={(tabId) => setAuditTab(tabId as AuditTabId)}
               testIdPrefix="admin-audit-tab"
             />
             {auditTab === '접근감사로그' && <AccessAuditLog user={user} />}
             {auditTab === '감사로그' && <AuditLogViewer />}
+            {auditTab === '급여이상치' && <SalaryAnomalyDetector staffs={staffs} />}
           </>
         )}
 
         {activeTab === '엑셀등록' && <ExcelBulkUpload onRefresh={onRefresh} />}
-        {activeTab === '알림자동화' && <NotificationAutomation user={user} />}
-        {activeTab === '회사관리' && <CompanyManager staffs={staffs} onRefresh={onRefresh} />}
+        {activeTab === '회사관리' && <CompanyManager user={user as Record<string, unknown> | null | undefined} staffs={staffs} onRefresh={onRefresh} />}
         {activeTab === '직원권한' && <StaffPermissionManager onRefresh={onRefresh} />}
-        {activeTab === '수술검사템플릿' && <SurgeryExamTemplateManager />}
-        {activeTab === '팝업관리' && <PopupManager />}
         {activeTab === '데이터백업' && <DataBackup user={user as Record<string, unknown> | null | undefined} />}
         {activeTab === '데이터초기화' && <DataReseter onRefresh={onRefresh ?? (() => {})} />}
         {activeTab === '문서양식' && <FormBuilder user={user as Record<string, unknown> | null | undefined} />}
-        {activeTab === '급여이상치' && <SalaryAnomalyDetector staffs={staffs} />}
-        {activeTab === '공문서대장' && <OfficialDocumentLog staffs={staffs} selectedCo="전체" user={user} />}
-        {activeTab === '비품대여설정' && <AssetLoanSettingsAdminView staffs={staffs} user={user as any} />}
         {activeTab === '시스템마스터센터' && (
           <SystemMasterCenter
             user={user}
