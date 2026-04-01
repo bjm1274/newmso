@@ -1462,12 +1462,13 @@ export default function OperationCheckView({
     };
   }, [checkFormIsDirty]);
 
-  const workspaceSchedules = useMemo(() => {
-    if (selectedScheduleId && filteredSchedules.some((post) => post.id === selectedScheduleId)) {
-      return filteredSchedules;
-    }
-    return selectedDateSchedules;
-  }, [filteredSchedules, selectedDateSchedules, selectedScheduleId]);
+  const hasActiveScheduleFilters =
+    statusFilterTab !== '전체' || normalizeLookupValue(deferredSearchTerm).length > 0;
+
+  const workspaceSchedules = useMemo(
+    () => (hasActiveScheduleFilters ? filteredSchedules : selectedDateSchedules),
+    [filteredSchedules, hasActiveScheduleFilters, selectedDateSchedules],
+  );
 
   const workspaceSelectedIndex = useMemo(
     () => workspaceSchedules.findIndex((post) => post.id === selectedScheduleId),
@@ -1513,6 +1514,57 @@ export default function OperationCheckView({
     return counts;
   }, [patientChecksByScheduleId, selectedDateSchedules]);
 
+  const workspaceStatusSummaryCards = useMemo(
+    () =>
+      [
+        {
+          value: '준비중' as const,
+          label: '준비중',
+          count: selectedDateStatusCounts.ready,
+          testId: 'ready',
+          idleClass: 'bg-[var(--muted)]/45 text-[var(--foreground)]',
+          labelClass: 'text-[var(--toss-gray-3)]',
+          activeClass: 'bg-[var(--foreground)] text-white shadow-sm',
+        },
+        {
+          value: '준비완료' as const,
+          label: '준비완료',
+          count: selectedDateStatusCounts.prepComplete,
+          testId: 'prep-complete',
+          idleClass: 'bg-[var(--toss-blue-light)]/75 text-[var(--accent)]',
+          labelClass: 'text-[var(--accent)]',
+          activeClass: 'bg-[var(--accent)] text-white shadow-sm',
+        },
+        {
+          value: '수술중' as const,
+          label: '수술중',
+          count: selectedDateStatusCounts.inProgress,
+          testId: 'in-progress',
+          idleClass: 'bg-orange-50 text-orange-700',
+          labelClass: 'text-orange-700',
+          activeClass: 'bg-orange-500 text-white shadow-sm',
+        },
+        {
+          value: '완료' as const,
+          label: '완료',
+          count: selectedDateStatusCounts.done,
+          testId: 'done',
+          idleClass: 'bg-emerald-50 text-emerald-700',
+          labelClass: 'text-emerald-700',
+          activeClass: 'bg-emerald-500 text-white shadow-sm',
+        },
+      ] satisfies ReadonlyArray<{
+        value: '준비중' | '준비완료' | '수술중' | '완료';
+        label: string;
+        count: number;
+        testId: string;
+        idleClass: string;
+        labelClass: string;
+        activeClass: string;
+      }>,
+    [selectedDateStatusCounts],
+  );
+
   const workspaceVisibleScheduleCount = workspaceSchedules.length;
   const workspaceSelectedOrderLabel =
     workspaceSelectedIndex >= 0 ? `${workspaceSelectedIndex + 1} / ${workspaceVisibleScheduleCount}` : `0 / ${workspaceVisibleScheduleCount}`;
@@ -1539,6 +1591,54 @@ export default function OperationCheckView({
       [sectionKey]: !prev[sectionKey],
     }));
   }, []);
+
+  const handleWorkspaceStatusSummaryClick = useCallback(
+    (nextStatus: '준비중' | '준비완료' | '수술중' | '완료') => {
+      const nextTab = statusFilterTab === nextStatus ? '전체' : nextStatus;
+
+      if (dayWorkspaceOpen && selectedDate && nextTab !== '전체') {
+        const matchingSchedules = selectedDateSchedules.filter((post) => {
+          const currentStatus = String(patientChecksByScheduleId[post.id]?.status || '준비중');
+          return currentStatus === nextTab;
+        });
+
+        if (
+          matchingSchedules.length > 0 &&
+          !matchingSchedules.some((post) => post.id === selectedScheduleId)
+        ) {
+          const nextSchedule = getPreferredScheduleForDate(selectedDate, matchingSchedules);
+          if (
+            nextSchedule &&
+            selectedScheduleId !== nextSchedule.id &&
+            !confirmWorkspaceTransition(
+              `"${stripHiddenMetaBlocks(nextSchedule.patient_name) || '선택 환자'}" 환자로 이동하기`,
+            )
+          ) {
+            return;
+          }
+
+          if (nextSchedule) {
+            applyDateAndScheduleSelection(selectedDate, nextSchedule, {
+              openWorkspace: true,
+            });
+          }
+        }
+      }
+
+      setStatusFilterTab(nextTab);
+    },
+    [
+      applyDateAndScheduleSelection,
+      confirmWorkspaceTransition,
+      dayWorkspaceOpen,
+      getPreferredScheduleForDate,
+      patientChecksByScheduleId,
+      selectedDate,
+      selectedDateSchedules,
+      selectedScheduleId,
+      statusFilterTab,
+    ],
+  );
 
   const handleWorkspaceClose = useCallback(() => {
     setDayWorkspaceOpen(false);
@@ -2656,7 +2756,10 @@ export default function OperationCheckView({
     </div>
   ) : (
     <>
-      <div className="sticky top-0 z-20 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)]/95 px-4 py-4 shadow-md backdrop-blur">
+      <div
+        data-testid="op-check-workspace-detail-header"
+        className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] px-4 py-4 shadow-sm"
+      >
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0 flex-1">
@@ -3680,50 +3783,72 @@ export default function OperationCheckView({
             className="flex h-[100dvh] w-full max-w-none flex-col overflow-hidden rounded-none border border-[var(--border)] bg-[var(--card)] shadow-2xl md:h-[92vh] md:max-w-[1760px] md:rounded-[var(--radius-xl)]"
           >
             <div className="border-b border-[var(--border)] bg-[var(--card)]/96 px-5 py-4 backdrop-blur">
-              <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">OP체크 작업창</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-2">
-                      <h3 className="text-lg font-bold text-[var(--foreground)]">{formatDateLabel(selectedDate)}</h3>
-                      <span className="rounded-full bg-[var(--muted)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
-                        현재 환자 {workspaceSelectedOrderLabel}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm font-medium text-[var(--toss-gray-3)]">
-                      해당일 수술 환자 {filteredSchedules.length}명을 한 화면에서 빠르게 확인하고 처리합니다.
-                    </p>
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto_minmax(320px,360px)] xl:items-start">
+                <div className="space-y-2">
+                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">OP체크 작업창</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg font-bold text-[var(--foreground)]">{formatDateLabel(selectedDate)}</h3>
+                    <span className="rounded-full bg-[var(--muted)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
+                      현재 환자 {workspaceSelectedOrderLabel}
+                    </span>
+                    {statusFilterTab !== '전체' ? (
+                      <button
+                        type="button"
+                        data-testid="op-check-workspace-status-filter-reset"
+                        onClick={() => setStatusFilterTab('전체')}
+                        className="rounded-full border border-[var(--border)] px-3 py-1 text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
+                      >
+                        전체 보기
+                      </button>
+                    ) : null}
                   </div>
-                  <div
-                    data-testid="op-check-workspace-header-summary"
-                    className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4"
-                  >
-                    <div className="rounded-[var(--radius-lg)] bg-[var(--muted)]/45 px-3 py-2.5">
-                      <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">준비중</p>
-                      <p className="mt-1 text-base font-bold text-[var(--foreground)]">{selectedDateStatusCounts.ready}</p>
-                    </div>
-                    <div className="rounded-[var(--radius-lg)] bg-[var(--toss-blue-light)]/75 px-3 py-2.5">
-                      <p className="text-[11px] font-semibold text-[var(--accent)]">준비완료</p>
-                      <p className="mt-1 text-base font-bold text-[var(--accent)]">{selectedDateStatusCounts.prepComplete}</p>
-                    </div>
-                    <div className="rounded-[var(--radius-lg)] bg-orange-50 px-3 py-2.5">
-                      <p className="text-[11px] font-semibold text-orange-700">수술중</p>
-                      <p className="mt-1 text-base font-bold text-orange-700">{selectedDateStatusCounts.inProgress}</p>
-                    </div>
-                    <div className="rounded-[var(--radius-lg)] bg-emerald-50 px-3 py-2.5">
-                      <p className="text-[11px] font-semibold text-emerald-700">완료</p>
-                      <p className="mt-1 text-base font-bold text-emerald-700">{selectedDateStatusCounts.done}</p>
-                    </div>
-                  </div>
+                  <p className="text-sm font-medium text-[var(--toss-gray-3)]">
+                    해당일 수술 환자 {workspaceVisibleScheduleCount}명을 한 화면에서 빠르게 확인하고 처리합니다.
+                  </p>
                 </div>
-                <div className="flex w-full flex-col gap-2 xl:w-auto xl:min-w-[340px]">
+
+                <div
+                  data-testid="op-check-workspace-header-summary"
+                  className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:min-w-[448px] xl:self-center"
+                >
+                  {workspaceStatusSummaryCards.map((card) => {
+                    const isSelected = statusFilterTab === card.value;
+                    return (
+                      <button
+                        key={card.value}
+                        type="button"
+                        data-testid={`op-check-workspace-status-filter-${card.testId}`}
+                        onClick={() => handleWorkspaceStatusSummaryClick(card.value)}
+                        className={`rounded-[var(--radius-lg)] border px-3 py-2.5 text-left transition-all ${
+                          isSelected
+                            ? `border-transparent ${card.activeClass}`
+                            : `border-[var(--border)] ${card.idleClass} hover:-translate-y-0.5 hover:border-[var(--foreground)]/10`
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <p className={`text-[11px] font-semibold ${isSelected ? 'text-white/80' : card.labelClass}`}>
+                            {card.label}
+                          </p>
+                          {isSelected ? (
+                            <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-bold text-white">
+                              선택중
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className={`mt-1 text-base font-bold ${isSelected ? 'text-white' : ''}`}>{card.count}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex w-full flex-col gap-2 xl:w-auto xl:min-w-[320px] xl:justify-self-end">
                   <input
                     value={searchTerm}
                     onChange={(event) => setSearchTerm(event.target.value)}
                     placeholder="환자명, 수술명, 차트번호"
                     className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-medium"
                   />
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                     <select
                       data-testid="op-check-workspace-sort-modal"
                       value={workspaceSort}
@@ -3742,7 +3867,7 @@ export default function OperationCheckView({
                       type="button"
                       onClick={handleWorkspaceClose}
                       data-testid="op-check-workspace-close"
-                      className="ml-auto rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                      className="rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
                     >
                       닫기
                     </button>
@@ -3787,7 +3912,9 @@ export default function OperationCheckView({
                   </div>
                 </div>
 
-                {renderStatusFilterTabs('mb-3 flex flex-wrap gap-1')}
+                <p className="mb-3 text-[11px] font-medium text-[var(--toss-gray-3)]">
+                  상단 상태 박스를 눌러 해당 환자만 빠르게 골라볼 수 있습니다.
+                </p>
                 {renderFilteredScheduleList({
                   containerClassName: 'min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 custom-scrollbar',
                   emptyMessage: '현재 조건에 맞는 수술 환자가 없습니다.',
