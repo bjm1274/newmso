@@ -1,20 +1,108 @@
 import { expect, test, type Page } from '@playwright/test';
 import { dismissDialogs, fakeUser, mockSupabase, seedSession } from './helpers';
 
+async function installFixedDate(page: Page, initialIso = '2026-03-01T09:00:00+09:00') {
+  await page.addInitScript(({ iso }) => {
+    const RealDate = Date;
+    const fixedTime = new RealDate(iso).getTime();
+
+    class MockDate extends RealDate {
+      constructor(...args: any[]) {
+        if (args.length === 0) {
+          super(fixedTime);
+          return;
+        }
+        // @ts-expect-error browser test shim
+        super(...args);
+      }
+
+      static now() {
+        return fixedTime;
+      }
+    }
+
+    MockDate.parse = RealDate.parse;
+    MockDate.UTC = RealDate.UTC;
+    // @ts-expect-error browser test shim
+    window.Date = MockDate;
+  }, { iso: initialIso });
+}
+
 async function openShiftPlanner(page: Page) {
-  await page.goto('/main?open_menu=인사관리');
+  await installFixedDate(page);
+  await page.goto(
+    `/main?${new URLSearchParams({ open_menu: '인사관리', open_subview: '교대근무' }).toString()}`
+  );
   await page.getByRole('button', { name: '교대근무' }).click();
   await expect(page.getByTestId('shift-suite-bar')).toBeVisible();
   await page.getByTestId('shift-suite-1').click();
   await expect(page.getByTestId('roster-pattern-planner')).toBeVisible();
 }
 
+async function openAdminRosterPolicy(page: Page, tab: 'planner' | 'rules' | 'patterns') {
+  await installFixedDate(page);
+  await page.goto(
+    `/main?${new URLSearchParams({ open_menu: '관리자', open_subview: '회사관리' }).toString()}`
+  );
+  await expect(page.getByTestId('company-manager-view')).toBeVisible();
+  await page.getByTestId('company-manager-tab-rosterPolicy').click();
+
+  if (tab === 'rules') {
+    await page.getByRole('button', { name: '근무 규칙', exact: true }).click();
+    await expect(page.getByTestId('roster-rule-manager')).toBeVisible();
+    return;
+  }
+
+  if (tab === 'patterns') {
+    await page.getByRole('button', { name: '근무 패턴', exact: true }).click();
+    await expect(page.getByTestId('roster-pattern-manager')).toBeVisible();
+    return;
+  }
+
+  await page.getByRole('button', { name: '월간 편성 저장', exact: true }).click();
+  await expect(page.getByTestId('roster-pattern-planner')).toBeVisible();
+}
+
 async function openShiftPatternManager(page: Page) {
-  await page.goto('/main?open_menu=인사관리');
-  await page.getByRole('button', { name: '교대근무' }).click();
-  await expect(page.getByTestId('shift-suite-bar')).toBeVisible();
-  await page.getByTestId('shift-suite-3').click();
-  await expect(page.getByTestId('roster-pattern-manager')).toBeVisible();
+  await openAdminRosterPolicy(page, 'patterns');
+}
+
+async function switchAdminRosterTab(page: Page, tab: 'planner' | 'rules' | 'patterns') {
+  if (tab === 'rules') {
+    await page.getByRole('button', { name: '근무 규칙', exact: true }).click();
+    await expect(page.getByTestId('roster-rule-manager')).toBeVisible();
+    return;
+  }
+
+  if (tab === 'patterns') {
+    await page.getByRole('button', { name: '근무 패턴', exact: true }).click();
+    await expect(page.getByTestId('roster-pattern-manager')).toBeVisible();
+    return;
+  }
+
+  await page.getByRole('button', { name: '월간 편성 저장', exact: true }).click();
+  await expect(page.getByTestId('roster-pattern-planner')).toBeVisible();
+}
+
+function createRosterAdminUser() {
+  return {
+    ...fakeUser,
+    id: 'roster-admin-user',
+    employee_no: 'ROSTER-ADM-001',
+    name: '근무표 관리자',
+    company: 'SY INC.',
+    company_id: 'mso-company-id',
+    department: 'Operations',
+    position: 'Director',
+    role: 'admin',
+    permissions: {
+      ...fakeUser.permissions,
+      admin: true,
+      mso: true,
+      ['menu_관리자']: true,
+      ['menu_인사관리']: true,
+    },
+  };
 }
 
 test.beforeEach(async ({ page }) => {
@@ -322,6 +410,7 @@ test('pattern planner narrows management and surgery teams to their allowed shif
 test('saved ward pattern mixes day-fixed, night-fixed, and rotating staff in one roster', async ({
   page,
 }) => {
+  const rosterAdminUser = createRosterAdminUser();
   const plannerUser = {
     ...fakeUser,
     id: 'ward-planner-1',
@@ -376,7 +465,7 @@ test('saved ward pattern mixes day-fixed, night-fixed, and rotating staff in one
   };
 
   await mockSupabase(page, {
-    staffMembers: [plannerUser, dayFixedMate, nightFixedMate, rotatingMate],
+    staffMembers: [rosterAdminUser, plannerUser, dayFixedMate, nightFixedMate, rotatingMate],
     companies: [{ id: 'clinic-1', name: 'AlphaClinic', type: 'hospital', is_active: true }],
     workShifts: [
       {
@@ -415,7 +504,7 @@ test('saved ward pattern mixes day-fixed, night-fixed, and rotating staff in one
     ],
   });
   await seedSession(page, {
-    user: plannerUser,
+    user: rosterAdminUser,
     localStorage: {
       erp_last_menu: '인사관리',
       erp_last_subview: '교대근무',
@@ -450,8 +539,7 @@ test('saved ward pattern mixes day-fixed, night-fixed, and rotating staff in one
   await page.getByTestId('pattern-profile-save').click();
   await expect(page.getByTestId('roster-pattern-manager').getByText('병동 혼합 3교대')).toBeVisible();
 
-  await page.getByTestId('shift-suite-2').click();
-  await expect(page.getByTestId('roster-rule-manager')).toBeVisible();
+  await switchAdminRosterTab(page, 'rules');
   await page.getByTestId('generation-rule-name-input').fill('병동 안전규칙');
   await page.getByTestId('generation-rule-team-keywords-input').fill('병동팀');
   await page.getByTestId('generation-rule-rotation-night-min-count').fill('3');
@@ -463,7 +551,7 @@ test('saved ward pattern mixes day-fixed, night-fixed, and rotating staff in one
     page.getByTestId('roster-rule-manager').getByText('병동 안전규칙'),
   ).toBeVisible();
 
-  await page.getByTestId('shift-suite-1').click();
+  await switchAdminRosterTab(page, 'planner');
   await page.getByTestId('roster-pattern-profile-select').selectOption({ label: '병동 혼합 3교대' });
   await page.getByTestId('roster-generation-rule-select').selectOption({ label: '병동 안전규칙' });
   await page.getByTestId('roster-auto-generate').click();
@@ -634,6 +722,7 @@ test('ward auto generation detects dedicated staff without a saved pattern profi
 test('ward generation clearly marks staff shortage when minimum D/E/N exceeds available headcount', async ({
   page,
 }) => {
+  const rosterAdminUser = createRosterAdminUser();
   const plannerUser = {
     ...fakeUser,
     id: 'ward-shortage-1',
@@ -662,7 +751,7 @@ test('ward generation clearly marks staff shortage when minimum D/E/N exceeds av
   };
 
   await mockSupabase(page, {
-    staffMembers: [plannerUser, shortageMate],
+    staffMembers: [rosterAdminUser, plannerUser, shortageMate],
     companies: [{ id: 'clinic-1', name: 'AlphaClinic', type: 'hospital', is_active: true }],
     workShifts: [
       {
@@ -701,7 +790,7 @@ test('ward generation clearly marks staff shortage when minimum D/E/N exceeds av
     ],
   });
   await seedSession(page, {
-    user: plannerUser,
+    user: rosterAdminUser,
     localStorage: {
       erp_last_menu: '인사관리',
       erp_last_subview: '교대근무',
@@ -711,8 +800,7 @@ test('ward generation clearly marks staff shortage when minimum D/E/N exceeds av
   });
 
   await openShiftPatternManager(page);
-  await page.getByTestId('shift-suite-2').click();
-  await expect(page.getByTestId('roster-rule-manager')).toBeVisible();
+  await switchAdminRosterTab(page, 'rules');
   await page.getByTestId('generation-rule-name-input').fill('병동 인원부족 규칙');
   await page.getByTestId('generation-rule-team-keywords-input').fill('병동팀');
   await page.getByTestId('generation-rule-min-day-staff').fill('1');
@@ -720,7 +808,7 @@ test('ward generation clearly marks staff shortage when minimum D/E/N exceeds av
   await page.getByTestId('generation-rule-min-night-staff').fill('1');
   await page.getByTestId('generation-rule-save').click();
 
-  await page.getByTestId('shift-suite-1').click();
+  await switchAdminRosterTab(page, 'planner');
   await page.getByTestId('roster-generation-rule-select').selectOption({ label: '병동 인원부족 규칙' });
   await page.getByTestId('roster-auto-generate').click();
 
@@ -732,6 +820,7 @@ test('ward generation clearly marks staff shortage when minimum D/E/N exceeds av
 test('ward generation rule limits consecutive work days while preserving weekend coverage', async ({
   page,
 }) => {
+  const rosterAdminUser = createRosterAdminUser();
   const plannerUser = {
     ...fakeUser,
     id: 'ward-rule-planner-1',
@@ -802,7 +891,7 @@ test('ward generation rule limits consecutive work days while preserving weekend
   ];
 
   await mockSupabase(page, {
-    staffMembers,
+    staffMembers: [rosterAdminUser, ...staffMembers],
     companies: [{ id: 'clinic-1', name: 'AlphaClinic', type: 'hospital', is_active: true }],
     workShifts: [
       {
@@ -841,7 +930,7 @@ test('ward generation rule limits consecutive work days while preserving weekend
     ],
   });
   await seedSession(page, {
-    user: plannerUser,
+    user: rosterAdminUser,
     localStorage: {
       erp_last_menu: '\uC778\uC0AC\uAD00\uB9AC',
       erp_last_subview: '\uAD50\uB300\uADFC\uBB34',
@@ -851,8 +940,7 @@ test('ward generation rule limits consecutive work days while preserving weekend
   });
 
   await openShiftPatternManager(page);
-  await page.getByTestId('shift-suite-2').click();
-  await expect(page.getByTestId('roster-rule-manager')).toBeVisible();
+  await switchAdminRosterTab(page, 'rules');
 
   await page.getByTestId('generation-rule-name-input').fill('\uBCD1\uB3D9 \uC778\uB825\uC548\uC804\uADDC\uCE59');
   await page.getByTestId('generation-rule-team-keywords-input').fill('\uBCD1\uB3D9\uD300');
@@ -863,7 +951,7 @@ test('ward generation rule limits consecutive work days while preserving weekend
   await page.getByTestId('generation-rule-min-monthly-off-days').fill('7');
   await page.getByTestId('generation-rule-save').click();
 
-  await page.getByTestId('shift-suite-1').click();
+  await switchAdminRosterTab(page, 'planner');
   await page.getByTestId('roster-generation-rule-select').selectOption({
     label: '\uBCD1\uB3D9 \uC778\uB825\uC548\uC804\uADDC\uCE59',
   });
@@ -932,6 +1020,7 @@ test('ward generation rule limits consecutive work days while preserving weekend
 test('ward generation rule can block a day shift immediately after an evening shift', async ({
   page,
 }) => {
+  const rosterAdminUser = createRosterAdminUser();
   const plannerUser = {
     ...fakeUser,
     id: 'ward-evening-rule-planner-1',
@@ -1002,7 +1091,7 @@ test('ward generation rule can block a day shift immediately after an evening sh
   ];
 
   await mockSupabase(page, {
-    staffMembers,
+    staffMembers: [rosterAdminUser, ...staffMembers],
     companies: [{ id: 'clinic-1', name: 'AlphaClinic', type: 'hospital', is_active: true }],
     workShifts: [
       {
@@ -1041,7 +1130,7 @@ test('ward generation rule can block a day shift immediately after an evening sh
     ],
   });
   await seedSession(page, {
-    user: plannerUser,
+    user: rosterAdminUser,
     localStorage: {
       erp_last_menu: '\uC778\uC0AC\uAD00\uB9AC',
       erp_last_subview: '\uAD50\uB300\uADFC\uBB34',
@@ -1051,15 +1140,14 @@ test('ward generation rule can block a day shift immediately after an evening sh
   });
 
   await openShiftPatternManager(page);
-  await page.getByTestId('shift-suite-2').click();
-  await expect(page.getByTestId('roster-rule-manager')).toBeVisible();
+  await switchAdminRosterTab(page, 'rules');
 
   await page.getByTestId('generation-rule-name-input').fill('\uBCD1\uB3D9 \uC774\uBE0C \uBCF4\uD638\uADDC\uCE59');
   await page.getByTestId('generation-rule-team-keywords-input').fill('\uBCD1\uB3D9\uD300');
   await page.getByTestId('generation-rule-avoid-day-after-evening').check();
   await page.getByTestId('generation-rule-save').click();
 
-  await page.getByTestId('shift-suite-1').click();
+  await switchAdminRosterTab(page, 'planner');
   await page.getByTestId('roster-generation-rule-select').selectOption({
     label: '\uBCD1\uB3D9 \uC774\uBE0C \uBCF4\uD638\uADDC\uCE59',
   });

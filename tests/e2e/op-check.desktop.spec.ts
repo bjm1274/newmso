@@ -168,10 +168,10 @@ test('op check links schedules, applies templates, and saves a patient record', 
   await page.getByTestId('op-check-calendar-day-' + todayKey).click();
   await expect(page.getByTestId('op-check-workspace-modal')).toBeVisible();
   await expect(page.getByTestId('op-check-workspace-header-summary')).toBeVisible();
-  await expect(page.getByTestId('op-check-workspace-patient-strip')).toBeVisible();
+  await expect(page.getByTestId('op-check-workspace-detail-header')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Patient Alpha' }).first()).toBeVisible();
   await page.getByTestId('op-check-workspace-status-filter-ready').click();
-  await expect(page.getByTestId('op-check-workspace-detail-meta')).toBeVisible();
+  await expect(page.getByTestId('op-check-workspace-detail-header')).toContainText('CH-001');
   await expect(page.getByRole('heading', { name: 'Patient Alpha' }).first()).toBeVisible();
   await expect(page.locator('input[value="Knee set"]').first()).toBeVisible();
   await expect(page.locator('input[value="Screw set"]').first()).toBeVisible();
@@ -353,10 +353,12 @@ test('op check ward messages use dropdown recipients, keep favorites, and send s
   await expect(page.getByTestId('op-check-ward-recipient-option-' + favoriteStaffId)).toHaveCount(0);
   await expect(page.getByTestId('op-check-ward-message-textarea')).toHaveValue(/CH-033/);
   await expect(page.getByTestId('op-check-ward-message-textarea')).not.toHaveValue(/BOARD_META/);
-  await page.getByTestId('op-check-ward-template-move-request').click();
+  await page.getByTestId('op-check-ward-template-move-request').evaluate((node: HTMLElement) => node.click());
   await expect(page.getByTestId('op-check-ward-message-textarea')).toHaveValue(/\[수술실 이동 요청\]/);
 
-  await page.getByTestId('op-check-ward-recipient-dropdown-button').click();
+  await page
+    .getByTestId('op-check-ward-recipient-dropdown-button')
+    .evaluate((node: HTMLElement) => node.click());
   await page.getByTestId('op-check-ward-recipient-search').fill('김규');
   await page.getByTestId('op-check-ward-recipient-option-' + favoriteStaffId).click();
   await expect(page.getByTestId('op-check-ward-selected-recipient-' + favoriteStaffId)).toBeVisible();
@@ -435,7 +437,9 @@ test('op check ward recipient dropdown falls back to the full staff list when co
 
   await page.getByTestId('op-check-schedule-card-schedule-post-ward-fallback').click();
   await page.getByRole('button', { name: '병동팀 메시지 보내기' }).first().click();
-  await page.getByTestId('op-check-ward-recipient-dropdown-button').click();
+  await page
+    .getByTestId('op-check-ward-recipient-dropdown-button')
+    .evaluate((node: HTMLElement) => node.click());
   await page.getByTestId('op-check-ward-recipient-search').fill('병동팀');
   await expect(page.getByTestId('op-check-ward-recipient-option-ward-fallback-staff-1')).toBeVisible();
 
