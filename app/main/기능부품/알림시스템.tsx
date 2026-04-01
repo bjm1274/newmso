@@ -7,6 +7,7 @@ import { canAccessAdminSection } from '@/lib/access-control';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { bindChannelHealthcheck, bindPageRefresh } from '@/lib/realtime-maintenance';
 import { detectPayrollAnomalies } from './관리자전용서브/급여이상치감지';
+import { CHAT_ACTIVE_ROOM_KEY as ACTIVE_CHAT_ROOM_SESSION_KEY } from '@/app/main/navigation-state';
 
 /**
  * [실시간 알림 엔진 + KakaoTalk 스타일 Toast UI]
@@ -72,7 +73,6 @@ const TYPE_CFG: Record<string, { icon: string; bg: string; progress: string; acc
 const DEFAULT_CFG = { icon: '🔔', bg: 'bg-[var(--toss-gray-4)]', progress: 'bg-[var(--toss-gray-3)]', accent: 'border-[var(--border)]' };
 const getTypeCfg = (type: string) => TYPE_CFG[type] || DEFAULT_CFG;
 
-const ACTIVE_CHAT_ROOM_SESSION_KEY = 'erp_chat_active_room';
 export const PUSH_STATUS_CHANGED_EVENT = 'erp-push-status-changed';
 
 function toNotificationText(value: unknown, fallback = '') {

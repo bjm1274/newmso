@@ -51,8 +51,8 @@ import AnnualLeavePlanForm from './전자결재서브/연차사용계획서양�
 import OfficialDocumentDispatchForm from './전자결재서브/공문발송양식';
 
 import { useActionDialog } from '@/app/components/useActionDialog';
+import { APPROVAL_VIEW_KEY } from '@/app/main/navigation-state';
 
-const APPROVAL_VIEW_KEY = 'erp_approval_view';
 const DRAFT_STORAGE_KEY = 'erp_draft_approval';
 const LOCAL_APPROVAL_FORM_TYPES_KEY = 'erp_approval_form_types_custom';
 const LOCAL_FORM_TEMPLATE_DESIGNS_KEY = 'erp_form_template_designs';

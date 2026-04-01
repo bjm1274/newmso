@@ -31,12 +31,32 @@ type MobileBleTaskAttempt = {
   ok: boolean;
   upstream: unknown;
 };
+type BoundBleDeviceSummary = {
+  id?: number | null;
+  eslCode?: string;
+  productCode?: string;
+  templateId?: number | null;
+  typeCode?: string;
+  deviceArea?: number | null;
+  actionFrom?: string;
+  pid?: string;
+  eslVersion?: string;
+};
 type MobileBlePreflightResult = {
   ok: boolean;
   normalizedBaseUrl?: string;
   deviceId?: string;
   license?: unknown;
   trigger?: unknown;
+  bleQuery?: unknown;
+  deviceLookup?: unknown;
+  boundDevice?: BoundBleDeviceSummary | null;
+  waitingCount?: number | null;
+  errorTaskCount?: number | null;
+  queryBleCount?: number;
+  taskList?: unknown;
+  taskState?: 'ready' | 'idle' | 'missing' | 'unknown';
+  statusSummary?: string;
   taskReady?: boolean;
   task?: unknown;
   taskAttempts?: MobileBleTaskAttempt[];
@@ -605,8 +625,10 @@ export default function ZhsunycoEslSync(_props: Props) {
 
       if (parsed.taskReady) {
         toast('제조사 서버에서 BLE 작업을 확인했습니다.', 'success');
+      } else if (parsed.boundDevice?.eslCode) {
+        toast('제조사 서버에는 등록된 기기지만 현재 대기 BLE 작업은 없습니다.', 'error');
       } else {
-        toast('제조사 서버에서 아직 BLE 작업을 만들지 않았습니다.', 'error');
+        toast('제조사 서버에서 이 기기 바코드를 찾지 못했습니다.', 'error');
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : '제조사 전송 상태 확인에 실패했습니다.';
@@ -924,15 +946,19 @@ export default function ZhsunycoEslSync(_props: Props) {
                       className={`rounded-[var(--radius-lg)] border px-3 py-3 text-sm ${
                         mobileBlePreflight.taskReady
                           ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                          : 'border-amber-200 bg-amber-50 text-amber-900'
+                          : mobileBlePreflight.boundDevice?.eslCode
+                            ? 'border-amber-200 bg-amber-50 text-amber-900'
+                            : 'border-rose-200 bg-rose-50 text-rose-800'
                       }`}
                     >
                       {mobileBlePreflight.taskReady
                         ? '제조사 서버가 BLE 작업을 반환했습니다. 다만 실제 브라우저 write 프로토콜은 아직 별도 확인이 필요합니다.'
-                        : mobileBlePreflight.error || '제조사 서버가 아직 이 기기의 BLE 작업을 만들지 않았습니다. 보통 첫 바인딩이나 기기 등록이 선행되어야 합니다.'}
+                        : mobileBlePreflight.statusSummary ||
+                          mobileBlePreflight.error ||
+                          '제조사 서버 상태를 더 확인해 주세요.'}
                     </div>
 
-                    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-1">
+                    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-2">
                       <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2">
                         <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">라이선스</div>
                         <div className="mt-1 text-[12px] font-semibold text-[var(--foreground)]">
@@ -945,7 +971,67 @@ export default function ZhsunycoEslSync(_props: Props) {
                           {extractDiagnosticMessage(mobileBlePreflight.trigger)}
                         </div>
                       </div>
+                      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2">
+                        <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">기기 등록 상태</div>
+                        <div className="mt-1 text-[12px] font-semibold text-[var(--foreground)]">
+                          {mobileBlePreflight.boundDevice?.eslCode ? '제조사 서버 등록됨' : '제조사 서버 미확인'}
+                        </div>
+                      </div>
+                      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2">
+                        <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">대기 작업</div>
+                        <div className="mt-1 text-[12px] font-semibold text-[var(--foreground)]">
+                          {mobileBlePreflight.taskReady
+                            ? 'BLE 작업 준비됨'
+                            : mobileBlePreflight.boundDevice?.eslCode
+                              ? `대기 ${mobileBlePreflight.waitingCount ?? 0}건`
+                              : '작업 없음'}
+                        </div>
+                      </div>
                     </div>
+
+                    {mobileBlePreflight.boundDevice ? (
+                      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
+                        <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">제조사 서버에 저장된 기기 정보</div>
+                        <div className="mt-2 grid gap-2 md:grid-cols-2">
+                          <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2">
+                            <div className="text-[10px] font-bold text-[var(--toss-gray-3)]">ESL 코드</div>
+                            <div className="mt-1 text-[12px] font-semibold text-[var(--foreground)]">
+                              {mobileBlePreflight.boundDevice.eslCode || '-'}
+                            </div>
+                          </div>
+                          <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2">
+                            <div className="text-[10px] font-bold text-[var(--toss-gray-3)]">상품 코드</div>
+                            <div className="mt-1 text-[12px] font-semibold text-[var(--foreground)]">
+                              {mobileBlePreflight.boundDevice.productCode || '-'}
+                            </div>
+                          </div>
+                          <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2">
+                            <div className="text-[10px] font-bold text-[var(--toss-gray-3)]">템플릿 ID</div>
+                            <div className="mt-1 text-[12px] font-semibold text-[var(--foreground)]">
+                              {mobileBlePreflight.boundDevice.templateId ?? '-'}
+                            </div>
+                          </div>
+                          <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2">
+                            <div className="text-[10px] font-bold text-[var(--toss-gray-3)]">기기 종류</div>
+                            <div className="mt-1 text-[12px] font-semibold text-[var(--foreground)]">
+                              {mobileBlePreflight.boundDevice.typeCode || '-'}
+                            </div>
+                          </div>
+                          <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2">
+                            <div className="text-[10px] font-bold text-[var(--toss-gray-3)]">바인딩 출처</div>
+                            <div className="mt-1 text-[12px] font-semibold text-[var(--foreground)]">
+                              {mobileBlePreflight.boundDevice.actionFrom || '-'}
+                            </div>
+                          </div>
+                          <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2">
+                            <div className="text-[10px] font-bold text-[var(--toss-gray-3)]">펌웨어 / PID</div>
+                            <div className="mt-1 text-[12px] font-semibold text-[var(--foreground)]">
+                              {[mobileBlePreflight.boundDevice.eslVersion, mobileBlePreflight.boundDevice.pid].filter(Boolean).join(' / ') || '-'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
 
                     {mobileBlePreflight.taskAttempts?.length ? (
                       <div className="space-y-2">
@@ -969,8 +1055,29 @@ export default function ZhsunycoEslSync(_props: Props) {
                             </pre>
                           </div>
                         ))}
+                        </div>
+                      ) : null}
+
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
+                        <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">BLE 조회 응답</div>
+                        <pre className="mt-2 max-h-32 overflow-auto rounded-[var(--radius-md)] bg-slate-950 px-3 py-2 text-[11px] text-slate-100">
+                          {stringifyDiagnosticValue(mobileBlePreflight.bleQuery)}
+                        </pre>
                       </div>
-                    ) : null}
+                      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
+                        <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">기기 상세 응답</div>
+                        <pre className="mt-2 max-h-32 overflow-auto rounded-[var(--radius-md)] bg-slate-950 px-3 py-2 text-[11px] text-slate-100">
+                          {stringifyDiagnosticValue(mobileBlePreflight.deviceLookup)}
+                        </pre>
+                      </div>
+                      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
+                        <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">대기 작업 목록 응답</div>
+                        <pre className="mt-2 max-h-32 overflow-auto rounded-[var(--radius-md)] bg-slate-950 px-3 py-2 text-[11px] text-slate-100">
+                          {stringifyDiagnosticValue(mobileBlePreflight.taskList)}
+                        </pre>
+                      </div>
+                    </div>
 
                     {mobileBlePreflight.browserBle ? (
                       <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
