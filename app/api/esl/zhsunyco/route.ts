@@ -55,6 +55,13 @@ type LegacyBleDirectPayload = {
   led?: LegacyBleLedPayload[];
 };
 
+type LegacyTemplateSummary = {
+  id: number;
+  name: string;
+  typeCode: string;
+  isDefault: boolean;
+};
+
 type BoundBleDeviceSummary = {
   id: number | null;
   eslCode: string;
@@ -94,6 +101,7 @@ type RouteBody =
   | { action: 'queryStores'; config?: RouteConfig }
   | { action: 'pushGoods'; config?: RouteConfig; payload?: ZhsunycoGoodsPayloadRow[] }
   | { action: 'bindDevice'; config?: RouteConfig; payload?: BindDevicePayload }
+  | { action: 'legacyTemplateQuery'; config?: RouteConfig }
   | { action: 'legacyBleSearch'; config?: RouteConfig; payload?: LegacyBleSearchPayload }
   | { action: 'legacyBleDirect'; config?: RouteConfig; payload?: LegacyBleDirectPayload }
   | { action: 'mobileTest'; config?: RouteConfig }
@@ -244,6 +252,39 @@ function buildLegacyApiUrl(baseUrl: string, apiCode: string, resourcePath: strin
   return `${baseUrl}/api/${encodeURIComponent(apiCode)}/${trimmedPath}`;
 }
 
+function buildLegacyTemplateSummary(value: unknown): LegacyTemplateSummary | null {
+  if (!isObject(value)) {
+    return null;
+  }
+
+  const id = toNullableNumber(value.id);
+  if (id === null) {
+    return null;
+  }
+
+  return {
+    id,
+    name: String(value.name || `Template ${id}`).trim(),
+    typeCode: String(value.esltype_code || value.type_code || '').trim(),
+    isDefault: Number(value.default) === 1 || value.default === true,
+  };
+}
+
+function extractLegacyTemplateList(json: unknown) {
+  if (Array.isArray(json)) {
+    return json.map((entry) => buildLegacyTemplateSummary(entry)).filter((entry): entry is LegacyTemplateSummary => Boolean(entry));
+  }
+
+  if (isObject(json)) {
+    const listCandidate = Array.isArray(json.list) ? json.list : Array.isArray(json.body) ? json.body : [];
+    return listCandidate
+      .map((entry) => buildLegacyTemplateSummary(entry))
+      .filter((entry): entry is LegacyTemplateSummary => Boolean(entry));
+  }
+
+  return [] as LegacyTemplateSummary[];
+}
+
 async function postLegacyApi(
   baseUrl: string,
   apiCode: string,
@@ -259,18 +300,41 @@ async function postLegacyApi(
   });
 }
 
+function isLegacyApiTextFailure(messageSource: string) {
+  const normalized = String(messageSource || '').trim().toLowerCase();
+  if (!normalized) return false;
+
+  const statusMatch = normalized.match(/"?(error_code|code)"?\s*[:=]\s*(-?\d+)/);
+  if (statusMatch) {
+    return Number(statusMatch[2]) !== 0;
+  }
+
+  return normalized.startsWith('miss ') || normalized.startsWith('invalid ') || /\berror\b/.test(normalized);
+}
+
 function isLegacyApiMessageFailure(parsed: { json: UpstreamJson | null; rawText: string }) {
   const jsonValue = parsed.json as unknown;
-  const messageSource =
-    typeof jsonValue === 'string'
-      ? jsonValue
-      : typeof parsed.rawText === 'string'
-        ? parsed.rawText
-        : '';
 
-  const normalized = messageSource.trim().toLowerCase();
-  if (!normalized) return false;
-  return normalized.startsWith('miss ') || normalized.startsWith('invalid ') || normalized.includes('error');
+  if (isObject(jsonValue)) {
+    const errorCode = toNullableNumber(jsonValue.error_code);
+    if (errorCode !== null) {
+      return errorCode !== 0;
+    }
+
+    const explicitError = typeof jsonValue.error === 'string' ? jsonValue.error.trim() : '';
+    if (explicitError) {
+      return true;
+    }
+
+    const message = typeof jsonValue.message === 'string' ? jsonValue.message : '';
+    return isLegacyApiTextFailure(message);
+  }
+
+  if (typeof jsonValue === 'string') {
+    return isLegacyApiTextFailure(jsonValue);
+  }
+
+  return isLegacyApiTextFailure(parsed.rawText);
 }
 
 function normalizeLegacyLedEntry(value: LegacyBleLedPayload) {
@@ -615,6 +679,48 @@ export async function POST(request: NextRequest) {
         deviceIds,
         requestBody,
         upstream: searchResult.json ?? searchResult.rawText,
+      });
+    }
+
+    if (body.action === 'legacyTemplateQuery') {
+      const legacyConfig = validateLegacyApiConfig(config);
+      const query = new URLSearchParams({
+        store_code: legacyConfig.storeCode,
+        f1: '1',
+        f2: '100',
+        is_base64: '0',
+        sign: legacyConfig.sign,
+      });
+
+      const templateResult = await fetchUpstream(`${buildLegacyApiUrl(config.baseUrl, legacyConfig.apiCode, 'template/query')}?${query.toString()}`, {
+        method: 'GET',
+      });
+
+      const templateJson = templateResult.json as unknown;
+      if (!templateResult.response.ok) {
+        return buildErrorResponse(
+          `공식 템플릿 조회 실패: ${extractUpstreamMessage(templateResult, templateResult.response.status)}`,
+          502,
+        );
+      }
+
+      if (isObject(templateJson)) {
+        const errorCode = toNullableNumber(templateJson.error_code);
+        if (errorCode !== null && errorCode !== 0) {
+          return buildErrorResponse(
+            `공식 템플릿 조회 실패: ${extractUpstreamMessage(templateResult, templateResult.response.status)}`,
+            502,
+          );
+        }
+      }
+
+      return NextResponse.json({
+        ok: true,
+        normalizedBaseUrl: config.baseUrl,
+        apiCode: legacyConfig.apiCode,
+        storeCode: legacyConfig.storeCode,
+        templates: extractLegacyTemplateList(templateJson),
+        upstream: templateJson ?? templateResult.rawText,
       });
     }
 
