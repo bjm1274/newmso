@@ -169,7 +169,7 @@ test('op check links schedules, applies templates, and saves a patient record', 
   await expect(page.getByTestId('op-check-workspace-modal')).toBeVisible();
   await expect(page.getByTestId('op-check-workspace-header-summary')).toBeVisible();
   await expect(page.getByTestId('op-check-workspace-patient-strip')).toBeVisible();
-  await expect(page.getByTestId('op-check-workspace-empty')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Patient Alpha' }).first()).toBeVisible();
   await page.getByTestId('op-check-workspace-status-filter-ready').click();
   await expect(page.getByTestId('op-check-workspace-detail-meta')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Patient Alpha' }).first()).toBeVisible();
