@@ -1039,7 +1039,12 @@ export default function IntegratedInventoryManagement({
       }
 
       await fetchPendingSupplyApprovals();
-      toast(orderRequested ? '발주 요청을 등록했습니다.' : '자동 발주 기준 재고가 없어 발주 필요 상태로만 표시했습니다.', 'success');
+      toast(
+        orderRequested
+          ? '발주 요청을 등록했습니다. 발주 관리 탭에서 이어서 확인할 수 있습니다.'
+          : '자동 발주 기준 재고가 없어 발주 필요 상태로만 표시했습니다.',
+        'success',
+      );
     } catch (error: unknown) {
       console.error('물품신청 발주 처리 실패:', error);
       toast((error as Error)?.message || '발주 처리 중 오류가 발생했습니다.', 'error');
@@ -1047,6 +1052,69 @@ export default function IntegratedInventoryManagement({
       setWorkflowActionKey(null);
     }
   }, [fetchPendingSupplyApprovals, updateSupplyApprovalWorkflow, user]);
+
+  const handleSupplyOrderCancel = useCallback(async (approval: ApprovalRecord, workflowItem: WorkflowItem) => {
+    if (workflowItem.order_approval_requested) {
+      toast('자동으로 생성된 발주 요청이 있으면 발주 관리에서 먼저 확인해 주세요.', 'warning');
+      return;
+    }
+    if (!confirm('이 항목의 발주 처리 상태를 취소하고 다시 발주 필요 상태로 되돌릴까요?')) {
+      return;
+    }
+
+    const actionKey = `${approval.id}:${workflowItem.request_index}:order-cancel`;
+    setWorkflowActionKey(actionKey);
+
+    try {
+      const { data: supportInventoryRows, error: inventoryError } = await fetchSupportInventoryRows();
+
+      if (inventoryError) throw inventoryError;
+
+      const liveItems = buildSupplyRequestWorkflowItems(
+        approval?.meta_data?.items,
+        supportInventoryRows || [],
+        (approval?.meta_data?.inventory_workflow as Record<string, unknown> | undefined)?.items as Record<string, unknown>[] | undefined,
+      );
+      const currentItem = liveItems.find(
+        (item) => Number(item.request_index) === Number(workflowItem.request_index),
+      );
+
+      if (!currentItem) {
+        throw new Error('취소할 물품신청 항목을 찾지 못했습니다.');
+      }
+      if (currentItem.status !== 'ordered') {
+        return;
+      }
+
+      const fallbackNote =
+        currentItem.recommended_action === 'order' && !currentItem.source_inventory_id
+          ? '기준 재고가 없어 수동 발주가 필요합니다.'
+          : null;
+
+      const nextItems: SupplyRequestWorkflowItem[] = liveItems.map((item) =>
+        Number(item.request_index) === Number(currentItem.request_index)
+          ? {
+              ...item,
+              status: (currentItem.recommended_action === 'issue' ? 'issue_ready' : 'order_required') as SupplyRequestWorkflowItem['status'],
+              processed_at: null,
+              processed_by_id: null,
+              processed_by_name: null,
+              order_approval_requested: false,
+              note: fallbackNote,
+            }
+          : item,
+      );
+
+      await updateSupplyApprovalWorkflow(approval, nextItems);
+      await fetchPendingSupplyApprovals();
+      toast('발주 처리를 취소했고 다시 발주 필요 상태로 돌려두었습니다.', 'success');
+    } catch (error: unknown) {
+      console.error('물품신청 발주 처리 취소 실패:', error);
+      toast((error as Error)?.message || '발주 처리 취소 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setWorkflowActionKey(null);
+    }
+  }, [fetchPendingSupplyApprovals, updateSupplyApprovalWorkflow]);
 
   const pendingSupplyApprovalSummary = useMemo(() => (
     pendingSupplyApprovals.reduce(
@@ -1304,7 +1372,8 @@ export default function IntegratedInventoryManagement({
                                 const actionKeyPrefix = `${approval.id}:${workflowItem.request_index}`;
                                 const isBusy =
                                   workflowActionKey === `${actionKeyPrefix}:issue` ||
-                                  workflowActionKey === `${actionKeyPrefix}:order`;
+                                  workflowActionKey === `${actionKeyPrefix}:order` ||
+                                  workflowActionKey === `${actionKeyPrefix}:order-cancel`;
                                 const isIssued = workflowItem.status === 'issued';
                                 const isOrdered = workflowItem.status === 'ordered';
                                 const canIssue = workflowItem.recommended_action === 'issue' && !isIssued && !isOrdered;
@@ -1375,6 +1444,17 @@ export default function IntegratedInventoryManagement({
                                           data-testid={`inventory-supply-order-${approval.id}-${workflowItem.request_index}`}
                                         >
                                           {isBusy ? '처리 중...' : '발주 처리'}
+                                        </button>
+                                      )}
+                                      {isOrdered && !workflowItem.order_approval_requested && (
+                                        <button
+                                          type="button"
+                                          onClick={() => void handleSupplyOrderCancel(approval, workflowItem)}
+                                          disabled={isBusy}
+                                          className="rounded-full border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] disabled:cursor-not-allowed disabled:opacity-50"
+                                          data-testid={`inventory-supply-order-cancel-${approval.id}-${workflowItem.request_index}`}
+                                        >
+                                          {isBusy ? '처리 중...' : '발주 취소'}
                                         </button>
                                       )}
                                       {(isIssued || isOrdered) && (
@@ -1492,14 +1572,28 @@ export default function IntegratedInventoryManagement({
                                         {String(workflowItem.processed_by_name ?? '') || '처리 완료'}
                                       </span>
                                       {isOrdered && (
-                                        <button
-                                          type="button"
-                                          onClick={() => openLinkedSupplyOrder(approval.id ?? '', workflowItem.request_index as number)}
-                                          className="rounded-full bg-[var(--foreground)] px-3 py-2 text-[11px] font-bold text-white"
-                                          data-testid={`inventory-supply-history-open-order-${approval.id}-${String(workflowItem.request_index ?? '')}`}
-                                        >
-                                          발주 보기
-                                        </button>
+                                        <>
+                                          {workflowItem.order_approval_requested ? (
+                                            <button
+                                              type="button"
+                                              onClick={() => openLinkedSupplyOrder(approval.id ?? '', workflowItem.request_index as number)}
+                                              className="rounded-full bg-[var(--foreground)] px-3 py-2 text-[11px] font-bold text-white"
+                                              data-testid={`inventory-supply-history-open-order-${approval.id}-${String(workflowItem.request_index ?? '')}`}
+                                            >
+                                              발주 보기
+                                            </button>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={() => void handleSupplyOrderCancel(approval, workflowItem)}
+                                              disabled={workflowActionKey === `${approval.id}:${workflowItem.request_index}:order-cancel`}
+                                              className="rounded-full border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] disabled:cursor-not-allowed disabled:opacity-50"
+                                              data-testid={`inventory-supply-history-cancel-order-${approval.id}-${String(workflowItem.request_index ?? '')}`}
+                                            >
+                                              {workflowActionKey === `${approval.id}:${workflowItem.request_index}:order-cancel` ? '처리 중...' : '발주 취소'}
+                                            </button>
+                                          )}
+                                        </>
                                       )}
                                     </div>
                                   </div>
