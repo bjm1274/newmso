@@ -157,6 +157,22 @@ type BrowserBlePayloadCandidate = {
   previewHex: string;
   previewValue: string;
 };
+type OfficialBleWorkflowStageTone = 'emerald' | 'amber' | 'rose' | 'slate';
+type OfficialBleWorkflowStage = {
+  key: 'bind' | 'task' | 'start';
+  title: string;
+  badge: string;
+  tone: OfficialBleWorkflowStageTone;
+  summary: string;
+  detail?: string;
+};
+type OfficialBleWorkflowSummary = {
+  stages: OfficialBleWorkflowStage[];
+  handshakeCandidate: BrowserBlePayloadCandidate | null;
+  streamCandidates: BrowserBlePayloadCandidate[];
+  topCandidates: BrowserBlePayloadCandidate[];
+  browserWriteReady: boolean;
+};
 
 const ROOM_DRAFT_STORAGE_KEY = 'erp-zhsunyco-room-board-drafts';
 const MOBILE_USERNAME_STORAGE_KEY = 'erp-zhsunyco-mobile-user-name';
@@ -173,6 +189,8 @@ const DEFAULT_BROWSER_BLE_CHARACTERISTIC_UUIDS = [
   '34323032-4c53-4545-4c42-4b4e494c4f57',
   '35323032-4c53-4545-4c42-4b4e494c4f57',
 ];
+const OFFICIAL_BLE_HANDSHAKE_CHARACTERISTIC_UUID = '33323032-4c53-4545-4c42-4b4e494c4f57';
+const OFFICIAL_BLE_STREAM_CHARACTERISTIC_UUID = '31323032-4c53-4545-4c42-4b4e494c4f57';
 const DEFAULT_LEGACY_API_CONFIG: LegacyEslApiConfig = {
   baseUrl: '',
   apiCode: 'default',
@@ -460,6 +478,159 @@ function collectMobileBlePayloadCandidates(value: unknown) {
 
   visit(value, 'mobileBle', 0);
   return results;
+}
+
+function scoreMobileBlePayloadCandidate(candidate: BrowserBlePayloadCandidate) {
+  const loweredPath = candidate.path.toLowerCase();
+  let score = candidate.byteLength;
+
+  if (loweredPath.includes('taskattempts')) score += 180;
+  if (loweredPath.includes('.value')) score += 140;
+  if (loweredPath.includes('cmd')) score += 120;
+  if (loweredPath.includes('tasklist')) score += 60;
+  if (loweredPath.includes('extend')) score -= 40;
+  if (candidate.kind === 'byte-array') score += 20;
+  if (candidate.byteLength >= 128) score += 800;
+  if (candidate.byteLength >= 12 && candidate.byteLength <= 32) score += 120;
+
+  return score;
+}
+
+function sortMobileBlePayloadCandidates(candidates: BrowserBlePayloadCandidate[]) {
+  return [...candidates].sort((left, right) => {
+    const scoreDelta = scoreMobileBlePayloadCandidate(right) - scoreMobileBlePayloadCandidate(left);
+    if (scoreDelta !== 0) return scoreDelta;
+    const sizeDelta = right.byteLength - left.byteLength;
+    if (sizeDelta !== 0) return sizeDelta;
+    return left.path.localeCompare(right.path, 'ko-KR', { sensitivity: 'base' });
+  });
+}
+
+function buildOfficialBleWorkflowSummary(
+  preflight: MobileBlePreflightResult | null,
+  browserBleProbeResult: BrowserBleProbeResult | null,
+  payloadCandidates: BrowserBlePayloadCandidate[],
+): OfficialBleWorkflowSummary | null {
+  if (!preflight) return null;
+
+  const bindReady = Boolean(preflight.boundDevice?.eslCode);
+  const taskReady = Boolean(preflight.taskReady);
+  const handshakeCandidate =
+    payloadCandidates.find((candidate) => candidate.byteLength >= 12 && candidate.byteLength <= 32) || null;
+  const streamCandidates = payloadCandidates.filter((candidate) => candidate.byteLength >= 128);
+  const writableCharacteristicUuids = new Set(
+    (browserBleProbeResult?.characteristics || [])
+      .filter((characteristic) =>
+        characteristic.properties.some((property) => property === 'write' || property === 'writeWithoutResponse'),
+      )
+      .map((characteristic) => normalizeUuidString(characteristic.uuid)),
+  );
+  const browserWriteReady =
+    writableCharacteristicUuids.has(OFFICIAL_BLE_HANDSHAKE_CHARACTERISTIC_UUID) &&
+    writableCharacteristicUuids.has(OFFICIAL_BLE_STREAM_CHARACTERISTIC_UUID);
+  const largestCandidate = payloadCandidates[0] || null;
+
+  const stages: OfficialBleWorkflowStage[] = [
+    bindReady
+      ? {
+          key: 'bind',
+          title: '1. BLE EPD BIND',
+          badge: 'DONE',
+          tone: 'emerald',
+          summary: `기기 ${preflight.boundDevice?.eslCode || preflight.deviceId || '-'}가 제조사 앱 기준으로 바인드돼 있습니다.`,
+          detail: preflight.boundDevice?.typeCode
+            ? `기기 종류 ${preflight.boundDevice.typeCode} / template ${preflight.boundDevice.templateId ?? '-'}`
+            : undefined,
+        }
+      : {
+          key: 'bind',
+          title: '1. BLE EPD BIND',
+          badge: 'NEED BIND',
+          tone: 'rose',
+          summary: '공식 앱의 BLE EPD 화면에서 먼저 BIND가 필요합니다.',
+          detail: '현재 서버 응답에는 바인드된 ESL 정보가 없습니다.',
+        },
+    taskReady
+      ? {
+          key: 'task',
+          title: '2. TASK READY',
+          badge: 'READY',
+          tone: 'emerald',
+          summary: 'TASK 화면에서 Start Task를 누를 수 있는 상태입니다.',
+          detail:
+            preflight.waitingCount != null || preflight.errorTaskCount != null
+              ? `대기 ${preflight.waitingCount ?? 0}건 / 오류 ${preflight.errorTaskCount ?? 0}건`
+              : undefined,
+        }
+      : bindReady
+        ? {
+            key: 'task',
+            title: '2. TASK READY',
+            badge: 'WAITING',
+            tone: 'amber',
+            summary: 'BIND는 됐지만 아직 TASK READY가 아닙니다.',
+            detail: '공식 앱에서도 이 단계가 준비돼야 Start Task가 열립니다.',
+          }
+        : {
+            key: 'task',
+            title: '2. TASK READY',
+            badge: 'BLOCKED',
+            tone: 'slate',
+            summary: 'BIND 이후에만 TASK가 생성됩니다.',
+          },
+    !bindReady
+      ? {
+          key: 'start',
+          title: '3. Start Task',
+          badge: 'BLOCKED',
+          tone: 'slate',
+          summary: 'BIND가 끝나야 Start Task를 시도할 수 있습니다.',
+        }
+      : !taskReady
+        ? {
+            key: 'start',
+            title: '3. Start Task',
+            badge: 'WAITING',
+            tone: 'amber',
+            summary: 'TASK READY 이후에만 Start Task가 실제 BLE write를 시작합니다.',
+          }
+        : streamCandidates.length === 0
+          ? {
+              key: 'start',
+              title: '3. Start Task',
+              badge: 'WRITE MISSING',
+              tone: 'amber',
+              summary: '서버는 준비됐지만 앱 로그의 대용량 write 후보가 아직 보이지 않습니다.',
+              detail: largestCandidate
+                ? `현재 자동 추출된 최대 후보는 ${largestCandidate.byteLength}B (${largestCandidate.path}) 입니다.`
+                : '자동 추출된 write 후보가 없습니다.',
+            }
+          : browserWriteReady
+            ? {
+                key: 'start',
+                title: '3. Start Task',
+                badge: 'WRITE READY',
+                tone: 'emerald',
+                summary: 'Start Task 실험에 필요한 characteristic과 대용량 write 후보가 모두 보입니다.',
+                detail: `핸드셰이크 ${handshakeCandidate?.byteLength ?? 0}B / 대용량 후보 ${streamCandidates.length}개`,
+              }
+            : {
+                key: 'start',
+                title: '3. Start Task',
+                badge: 'NEED LOCAL WRITE',
+                tone: 'amber',
+                summary: 'TASK READY는 됐지만 Start Task의 로컬 BLE write 단계가 아직 비어 있습니다.',
+                detail: `앱 로그 기준 ${OFFICIAL_BLE_HANDSHAKE_CHARACTERISTIC_UUID} 16B 1회 + ${OFFICIAL_BLE_STREAM_CHARACTERISTIC_UUID} 244B 반복 write`,
+              },
+  ];
+
+  return {
+    stages,
+    handshakeCandidate,
+    streamCandidates,
+    topCandidates: payloadCandidates.slice(0, 20),
+    browserWriteReady,
+  };
 }
 
 function describeCharacteristicProperties(properties?: BrowserBleCharacteristicPropertiesLike | null) {
@@ -802,17 +973,27 @@ export default function ZhsunycoEslSync(_props: Props) {
   const mobileBlePayloadCandidates = useMemo(
     () =>
       mobileBlePreflight
-        ? collectMobileBlePayloadCandidates({
-            task: mobileBlePreflight.task,
-            taskList: mobileBlePreflight.taskList,
-            taskAttempts: (mobileBlePreflight.taskAttempts || []).map((attempt) => ({
-              label: attempt.label,
-              query: attempt.query,
-              upstream: attempt.upstream,
-            })),
-          })
+        ? sortMobileBlePayloadCandidates(
+            collectMobileBlePayloadCandidates({
+              task: mobileBlePreflight.task,
+              taskList: mobileBlePreflight.taskList,
+              taskAttempts: (mobileBlePreflight.taskAttempts || []).map((attempt) => ({
+                label: attempt.label,
+                query: attempt.query,
+                upstream: attempt.upstream,
+              })),
+            }),
+          )
         : [],
     [mobileBlePreflight],
+  );
+  const officialBleWorkflowSummary = useMemo(
+    () => buildOfficialBleWorkflowSummary(mobileBlePreflight, browserBleProbeResult, mobileBlePayloadCandidates),
+    [browserBleProbeResult, mobileBlePayloadCandidates, mobileBlePreflight],
+  );
+  const mobileBleTopPayloadCandidates = useMemo(
+    () => officialBleWorkflowSummary?.topCandidates || [],
+    [officialBleWorkflowSummary],
   );
 
   const updateSelectedDraft = useCallback((updater: (draft: RoomBoardDraft) => RoomBoardDraft) => {
@@ -1247,11 +1428,11 @@ export default function ZhsunycoEslSync(_props: Props) {
       }
 
       if (parsed.taskReady) {
-        toast('제조사 서버에서 BLE 작업을 확인했습니다.', 'success');
+        toast('공식 앱 기준 BIND 완료 + TASK READY 상태입니다. 다음은 Start Task 로컬 BLE write입니다.', 'success');
       } else if (parsed.boundDevice?.eslCode) {
-        toast('제조사 서버에는 등록된 기기지만 현재 대기 BLE 작업은 없습니다.', 'error');
+        toast('BIND는 확인됐지만 아직 TASK READY가 아닙니다.', 'error');
       } else {
-        toast('제조사 서버에서 이 기기 바코드를 찾지 못했습니다.', 'error');
+        toast('제조사 앱 BLE EPD에서 먼저 BIND가 필요합니다.', 'error');
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : '제조사 전송 상태 확인에 실패했습니다.';
@@ -1672,7 +1853,7 @@ export default function ZhsunycoEslSync(_props: Props) {
           onClick={closePreview}
         >
           <div
-            className="mx-auto my-3 w-full max-w-6xl max-h-[calc(100dvh-1.5rem)] overflow-y-auto overscroll-contain rounded-[var(--radius-xl)] bg-[var(--card)] p-4 shadow-xl sm:my-4 sm:p-5"
+            className="mx-auto my-3 w-full max-w-[min(96rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-1.5rem)] overflow-y-auto overscroll-contain rounded-[var(--radius-xl)] bg-[var(--card)] p-4 shadow-xl sm:my-4 sm:p-5 xl:overflow-hidden"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1689,9 +1870,13 @@ export default function ZhsunycoEslSync(_props: Props) {
               </button>
             </div>
 
-            <div className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
-              <div className="min-w-0 space-y-3">
-                <RoomBoardPreview draft={previewDraft} />
+            <div className="mt-4 grid items-start gap-4 xl:max-h-[calc(100dvh-10rem)] xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
+              <div className="min-w-0 space-y-3 xl:sticky xl:top-0">
+                <div className="overflow-x-auto pb-1">
+                  <div className="min-w-[520px]">
+                    <RoomBoardPreview draft={previewDraft} />
+                  </div>
+                </div>
                 <div className="flex flex-wrap gap-2 text-[12px] text-[var(--toss-gray-3)]">
                   <div className="rounded-full border border-[var(--border)] bg-[var(--muted)] px-3 py-1">기기 바코드 {previewDraft.deviceId || '미등록'}</div>
                   <div className="rounded-full border border-[var(--border)] bg-[var(--muted)] px-3 py-1">
@@ -1700,7 +1885,7 @@ export default function ZhsunycoEslSync(_props: Props) {
                 </div>
               </div>
 
-              <div className="min-w-0 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)]/20 p-4">
+              <div className="min-w-0 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)]/20 p-4 xl:max-h-[calc(100dvh-10rem)] xl:overflow-y-auto xl:pr-2">
                 <div className="text-base font-bold text-[var(--foreground)]">제조사 BLE 전송 상태</div>
                 <div className="mt-2 text-sm text-[var(--toss-gray-3)]">
                   현재 제조사 앱은 클라우드 태스크를 받아 BLE로 쓰는 구조라서, 먼저 서버가 이 기기의 전송 작업을 만들 수 있는지 확인합니다.
@@ -1928,6 +2113,48 @@ export default function ZhsunycoEslSync(_props: Props) {
                       </div>
                     </div>
 
+                    {officialBleWorkflowSummary ? (
+                      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
+                        <div className="text-[12px] font-bold text-[var(--foreground)]">공식 앱 기준 단계</div>
+                        <div className="mt-2 text-[11px] text-[var(--toss-gray-3)]">
+                          공식 앱은 <code>BLE EPD BIND</code> 후 <code>TASK &gt; Start Task</code>를 눌러야 실제 BLE write가 시작됩니다.
+                        </div>
+                        <div className="mt-3 grid gap-2 md:grid-cols-3">
+                          {officialBleWorkflowSummary.stages.map((stage) => (
+                            <div key={stage.key} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/50 px-3 py-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="text-[11px] font-bold text-[var(--foreground)]">{stage.title}</div>
+                                <div
+                                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                    stage.tone === 'emerald'
+                                      ? 'bg-emerald-100 text-emerald-700'
+                                      : stage.tone === 'amber'
+                                        ? 'bg-amber-100 text-amber-800'
+                                        : stage.tone === 'rose'
+                                          ? 'bg-rose-100 text-rose-700'
+                                          : 'bg-slate-100 text-slate-700'
+                                  }`}
+                                >
+                                  {stage.badge}
+                                </div>
+                              </div>
+                              <div className="mt-2 text-[12px] font-semibold text-[var(--foreground)]">{stage.summary}</div>
+                              {stage.detail ? (
+                                <div className="mt-2 text-[11px] text-[var(--toss-gray-3)]">{stage.detail}</div>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-3 rounded-[var(--radius-md)] border border-indigo-200 bg-indigo-50 px-3 py-2 text-[11px] text-indigo-900">
+                          앱 로그 기준 Start Task는 <code>{OFFICIAL_BLE_HANDSHAKE_CHARACTERISTIC_UUID}</code>에 16B 1회,
+                          <code className="ml-1">{OFFICIAL_BLE_STREAM_CHARACTERISTIC_UUID}</code>에 244B 반복 write를 수행합니다.
+                          {officialBleWorkflowSummary.browserWriteReady
+                            ? ' 브라우저 probe에서는 공식 characteristic write 접근 가능성이 확인됐습니다.'
+                            : ' 현재는 이 마지막 로컬 write 단계가 아직 구현/검증되지 않았습니다.'}
+                        </div>
+                      </div>
+                    ) : null}
+
                     {mobileBlePreflight.boundDevice ? (
                       <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
                         <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">제조사 서버에 저장된 기기 정보</div>
@@ -2112,9 +2339,9 @@ export default function ZhsunycoEslSync(_props: Props) {
                         버그리포트 기준 앱은 GATT write를 직접 수행합니다. <code>/mobile/getTask/ble</code> 응답 안에 hex / base64 / byte-array 바이트가
                         들어있는지 자동으로 추려서 보여줍니다.
                       </div>
-                      {mobileBlePayloadCandidates.length ? (
+                      {mobileBleTopPayloadCandidates.length ? (
                         <div className="mt-3 space-y-2">
-                          {mobileBlePayloadCandidates.slice(0, 12).map((candidate) => (
+                          {mobileBleTopPayloadCandidates.map((candidate) => (
                             <div key={`${candidate.path}-${candidate.kind}-${candidate.previewHex}`} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/50 px-3 py-2">
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <div className="text-[11px] font-semibold text-[var(--foreground)]">{candidate.path}</div>

@@ -604,6 +604,14 @@ export async function POST(request: NextRequest) {
             ? '제조사 서버에서 이 기기 바코드를 찾지 못했습니다. 먼저 공식 앱/웹에서 바인딩이 필요합니다.'
             : '기기 바코드를 입력하면 제조사 서버 등록 상태를 확인할 수 있습니다.';
 
+      const officialStatusSummary = readyTask
+        ? '공식 앱 기준 BLE EPD BIND 완료 + TASK READY 상태입니다. 마지막 Start Task는 휴대폰 BLE write가 수행해야 합니다.'
+        : boundDevice
+          ? 'BLE EPD BIND는 확인됐지만 아직 TASK READY가 아닙니다.'
+          : deviceId
+            ? '제조사 앱의 BLE EPD 화면에서 먼저 BIND가 필요합니다.'
+            : '기기 바코드를 입력하면 제조사 서버 등록 상태를 확인할 수 있습니다.';
+
       return NextResponse.json({
         ok: true,
         normalizedBaseUrl: config.baseUrl,
@@ -614,7 +622,7 @@ export async function POST(request: NextRequest) {
         taskReady: Boolean(readyTask),
         task: readyTask?.upstream ?? null,
         taskState,
-        statusSummary,
+        statusSummary: officialStatusSummary || statusSummary,
         bleQuery: bleQueryResult ? bleQueryResult.json ?? bleQueryResult.rawText : null,
         deviceLookup: deviceLookupResult ? deviceLookupResult.json ?? deviceLookupResult.rawText : null,
         boundDevice,
