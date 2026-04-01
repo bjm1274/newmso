@@ -36,8 +36,8 @@ import {
   summarizeSupplyRequestWorkflow,
   type SupplyRequestWorkflowItem,
 } from '@/app/main/inventory-utils';
+import { INV_VIEW_KEY } from '@/app/main/navigation-state';
 
-const INV_VIEW_KEY = 'erp_inventory_view';
 
 const INVENTORY_VIEWS = ['UDI', '발주', '스캔', '등록', '현황', '이력', '자산', '비품대여설정', 'AS반품', '거래처', '재고실사', '이관', '카테고리', '소모품통계', '납품확인서', '수요예측'] as const;
 const LEGACY_VIEWS = ['명세서', '유통기한'] as const;

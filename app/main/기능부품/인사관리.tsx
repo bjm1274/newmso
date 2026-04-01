@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { HR_COMPANY_KEY, HR_STATUS_KEY, HR_TAB_KEY, HR_WORKSPACE_KEY } from '@/app/main/navigation-state';
 import { canAccessHrSection, canAccessMainMenu, isAdminUser } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import 구성원관리 from './인사관리서브/구성원현황';
@@ -33,10 +34,6 @@ import ContractAutoGenerator from './인사관리서브/계약서자동생성';
 import InsuranceEDI from './인사관리서브/급여명세/4대보험EDI';
 import AutoRosterPlanner from './근무표자동편성';
 
-const HR_TAB_KEY = 'erp_hr_tab';
-const HR_COMPANY_KEY = 'erp_hr_company';
-const HR_STATUS_KEY = 'erp_hr_status';
-const HR_WORKSPACE_KEY = 'erp_hr_workspace';
 
 type HrWorkspaceId = '인력관리' | '근태 · 급여' | '복지 · 문서';
 type StaffStatus = '재직' | '퇴사';

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canAccessMainMenu } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
+import { ADMIN_SIDEBAR_ITEMS } from '../../admin-menu-config';
 import NotificationCenter from '../NotificationCenter';
 
 const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
@@ -65,22 +66,7 @@ export const SUB_MENUS: Record<string, SubMenuItem[]> = {
     { id: '문서센터', label: '문서센터', group: '문서/기타', icon: '🗃️' },
     { id: '캘린더', label: '캘린더', group: '문서/기타', icon: '📅' },
   ],
-  관리자: [
-    { id: '경영분석', label: '경영 분석', group: '경영 분석', icon: '📈' },
-    { id: '회사관리', label: '회사 / 조직', group: '조직 / 권한', icon: '🏢' },
-    { id: '직원권한', label: '직원 권한', group: '조직 / 권한', icon: '🔐' },
-    { id: '운영설정', label: '운영 설정', group: '시스템 설정', icon: '⚙️' },
-    { id: '문서양식', label: '문서 양식', group: '시스템 설정', icon: '📄' },
-    { id: '엑셀등록', label: '엑셀 일괄 등록', group: '데이터 관리', icon: '📥' },
-    { id: '데이터백업', label: '백업 / 복원', group: '데이터 관리', icon: '💾' },
-    { id: '데이터초기화', label: '데이터 초기화', group: '데이터 관리', icon: '♻️' },
-    { id: '감사센터', label: '감사 센터', group: '감사 센터', icon: '🔍' },
-    { id: '시스템마스터센터', label: '시스템마스터센터', group: '시스템 마스터', icon: '🛡️' },
-    { id: '알림자동화', label: '알림 자동화', group: '시스템 설정', icon: '🔔', hidden: true },
-    { id: '수술검사템플릿', label: '수술 / 검사 템플릿', group: '시스템 설정', icon: '🧪', hidden: true },
-    { id: '팝업관리', label: '팝업 관리', group: '시스템 설정', icon: '🪟', hidden: true },
-    { id: '급여이상치', label: '급여 이상치 감지', group: '감사 센터', icon: '⚠️', hidden: true },
-  ],
+  관리자: ADMIN_SIDEBAR_ITEMS,
 };
 
 const MAIN_MENUS = [
