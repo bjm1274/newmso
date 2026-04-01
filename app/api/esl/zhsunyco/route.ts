@@ -18,6 +18,18 @@ type MobileBlePreflightPayload = {
   deviceId?: string;
 };
 
+type BoundBleDeviceSummary = {
+  id: number | null;
+  eslCode: string;
+  productCode: string;
+  templateId: number | null;
+  typeCode: string;
+  deviceArea: number | null;
+  actionFrom: string;
+  pid: string;
+  eslVersion: string;
+};
+
 type UpstreamJson = {
   code?: number;
   message?: string;
@@ -63,6 +75,34 @@ function buildErrorResponse(message: string, status = 400) {
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isUpstreamJsonOk(json: UpstreamJson | null, response: Response) {
+  const errorCode = Number(json?.error_code);
+  return response.ok && (!Number.isFinite(errorCode) || errorCode === 0);
+}
+
+function toNullableNumber(value: unknown) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function buildBoundBleDeviceSummary(value: unknown): BoundBleDeviceSummary | null {
+  if (!isObject(value)) {
+    return null;
+  }
+
+  return {
+    id: toNullableNumber(value.id),
+    eslCode: String(value.esl_code || '').trim(),
+    productCode: String(value.product_code || '').trim(),
+    templateId: toNullableNumber(value.template_id),
+    typeCode: String(value.esltype_code || value.type_code || '').trim(),
+    deviceArea: toNullableNumber(value.device_area),
+    actionFrom: String(value.action_from || '').trim(),
+    pid: String(value.pid || '').trim(),
+    eslVersion: String(value.esl_version || '').trim(),
+  };
 }
 
 async function parseUpstreamResponse(response: Response) {
@@ -289,6 +329,11 @@ export async function POST(request: NextRequest) {
       const { token, loginResult } = await loginToMobileCloud(config.baseUrl, config);
       const payload = isObject(body.payload) ? (body.payload as MobileBlePreflightPayload) : {};
       const deviceId = String(payload.deviceId || '').trim();
+      const triggerQuery = deviceId ? `?${new URLSearchParams({ esl_code: deviceId }).toString()}` : '';
+      const queryBleQuery = deviceId ? `?${new URLSearchParams({ page: '1', limit: '20', code: deviceId }).toString()}` : '';
+      const deviceLookupQuery = deviceId ? `?${new URLSearchParams({ esl_code: deviceId }).toString()}` : '';
+      const taskCountQuery = deviceId ? `?${new URLSearchParams({ esl_code: deviceId }).toString()}` : '';
+      const taskListQuery = deviceId ? `?${new URLSearchParams({ page: '1', limit: '20', esl_code: deviceId }).toString()}` : '';
 
       const queryVariants = [
         { label: '기본 조회', query: '' },
@@ -301,9 +346,21 @@ export async function POST(request: NextRequest) {
           : []),
       ];
 
-      const [licenseResult, triggerResult, ...taskResults] = await Promise.all([
+      const [licenseResult, triggerResult, bleQueryResult, deviceLookupResult, taskCountResult, taskListResult, ...taskResults] = await Promise.all([
         fetchUpstream(`${config.baseUrl}/mobile/query/license`, { method: 'GET' }, { mode: 'token', value: token }),
-        fetchUpstream(`${config.baseUrl}/mobile/trigger/task`, { method: 'GET' }, { mode: 'token', value: token }),
+        fetchUpstream(`${config.baseUrl}/mobile/trigger/task${triggerQuery}`, { method: 'GET' }, { mode: 'token', value: token }),
+        deviceId
+          ? fetchUpstream(`${config.baseUrl}/mobile/query/ble${queryBleQuery}`, { method: 'GET' }, { mode: 'token', value: token })
+          : Promise.resolve(null),
+        deviceId
+          ? fetchUpstream(`${config.baseUrl}/mobile/get/ble${deviceLookupQuery}`, { method: 'GET' }, { mode: 'token', value: token })
+          : Promise.resolve(null),
+        deviceId
+          ? fetchUpstream(`${config.baseUrl}/mobile/getTaskCount/ble${taskCountQuery}`, { method: 'GET' }, { mode: 'token', value: token })
+          : Promise.resolve(null),
+        deviceId
+          ? fetchUpstream(`${config.baseUrl}/mobile/getTaskList/ble${taskListQuery}`, { method: 'GET' }, { mode: 'token', value: token })
+          : Promise.resolve(null),
         ...queryVariants.map((variant) =>
           fetchUpstream(`${config.baseUrl}/mobile/getTask/ble${variant.query}`, { method: 'GET' }, { mode: 'token', value: token }),
         ),
@@ -321,7 +378,21 @@ export async function POST(request: NextRequest) {
         };
       });
 
+      const deviceLookupOk = deviceLookupResult ? isUpstreamJsonOk(deviceLookupResult.json, deviceLookupResult.response) : false;
+      const boundDevice = deviceLookupOk ? buildBoundBleDeviceSummary(deviceLookupResult?.json?.device) : null;
+      const bleQueryList = Array.isArray(bleQueryResult?.json?.list) ? bleQueryResult.json.list : [];
+      const waitingCount = toNullableNumber(taskCountResult?.json?.waiting);
+      const errorTaskCount = toNullableNumber(taskCountResult?.json?.error);
       const readyTask = taskAttempts.find((attempt) => attempt.ok) || null;
+      const taskState =
+        readyTask ? 'ready' : boundDevice ? 'idle' : deviceId ? 'missing' : 'unknown';
+      const statusSummary = readyTask
+        ? '제조사 서버에 이 기기의 BLE 작업이 준비되어 있습니다.'
+        : boundDevice
+          ? '제조사 서버에는 이 기기가 등록되어 있지만, 현재 내려온 BLE 작업은 없습니다.'
+          : deviceId
+            ? '제조사 서버에서 이 기기 바코드를 찾지 못했습니다. 먼저 공식 앱/웹에서 바인딩이 필요합니다.'
+            : '기기 바코드를 입력하면 제조사 서버 등록 상태를 확인할 수 있습니다.';
 
       return NextResponse.json({
         ok: true,
@@ -332,6 +403,15 @@ export async function POST(request: NextRequest) {
         trigger: triggerResult.json ?? triggerResult.rawText,
         taskReady: Boolean(readyTask),
         task: readyTask?.upstream ?? null,
+        taskState,
+        statusSummary,
+        bleQuery: bleQueryResult ? bleQueryResult.json ?? bleQueryResult.rawText : null,
+        deviceLookup: deviceLookupResult ? deviceLookupResult.json ?? deviceLookupResult.rawText : null,
+        boundDevice,
+        waitingCount,
+        errorTaskCount,
+        taskList: taskListResult ? taskListResult.json ?? taskListResult.rawText : null,
+        queryBleCount: bleQueryList.length,
         taskAttempts,
         browserBle: {
           primaryServiceUuid: '3e3d1158-5656-4217-b715-266f37eb5000',

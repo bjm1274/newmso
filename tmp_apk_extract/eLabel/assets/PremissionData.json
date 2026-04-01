@@ -1,0 +1,23 @@
+[
+  {
+    "title": "Read external storage permissions",
+    "permission": "android.permission.READ_EXTERNAL_STORAGE",
+    "subtitle": "Help you read pictures and files",
+    "problem": "Why do I need to get my read external storage?",
+    "answer": "Our access to your external storage can help you access and upload photos and pictures in your mobile phone, so that you can change your avatar, edit the template and select pictures, or communicate with customer service to prove your problems in time."
+  },
+  {
+    "title": "Location permissions",
+    "permission": "android.permission.ACCESS_COARSE_LOCATION",
+    "subtitle": "Authorized location permission is required to connect Bluetooth devices",
+    "problem": "Why do I need to get my location information?",
+    "answer": "According to the requirements of Android system, connecting Bluetooth devices requires authorized location permission to search for nearby Bluetooth devices."
+  },
+  {
+    "title": "Camera permissions",
+    "permission": "android.permission.CAMERA",
+    "subtitle": "Conduct code scanning, shooting and other operations",
+    "problem": "Why do I need to get my camera?",
+    "answer": "We visit your camera so that you can use the camera to scan, shoot, shoot and upload pictures or refresh photos to tags."
+  }
+]

@@ -1,0 +1,23 @@
+[
+  {
+    "title": "读取外置存储权限",
+    "permission": "android.permission.READ_EXTERNAL_STORAGE",
+    "subtitle": "帮助您实现图片和文件的读取",
+    "problem": "为什么需要获取我的读取外置存储？",
+    "answer": "我们访问您的外置存储可以帮助您实现手机中的照片、图片的取用和上传，便于您进行更换头像、编辑模板选择图片或与客服沟通及时证明您所遇到的问题。"
+  },
+  {
+    "title": "位置权限",
+    "permission": "android.permission.ACCESS_COARSE_LOCATION",
+    "subtitle": "连接蓝牙设备需要授权位置权限",
+    "problem": "为什么需要获取我的位置信息？",
+    "answer": "根据安卓系统要求，连接蓝牙设备需要授权位置权限，才能够搜索到附近的蓝牙设备。"
+  },
+  {
+    "title": "相机权限",
+    "permission": "android.permission.CAMERA",
+    "subtitle": "进行扫码，拍摄等操作",
+    "problem": "为什么需要获取我的相机？",
+    "answer": "我们访问您的相机是为了您可以使用摄像头进行扫描、拍摄，用于拍摄并上传图片或拍照刷新到标签。"
+  }
+]

@@ -17,6 +17,27 @@ import type {
   OpPatientCheck,
   StaffMember,
 } from '@/types';
+import {
+  buildSelectColumns,
+  buildWardSearchVariants,
+  createLocalId,
+  getChatRoomMemberIds,
+  getFocusableElements,
+  getWardFavoriteStorageKey,
+  getWardRecentStorageKey,
+  isInteractiveKeyboardTarget,
+  isMissingRelationError,
+  isOpCheckSchemaMissing,
+  normalizeDateValue,
+  normalizeInventoryRows,
+  normalizeLookupValue,
+  normalizeTimeValue,
+  normalizeWardStaffList,
+  QueryResult,
+  resolveWardStaffCandidates,
+  stripHiddenMetaBlocks,
+} from './op-check-utils';
+import { OpCheckScheduleList, OpCheckStatusFilterTabs } from './op-check-components';
 
 const SCHEDULE_META_PREFIX = '[[SCHEDULE_META]]';
 const SCHEDULE_META_SUFFIX = '[[/SCHEDULE_META]]';
@@ -26,8 +47,6 @@ const STATUS_OPTIONS = ['준비중', '준비완료', '수술중', '완료'] as c
 const ANESTHESIA_OPTIONS = ['전신마취', '척추마취', '국소마취', '수면마취', '부위마취', '기타'] as const;
 const ITEM_SUGGESTION_ID = 'op-check-item-suggestions';
 const MIGRATION_FILE = 'supabase_migrations/20260331_op_check_foundation.sql';
-const WARD_MESSAGE_FAVORITES_STORAGE_PREFIX = 'erp_op_check_ward_message_favorites';
-const WARD_MESSAGE_RECENTS_STORAGE_PREFIX = 'erp_op_check_ward_message_recents';
 type ScheduleStatus = (typeof STATUS_OPTIONS)[number];
 
 type TemplateScope = 'surgery' | 'anesthesia';
@@ -118,11 +137,6 @@ type PatientCheckState = {
   ward_message_sent_at?: string | null;
 };
 
-type QueryResult<T> = {
-  data: T | null;
-  error: unknown;
-};
-
 type OpCheckViewUser = Partial<Pick<StaffMember, 'id' | 'name' | 'company' | 'company_id'>> &
   Record<string, unknown>;
 
@@ -188,100 +202,6 @@ const OP_PATIENT_CHECK_OPTIONAL_COLUMNS = [
   'ward_message_sent_at',
 ] as const;
 
-function buildSelectColumns(
-  requiredColumns: readonly string[],
-  optionalColumns: readonly string[] = [],
-  omittedColumns?: ReadonlySet<string>,
-) {
-  return [...requiredColumns, ...optionalColumns.filter((column) => !omittedColumns?.has(column))].join(', ');
-}
-
-function createLocalId(prefix: string) {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function normalizeLookupValue(value: unknown) {
-  return String(value || '')
-    .trim()
-    .replace(/\s+/g, '')
-    .toLowerCase();
-}
-
-function buildWardSearchVariants(value: unknown) {
-  const normalized = normalizeLookupValue(value);
-  if (!normalized) return [] as string[];
-
-  return Array.from(
-    new Set([
-      normalized,
-      normalized.replace(/\d+/g, ''),
-    ].filter(Boolean)),
-  );
-}
-
-function filterWardStaffsByCompany<T extends { company?: string | null; company_id?: string | null }>(
-  data: T[] | null | undefined,
-  companyId: unknown,
-  companyName: unknown,
-): T[] {
-  const normalizedCompanyId = String(companyId || '').trim();
-  const normalizedCompanyName = normalizeLookupValue(companyName);
-
-  return (data || []).filter((staff) => {
-    const staffCompanyId = String(staff.company_id || '').trim();
-    const staffCompanyName = normalizeLookupValue(staff.company);
-
-    if (normalizedCompanyId) {
-      if (staffCompanyId) return staffCompanyId === normalizedCompanyId;
-      return Boolean(normalizedCompanyName) && staffCompanyName === normalizedCompanyName;
-    }
-
-    if (normalizedCompanyName) {
-      return staffCompanyName === normalizedCompanyName;
-    }
-
-    return true;
-  });
-}
-
-function resolveWardStaffCandidates<T extends { company?: string | null; company_id?: string | null }>(
-  data: T[] | null | undefined,
-  companyId: unknown,
-  companyName: unknown,
-) {
-  const rows = data || [];
-  const filtered = filterWardStaffsByCompany(rows, companyId, companyName);
-  if (filtered.length === 0) return rows;
-  return [...filtered, ...rows.filter((row) => !filtered.includes(row))];
-}
-
-function normalizeDateValue(value: unknown) {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
-  const matched = raw.match(/^(\d{4}-\d{2}-\d{2})/);
-  if (matched) return matched[1];
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return raw;
-  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
-}
-
-function normalizeTimeValue(value: unknown) {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
-  const matched = raw.match(/^(\d{2}:\d{2})/);
-  return matched ? matched[1] : raw;
-}
-
-function stripHiddenMetaBlocks(value: unknown) {
-  return String(value || '')
-    .replace(/\[\[SCHEDULE_META\]\][\s\S]*?\[\[\/SCHEDULE_META\]\]/g, '')
-    .replace(/\[\[BOARD_META\]\][\s\S]*?\[\[\/BOARD_META\]\]/g, '')
-    .replace(/\[\[WARD_MESSAGE_META\]\][\s\S]*?\[\[\/WARD_MESSAGE_META\]\]/g, '')
-    .replace(/\[\[(?:SCHEDULE_META|BOARD_META|WARD_MESSAGE_META)\]\][\s\S]*$/g, '')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-}
-
 function extractScheduleMetaFromContent(value: unknown) {
   const raw = String(value || '');
   const start = raw.indexOf(SCHEDULE_META_PREFIX);
@@ -308,50 +228,6 @@ function extractScheduleMetaFromContent(value: unknown) {
       meta: null as Record<string, unknown> | null,
     };
   }
-}
-
-function normalizeWardStaffList(data: WardStaffRow[] | null | undefined, senderId: string) {
-  const deduped = new Map<string, WardStaffRow>();
-
-  (data || []).forEach((staff) => {
-    const normalized = {
-      id: String(staff.id || '').trim(),
-      name: stripHiddenMetaBlocks(staff.name),
-      department: stripHiddenMetaBlocks(staff.department),
-      position: stripHiddenMetaBlocks(staff.position),
-      company: stripHiddenMetaBlocks(staff.company),
-      company_id: String(staff.company_id || '').trim() || null,
-    };
-
-    if (!normalized.id || !normalized.name || normalized.id === senderId) return;
-    deduped.set(normalized.id, normalized);
-  });
-
-  return Array.from(deduped.values());
-}
-
-function getWardScopedStorageKey(prefix: string, userId: unknown, companyId: unknown) {
-  const normalizedUserId = String(userId || 'anonymous').trim() || 'anonymous';
-  const normalizedCompanyId = String(companyId || 'global').trim() || 'global';
-  return `${prefix}:${normalizedUserId}:${normalizedCompanyId}`;
-}
-
-function getWardFavoriteStorageKey(userId: unknown, companyId: unknown) {
-  return getWardScopedStorageKey(WARD_MESSAGE_FAVORITES_STORAGE_PREFIX, userId, companyId);
-}
-
-function getWardRecentStorageKey(userId: unknown, companyId: unknown) {
-  return getWardScopedStorageKey(WARD_MESSAGE_RECENTS_STORAGE_PREFIX, userId, companyId);
-}
-
-function getChatRoomMemberIds(room: ChatRoomMemberLookupRow) {
-  if (Array.isArray(room.members)) {
-    return room.members.map((memberId) => String(memberId || '').trim()).filter(Boolean);
-  }
-  if (Array.isArray(room.member_ids)) {
-    return room.member_ids.map((memberId) => String(memberId || '').trim()).filter(Boolean);
-  }
-  return [] as string[];
 }
 
 function mapSchedulePost(post: BoardPost): LinkedSchedulePost {
@@ -612,27 +488,6 @@ function summarizeChecklistItems(items: ChecklistItemDraft[]) {
   return `${checkedCount}/${validItems.length} 완료`;
 }
 
-function isInteractiveKeyboardTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) return false;
-  const tagName = target.tagName.toLowerCase();
-  return (
-    target.isContentEditable ||
-    tagName === 'input' ||
-    tagName === 'textarea' ||
-    tagName === 'select' ||
-    tagName === 'button'
-  );
-}
-
-function getFocusableElements(container: HTMLElement | null) {
-  if (!container) return [] as HTMLElement[];
-  return Array.from(
-    container.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    ),
-  ).filter((element) => !element.hasAttribute('disabled') && element.getClientRects().length > 0);
-}
-
 function findMatchingSurgeryTemplate(surgeryTemplates: SurgeryTemplateRow[], surgeryName: string) {
   const normalizedTarget = normalizeLookupValue(surgeryName);
   if (!normalizedTarget) return null;
@@ -689,56 +544,6 @@ function emptyTemplateEditor(): TemplateEditorState {
     notes: '',
     is_active: true,
   };
-}
-
-function normalizeInventoryRows(rows: unknown) {
-  if (!Array.isArray(rows)) return [] as InventoryItem[];
-
-  return rows
-    .map((row) => {
-      const item = (row || {}) as Record<string, unknown>;
-      const id = String(item.id || '').trim();
-      const name = String(item.name || '').trim();
-      if (!id || !name) return null;
-
-      return {
-        ...item,
-        id,
-        name,
-        unit: String(item.unit || '').trim() || null,
-        quantity: typeof item.quantity === 'number' ? item.quantity : Number(item.quantity || 0),
-        company: String(item.company || '').trim() || null,
-        company_id: String(item.company_id || '').trim() || null,
-        department: String(item.department || '').trim() || null,
-      } as InventoryItem;
-    })
-    .filter((item): item is InventoryItem => Boolean(item));
-}
-
-function isOpCheckSchemaMissing(error: unknown) {
-  if (!error || typeof error !== 'object') return false;
-  const code = String((error as { code?: string }).code || '');
-  const message = String((error as { message?: string }).message || '');
-  return code === '42P01' || message.includes('op_check_templates') || message.includes('op_patient_checks');
-}
-
-function isMissingRelationError(error: unknown, relationNames: string[]) {
-  if (!error || typeof error !== 'object') return false;
-  const code = String((error as { code?: string }).code || '');
-  const message = String(
-    (error as { message?: string; details?: string }).message ||
-      (error as { details?: string }).details ||
-      ''
-  ).toLowerCase();
-
-  return (
-    code === '42P01' ||
-    code === 'PGRST205' ||
-    relationNames.some((relationName) => {
-      const target = relationName.toLowerCase();
-      return message.includes(target) || message.includes(`public.${target}`);
-    })
-  );
 }
 
 async function withOptionalQueryFallback<T>(
@@ -1231,6 +1036,17 @@ export default function OperationCheckView({
     [patientChecks]
   );
 
+  const patientCheckStatusByScheduleId = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(patientChecksByScheduleId).map(([scheduleId, row]) => [
+          scheduleId,
+          String(row?.status || '준비중'),
+        ]),
+      ) as Record<string, string>,
+    [patientChecksByScheduleId],
+  );
+
   const getSortedSchedulesForDate = useCallback(
     (dateKey: string) => {
       if (!dateKey) return [] as LinkedSchedulePost[];
@@ -1271,6 +1087,21 @@ export default function OperationCheckView({
   }, [patientChecksByScheduleId, searchFilteredSelectedDateSchedules, statusFilterTab]);
   const hasActiveScheduleFilters =
     statusFilterTab !== '전체' || normalizeLookupValue(deferredSearchTerm).length > 0;
+
+  const statusFilterTabOptions = useMemo(
+    () =>
+      (['전체', ...STATUS_OPTIONS] as const).map((tab) => ({
+        value: tab,
+        count:
+          tab === '전체'
+            ? selectedDateSchedules.length
+            : selectedDateSchedules.filter((post) => {
+                const currentStatus = patientCheckStatusByScheduleId[post.id] || '준비중';
+                return currentStatus === tab;
+              }).length,
+      })),
+    [patientCheckStatusByScheduleId, selectedDateSchedules],
+  );
 
   const scheduleCalendarData = useMemo(() => {
     const toKey = (date: Date) =>
@@ -2743,37 +2574,14 @@ export default function OperationCheckView({
 
   const renderStatusFilterTabs = useCallback(
     (className = 'mb-2 flex flex-wrap gap-1') => (
-      <div className={className}>
-        {(['전체', '준비중', '준비완료', '수술중', '완료'] as const).map((tab) => {
-          const count =
-            tab === '전체'
-              ? selectedDateSchedules.length
-              : selectedDateSchedules.filter((post) => {
-                  const savedRow = patientChecksByScheduleId[post.id];
-                  return String(savedRow?.status || '준비중') === tab;
-                }).length;
-          return (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setStatusFilterTab(tab)}
-              className={`rounded-[var(--radius-md)] px-2 py-1 text-[10px] font-bold transition-colors ${
-                statusFilterTab === tab
-                  ? tab === '수술중'
-                    ? 'bg-orange-500 text-white'
-                    : tab === '완료'
-                      ? 'bg-emerald-500 text-white'
-                      : 'bg-[var(--accent)] text-white'
-                  : 'border border-[var(--border)] text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
-              }`}
-            >
-              {tab} {count > 0 && <span className="opacity-80">({count})</span>}
-            </button>
-          );
-        })}
-      </div>
+      <OpCheckStatusFilterTabs
+        className={className}
+        activeTab={statusFilterTab}
+        options={statusFilterTabOptions}
+        onChange={(value) => setStatusFilterTab(value as '전체' | ScheduleStatus)}
+      />
     ),
-    [patientChecksByScheduleId, selectedDateSchedules, statusFilterTab],
+    [statusFilterTab, statusFilterTabOptions],
   );
 
   const renderFilteredScheduleList = useCallback(
@@ -2792,113 +2600,20 @@ export default function OperationCheckView({
       testIdPrefix: string;
       schedules?: LinkedSchedulePost[];
     }) => (
-      <div className={containerClassName}>
-        {schedules.length === 0 ? (
-          <div className="empty-state rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)]/40 p-6 text-center">
-            <p className="text-sm font-semibold text-[var(--toss-gray-3)]">{emptyMessage}</p>
-          </div>
-        ) : (
-          schedules.map((post) => {
-            const savedRow = patientChecksByScheduleId[post.id];
-            const currentStatus = String(savedRow?.status || '준비중');
-            const selected = post.id === selectedScheduleId;
-            const isRowLayout = layout === 'row';
-            const displayChartNo = stripHiddenMetaBlocks(post.chart_no);
-            const displayScheduleRoom = stripHiddenMetaBlocks(post.schedule_room || '');
-            const statusAccentClass =
-              isRowLayout
-                ? currentStatus === '수술중'
-                  ? 'border-t-orange-400'
-                  : currentStatus === '완료'
-                    ? 'border-t-emerald-400'
-                    : currentStatus === '준비완료'
-                      ? 'border-t-[var(--accent)]'
-                      : 'border-t-[var(--border)]'
-                : currentStatus === '수술중'
-                  ? 'border-l-orange-400'
-                  : currentStatus === '완료'
-                    ? 'border-l-emerald-400'
-                    : currentStatus === '준비완료'
-                      ? 'border-l-[var(--accent)]'
-                      : 'border-l-[var(--border)]';
-            const statusBadgeClass =
-              currentStatus === '수술중'
-                ? 'bg-orange-50 text-orange-700'
-                : currentStatus === '완료'
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : currentStatus === '준비완료'
-                    ? 'bg-[var(--accent)]/10 text-[var(--accent)]'
-                    : 'bg-[var(--muted)] text-[var(--toss-gray-4)]';
-            return (
-              <button
-                key={post.id}
-                type="button"
-                data-testid={`${testIdPrefix}-${post.id}`}
-                onClick={() => handleScheduleSelection(post, openWorkspaceOnSelect)}
-                className={
-                  isRowLayout
-                    ? `min-w-[172px] max-w-[172px] flex-none snap-start rounded-[var(--radius-lg)] border border-t-4 px-3 py-2.5 text-left transition-all ${statusAccentClass} ${
-                        selected
-                          ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/70 shadow-sm'
-                          : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]/35 hover:bg-[var(--muted)]/40'
-                      }`
-                    : `w-full rounded-[var(--radius-lg)] border border-l-4 p-3 text-left transition-all ${statusAccentClass} ${
-                        selected
-                          ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/60 shadow-sm'
-                          : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]/35 hover:bg-[var(--muted)]/40'
-                      }`
-                }
-              >
-                <div className={`flex ${isRowLayout ? 'items-center justify-between gap-1.5' : 'items-start justify-between gap-2'}`}>
-                  <div className="min-w-0 flex-1">
-                    <p className={`truncate font-bold text-[var(--foreground)] ${isRowLayout ? 'text-[15px]' : 'text-sm'}`}>
-                      {post.patient_name}
-                    </p>
-                    <p
-                      className={`truncate font-medium text-[var(--toss-gray-3)] ${
-                        isRowLayout ? 'mt-1 text-[10px]' : 'mt-0.5 text-[11px]'
-                      }`}
-                    >
-                      {post.surgery_name}
-                    </p>
-                  </div>
-                  <div className={`flex shrink-0 ${isRowLayout ? 'flex-col items-end gap-1.5' : 'flex-col items-end gap-1'}`}>
-                    <span className={`font-bold text-[var(--toss-gray-4)] ${isRowLayout ? 'text-[10px]' : 'text-[11px]'}`}>
-                      {post.schedule_time || '시간 미정'}
-                    </span>
-                    <span
-                      className={`rounded-[var(--radius-md)] font-bold ${statusBadgeClass} ${
-                        isRowLayout ? 'px-1.5 py-0.5 text-[9px]' : 'px-2 py-0.5 text-[10px]'
-                      }`}
-                    >
-                      {savedRow ? currentStatus : '신규'}
-                    </span>
-                  </div>
-                </div>
-                <div
-                  className={`flex flex-wrap items-center gap-1.5 font-medium text-[var(--toss-gray-3)] ${
-                    isRowLayout ? 'mt-2 text-[10px]' : 'mt-1.5 text-[11px]'
-                  }`}
-                >
-                  <span>{displayScheduleRoom || '방 미정'}</span>
-                  {displayChartNo ? <span>· 차트 {displayChartNo}</span> : null}
-                  {post.surgery_fasting ? (
-                    <span
-                      className={`rounded-[var(--radius-md)] bg-rose-50 font-bold text-rose-600 ${
-                        isRowLayout ? 'px-1.5 py-0.5 text-[9px]' : 'px-1.5 py-0.5 text-[10px]'
-                      }`}
-                    >
-                      금식
-                    </span>
-                  ) : null}
-                </div>
-              </button>
-            );
-          })
-        )}
-      </div>
+      <OpCheckScheduleList
+        items={schedules}
+        containerClassName={containerClassName}
+        emptyMessage={emptyMessage}
+        openWorkspaceOnSelect={openWorkspaceOnSelect}
+        layout={layout}
+        testIdPrefix={testIdPrefix}
+        selectedScheduleId={selectedScheduleId}
+        statusByScheduleId={patientCheckStatusByScheduleId}
+        sanitizeText={stripHiddenMetaBlocks}
+        onSelect={handleScheduleSelection}
+      />
     ),
-    [filteredSchedules, handleScheduleSelection, patientChecksByScheduleId, selectedScheduleId],
+    [handleScheduleSelection, patientCheckStatusByScheduleId, selectedScheduleId],
   );
 
   const patientWorkspaceTopPanel = !selectedSchedule || !checkForm ? (
