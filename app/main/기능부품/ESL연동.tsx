@@ -31,6 +31,39 @@ type MobileBleTaskAttempt = {
   ok: boolean;
   upstream: unknown;
 };
+type BrowserBleCharacteristicPropertiesLike = {
+  broadcast?: boolean;
+  read?: boolean;
+  writeWithoutResponse?: boolean;
+  write?: boolean;
+  notify?: boolean;
+  indicate?: boolean;
+  authenticatedSignedWrites?: boolean;
+  reliableWrite?: boolean;
+  writableAuxiliaries?: boolean;
+};
+type BrowserBleCharacteristicLike = {
+  uuid?: string;
+  properties?: BrowserBleCharacteristicPropertiesLike;
+};
+type BrowserBleServiceLike = {
+  getCharacteristics?: () => Promise<BrowserBleCharacteristicLike[]>;
+};
+type BrowserBleGattServerLike = {
+  connected?: boolean;
+  connect?: () => Promise<BrowserBleGattServerLike>;
+  disconnect?: () => void;
+  getPrimaryService?: (serviceUuid: string) => Promise<BrowserBleServiceLike>;
+};
+type BrowserBleDeviceLike = {
+  name?: string;
+  gatt?: BrowserBleGattServerLike;
+  addEventListener?: (type: string, listener: (...args: unknown[]) => void, options?: unknown) => void;
+  removeEventListener?: (type: string, listener: (...args: unknown[]) => void, options?: unknown) => void;
+};
+type BrowserBleAdapterLike = {
+  requestDevice: (options: { filters?: Array<{ namePrefix?: string }>; optionalServices?: string[] }) => Promise<BrowserBleDeviceLike>;
+};
 type BoundBleDeviceSummary = {
   id?: number | null;
   eslCode?: string;
@@ -76,12 +109,53 @@ type LegacyBleActionResult = {
   upstream?: unknown;
   error?: string;
 };
+type LegacyTemplateSummary = {
+  id: number;
+  name: string;
+  typeCode?: string;
+  isDefault?: boolean;
+};
+type LegacyTemplateQueryResult = {
+  ok: boolean;
+  normalizedBaseUrl?: string;
+  apiCode?: string;
+  storeCode?: string;
+  templates?: LegacyTemplateSummary[];
+  upstream?: unknown;
+  error?: string;
+};
 type LegacyEslApiConfig = {
   baseUrl: string;
   apiCode: string;
   shopCode: string;
   sign: string;
   templateId: string;
+};
+type LegacyTemplateRecommendation = {
+  template: LegacyTemplateSummary | null;
+  reason: 'bound-template' | 'type-default' | 'type-match' | 'current' | 'store-default' | 'first' | 'none';
+};
+type BrowserBleCharacteristicInfo = {
+  uuid: string;
+  properties: string[];
+  expected: boolean;
+};
+type BrowserBleProbeResult = {
+  ok: boolean;
+  secureContext: boolean;
+  aliasPrefix: string;
+  serviceUuid: string;
+  expectedCharacteristicUuids: string[];
+  deviceName?: string;
+  characteristics: BrowserBleCharacteristicInfo[];
+  error?: string;
+};
+type BrowserBlePayloadCandidate = {
+  path: string;
+  kind: 'hex' | 'base64' | 'byte-array';
+  byteLength: number;
+  previewHex: string;
+  previewValue: string;
 };
 
 const ROOM_DRAFT_STORAGE_KEY = 'erp-zhsunyco-room-board-drafts';
@@ -90,6 +164,15 @@ const LEGACY_API_CONFIG_STORAGE_KEY = 'erp-zhsunyco-legacy-esl-api-config';
 const CAMERA_BARCODE_HINT = '카메라를 바코드에 가까이 대고 잠시 멈추면 자동 등록됩니다.';
 const ROOM_BOARD_PREVIEW_SLOT_COUNT = 4;
 const ZHSUNYCO_MOBILE_BASE_URL = 'http://www.zhsunyco.com.cn';
+const DEFAULT_BROWSER_BLE_SERVICE_UUID = '3e3d1158-5656-4217-b715-266f37eb5000';
+const DEFAULT_BROWSER_BLE_CHARACTERISTIC_UUIDS = [
+  '30323032-4c53-4545-4c42-4b4e494c4f57',
+  '31323032-4c53-4545-4c42-4b4e494c4f57',
+  '32323032-4c53-4545-4c42-4b4e494c4f57',
+  '33323032-4c53-4545-4c42-4b4e494c4f57',
+  '34323032-4c53-4545-4c42-4b4e494c4f57',
+  '35323032-4c53-4545-4c42-4b4e494c4f57',
+];
 const DEFAULT_LEGACY_API_CONFIG: LegacyEslApiConfig = {
   baseUrl: '',
   apiCode: 'default',
@@ -164,6 +247,10 @@ async function copyText(text: string, successMessage: string) {
   }
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 function getBoardPreviewSlots(draft: RoomBoardDraft) {
   const normalized = Array.from({ length: ROOM_BOARD_PREVIEW_SLOT_COUNT }, (_, index) => {
     const slot = draft.patientSlots[index];
@@ -224,6 +311,254 @@ function extractDiagnosticMessage(value: unknown) {
     if (record.error_code === 0) return '정상';
   }
   return '응답 확인 필요';
+}
+
+function normalizeLegacyTemplateTypeCode(value?: string | null) {
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, '')
+    .toUpperCase();
+}
+
+function normalizeUuidString(value?: string | null) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function truncateDiagnosticValue(value: string, maxLength = 120) {
+  const trimmed = String(value || '').trim();
+  if (trimmed.length <= maxLength) return trimmed;
+  return `${trimmed.slice(0, maxLength)}...`;
+}
+
+function previewHex(bytes: Uint8Array, limit = 32) {
+  const hex = Array.from(bytes.slice(0, limit), (byte) => byte.toString(16).padStart(2, '0')).join(' ');
+  return bytes.length > limit ? `${hex} ...` : hex;
+}
+
+function hexToBytes(value: string) {
+  const normalized = String(value || '')
+    .replace(/^0x/i, '')
+    .replace(/[\s:-]+/g, '')
+    .trim();
+  if (!normalized || normalized.length % 2 !== 0 || !/^[\da-fA-F]+$/.test(normalized)) {
+    return null;
+  }
+
+  const bytes = new Uint8Array(normalized.length / 2);
+  for (let index = 0; index < normalized.length; index += 2) {
+    bytes[index / 2] = Number.parseInt(normalized.slice(index, index + 2), 16);
+  }
+  return bytes;
+}
+
+function base64ToBytes(value: string) {
+  const normalized = String(value || '').trim();
+  if (!normalized || normalized.length < 12 || normalized.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(normalized)) {
+    return null;
+  }
+  if (typeof window === 'undefined' || typeof window.atob !== 'function') {
+    return null;
+  }
+  try {
+    const binary = window.atob(normalized);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    return bytes;
+  } catch {
+    return null;
+  }
+}
+
+function hasInterestingPayloadKey(path: string) {
+  const lowered = String(path || '').toLowerCase();
+  return ['payload', 'data', 'hex', 'base64', 'bytes', 'cmd', 'command', 'packet', 'buffer', 'raw', 'value', 'content'].some((token) =>
+    lowered.includes(token),
+  );
+}
+
+function collectMobileBlePayloadCandidates(value: unknown) {
+  const results: BrowserBlePayloadCandidate[] = [];
+  const seenObjects = new WeakSet<object>();
+
+  const appendCandidate = (candidate: BrowserBlePayloadCandidate) => {
+    const duplicate = results.some(
+      (existing) =>
+        existing.path === candidate.path &&
+        existing.kind === candidate.kind &&
+        existing.byteLength === candidate.byteLength &&
+        existing.previewHex === candidate.previewHex,
+    );
+    if (!duplicate) {
+      results.push(candidate);
+    }
+  };
+
+  const visit = (current: unknown, path: string, depth: number) => {
+    if (current == null || depth > 7) return;
+
+    if (typeof current === 'string') {
+      const trimmed = current.trim();
+      if (!trimmed) return;
+
+      const hexBytes = hexToBytes(trimmed);
+      if (hexBytes && (hexBytes.length >= 6 || hasInterestingPayloadKey(path))) {
+        appendCandidate({
+          path,
+          kind: 'hex',
+          byteLength: hexBytes.length,
+          previewHex: previewHex(hexBytes),
+          previewValue: truncateDiagnosticValue(trimmed),
+        });
+        return;
+      }
+
+      const base64Bytes = base64ToBytes(trimmed);
+      if (base64Bytes && (base64Bytes.length >= 6 || hasInterestingPayloadKey(path))) {
+        appendCandidate({
+          path,
+          kind: 'base64',
+          byteLength: base64Bytes.length,
+          previewHex: previewHex(base64Bytes),
+          previewValue: truncateDiagnosticValue(trimmed),
+        });
+      }
+      return;
+    }
+
+    if (Array.isArray(current)) {
+      const isByteArray = current.every(
+        (item) => typeof item === 'number' && Number.isFinite(item) && item >= 0 && item <= 255 && Number.isInteger(item),
+      );
+      if (isByteArray && (current.length >= 6 || hasInterestingPayloadKey(path))) {
+        const bytes = Uint8Array.from(current as number[]);
+        appendCandidate({
+          path,
+          kind: 'byte-array',
+          byteLength: bytes.length,
+          previewHex: previewHex(bytes),
+          previewValue: truncateDiagnosticValue(JSON.stringify(current)),
+        });
+      }
+
+      current.forEach((item, index) => {
+        visit(item, `${path}[${index}]`, depth + 1);
+      });
+      return;
+    }
+
+    if (typeof current === 'object') {
+      const record = current as Record<string, unknown>;
+      if (seenObjects.has(record)) return;
+      seenObjects.add(record);
+      Object.entries(record).forEach(([key, nextValue]) => {
+        visit(nextValue, path ? `${path}.${key}` : key, depth + 1);
+      });
+    }
+  };
+
+  visit(value, 'mobileBle', 0);
+  return results;
+}
+
+function describeCharacteristicProperties(properties?: BrowserBleCharacteristicPropertiesLike | null) {
+  if (!properties) return [];
+
+  const propertyRecord = properties as Record<string, unknown>;
+  return [
+    ['broadcast', properties.broadcast],
+    ['read', properties.read],
+    ['writeWithoutResponse', properties.writeWithoutResponse],
+    ['write', properties.write],
+    ['notify', properties.notify],
+    ['indicate', properties.indicate],
+    ['authenticatedSignedWrites', propertyRecord.authenticatedSignedWrites === true],
+    ['reliableWrite', propertyRecord.reliableWrite === true],
+    ['writableAuxiliaries', propertyRecord.writableAuxiliaries === true],
+  ]
+    .filter((entry) => Boolean(entry[1]))
+    .map((entry) => String(entry[0]));
+}
+
+function choosePreferredLegacyTemplate(
+  templates: LegacyTemplateSummary[],
+  boundDevice?: BoundBleDeviceSummary | null,
+  currentTemplateId?: string | null,
+): LegacyTemplateRecommendation {
+  if (!templates.length) {
+    return { template: null, reason: 'none' };
+  }
+
+  const normalizedCurrentId = String(currentTemplateId || '').trim();
+  const currentTemplate = normalizedCurrentId
+    ? templates.find((template) => String(template.id) === normalizedCurrentId) || null
+    : null;
+
+  const boundTemplateId = boundDevice?.templateId != null ? String(boundDevice.templateId).trim() : '';
+  const boundTemplate =
+    boundTemplateId ? templates.find((template) => String(template.id) === boundTemplateId) || null : null;
+
+  if (boundTemplate) {
+    return { template: boundTemplate, reason: 'bound-template' };
+  }
+
+  const boundTypeCode = normalizeLegacyTemplateTypeCode(boundDevice?.typeCode);
+  const matchingTypeTemplates = boundTypeCode
+    ? templates.filter((template) => normalizeLegacyTemplateTypeCode(template.typeCode) === boundTypeCode)
+    : [];
+  const defaultMatchingTypeTemplate = matchingTypeTemplates.find((template) => template.isDefault) || null;
+
+  if (currentTemplate) {
+    const currentTypeCode = normalizeLegacyTemplateTypeCode(currentTemplate.typeCode);
+    if (!boundTypeCode || currentTypeCode === boundTypeCode) {
+      return { template: currentTemplate, reason: 'current' };
+    }
+  }
+
+  if (defaultMatchingTypeTemplate) {
+    return { template: defaultMatchingTypeTemplate, reason: 'type-default' };
+  }
+
+  if (matchingTypeTemplates[0]) {
+    return { template: matchingTypeTemplates[0], reason: 'type-match' };
+  }
+
+  if (currentTemplate) {
+    return { template: currentTemplate, reason: 'current' };
+  }
+
+  const defaultTemplate = templates.find((template) => template.isDefault) || null;
+  if (defaultTemplate) {
+    return { template: defaultTemplate, reason: 'store-default' };
+  }
+
+  return { template: templates[0], reason: 'first' };
+}
+
+function formatLegacyTemplateRecommendation(recommendation: LegacyTemplateRecommendation) {
+  if (!recommendation.template) return '';
+
+  const label = `#${recommendation.template.id} ${recommendation.template.name}${
+    recommendation.template.typeCode ? ` · ${recommendation.template.typeCode}` : ''
+  }`;
+
+  switch (recommendation.reason) {
+    case 'bound-template':
+      return `기기에 연결된 템플릿 기준으로 자동 선택: ${label}`;
+    case 'type-default':
+      return `기기 종류와 일치하는 기본 템플릿 자동 선택: ${label}`;
+    case 'type-match':
+      return `기기 종류와 일치하는 템플릿 자동 선택: ${label}`;
+    case 'store-default':
+      return `매장 기본 템플릿 자동 선택: ${label}`;
+    case 'first':
+      return `조회된 첫 템플릿으로 자동 선택: ${label}`;
+    case 'current':
+      return `현재 선택 템플릿 유지: ${label}`;
+    default:
+      return '';
+  }
 }
 
 function RoomBoardPreview({ draft }: { draft: RoomBoardDraft }) {
@@ -293,13 +628,20 @@ export default function ZhsunycoEslSync(_props: Props) {
   const [mobileBleChecking, setMobileBleChecking] = useState(false);
   const [mobileBlePreflight, setMobileBlePreflight] = useState<MobileBlePreflightResult | null>(null);
   const [legacyApiConfig, setLegacyApiConfig] = useState<LegacyEslApiConfig>(DEFAULT_LEGACY_API_CONFIG);
+  const [legacyTemplateLoading, setLegacyTemplateLoading] = useState(false);
+  const [legacyTemplateQueryResult, setLegacyTemplateQueryResult] = useState<LegacyTemplateQueryResult | null>(null);
+  const [legacyTemplateRecommendation, setLegacyTemplateRecommendation] = useState('');
   const [legacyBleSearching, setLegacyBleSearching] = useState(false);
   const [legacyBleDirectSending, setLegacyBleDirectSending] = useState(false);
   const [legacyBleSearchResult, setLegacyBleSearchResult] = useState<LegacyBleActionResult | null>(null);
   const [legacyBleDirectResult, setLegacyBleDirectResult] = useState<LegacyBleActionResult | null>(null);
+  const [browserBleProbing, setBrowserBleProbing] = useState(false);
+  const [browserBleProbeResult, setBrowserBleProbeResult] = useState<BrowserBleProbeResult | null>(null);
   const deviceRegistrationInputRef = useRef<HTMLInputElement | null>(null);
   const deviceRegistrationVideoRef = useRef<HTMLVideoElement | null>(null);
   const cameraScanControlsRef = useRef<ScannerControlsLike | null>(null);
+  const browserBleDeviceRef = useRef<BrowserBleDeviceLike | null>(null);
+  const browserBleServerRef = useRef<BrowserBleGattServerLike | null>(null);
 
   useEffect(() => {
     try {
@@ -424,12 +766,53 @@ export default function ZhsunycoEslSync(_props: Props) {
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      const server = browserBleServerRef.current;
+      const device = browserBleDeviceRef.current;
+      try {
+        if (server?.connected && typeof server.disconnect === 'function') {
+          server.disconnect();
+        } else if (device?.gatt?.connected && typeof device.gatt.disconnect === 'function') {
+          device.gatt.disconnect();
+        }
+      } catch {
+        // ignore cleanup failures
+      }
+    };
+  }, []);
+
   const selectedRoom = useMemo(() => rooms.find((room) => room.roomNumber === selectedRoomNumber) || null, [rooms, selectedRoomNumber]);
   const selectedDraft = useMemo(() => (selectedRoomNumber ? roomDrafts[selectedRoomNumber] || null : null), [roomDrafts, selectedRoomNumber]);
   const previewDraft = useMemo(() => (previewRoomNumber ? roomDrafts[previewRoomNumber] || null : null), [previewRoomNumber, roomDrafts]);
   const preparedRooms = useMemo(
     () => rooms.map((room) => roomDrafts[room.roomNumber]).filter((draft): draft is RoomBoardDraft => Boolean(draft)).filter((draft) => Boolean(draft.updatedAt)),
     [roomDrafts, rooms],
+  );
+  const browserBleServiceUuid = useMemo(
+    () => normalizeUuidString(mobileBlePreflight?.browserBle?.primaryServiceUuid) || DEFAULT_BROWSER_BLE_SERVICE_UUID,
+    [mobileBlePreflight?.browserBle?.primaryServiceUuid],
+  );
+  const browserBleCharacteristicUuids = useMemo(() => {
+    const candidates = (mobileBlePreflight?.browserBle?.characteristicUuids || [])
+      .map((value) => normalizeUuidString(value))
+      .filter(Boolean);
+    return candidates.length > 0 ? Array.from(new Set(candidates)) : DEFAULT_BROWSER_BLE_CHARACTERISTIC_UUIDS;
+  }, [mobileBlePreflight?.browserBle?.characteristicUuids]);
+  const mobileBlePayloadCandidates = useMemo(
+    () =>
+      mobileBlePreflight
+        ? collectMobileBlePayloadCandidates({
+            task: mobileBlePreflight.task,
+            taskList: mobileBlePreflight.taskList,
+            taskAttempts: (mobileBlePreflight.taskAttempts || []).map((attempt) => ({
+              label: attempt.label,
+              query: attempt.query,
+              upstream: attempt.upstream,
+            })),
+          })
+        : [],
+    [mobileBlePreflight],
   );
 
   const updateSelectedDraft = useCallback((updater: (draft: RoomBoardDraft) => RoomBoardDraft) => {
@@ -450,6 +833,10 @@ export default function ZhsunycoEslSync(_props: Props) {
 
   const updateLegacyApiField = useCallback(
     <Key extends keyof LegacyEslApiConfig,>(key: Key, value: LegacyEslApiConfig[Key]) => {
+      if (key === 'baseUrl' || key === 'apiCode' || key === 'shopCode' || key === 'sign') {
+        setLegacyTemplateQueryResult(null);
+        setLegacyTemplateRecommendation('');
+      }
       setLegacyApiConfig((prev) => ({ ...prev, [key]: value }));
     },
     [],
@@ -643,21 +1030,167 @@ export default function ZhsunycoEslSync(_props: Props) {
     toast(`${roomNumber}호 전송 준비를 해제했습니다.`, 'success');
   }, []);
 
+  const disconnectBrowserBle = useCallback(() => {
+    const server = browserBleServerRef.current;
+    const device = browserBleDeviceRef.current;
+    try {
+      if (server?.connected && typeof server.disconnect === 'function') {
+        server.disconnect();
+      } else if (device?.gatt?.connected && typeof device.gatt.disconnect === 'function') {
+        device.gatt.disconnect();
+      }
+    } catch {
+      // ignore disconnect failures
+    } finally {
+      browserBleServerRef.current = null;
+      browserBleDeviceRef.current = null;
+    }
+  }, []);
+
+  const runBrowserBleProbe = useCallback(
+    async (draft: RoomBoardDraft) => {
+      if (!draft.deviceId.trim()) {
+        toast('湲곌린 諛붿퐫?쒕? 癒쇱? ?깅줉??二쇱꽭??', 'error');
+        return;
+      }
+
+      const bluetooth =
+        typeof navigator !== 'undefined' ? (navigator as Navigator & { bluetooth?: BrowserBleAdapterLike }).bluetooth : undefined;
+      if (!bluetooth?.requestDevice) {
+        const message = '??釉뚮씪?곗???Web Bluetooth瑜?吏?먰븯吏 ?딆뒿?덈떎.';
+        setBrowserBleProbeResult({
+          ok: false,
+          secureContext: typeof window !== 'undefined' ? window.isSecureContext : false,
+          aliasPrefix: draft.deviceId.trim(),
+          serviceUuid: browserBleServiceUuid,
+          expectedCharacteristicUuids: browserBleCharacteristicUuids,
+          characteristics: [],
+          error: message,
+        });
+        toast(message, 'error');
+        return;
+      }
+
+      if (typeof window !== 'undefined' && !window.isSecureContext) {
+        const message = 'Web Bluetooth??HTTPS ?먮뒗 localhost?먯꽌留? ?ъ슜?????덉뒿?덈떎.';
+        setBrowserBleProbeResult({
+          ok: false,
+          secureContext: false,
+          aliasPrefix: draft.deviceId.trim(),
+          serviceUuid: browserBleServiceUuid,
+          expectedCharacteristicUuids: browserBleCharacteristicUuids,
+          characteristics: [],
+          error: message,
+        });
+        toast(message, 'error');
+        return;
+      }
+
+      const deviceCode = draft.deviceId.trim();
+      const aliasPrefix = deviceCode.toUpperCase().startsWith('WL') ? deviceCode : `WL${deviceCode}`;
+
+      setBrowserBleProbing(true);
+      setBrowserBleProbeResult(null);
+      disconnectBrowserBle();
+
+      try {
+        const device = await bluetooth.requestDevice({
+          filters: [{ namePrefix: aliasPrefix }, { namePrefix: deviceCode }],
+          optionalServices: [browserBleServiceUuid],
+        });
+
+        const handleDisconnected = () => {
+          browserBleServerRef.current = null;
+          browserBleDeviceRef.current = null;
+          setBrowserBleProbeResult((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  ok: false,
+                  error: '釉뚮씪?곗? BLE ?곌껐???댁젣?섏뿀?듬땲??',
+                }
+              : prev,
+          );
+        };
+
+        device.addEventListener?.('gattserverdisconnected', handleDisconnected, { once: true });
+        browserBleDeviceRef.current = device;
+
+        const server = device.gatt;
+        if (!server?.connect || !server.getPrimaryService) {
+          throw new Error('GATT ?쒕쾭?먯뿉 ?곌껐???덉쓣 ???놁뒿?덈떎.');
+        }
+
+        const connectedServer = await server.connect();
+        browserBleServerRef.current = connectedServer;
+
+        if (!connectedServer.getPrimaryService) {
+          throw new Error('?꾩닔 BLE ?쒕퉬?ㅻ? 諛쏆븘???놁뒿?덈떎.');
+        }
+
+        const primaryService = await connectedServer.getPrimaryService(browserBleServiceUuid);
+        const characteristics = (await primaryService.getCharacteristics?.()) || [];
+        const expectedSet = new Set(browserBleCharacteristicUuids);
+        const normalizedCharacteristics = characteristics.map((characteristic) => {
+          const uuid = normalizeUuidString(characteristic.uuid);
+          return {
+            uuid: uuid || '-',
+            properties: describeCharacteristicProperties(characteristic.properties),
+            expected: expectedSet.has(uuid),
+          };
+        });
+
+        setBrowserBleProbeResult({
+          ok: true,
+          secureContext: typeof window !== 'undefined' ? window.isSecureContext : false,
+          aliasPrefix,
+          serviceUuid: browserBleServiceUuid,
+          expectedCharacteristicUuids: browserBleCharacteristicUuids,
+          deviceName: String(device.name || '').trim() || undefined,
+          characteristics: normalizedCharacteristics,
+        });
+        toast('釉뚮씪?곗? BLE濡??ㅼ젣 ESL ?쒕퉬?ㅼ? ?≪꽦?щ? ?뺤씤?덉뒿?덈떎.', 'success');
+      } catch (error) {
+        disconnectBrowserBle();
+        const message = error instanceof Error ? error.message : '釉뚮씪?곗? BLE ?곌껐 ?뺤씤???ㅽ뙣?덉뒿?덈떎.';
+        setBrowserBleProbeResult({
+          ok: false,
+          secureContext: typeof window !== 'undefined' ? window.isSecureContext : false,
+          aliasPrefix,
+          serviceUuid: browserBleServiceUuid,
+          expectedCharacteristicUuids: browserBleCharacteristicUuids,
+          characteristics: [],
+          error: message,
+        });
+        toast(message, 'error');
+      } finally {
+        setBrowserBleProbing(false);
+      }
+    },
+    [browserBleCharacteristicUuids, browserBleServiceUuid, disconnectBrowserBle],
+  );
+
   const openPreview = useCallback((roomNumber?: string) => {
     const nextRoomNumber = String(roomNumber || selectedRoomNumber || '').trim();
     if (!nextRoomNumber) return;
+    disconnectBrowserBle();
     setPreviewRoomNumber(nextRoomNumber);
     setMobileBlePreflight(null);
     setLegacyBleSearchResult(null);
     setLegacyBleDirectResult(null);
-  }, [selectedRoomNumber]);
+    setLegacyTemplateRecommendation('');
+    setBrowserBleProbeResult(null);
+  }, [disconnectBrowserBle, selectedRoomNumber]);
 
   const closePreview = useCallback(() => {
+    disconnectBrowserBle();
     setPreviewRoomNumber('');
     setMobileBlePreflight(null);
     setLegacyBleSearchResult(null);
     setLegacyBleDirectResult(null);
-  }, []);
+    setLegacyTemplateRecommendation('');
+    setBrowserBleProbeResult(null);
+  }, [disconnectBrowserBle]);
 
   const runMobileBlePreflight = useCallback(async (draft: RoomBoardDraft) => {
     if (!draft.deviceId.trim()) {
@@ -700,6 +1233,19 @@ export default function ZhsunycoEslSync(_props: Props) {
 
       setMobileBlePreflight(parsed);
 
+      if (legacyTemplateQueryResult?.ok && (legacyTemplateQueryResult.templates?.length ?? 0) > 0) {
+        const recommendation = choosePreferredLegacyTemplate(
+          legacyTemplateQueryResult.templates || [],
+          parsed.boundDevice,
+          legacyApiConfig.templateId,
+        );
+        const nextRecommendationMessage = formatLegacyTemplateRecommendation(recommendation);
+        setLegacyTemplateRecommendation(nextRecommendationMessage);
+        if (recommendation.template && String(recommendation.template.id) !== legacyApiConfig.templateId.trim()) {
+          setLegacyApiConfig((prev) => ({ ...prev, templateId: String(recommendation.template?.id || '') }));
+        }
+      }
+
       if (parsed.taskReady) {
         toast('제조사 서버에서 BLE 작업을 확인했습니다.', 'success');
       } else if (parsed.boundDevice?.eslCode) {
@@ -714,7 +1260,7 @@ export default function ZhsunycoEslSync(_props: Props) {
     } finally {
       setMobileBleChecking(false);
     }
-  }, [mobilePassword, mobileUserName]);
+  }, [legacyApiConfig.templateId, legacyTemplateQueryResult, mobilePassword, mobileUserName]);
 
   const runLegacyBleSearch = useCallback(async (draft: RoomBoardDraft) => {
     if (!draft.deviceId.trim()) {
@@ -766,6 +1312,67 @@ export default function ZhsunycoEslSync(_props: Props) {
     }
   }, [legacyApiConfig]);
 
+  const runLegacyTemplateQuery = useCallback(async () => {
+    if (!legacyApiConfig.baseUrl.trim() || !legacyApiConfig.shopCode.trim() || !legacyApiConfig.sign.trim()) {
+      toast('공식 API 주소, 매장코드, sign 값을 입력해 주세요.', 'error');
+      return;
+    }
+
+    setLegacyTemplateLoading(true);
+    setLegacyTemplateQueryResult(null);
+
+    try {
+      const response = await fetch('/api/esl/zhsunyco', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'legacyTemplateQuery',
+          config: {
+            baseUrl: legacyApiConfig.baseUrl.trim(),
+            shopCode: legacyApiConfig.shopCode.trim(),
+            legacyApiCode: legacyApiConfig.apiCode.trim() || 'default',
+            legacyApiSign: legacyApiConfig.sign.trim(),
+          },
+        }),
+      });
+
+      const parsed = (await response.json().catch(() => null)) as LegacyTemplateQueryResult | null;
+      if (!response.ok || !parsed?.ok) {
+        throw new Error(parsed?.error || '공식 템플릿 조회에 실패했습니다.');
+      }
+
+      setLegacyTemplateQueryResult(parsed);
+
+      const templates = Array.isArray(parsed.templates) ? parsed.templates : [];
+      const recommendation = choosePreferredLegacyTemplate(templates, mobileBlePreflight?.boundDevice, legacyApiConfig.templateId);
+      setLegacyTemplateRecommendation(formatLegacyTemplateRecommendation(recommendation));
+      if (templates.length > 0) {
+        const currentTemplateId = legacyApiConfig.templateId.trim();
+        const preferredTemplate = recommendation.template;
+        if (preferredTemplate && String(preferredTemplate.id) !== currentTemplateId) {
+          setLegacyApiConfig((prev) => ({ ...prev, templateId: String(preferredTemplate.id) }));
+        }
+      } else {
+        setLegacyTemplateRecommendation('');
+      }
+
+      toast(
+        templates.length > 0
+          ? `공식 템플릿 ${templates.length}개를 불러왔습니다.`
+          : '공식 템플릿 목록은 비어 있습니다.',
+        'success',
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '공식 템플릿 조회에 실패했습니다.';
+      setLegacyTemplateQueryResult({ ok: false, error: message });
+      toast(message, 'error');
+    } finally {
+      setLegacyTemplateLoading(false);
+    }
+  }, [legacyApiConfig, mobileBlePreflight?.boundDevice]);
+
   const runLegacyBleDirect = useCallback(async (draft: RoomBoardDraft) => {
     if (!draft.deviceId.trim()) {
       toast('기기 바코드를 먼저 등록해 주세요.', 'error');
@@ -815,7 +1422,12 @@ export default function ZhsunycoEslSync(_props: Props) {
       }
 
       setLegacyBleDirectResult(parsed);
-      toast('공식 API로 즉시 전송을 요청했습니다.', 'success');
+      toast('공식 API가 전송 요청을 수락했습니다. 실제 ESL 반영 여부는 아래 전송 상태에서 다시 확인합니다.', 'success');
+
+      if (mobileUserName.trim() && mobilePassword.trim()) {
+        await sleep(1200);
+        await runMobileBlePreflight(draft);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : '공식 BLE 직접 전송 요청에 실패했습니다.';
       setLegacyBleDirectResult({ ok: false, error: message });
@@ -823,7 +1435,7 @@ export default function ZhsunycoEslSync(_props: Props) {
     } finally {
       setLegacyBleDirectSending(false);
     }
-  }, [legacyApiConfig]);
+  }, [legacyApiConfig, mobilePassword, mobileUserName, runMobileBlePreflight]);
 
   return (
     <div className="space-y-4">
@@ -1186,6 +1798,66 @@ export default function ZhsunycoEslSync(_props: Props) {
                       </label>
                     </div>
 
+                    <button
+                      type="button"
+                      onClick={() => void runLegacyTemplateQuery()}
+                      disabled={legacyTemplateLoading}
+                      className="rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] disabled:opacity-60"
+                    >
+                      {legacyTemplateLoading ? '템플릿 조회 중...' : '템플릿 목록 조회'}
+                    </button>
+
+                    {legacyTemplateRecommendation ? (
+                      <div className="rounded-[var(--radius-md)] border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-700">
+                        {legacyTemplateRecommendation}
+                      </div>
+                    ) : null}
+
+                    {legacyTemplateQueryResult ? (
+                      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-[12px] font-bold text-[var(--foreground)]">공식 템플릿 목록</div>
+                          <div
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              legacyTemplateQueryResult.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                            }`}
+                          >
+                            {legacyTemplateQueryResult.ok
+                              ? `${legacyTemplateQueryResult.templates?.length ?? 0}개`
+                              : legacyTemplateQueryResult.error || 'ERROR'}
+                          </div>
+                        </div>
+
+                        {legacyTemplateQueryResult.ok && (legacyTemplateQueryResult.templates?.length ?? 0) > 0 ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {(legacyTemplateQueryResult.templates || []).map((template) => {
+                              const selected = String(template.id) === legacyApiConfig.templateId.trim();
+                              return (
+                                <button
+                                  key={`${template.id}-${template.typeCode || ''}`}
+                                  type="button"
+                                  onClick={() => updateLegacyApiField('templateId', String(template.id))}
+                                  className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
+                                    selected
+                                      ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                                      : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]'
+                                  }`}
+                                >
+                                  {`#${template.id} ${template.name}${
+                                    template.typeCode ? ` · ${template.typeCode}` : ''
+                                  }${template.isDefault ? ' · 기본' : ''}`}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+
+                        {legacyTemplateQueryResult.ok && (legacyTemplateQueryResult.templates?.length ?? 0) === 0 ? (
+                          <div className="mt-3 text-[12px] text-[var(--toss-gray-3)]">이 매장에서 조회된 공식 템플릿이 없습니다.</div>
+                        ) : null}
+                      </div>
+                    ) : null}
+
                     <div className="grid gap-2 md:grid-cols-2">
                       <button
                         type="button"
@@ -1357,6 +2029,110 @@ export default function ZhsunycoEslSync(_props: Props) {
                         </div>
                       </div>
                     ) : null}
+
+                    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">브라우저 BLE 연결 확인</div>
+                        <div className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                          {typeof window !== 'undefined' && window.isSecureContext ? 'SECURE' : 'INSECURE'}
+                        </div>
+                      </div>
+                      <div className="mt-2 text-[11px] text-[var(--toss-gray-3)]">
+                        앱처럼 실제 ESL 기기에 브라우저가 같은 서비스로 접근 가능한지 확인합니다. 아직 write는 하지 않고 service / characteristic만 읽습니다.
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void runBrowserBleProbe(previewDraft)}
+                          disabled={browserBleProbing}
+                          className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] disabled:opacity-60"
+                        >
+                          {browserBleProbing ? '브라우저 BLE 연결 중...' : '브라우저 BLE 연결 확인'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={disconnectBrowserBle}
+                          disabled={!browserBleProbeResult && !browserBleDeviceRef.current}
+                          className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] disabled:opacity-60"
+                        >
+                          연결 해제
+                        </button>
+                      </div>
+                      <div className="mt-3 text-[11px] text-[var(--toss-gray-3)]">
+                        예상 alias <span className="font-semibold text-[var(--foreground)]">{`WL${previewDraft.deviceId.trim()}`}</span> / 서비스{' '}
+                        <span className="break-all font-mono text-[10px] text-[var(--foreground)]">{browserBleServiceUuid}</span>
+                      </div>
+                      {browserBleProbeResult ? (
+                        <div className="mt-3 space-y-2">
+                          <div
+                            className={`rounded-[var(--radius-md)] border px-3 py-2 text-[11px] font-semibold ${
+                              browserBleProbeResult.ok
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                                : 'border-rose-200 bg-rose-50 text-rose-800'
+                            }`}
+                          >
+                            {browserBleProbeResult.ok
+                              ? `${browserBleProbeResult.deviceName || browserBleProbeResult.aliasPrefix} 연결 성공 · 특성 ${browserBleProbeResult.characteristics.length}개`
+                              : browserBleProbeResult.error || '브라우저 BLE 확인 실패'}
+                          </div>
+                          <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-[11px]">
+                            <div className="font-semibold text-[var(--foreground)]">예상 characteristic</div>
+                            <div className="mt-1 break-all text-[var(--toss-gray-3)]">
+                              {browserBleProbeResult.expectedCharacteristicUuids.join(', ') || '-'}
+                            </div>
+                          </div>
+                          {browserBleProbeResult.characteristics.length ? (
+                            <div className="space-y-2">
+                              {browserBleProbeResult.characteristics.map((characteristic) => (
+                                <div key={characteristic.uuid} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/50 px-3 py-2">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="break-all font-mono text-[10px] font-semibold text-[var(--foreground)]">{characteristic.uuid}</div>
+                                    <div
+                                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                        characteristic.expected ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
+                                      }`}
+                                    >
+                                      {characteristic.expected ? 'EXPECTED' : 'DISCOVERED'}
+                                    </div>
+                                  </div>
+                                  <div className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                                    {characteristic.properties.join(', ') || '특성 정보 없음'}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
+                      <div className="text-[11px] font-bold text-[var(--toss-gray-3)]">모바일 task payload 후보</div>
+                      <div className="mt-2 text-[11px] text-[var(--toss-gray-3)]">
+                        버그리포트 기준 앱은 GATT write를 직접 수행합니다. <code>/mobile/getTask/ble</code> 응답 안에 hex / base64 / byte-array 바이트가
+                        들어있는지 자동으로 추려서 보여줍니다.
+                      </div>
+                      {mobileBlePayloadCandidates.length ? (
+                        <div className="mt-3 space-y-2">
+                          {mobileBlePayloadCandidates.slice(0, 12).map((candidate) => (
+                            <div key={`${candidate.path}-${candidate.kind}-${candidate.previewHex}`} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/50 px-3 py-2">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="text-[11px] font-semibold text-[var(--foreground)]">{candidate.path}</div>
+                                <div className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
+                                  {candidate.kind} · {candidate.byteLength}B
+                                </div>
+                              </div>
+                              <div className="mt-1 font-mono text-[10px] text-[var(--foreground)]">{candidate.previewHex}</div>
+                              <div className="mt-1 break-all text-[11px] text-[var(--toss-gray-3)]">{candidate.previewValue}</div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="mt-3 rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-3 py-3 text-[11px] text-[var(--toss-gray-3)]">
+                          현재 /mobile task 응답에서 바로 write할 raw bytes는 못 찾았습니다. 이 경우 앱이 받은 메타데이터를 내부 프로토콜로 다시 조립할 가능성이 큽니다.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : null}
 
@@ -1399,6 +2175,11 @@ export default function ZhsunycoEslSync(_props: Props) {
                             {legacyBleDirectResult.ok ? 'OK' : legacyBleDirectResult.error || 'ERROR'}
                           </div>
                         </div>
+                        {legacyBleDirectResult.ok ? (
+                          <div className="mt-2 rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800">
+                            서버가 전송 요청을 수락했습니다. 실제 ESL 화면 반영은 위 `전송 상태 확인` 결과나 기기 반응으로 한 번 더 확인해야 합니다.
+                          </div>
+                        ) : null}
                         <pre className="mt-2 max-h-32 overflow-auto rounded-[var(--radius-md)] bg-slate-950 px-3 py-2 text-[11px] text-slate-100">
                           {stringifyDiagnosticValue(legacyBleDirectResult.upstream || legacyBleDirectResult.error)}
                         </pre>
