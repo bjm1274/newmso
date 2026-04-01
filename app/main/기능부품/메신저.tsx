@@ -60,6 +60,12 @@ type WardMessageMeta = {
   schedule_time?: string;
 };
 
+type ReactionUsersByMessage = Record<string, Record<string, StaffMember[]>>;
+
+function compareStaffMembers(a: StaffMember, b: StaffMember) {
+  return (a.department || '').localeCompare(b.department || '') || (a.name || '').localeCompare(b.name || '');
+}
+
 function stripHiddenMessageMetaBlocks(value: unknown): string {
   return String(value || '')
     .replace(/\[\[SCHEDULE_META\]\][\s\S]*?\[\[\/SCHEDULE_META\]\]/g, '')
@@ -997,6 +1003,7 @@ export default function ChatView({
   const [unreadModalMsg, setUnreadModalMsg] = useState<ChatMessage | null>(null);
   const [unreadUsers, setUnreadUsers] = useState<StaffMember[]>([]);
   const [unreadLoading, setUnreadLoading] = useState(false);
+  const [reactionDetailTarget, setReactionDetailTarget] = useState<{ message: ChatMessage; emoji: string } | null>(null);
   const [globalRealtimeState, setGlobalRealtimeState] = useState<ChatRealtimeState>('connecting');
   const [roomRealtimeState, setRoomRealtimeState] = useState<ChatRealtimeState>('idle');
   const [globalRealtimeRetryToken, setGlobalRealtimeRetryToken] = useState(0);
@@ -1284,12 +1291,14 @@ export default function ChatView({
       setEditingMessageDraft('');
       setReplyTo(null);
       setReactions({});
+      setReactionUsersByMessage({});
       setPolls([]);
       setPollVotes({});
       setPinnedIds([]);
       setPersistedPinnedMessages([]);
       setBookmarkedIds(new Set());
       setUnreadModalMsg(null);
+      setReactionDetailTarget(null);
       // sent 상태 메시지의 deliveryState 정리 (메모리 누적 방지)
       setDeliveryStates((prev) => {
         const next: Record<string, DeliveryState> = {};
@@ -1865,6 +1874,7 @@ export default function ChatView({
   const [polls, setPolls] = useState<PollItem[]>([]);
   const [pollVotes, setPollVotes] = useState<Record<string, Record<number, number>>>({});
   const [reactions, setReactions] = useState<Record<string, Record<string, number>>>({});
+  const [reactionUsersByMessage, setReactionUsersByMessage] = useState<ReactionUsersByMessage>({});
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [showPollModal, setShowPollModal] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
@@ -2720,15 +2730,46 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     }
 
     try {
-      const { data: reacts } = await supabase.from('message_reactions').select('message_id, emoji');
+      const { data: reacts } = await supabase.from('message_reactions').select('message_id, emoji, user_id');
       const reactMap: Record<string, Record<string, number>> = {};
+      const reactionUsersMap: ReactionUsersByMessage = {};
       reacts?.forEach(( r: Record<string, unknown>) => {
-        const msgId = r.message_id as string;
-        const emoji = r.emoji as string;
+        const msgId = String(r.message_id || '').trim();
+        const emoji = String(r.emoji || '').trim();
+        const reactionUserId = String(r.user_id || '').trim();
+        if (!msgId || !emoji) return;
         if (!reactMap[msgId]) reactMap[msgId] = {};
         reactMap[msgId][emoji] = (reactMap[msgId][emoji] || 0) + 1;
+        if (!reactionUsersMap[msgId]) reactionUsersMap[msgId] = {};
+        if (!reactionUsersMap[msgId][emoji]) reactionUsersMap[msgId][emoji] = [];
+        if (!reactionUserId) return;
+        const resolvedReactionUser = resolveStaffProfile(reactionUserId) || {
+          id: reactionUserId,
+          name: '이름 없음',
+          company: '',
+          department: '',
+          position: '',
+          photo_url: null,
+        };
+        if (!reactionUsersMap[msgId][emoji].some((staff) => String(staff.id) === reactionUserId)) {
+          reactionUsersMap[msgId][emoji].push({
+            ...resolvedReactionUser,
+            id: String(resolvedReactionUser.id || reactionUserId),
+            name: String(resolvedReactionUser.name || '이름 없음'),
+            company: String(resolvedReactionUser.company || ''),
+            department: String(resolvedReactionUser.department || ''),
+            position: String(resolvedReactionUser.position || ''),
+            photo_url: resolvedReactionUser.photo_url ?? null,
+          });
+        }
+      });
+      Object.values(reactionUsersMap).forEach((emojiMap) => {
+        Object.keys(emojiMap).forEach((emoji) => {
+          emojiMap[emoji] = [...emojiMap[emoji]].sort(compareStaffMembers);
+        });
       });
       setReactions(reactMap);
+      setReactionUsersByMessage(reactionUsersMap);
 
       const { data: dbPolls } = (await supabase
         .from('polls')
@@ -2750,6 +2791,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       setPollVotes(vMap);
     } catch (error) {
       console.error('반응/투표 데이터 불러오기 실패:', error);
+      setReactions({});
+      setReactionUsersByMessage({});
     }
 
     // 읽음 커서/message_reads 쓰기는 방 선택 시(setRoom)와 실시간 새 메시지 수신 시에만 수행.
@@ -3611,9 +3654,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           }
         });
 
-        const sorter = (a: StaffMember, b: StaffMember) => (a.department || '').localeCompare(b.department || '') || (a.name || '').localeCompare(b.name || '');
-        setReadUsers(readers.sort(sorter));
-        setUnreadUsers(nonReaders.sort(sorter));
+        setReadUsers(readers.sort(compareStaffMembers));
+        setUnreadUsers(nonReaders.sort(compareStaffMembers));
       } catch (e) {
         console.error('loadReadStatusForMessage error', e);
         toast('읽음 현황을 불러오지 못했습니다.');
@@ -3623,6 +3665,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     },
     [selectedRoom, allKnownStaffs, getEffectiveRoomMemberIds, roomReadCursorMap]
   );
+  const openReactionDetail = useCallback((message: ChatMessage, emoji: string) => {
+    setReactionDetailTarget({ message, emoji });
+  }, []);
 
   const handleLeaveRoom = async () => {
     if (!selectedRoom) return;
@@ -5608,13 +5653,19 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                               <span className="flex gap-1 flex-wrap">
                                 {Object.entries(msgReacts).map(([emoji, cnt]) =>
                                 ((cnt as number) > 0 ? (
-                                  <span
+                                  <button
                                     key={emoji}
-                                    className={`px-1.5 py-0.5 rounded text-[11px] ${isMine ? 'bg-[var(--card)]/20' : 'bg-[var(--muted)]'
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openReactionDetail(msg, emoji);
+                                    }}
+                                    className={`px-1.5 py-0.5 rounded text-[11px] transition-colors ${isMine ? 'bg-[var(--card)]/20 hover:bg-[var(--card)]/30' : 'bg-[var(--muted)] hover:bg-[var(--toss-blue-light)]'
                                       }`}
+                                    aria-label={`${emoji} 반응 누른 사람 ${(cnt as number)}명 보기`}
                                   >
                                     {emoji} {cnt as number}
-                                  </span>
+                                  </button>
                                 ) : null)
                                 )}
                               </span>
@@ -6767,6 +6818,68 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         </div>
       )}
 
+      {reactionDetailTarget && (() => {
+        const reactionUsers =
+          reactionUsersByMessage[String(reactionDetailTarget.message.id)]?.[reactionDetailTarget.emoji] || [];
+        return (
+          <div
+            data-testid="chat-reaction-detail-modal"
+            className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4"
+            onClick={() => setReactionDetailTarget(null)}
+          >
+            <div
+              className="bg-[var(--card)] w-full max-w-md rounded-2xl p-4 space-y-4 shadow-sm border border-[var(--border)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
+                    반응 상세
+                  </p>
+                  <div className="mt-1 flex items-center gap-2 min-w-0">
+                    <span className="shrink-0 rounded-full bg-[var(--muted)] px-2 py-0.5 text-xs font-bold text-[var(--foreground)]">
+                      {reactionDetailTarget.emoji} {reactionUsers.length}
+                    </span>
+                    <p className="text-xs font-semibold text-[var(--foreground)] line-clamp-1 opacity-60">
+                      {getMessageDisplayText(
+                        reactionDetailTarget.message.content,
+                        reactionDetailTarget.message.file_name,
+                        reactionDetailTarget.message.file_url,
+                        '첨부 파일 메시지'
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReactionDetailTarget(null)}
+                  className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[var(--radius-md)] hover:bg-[var(--muted)]"
+                >
+                  닫기
+                </button>
+              </div>
+
+              <div className="border-t border-[var(--border)] pt-3 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                {reactionUsers.length === 0 ? (
+                  <p className="text-[10px] text-[var(--toss-gray-3)] font-bold py-2 px-1">
+                    아직 이 반응을 누른 사람이 없습니다.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-1">
+                    {reactionUsers.map((staff) => (
+                      <MessengerStatusUserRow
+                        key={`${reactionDetailTarget.emoji}-${staff.id}`}
+                        staff={staff}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {showForwardModal && forwardSourceMsg && (
         <div data-testid="chat-forward-modal" className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4" onClick={() => { setShowForwardModal(false); setForwardSourceMsg(null); }}>
           <div className="bg-[var(--card)] w-full max-w-md rounded-2xl p-4 space-y-4 shadow-sm border border-[var(--border)]" onClick={e => e.stopPropagation()}>
@@ -6818,10 +6931,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     }}
                     className="w-full flex items-center justify-between px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] hover:bg-[var(--toss-blue-light)] text-left text-xs font-bold text-[var(--foreground)]"
                   >
-                    <span className="truncate">
-                      {room.id === NOTICE_ROOM_ID ? '공 ' : '채 '}
-                      {room.name || '채팅방'}
-                    </span>
+                    <span className="truncate">{room.name || '채팅방'}</span>
                     <span className="text-[11px] text-[var(--toss-gray-3)]">
                       {getConversationUnreadCountForRoom(room, roomUnreadCounts, chatRooms)
                         ? String(getConversationUnreadCountForRoom(room, roomUnreadCounts, chatRooms))
