@@ -4054,6 +4054,30 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     const uploadFileName = buildUploadRequestFileName(file);
     setFileUploading(true);
     try {
+      const uploadViaAppServer = async () => {
+        const formData = new FormData();
+        formData.append('file', file, uploadFileName);
+
+        const fallbackResponse = await fetch('/api/chat/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        const fallbackPayload = await fallbackResponse.json().catch(() => null) as {
+          provider?: 'supabase' | 'r2';
+          bucket?: string;
+          path?: string;
+          fileName?: string;
+          url?: string;
+          error?: string;
+        } | null;
+
+        if (!fallbackResponse.ok || !fallbackPayload?.path || !fallbackPayload?.url) {
+          throw new Error(fallbackPayload?.error || `파일 업로드에 실패했습니다. (HTTP ${fallbackResponse.status})`);
+        }
+
+        return fallbackPayload;
+      };
+
       const response = await fetch('/api/chat/upload', {
         method: 'POST',
         headers: {
@@ -4079,62 +4103,72 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         throw new Error(payload?.error || `파일 업로드 준비에 실패했습니다. (HTTP ${response.status})`);
       }
 
-      let uploadErrorMessage = '';
-      if (payload.provider === 'supabase' && payload.bucket && payload.token) {
-        const uploadClient = supabase.storage.from(payload.bucket) as typeof supabase.storage extends {
-          from: (...args: unknown[]) => infer TStorageClient;
-        }
-          ? TStorageClient & {
-              uploadToSignedUrl?: (
-                path: string,
-                token: string,
-                fileBody: File,
-                options?: Record<string, unknown>,
-              ) => Promise<{ error: { message?: string } | null }>;
-            }
-          : {
-              uploadToSignedUrl?: (
-                path: string,
-                token: string,
-                fileBody: File,
-                options?: Record<string, unknown>,
-              ) => Promise<{ error: { message?: string } | null }>;
-            };
-
-        if (typeof uploadClient.uploadToSignedUrl === 'function') {
-          const uploadResult = await uploadClient.uploadToSignedUrl(payload.path, payload.token, file, {
-            contentType: file.type || 'application/octet-stream',
-            upsert: false,
-            cacheControl: '3600',
-          });
-          uploadErrorMessage = uploadResult.error?.message || '';
-        }
-      }
-
-      if (payload.provider !== 'supabase' || uploadErrorMessage) {
-        const directUploadResponse = await fetch(payload.signedUrl, {
-          method: 'PUT',
-          headers: payload.provider === 'r2'
-            ? payload.headers || { 'content-type': file.type || 'application/octet-stream' }
-            : {
-                'content-type': file.type || 'application/octet-stream',
-                'x-upsert': 'false',
-                'cache-control': '3600',
-              },
-          body: file,
-        });
-
-        if (!directUploadResponse.ok) {
-          throw new Error(uploadErrorMessage || `Storage 직접 업로드에 실패했습니다. (HTTP ${directUploadResponse.status})`);
-        }
-      }
-
-      const publicUrl =
+      let publicUrl =
         payload.url || (
           payload.provider === 'supabase' && payload.bucket
             ? supabase.storage.from(payload.bucket).getPublicUrl(payload.path).data.publicUrl
             : ''
         );
+      try {
+        let uploadErrorMessage = '';
+        if (payload.provider === 'supabase' && payload.bucket && payload.token) {
+          const uploadClient = supabase.storage.from(payload.bucket) as typeof supabase.storage extends {
+            from: (...args: unknown[]) => infer TStorageClient;
+          }
+            ? TStorageClient & {
+                uploadToSignedUrl?: (
+                  path: string,
+                  token: string,
+                  fileBody: File,
+                  options?: Record<string, unknown>,
+                ) => Promise<{ error: { message?: string } | null }>;
+              }
+            : {
+                uploadToSignedUrl?: (
+                  path: string,
+                  token: string,
+                  fileBody: File,
+                  options?: Record<string, unknown>,
+                ) => Promise<{ error: { message?: string } | null }>;
+              };
+
+          if (typeof uploadClient.uploadToSignedUrl === 'function') {
+            const uploadResult = await uploadClient.uploadToSignedUrl(payload.path, payload.token, file, {
+              contentType: file.type || 'application/octet-stream',
+              upsert: false,
+              cacheControl: '3600',
+            });
+            uploadErrorMessage = uploadResult.error?.message || '';
+          }
+        }
+
+        if (payload.provider !== 'supabase' || uploadErrorMessage) {
+          const directUploadResponse = await fetch(payload.signedUrl, {
+            method: 'PUT',
+            headers: payload.provider === 'r2'
+              ? payload.headers || { 'content-type': file.type || 'application/octet-stream' }
+              : {
+                  'content-type': file.type || 'application/octet-stream',
+                  'x-upsert': 'false',
+                  'cache-control': '3600',
+                },
+            body: file,
+          });
+
+          if (!directUploadResponse.ok) {
+            throw new Error(uploadErrorMessage || `Storage 직접 업로드에 실패했습니다. (HTTP ${directUploadResponse.status})`);
+          }
+        }
+      } catch (directUploadError) {
+        console.warn('직접 업로드 실패, 서버 업로드로 재시도합니다.', directUploadError);
+        const fallbackPayload = await uploadViaAppServer();
+        publicUrl = fallbackPayload.url || '';
+      }
+
+      if (!publicUrl) {
+        throw new Error('업로드된 파일 URL을 확인하지 못했습니다.');
+      }
+
       const fileKind = getFileKind(file.type || '');
       return await handleSendMessage({
         fileUrl: publicUrl,

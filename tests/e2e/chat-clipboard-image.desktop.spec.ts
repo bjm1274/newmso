@@ -385,3 +385,107 @@ test('chat file picker can queue and send both photo and document attachments', 
 
   expect(runtimeErrors).toEqual([]);
 });
+
+test('chat falls back to app-server upload when direct storage upload fails', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  let uploadPlanCalls = 0;
+  let fallbackUploadCalls = 0;
+
+  await mockSupabase(page, {
+    staffMembers: [fakeUser, peerUser],
+    chatRooms: [
+      {
+        id: 'room-clipboard',
+        name: '',
+        type: 'direct',
+        members: [fakeUser.id, peerUser.id],
+        created_at: '2026-03-08T09:00:00.000Z',
+        last_message_at: '2026-03-08T09:00:00.000Z',
+      },
+    ],
+    messages: [],
+  });
+
+  await page.unroute('**/api/chat/upload');
+  await page.route('**/api/chat/upload', async (route) => {
+    const contentType = (await route.request().headerValue('content-type')) || '';
+    if (contentType.includes('application/json')) {
+      uploadPlanCalls += 1;
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          provider: 'r2',
+          bucket: 'pchos-files',
+          path: 'chat/mock-r2-fallback.png',
+          signedUrl: 'https://example-r2.invalid/upload/mock-r2-fallback.png',
+          headers: {
+            'content-type': 'image/png',
+          },
+          url: '/api/storage/object?provider=r2&bucket=pchos-files&key=chat%2Fmock-r2-fallback.png',
+        }),
+      });
+    }
+
+    fallbackUploadCalls += 1;
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        provider: 'r2',
+        bucket: 'pchos-files',
+        path: 'chat/mock-r2-fallback.png',
+        fileName: 'fallback-image.png',
+        url: '/api/storage/object?provider=r2&bucket=pchos-files&key=chat%2Fmock-r2-fallback.png',
+      }),
+    });
+  });
+
+  await page.route('**://example-r2.invalid/**', async (route) => {
+    await route.abort('failed');
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '채팅',
+      erp_chat_last_room: 'room-clipboard',
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent('채팅')}`);
+
+  await expect(page.getByTestId('chat-view')).toBeVisible();
+  await page.getByTestId('chat-room-room-clipboard').click();
+
+  await page.locator('input[type="file"]').first().setInputFiles({
+    name: 'fallback-image.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+  });
+
+  await expect(page.getByTestId('chat-pending-upload-panel')).toBeVisible();
+  await page.getByTestId('chat-pending-upload-send-button').click();
+  await expect(page.getByTestId('chat-pending-upload-panel')).toBeHidden();
+
+  await expect
+    .poll(async () => {
+      const savedMessages = await page.evaluate(async () => {
+        const response = await fetch('/rest/v1/messages?room_id=eq.room-clipboard&select=*');
+        return response.json();
+      });
+      return Array.isArray(savedMessages)
+        ? savedMessages.some(
+            (message) =>
+              String(message?.file_name || '') === 'fallback-image.png' &&
+              String(message?.file_url || '').includes('/api/storage/object?provider=r2'),
+          )
+        : false;
+    })
+    .toBeTruthy();
+
+  expect(uploadPlanCalls).toBe(1);
+  expect(fallbackUploadCalls).toBe(1);
+  expect(runtimeErrors).toEqual([]);
+});
