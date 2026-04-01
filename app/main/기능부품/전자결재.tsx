@@ -449,6 +449,7 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
   const [approvalMonth, setApprovalMonth] = useState(getCurrentMonthValue);
   const [approvalDateFrom, setApprovalDateFrom] = useState('');
   const [approvalDateTo, setApprovalDateTo] = useState('');
+  const [approvalDateTouched, setApprovalDateTouched] = useState(false);
   const defaultApprovalMonth = useMemo(() => getCurrentMonthValue(), []);
   const [savedApproverLine, setSavedApproverLine] = useState<StaffMember[]>([]);
   // 결재선 다중 템플릿 (name + line 배열)
@@ -3253,6 +3254,18 @@ window.onload = () => window.print();
       : { from: approvalDateFrom, to: approvalDateTo };
   }, [approvalDateFrom, approvalDateMode, approvalDateTo, approvalMonth]);
 
+  const shouldApplyApprovalDateFilter = useMemo(() => {
+    if (approvalDateMode === 'range') {
+      return Boolean(approvalDateFrom || approvalDateTo);
+    }
+
+    if (viewMode === '결재함' && !approvalDateTouched && approvalMonth === defaultApprovalMonth) {
+      return false;
+    }
+
+    return Boolean(approvalMonth);
+  }, [approvalDateFrom, approvalDateMode, approvalDateTo, approvalDateTouched, approvalMonth, defaultApprovalMonth, viewMode]);
+
   const hasApprovalFilterOverrides =
     approvalDocumentFilter !== ALL_DOCUMENT_FILTER ||
     Boolean(approvalKeyword) ||
@@ -3273,7 +3286,7 @@ window.onload = () => window.print();
       filtered = filtered.filter((item) => item.type === approvalDocumentFilter);
     }
 
-    if (effectiveApprovalDateRange.from || effectiveApprovalDateRange.to) {
+    if (shouldApplyApprovalDateFilter && (effectiveApprovalDateRange.from || effectiveApprovalDateRange.to)) {
       filtered = filtered.filter((item) =>
         matchesCreatedDateRange(
           item.created_at as string | null,
@@ -3289,7 +3302,7 @@ window.onload = () => window.print();
     }
 
     return filtered;
-  }, [approvalDocumentFilter, approvalKeyword, approvalStatusFilter, buildApprovalSearchText, effectiveApprovalDateRange.from, effectiveApprovalDateRange.to]);
+  }, [approvalDocumentFilter, approvalKeyword, approvalStatusFilter, buildApprovalSearchText, effectiveApprovalDateRange.from, effectiveApprovalDateRange.to, shouldApplyApprovalDateFilter]);
 
   const draftBoxList = useMemo(() => {
     return applyListFilters(draftBaseList);
@@ -3832,7 +3845,10 @@ window.onload = () => window.print();
                   />
                   <select
                     value={approvalDateMode}
-                    onChange={(e) => setApprovalDateMode(e.target.value === 'range' ? 'range' : 'month')}
+                    onChange={(e) => {
+                      setApprovalDateTouched(true);
+                      setApprovalDateMode(e.target.value === 'range' ? 'range' : 'month');
+                    }}
                     className="h-10 w-full sm:w-auto sm:min-w-[116px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
                     aria-label="조회 기간 유형"
                     data-testid="approval-date-mode"
@@ -3844,7 +3860,10 @@ window.onload = () => window.print();
                     <input
                       type="month"
                       value={approvalMonth}
-                      onChange={(e) => setApprovalMonth(e.target.value)}
+                      onChange={(e) => {
+                        setApprovalDateTouched(true);
+                        setApprovalMonth(e.target.value);
+                      }}
                       className="h-10 w-full sm:w-auto sm:min-w-[150px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
                       aria-label="조회 월"
                       data-testid="approval-month-filter"
@@ -3854,7 +3873,10 @@ window.onload = () => window.print();
                       <input
                         type="date"
                         value={approvalDateFrom}
-                        onChange={(e) => setApprovalDateFrom(e.target.value)}
+                        onChange={(e) => {
+                          setApprovalDateTouched(true);
+                          setApprovalDateFrom(e.target.value);
+                        }}
                         className="h-10 w-full sm:w-auto sm:min-w-[138px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
                         aria-label="조회 시작일"
                         data-testid="approval-date-from"
@@ -3863,7 +3885,10 @@ window.onload = () => window.print();
                       <input
                         type="date"
                         value={approvalDateTo}
-                        onChange={(e) => setApprovalDateTo(e.target.value)}
+                        onChange={(e) => {
+                          setApprovalDateTouched(true);
+                          setApprovalDateTo(e.target.value);
+                        }}
                         className="h-10 w-full sm:w-auto sm:min-w-[138px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
                         aria-label="조회 종료일"
                         data-testid="approval-date-to"
@@ -3880,6 +3905,7 @@ window.onload = () => window.print();
                         setApprovalMonth(defaultApprovalMonth);
                         setApprovalDateFrom('');
                         setApprovalDateTo('');
+                        setApprovalDateTouched(false);
                       }}
                       className="h-10 shrink-0 rounded-[var(--radius-md)] border border-[var(--border)] px-3 text-sm font-bold text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
                     >

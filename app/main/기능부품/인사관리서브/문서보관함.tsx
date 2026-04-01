@@ -67,8 +67,8 @@ export default function DocumentRepository({
 
   const fetchDocs = async () => {
     setLoading(true);
-    let repositoryQuery = supabase.from('document_repository').select('*').order('updated_at', { ascending: false });
-    let approvalsQuery = supabase.from('approvals').select('*').order('created_at', { ascending: false });
+    const repositoryQuery = supabase.from('document_repository').select('*').order('updated_at', { ascending: false });
+    const approvalsQuery = supabase.from('approvals').select('*').order('created_at', { ascending: false });
     const [{ data: repositoryDocs }, { data: approvalDocs }] = await Promise.all([repositoryQuery, approvalsQuery]);
     const existingDocNumbers = new Set(
       (repositoryDocs || [])

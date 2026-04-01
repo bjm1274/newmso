@@ -78,6 +78,30 @@ const HR_STATUS_KEY = 'erp_hr_status';
 const HR_WORKSPACE_KEY = 'erp_hr_workspace';
 const INV_VIEW_KEY = 'erp_inventory_view';
 const APPROVAL_VIEW_KEY = 'erp_approval_view';
+const ADMIN_SUBVIEW_KEY = 'erp_admin_subview';
+
+function getSavedSubViewForMenu(targetMenu?: string | null) {
+  if (typeof window === 'undefined' || !targetMenu) {
+    return null;
+  }
+
+  const genericSubView = window.localStorage.getItem('erp_last_subview');
+
+  switch (targetMenu) {
+    case '내정보':
+      return window.localStorage.getItem(MYPAGE_TAB_KEY) || genericSubView;
+    case '인사관리':
+      return window.localStorage.getItem(HR_TAB_KEY) || genericSubView;
+    case '재고관리':
+      return window.localStorage.getItem(INV_VIEW_KEY) || genericSubView;
+    case '전자결재':
+      return window.localStorage.getItem(APPROVAL_VIEW_KEY) || genericSubView;
+    case '관리자':
+      return window.localStorage.getItem(ADMIN_SUBVIEW_KEY) || genericSubView;
+    default:
+      return genericSubView;
+  }
+}
 
 function MainPageFallback() {
   return (
@@ -230,7 +254,11 @@ function MainPageContent() {
           subViewId === '인력생애주기센터'
         )
       ) {
-        return { menuId: '인사관리', subViewId: '입퇴사·교육센터' };
+        return {
+          menuId: '인사관리',
+          subViewId:
+            subViewId === '교육' || subViewId === '오프보딩' ? subViewId : '입퇴사·교육센터',
+        };
       }
 
       if (
@@ -242,14 +270,29 @@ function MainPageContent() {
           subViewId === '자격·안전센터' ||
           subViewId === '규정준수센터')
       ) {
-        return { menuId: '인사관리', subViewId: '자격·안전센터' };
+        return {
+          menuId: '인사관리',
+          subViewId:
+            subViewId === '건강검진' ||
+            subViewId === '면허/자격증' ||
+            subViewId === '의료기기점검' ||
+            subViewId === '사고보고서'
+              ? subViewId
+              : '자격·안전센터',
+        };
       }
 
       if (
         menuId === '인사관리' &&
         (subViewId === '문서보관함' || subViewId === '증명서' || subViewId === '서류제출')
       ) {
-        return { menuId: '인사관리', subViewId: '문서센터' };
+        return {
+          menuId: '인사관리',
+          subViewId:
+            subViewId === '문서보관함' || subViewId === '증명서' || subViewId === '서류제출'
+              ? subViewId
+              : '문서센터',
+        };
       }
 
       if (menuId === '관리자' && subViewId === '조직도') {
@@ -614,8 +657,7 @@ function MainPageContent() {
     const openInventoryApproval = navigationIntent.openInventoryApproval;
     if (!user) return;
     if (targetMenu || targetSubView || openMyPageTab || openPost || openApprovalId || openInventoryView || openInventoryApproval) {
-      const savedSubView =
-        typeof window !== 'undefined' ? window.localStorage.getItem('erp_last_subview') : null;
+      const savedSubView = getSavedSubViewForMenu(targetMenu);
       const resolvedNavigation = targetMenu
         ? resolveLegacyNavigation(targetMenu, targetSubView ?? savedSubView, user)
         : null;
@@ -745,6 +787,9 @@ function MainPageContent() {
       localStorage.setItem('erp_last_menu', mainMenu);
       localStorage.setItem('erp_last_subview', subView);
       localStorage.setItem('erp_last_co', selectedCo);
+      if (mainMenu === '관리자') {
+        localStorage.setItem(ADMIN_SUBVIEW_KEY, subView);
+      }
     }
   }, [mainMenu, subView, selectedCo, user]);
 
@@ -869,12 +914,24 @@ function MainPageContent() {
   useEffect(() => {
     if (!currentSubMenus.length) return;
     const normalizedNavigation = resolveLegacyNavigation(mainMenu, subView, user);
-    const preferredSubView =
-      normalizedNavigation.menuId === mainMenu
-        ? normalizedNavigation.subViewId
-        : subView;
+    const persistedSubView = (() => {
+      if (navigationIntent.openMenu !== mainMenu || navigationIntent.openSubView) {
+        return null;
+      }
 
-    if (preferredSubView && currentSubMenus.some((s) => s.id === preferredSubView)) {
+      const savedSubView = getSavedSubViewForMenu(mainMenu);
+      if (!savedSubView) {
+        return null;
+      }
+
+      const restoredNavigation = resolveLegacyNavigation(mainMenu, savedSubView, user);
+      return restoredNavigation.menuId === mainMenu ? restoredNavigation.subViewId : null;
+    })();
+    const preferredSubView =
+      [normalizedNavigation.menuId === mainMenu ? normalizedNavigation.subViewId : null, persistedSubView, subView]
+        .find((candidate) => candidate && currentSubMenus.some((menu) => menu.id === candidate)) ?? null;
+
+    if (preferredSubView) {
       if (preferredSubView !== subView) {
         setSubView(preferredSubView);
       }
@@ -884,7 +941,16 @@ function MainPageContent() {
     if (!currentSubMenus.some((s) => s.id === subView) && selectableSubMenus.length > 0) {
       setSubView(selectableSubMenus[0].id);
     }
-  }, [currentSubMenus, mainMenu, resolveLegacyNavigation, selectableSubMenus, subView, user]);
+  }, [
+    currentSubMenus,
+    mainMenu,
+    navigationIntent.openMenu,
+    navigationIntent.openSubView,
+    resolveLegacyNavigation,
+    selectableSubMenus,
+    subView,
+    user,
+  ]);
 
   const clearMenuNavigationTargets = useCallback(() => {
     setInitialMyPageTab(null);
@@ -912,6 +978,9 @@ function MainPageContent() {
           break;
         case '전자결재':
           window.localStorage.removeItem(APPROVAL_VIEW_KEY);
+          break;
+        case '관리자':
+          window.localStorage.removeItem(ADMIN_SUBVIEW_KEY);
           break;
         case '인사관리':
           window.localStorage.removeItem(HR_TAB_KEY);

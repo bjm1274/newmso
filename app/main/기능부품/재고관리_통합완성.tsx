@@ -1840,6 +1840,7 @@ export default function IntegratedInventoryManagement({
               <div className="flex gap-2 mb-2">
                 <button
                   type="button"
+                  aria-label="일반 입력"
                   onClick={() => setRegistrationMode('form')}
                   className={`flex-1 px-4 py-3 rounded-[var(--radius-md)] text-[11px] font-semibold transition-all ${registrationMode === 'form'
                     ? 'bg-[var(--accent)] text-white shadow-sm'
@@ -1850,6 +1851,7 @@ export default function IntegratedInventoryManagement({
                 </button>
                 <button
                   type="button"
+                  aria-label="엑셀 업로드"
                   onClick={() => setRegistrationMode('excel')}
                   className={`flex-1 px-4 py-3 rounded-[var(--radius-md)] text-[11px] font-semibold transition-all ${registrationMode === 'excel'
                     ? 'bg-emerald-600 text-white shadow-md'
@@ -1860,6 +1862,7 @@ export default function IntegratedInventoryManagement({
                 </button>
                 <button
                   type="button"
+                  aria-label="AI 자동추출"
                   onClick={() => setRegistrationMode('auto_extract')}
                   className={`flex-1 px-4 py-3 rounded-[var(--radius-md)] text-[11px] font-semibold transition-all ${registrationMode === 'auto_extract'
                     ? 'bg-purple-600 text-white shadow-md'

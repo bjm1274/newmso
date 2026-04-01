@@ -408,6 +408,7 @@ export default function ProductRegistration({
 
         <button
           data-testid="inventory-registration-submit"
+          aria-label="물품 자산 저장하기"
           onClick={handleRegisterProduct}
           disabled={loading}
           className="w-full rounded-[var(--radius-lg)] bg-[var(--accent)] py-5 text-sm font-bold text-white shadow-sm transition-all hover:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
