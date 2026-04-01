@@ -41,15 +41,17 @@ export function isSystemMasterStaffMissingColumnError(
   const message = String(error.message || error.details || '').toLowerCase();
   const hint = String(error.hint || '').toLowerCase();
   const needle = columnName.toLowerCase();
+  const missingColumnMessage =
+    message.includes(`column ${needle}`) ||
+    message.includes(`"${needle}"`) ||
+    message.includes(`'${needle}'`) ||
+    message.includes(`could not find the '${needle}' column`) ||
+    message.includes(`could not find the "${needle}" column`) ||
+    hint.includes(needle);
 
   return (
-    ((code === '42703' || !code) &&
-      (
-        message.includes(`column ${needle}`) ||
-        message.includes(`"${needle}"`) ||
-        message.includes(`'${needle}'`) ||
-        hint.includes(needle)
-      ))
+    ((code === '42703' || code === 'PGRST204' || code === 'PGRST200' || !code) &&
+      missingColumnMessage)
   );
 }
 
