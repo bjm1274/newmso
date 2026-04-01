@@ -289,17 +289,17 @@ export default function ZhsunycoEslSync(_props: Props) {
       toast('이 브라우저는 카메라 스캔을 지원하지 않습니다.', 'error');
       return;
     }
-    if (!deviceRegistrationVideoRef.current) {
-      toast('카메라 미리보기를 준비하지 못했습니다.', 'error');
-      return;
-    }
-
     stopCameraBarcodeScan();
     setCameraScanOpen(true);
     setCameraScanBusy(true);
     setCameraScanStatus('카메라 여는 중...');
 
     try {
+      const previewElement = deviceRegistrationVideoRef.current;
+      if (!previewElement) {
+        throw new Error('preview-not-ready');
+      }
+
       const { BrowserMultiFormatReader, BarcodeFormat } = await import('@zxing/browser');
       const reader = new BrowserMultiFormatReader();
       reader.possibleFormats = [
@@ -324,7 +324,7 @@ export default function ZhsunycoEslSync(_props: Props) {
           },
           audio: false,
         },
-        deviceRegistrationVideoRef.current,
+        previewElement,
         (result, error, nextControls) => {
           cameraScanControlsRef.current = nextControls;
           if (result) {
@@ -350,8 +350,12 @@ export default function ZhsunycoEslSync(_props: Props) {
     } catch (error) {
       console.error('Failed to start barcode camera scan:', error);
       stopCameraBarcodeScan();
-      toast('카메라 권한을 허용한 뒤 다시 시도해 주세요.', 'error');
-      setCameraScanStatus('카메라 권한이 필요합니다.');
+      const message =
+        error instanceof Error && error.message === 'preview-not-ready'
+          ? '카메라 화면을 준비하는 중입니다. 다시 한 번 눌러 주세요.'
+          : '카메라 권한을 허용한 뒤 다시 시도해 주세요.';
+      toast(message, 'error');
+      setCameraScanStatus(message);
     } finally {
       setCameraScanBusy(false);
     }
@@ -652,17 +656,19 @@ export default function ZhsunycoEslSync(_props: Props) {
               ) : null}
             </div>
 
-            {cameraScanOpen ? (
-              <div className="mt-4 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-black">
-                <video
-                  ref={deviceRegistrationVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="aspect-[4/3] w-full object-cover"
-                />
-              </div>
-            ) : null}
+            <div
+              className={`mt-4 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-black ${
+                cameraScanOpen ? 'block' : 'hidden'
+              }`}
+            >
+              <video
+                ref={deviceRegistrationVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="aspect-[4/3] w-full object-cover"
+              />
+            </div>
 
             <div className="mt-2 text-[12px] text-[var(--toss-gray-3)]">{cameraScanStatus}</div>
             <input
