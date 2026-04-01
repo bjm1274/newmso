@@ -2770,7 +2770,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       });
       setReactions(reactMap);
       setReactionUsersByMessage(reactionUsersMap);
+    } catch (error) {
+      console.error('반응 데이터 불러오기 실패:', error);
+      setReactions({});
+      setReactionUsersByMessage({});
+    }
 
+    try {
       const { data: dbPolls } = (await supabase
         .from('polls')
         .select(POLL_SELECT)
@@ -2790,9 +2796,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       });
       setPollVotes(vMap);
     } catch (error) {
-      console.error('반응/투표 데이터 불러오기 실패:', error);
-      setReactions({});
-      setReactionUsersByMessage({});
+      console.error('투표 데이터 불러오기 실패:', error);
     }
 
     // 읽음 커서/message_reads 쓰기는 방 선택 시(setRoom)와 실시간 새 메시지 수신 시에만 수행.

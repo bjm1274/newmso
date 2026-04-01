@@ -299,3 +299,86 @@ test('chat shows ward quick replies for received op ward messages and sends the 
 
   expect(runtimeErrors).toEqual([]);
 });
+
+test('chat shows who reacted when a reaction chip is selected', async ({
+  page,
+}) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    staffMembers: [fakeUser, peerOne, peerTwo],
+    chatRooms: [
+      {
+        id: noticeRoomId,
+        name: '공지메시지',
+        type: 'notice',
+        members: [fakeUser.id],
+        created_at: '2026-03-08T00:00:00.000Z',
+        last_message_at: '2026-03-08T00:00:00.000Z',
+      },
+      {
+        id: 'room-reaction-detail',
+        name: '반응 확인 방',
+        type: 'group',
+        members: [fakeUser.id, peerOne.id, peerTwo.id],
+        created_at: '2026-03-08T09:00:00.000Z',
+        last_message_at: '2026-03-08T10:05:00.000Z',
+        last_message_preview: '반응 확인 메시지',
+        created_by: fakeUser.id,
+      },
+    ],
+    messages: [
+      {
+        id: 'msg-reaction-detail-1',
+        room_id: 'room-reaction-detail',
+        sender_id: peerTwo.id,
+        content: '반응 확인 메시지',
+        created_at: '2026-03-08T10:05:00.000Z',
+        is_deleted: false,
+        staff: { name: peerTwo.name, photo_url: null },
+      },
+    ],
+    messageReactions: [
+      {
+        id: 'reaction-1',
+        message_id: 'msg-reaction-detail-1',
+        user_id: fakeUser.id,
+        emoji: '👍',
+      },
+      {
+        id: 'reaction-2',
+        message_id: 'msg-reaction-detail-1',
+        user_id: peerOne.id,
+        emoji: '👍',
+      },
+      {
+        id: 'reaction-3',
+        message_id: 'msg-reaction-detail-1',
+        user_id: peerTwo.id,
+        emoji: '🔥',
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '\uCC44\uD305',
+      erp_chat_last_room: 'room-reaction-detail',
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent('\uCC44\uD305')}`);
+
+  await expect(page.getByTestId('chat-view')).toBeVisible();
+  await expect(page.getByTestId('chat-message-msg-reaction-detail-1')).toContainText('반응 확인 메시지');
+  await page.getByRole('button', { name: '👍 반응 누른 사람 2명 보기' }).click();
+  await expect(page.getByTestId('chat-reaction-detail-modal')).toBeVisible();
+  await expect(page.getByTestId('chat-reaction-detail-modal')).toContainText('👍 2');
+  await expect(page.getByTestId('chat-reaction-detail-modal')).toContainText(fakeUser.name);
+  await expect(page.getByTestId('chat-reaction-detail-modal')).toContainText(peerOne.name);
+  await expect(page.getByTestId('chat-reaction-detail-modal')).not.toContainText(peerTwo.name);
+  await page.getByTestId('chat-reaction-detail-modal').getByRole('button', { name: '닫기' }).click();
+  await expect(page.getByTestId('chat-reaction-detail-modal')).toBeHidden();
+
+  expect(runtimeErrors).toEqual([]);
+});
