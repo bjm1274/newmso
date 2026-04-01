@@ -63,17 +63,10 @@ function buildSafeFilePath(fileName: string, mimeType: string) {
   const normalizedFileName = normalizeUploadFileName(fileName, mimeType);
   const ext = guessFileExtension(normalizedFileName, mimeType);
   const safeExt = /^[a-z0-9]+$/i.test(ext) ? ext.toLowerCase() : 'bin';
-  const lastDotIndex = normalizedFileName.lastIndexOf('.');
-  const baseName =
-    lastDotIndex > 0 ? normalizedFileName.slice(0, lastDotIndex) : normalizedFileName;
-  const safeBaseName = baseName
-    .replace(/\s+/g, '_')
-    .replace(/[^\p{L}\p{N}._-]+/gu, '')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 80);
-  const suffix = safeBaseName ? `__${safeBaseName}.${safeExt}` : `.${safeExt}`;
 
-  return `chat/${Date.now()}_${crypto.randomUUID()}${suffix}`;
+  // Storage object key는 원본 파일명과 분리해 ASCII-safe 경로만 사용한다.
+  // 표시용 원본 이름은 DB의 file_name 필드로 별도 보존한다.
+  return `chat/${Date.now()}_${crypto.randomUUID()}.${safeExt}`;
 }
 
 function isMissingBucketError(error: unknown, bucketName: string) {

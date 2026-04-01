@@ -4,6 +4,11 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { sound } from '@/lib/sounds';
+import {
+  resolveApprovalNotificationId,
+  resolveInventoryNotificationApprovalId,
+  toNotificationMetadataRecord,
+} from '@/lib/notification-metadata';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 
 const TYPE_CFG: Record<string, { icon: string; color: string; label: string }> = {
@@ -42,20 +47,21 @@ function timeAgo(dateStr: string) {
   });
 }
 
-function buildInventoryNotificationHref(metadata: Record<string, any>) {
+function buildInventoryNotificationHref(metadata: Record<string, unknown>) {
   const params = new URLSearchParams({
     open_menu: '재고관리',
   });
 
-  if (metadata?.approval_id) {
+  const approvalId = resolveInventoryNotificationApprovalId(metadata);
+  if (approvalId) {
     params.set('open_inventory_view', '현황');
-    params.set('open_inventory_approval', String(metadata.approval_id));
+    params.set('open_inventory_approval', approvalId);
   }
 
   return `/main?${params.toString()}`;
 }
 
-function buildApprovalNotificationHref(metadata: Record<string, any>) {
+function buildApprovalNotificationHref(metadata: Record<string, unknown>) {
   const params = new URLSearchParams({
     open_menu: '전자결재',
   });
@@ -64,7 +70,7 @@ function buildApprovalNotificationHref(metadata: Record<string, any>) {
     params.set('open_subview', metadata.approval_view.trim());
   }
 
-  const approvalId = String(metadata?.approval_id || '').trim();
+  const approvalId = resolveApprovalNotificationId(metadata);
   if (approvalId) {
     params.set('open_approval_id', approvalId);
   }
@@ -256,7 +262,7 @@ export default function NotificationCenter({
 
     setIsOpen(false);
 
-    const meta = notification.metadata || {};
+    const meta = toNotificationMetadataRecord(notification.metadata);
     if (notification.type === 'message' || notification.type === 'mention') {
       router.push(meta.room_id ? `/main?open_chat_room=${meta.room_id}` : '/main?open_menu=채팅');
       return;

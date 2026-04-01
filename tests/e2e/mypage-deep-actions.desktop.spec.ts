@@ -31,6 +31,37 @@ async function openMyPage(page: Page) {
   await expect(page.getByTestId('mypage-view')).toBeVisible();
 }
 
+async function installMutableDateMock(page: Page, initialIso: string) {
+  await page.addInitScript(({ iso }) => {
+    const RealDate = Date;
+    let currentTime = new RealDate(iso).getTime();
+
+    class MockDate extends RealDate {
+      constructor(...args: any[]) {
+        if (args.length === 0) {
+          super(currentTime);
+          return;
+        }
+        // @ts-expect-error browser test shim
+        super(...args);
+      }
+
+      static now() {
+        return currentTime;
+      }
+    }
+
+    MockDate.parse = RealDate.parse;
+    MockDate.UTC = RealDate.UTC;
+    // @ts-expect-error browser test shim
+    window.__setMockNow = (nextIso: string) => {
+      currentTime = new RealDate(nextIso).getTime();
+    };
+    // @ts-expect-error browser test shim
+    window.Date = MockDate;
+  }, { iso: initialIso });
+}
+
 test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
 });
@@ -98,6 +129,52 @@ test('mypage commute can check in and out with geolocation permission', async ({
 
   expect(snapshot.attendance[0]?.check_out).toBeTruthy();
   expect(snapshot.attendances[0]?.check_out_time).toBeTruthy();
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('mypage commute enables today check-in after midnight even when yesterday checkout was missed', async ({
+  page,
+}) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await installMutableDateMock(page, '2026-03-30T23:58:00+09:00');
+
+  await mockSupabase(page, {
+    attendance: [
+      {
+        id: 'attendance-open-yesterday',
+        staff_id: fakeUser.id,
+        date: '2026-03-30',
+        check_in: '2026-03-30T00:10:00.000Z',
+        check_out: null,
+        status: '정상',
+      },
+    ],
+    attendances: [],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '내정보',
+      erp_mypage_tab: 'commute',
+    },
+  });
+
+  await openMyPage(page);
+  await page.getByRole('button', { name: /출퇴근/ }).click();
+
+  await expect(page.getByTestId('commute-record-view')).toBeVisible();
+  await expect(page.getByTestId('commute-check-out-button')).toBeVisible();
+
+  await page.evaluate(() => {
+    // @ts-expect-error browser test shim
+    window.__setMockNow('2026-03-31T08:20:00+09:00');
+  });
+
+  await expect
+    .poll(async () => page.getByTestId('commute-check-in-button').count(), { timeout: 4000 })
+    .toBe(1);
+  await expect(page.getByText('전날 미퇴근 기록이 남아 있습니다.')).toBeVisible();
   expect(runtimeErrors).toEqual([]);
 });
 
