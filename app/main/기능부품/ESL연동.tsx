@@ -18,11 +18,7 @@ type RoomBoardPatientSlot = {
 };
 type RoomBoardDraft = {
   roomNumber: string;
-  roomTitle: string;
-  wardLabel: string;
   deviceId: string;
-  templateName: string;
-  headerNote: string;
   updatedAt: string | null;
   patientSlots: RoomBoardPatientSlot[];
 };
@@ -63,11 +59,7 @@ function buildRoomDraft(room: HandoverRoomConfig, previous?: RoomBoardDraft | nu
   const previousSlots = new Map((previous?.patientSlots || []).map((slot) => [slot.bedNumber, slot]));
   return {
     roomNumber: room.roomNumber,
-    roomTitle: previous?.roomTitle || '',
-    wardLabel: previous?.wardLabel || '',
     deviceId: previous?.deviceId || '',
-    templateName: previous?.templateName || '',
-    headerNote: previous?.headerNote || '',
     updatedAt: previous?.updatedAt || null,
     patientSlots: room.beds.map((bed) => {
       const existing = previousSlots.get(bed.bedNumber);
