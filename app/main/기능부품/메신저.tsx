@@ -72,12 +72,23 @@ function sortChatRoomsWithNoticeFirst(rooms: ChatRoom[]): ChatRoom[] {
 
 function isImageUrl(url: string): boolean {
   const ext = url.split('.').pop()?.toLowerCase();
-  return /^(jpg|jpeg|png|gif|webp|bmp|svg)$/.test(ext || '');
+  return /^(jpg|jpeg|png|gif|webp|bmp|svg|heic|heif|avif)$/.test(ext || '');
 }
 
 function isVideoUrl(url: string): boolean {
   const ext = url.split('.').pop()?.toLowerCase();
   return /^(mp4|webm|mov|m4v|avi|mkv)$/.test(ext || '');
+}
+
+function resolveAttachmentKind(
+  fileUrl: unknown,
+  fileKind: unknown,
+): AttachmentPreviewKind {
+  const normalizedKind = String(fileKind || '').trim().toLowerCase();
+  if (normalizedKind === 'image') return 'image';
+  if (normalizedKind === 'video') return 'video';
+  const resolvedUrl = String(fileUrl || '');
+  return isImageUrl(resolvedUrl) ? 'image' : isVideoUrl(resolvedUrl) ? 'video' : 'file';
 }
 
 function extractFileNameFromUrl(url: string | null | undefined): string {
@@ -116,15 +127,26 @@ function guessFileExtension(file: File): string {
     'image/png': 'png',
     'image/jpeg': 'jpg',
     'image/jpg': 'jpg',
+    'image/heic': 'heic',
+    'image/heif': 'heif',
+    'image/avif': 'avif',
     'image/webp': 'webp',
     'image/gif': 'gif',
     'image/bmp': 'bmp',
     'image/svg+xml': 'svg',
+    'video/mp4': 'mp4',
+    'video/quicktime': 'mov',
     'application/pdf': 'pdf',
     'text/plain': 'txt',
     'application/zip': 'zip',
   };
   return mimeMap[mime] || 'bin';
+}
+
+function buildUploadRequestFileName(file: File): string {
+  const rawName = String(file.name || '').trim();
+  if (rawName) return rawName;
+  return getPendingAttachmentDisplayName(file);
 }
 
 function getAttachmentDisplayName(fileName: string | null | undefined, fileUrl?: string | null): string {
@@ -889,6 +911,7 @@ export default function ChatView({
   const lastTimelineTailRef = useRef('');
   const lastHandledChatListResetTokenRef = useRef(0);
   const selectedRoomIdRef = useRef<string | null>(null);
+  const initialRoomRestoreSyncedRef = useRef(false);
   const fetchDataRef = useRef<(() => Promise<void>) | null>(null);
   const globalRealtimeRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const roomRealtimeRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1185,12 +1208,17 @@ export default function ChatView({
       setMessages([]);
       setReadCounts({});
       setRoomReadCursorMap({});
+      setActiveActionMsg(null);
+      setEditingMessage(null);
+      setEditingMessageDraft('');
+      setReplyTo(null);
       setReactions({});
       setPolls([]);
       setPollVotes({});
       setPinnedIds([]);
       setPersistedPinnedMessages([]);
       setBookmarkedIds(new Set());
+      setUnreadModalMsg(null);
       // sent 상태 메시지의 deliveryState 정리 (메모리 누적 방지)
       setDeliveryStates((prev) => {
         const next: Record<string, DeliveryState> = {};
@@ -1814,7 +1842,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       if (!resolvedUrl) return;
 
       const resolvedKind: AttachmentPreviewKind =
-        forcedKind || (isImageUrl(resolvedUrl) ? 'image' : isVideoUrl(resolvedUrl) ? 'video' : 'file');
+        forcedKind || resolveAttachmentKind(resolvedUrl, null);
 
       setAttachmentPreview({
         url: resolvedUrl,
@@ -2365,6 +2393,18 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   }, []);
 
   useEffect(() => {
+    if (initialRoomRestoreSyncedRef.current) return;
+    if (selectedRoomId === null) {
+      initialRoomRestoreSyncedRef.current = true;
+      return;
+    }
+    if (chatRooms.length === 0) return;
+
+    initialRoomRestoreSyncedRef.current = true;
+    setRoom(String(selectedRoomId));
+  }, [chatRooms.length, selectedRoomId]);
+
+  useEffect(() => {
     if (initialOpenChatRoomId) {
       setRoom(initialOpenChatRoomId);
       if (initialOpenMessageId) {
@@ -2477,7 +2517,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           return id.startsWith('temp-') && deliveryStatesRef.current[id]?.status !== 'sent';
         });
         return [...enrichedMessages, ...localOnly].sort(
-          (a: ChatRoom, b: ChatRoom) =>
+          (a: ChatMessage, b: ChatMessage) =>
             new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
         );
       });
@@ -2849,7 +2889,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_read_cursors', filter: `room_id=eq.${selectedRoomId}` }, (payload: Record<string, unknown>) => {
         // 자신의 커서 업데이트는 낙관적으로 처리됨 — full refetch 생략하여 메시지 수신 지연 방지
         const updatedUserId = (payload.new as Record<string, unknown> | null)?.user_id;
-        if (updatedUserId && String(updatedUserId) === String(user?.id || '')) return;
+        if (updatedUserId && String(updatedUserId) === String(effectiveChatUserId || '')) return;
         fetchData();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reads' }, () => fetchData())
@@ -3896,6 +3936,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       }
     }
     const contentSnapshot = options?.contentSnapshot ?? inputMsgRef.current;
+    const uploadFileName = buildUploadRequestFileName(file);
     setFileUploading(true);
     try {
       const response = await fetch('/api/chat/upload', {
@@ -3904,7 +3945,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          fileName: file.name,
+          fileName: uploadFileName,
           mimeType: file.type || 'application/octet-stream',
           fileSize: file.size,
         }),
@@ -3913,6 +3954,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         bucket?: string;
         path?: string;
         token?: string;
+        signedUrl?: string;
         url?: string;
         error?: string;
       } | null;
@@ -3920,16 +3962,55 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         throw new Error(payload?.error || `파일 업로드 준비에 실패했습니다. (HTTP ${response.status})`);
       }
 
-      const uploadResult = await supabase.storage
-        .from(payload.bucket)
-        .uploadToSignedUrl(payload.path, payload.token, file, {
+      const uploadClient = supabase.storage.from(payload.bucket) as typeof supabase.storage extends {
+        from: (...args: unknown[]) => infer TStorageClient;
+      }
+        ? TStorageClient & {
+            uploadToSignedUrl?: (
+              path: string,
+              token: string,
+              fileBody: File,
+              options?: Record<string, unknown>,
+            ) => Promise<{ error: { message?: string } | null }>;
+          }
+        : {
+            uploadToSignedUrl?: (
+              path: string,
+              token: string,
+              fileBody: File,
+              options?: Record<string, unknown>,
+            ) => Promise<{ error: { message?: string } | null }>;
+          };
+
+      const needsDirectUpload = typeof uploadClient.uploadToSignedUrl !== 'function';
+      let uploadErrorMessage = '';
+      if (!needsDirectUpload && typeof uploadClient.uploadToSignedUrl === 'function') {
+        const uploadResult = await uploadClient.uploadToSignedUrl(payload.path, payload.token, file, {
           contentType: file.type || 'application/octet-stream',
           upsert: false,
           cacheControl: '3600',
         });
+        uploadErrorMessage = uploadResult.error?.message || '';
+      }
 
-      if (uploadResult.error) {
-        throw new Error(uploadResult.error.message || 'Storage 직접 업로드에 실패했습니다.');
+      if (needsDirectUpload || uploadErrorMessage) {
+        if (!payload.signedUrl) {
+          throw new Error(uploadErrorMessage || 'Storage 직접 업로드에 실패했습니다.');
+        }
+
+        const directUploadResponse = await fetch(payload.signedUrl, {
+          method: 'PUT',
+          headers: {
+            'content-type': file.type || 'application/octet-stream',
+            'x-upsert': 'false',
+            'cache-control': '3600',
+          },
+          body: file,
+        });
+
+        if (!directUploadResponse.ok) {
+          throw new Error(uploadErrorMessage || `Storage 직접 업로드에 실패했습니다. (HTTP ${directUploadResponse.status})`);
+        }
       }
 
       const publicUrl =
@@ -3939,7 +4020,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         fileUrl: publicUrl,
         fileSizeBytes: file.size,
         fileKind,
-        fileName: getPendingAttachmentDisplayName(file),
+        fileName: uploadFileName,
         contentOverride: contentSnapshot.trim(),
         clearComposerIfUnchangedFrom: options?.shouldClearSnapshot === false ? undefined : contentSnapshot,
         albumId: options?.albumId ?? null,
@@ -4249,17 +4330,21 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const filteredMediaMessages = useMemo(() => {
     if (mediaFilter === 'all') return mediaMessages;
     if (mediaFilter === 'media') {
-      return mediaMessages.filter((m: ChatMessage) => isImageUrl(m.file_url || '') || isVideoUrl(m.file_url || ''));
+      return mediaMessages.filter((m: ChatMessage) => resolveAttachmentKind(m.file_url, m.file_kind) !== 'file');
     }
     return mediaMessages.filter(( m: ChatMessage) => {
-      if (mediaFilter === 'image') return isImageUrl(m.file_url || '');
-      if (mediaFilter === 'video') return isVideoUrl(m.file_url || '');
-      return !isImageUrl(m.file_url || '') && !isVideoUrl(m.file_url || '');
+      const attachmentKind = resolveAttachmentKind(m.file_url, m.file_kind);
+      if (mediaFilter === 'image') return attachmentKind === 'image';
+      if (mediaFilter === 'video') return attachmentKind === 'video';
+      return attachmentKind === 'file';
     });
   }, [mediaMessages, mediaFilter]);
 
   const sharedMediaPreviewMessages = useMemo(
-    () => mediaMessages.filter((message) => message.file_kind === 'image' || message.file_kind === 'video').slice(-6),
+    () =>
+      mediaMessages
+        .filter((message) => resolveAttachmentKind(message.file_url, message.file_kind) !== 'file')
+        .slice(-6),
     [mediaMessages]
   );
 
@@ -4270,7 +4355,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           const fileUrl = String(message.file_url || '');
           if (!fileUrl) return false;
           if (message.file_kind === 'file') return true;
-          return !isImageUrl(fileUrl) && !isVideoUrl(fileUrl);
+          return resolveAttachmentKind(fileUrl, message.file_kind) === 'file';
         })
         .slice(-6),
     [mediaMessages]
@@ -4568,7 +4653,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
     for (const item of sorted) {
       const msg = item as unknown as ChatMessage & { album_id?: string };
-      if (msg.type === 'message' && msg.album_id && msg.file_kind === 'image' && !msg.is_deleted) {
+      if (msg.type === 'message' && msg.album_id && resolveAttachmentKind(msg.file_url, msg.file_kind) === 'image' && !msg.is_deleted) {
         const aid = msg.album_id;
         if (!albumMap.has(aid)) {
           albumMap.set(aid, []);
@@ -5343,8 +5428,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           {!isDeletedMessage && msg.file_url && (() => {
                             const furl = msg.file_url!;
                             const attachmentName = getAttachmentDisplayName(msg.file_name, furl);
-                            const attachmentKind: AttachmentPreviewKind =
-                              isImageUrl(furl) ? 'image' : isVideoUrl(furl) ? 'video' : 'file';
+                            const attachmentKind = resolveAttachmentKind(furl, msg.file_kind);
                             return (
                               <div className="mt-2" onClick={(e) => e.stopPropagation()}>
                                 <AttachmentListCard
@@ -5600,7 +5684,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             ? 'bg-[var(--muted)] border-[var(--border)] opacity-80 pointer-events-none'
             : 'bg-[var(--muted)] border-[var(--border)] focus-within:bg-[var(--card)] focus-within:ring-2 focus-within:ring-[var(--accent)]/50'
             }`}>
-            <input type="file" ref={fileInputRef} className="hidden" onChange={handleAttachmentSelect} accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.hwp" multiple />
+            <input type="file" ref={fileInputRef} className="hidden" onChange={handleAttachmentSelect} accept="image/*,.heic,.heif,.avif,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.hwp,.hwpx,.csv" multiple />
             <input type="file" ref={albumFileInputRef} className="hidden" onChange={handleAlbumFileSelect} accept="image/*" multiple />
             {/* 통합 첨부 버튼 */}
             <button
@@ -5728,8 +5812,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   </div>
                   <div className="grid grid-cols-3 gap-1 rounded-2xl overflow-hidden">
                     {sharedMediaPreviewMessages.map((m) => (
-                      <div key={m.id} className="aspect-square bg-[var(--tab-bg)] dark:bg-zinc-800 relative group cursor-pointer" onClick={() => m.file_url && openAttachmentPreview(m.file_url, m.file_name || null, m.file_kind === 'video' ? 'video' : m.file_kind === 'image' ? 'image' : 'file')}>
-                        {m.file_kind === 'image' ? (
+                      <div key={m.id} className="aspect-square bg-[var(--tab-bg)] dark:bg-zinc-800 relative group cursor-pointer" onClick={() => m.file_url && openAttachmentPreview(m.file_url, m.file_name || null, resolveAttachmentKind(m.file_url, m.file_kind))}>
+                        {resolveAttachmentKind(m.file_url, m.file_kind) === 'image' ? (
                           <img
                             src={m.file_url || ''}
                             alt={buildMessengerImageAlt(m.file_name, '공유된 이미지')}
@@ -5743,7 +5827,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             <AttachmentQuickActions
                               url={m.file_url}
                               name={getAttachmentDisplayName(m.file_name, m.file_url)}
-                              onPreview={() => openAttachmentPreview(m.file_url, m.file_name || null, m.file_kind === 'video' ? 'video' : m.file_kind === 'image' ? 'image' : 'file')}
+                              onPreview={() => openAttachmentPreview(m.file_url, m.file_name || null, resolveAttachmentKind(m.file_url, m.file_kind))}
                               variant="overlay"
                             />
                           </div>
@@ -6403,8 +6487,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       {m.file_url && (() => {
                         const attachmentUrl = String(m.file_url);
                         const attachmentName = getAttachmentDisplayName(m.file_name, attachmentUrl);
-                        const attachmentKind: AttachmentPreviewKind =
-                          isImageUrl(attachmentUrl) ? 'image' : isVideoUrl(attachmentUrl) ? 'video' : 'file';
+                        const attachmentKind = resolveAttachmentKind(attachmentUrl, m.file_kind);
                         return (
                           <AttachmentListCard
                             url={attachmentUrl}
@@ -6737,7 +6820,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 filteredMediaMessages.map(( m: ChatMessage) => {
                   const furl = (m.file_url || '') as string;
                   const attachmentName = getAttachmentDisplayName(m.file_name, furl);
-                  const previewKind = isImageUrl(furl) ? 'image' : isVideoUrl(furl) ? 'video' : 'file';
+                  const previewKind = resolveAttachmentKind(furl, m.file_kind);
                   return (
                     <AttachmentListCard
                       key={m.id}
@@ -6917,8 +7000,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             if (otherStaff) roomName = otherStaff.name;
                           }
                           const fileUrl = msg.file_url || '';
-                          const isImage = /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(fileUrl);
-                          const isFile = !!fileUrl && !isImage;
+                          const attachmentKind = resolveAttachmentKind(fileUrl, msg.file_kind);
+                          const isImage = attachmentKind === 'image';
+                          const isFile = !!fileUrl && attachmentKind === 'file';
                           const fileName = fileUrl ? getAttachmentDisplayName(msg.file_name, fileUrl) : '';
                           return (
                             <div
@@ -6939,11 +7023,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                 <AttachmentListCard
                                   url={fileUrl}
                                   name={fileName}
-                                  kind={isImage ? 'image' : isVideoUrl(fileUrl) ? 'video' : 'file'}
+                                  kind={attachmentKind}
                                   summary={msg.content || null}
                                   meta={`${roomName} · ${(msg.staff as { name?: string } | null | undefined)?.name || '이름 없음'} · ${new Date(msg.created_at || 0).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} ${new Date(msg.created_at || 0).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`}
                                   badgeLabel={isImage ? '이미지' : isFile ? '파일' : '동영상'}
-                                  onPreview={() => openAttachmentPreview(fileUrl, fileName, isImage ? 'image' : isVideoUrl(fileUrl) ? 'video' : 'file')}
+                                  onPreview={() => openAttachmentPreview(fileUrl, fileName, attachmentKind)}
                                   onActivate={() => openRoomFromGlobalSearch(String(msg.room_id), String(msg.id))}
                                   actionVariant="subtle"
                                   className="border-0 bg-transparent p-0 shadow-none"
@@ -7041,7 +7125,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     if (otherStaff) roomName = otherStaff.name;
                   }
                   const fileUrl = msg.file_url || '';
-                  const isImage = /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(fileUrl);
+                  const isImage = /\.(jpg|jpeg|png|gif|webp|bmp|svg|heic|heif|avif)(\?|$)/i.test(fileUrl);
                   const isFile = !!fileUrl && !isImage;
                   const fileName = fileUrl ? getAttachmentDisplayName(msg.file_name, fileUrl) : '';
                   return (

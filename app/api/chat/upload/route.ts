@@ -34,15 +34,46 @@ function guessFileExtension(fileName: string, mimeType: string) {
   }
 
   if (mimeType.startsWith('image/')) return mimeType.split('/')[1] || 'png';
+  if (mimeType.startsWith('video/')) return mimeType.split('/')[1] || 'mp4';
   if (mimeType === 'application/pdf') return 'pdf';
   if (mimeType === 'text/plain') return 'txt';
   return 'bin';
 }
 
-function buildSafeFilePath(fileName: string, mimeType: string) {
+function buildFallbackFileName(mimeType: string, ext: string) {
+  if (mimeType.startsWith('image/')) return `image.${ext}`;
+  if (mimeType.startsWith('video/')) return `video.${ext}`;
+  if (mimeType === 'application/pdf') return `document.${ext}`;
+  return `attachment.${ext}`;
+}
+
+function normalizeUploadFileName(fileName: string, mimeType: string) {
   const ext = guessFileExtension(fileName, mimeType);
+  const rawName = String(fileName || '').trim() || buildFallbackFileName(mimeType, ext);
+  const withoutPath = rawName.split(/[/\\]/).pop() || rawName;
+  const sanitized = withoutPath
+    .replace(/[\u0000-\u001f<>:"/\\|?*]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return sanitized || buildFallbackFileName(mimeType, ext);
+}
+
+function buildSafeFilePath(fileName: string, mimeType: string) {
+  const normalizedFileName = normalizeUploadFileName(fileName, mimeType);
+  const ext = guessFileExtension(normalizedFileName, mimeType);
   const safeExt = /^[a-z0-9]+$/i.test(ext) ? ext.toLowerCase() : 'bin';
-  return `chat/${Date.now()}_${crypto.randomUUID()}.${safeExt}`;
+  const lastDotIndex = normalizedFileName.lastIndexOf('.');
+  const baseName =
+    lastDotIndex > 0 ? normalizedFileName.slice(0, lastDotIndex) : normalizedFileName;
+  const safeBaseName = baseName
+    .replace(/\s+/g, '_')
+    .replace(/[^\p{L}\p{N}._-]+/gu, '')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 80);
+  const suffix = safeBaseName ? `__${safeBaseName}.${safeExt}` : `.${safeExt}`;
+
+  return `chat/${Date.now()}_${crypto.randomUUID()}${suffix}`;
 }
 
 function isMissingBucketError(error: unknown, bucketName: string) {
@@ -84,8 +115,8 @@ async function createSignedUploadPlan(
   supabase: any,
   payload: UploadPlanRequest,
 ) {
-  const fileName = String(payload.fileName || '').trim();
   const mimeType = String(payload.mimeType || 'application/octet-stream').trim() || 'application/octet-stream';
+  const fileName = normalizeUploadFileName(String(payload.fileName || '').trim(), mimeType);
   const fileSize = Number(payload.fileSize || 0);
 
   validateUploadTarget(fileName, mimeType, fileSize);
@@ -145,13 +176,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '업로드할 파일이 없습니다.' }, { status: 400 });
     }
 
-    validateUploadTarget(
-      String(file.name || '').trim(),
-      file.type || 'application/octet-stream',
-      file.size,
-    );
+    const mimeType = file.type || 'application/octet-stream';
+    const normalizedFileName = normalizeUploadFileName(String(file.name || '').trim(), mimeType);
+    validateUploadTarget(normalizedFileName, mimeType, file.size);
 
-    const filePath = buildSafeFilePath(file.name, file.type || 'application/octet-stream');
+    const filePath = buildSafeFilePath(normalizedFileName, mimeType);
     const arrayBuffer = await file.arrayBuffer();
     let lastError: unknown = null;
 
@@ -170,7 +199,7 @@ export async function POST(request: NextRequest) {
           success: true,
           bucket,
           path: filePath,
-          fileName: file.name,
+          fileName: normalizedFileName,
           url: data.publicUrl,
         });
       }

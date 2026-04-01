@@ -214,7 +214,14 @@ export interface ChatMessage {
   content?: string | null;
   file_url?: string | null;
   file_name?: string | null;
+  file_kind?: 'image' | 'video' | 'file' | null;
+  file_size_bytes?: number | null;
   message_type?: 'text' | 'image' | 'file' | 'system' | null;
+  reply_to_id?: string | null;
+  album_id?: string | null;
+  album_index?: number | null;
+  album_total?: number | null;
+  type?: string | null;
   created_at?: string | null;
   read_by?: string[] | null;
   reactions?: Record<string, string[]> | null;

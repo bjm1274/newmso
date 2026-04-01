@@ -112,6 +112,17 @@ async function getSavedClipboardImageMessages(page: Page) {
     : [];
 }
 
+async function getSavedClipboardAttachmentMessages(page: Page) {
+  const savedMessages = await page.evaluate(async () => {
+    const response = await fetch('/rest/v1/messages?room_id=eq.room-clipboard&select=*');
+    return response.json();
+  });
+
+  return Array.isArray(savedMessages)
+    ? savedMessages.filter((message) => String(message?.file_url || '').includes('/storage/v1/object/public/'))
+    : [];
+}
+
 test('chat composer asks for confirmation before sending a pasted clipboard image', async ({ page }) => {
   const runtimeErrors = trackRuntimeErrors(page);
 
@@ -294,6 +305,83 @@ test('chat composer asks for confirmation before sending a dropped attachment', 
       return messages[0]?.file_name ?? null;
     })
     .toBe('drop-image.png');
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('chat file picker can queue and send both photo and document attachments', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    staffMembers: [fakeUser, peerUser],
+    chatRooms: [
+      {
+        id: '00000000-0000-0000-0000-000000000000',
+        name: '공지메시지',
+        type: 'notice',
+        members: [fakeUser.id],
+        created_at: '2026-03-08T00:00:00.000Z',
+        last_message_at: '2026-03-08T00:00:00.000Z',
+      },
+      {
+        id: 'room-clipboard',
+        name: '파일선택 테스트방',
+        type: 'group',
+        members: [fakeUser.id, peerUser.id],
+        created_at: '2026-03-08T09:00:00.000Z',
+        last_message_at: '2026-03-08T09:00:00.000Z',
+        created_by: fakeUser.id,
+      },
+    ],
+    messages: [],
+  });
+
+  await page.route('**/storage/v1/object/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ Key: 'mock-chat-upload' }),
+    });
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '채팅',
+      erp_chat_last_room: 'room-clipboard',
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent('채팅')}`);
+
+  await expect(page.getByTestId('chat-view')).toBeVisible();
+  await page.getByTestId('chat-room-room-clipboard').click();
+
+  await page.locator('input[type="file"]').first().setInputFiles([
+    {
+      name: 'iphone-photo.heic',
+      mimeType: 'image/heic',
+      buffer: Buffer.from([0, 1, 2, 3]),
+    },
+    {
+      name: 'report.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4'),
+    },
+  ]);
+
+  await expect(page.getByTestId('chat-pending-upload-panel')).toBeVisible();
+  await expect(page.getByTestId('chat-pending-upload-panel')).toContainText('iphone-photo.heic');
+  await expect(page.getByTestId('chat-pending-upload-panel')).toContainText('report.pdf');
+
+  await page.getByTestId('chat-pending-upload-send-button').click();
+  await expect(page.getByTestId('chat-pending-upload-panel')).toBeHidden();
+
+  await expect
+    .poll(async () => {
+      const messages = await getSavedClipboardAttachmentMessages(page);
+      return messages.map((message) => message.file_name).sort();
+    })
+    .toEqual(['iphone-photo.heic', 'report.pdf']);
 
   expect(runtimeErrors).toEqual([]);
 });

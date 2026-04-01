@@ -1745,12 +1745,24 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
               ].filter(Boolean).join('\n');
               const senderId = effectiveBoardUserId || String(user?.id || '').trim();
               if (senderId) {
-                await supabase.from('messages').insert([{
+                const { data: insertedMsg } = await supabase.from('messages').insert([{
                   room_id: NOTICE_ROOM_ID,
                   sender_id: senderId,
                   sender_name: useAnonymous ? '관리자' : (user?.name || '관리자'),
                   content: chatContent,
-                }]);
+                }]).select('id').single();
+                // 공지 채팅방 push 알림 트리거
+                if (insertedMsg?.id) {
+                  try {
+                    await fetch('/api/notifications/chat-push', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ roomId: NOTICE_ROOM_ID, messageId: insertedMsg.id }),
+                    });
+                  } catch {
+                    // push 실패는 무시 (메시지는 이미 전송됨)
+                  }
+                }
               }
             } catch (e) {
               console.warn('공지 채팅방 자동 메시지 전송 실패:', e);
