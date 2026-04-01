@@ -16,12 +16,10 @@ import RoleDashboard from './역할별대시보드';
 import { supabase } from '@/lib/supabase';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import { useActionDialog } from '@/app/components/useActionDialog';
+import { HR_TAB_KEY, INV_VIEW_KEY, MYPAGE_TAB_KEY } from '@/app/main/navigation-state';
 
-const MYPAGE_TAB_KEY = 'erp_mypage_tab';
 const MYPAGE_RECORDS_VIEW_KEY = 'erp_mypage_records_view';
 const FAVORITES_KEY = 'erp_mypage_favorites';
-const HR_TAB_KEY = 'erp_hr_tab';
-const INV_VIEW_KEY = 'erp_inventory_view';
 
 type FavoriteId =
   | 'mypage_profile'
@@ -931,5 +929,4 @@ function QuickFavoriteButton({ label, icon, onClick, active, onRemove }: {
     </button>
   );
 }
-
 

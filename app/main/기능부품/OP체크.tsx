@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
 import {
@@ -623,6 +624,15 @@ function isInteractiveKeyboardTarget(target: EventTarget | null) {
   );
 }
 
+function getFocusableElements(container: HTMLElement | null) {
+  if (!container) return [] as HTMLElement[];
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ),
+  ).filter((element) => !element.hasAttribute('disabled') && element.getClientRects().length > 0);
+}
+
 function findMatchingSurgeryTemplate(surgeryTemplates: SurgeryTemplateRow[], surgeryName: string) {
   const normalizedTarget = normalizeLookupValue(surgeryName);
   if (!normalizedTarget) return null;
@@ -824,6 +834,11 @@ export default function OperationCheckView({
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deferredWardRecipientSearch = useDeferredValue(wardRecipientSearch);
   const savePatientCheckRef = useRef<() => Promise<void>>(async () => {});
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
+  const wardMessageDialogRef = useRef<HTMLDivElement | null>(null);
+  const wardMessageCloseButtonRef = useRef<HTMLButtonElement | null>(null);
+  const wardRecipientSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const wardMessageReturnFocusRef = useRef<HTMLElement | null>(null);
 
   const selectedScheduleCompanyId = useMemo(
     () => schedulePosts.find((post) => post.id === selectedScheduleId)?.company_id || null,
@@ -905,6 +920,105 @@ export default function OperationCheckView({
     () => buildWardMessageTemplateOptions(checkForm),
     [checkForm],
   );
+
+  const closeWardMessageModal = useCallback(() => {
+    setWardRecipientPickerOpen(false);
+    setWardRecipientSearch('');
+    setShowWardMsgModal(false);
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    setPortalHost(document.body);
+  }, []);
+
+  useEffect(() => {
+    if (!showWardMsgModal || typeof document === 'undefined' || typeof window === 'undefined') return;
+
+    wardMessageReturnFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    const { body, documentElement } = document;
+    const previousOverflow = body.style.overflow;
+    const previousPaddingRight = body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - documentElement.clientWidth;
+
+    body.style.overflow = 'hidden';
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    const focusFrame = window.requestAnimationFrame(() => {
+      if (wardRecipientPickerOpen) {
+        wardRecipientSearchInputRef.current?.focus();
+        return;
+      }
+      wardMessageCloseButtonRef.current?.focus();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      body.style.overflow = previousOverflow;
+      body.style.paddingRight = previousPaddingRight;
+      wardMessageReturnFocusRef.current?.focus();
+      wardMessageReturnFocusRef.current = null;
+    };
+  }, [showWardMsgModal, wardRecipientPickerOpen]);
+
+  useEffect(() => {
+    if (!showWardMsgModal || typeof window === 'undefined') return;
+
+    const handleDialogKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        if (wardRecipientPickerOpen) {
+          setWardRecipientPickerOpen(false);
+          setWardRecipientSearch('');
+          return;
+        }
+        closeWardMessageModal();
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+
+      const focusable = getFocusableElements(wardMessageDialogRef.current);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        wardMessageDialogRef.current?.focus();
+        return;
+      }
+
+      const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      const firstElement = focusable[0];
+      const lastElement = focusable[focusable.length - 1];
+
+      if (!activeElement || !wardMessageDialogRef.current?.contains(activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? lastElement : firstElement).focus();
+        return;
+      }
+
+      if (event.shiftKey && activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+        return;
+      }
+
+      if (!event.shiftKey && activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleDialogKeyDown, true);
+    return () => {
+      window.removeEventListener('keydown', handleDialogKeyDown, true);
+    };
+  }, [closeWardMessageModal, showWardMsgModal, wardRecipientPickerOpen]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1711,7 +1825,7 @@ export default function OperationCheckView({
   }, [filteredSchedules, getPreferredScheduleForDate, handleScheduleSelection, selectedDate, selectedDateSchedules, selectedSchedule]);
 
   useEffect(() => {
-    if (!dayWorkspaceOpen || activeTab !== 'patients' || typeof window === 'undefined') return;
+    if (!dayWorkspaceOpen || activeTab !== 'patients' || showWardMsgModal || typeof window === 'undefined') return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
@@ -1744,6 +1858,7 @@ export default function OperationCheckView({
     dayWorkspaceOpen,
     handleWorkspaceClose,
     handleWorkspaceStep,
+    showWardMsgModal,
     workspaceSchedules.length,
     workspaceSelectedIndex,
   ]);
@@ -2351,15 +2466,14 @@ export default function OperationCheckView({
       } else {
         toast('메시지 전송에 실패했습니다. 다시 시도해 주세요.', 'error');
       }
-      setWardRecipientPickerOpen(false);
-      setShowWardMsgModal(false);
+      closeWardMessageModal();
     } catch (err) {
       console.error('메시지 전송 실패', err);
       toast('메시지 전송 중 오류가 발생했습니다.', 'error');
     } finally {
       setSendingMsg(false);
     }
-  }, [checkForm, normalizedWardMessageText, selectedSchedule?.company_id, wardMsgTargets, wardStaffMap, user?.id, user?.company_id]);
+  }, [checkForm, closeWardMessageModal, normalizedWardMessageText, selectedSchedule?.company_id, wardMsgTargets, wardStaffMap, user?.id, user?.company_id]);
 
   // #8 소모품 재고 차감
   const deductInventoryItems = useCallback(async (items: ChecklistItemDraft[]) => {
@@ -3226,6 +3340,358 @@ export default function OperationCheckView({
     </>
   );
 
+  const wardMessageDialog =
+    showWardMsgModal && portalHost
+      ? createPortal(
+          <div
+            className="fixed inset-0 z-[360] flex items-center justify-center bg-black/50 p-4"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) {
+                closeWardMessageModal();
+              }
+            }}
+          >
+            <div
+              ref={wardMessageDialogRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="op-check-ward-message-title"
+              aria-describedby="op-check-ward-message-description"
+              data-testid="op-check-ward-message-modal"
+              tabIndex={-1}
+              className="relative w-full max-w-lg rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-lg"
+            >
+              <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
+                <div>
+                  <h3
+                    id="op-check-ward-message-title"
+                    className="text-base font-bold text-[var(--foreground)]"
+                  >
+                    메시지 전송
+                  </h3>
+                  <p
+                    id="op-check-ward-message-description"
+                    className="mt-0.5 text-[12px] font-medium text-[var(--toss-gray-3)]"
+                  >
+                    환자를 수술실로 올려달라고 병동팀에게 메시지를 보냅니다.
+                  </p>
+                </div>
+                <button
+                  ref={wardMessageCloseButtonRef}
+                  type="button"
+                  onClick={closeWardMessageModal}
+                  data-testid="op-check-ward-message-close"
+                  className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                >
+                  닫기
+                </button>
+              </div>
+
+              <div className="space-y-4 p-5">
+                <div>
+                  <p className="mb-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                    받는 사람 선택 ({wardMsgTargets.length}명 선택)
+                  </p>
+                  <div className="space-y-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/20 p-3">
+                    <div>
+                      <p className="mb-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                        최근 보낸 사람
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {recentWardStaffs.length === 0 ? (
+                          <p className="text-[11px] font-medium text-[var(--toss-gray-3)]">
+                            최근에 전송한 대상이 아직 없습니다.
+                          </p>
+                        ) : (
+                          recentWardStaffs.map((staff) => {
+                            const selected = wardMsgTargets.includes(staff.id);
+                            return (
+                              <button
+                                key={staff.id}
+                                type="button"
+                                onClick={() =>
+                                  selected ? removeWardMessageTarget(staff.id) : addWardMessageTarget(staff.id)
+                                }
+                                data-testid={`op-check-ward-recent-chip-${staff.id}`}
+                                className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold ${
+                                  selected
+                                    ? 'border-[var(--accent)] bg-[var(--toss-blue-light)] text-[var(--accent)]'
+                                    : 'border-[var(--border)] bg-white text-[var(--foreground)] hover:border-[var(--accent)]'
+                                }`}
+                              >
+                                {staff.name}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="mb-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                        즐겨찾는 사람
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {favoriteWardStaffs.length === 0 ? (
+                          <p className="text-[11px] font-medium text-[var(--toss-gray-3)]">
+                            자주 보내는 대상을 추가해 두면 여기서 바로 선택할 수 있습니다.
+                          </p>
+                        ) : (
+                          favoriteWardStaffs.map((staff) => {
+                            const selected = wardMsgTargets.includes(staff.id);
+                            return (
+                              <div
+                                key={staff.id}
+                                className={`flex items-center gap-1 rounded-full border px-2 py-1 ${
+                                  selected
+                                    ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]'
+                                    : 'border-[var(--border)] bg-white'
+                                }`}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    selected
+                                      ? removeWardMessageTarget(staff.id)
+                                      : addWardMessageTarget(staff.id)
+                                  }
+                                  data-testid={`op-check-ward-favorite-chip-${staff.id}`}
+                                  className="text-[11px] font-semibold text-[var(--foreground)]"
+                                >
+                                  {staff.name}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleWardFavoriteTarget(staff.id)}
+                                  className="rounded-full px-1.5 py-0.5 text-[10px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                                >
+                                  해제
+                                </button>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setWardRecipientPickerOpen((prev) => !prev)}
+                        data-testid="op-check-ward-recipient-dropdown-button"
+                        aria-haspopup="listbox"
+                        aria-expanded={wardRecipientPickerOpen}
+                        className="flex w-full items-center justify-between rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 text-left text-sm font-semibold text-[var(--foreground)]"
+                      >
+                        <span>
+                          {selectedWardStaffs.length > 0
+                            ? `받는 사람 추가 (${selectedWardStaffs.length}명 선택됨)`
+                            : '받는 사람 추가...'}
+                        </span>
+                        <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">
+                          {wardRecipientPickerOpen ? '닫기' : '열기'}
+                        </span>
+                      </button>
+
+                      {wardRecipientPickerOpen && (
+                        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-20 rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-3 shadow-lg">
+                          <input
+                            ref={wardRecipientSearchInputRef}
+                            value={wardRecipientSearch}
+                            onChange={(e) => setWardRecipientSearch(e.target.value)}
+                            data-testid="op-check-ward-recipient-search"
+                            className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-medium"
+                            placeholder="이름, 소속, 직책으로 검색"
+                          />
+                          <div className="mt-2 max-h-56 overflow-y-auto custom-scrollbar space-y-1">
+                            {wardStaffs.length === 0 ? (
+                              <p className="py-4 text-center text-[11px] font-medium text-[var(--toss-gray-3)]">
+                                직원 목록이 없습니다.
+                              </p>
+                            ) : filteredWardStaffs.length === 0 ? (
+                              <p className="py-4 text-center text-[11px] font-medium text-[var(--toss-gray-3)]">
+                                조건에 맞는 직원이 없습니다.
+                              </p>
+                            ) : (
+                              filteredWardStaffs.map((staff) => {
+                                const isFavorite = wardFavoriteTargets.includes(staff.id);
+                                return (
+                                  <div
+                                    key={staff.id}
+                                    className="flex items-center gap-2 rounded-[var(--radius-md)] border border-transparent px-1 py-1 hover:bg-[var(--muted)]/60"
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => addWardMessageTarget(staff.id)}
+                                      data-testid={`op-check-ward-recipient-option-${staff.id}`}
+                                      className="flex flex-1 items-center gap-2.5 rounded-[var(--radius-md)] px-2 py-2 text-left"
+                                    >
+                                      <span className="flex-1 text-sm font-semibold text-[var(--foreground)]">
+                                        {staff.name}
+                                      </span>
+                                      {staff.department && (
+                                        <span className="rounded-full bg-[var(--muted)] px-2 py-0.5 text-[10px] font-medium text-[var(--toss-gray-3)]">
+                                          {staff.department}
+                                        </span>
+                                      )}
+                                      {staff.position && (
+                                        <span className="text-[11px] font-medium text-[var(--toss-gray-4)]">
+                                          {staff.position}
+                                        </span>
+                                      )}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleWardFavoriteTarget(staff.id)}
+                                      data-testid={`op-check-ward-favorite-toggle-${staff.id}`}
+                                      className={`rounded-full px-2 py-1 text-[10px] font-bold ${
+                                        isFavorite
+                                          ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
+                                          : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
+                                      }`}
+                                    >
+                                      {isFavorite ? '저장됨' : '즐겨찾기'}
+                                    </button>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                          선택된 받는 사람
+                        </p>
+                        {selectedWardStaffs.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setWardMsgTargets([])}
+                            className="rounded-[var(--radius-md)] border border-[var(--border)] px-2 py-1 text-[10px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                          >
+                            전체 해제
+                          </button>
+                        )}
+                      </div>
+                      {selectedWardStaffs.length === 0 ? (
+                        <p className="text-[11px] font-medium text-[var(--toss-gray-3)]">
+                          드롭다운에서 받는 사람을 추가해 주세요.
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {selectedWardStaffs.map((staff) => {
+                            const isFavorite = wardFavoriteTargets.includes(staff.id);
+                            return (
+                              <div
+                                key={staff.id}
+                                data-testid={`op-check-ward-selected-recipient-${staff.id}`}
+                                className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2"
+                              >
+                                <div>
+                                  <p className="text-sm font-semibold text-[var(--foreground)]">{staff.name}</p>
+                                  <p className="text-[11px] font-medium text-[var(--toss-gray-3)]">
+                                    {[staff.department, staff.position].filter(Boolean).join(' · ') || '직원'}
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleWardFavoriteTarget(staff.id)}
+                                  className={`rounded-full px-2 py-1 text-[10px] font-bold ${
+                                    isFavorite
+                                      ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
+                                      : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
+                                  }`}
+                                >
+                                  {isFavorite ? '저장됨' : '즐겨찾기'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeWardMessageTarget(staff.id)}
+                                  className="rounded-full px-2 py-1 text-[10px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                                >
+                                  제거
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">메시지 내용</p>
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {wardMessageTemplates.map((template) => {
+                      const selectedTemplate =
+                        normalizedWardMessageText === stripHiddenMetaBlocks(template.text).trim();
+                      return (
+                        <button
+                          key={template.id}
+                          type="button"
+                          onClick={() => setWardMsgText(template.text)}
+                          data-testid={`op-check-ward-template-${template.id}`}
+                          className={`rounded-full px-3 py-1.5 text-[11px] font-bold ${
+                            selectedTemplate
+                              ? 'bg-[var(--accent)] text-white'
+                              : 'border border-[var(--border)] bg-white text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
+                          }`}
+                        >
+                          {template.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <textarea
+                    value={wardMsgText}
+                    onChange={(e) => setWardMsgText(e.target.value)}
+                    data-testid="op-check-ward-message-textarea"
+                    className="min-h-[120px] w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-medium"
+                    placeholder="전송할 메시지를 입력해 주세요."
+                  />
+                  {wardMessageValidationText ? (
+                    <p
+                      data-testid="op-check-ward-validation-text"
+                      className="mt-2 text-[11px] font-semibold text-rose-600"
+                    >
+                      {wardMessageValidationText}
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-[11px] font-medium text-[var(--toss-gray-3)]">
+                      최근/즐겨찾기에서 받는 사람을 빠르게 추가할 수 있습니다.
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={closeWardMessageModal}
+                    className="rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void sendWardMessage()}
+                    disabled={sendingMsg || wardMsgTargets.length === 0 || !normalizedWardMessageText}
+                    data-testid="op-check-ward-message-send"
+                    className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+                  >
+                    {sendingMsg ? '전송 중...' : `메시지 보내기 (${wardMsgTargets.length}명)`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          portalHost,
+        )
+      : null;
+
   if (loading) {
     return (
       <div
@@ -3985,7 +4451,7 @@ export default function OperationCheckView({
       )}
 
       {/* 메시지 전송 모달 */}
-      {showWardMsgModal && (
+      {false && showWardMsgModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowWardMsgModal(false); }}>
           <div className="w-full max-w-lg rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-lg">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
@@ -4297,6 +4763,8 @@ export default function OperationCheckView({
           </div>
         </div>
       )}
+
+      {wardMessageDialog}
 
       <datalist id={ITEM_SUGGESTION_ID}>
         {itemSuggestions.map((name) => (

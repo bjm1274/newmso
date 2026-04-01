@@ -353,32 +353,26 @@ test('op check ward messages use dropdown recipients, keep favorites, and send s
   await expect(page.getByTestId('op-check-ward-recipient-option-' + favoriteStaffId)).toHaveCount(0);
   await expect(page.getByTestId('op-check-ward-message-textarea')).toHaveValue(/CH-033/);
   await expect(page.getByTestId('op-check-ward-message-textarea')).not.toHaveValue(/BOARD_META/);
-  await page.getByTestId('op-check-ward-template-move-request').evaluate((node: HTMLElement) => node.click());
+  await page.getByTestId('op-check-ward-template-move-request').click();
   await expect(page.getByTestId('op-check-ward-message-textarea')).toHaveValue(/\[수술실 이동 요청\]/);
 
-  await page
-    .getByTestId('op-check-ward-recipient-dropdown-button')
-    .evaluate((node: HTMLElement) => node.click());
+  await page.getByTestId('op-check-ward-recipient-dropdown-button').click();
   await page.getByTestId('op-check-ward-recipient-search').fill('김규');
-  await page
-    .getByTestId('op-check-ward-recipient-option-' + favoriteStaffId)
-    .evaluate((node: HTMLElement) => node.click());
+  await page.getByTestId('op-check-ward-recipient-option-' + favoriteStaffId).click();
   await expect(page.getByTestId('op-check-ward-selected-recipient-' + favoriteStaffId)).toBeVisible();
 
   await page
     .getByTestId('op-check-ward-selected-recipient-' + favoriteStaffId)
     .getByRole('button', { name: '즐겨찾기' })
-    .evaluate((node: HTMLElement) => node.click());
+    .click();
 
-  await page.getByTestId('op-check-ward-message-close').evaluate((node: HTMLElement) => node.click());
+  await page.getByTestId('op-check-ward-message-close').click();
   await page.getByRole('button', { name: '병동팀 메시지 보내기' }).first().click();
   await expect(page.getByTestId('op-check-ward-favorite-chip-' + favoriteStaffId)).toBeVisible();
 
-  await page
-    .getByTestId('op-check-ward-favorite-chip-' + favoriteStaffId)
-    .evaluate((node: HTMLElement) => node.click());
+  await page.getByTestId('op-check-ward-favorite-chip-' + favoriteStaffId).click();
   await expect(page.getByTestId('op-check-ward-message-send')).toContainText('1명');
-  await page.getByTestId('op-check-ward-message-send').evaluate((node: HTMLElement) => node.click());
+  await page.getByTestId('op-check-ward-message-send').click();
   await expect(page.getByTestId('op-check-ward-message-close')).toHaveCount(0);
   const persistedWardMessages = await page.evaluate(async () => {
     const response = await fetch('/rest/v1/messages?room_id=eq.direct-room-ward-1&select=*');
@@ -441,9 +435,7 @@ test('op check ward recipient dropdown falls back to the full staff list when co
 
   await page.getByTestId('op-check-schedule-card-schedule-post-ward-fallback').click();
   await page.getByRole('button', { name: '병동팀 메시지 보내기' }).first().click();
-  await page
-    .getByTestId('op-check-ward-recipient-dropdown-button')
-    .evaluate((node: HTMLElement) => node.click());
+  await page.getByTestId('op-check-ward-recipient-dropdown-button').click();
   await page.getByTestId('op-check-ward-recipient-search').fill('병동팀');
   await expect(page.getByTestId('op-check-ward-recipient-option-ward-fallback-staff-1')).toBeVisible();
 
