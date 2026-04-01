@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import {
+  buildChatAttachmentObjectKey,
+  createChatAttachmentUploadPlan,
+  isR2ChatStorageEnabled,
+  uploadChatAttachmentToR2,
+} from '@/lib/object-storage';
 import { readSessionFromRequest } from '@/lib/server-session';
 
 export const runtime = 'nodejs';
@@ -14,6 +20,28 @@ type UploadPlanRequest = {
   mimeType?: string;
   fileSize?: number;
 };
+
+type UploadPlanResponse =
+  | {
+      success: true;
+      provider: 'supabase';
+      bucket: string;
+      path: string;
+      token: string;
+      signedUrl: string;
+      fileName: string;
+      url: string;
+    }
+  | {
+      success: true;
+      provider: 'r2';
+      bucket: string;
+      path: string;
+      signedUrl: string;
+      fileName: string;
+      url: string;
+      headers: Record<string, string>;
+    };
 
 function getAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -60,13 +88,7 @@ function normalizeUploadFileName(fileName: string, mimeType: string) {
 }
 
 function buildSafeFilePath(fileName: string, mimeType: string) {
-  const normalizedFileName = normalizeUploadFileName(fileName, mimeType);
-  const ext = guessFileExtension(normalizedFileName, mimeType);
-  const safeExt = /^[a-z0-9]+$/i.test(ext) ? ext.toLowerCase() : 'bin';
-
-  // Storage object key는 원본 파일명과 분리해 ASCII-safe 경로만 사용한다.
-  // 표시용 원본 이름은 DB의 file_name 필드로 별도 보존한다.
-  return `chat/${Date.now()}_${crypto.randomUUID()}.${safeExt}`;
+  return buildChatAttachmentObjectKey(normalizeUploadFileName(fileName, mimeType), mimeType);
 }
 
 function isMissingBucketError(error: unknown, bucketName: string) {
@@ -114,23 +136,42 @@ async function createSignedUploadPlan(
 
   validateUploadTarget(fileName, mimeType, fileSize);
 
-  let lastError: unknown = null;
   const filePath = buildSafeFilePath(fileName, mimeType);
+  if (isR2ChatStorageEnabled()) {
+    const r2Plan = await createChatAttachmentUploadPlan(filePath, mimeType);
+    if (r2Plan) {
+      const response: UploadPlanResponse = {
+        success: true,
+        provider: 'r2',
+        bucket: r2Plan.bucket,
+        path: r2Plan.path,
+        signedUrl: r2Plan.signedUrl,
+        fileName,
+        url: r2Plan.url,
+        headers: r2Plan.headers,
+      };
+      return NextResponse.json(response);
+    }
+  }
+
+  let lastError: unknown = null;
 
   for (const bucket of CHAT_BUCKET_CANDIDATES) {
     const { data, error } = await supabase.storage.from(bucket).createSignedUploadUrl(filePath);
 
     if (!error && data?.token) {
       const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
-      return NextResponse.json({
+      const response: UploadPlanResponse = {
         success: true,
+        provider: 'supabase',
         bucket,
         path: filePath,
         token: data.token,
         signedUrl: data.signedUrl,
         fileName,
         url: publicUrlData.publicUrl,
-      });
+      };
+      return NextResponse.json(response);
     }
 
     lastError = error;
@@ -175,6 +216,22 @@ export async function POST(request: NextRequest) {
 
     const filePath = buildSafeFilePath(normalizedFileName, mimeType);
     const arrayBuffer = await file.arrayBuffer();
+    if (isR2ChatStorageEnabled()) {
+      const uploaded = await uploadChatAttachmentToR2(
+        filePath,
+        Buffer.from(arrayBuffer),
+        file.type || 'application/octet-stream',
+      );
+      return NextResponse.json({
+        success: true,
+        provider: uploaded.provider,
+        bucket: uploaded.bucket,
+        path: uploaded.path,
+        fileName: normalizedFileName,
+        url: uploaded.url,
+      });
+    }
+
     let lastError: unknown = null;
 
     for (const bucket of CHAT_BUCKET_CANDIDATES) {
