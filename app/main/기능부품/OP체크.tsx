@@ -792,6 +792,7 @@ export default function OperationCheckView({
   const [statusFilterTab, setStatusFilterTab] = useState<'전체' | '준비중' | '준비완료' | '수술중' | '완료'>('전체');
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [deductingInventory, setDeductingInventory] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deferredWardRecipientSearch = useDeferredValue(wardRecipientSearch);
   const savePatientCheckRef = useRef<() => Promise<void>>(async () => {});
@@ -2292,23 +2293,22 @@ export default function OperationCheckView({
           return (
             <div
               key={item.id}
-              className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3"
+              className={`rounded-[var(--radius-md)] border bg-[var(--card)] p-2.5 transition-colors ${
+                item.checked ? 'border-emerald-200 bg-emerald-50/40' : 'border-[var(--border)]'
+              }`}
             >
-              <div className="grid gap-2 md:grid-cols-[auto,1.6fr,0.7fr,0.7fr,1fr,auto] md:items-center">
-                <label className="inline-flex items-center gap-2 text-xs font-bold text-[var(--foreground)]">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(item.checked)}
-                    onChange={(event) => {
-                      const next = [...items];
-                      next[index] = { ...item, checked: event.target.checked };
-                      onChange(next);
-                    }}
-                    className="h-4 w-4 rounded border-[var(--border)] text-[var(--accent)]"
-                  />
-                  {kind === 'prep' ? '준비' : '사용'}
-                </label>
-
+              {/* Row 1: checkbox + name + delete */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={Boolean(item.checked)}
+                  onChange={(event) => {
+                    const next = [...items];
+                    next[index] = { ...item, checked: event.target.checked };
+                    onChange(next);
+                  }}
+                  className="h-4 w-4 shrink-0 rounded border-[var(--border)] accent-[var(--accent)]"
+                />
                 <input
                   value={item.name}
                   list={ITEM_SUGGESTION_ID}
@@ -2318,9 +2318,24 @@ export default function OperationCheckView({
                     onChange(next);
                   }}
                   placeholder={kind === 'prep' ? '준비 물품명' : '사용 소모품명'}
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-medium"
+                  className={`min-w-0 flex-1 rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-sm font-medium ${
+                    item.checked ? 'text-[var(--toss-gray-3)] line-through' : 'text-[var(--foreground)]'
+                  }`}
                 />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = items.filter((row) => row.id !== item.id);
+                    onChange(next.length ? next : [createChecklistItem(kind === 'prep' ? 'patient-prep' : 'patient-consumable')]);
+                  }}
+                  className="shrink-0 rounded-[var(--radius-md)] px-2 py-1.5 text-[11px] font-bold text-[var(--toss-gray-3)] hover:bg-rose-50 hover:text-rose-500"
+                >
+                  ✕
+                </button>
+              </div>
 
+              {/* Row 2: quantity + unit + note + tags */}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 {kind === 'consumable' ? (
                   <div className="flex items-center gap-1">
                     <button
@@ -2331,7 +2346,7 @@ export default function OperationCheckView({
                         if (cur > 0) next[index] = { ...item, quantity: String(cur - 1) };
                         onChange(next);
                       }}
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] text-base font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                      className="flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
                     >
                       −
                     </button>
@@ -2343,7 +2358,7 @@ export default function OperationCheckView({
                         onChange(next);
                       }}
                       placeholder="0"
-                      className="w-12 rounded-[var(--radius-md)] border border-[var(--border)] px-2 py-2 text-center text-sm font-bold"
+                      className="w-10 rounded-[var(--radius-md)] border border-[var(--border)] px-1 py-1.5 text-center text-sm font-bold"
                     />
                     <button
                       type="button"
@@ -2353,24 +2368,23 @@ export default function OperationCheckView({
                         next[index] = { ...item, quantity: String(cur + 1) };
                         onChange(next);
                       }}
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--accent)]/40 bg-[var(--toss-blue-light)] text-base font-bold text-[var(--accent)] hover:bg-[var(--accent)]/20"
+                      className="flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] border border-[var(--accent)]/30 bg-[var(--toss-blue-light)] text-sm font-bold text-[var(--accent)] hover:bg-[var(--accent)]/20"
                     >
                       +
                     </button>
                   </div>
                 ) : (
-                <input
-                  value={item.quantity || ''}
-                  onChange={(event) => {
-                    const next = [...items];
-                    next[index] = { ...item, quantity: event.target.value };
-                    onChange(next);
-                  }}
-                  placeholder="수량"
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
-                />
+                  <input
+                    value={item.quantity || ''}
+                    onChange={(event) => {
+                      const next = [...items];
+                      next[index] = { ...item, quantity: event.target.value };
+                      onChange(next);
+                    }}
+                    placeholder="수량"
+                    className="w-16 rounded-[var(--radius-md)] border border-[var(--border)] px-2 py-1.5 text-sm"
+                  />
                 )}
-
                 <input
                   value={item.unit || ''}
                   onChange={(event) => {
@@ -2379,9 +2393,8 @@ export default function OperationCheckView({
                     onChange(next);
                   }}
                   placeholder="단위"
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
+                  className="w-16 rounded-[var(--radius-md)] border border-[var(--border)] px-2 py-1.5 text-sm"
                 />
-
                 <input
                   value={item.note || ''}
                   onChange={(event) => {
@@ -2390,33 +2403,16 @@ export default function OperationCheckView({
                     onChange(next);
                   }}
                   placeholder="메모"
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
+                  className="min-w-[80px] flex-1 rounded-[var(--radius-md)] border border-[var(--border)] px-2 py-1.5 text-sm"
                 />
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = items.filter((row) => row.id !== item.id);
-                    onChange(next.length ? next : [createChecklistItem(kind === 'prep' ? 'patient-prep' : 'patient-consumable')]);
-                  }}
-                  className="rounded-full border border-[var(--border)] px-3 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
-                >
-                  삭제
-                </button>
-              </div>
-
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-medium text-[var(--toss-gray-3)]">
                 {item.source_label ? (
-                  <span className="rounded-full bg-[var(--toss-blue-light)] px-2 py-1 text-[var(--accent)]">
+                  <span className="rounded-full bg-[var(--toss-blue-light)] px-2 py-0.5 text-[10px] font-semibold text-[var(--accent)]">
                     {item.source_label}
                   </span>
                 ) : null}
                 {inventoryMatch ? (
-                  <span>
-                    재고관리 연동 수량 {String(inventoryMatch.quantity ?? 0)}
-                    {String(inventoryMatch.unit || item.unit || '').trim()
-                      ? ` ${String(inventoryMatch.unit || item.unit || '').trim()}`
-                      : ''}
+                  <span className="text-[10px] font-medium text-[var(--toss-gray-3)]">
+                    재고 {String(inventoryMatch.quantity ?? 0)}{String(inventoryMatch.unit || item.unit || '').trim() ? ` ${String(inventoryMatch.unit || item.unit || '').trim()}` : ''}
                   </span>
                 ) : null}
               </div>
@@ -2553,49 +2549,57 @@ export default function OperationCheckView({
         ) : (
           filteredSchedules.map((post) => {
             const savedRow = patientChecksByScheduleId[post.id];
+            const currentStatus = String(savedRow?.status || '준비중');
             const selected = post.id === selectedScheduleId;
+            const statusAccentClass =
+              currentStatus === '수술중'
+                ? 'border-l-orange-400'
+                : currentStatus === '완료'
+                  ? 'border-l-emerald-400'
+                  : currentStatus === '준비완료'
+                    ? 'border-l-[var(--accent)]'
+                    : 'border-l-[var(--border)]';
+            const statusBadgeClass =
+              currentStatus === '수술중'
+                ? 'bg-orange-50 text-orange-700'
+                : currentStatus === '완료'
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : currentStatus === '준비완료'
+                    ? 'bg-[var(--accent)]/10 text-[var(--accent)]'
+                    : 'bg-[var(--muted)] text-[var(--toss-gray-4)]';
             return (
               <button
                 key={post.id}
                 type="button"
                 data-testid={`${testIdPrefix}-${post.id}`}
                 onClick={() => handleScheduleSelection(post, openWorkspaceOnSelect)}
-                className={`w-full rounded-[var(--radius-lg)] border p-3 text-left transition-all ${
+                className={`w-full rounded-[var(--radius-lg)] border border-l-4 p-3 text-left transition-all ${statusAccentClass} ${
                   selected
                     ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/60 shadow-sm'
                     : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]/35 hover:bg-[var(--muted)]/40'
                 }`}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-bold text-[var(--foreground)]">{post.patient_name}</p>
-                    <p className="mt-1 truncate text-[12px] font-semibold text-[var(--accent)]">
+                    <p className="mt-0.5 truncate text-[11px] font-medium text-[var(--toss-gray-3)]">
                       {post.surgery_name}
                     </p>
                   </div>
-                  <span className="rounded-full bg-[var(--muted)] px-2 py-1 text-[10px] font-bold text-[var(--toss-gray-4)]">
-                    {post.schedule_time || '시간 미정'}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">
+                      {post.schedule_time || '시간 미정'}
+                    </span>
+                    <span className={`rounded-[var(--radius-md)] px-2 py-0.5 text-[10px] font-bold ${statusBadgeClass}`}>
+                      {savedRow ? currentStatus : '신규'}
+                    </span>
+                  </div>
                 </div>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-medium text-[var(--toss-gray-3)]">
-                  <span>{formatDateLabel(post.schedule_date)}</span>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-[var(--toss-gray-3)]">
                   <span>{post.schedule_room || '방 미정'}</span>
-                  {post.chart_no ? <span>차트 {post.chart_no}</span> : null}
-                </div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {savedRow ? (
-                    <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
-                      저장됨 · {String(savedRow.status || '준비중')}
-                    </span>
-                  ) : (
-                    <span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">
-                      신규 체크
-                    </span>
-                  )}
+                  {post.chart_no ? <span>· 차트 {post.chart_no}</span> : null}
                   {post.surgery_fasting ? (
-                    <span className="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-700">
-                      금식
-                    </span>
+                    <span className="rounded-[var(--radius-md)] bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-600">금식</span>
                   ) : null}
                 </div>
               </button>
@@ -2619,82 +2623,82 @@ export default function OperationCheckView({
     </div>
   ) : (
     <>
-      <div className="sticky top-0 z-20 rounded-[var(--radius-xl)] border border-[var(--border)] bg-white/95 p-4 shadow-lg backdrop-blur">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
-              {formatDateLabel(checkForm.schedule_date)} · 수술실 {checkForm.schedule_room || '미정'} · 시간 {checkForm.schedule_time || '미정'}
-            </p>
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              <h3 className="text-xl font-bold text-[var(--foreground)]">{checkForm.patient_name}</h3>
-              <span className="rounded-full bg-[var(--accent)]/10 px-2.5 py-1 text-[11px] font-bold text-[var(--accent)]">
+      <div className="sticky top-0 z-20 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)]/95 px-4 py-3 shadow-md backdrop-blur">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* 환자 정보 (compact) */}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-base font-bold text-[var(--foreground)]">{checkForm.patient_name}</h3>
+              <span
+                className={`rounded-[var(--radius-md)] px-2 py-0.5 text-[11px] font-bold ${
+                  checkForm.status === '수술중'
+                    ? 'bg-orange-100 text-orange-700'
+                    : checkForm.status === '완료'
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : checkForm.status === '준비완료'
+                        ? 'bg-[var(--accent)]/10 text-[var(--accent)]'
+                        : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
+                }`}
+              >
                 {checkForm.status}
               </span>
               {checkFormIsDirty ? (
                 <span
                   data-testid="op-check-workspace-dirty-indicator"
-                  className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800"
+                  className="rounded-[var(--radius-md)] bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800"
                 >
-                  미저장 변경
+                  미저장
                 </span>
-              ) : (
-                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
-                  저장됨
-                </span>
-              )}
+              ) : null}
               {selectedScheduleHiddenByFilters ? (
-                <span className="rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700">
-                  현재 환자는 필터에서 숨김
+                <span className="rounded-[var(--radius-md)] bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-600">
+                  필터 숨김
                 </span>
               ) : null}
             </div>
-            <p className="mt-1 truncate text-sm font-semibold text-[var(--accent)]">
+            <p className="mt-0.5 truncate text-[12px] font-medium text-[var(--toss-gray-3)]">
               {checkForm.surgery_name}
               {checkForm.chart_no ? ` · 차트 ${checkForm.chart_no}` : ''}
+              {' · '}수술실 {checkForm.schedule_room || '미정'}
+              {' · '}{checkForm.schedule_time || '시간 미정'}
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          {/* 액션 버튼 */}
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5">
             <button
               type="button"
               data-testid="op-check-workspace-prev"
               onClick={() => handleWorkspaceStep(-1)}
               disabled={workspaceSelectedIndex <= 0}
-              className="rounded-full border border-[var(--border)] px-3 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] disabled:opacity-50"
+              className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-[12px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] disabled:opacity-40"
             >
-              이전 환자
+              ← 이전
             </button>
             <button
               type="button"
               data-testid="op-check-workspace-next"
               onClick={() => handleWorkspaceStep(1)}
               disabled={workspaceSelectedIndex < 0 || workspaceSelectedIndex >= workspaceSchedules.length - 1}
-              className="rounded-full border border-[var(--border)] px-3 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] disabled:opacity-50"
+              className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-[12px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] disabled:opacity-40"
             >
-              다음 환자
-            </button>
-            <button
-              type="button"
-              onClick={() => void openWardMsgModal()}
-              className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
-            >
-              병동팀 메시지 보내기
+              다음 →
             </button>
             <button
               type="button"
               onClick={() => setPrintModalOpen(true)}
-              className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+              className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-[12px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
             >
-              청구내역 출력
+              출력
             </button>
             <button
               type="button"
               data-testid="op-check-record-save"
               onClick={() => void savePatientCheck()}
               disabled={savingCheck}
-              className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+              className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-1.5 text-[12px] font-bold text-white disabled:opacity-60"
             >
-              {savingCheck ? '저장 중...' : '환자별 OP체크 저장'}
+              {savingCheck ? '저장 중...' : '저장'}
             </button>
           </div>
         </div>
@@ -2805,115 +2809,83 @@ export default function OperationCheckView({
         </div>
       </div>
 
-      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <div className="grid gap-4 lg:grid-cols-[1.2fr,0.8fr]">
-          <div>
-            <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">환자 정보</p>
-            <h3 className="mt-1 text-xl font-bold text-[var(--foreground)]">{checkForm.patient_name}</h3>
-            <p className="mt-1 text-sm font-semibold text-[var(--accent)]">{checkForm.surgery_name}</p>
-            <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-medium text-[var(--toss-gray-3)]">
-              <span className="rounded-full bg-[var(--muted)] px-2 py-1">수술일 {formatDateLabel(checkForm.schedule_date)}</span>
-              <span className="rounded-full bg-[var(--muted)] px-2 py-1">시간 {checkForm.schedule_time || '미정'}</span>
-              <span className="rounded-full bg-[var(--muted)] px-2 py-1">수술실 {checkForm.schedule_room || '미정'}</span>
-              {checkForm.chart_no ? (
-                <span className="rounded-full bg-[var(--muted)] px-2 py-1">차트 {checkForm.chart_no}</span>
-              ) : null}
-            </div>
+      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* 마취 유형 */}
+          <label className="flex shrink-0 items-center gap-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+            마취 유형
+            <input
+              data-testid="op-check-anesthesia-select"
+              list="op-check-anesthesia-options"
+              value={checkForm.anesthesia_type}
+              onChange={(event) =>
+                setCheckForm((prev) => (prev ? { ...prev, anesthesia_type: event.target.value } : prev))
+              }
+              placeholder="예: 전신마취"
+              className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-sm font-medium"
+            />
+          </label>
+
+          {/* 특수 조건 배지 */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {selectedSchedule.surgery_fasting ? (
+              <span className="rounded-[var(--radius-md)] bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700">금식</span>
+            ) : null}
+            {selectedSchedule.surgery_inpatient ? (
+              <span className="rounded-[var(--radius-md)] bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-700">입원</span>
+            ) : null}
+            {selectedSchedule.surgery_guardian ? (
+              <span className="rounded-[var(--radius-md)] bg-violet-50 px-2 py-0.5 text-[11px] font-bold text-violet-700">보호자</span>
+            ) : null}
+            {selectedSchedule.surgery_caregiver ? (
+              <span className="rounded-[var(--radius-md)] bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700">간병인</span>
+            ) : null}
+            {selectedSchedule.surgery_transfusion ? (
+              <span className="rounded-[var(--radius-md)] bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">수혈</span>
+            ) : null}
+            <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2 py-0.5 text-[11px] font-medium text-[var(--toss-gray-3)]">
+              템플릿 {checkForm.applied_template_ids.length}개
+            </span>
           </div>
 
-          <div className="space-y-3">
-            <div className="grid gap-2 md:grid-cols-2">
-              <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                진행 상태
-                <select
-                  data-testid="op-check-status-select"
-                  value={checkForm.status}
-                  onChange={(event) =>
-                    setCheckForm((prev) => (prev ? { ...prev, status: event.target.value } : prev))
-                  }
-                  className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-medium"
-                >
-                  {STATUS_OPTIONS.map((status) => (
-                    <option key={status} value={status}>
-                      {status}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                마취 유형
-                <input
-                  data-testid="op-check-anesthesia-select"
-                  list="op-check-anesthesia-options"
-                  value={checkForm.anesthesia_type}
-                  onChange={(event) =>
-                    setCheckForm((prev) => (prev ? { ...prev, anesthesia_type: event.target.value } : prev))
-                  }
-                  placeholder="예: 전신마취"
-                  className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-medium"
-                />
-              </label>
+          {/* 타임스탬프 */}
+          {(checkForm.surgery_started_at || checkForm.surgery_ended_at || checkForm.ward_message_sent_at || deductingInventory) && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {checkForm.ward_message_sent_at && (
+                <span className="rounded-[var(--radius-md)] bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                  병동 {new Date(checkForm.ward_message_sent_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} 발송
+                </span>
+              )}
+              {checkForm.surgery_started_at && (
+                <span className="rounded-[var(--radius-md)] bg-orange-50 px-2 py-0.5 text-[11px] font-medium text-orange-700">
+                  시작 {new Date(checkForm.surgery_started_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+              {checkForm.surgery_ended_at && (
+                <span className="rounded-[var(--radius-md)] bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                  종료 {new Date(checkForm.surgery_ended_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+              {checkForm.surgery_started_at && checkForm.surgery_ended_at && (
+                <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2 py-0.5 text-[11px] font-medium text-[var(--toss-gray-4)]">
+                  총 {Math.round((new Date(checkForm.surgery_ended_at).getTime() - new Date(checkForm.surgery_started_at).getTime()) / 60000)}분
+                </span>
+              )}
+              {deductingInventory && (
+                <span className="rounded-[var(--radius-md)] bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">재고 차감 중...</span>
+              )}
             </div>
+          )}
 
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                data-testid="op-check-apply-template"
-                onClick={mergeTemplateItemsIntoForm}
-                className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
-              >
-                기본 항목 다시 불러오기
-              </button>
-            </div>
-
-            {(checkForm.surgery_started_at || checkForm.surgery_ended_at || checkForm.ward_message_sent_at || deductingInventory) && (
-              <div className="flex flex-wrap gap-2 text-[11px] font-medium text-[var(--toss-gray-3)]">
-                {checkForm.ward_message_sent_at && (
-                  <span className="rounded-full bg-blue-50 px-2 py-1 text-blue-700">
-                    병동 메시지 {new Date(checkForm.ward_message_sent_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} 발송
-                  </span>
-                )}
-                {checkForm.surgery_started_at && (
-                  <span className="rounded-full bg-orange-50 px-2 py-1 text-orange-700">
-                    수술 시작 {new Date(checkForm.surgery_started_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                )}
-                {checkForm.surgery_ended_at && (
-                  <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
-                    수술 종료 {new Date(checkForm.surgery_ended_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                )}
-                {checkForm.surgery_started_at && checkForm.surgery_ended_at && (
-                  <span className="rounded-full bg-[var(--muted)] px-2 py-1">
-                    총 {Math.round((new Date(checkForm.surgery_ended_at).getTime() - new Date(checkForm.surgery_started_at).getTime()) / 60000)}분
-                  </span>
-                )}
-                {deductingInventory && (
-                  <span className="rounded-full bg-amber-50 px-2 py-1 text-amber-700">재고 차감 중...</span>
-                )}
-              </div>
-            )}
-
-            <div className="flex flex-wrap gap-2 text-[11px] font-medium text-[var(--toss-gray-3)]">
-              <span className="rounded-full bg-[var(--muted)] px-2 py-1">적용 템플릿 {checkForm.applied_template_ids.length}개</span>
-              {selectedSchedule.surgery_fasting ? (
-                <span className="rounded-full bg-rose-50 px-2 py-1 text-rose-700">금식 환자</span>
-              ) : null}
-              {selectedSchedule.surgery_inpatient ? (
-                <span className="rounded-full bg-sky-50 px-2 py-1 text-sky-700">입원 환자</span>
-              ) : null}
-              {selectedSchedule.surgery_guardian ? (
-                <span className="rounded-full bg-violet-50 px-2 py-1 text-violet-700">보호자 동행</span>
-              ) : null}
-              {selectedSchedule.surgery_caregiver ? (
-                <span className="rounded-full bg-indigo-500/10 px-2 py-1 text-indigo-700">간병인 동행</span>
-              ) : null}
-              {selectedSchedule.surgery_transfusion ? (
-                <span className="rounded-full bg-amber-50 px-2 py-1 text-amber-700">수혈 준비</span>
-              ) : null}
-            </div>
-          </div>
+          {/* 기본 항목 불러오기 */}
+          <button
+            type="button"
+            data-testid="op-check-apply-template"
+            onClick={mergeTemplateItemsIntoForm}
+            className="ml-auto rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
+          >
+            기본 항목 불러오기
+          </button>
         </div>
       </div>
 
@@ -3127,12 +3099,19 @@ export default function OperationCheckView({
             <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">수술일정 달력</p>
-                    <h3 className="mt-1 text-lg font-bold text-[var(--foreground)]">
+                  <button
+                    type="button"
+                    onClick={() => setCalendarOpen((prev) => !prev)}
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                  >
+                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">
+                      {calendarOpen ? '▲' : '▼'}
+                    </span>
+                    <span className="text-sm font-bold text-[var(--foreground)]">
                       {calendarMonth.getFullYear()}년 {calendarMonth.getMonth() + 1}월
-                    </h3>
-                  </div>
+                    </span>
+                    <span className="text-[11px] font-medium text-[var(--toss-gray-3)]">달력</span>
+                  </button>
                   <div className="flex gap-1">
                     <button
                       type="button"
@@ -3162,7 +3141,7 @@ export default function OperationCheckView({
                   </div>
                 </div>
 
-                <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)]">
+                {calendarOpen && <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)]">
                   <div className="grid grid-cols-7 bg-[var(--muted)] text-[10px] font-semibold text-[var(--toss-gray-3)]">
                     {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
                       <div key={day} className="px-1 py-2 text-center">
@@ -3231,7 +3210,7 @@ export default function OperationCheckView({
                       );
                     })}
                   </div>
-                </div>
+                </div>}
 
                 <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/35 px-3 py-2">
                   <div className="flex items-center justify-between gap-2">
@@ -3247,24 +3226,18 @@ export default function OperationCheckView({
                       className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-xs font-medium"
                     />
                   </div>
-                  <div className="mt-3 flex items-center justify-between gap-3 rounded-[var(--radius-md)] bg-white/80 px-3 py-2">
-                    <div>
-                      <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">해당일 환자</p>
-                      <p className="text-sm font-bold text-[var(--foreground)]">{selectedDateSchedules.length}명</p>
-                    </div>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <span className="text-[11px] font-medium text-[var(--toss-gray-3)]">해당일 {selectedDateSchedules.length}명</span>
                     <button
                       type="button"
                       data-testid="op-check-workspace-open"
                       onClick={handleWorkspaceOpen}
                       disabled={!selectedDateSchedules[0]}
-                      className="rounded-full bg-[var(--accent)] px-4 py-2 text-[11px] font-bold text-white disabled:opacity-50"
+                      className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50"
                     >
-                      작업창 열기
+                      첫 환자 열기
                     </button>
                   </div>
-                  <p className="mt-2 text-[11px] font-medium text-[var(--toss-gray-3)]">
-                    날짜를 누르면 해당일 수술 환자 작업창이 바로 열립니다.
-                  </p>
                 </div>
               </div>
             </div>
