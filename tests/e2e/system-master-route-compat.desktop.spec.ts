@@ -8,6 +8,13 @@ function makeMissingColumnError(columnName: string) {
   };
 }
 
+function makeQualifiedMissingColumnError(tableName: string, columnName: string) {
+  return {
+    code: '42703',
+    message: `column ${tableName}.${columnName} does not exist`,
+  };
+}
+
 function makeSchemaCacheMissingColumnError(columnName: string) {
   return {
     code: 'PGRST204',
@@ -57,6 +64,34 @@ test('system master staff query retries without missing optional columns', async
   expect(calls[2]).toMatchObject({ orderColumn: 'name' });
   expect(calls[2]?.select).not.toContain('employee_no');
   expect(calls[2]?.select).not.toContain('resident_no');
+});
+
+test('system master staff query retries for qualified missing-column errors', async () => {
+  const calls: Array<{ select: string; orderColumn: string }> = [];
+
+  const result = await selectSystemMasterStaffRows<{ id: string; name: string }>(
+    async ({ select, orderColumn }) => {
+      calls.push({ select, orderColumn });
+
+      if (select.includes('bank_name')) {
+        return {
+          data: null,
+          error: makeQualifiedMissingColumnError('staff_members', 'bank_name'),
+        };
+      }
+
+      return {
+        data: [{ id: 'staff-qualified-1', name: 'Qualified Fallback' }],
+        error: null,
+      };
+    },
+  );
+
+  expect(result.error).toBeNull();
+  expect(result.data).toEqual([{ id: 'staff-qualified-1', name: 'Qualified Fallback' }]);
+  expect(calls).toHaveLength(2);
+  expect(calls[0]?.select).toContain('bank_name');
+  expect(calls[1]?.select).not.toContain('bank_name');
 });
 
 test('system master staff query also retries for schema-cache missing column errors', async () => {
