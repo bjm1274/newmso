@@ -1668,11 +1668,11 @@ export default function ZhsunycoEslSync(_props: Props) {
 
       {previewDraft ? (
         <div
-          className="fixed inset-0 z-[190] flex items-center justify-center bg-black/45 p-4"
+          className="fixed inset-0 z-[190] overflow-y-auto bg-black/45 p-3 sm:p-4"
           onClick={closePreview}
         >
           <div
-            className="w-full max-w-6xl rounded-[var(--radius-xl)] bg-[var(--card)] p-5 shadow-xl"
+            className="mx-auto my-3 w-full max-w-6xl max-h-[calc(100dvh-1.5rem)] overflow-y-auto overscroll-contain rounded-[var(--radius-xl)] bg-[var(--card)] p-4 shadow-xl sm:my-4 sm:p-5"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1689,8 +1689,8 @@ export default function ZhsunycoEslSync(_props: Props) {
               </button>
             </div>
 
-            <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
-              <div className="space-y-3">
+            <div className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
+              <div className="min-w-0 space-y-3">
                 <RoomBoardPreview draft={previewDraft} />
                 <div className="flex flex-wrap gap-2 text-[12px] text-[var(--toss-gray-3)]">
                   <div className="rounded-full border border-[var(--border)] bg-[var(--muted)] px-3 py-1">기기 바코드 {previewDraft.deviceId || '미등록'}</div>
@@ -1700,7 +1700,7 @@ export default function ZhsunycoEslSync(_props: Props) {
                 </div>
               </div>
 
-              <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)]/20 p-4">
+              <div className="min-w-0 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)]/20 p-4">
                 <div className="text-base font-bold text-[var(--foreground)]">제조사 BLE 전송 상태</div>
                 <div className="mt-2 text-sm text-[var(--toss-gray-3)]">
                   현재 제조사 앱은 클라우드 태스크를 받아 BLE로 쓰는 구조라서, 먼저 서버가 이 기기의 전송 작업을 만들 수 있는지 확인합니다.
