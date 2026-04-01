@@ -2450,14 +2450,17 @@ export default function AutoRosterPlanner({
   staffs = [],
   selectedCo = '전체',
   panelMode = 'planner',
+  adminMode = false,
 }: {
   user?: StaffMember;
   staffs?: StaffMember[];
   selectedCo?: string;
   panelMode?: 'planner' | 'patterns' | 'rules';
+  adminMode?: boolean;
 }) {
   const canAccess = isManagerOrHigher(user);
-  const isAdmin = user?.role === 'admin' || user?.company === 'SY INC.' || user?.permissions?.mso === true;
+  const isAdmin = adminMode;
+  const canManageRosterPolicies = adminMode;
   const ownDepartment = getDepartmentName(user);
   const activeStaffs = useMemo(() => staffs.filter((staff) => staff?.status !== '퇴사'), [staffs]);
   const companyOptions = useMemo(
@@ -4499,6 +4502,10 @@ export default function AutoRosterPlanner({
   };
 
   const savePatternProfile = () => {
+    if (!canManageRosterPolicies) {
+      toast('근무 패턴 저장은 관리자 전용입니다.', 'warning');
+      return;
+    }
     const nextName = patternDraft.name.trim();
     if (!nextName) {
       toast('패턴 이름을 입력하세요.', 'warning');
@@ -4539,6 +4546,10 @@ export default function AutoRosterPlanner({
   };
 
   const deletePatternProfile = (profileId: string) => {
+    if (!canManageRosterPolicies) {
+      toast('근무 패턴 삭제는 관리자 전용입니다.', 'warning');
+      return;
+    }
     setSavedPatternProfiles((prev) => {
       const nextProfiles = prev.filter((profile) => profile.id !== profileId);
       persistPatternProfiles(nextProfiles);
@@ -4560,6 +4571,10 @@ export default function AutoRosterPlanner({
   };
 
   const saveGenerationRule = () => {
+    if (!canManageRosterPolicies) {
+      toast('근무 규칙 저장은 관리자 전용입니다.', 'warning');
+      return;
+    }
     const nextName = generationRuleDraft.name.trim();
     if (!nextName) {
       toast('근무규칙 이름을 입력해 주세요.', 'warning');
@@ -4619,6 +4634,10 @@ export default function AutoRosterPlanner({
   };
 
   const deleteGenerationRule = (ruleId: string) => {
+    if (!canManageRosterPolicies) {
+      toast('근무 규칙 삭제는 관리자 전용입니다.', 'warning');
+      return;
+    }
     setSavedGenerationRules((prev) => {
       const nextRules = prev.filter((rule) => rule.id !== ruleId);
       persistGenerationRules(nextRules);
@@ -5402,6 +5421,10 @@ export default function AutoRosterPlanner({
   };
 
   const savePlannerPreset = () => {
+    if (!canManageRosterPolicies) {
+      toast('자동생성 형식 저장은 관리자 전용입니다.', 'warning');
+      return;
+    }
     const nextName = plannerPresetName.trim();
     if (!nextName) {
       toast('자동생성 형식 이름을 입력하세요.', 'warning');
@@ -5690,6 +5713,10 @@ export default function AutoRosterPlanner({
   };
 
   const saveAssignments = async () => {
+    if (!canManageRosterPolicies) {
+      toast('월간 근무표 저장은 관리자 전용입니다.', 'warning');
+      return;
+    }
     const enabledRows = previewRows;
     if (!selectedCompany) return toast('사업체를 먼저 선택하세요.', 'warning');
     if (!selectedDepartment) return toast('팀을 먼저 선택하세요.', 'warning');
@@ -5748,6 +5775,17 @@ export default function AutoRosterPlanner({
     return (
       <div className="rounded-[var(--radius-xl)] border border-red-100 bg-red-500/10 p-4 text-sm font-semibold text-red-600">
         부서장 이상만 교대근무 자동생성 기능을 사용할 수 있습니다.
+      </div>
+    );
+  }
+
+  if ((panelMode === 'rules' || panelMode === 'patterns') && !canManageRosterPolicies) {
+    return (
+      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
+        <h3 className="text-base font-bold text-[var(--foreground)]">관리자 전용 기능</h3>
+        <p className="mt-2 text-sm text-[var(--toss-gray-3)]">
+          근무 규칙과 근무 패턴 관리는 관리자 메뉴의 회사관리에서만 수정할 수 있습니다.
+        </p>
       </div>
     );
   }
@@ -6646,7 +6684,7 @@ export default function AutoRosterPlanner({
               <button
                 type="button"
                 onClick={saveAssignments}
-                disabled={saving || loadingShifts || previewRows.length === 0}
+                disabled={!canManageRosterPolicies || saving || loadingShifts || previewRows.length === 0}
                 className="rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {saving ? '저장 중...' : '월간 근무표 저장'}
@@ -7078,7 +7116,7 @@ export default function AutoRosterPlanner({
             <button
               type="button"
               onClick={saveAssignments}
-              disabled={saving || loadingShifts || previewRows.length === 0}
+              disabled={!canManageRosterPolicies || saving || loadingShifts || previewRows.length === 0}
               className="rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving ? '저장 중...' : '월간 근무표 저장'}
@@ -7399,7 +7437,8 @@ export default function AutoRosterPlanner({
                 <button
                   type="button"
                   onClick={savePlannerPreset}
-                  className="rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white"
+                  disabled={!canManageRosterPolicies}
+                  className="rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
                   data-testid="planner-preset-save"
                 >
                   규칙 저장

@@ -1,12 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import {
+  buildOfficialDocumentApprovalContent,
+  extractOfficialDocRequest,
+  type OfficialDocRequest,
+} from '@/lib/official-document-approval';
 
 interface Props {
   staffs: any[];
   selectedCo: string;
   user: any;
+  onOpenApproval?: (intent?: Record<string, unknown>) => void;
 }
 
 interface OfficialDoc {
@@ -21,8 +27,28 @@ interface OfficialDoc {
   company: string;
 }
 
-export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props) {
+type ApprovalWorkflowItem = {
+  id: string;
+  status: string;
+  title: string;
+  created_at: string;
+  sender_name: string;
+  current_approver_id: string;
+  current_approver_name: string;
+  doc_number: string;
+  request: OfficialDocRequest;
+};
+
+function buildApprovalStatusClass(status: string) {
+  if (status === '승인') return 'bg-emerald-100 text-emerald-700';
+  if (status === '반려') return 'bg-red-500/10 text-red-600';
+  if (status === '회수') return 'bg-slate-100 text-slate-600';
+  return 'bg-orange-500/15 text-orange-700';
+}
+
+export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenApproval }: Props) {
   const [docs, setDocs] = useState<OfficialDoc[]>([]);
+  const [approvalQueue, setApprovalQueue] = useState<ApprovalWorkflowItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -41,29 +67,78 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
     company: selectedCo !== '전체' ? selectedCo : '',
   });
 
+  const staffNameById = useMemo(
+    () =>
+      new Map(
+        (staffs || [])
+          .filter((staff) => staff?.id)
+          .map((staff) => [String(staff.id), String(staff.name || '').trim()])
+      ),
+    [staffs],
+  );
+
   const fetchDocs = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('official_doc_log')
-        .select('*')
-        .order('sent_date', { ascending: false });
-      if (error) throw error;
-      setDocs(data || []);
+      const [docResult, approvalResult] = await Promise.all([
+        supabase
+          .from('official_doc_log')
+          .select('*')
+          .order('sent_date', { ascending: false }),
+        supabase
+          .from('approvals')
+          .select('id, status, title, created_at, sender_name, current_approver_id, doc_number, meta_data')
+          .order('created_at', { ascending: false })
+          .limit(200),
+      ]);
+
+      if (docResult.error) throw docResult.error;
+      if (approvalResult.error) throw approvalResult.error;
+
+      setDocs((docResult.data || []) as OfficialDoc[]);
+
+      const workflowRows = ((approvalResult.data || []) as Array<Record<string, unknown>>)
+        .map((item) => {
+          const request = extractOfficialDocRequest(item.meta_data);
+          if (!request) return null;
+          const metaData =
+            item.meta_data && typeof item.meta_data === 'object'
+              ? (item.meta_data as Record<string, unknown>)
+              : null;
+          if (String(item.status || '').trim() === '회수' || metaData?.superseded_by) {
+            return null;
+          }
+
+          const currentApproverId = String(item.current_approver_id || '').trim();
+          return {
+            id: String(item.id || '').trim(),
+            status: String(item.status || '').trim() || '대기',
+            title: String(item.title || request.title || '').trim(),
+            created_at: String(item.created_at || ''),
+            sender_name: String(item.sender_name || '').trim(),
+            current_approver_id: currentApproverId,
+            current_approver_name: staffNameById.get(currentApproverId) || currentApproverId || '-',
+            doc_number: String(item.doc_number || '').trim(),
+            request,
+          } satisfies ApprovalWorkflowItem;
+        })
+        .filter(Boolean) as ApprovalWorkflowItem[];
+
+      setApprovalQueue(workflowRows);
     } catch (e: unknown) {
       console.warn('공문서발송대장 조회 실패:', ((e as Error)?.message ?? String(e)));
       setDocs([]);
+      setApprovalQueue([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [staffNameById]);
 
   useEffect(() => {
-    fetchDocs();
+    void fetchDocs();
   }, [fetchDocs, selectedCo]);
 
-  const openAdd = () => {
-    setEditingDoc(null);
+  const resetForm = useCallback(() => {
     setForm({
       sent_date: new Date().toISOString().slice(0, 10),
       doc_number: '',
@@ -74,6 +149,11 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
       note: '',
       company: selectedCo !== '전체' ? selectedCo : '',
     });
+  }, [selectedCo, user?.name]);
+
+  const openAdd = () => {
+    setEditingDoc(null);
+    resetForm();
     setShowForm(true);
     setMessage(null);
   };
@@ -90,44 +170,65 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
       setMessage({ type: 'error', text: '발송일, 수신처, 제목은 필수입니다.' });
       return;
     }
+
+    const requestPayload: OfficialDocRequest = {
+      sent_date: String(form.sent_date || '').slice(0, 10),
+      doc_number: String(form.doc_number || '').trim(),
+      title: String(form.title || '').trim(),
+      recipient: String(form.recipient || '').trim(),
+      manager: String(form.manager || user?.name || '').trim(),
+      is_received: false,
+      note: String(form.note || '').trim(),
+      company: String(form.company || '').trim(),
+    };
+
+    if (!editingDoc?.id) {
+      if (!onOpenApproval) {
+        setMessage({ type: 'error', text: '전자결재 화면을 열 수 없어 상신할 수 없습니다.' });
+        return;
+      }
+
+      onOpenApproval({
+        viewMode: '작성하기',
+        formType: '업무기안',
+        title: `[공문 발송 승인] ${requestPayload.title}`,
+        content: buildOfficialDocumentApprovalContent(requestPayload),
+        extraData: {
+          official_doc_request: requestPayload,
+          request_category: 'official_document_dispatch',
+        },
+      });
+
+      setShowForm(false);
+      setEditingDoc(null);
+      resetForm();
+      setMessage({
+        type: 'success',
+        text: '전자결재 작성 화면으로 이동했습니다. 상신 후 최종 승인되면 발송대장에 자동 반영됩니다.',
+      });
+      return;
+    }
+
     setSaving(true);
     setMessage(null);
     try {
-      // 신규 등록 시 문서번호 자동 채번
-      let docNumber = form.doc_number || '';
-      if (!editingDoc?.id && !docNumber) {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const prefix = `공문-${year}${month}`;
-        const { count } = await supabase
-          .from('official_doc_log')
-          .select('*', { count: 'exact', head: true })
-          .like('doc_number', `${prefix}%`);
-        const seq = String((count ?? 0) + 1).padStart(3, '0');
-        docNumber = `${prefix}-${seq}`;
-      }
       const payload = {
-        sent_date: form.sent_date,
-        doc_number: docNumber,
-        title: form.title,
-        recipient: form.recipient,
-        manager: form.manager || '',
+        sent_date: requestPayload.sent_date,
+        doc_number: requestPayload.doc_number,
+        title: requestPayload.title,
+        recipient: requestPayload.recipient,
+        manager: requestPayload.manager,
         is_received: form.is_received ?? false,
-        note: form.note || '',
-        company: form.company || '',
+        note: requestPayload.note,
+        company: requestPayload.company,
       };
-      if (editingDoc?.id) {
-        const { error } = await supabase.from('official_doc_log').update(payload).eq('id', editingDoc.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('official_doc_log').insert([payload]);
-        if (error) throw error;
-      }
-      setMessage({ type: 'success', text: editingDoc ? '수정되었습니다.' : '등록되었습니다.' });
+      const { error } = await supabase.from('official_doc_log').update(payload).eq('id', editingDoc.id);
+      if (error) throw error;
+
+      setMessage({ type: 'success', text: '수정되었습니다.' });
       setShowForm(false);
       setEditingDoc(null);
-      fetchDocs();
+      void fetchDocs();
     } catch (e: unknown) {
       setMessage({ type: 'error', text: `저장 실패: ${((e as Error)?.message ?? String(e))}` });
     } finally {
@@ -140,7 +241,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
     try {
       const { error } = await supabase.from('official_doc_log').delete().eq('id', id);
       if (error) throw error;
-      fetchDocs();
+      void fetchDocs();
     } catch (e: unknown) {
       setMessage({ type: 'error', text: `삭제 실패: ${((e as Error)?.message ?? String(e))}` });
     }
@@ -153,7 +254,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
         .update({ is_received: !doc.is_received })
         .eq('id', doc.id!);
       if (error) throw error;
-      fetchDocs();
+      void fetchDocs();
     } catch (e: unknown) {
       setMessage({ type: 'error', text: `수신 확인 처리 실패: ${((e as Error)?.message ?? String(e))}` });
     }
@@ -161,156 +262,221 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
 
   const displayDocs = docs.filter((d) => {
     const kw = searchKeyword.toLowerCase();
-    const matchKw = !kw || d.title?.toLowerCase().includes(kw) || d.recipient?.toLowerCase().includes(kw) || d.doc_number?.toLowerCase().includes(kw) || d.manager?.toLowerCase().includes(kw);
-    const matchFilter = filterReceived === '전체' || (filterReceived === '확인' && d.is_received) || (filterReceived === '미확인' && !d.is_received);
+    const matchKw =
+      !kw ||
+      d.title?.toLowerCase().includes(kw) ||
+      d.recipient?.toLowerCase().includes(kw) ||
+      d.doc_number?.toLowerCase().includes(kw) ||
+      d.manager?.toLowerCase().includes(kw);
+    const matchFilter =
+      filterReceived === '전체' ||
+      (filterReceived === '확인' && d.is_received) ||
+      (filterReceived === '미확인' && !d.is_received);
     return matchKw && matchFilter;
   });
 
+  const pendingApprovals = approvalQueue.filter((item) => item.status === '대기');
+  const approvedApprovals = approvalQueue.filter((item) => item.status === '승인');
+  const rejectedApprovals = approvalQueue.filter((item) => item.status === '반려');
   const receivedCount = docs.filter((d) => d.is_received).length;
   const unreceivedCount = docs.length - receivedCount;
 
   return (
-    <div className="p-4 md:p-4 space-y-4">
-      {/* 헤더 */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4 p-4 md:p-4">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">공문서 발송 대장</h2>
+          <p className="mt-1 text-xs font-semibold text-[var(--toss-gray-3)]">
+            신규 공문은 전자결재 승인 후 자동 반영되고, 대장에서는 발송 이후 이력과 수신 확인을 관리합니다.
+          </p>
         </div>
         <button
           onClick={openAdd}
-          className="px-5 py-1.5 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)] hover:opacity-90 transition-opacity"
+          className="rounded-[var(--radius-md)] bg-[var(--accent)] px-5 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
         >
-          + 공문 등록
+          + 공문 승인 상신
         </button>
       </div>
 
-      {/* 메시지 */}
       {message && (
-        <div className={`px-4 py-3 rounded-xl text-sm font-bold ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-500/10 text-red-700 border border-red-500/20'}`}>
+        <div className={`rounded-xl border px-4 py-3 text-sm font-bold ${message.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-500/20 bg-red-500/10 text-red-700'}`}>
           {message.text}
         </div>
       )}
 
-      {/* 요약 */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] p-4">
-          <p className="text-xs font-bold text-[var(--toss-gray-3)]">총 발송 건수</p>
-          <p className="text-2xl font-extrabold text-[var(--foreground)] mt-1">{docs.length}<span className="text-sm ml-1">건</span></p>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-4">
+          <p className="text-xs font-bold text-[var(--toss-gray-3)]">대장 반영 건수</p>
+          <p className="mt-1 text-2xl font-extrabold text-[var(--foreground)]">{docs.length}<span className="ml-1 text-sm">건</span></p>
         </div>
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+        <div className="rounded-2xl border border-orange-500/20 bg-orange-500/10 p-4">
+          <p className="text-xs font-bold text-orange-600">승인 대기</p>
+          <p className="mt-1 text-2xl font-extrabold text-orange-700">{pendingApprovals.length}<span className="ml-1 text-sm">건</span></p>
+        </div>
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
           <p className="text-xs font-bold text-emerald-500">수신 확인</p>
-          <p className="text-2xl font-extrabold text-emerald-600 mt-1">{receivedCount}<span className="text-sm ml-1">건</span></p>
+          <p className="mt-1 text-2xl font-extrabold text-emerald-600">{receivedCount}<span className="ml-1 text-sm">건</span></p>
         </div>
-        <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-4">
-          <p className="text-xs font-bold text-orange-500">수신 미확인</p>
-          <p className="text-2xl font-extrabold text-orange-600 mt-1">{unreceivedCount}<span className="text-sm ml-1">건</span></p>
+        <div className="rounded-2xl border border-red-500/15 bg-red-500/5 p-4">
+          <p className="text-xs font-bold text-red-500">반려 / 미확인</p>
+          <p className="mt-1 text-2xl font-extrabold text-red-600">{rejectedApprovals.length + unreceivedCount}<span className="ml-1 text-sm">건</span></p>
         </div>
       </div>
 
-      {/* 등록/수정 폼 */}
       {showForm && (
-        <div className="bg-blue-500/10 border border-[var(--accent)]/30 rounded-[var(--radius-md)] p-4 space-y-3">
-          <h3 className="text-sm font-bold text-[var(--accent)]">{editingDoc ? '공문 수정' : '공문 등록'}</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="space-y-3 rounded-[var(--radius-md)] border border-[var(--accent)]/30 bg-blue-500/10 p-4">
+          <h3 className="text-sm font-bold text-[var(--accent)]">{editingDoc ? '공문 대장 수정' : '공문 발송 승인 상신'}</h3>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
             <div>
-              <label className="text-xs font-bold text-[var(--toss-gray-4)] block mb-1">발송일 *</label>
+              <label className="mb-1 block text-xs font-bold text-[var(--toss-gray-4)]">발송 예정일 *</label>
               <input
                 type="date"
                 value={form.sent_date ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, sent_date: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-[var(--toss-gray-4)] block mb-1">문서번호</label>
+              <label className="mb-1 block text-xs font-bold text-[var(--toss-gray-4)]">문서번호</label>
               <input
                 type="text"
                 value={form.doc_number ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, doc_number: e.target.value }))}
-                placeholder="비워두면 자동 채번 (공문-202603-001)"
-                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                placeholder="비워두면 승인 시 자동 채번"
+                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-[var(--toss-gray-4)] block mb-1">수신처 *</label>
+              <label className="mb-1 block text-xs font-bold text-[var(--toss-gray-4)]">수신처 *</label>
               <input
                 type="text"
                 value={form.recipient ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, recipient: e.target.value }))}
                 placeholder="예: 보건복지부"
-                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="text-xs font-bold text-[var(--toss-gray-4)] block mb-1">제목 *</label>
+              <label className="mb-1 block text-xs font-bold text-[var(--toss-gray-4)]">제목 *</label>
               <input
                 type="text"
                 value={form.title ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
                 placeholder="공문서 제목 입력"
-                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-[var(--toss-gray-4)] block mb-1">담당자</label>
+              <label className="mb-1 block text-xs font-bold text-[var(--toss-gray-4)]">담당자</label>
               <input
                 type="text"
                 value={form.manager ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, manager: e.target.value }))}
                 placeholder="담당자명"
-                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-[var(--toss-gray-4)] block mb-1">비고</label>
+              <label className="mb-1 block text-xs font-bold text-[var(--toss-gray-4)]">비고</label>
               <input
                 type="text"
                 value={form.note ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))}
                 placeholder="추가 메모"
-                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
               />
             </div>
             <div className="flex items-center gap-3 pt-6">
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex cursor-pointer items-center gap-2">
                 <input
                   type="checkbox"
                   checked={form.is_received ?? false}
                   onChange={(e) => setForm((p) => ({ ...p, is_received: e.target.checked }))}
-                  className="w-4 h-4 rounded"
+                  className="h-4 w-4 rounded"
+                  disabled={!editingDoc}
                 />
                 <span className="text-xs font-bold text-[var(--toss-gray-4)]">수신 확인됨</span>
               </label>
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleSave} disabled={saving} className="px-5 py-1.5 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)] hover:opacity-90 transition-opacity disabled:opacity-50">
-              {saving ? '저장 중...' : '저장'}
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="rounded-[var(--radius-md)] bg-[var(--accent)] px-5 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {editingDoc ? (saving ? '저장 중...' : '저장') : '전자결재 작성하기'}
             </button>
-            <button onClick={() => { setShowForm(false); setEditingDoc(null); }} className="px-5 py-1.5 bg-[var(--muted)] text-[var(--foreground)] text-xs font-bold rounded-[var(--radius-md)] hover:bg-[var(--toss-gray-2)] transition-colors">
+            <button
+              onClick={() => {
+                setShowForm(false);
+                setEditingDoc(null);
+              }}
+              className="rounded-[var(--radius-md)] bg-[var(--muted)] px-5 py-1.5 text-xs font-bold text-[var(--foreground)] transition-colors hover:bg-[var(--toss-gray-2)]"
+            >
               취소
             </button>
           </div>
         </div>
       )}
 
-      {/* 검색 및 필터 */}
+      {approvalQueue.length > 0 && (
+        <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-bold text-[var(--foreground)]">공문 결재 진행 현황</h3>
+              <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                상신된 공문은 최종 승인되면 아래 발송대장으로 자동 이동합니다.
+              </p>
+            </div>
+            <span className="text-xs font-bold text-[var(--toss-gray-3)]">{approvalQueue.length}건</span>
+          </div>
+          <div className="space-y-2">
+            {approvalQueue.slice(0, 8).map((item) => (
+              <div key={item.id} className="flex flex-col gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/30 p-3 md:flex-row md:items-center md:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-bold text-[var(--foreground)]">{item.request.title}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${buildApprovalStatusClass(item.status)}`}>
+                      {item.status}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                    <span>수신처 {item.request.recipient}</span>
+                    <span>기안자 {item.sender_name || '-'}</span>
+                    <span>현재 결재자 {item.current_approver_name || '-'}</span>
+                    <span>{item.created_at ? new Date(item.created_at).toLocaleDateString('ko-KR') : '-'}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onOpenApproval?.({ approvalId: item.id, viewMode: '기안함' })}
+                  className="self-start rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] transition-colors hover:bg-[var(--toss-gray-2)]"
+                >
+                  결재 보기
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-3">
         <input
           type="text"
           value={searchKeyword}
           onChange={(e) => setSearchKeyword(e.target.value)}
           placeholder="제목, 수신처, 문서번호, 담당자 검색..."
-          className="px-4 py-2 text-sm border border-[var(--border)] rounded-xl bg-[var(--card)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30 w-72"
+          className="w-72 rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-2 text-sm text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
         />
         <div className="flex gap-1">
-          {(['전체', '확인', '미확인'] as const).map((f) => (
+          {(['전체', '확인', '미확인'] as const).map((filter) => (
             <button
-              key={f}
-              onClick={() => setFilterReceived(f)}
-              className={`px-3 py-1.5 text-xs font-bold rounded-[var(--radius-md)] transition-all ${filterReceived === f ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}
+              key={filter}
+              onClick={() => setFilterReceived(filter)}
+              className={`rounded-[var(--radius-md)] px-3 py-1.5 text-xs font-bold transition-all ${filterReceived === filter ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}
             >
-              {f}
+              {filter}
             </button>
           ))}
         </div>
@@ -322,8 +488,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
         <span className="text-xs text-[var(--toss-gray-3)]">{displayDocs.length}건 표시</span>
       </div>
 
-      {/* 발송 대장 테이블 */}
-      <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] overflow-hidden">
+      <div className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)]">
         {loading ? (
           <div className="p-5 text-center text-sm text-[var(--toss-gray-3)]">불러오는 중...</div>
         ) : displayDocs.length === 0 ? (
@@ -333,32 +498,32 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
             <table className="w-full text-xs">
               <thead className="bg-[var(--muted)]">
                 <tr>
-                  {['발송일', '문서번호', '제목', '수신처', '담당자', '수신확인', '비고', ''].map((h) => (
-                    <th key={h} className="px-4 py-2 text-left font-bold text-[var(--toss-gray-4)] whitespace-nowrap">{h}</th>
+                  {['발송일', '문서번호', '제목', '수신처', '담당자', '수신확인', '비고', ''].map((header) => (
+                    <th key={header} className="whitespace-nowrap px-4 py-2 text-left font-bold text-[var(--toss-gray-4)]">{header}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
                 {displayDocs.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-[var(--muted)]/50 transition-colors">
-                    <td className="px-4 py-2 font-bold text-[var(--foreground)] whitespace-nowrap">{doc.sent_date}</td>
-                    <td className="px-4 py-2 text-[var(--toss-gray-4)] whitespace-nowrap">{doc.doc_number || '-'}</td>
-                    <td className="px-4 py-2 font-bold text-[var(--foreground)] max-w-xs truncate">{doc.title}</td>
-                    <td className="px-4 py-2 text-[var(--toss-gray-4)] whitespace-nowrap">{doc.recipient}</td>
-                    <td className="px-4 py-2 text-[var(--toss-gray-4)] whitespace-nowrap">{doc.manager || '-'}</td>
+                  <tr key={doc.id} className="transition-colors hover:bg-[var(--muted)]/50">
+                    <td className="whitespace-nowrap px-4 py-2 font-bold text-[var(--foreground)]">{doc.sent_date}</td>
+                    <td className="whitespace-nowrap px-4 py-2 text-[var(--toss-gray-4)]">{doc.doc_number || '-'}</td>
+                    <td className="max-w-xs truncate px-4 py-2 font-bold text-[var(--foreground)]">{doc.title}</td>
+                    <td className="whitespace-nowrap px-4 py-2 text-[var(--toss-gray-4)]">{doc.recipient}</td>
+                    <td className="whitespace-nowrap px-4 py-2 text-[var(--toss-gray-4)]">{doc.manager || '-'}</td>
                     <td className="px-4 py-2">
                       <button
                         onClick={() => handleToggleReceived(doc)}
-                        className={`px-2 py-1 text-[10px] font-extrabold rounded-lg transition-all ${doc.is_received ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-orange-500/20 text-orange-700 hover:bg-orange-200'}`}
+                        className={`rounded-lg px-2 py-1 text-[10px] font-extrabold transition-all ${doc.is_received ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-orange-500/20 text-orange-700 hover:bg-orange-200'}`}
                       >
                         {doc.is_received ? '✓ 확인' : '미확인'}
                       </button>
                     </td>
-                    <td className="px-4 py-3 text-[var(--toss-gray-3)] max-w-[120px] truncate">{doc.note || '-'}</td>
+                    <td className="max-w-[200px] truncate px-4 py-3 text-[var(--toss-gray-3)]">{doc.note || '-'}</td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
-                        <button onClick={() => openEdit(doc)} className="px-2 py-1 text-[10px] font-bold bg-blue-500/10 text-[var(--accent)] rounded-lg hover:bg-blue-500/20 transition-colors">수정</button>
-                        <button onClick={() => handleDelete(doc.id!)} className="px-2 py-1 text-[10px] font-bold bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors">삭제</button>
+                        <button onClick={() => openEdit(doc)} className="rounded-lg bg-blue-500/10 px-2 py-1 text-[10px] font-bold text-[var(--accent)] transition-colors hover:bg-blue-500/20">수정</button>
+                        <button onClick={() => handleDelete(doc.id!)} className="rounded-lg bg-red-500/10 px-2 py-1 text-[10px] font-bold text-red-500 transition-colors hover:bg-red-500/20">삭제</button>
                       </div>
                     </td>
                   </tr>

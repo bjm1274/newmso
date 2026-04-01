@@ -50,6 +50,7 @@ const EXTRA_FEATURE_PERMISSION_KEYS: Record<string, string> = {
   입금실시간조회: 'extra_입금실시간조회',
   수술상담: 'extra_수술상담',
   OP체크: 'extra_OP체크',
+  ESL연동: 'extra_ESL연동',
 };
 
 const STRICT_EXTRA_FEATURE_PERMISSION_KEYS = new Set([
@@ -89,7 +90,6 @@ const HR_PERMISSION_KEYS: Record<string, string> = {
   경조사: 'hr_경조사',
   '면허/자격증': 'hr_면허자격증',
   의료기기점검: 'hr_의료기기점검',
-  비품대여: 'hr_비품대여',
   사고보고서: 'hr_사고보고서',
   계약: 'hr_계약',
   문서보관함: 'hr_문서보관함',
@@ -110,6 +110,7 @@ const INVENTORY_PERMISSION_KEYS: Record<string, string> = {
   납품확인서: 'inventory_납품확인서',
   UDI: 'inventory_UDI',
   자산: 'inventory_자산',
+  비품대여설정: 'admin_비품대여설정',
   거래처: 'inventory_거래처',
   카테고리: 'inventory_카테고리',
   AS반품: 'inventory_AS반품',
@@ -137,16 +138,17 @@ const ADMIN_PERMISSION_KEYS: Record<string, string> = {
 };
 
 const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
-  menu_전자결재: ['approval', ...Object.values(APPROVAL_PERMISSION_KEYS)],
+  menu_전자결재: ['approval', ...Object.values(APPROVAL_PERMISSION_KEYS), 'admin_공문서대장'],
   menu_인사관리: ['hr', ...Object.values(HR_PERMISSION_KEYS)],
   menu_재고관리: ['inventory', ...Object.values(INVENTORY_PERMISSION_KEYS)],
   menu_관리자: ['admin', ...Object.values(ADMIN_PERMISSION_KEYS)],
   extra_조직도: ['menu_조직도'],
   extra_인계노트: ['handover_read'],
-  approval_기안함: ['approval'],
+  extra_ESL연동: ['inventory', 'menu_재고관리'],
+  approval_기안함: ['approval', 'admin_공문서대장'],
   approval_결재함: ['approval'],
   approval_참조문서함: ['approval'],
-  approval_작성하기: ['approval'],
+  approval_작성하기: ['approval', 'admin_공문서대장'],
   hr_구성원: ['hr'],
   hr_인사발령: ['hr_구성원', 'hr'],
   hr_포상징계: ['hr_구성원', 'hr'],
@@ -160,7 +162,6 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   hr_경조사: ['hr_구성원', 'hr'],
   hr_면허자격증: ['hr_구성원', 'hr'],
   hr_의료기기점검: ['hr_구성원', 'hr'],
-  hr_비품대여: ['hr'],
   hr_사고보고서: ['hr_구성원', 'hr'],
   hr_계약: ['hr'],
   hr_문서보관함: ['hr'],
@@ -437,6 +438,27 @@ export function canAccessHrSection(
   user: UserLike | null | undefined,
   sectionIdOrPermissionKey: string
 ): boolean {
+  if (sectionIdOrPermissionKey === '인사변동') {
+    return canAccessHrSection(user, 'hr_인사발령') || canAccessHrSection(user, 'hr_포상징계');
+  }
+  if (sectionIdOrPermissionKey === '입퇴사·교육센터' || sectionIdOrPermissionKey === '인력생애주기센터') {
+    return canAccessHrSection(user, 'hr_교육') || canAccessHrSection(user, 'hr_오프보딩');
+  }
+  if (sectionIdOrPermissionKey === '자격·안전센터' || sectionIdOrPermissionKey === '규정준수센터') {
+    return (
+      canAccessHrSection(user, 'hr_건강검진') ||
+      canAccessHrSection(user, 'hr_면허자격증') ||
+      canAccessHrSection(user, 'hr_의료기기점검') ||
+      canAccessHrSection(user, 'hr_사고보고서')
+    );
+  }
+  if (sectionIdOrPermissionKey === '문서센터') {
+    return (
+      canAccessHrSection(user, 'hr_문서보관함') ||
+      canAccessHrSection(user, 'hr_증명서') ||
+      canAccessHrSection(user, 'hr_서류제출')
+    );
+  }
   return canAccessDetailedSection(user, '인사관리', sectionIdOrPermissionKey, HR_PERMISSION_KEYS);
 }
 
@@ -451,6 +473,21 @@ export function canAccessAdminSection(
   user: UserLike | null | undefined,
   sectionIdOrPermissionKey: string
 ): boolean {
+  if (sectionIdOrPermissionKey === '운영설정') {
+    return (
+      canAccessDetailedSection(user, '관리자', '알림자동화', ADMIN_PERMISSION_KEYS) ||
+      canAccessDetailedSection(user, '관리자', '수술검사템플릿', ADMIN_PERMISSION_KEYS) ||
+      canAccessDetailedSection(user, '관리자', '팝업관리', ADMIN_PERMISSION_KEYS)
+    );
+  }
+
+  if (sectionIdOrPermissionKey === '감사센터') {
+    return (
+      canAccessDetailedSection(user, '관리자', '감사센터', ADMIN_PERMISSION_KEYS) ||
+      canAccessDetailedSection(user, '관리자', '급여이상치', ADMIN_PERMISSION_KEYS)
+    );
+  }
+
   return canAccessDetailedSection(user, '관리자', sectionIdOrPermissionKey, ADMIN_PERMISSION_KEYS);
 }
 

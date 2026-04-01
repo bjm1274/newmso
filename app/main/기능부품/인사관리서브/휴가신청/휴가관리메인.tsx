@@ -46,6 +46,16 @@ const LEAVE_TAB_DEFS: { id: LeaveManagementTabId; label: string }[] = [
   { id: '휴일/대체휴무 규칙', label: '휴일/대체휴무 규칙' },
 ];
 
+const LEGACY_ADMIN_REDIRECT_TABS = new Set<LeaveManagementTabId>([
+  LEAVE_TAB_DEFS[2].id,
+]);
+
+const ADMIN_ONLY_LEAVE_TABS = new Set<LeaveManagementTabId>([
+  LEAVE_TAB_DEFS[3].id,
+  LEAVE_TAB_DEFS[4].id,
+  LEAVE_TAB_DEFS[8].id,
+]);
+
 export default function LeaveManagement({
   staffs = [],
   selectedCo,
@@ -54,6 +64,7 @@ export default function LeaveManagement({
   initialTab,
   allowLeaveTabs = true,
   allowHolidayTab = true,
+  tabMode = 'all',
 }: Record<string, unknown>) {
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [loading, setLoading] = useState(false);
@@ -65,10 +76,17 @@ export default function LeaveManagement({
   const availableTabs = useMemo(
     () =>
       LEAVE_TAB_DEFS.filter((tab) => {
+        if (LEGACY_ADMIN_REDIRECT_TABS.has(tab.id)) return tabMode === 'all' && allowLeaveTabs;
+        if (tabMode === 'admin') {
+          if (!ADMIN_ONLY_LEAVE_TABS.has(tab.id)) return false;
+          if (tab.id === LEAVE_TAB_DEFS[4].id) return allowHolidayTab;
+          return true;
+        }
+        if (ADMIN_ONLY_LEAVE_TABS.has(tab.id)) return false;
         if (tab.id === '공휴일 달력') return allowHolidayTab;
         return allowLeaveTabs;
       }),
-    [allowHolidayTab, allowLeaveTabs]
+    [allowHolidayTab, allowLeaveTabs, tabMode]
   );
 
   const fetchLeaves = async () => {

@@ -10,7 +10,6 @@ import AttendanceMain from './인사관리서브/근태기록/근태관리메인
 import LeaveManagement from './인사관리서브/휴가신청/휴가관리메인';
 import SharedCalendarView from './공유캘린더';
 import CalendarSync from './캘린더동기화';
-import AssetLoanManager from './인사관리서브/비품장비대여관리';
 import ContractMain from './인사관리서브/계약관리';
 import 문서보관함 from './인사관리서브/문서보관함';
 import EducationMain from './인사관리서브/교육관리';
@@ -43,24 +42,16 @@ type HrWorkspaceId = '인력관리' | '근태 · 급여' | '복지 · 문서';
 type StaffStatus = '재직' | '퇴사';
 type HrMenuId =
   | '구성원'
-  | '인사발령'
-  | '포상/징계'
-  | '교육'
-  | '오프보딩'
+  | '인사변동'
+  | '입퇴사·교육센터'
   | '근태'
   | '교대근무'
   | '연차/휴가'
   | '급여'
-  | '건강검진'
   | '경조사'
-  | '면허/자격증'
-  | '의료기기점검'
-  | '비품대여'
-  | '사고보고서'
+  | '자격·안전센터'
   | '계약'
-  | '문서보관함'
-  | '증명서'
-  | '서류제출'
+  | '문서센터'
   | '캘린더';
 
 type AttendanceAnalysisTabId =
@@ -70,6 +61,10 @@ type AttendanceAnalysisTabId =
   | '근무형태이력'
   | '조기퇴근감지';
 
+type PersonnelSuiteTabId = '인사발령' | '포상/징계';
+type LifecycleSuiteTabId = '교육' | '오프보딩';
+type ComplianceSuiteTabId = '건강검진' | '면허/자격증' | '의료기기점검' | '사고보고서';
+type DocumentCenterTabId = '문서보관함' | '증명서' | '서류제출';
 type PayrollEmbeddedTabId = '기본' | '원천징수파일' | '4대보험';
 type ContractEmbeddedTabId = '기본' | '계약서생성기';
 type ShiftSuiteTabId = '캘린더' | '생성마법사' | '근무규칙생성' | '교대방식패턴';
@@ -105,24 +100,16 @@ const HR_GROUP_LABELS: Record<HrTabDef['group'], string> = {
 
 const HR_TABS: HrTabDef[] = [
   { id: '구성원', label: '구성원', perm: 'hr_구성원', icon: '👥', group: '인력관리' },
-  { id: '인사발령', label: '인사발령', perm: 'hr_인사발령', icon: '📋', group: '인력관리' },
-  { id: '포상/징계', label: '포상 / 징계', perm: 'hr_포상징계', icon: '🏅', group: '인력관리' },
-  { id: '교육', label: '교육', perm: 'hr_교육', icon: '📚', group: '인력관리' },
-  { id: '오프보딩', label: '오프보딩', perm: 'hr_오프보딩', icon: '🚪', group: '인력관리' },
+  { id: '인사변동', label: '인사변동', perm: 'hr_인사발령', icon: '🗂️', group: '인력관리' },
+  { id: '입퇴사·교육센터', label: '입퇴사·교육센터', perm: 'hr_교육', icon: '🧭', group: '인력관리' },
   { id: '근태', label: '근태', perm: 'hr_근태', icon: '⏰', group: '근태/급여' },
   { id: '교대근무', label: '교대근무', perm: 'hr_교대근무', icon: '🔄', group: '근태/급여' },
   { id: '연차/휴가', label: '연차 / 휴가', perm: 'hr_연차휴가', icon: '🌴', group: '근태/급여' },
   { id: '급여', label: '급여', perm: 'hr_급여', icon: '💰', group: '근태/급여' },
-  { id: '건강검진', label: '건강검진', perm: 'hr_건강검진', icon: '🩺', group: '복무/복지' },
   { id: '경조사', label: '경조사 지원', perm: 'hr_경조사', icon: '🎊', group: '복무/복지' },
-  { id: '면허/자격증', label: '면허 / 자격증', perm: 'hr_면허자격증', icon: '📜', group: '복무/복지' },
-  { id: '의료기기점검', label: '의료기기점검', perm: 'hr_의료기기점검', icon: '🔧', group: '복무/복지' },
-  { id: '비품대여', label: '비품대여', perm: 'hr_비품대여', icon: '📦', group: '복무/복지' },
-  { id: '사고보고서', label: '사고보고서', perm: 'hr_사고보고서', icon: '🚨', group: '복무/복지' },
+  { id: '자격·안전센터', label: '자격·안전센터', perm: 'hr_건강검진', icon: '🛡️', group: '복무/복지' },
   { id: '계약', label: '계약 관리', perm: 'hr_계약', icon: '📝', group: '문서/기타' },
-  { id: '문서보관함', label: '문서보관함', perm: 'hr_문서보관함', icon: '📁', group: '문서/기타' },
-  { id: '증명서', label: '증명서 발급', perm: 'hr_증명서', icon: '📄', group: '문서/기타' },
-  { id: '서류제출', label: '서류 제출 관리', perm: 'hr_서류제출', icon: '📤', group: '문서/기타' },
+  { id: '문서센터', label: '문서센터', perm: 'hr_문서보관함', icon: '🗃️', group: '문서/기타' },
   { id: '캘린더', label: '캘린더', perm: 'hr_캘린더', icon: '📅', group: '문서/기타' },
 ];
 
@@ -133,6 +120,29 @@ const ATTENDANCE_ANALYSIS_TABS: AttendanceAnalysisTabDef[] = [
   { id: '근무형태이력', label: '근무형태이력', perm: 'hr_근무형태', icon: '🔁' },
   { id: '조기퇴근감지', label: '조기퇴근감지', perm: 'hr_근태', icon: '🚶' },
 ];
+
+const PERSONNEL_SUITE_TABS = [
+  { id: '인사발령', label: '인사발령', perm: 'hr_인사발령', icon: '📋' },
+  { id: '포상/징계', label: '포상 · 징계', perm: 'hr_포상징계', icon: '🏅' },
+] as const;
+
+const LIFECYCLE_SUITE_TABS = [
+  { id: '교육', label: '교육', perm: 'hr_교육', icon: '📚' },
+  { id: '오프보딩', label: '오프보딩', perm: 'hr_오프보딩', icon: '🚪' },
+] as const;
+
+const COMPLIANCE_SUITE_TABS = [
+  { id: '건강검진', label: '건강검진', perm: 'hr_건강검진', icon: '🩺' },
+  { id: '면허/자격증', label: '면허 · 자격증', perm: 'hr_면허자격증', icon: '📜' },
+  { id: '의료기기점검', label: '의료기기점검', perm: 'hr_의료기기점검', icon: '🔧' },
+  { id: '사고보고서', label: '사고보고서', perm: 'hr_사고보고서', icon: '🚨' },
+] as const;
+
+const DOCUMENT_CENTER_TABS = [
+  { id: '문서보관함', label: '문서보관함', perm: 'hr_문서보관함', icon: '📁' },
+  { id: '증명서', label: '증명서 발급', perm: 'hr_증명서', icon: '📄' },
+  { id: '서류제출', label: '서류 제출', perm: 'hr_서류제출', icon: '📤' },
+] as const;
 
 const PAYROLL_UTILITY_TABS = [
   { id: '기본', label: '급여 메인', icon: '💰' },
@@ -152,6 +162,8 @@ const SHIFT_SUITE_TABS = [
   { id: '교대방식패턴', label: '교대방식 패턴', icon: '🧬' },
 ] as const;
 
+const SAFE_SHIFT_SUITE_TABS = [SHIFT_SUITE_TABS[0], SHIFT_SUITE_TABS[1]] as const;
+
 const LEAVE_SUITE_MENU_MAP: Record<string, LeaveSuiteTabId> = {
   '연차/휴가': '연차/휴가 신청내역',
   공휴일달력: '공휴일 달력',
@@ -160,7 +172,12 @@ const LEAVE_SUITE_MENU_MAP: Record<string, LeaveSuiteTabId> = {
 const REMOVED_MENU_FALLBACKS: Record<string, HrMenuId> = {
   생일기념일: '경조사',
   '생일/기념일': '경조사',
-  칭찬배지: '포상/징계',
+  칭찬배지: '인사변동',
+  인사발령: '인사변동',
+  '포상/징계': '인사변동',
+  교육: '입퇴사·교육센터',
+  오프보딩: '입퇴사·교육센터',
+  '인력생애주기센터': '입퇴사·교육센터',
   조직도: '구성원',
   스킬매트릭스: '구성원',
   회의실예약: '구성원',
@@ -175,6 +192,15 @@ const REMOVED_MENU_FALLBACKS: Record<string, HrMenuId> = {
   근무표자동편성: '교대근무',
   간호근무표: '교대근무',
   공휴일달력: '연차/휴가',
+  건강검진: '자격·안전센터',
+  '면허/자격증': '자격·안전센터',
+  의료기기점검: '자격·안전센터',
+  사고보고서: '자격·안전센터',
+  '규정준수센터': '자격·안전센터',
+  문서보관함: '문서센터',
+  증명서: '문서센터',
+  서류제출: '문서센터',
+  비품대여: '구성원',
 };
 
 const PAYROLL_UTILITY_MENU_MAP: Record<string, PayrollEmbeddedTabId> = {
@@ -199,6 +225,34 @@ const ATTENDANCE_ANALYSIS_MENU_MAP: Record<string, AttendanceAnalysisTabId> = {
   지각조퇴분석: '지각조퇴분석',
   근무형태이력: '근무형태이력',
   조기퇴근감지: '조기퇴근감지',
+};
+
+const PERSONNEL_SUITE_MENU_MAP: Record<string, PersonnelSuiteTabId> = {
+  인사발령: '인사발령',
+  '포상/징계': '포상/징계',
+};
+
+const LIFECYCLE_SUITE_MENU_MAP: Record<string, LifecycleSuiteTabId> = {
+  교육: '교육',
+  오프보딩: '오프보딩',
+  '입퇴사·교육센터': '교육',
+  '인력생애주기센터': '교육',
+};
+
+const COMPLIANCE_SUITE_MENU_MAP: Record<string, ComplianceSuiteTabId> = {
+  건강검진: '건강검진',
+  '면허/자격증': '면허/자격증',
+  의료기기점검: '의료기기점검',
+  사고보고서: '사고보고서',
+  '자격·안전센터': '건강검진',
+  '규정준수센터': '건강검진',
+};
+
+const DOCUMENT_CENTER_MENU_MAP: Record<string, DocumentCenterTabId> = {
+  문서보관함: '문서보관함',
+  증명서: '증명서',
+  서류제출: '서류제출',
+  문서센터: '문서보관함',
 };
 
 const LEGACY_WORKSPACE_MAP: Record<string, HrWorkspaceId> = {
@@ -246,6 +300,22 @@ function getAttendanceInitialTab(menuId?: string | null): AttendanceAnalysisTabI
   return ATTENDANCE_ANALYSIS_MENU_MAP[menuId || ''] || '근태관리';
 }
 
+function getPersonnelSuiteInitialTab(menuId?: string | null): PersonnelSuiteTabId {
+  return PERSONNEL_SUITE_MENU_MAP[menuId || ''] || '인사발령';
+}
+
+function getLifecycleSuiteInitialTab(menuId?: string | null): LifecycleSuiteTabId {
+  return LIFECYCLE_SUITE_MENU_MAP[menuId || ''] || '교육';
+}
+
+function getComplianceSuiteInitialTab(menuId?: string | null): ComplianceSuiteTabId {
+  return COMPLIANCE_SUITE_MENU_MAP[menuId || ''] || '건강검진';
+}
+
+function getDocumentCenterInitialTab(menuId?: string | null): DocumentCenterTabId {
+  return DOCUMENT_CENTER_MENU_MAP[menuId || ''] || '문서보관함';
+}
+
 function normalizeWorkspaceId(workspaceId?: string | null): HrWorkspaceId | null {
   if (!workspaceId) return null;
   if (HR_WORKSPACES.some((workspace) => workspace.id === workspaceId)) {
@@ -255,22 +325,22 @@ function normalizeWorkspaceId(workspaceId?: string | null): HrWorkspaceId | null
 }
 
 function getInitialHrMenuState(initialMenu?: string | null): HrMenuId {
-  if (initialMenu && HR_TABS.some((tab) => tab.id === initialMenu)) {
-    return initialMenu as HrMenuId;
+  if (initialMenu) {
+    return normalizeHrMenu(initialMenu);
   }
 
   if (typeof window !== 'undefined') {
     const savedTab = window.localStorage.getItem(HR_TAB_KEY);
-    if (savedTab && HR_TABS.some((tab) => tab.id === savedTab)) {
-      return savedTab as HrMenuId;
+    if (savedTab) {
+      return normalizeHrMenu(savedTab);
     }
   }
 
-  return normalizeHrMenu(initialMenu);
+  return '구성원';
 }
 
 function getInitialHrWorkspaceState(initialMenu?: string | null): HrWorkspaceId {
-  const hasExplicitInitialHrMenu = !!initialMenu && HR_TABS.some((tab) => tab.id === initialMenu);
+  const hasExplicitInitialHrMenu = typeof initialMenu === 'string' && initialMenu.trim().length > 0;
 
   if (!hasExplicitInitialHrMenu && typeof window !== 'undefined') {
     const savedWorkspace = normalizeWorkspaceId(window.localStorage.getItem(HR_WORKSPACE_KEY));
@@ -290,23 +360,72 @@ function normalizeAttendanceTabForUser(user: any, requestedTab: AttendanceAnalys
   return visibleTabs[0]?.id || '근태관리';
 }
 
+function normalizePersonnelTabForUser(user: any, requestedTab: PersonnelSuiteTabId): PersonnelSuiteTabId {
+  const visibleTabs = PERSONNEL_SUITE_TABS.filter((tab) => canAccessHrSection(user, tab.perm));
+  if (visibleTabs.some((tab) => tab.id === requestedTab)) {
+    return requestedTab;
+  }
+  return visibleTabs[0]?.id || '인사발령';
+}
+
+function normalizeLifecycleTabForUser(user: any, requestedTab: LifecycleSuiteTabId): LifecycleSuiteTabId {
+  const visibleTabs = LIFECYCLE_SUITE_TABS.filter((tab) => canAccessHrSection(user, tab.perm));
+  if (visibleTabs.some((tab) => tab.id === requestedTab)) {
+    return requestedTab;
+  }
+  return visibleTabs[0]?.id || '교육';
+}
+
+function normalizeComplianceTabForUser(user: any, requestedTab: ComplianceSuiteTabId): ComplianceSuiteTabId {
+  const visibleTabs = COMPLIANCE_SUITE_TABS.filter((tab) => canAccessHrSection(user, tab.perm));
+  if (visibleTabs.some((tab) => tab.id === requestedTab)) {
+    return requestedTab;
+  }
+  return visibleTabs[0]?.id || '건강검진';
+}
+
+function normalizeDocumentCenterTabForUser(user: any, requestedTab: DocumentCenterTabId): DocumentCenterTabId {
+  const visibleTabs = DOCUMENT_CENTER_TABS.filter((tab) => canAccessHrSection(user, tab.perm));
+  if (visibleTabs.some((tab) => tab.id === requestedTab)) {
+    return requestedTab;
+  }
+  return visibleTabs[0]?.id || '문서보관함';
+}
+
 function canAccessHrTab(user: any, tab: HrTabDef) {
+  if (tab.id === '인사변동') {
+    return canAccessHrSection(user, 'hr_인사발령') || canAccessHrSection(user, 'hr_포상징계');
+  }
+  if (tab.id === '입퇴사·교육센터') {
+    return canAccessHrSection(user, 'hr_교육') || canAccessHrSection(user, 'hr_오프보딩');
+  }
   if (tab.id === '연차/휴가') {
     return canAccessHrSection(user, 'hr_연차휴가') || canAccessHrSection(user, 'hr_근태');
+  }
+  if (tab.id === '자격·안전센터') {
+    return (
+      canAccessHrSection(user, 'hr_건강검진') ||
+      canAccessHrSection(user, 'hr_면허자격증') ||
+      canAccessHrSection(user, 'hr_의료기기점검') ||
+      canAccessHrSection(user, 'hr_사고보고서')
+    );
+  }
+  if (tab.id === '문서센터') {
+    return (
+      canAccessHrSection(user, 'hr_문서보관함') ||
+      canAccessHrSection(user, 'hr_증명서') ||
+      canAccessHrSection(user, 'hr_서류제출')
+    );
   }
   return canAccessHrSection(user, tab.perm);
 }
 
 function SectionTabBar({
-  title,
-  description,
   tabs,
   activeTab,
   onChange,
   testIdPrefix,
 }: {
-  title?: string;
-  description?: string;
   tabs: { id: string; label: string; icon: string }[];
   activeTab: string;
   onChange: (tabId: string) => void;
@@ -317,14 +436,6 @@ function SectionTabBar({
       className="shrink-0 border-b border-[var(--border)] bg-[var(--card)] px-3 py-2.5 md:px-5"
       data-testid={testIdPrefix ? `${testIdPrefix}-bar` : undefined}
     >
-      {title || description ? (
-        <div className="mb-2">
-          {title ? <h3 className="text-[12px] font-bold text-[var(--foreground)]">{title}</h3> : null}
-          {description ? (
-            <p className="mt-0.5 hidden text-[11px] text-[var(--toss-gray-3)] md:block">{description}</p>
-          ) : null}
-        </div>
-      ) : null}
       <div className="no-scrollbar flex gap-1 overflow-x-auto">
         {tabs.map((tab, index) => (
           <button
@@ -364,6 +475,10 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
   const [직원상태필터, 직원상태필터설정] = useState<StaffStatus>('재직');
   const [문서연결대상, 문서연결대상설정] = useState<{ id?: string; name?: string } | undefined>(undefined);
   const [근태분석탭, 근태분석탭설정] = useState<AttendanceAnalysisTabId>(getAttendanceInitialTab(initialMenu));
+  const [인사변동탭, 인사변동탭설정] = useState<PersonnelSuiteTabId>(getPersonnelSuiteInitialTab(initialMenu));
+  const [입퇴사교육탭, 입퇴사교육탭설정] = useState<LifecycleSuiteTabId>(getLifecycleSuiteInitialTab(initialMenu));
+  const [자격안전탭, 자격안전탭설정] = useState<ComplianceSuiteTabId>(getComplianceSuiteInitialTab(initialMenu));
+  const [문서센터탭, 문서센터탭설정] = useState<DocumentCenterTabId>(getDocumentCenterInitialTab(initialMenu));
   const [급여내부탭, 급여내부탭설정] = useState<PayrollEmbeddedTabId>(getPayrollInitialTab(initialMenu));
   const [계약내부탭, 계약내부탭설정] = useState<ContractEmbeddedTabId>(getContractInitialTab(initialMenu));
   const [교대근무탭, 교대근무탭설정] = useState<ShiftSuiteTabId>(getShiftSuiteInitialTab(initialMenu));
@@ -386,8 +501,16 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
   const activeWorkspaceConfig = HR_WORKSPACES.find((workspace) => workspace.id === activeWorkspace) || HR_WORKSPACES[0];
   const workspaceTabs = visibleHrTabs.filter((tab) => activeWorkspaceConfig.groups.includes(tab.group));
   const visibleAttendanceTabs = ATTENDANCE_ANALYSIS_TABS.filter((tab) => canAccessHrSection(user, tab.perm));
+  const visiblePersonnelTabs = PERSONNEL_SUITE_TABS.filter((tab) => canAccessHrSection(user, tab.perm));
+  const visibleLifecycleTabs = LIFECYCLE_SUITE_TABS.filter((tab) => canAccessHrSection(user, tab.perm));
+  const visibleComplianceTabs = COMPLIANCE_SUITE_TABS.filter((tab) => canAccessHrSection(user, tab.perm));
+  const visibleDocumentCenterTabs = DOCUMENT_CENTER_TABS.filter((tab) => canAccessHrSection(user, tab.perm));
   const canRegisterNewStaff = isAdminUser(user) || canAccessHrSection(user, 'hr_직원등록');
   const activeAttendanceTab = normalizeAttendanceTabForUser(user, 근태분석탭);
+  const activePersonnelTab = normalizePersonnelTabForUser(user, 인사변동탭);
+  const activeLifecycleTab = normalizeLifecycleTabForUser(user, 입퇴사교육탭);
+  const activeComplianceTab = normalizeComplianceTabForUser(user, 자격안전탭);
+  const activeDocumentCenterTab = normalizeDocumentCenterTabForUser(user, 문서센터탭);
   const 인사직원목록 = useMemo(
     () => (isMsoViewer && 전체직원목록.length > 0 ? 전체직원목록 : staffs || []),
     [isMsoViewer, staffs, 전체직원목록]
@@ -453,6 +576,10 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
     메뉴설정(normalizedMenu);
     워크스페이스설정(getWorkspaceForHrMenu(normalizedMenu));
     근태분석탭설정(normalizeAttendanceTabForUser(user, getAttendanceInitialTab(requestedMenu)));
+    인사변동탭설정(normalizePersonnelTabForUser(user, getPersonnelSuiteInitialTab(requestedMenu)));
+    입퇴사교육탭설정(normalizeLifecycleTabForUser(user, getLifecycleSuiteInitialTab(requestedMenu)));
+    자격안전탭설정(normalizeComplianceTabForUser(user, getComplianceSuiteInitialTab(requestedMenu)));
+    문서센터탭설정(normalizeDocumentCenterTabForUser(user, getDocumentCenterInitialTab(requestedMenu)));
     급여내부탭설정(getPayrollInitialTab(requestedMenu));
     계약내부탭설정(getContractInitialTab(requestedMenu));
     교대근무탭설정(getShiftSuiteInitialTab(requestedMenu));
@@ -488,7 +615,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
       const savedStatus = window.localStorage.getItem(HR_STATUS_KEY) as StaffStatus | null;
       const savedWorkspace = normalizeWorkspaceId(window.localStorage.getItem(HR_WORKSPACE_KEY));
 
-      const hasExplicitInitialHrMenu = !!initialMenu && HR_TABS.some((tab) => tab.id === initialMenu);
+      const hasExplicitInitialHrMenu = typeof initialMenu === 'string' && initialMenu.trim().length > 0;
 
       if (!hasExplicitInitialHrMenu && savedTab) {
         적용입장메뉴(savedTab);
@@ -544,8 +671,9 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
   const 인사서류보기 = (직원: any) => {
     문서연결대상설정({ id: 직원.id, name: 직원.name });
     사업체설정(직원.company || '전체');
-    메뉴설정('문서보관함');
-    워크스페이스설정(getWorkspaceForHrMenu('문서보관함'));
+    메뉴설정('문서센터');
+    문서센터탭설정('문서보관함');
+    워크스페이스설정(getWorkspaceForHrMenu('문서센터'));
   };
 
   if (!hasAccess || visibleHrTabs.length === 0) {
@@ -684,38 +812,6 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
 
       {/* ── 메인 콘텐츠 ── */}
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        {/* 컨텍스트 헤더 — 모바일: 현재 메뉴 + 필터 상태 / 데스크탑: 숨김 */}
-        <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--card)] px-3 py-2.5 md:hidden">
-          <span className="text-base">{workspaceTabs.find((t) => t.id === activeMenu)?.icon ?? '📋'}</span>
-          <span className="text-[13px] font-bold text-[var(--foreground)]">
-            {workspaceTabs.find((t) => t.id === activeMenu)?.label ?? activeMenu}
-          </span>
-          <div className="ml-auto flex items-center gap-1">
-            <span className="rounded-full bg-[var(--muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--toss-gray-4)]">
-              {선택사업체 === '전체' ? '전체' : 선택사업체}
-            </span>
-            <span className="rounded-full bg-[var(--muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--toss-gray-4)]">
-              {직원상태필터}자
-            </span>
-          </div>
-        </div>
-        {/* 데스크탑 전용: 콘텐츠 영역 상단 컨텍스트 바 */}
-        <div className="hidden shrink-0 items-center gap-2.5 border-b border-[var(--border)] bg-[var(--card)] px-5 py-3 md:flex">
-          <span className="text-base">{workspaceTabs.find((t) => t.id === activeMenu)?.icon ?? '📋'}</span>
-          <h2 className="text-[14px] font-bold text-[var(--foreground)]">
-            {workspaceTabs.find((t) => t.id === activeMenu)?.label ?? activeMenu}
-          </h2>
-          <span className="text-[11px] text-[var(--toss-gray-3)]">·</span>
-          <span className="text-[11px] font-medium text-[var(--toss-gray-3)]">{activeWorkspace}</span>
-          <div className="ml-auto flex items-center gap-1.5">
-            <span className="rounded-full border border-[var(--border)] px-2.5 py-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
-              {선택사업체 === '전체' ? '전체 사업체' : 선택사업체}
-            </span>
-            <span className="rounded-full border border-[var(--border)] px-2.5 py-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
-              {직원상태필터}자
-            </span>
-          </div>
-        </div>
         <section className="custom-scrollbar flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-0">
           {activeMenu === '구성원' && (
             <div className="flex h-full flex-col">
@@ -736,25 +832,51 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
             </div>
           )}
 
-          {activeMenu === '인사발령' && <PersonnelAppointment staffs={인사직원목록} selectedCo={선택사업체} user={user} />}
-          {activeMenu === '포상/징계' && <RewardDisciplineManagement staffs={인사직원목록} selectedCo={선택사업체} user={user} />}
-
-          {activeMenu === '교육' && (
-            <div className="p-3 md:p-4">
-              <EducationMain staffs={인사직원목록} selectedCo={선택사업체} />
+          {activeMenu === '인사변동' && (
+            <div className="flex h-full flex-col">
+              <SectionTabBar
+                tabs={visiblePersonnelTabs.map((tab) => ({ id: tab.id, label: tab.label, icon: tab.icon }))}
+                activeTab={activePersonnelTab}
+                onChange={(tabId) => 인사변동탭설정(tabId as PersonnelSuiteTabId)}
+                testIdPrefix="personnel-suite"
+              />
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {activePersonnelTab === '인사발령' && (
+                  <PersonnelAppointment staffs={인사직원목록} selectedCo={선택사업체} user={user} />
+                )}
+                {activePersonnelTab === '포상/징계' && (
+                  <RewardDisciplineManagement staffs={인사직원목록} selectedCo={선택사업체} user={user} />
+                )}
+              </div>
             </div>
           )}
 
-          {activeMenu === '오프보딩' && (
-            <div className="p-3 md:p-4">
-              <OffboardingView staffs={인사직원목록} selectedCo={선택사업체} onRefresh={onRefresh} />
+          {activeMenu === '입퇴사·교육센터' && (
+            <div className="flex h-full flex-col">
+              <SectionTabBar
+                tabs={visibleLifecycleTabs.map((tab) => ({ id: tab.id, label: tab.label, icon: tab.icon }))}
+                activeTab={activeLifecycleTab}
+                onChange={(tabId) => 입퇴사교육탭설정(tabId as LifecycleSuiteTabId)}
+                testIdPrefix="lifecycle-suite"
+              />
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {activeLifecycleTab === '교육' && (
+                  <div className="p-3 md:p-4">
+                    <EducationMain staffs={인사직원목록} selectedCo={선택사업체} />
+                  </div>
+                )}
+                {activeLifecycleTab === '오프보딩' && (
+                  <div className="p-3 md:p-4">
+                    <OffboardingView staffs={인사직원목록} selectedCo={선택사업체} onRefresh={onRefresh} />
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
           {activeMenu === '근태' && (
             <div className="flex h-full flex-col">
               <SectionTabBar
-                title="근태 분석"
                 tabs={visibleAttendanceTabs}
                 activeTab={activeAttendanceTab}
                 onChange={(tabId) => 근태분석탭설정(tabId as AttendanceAnalysisTabId)}
@@ -780,8 +902,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
           {activeMenu === '교대근무' && (
             <div className="flex h-full flex-col">
               <SectionTabBar
-                title="교대근무 통합"
-                tabs={[...SHIFT_SUITE_TABS]}
+                tabs={[...SAFE_SHIFT_SUITE_TABS]}
                 activeTab={교대근무탭}
                 onChange={(tabId) => 교대근무탭설정(tabId as ShiftSuiteTabId)}
                 testIdPrefix="shift-suite"
@@ -789,7 +910,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {교대근무탭 === '캘린더' && <ShiftCalendar staffs={인사직원목록} selectedCo={선택사업체} />}
                 {교대근무탭 === '생성마법사' && (
-                  <AutoRosterPlanner user={user as unknown as import('@/types').StaffMember} staffs={인사직원목록} selectedCo={선택사업체} />
+                  <AutoRosterPlanner user={user as unknown as import('@/types').StaffMember} staffs={인사직원목록} selectedCo={선택사업체} adminMode={false} />
                 )}
                 {교대근무탭 === '근무규칙생성' && (
                   <AutoRosterPlanner
@@ -797,6 +918,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                     staffs={인사직원목록}
                     selectedCo={선택사업체}
                     panelMode="rules"
+                    adminMode={false}
                   />
                 )}
                 {교대근무탭 === '교대방식패턴' && (
@@ -805,6 +927,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                     staffs={인사직원목록}
                     selectedCo={선택사업체}
                     panelMode="patterns"
+                    adminMode={false}
                   />
                 )}
               </div>
@@ -820,6 +943,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                 initialTab={휴가내부탭}
                 allowLeaveTabs={canAccessHrSection(user, 'hr_연차휴가')}
                 allowHolidayTab={canAccessHrSection(user, 'hr_근태')}
+                tabMode="operational"
               />
             </div>
           )}
@@ -832,7 +956,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                 testIdPrefix="payroll-utility"
               />
               <div className="min-h-0 flex-1 overflow-y-auto">
-                {급여내부탭 === '기본' && <PayrollMain staffs={인사직원목록} selectedCo={선택사업체} onRefresh={onRefresh} />}
+                {급여내부탭 === '기본' && <PayrollMain staffs={인사직원목록} selectedCo={선택사업체} onRefresh={onRefresh} showAdminPolicyTabs={false} />}
                 {급여내부탭 === '원천징수파일' && (
                     <div className="p-3 md:p-4">
                     <TaxFileGenerator staffs={인사직원목록} selectedCo={선택사업체} />
@@ -851,24 +975,27 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
               </div>
             </div>
           )}
-          {activeMenu === '건강검진' && <HealthCheckupManagement staffs={인사직원목록} selectedCo={선택사업체} />}
           {activeMenu === '경조사' && <CongratulationsCondolences staffs={인사직원목록} selectedCo={선택사업체} />}
-          {activeMenu === '면허/자격증' && <LicenseManager staffs={인사직원목록} selectedCo={선택사업체} user={user} />}
-          {activeMenu === '의료기기점검' && <MedicalDeviceInspection selectedCo={선택사업체} user={user} />}
-
-          {activeMenu === '비품대여' && (
-            <div className="p-3 md:p-4">
-              <AssetLoanManager staffs={인사직원목록} selectedCo={선택사업체} />
+          {activeMenu === '자격·안전센터' && (
+            <div className="flex h-full flex-col">
+              <SectionTabBar
+                tabs={visibleComplianceTabs.map((tab) => ({ id: tab.id, label: tab.label, icon: tab.icon }))}
+                activeTab={activeComplianceTab}
+                onChange={(tabId) => 자격안전탭설정(tabId as ComplianceSuiteTabId)}
+                testIdPrefix="compliance-suite"
+              />
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {activeComplianceTab === '건강검진' && <HealthCheckupManagement staffs={인사직원목록} selectedCo={선택사업체} />}
+                {activeComplianceTab === '면허/자격증' && <LicenseManager staffs={인사직원목록} selectedCo={선택사업체} user={user} />}
+                {activeComplianceTab === '의료기기점검' && <MedicalDeviceInspection selectedCo={선택사업체} user={user} />}
+                {activeComplianceTab === '사고보고서' && <IncidentReport staffs={인사직원목록} selectedCo={선택사업체} user={user} />}
+              </div>
             </div>
           )}
-
-          {activeMenu === '사고보고서' && <IncidentReport staffs={인사직원목록} selectedCo={선택사업체} user={user} />}
 
           {activeMenu === '계약' && (
             <div className="flex h-full flex-col">
               <SectionTabBar
-                title="계약관리"
-                description="전자 계약 현황과 계약서 자동생성을 하나의 워크스페이스에서 처리합니다."
                 tabs={[...CONTRACT_UTILITY_TABS]}
                 activeTab={계약내부탭}
                 onChange={(tabId) => 계약내부탭설정(tabId as ContractEmbeddedTabId)}
@@ -876,7 +1003,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
               />
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {계약내부탭 === '기본' && (
-                  <ContractMain staffs={인사직원목록} selectedCo={선택사업체} onRefresh={onRefresh} />
+                  <ContractMain staffs={인사직원목록} selectedCo={선택사업체} onRefresh={onRefresh} showAdminPolicyTabs={false} showTemplateEditor={false} />
                 )}
                 {계약내부탭 === '계약서생성기' && (
                     <div className="p-3 md:p-4">
@@ -887,19 +1014,29 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
             </div>
           )}
 
-          {activeMenu === '문서보관함' && (
-              <문서보관함 user={user} selectedCo={선택사업체} linkedTarget={문서연결대상} />
-            )}
-
-          {activeMenu === '증명서' && (
-            <div className="p-3 md:p-4">
-              <CertificateGenerator staffs={인사직원목록} selectedCo={선택사업체} />
-            </div>
-          )}
-
-          {activeMenu === '서류제출' && (
-            <div className="p-3 md:p-4">
-              <DocumentScanner user={user ?? undefined} staffs={인사직원목록} selectedCo={선택사업체 ?? undefined} />
+          {activeMenu === '문서센터' && (
+            <div className="flex h-full flex-col">
+              <SectionTabBar
+                tabs={visibleDocumentCenterTabs.map((tab) => ({ id: tab.id, label: tab.label, icon: tab.icon }))}
+                activeTab={activeDocumentCenterTab}
+                onChange={(tabId) => 문서센터탭설정(tabId as DocumentCenterTabId)}
+                testIdPrefix="document-center"
+              />
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {activeDocumentCenterTab === '문서보관함' && (
+                  <문서보관함 user={user} selectedCo={선택사업체} linkedTarget={문서연결대상} canManageDocuments={false} />
+                )}
+                {activeDocumentCenterTab === '증명서' && (
+                  <div className="p-3 md:p-4">
+                    <CertificateGenerator staffs={인사직원목록} selectedCo={선택사업체} />
+                  </div>
+                )}
+                {activeDocumentCenterTab === '서류제출' && (
+                  <div className="p-3 md:p-4">
+                    <DocumentScanner user={user ?? undefined} staffs={인사직원목록} selectedCo={선택사업체 ?? undefined} />
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

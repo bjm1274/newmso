@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import SmartMonthPicker from '../../공통/SmartMonthPicker';
 import { calculateAttendanceDeduction, type AttendanceRecord, type DeductionRule } from '@/lib/attendance-deduction';
 
@@ -26,6 +27,46 @@ const EMPTY_RULE: DeductionRule = {
   early_leave_deduction_amount: 10000,
   absent_use_daily_rate: true,
 };
+
+const ATTENDANCE_REQUIRED_COLUMNS = [
+  'staff_id',
+  'work_date',
+  'status',
+  'check_in_time',
+  'check_out_time',
+] as const;
+
+const ATTENDANCE_OPTIONAL_COLUMNS = ['late_minutes', 'early_leave_minutes'] as const;
+
+function buildSelectColumns(
+  requiredColumns: readonly string[],
+  optionalColumns: readonly string[] = [],
+  omittedColumns?: ReadonlySet<string>,
+) {
+  return [...requiredColumns, ...optionalColumns.filter((column) => !omittedColumns?.has(column))].join(', ');
+}
+
+function normalizeQueryError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  if (error && typeof error === 'object') {
+    const record = error as Record<string, unknown>;
+    return {
+      code: record.code ?? null,
+      message: String(record.message ?? ''),
+      details: String(record.details ?? ''),
+      hint: String(record.hint ?? ''),
+    };
+  }
+
+  return { message: String(error ?? 'unknown error') };
+}
 
 export default function AttendanceDeductionSimulator({
   staffs,
@@ -115,31 +156,48 @@ export default function AttendanceDeductionSimulator({
       const endDate = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`;
 
       try {
-        const [{ data: attendanceRows, error: attendanceError }, { data: shiftRows, error: shiftError }] =
-          await Promise.all([
+        const { data: attendanceRows, error: attendanceError } = await withMissingColumnsFallback(
+          (omittedColumns) =>
             supabase
               .from('attendances')
-              .select('staff_id, work_date, status, check_in_time, check_out_time, late_minutes, early_leave_minutes')
+              .select(buildSelectColumns(ATTENDANCE_REQUIRED_COLUMNS, ATTENDANCE_OPTIONAL_COLUMNS, omittedColumns))
               .eq('staff_id', selectedStaffId)
               .gte('work_date', startDate)
               .lte('work_date', endDate),
-            supabase
-              .from('shift_assignments')
-              .select('staff_id, work_date, shift_id')
-              .eq('staff_id', selectedStaffId)
-              .gte('work_date', startDate)
-              .lte('work_date', endDate),
-          ]);
+          [...ATTENDANCE_OPTIONAL_COLUMNS],
+        );
 
         if (attendanceError) throw attendanceError;
-        if (shiftError) throw shiftError;
+
+        const { data: shiftRows, error: shiftError } = await supabase
+          .from('shift_assignments')
+          .select('staff_id, work_date, shift_id')
+          .eq('staff_id', selectedStaffId)
+          .gte('work_date', startDate)
+          .lte('work_date', endDate);
+
+        if (shiftError) {
+          console.warn('근태 차감 시뮬레이터 근무 배정 조회 실패:', {
+            month: selectedMonth,
+            staffId: selectedStaffId,
+            selectedCo,
+            error: normalizeQueryError(shiftError),
+          });
+        }
+
+        const normalizedAttendanceRows = (attendanceRows || []) as unknown as AttendanceRecord[];
 
         if (active) {
-          setRecords((attendanceRows || []) as AttendanceRecord[]);
+          setRecords(normalizedAttendanceRows);
           setScheduledWorkDays((shiftRows || []).filter((row: any) => row.shift_id).length);
         }
       } catch (error) {
-        console.error('근태 차감 시뮬레이터 조회 실패:', error);
+        console.error('근태 차감 시뮬레이터 조회 실패:', {
+          month: selectedMonth,
+          staffId: selectedStaffId,
+          selectedCo,
+          error: normalizeQueryError(error),
+        });
         if (active) {
           setRecords([]);
           setScheduledWorkDays(0);
@@ -151,7 +209,7 @@ export default function AttendanceDeductionSimulator({
     return () => {
       active = false;
     };
-  }, [selectedMonth, selectedStaffId]);
+  }, [selectedCo, selectedMonth, selectedStaffId]);
 
   const result = useMemo(
     () => calculateAttendanceDeduction(baseSalary, selectedMonth, records, rule, { scheduledWorkDays }),
