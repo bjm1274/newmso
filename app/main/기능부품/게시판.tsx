@@ -5,11 +5,10 @@ import { canAccessBoard, isAdminUser, isPrivilegedUser } from '@/lib/access-cont
 import { getStaffLikeId, resolveStaffLike } from '@/lib/staff-identity';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { CHAT_FOCUS_KEY, CHAT_ROOM_KEY } from '@/app/main/navigation-state';
 import SmartDatePicker from './공통/SmartDatePicker';
 import WikiDashboard from './게시판서브/사내위키';
 import type { StaffMember, BoardPost, ScheduleItem, AttachmentItem } from '@/types';
-const CHAT_ROOM_KEY = 'erp_chat_last_room';
-const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
 const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
 // 공지사항·경조사 게시글 등록 시 공지 채팅방 자동 전송 대상 게시판
 const BOARD_AUTO_CHAT_TYPES = new Set(['공지사항', '경조사']);

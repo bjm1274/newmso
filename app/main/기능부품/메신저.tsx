@@ -17,6 +17,7 @@ import {
   CHAT_ROOM_SELECT,
   POLL_SELECT,
 } from '@/lib/chat-query-columns';
+import { CHAT_ACTIVE_ROOM_KEY, CHAT_FOCUS_KEY, CHAT_ROOM_KEY } from '@/app/main/navigation-state';
 import SmartDatePicker from './공통/SmartDatePicker';
 import { buildMessengerImageAlt, MessengerAvatar, MessengerStatusUserRow } from './메신저공통';
 import type { StaffMember, ChatRoom, ChatMessage } from '@/types';
@@ -34,9 +35,6 @@ type PollItem = {
 const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
 const NOTICE_ROOM_NAME = '공지메시지';
 const CAN_WRITE_NOTICE_POSITIONS = ['대표', '부장', '팀장', '실장', '병원장', '이사', '본부장', '총무부장', '진료부장', '간호부장'];
-const CHAT_ROOM_KEY = 'erp_chat_last_room';
-const CHAT_ACTIVE_ROOM_KEY = 'erp_chat_active_room';
-const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
 const MOBILE_CHAT_MEDIA_QUERY = '(max-width: 767px), (hover: none) and (pointer: coarse)';
 const WARD_MESSAGE_META_PREFIX = '[[WARD_MESSAGE_META]]';
 const WARD_MESSAGE_META_SUFFIX = '[[/WARD_MESSAGE_META]]';
