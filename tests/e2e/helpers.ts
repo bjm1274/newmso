@@ -151,6 +151,7 @@ export type MockFixtures = {
   messageReads?: any[];
   messageBookmarks?: any[];
   messageInsertFailures?: number;
+  missingMessageColumns?: string[];
   approvals?: any[];
   payrollRecords?: any[];
   boardPosts?: any[];
@@ -432,6 +433,7 @@ function buildFixtures(overrides: MockFixtures = {}) {
     opPatientChecks: overrides.opPatientChecks ?? [],
     missingSurgeryTemplatesSchema: overrides.missingSurgeryTemplatesSchema ?? false,
     missingInventoryItemsSchema: overrides.missingInventoryItemsSchema ?? false,
+    missingMessageColumns: overrides.missingMessageColumns ?? [],
     dailyClosures: overrides.dailyClosures ?? [],
     dailyClosureItems: overrides.dailyClosureItems ?? [],
     dailyChecks: overrides.dailyChecks ?? [],
@@ -686,6 +688,7 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   let opPatientChecks = [...fixtures.opPatientChecks];
   const missingSurgeryTemplatesSchema = fixtures.missingSurgeryTemplatesSchema;
   const missingInventoryItemsSchema = fixtures.missingInventoryItemsSchema;
+  const missingMessageColumns = new Set(fixtures.missingMessageColumns ?? []);
   let dailyClosures = [...fixtures.dailyClosures];
   let dailyClosureItems = [...fixtures.dailyClosureItems];
   let dailyChecks = [...fixtures.dailyChecks];
@@ -1648,6 +1651,13 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
 
     if (path.includes('/messages')) {
       if (method === 'GET') {
+        const select = url.searchParams.get('select') || '';
+        const missingSelectColumn = Array.from(missingMessageColumns).find(
+          (columnName) => select.includes(columnName) || url.searchParams.has(columnName)
+        );
+        if (missingSelectColumn) {
+          return missingColumn(route, missingSelectColumn, 'messages');
+        }
         return json(route, applyQueryFilters(messages, url));
       }
       if (method === 'PATCH') {

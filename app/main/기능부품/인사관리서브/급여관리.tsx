@@ -40,19 +40,68 @@ import UnpaidAllowanceAlert from './급여명세/미지급수당알림';
 import PayrollAdvancedCenter from './급여명세/급여고도화센터';
 import UnpaidAbsenceDeduction from './급여명세/무급결근차감';
 
-type Staff = {
-  id: string | number;
-  name: string;
-  company?: string;
-  position?: string;
-  department?: string;
-  employee_no?: string;
+type Staff = StaffMember & {
   join_date?: string;
   joined_at?: string;
   base_salary?: number;
   base?: number;
-  permissions?: Record<string, unknown>;
 };
+
+type PayrollRecordRow = {
+  staff_id: string | number;
+  year_month?: string | null;
+  record_type?: string | null;
+  base_salary?: number | null;
+  meal_allowance?: number | null;
+  night_duty_allowance?: number | null;
+  vehicle_allowance?: number | null;
+  childcare_allowance?: number | null;
+  research_allowance?: number | null;
+  other_taxfree?: number | null;
+  extra_allowance?: number | null;
+  overtime_pay?: number | null;
+  bonus?: number | null;
+  deduction_detail?: Record<string, unknown> | null;
+  total_taxable?: number | null;
+  total_taxfree?: number | null;
+  total_deduction?: number | null;
+  national_pension?: number | null;
+  health_insurance?: number | null;
+  long_term_care?: number | null;
+  employment_insurance?: number | null;
+  income_tax?: number | null;
+  local_tax?: number | null;
+  net_pay?: number | null;
+  advance_pay?: number | null;
+};
+
+const PAYROLL_RECORD_SELECT = [
+  'staff_id',
+  'year_month',
+  'record_type',
+  'base_salary',
+  'meal_allowance',
+  'night_duty_allowance',
+  'vehicle_allowance',
+  'childcare_allowance',
+  'research_allowance',
+  'other_taxfree',
+  'extra_allowance',
+  'overtime_pay',
+  'bonus',
+  'deduction_detail',
+  'total_taxable',
+  'total_taxfree',
+  'total_deduction',
+  'national_pension',
+  'health_insurance',
+  'long_term_care',
+  'employment_insurance',
+  'income_tax',
+  'local_tax',
+  'net_pay',
+  'advance_pay',
+].join(', ');
 
 type PayrollMainProps = {
   staffs?: Staff[];
@@ -65,11 +114,115 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: Payr
   const [selectedStaffId, setSelectedStaffId] = useState<string | number | null>(null);
   const [checkedIds, setCheckedIds] = useState<(string | number)[]>([]);
   const [yearMonth, setYearMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
-  const [payrollRecords, setPayrollRecords] = useState<any[]>([]);
+  const [payrollRecords, setPayrollRecords] = useState<PayrollRecordRow[]>([]);
   const [payrollAudit, setPayrollAudit] = useState<{ orphanCount: number; officialBracketConfigured: boolean } | null>(null);
 
   const filtered: Staff[] = selectedCo === '전체' ? staffs : staffs.filter((s: Staff) => s.company === selectedCo);
   const current = filtered.find((s) => s.id === selectedStaffId) || filtered[0];
+  const currentRecord = current
+    ? payrollRecords.find((row) => String(row.staff_id) === String(current.id))
+    : null;
+  const payrollTableStaffs = filtered.map((staff) => ({
+    id: staff.id,
+    name: staff.name,
+    position: staff.position || undefined,
+    department: staff.department || undefined,
+    company: staff.company || undefined,
+  }));
+  const currentSalaryDetailStaff = current
+    ? (() => {
+        const extraFields = current as Record<string, unknown>;
+        return {
+          company: current.company || undefined,
+          name: current.name || undefined,
+          employee_no: current.employee_no || undefined,
+          id: String(current.id),
+          join_date: current.join_date || undefined,
+          joined_at: current.joined_at || undefined,
+          department: current.department || undefined,
+          position: current.position || undefined,
+          base_salary: current.base_salary ?? undefined,
+          meal_allowance:
+            typeof extraFields.meal_allowance === 'number' ? extraFields.meal_allowance : undefined,
+          night_duty_allowance:
+            typeof extraFields.night_duty_allowance === 'number'
+              ? extraFields.night_duty_allowance
+              : undefined,
+          vehicle_allowance:
+            typeof extraFields.vehicle_allowance === 'number' ? extraFields.vehicle_allowance : undefined,
+          childcare_allowance:
+            typeof extraFields.childcare_allowance === 'number'
+              ? extraFields.childcare_allowance
+              : undefined,
+          research_allowance:
+            typeof extraFields.research_allowance === 'number' ? extraFields.research_allowance : undefined,
+          other_taxfree:
+            typeof extraFields.other_taxfree === 'number' ? extraFields.other_taxfree : undefined,
+          working_hours_per_week:
+            typeof extraFields.working_hours_per_week === 'number'
+              ? extraFields.working_hours_per_week
+              : undefined,
+        };
+      })()
+    : undefined;
+  const payrollTableRecords = payrollRecords.map((row) => ({
+    staff_id: row.staff_id,
+    total_taxfree: row.total_taxfree ?? undefined,
+    total_taxable: row.total_taxable ?? undefined,
+    total_deduction: row.total_deduction ?? undefined,
+    net_pay: row.net_pay ?? undefined,
+    advance_pay: row.advance_pay ?? undefined,
+  }));
+  const payrollAdvancedRecords = payrollRecords.map((row) => ({
+    staff_id: row.staff_id != null ? String(row.staff_id) : undefined,
+    total_taxable: row.total_taxable ?? undefined,
+    total_taxfree: row.total_taxfree ?? undefined,
+    total_deduction: row.total_deduction ?? undefined,
+    net_pay: row.net_pay ?? undefined,
+    deduction_detail:
+      row.deduction_detail && typeof row.deduction_detail === 'object'
+        ? Object.fromEntries(
+            Object.entries(row.deduction_detail).filter(
+              (entry): entry is [string, number] => typeof entry[1] === 'number',
+            ),
+          )
+        : undefined,
+  }));
+  const currentSalaryDetailRecord = currentRecord
+    ? {
+        company: current?.company ?? undefined,
+        base_salary: currentRecord.base_salary ?? undefined,
+        meal_allowance: currentRecord.meal_allowance ?? undefined,
+        night_duty_allowance: currentRecord.night_duty_allowance ?? undefined,
+        vehicle_allowance: currentRecord.vehicle_allowance ?? undefined,
+        childcare_allowance: currentRecord.childcare_allowance ?? undefined,
+        research_allowance: currentRecord.research_allowance ?? undefined,
+        other_taxfree: currentRecord.other_taxfree ?? undefined,
+        extra_allowance: currentRecord.extra_allowance ?? undefined,
+        overtime_pay: currentRecord.overtime_pay ?? undefined,
+        bonus: currentRecord.bonus ?? undefined,
+        year_month: currentRecord.year_month ?? undefined,
+        deduction_detail:
+          currentRecord.deduction_detail && typeof currentRecord.deduction_detail === 'object'
+            ? Object.fromEntries(
+                Object.entries(currentRecord.deduction_detail).filter(
+                  (entry): entry is [string, number] => typeof entry[1] === 'number',
+                ),
+              )
+            : undefined,
+        total_taxable: currentRecord.total_taxable ?? undefined,
+        total_taxfree: currentRecord.total_taxfree ?? undefined,
+        total_deduction: currentRecord.total_deduction ?? undefined,
+        national_pension: currentRecord.national_pension ?? undefined,
+        health_insurance: currentRecord.health_insurance ?? undefined,
+        long_term_care: currentRecord.long_term_care ?? undefined,
+        employment_insurance: currentRecord.employment_insurance ?? undefined,
+        income_tax: currentRecord.income_tax ?? undefined,
+        local_tax: currentRecord.local_tax ?? undefined,
+        net_pay: currentRecord.net_pay ?? undefined,
+        advance_pay: currentRecord.advance_pay ?? undefined,
+      }
+    : undefined;
 
   // 선택된 월·회사에 대한 급여 정산 결과 불러오기
   useEffect(() => {
@@ -81,14 +234,14 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: Payr
       try {
         const { data, error } = await supabase
           .from('payroll_records')
-          .select('*')
+          .select(PAYROLL_RECORD_SELECT)
           .eq('year_month', yearMonth)
           .not('record_type', 'eq', 'interim');
         if (error) {
           console.warn('payroll_records 조회 실패:', error.message);
           setPayrollRecords([]);
         } else {
-          setPayrollRecords(data || []);
+          setPayrollRecords(((data || []) as unknown) as PayrollRecordRow[]);
         }
       } catch (e) {
         console.warn('payroll_records 조회 중 예외:', e);
@@ -97,14 +250,10 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: Payr
     })();
   }, [yearMonth, filtered.map(s => s.id).join(',')]);
 
-  const currentRecord = current
-    ? payrollRecords.find((r: any) => String(r.staff_id) === String(current.id))
-    : null;
-
   useEffect(() => {
     (async () => {
       const staffIdSet = new Set(filtered.map((staff: Staff) => String(staff.id)));
-      const orphanCount = payrollRecords.filter((row: any) => !staffIdSet.has(String(row.staff_id))).length;
+      const orphanCount = payrollRecords.filter((row) => !staffIdSet.has(String(row.staff_id))).length;
       const targetYear = parseInt((yearMonth || '').slice(0, 4), 10);
       let officialBracketConfigured = false;
 
@@ -171,7 +320,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: Payr
                 data-testid={`payroll-tab-${tab.id}`}
                 onClick={() => {
                   setActiveTab(tab.id);
-                  if (tab.id !== '급여정산') setSelectedStaffId(null as any);
+                  if (tab.id !== '급여정산') setSelectedStaffId(null);
                 }}
                 className={`px-4 py-2.5 rounded-[var(--radius-md)] text-[12px] font-bold transition-all flex items-center gap-2 whitespace-nowrap ${activeTab === tab.id
                   ? 'bg-[var(--accent)] text-white shadow-sm scale-[1.02]'
@@ -216,8 +365,8 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: Payr
               <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3 xl:grid-cols-4">
                 <div className="xl:col-span-1 h-fit max-h-[800px] sticky top-4">
                   <PayrollTable
-                    staffs={filtered}
-                    payrollRecords={payrollRecords}
+                    staffs={payrollTableStaffs}
+                    payrollRecords={payrollTableRecords}
                     yearMonth={yearMonth}
                     checkedIds={checkedIds}
                     setCheckedIds={setCheckedIds}
@@ -232,7 +381,9 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: Payr
                   />
                 </div>
                 <div className="xl:col-span-3 space-y-4">
-                  {current && <SalaryDetail staff={current as any} record={currentRecord || null} />}
+                  {currentSalaryDetailStaff && (
+                    <SalaryDetail staff={currentSalaryDetailStaff} record={currentSalaryDetailRecord} />
+                  )}
                   <aside className="grid grid-cols-1 gap-4">
                     {current && <SalaryChangeHistory staffId={String(current.id)} staffName={current.name} />}
                   </aside>
@@ -273,25 +424,25 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: Payr
                 <SalarySimulator />
               </div>
             )}
-            {activeTab === '4대보험EDI' && <InsuranceEDI staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
-            {activeTab === '퇴직연금' && <RetirementPensionManager staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
-            {activeTab === '임금피크제' && <WagePeakCalculator staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
-            {activeTab === '최저임금' && <MinWageChecker staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
-            {activeTab === '통상임금' && <OrdinaryWageCalculator staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
-            {activeTab === '비과세체크' && <TaxFreeLimitChecker staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
-            {activeTab === '총인건비예측' && <TotalLaborCostForecast staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
-            {activeTab === '세전세후' && <GrossNetComparison staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
-            {activeTab === '미지급수당' && <UnpaidAllowanceAlert staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
+            {activeTab === '4대보험EDI' && <InsuranceEDI staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
+            {activeTab === '퇴직연금' && <RetirementPensionManager staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
+            {activeTab === '임금피크제' && <WagePeakCalculator staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
+            {activeTab === '최저임금' && <MinWageChecker staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
+            {activeTab === '통상임금' && <OrdinaryWageCalculator staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
+            {activeTab === '비과세체크' && <TaxFreeLimitChecker staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
+            {activeTab === '총인건비예측' && <TotalLaborCostForecast staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
+            {activeTab === '세전세후' && <GrossNetComparison staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
+            {activeTab === '미지급수당' && <UnpaidAllowanceAlert staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
             {activeTab === '급여고도화' && (
               <PayrollAdvancedCenter
-                staffs={staffs as StaffMember[]}
+                staffs={staffs}
                 selectedCo={selectedCo}
                 yearMonth={yearMonth}
-                payrollRecords={payrollRecords}
+                payrollRecords={payrollAdvancedRecords}
                 onRefresh={onRefresh}
               />
             )}
-            {activeTab === '무급결근차감' && <UnpaidAbsenceDeduction staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
+            {activeTab === '무급결근차감' && <UnpaidAbsenceDeduction staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
           </>
         ) : (
           <div className="h-full flex items-center justify-center bg-[var(--card)] border border-dashed border-[var(--border)] rounded-[var(--radius-xl)] p-5">
@@ -309,7 +460,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: Payr
   );
 }
 
-function RunPayrollWizard({ staffs, selectedCo, onRefresh }: { staffs?: Staff[]; selectedCo?: string; onRefresh?: () => void }) {
+function RunPayrollWizard({ staffs = [], selectedCo, onRefresh }: { staffs?: Staff[]; selectedCo?: string; onRefresh?: () => void }) {
   const [mode, setMode] = useState<'select' | 'regular' | 'interim'>('select');
 
   if (mode === 'regular') {
@@ -318,7 +469,7 @@ function RunPayrollWizard({ staffs, selectedCo, onRefresh }: { staffs?: Staff[];
         <button onClick={() => setMode('select')} className="px-4 py-2 bg-[var(--muted)] text-[var(--foreground)] text-xs font-bold rounded-[var(--radius-md)] hover:bg-[var(--toss-gray-2)] transition-colors">
           ← 마법사 홈으로 돌아가기
         </button>
-        <SalarySettlement staffs={staffs as any} selectedCo={selectedCo ?? ''} onRefresh={onRefresh} />
+        <SalarySettlement staffs={staffs} selectedCo={selectedCo ?? ''} onRefresh={onRefresh} />
       </div>
     );
   }
@@ -329,7 +480,7 @@ function RunPayrollWizard({ staffs, selectedCo, onRefresh }: { staffs?: Staff[];
         <button onClick={() => setMode('select')} className="px-4 py-2 bg-[var(--muted)] text-[var(--foreground)] text-xs font-bold rounded-[var(--radius-md)] hover:bg-[var(--toss-gray-2)] transition-colors">
           ← 마법사 홈으로 돌아가기
         </button>
-        <InterimSettlement staffs={staffs as any} selectedCo={selectedCo} onRefresh={onRefresh} />
+        <InterimSettlement staffs={staffs} selectedCo={selectedCo} onRefresh={onRefresh} />
       </div>
     );
   }
