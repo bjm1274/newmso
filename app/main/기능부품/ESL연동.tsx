@@ -66,12 +66,37 @@ type MobileBlePreflightResult = {
   };
   error?: string;
 };
+type LegacyBleActionResult = {
+  ok: boolean;
+  normalizedBaseUrl?: string;
+  apiCode?: string;
+  storeCode?: string;
+  deviceIds?: string[];
+  requestBody?: unknown;
+  upstream?: unknown;
+  error?: string;
+};
+type LegacyEslApiConfig = {
+  baseUrl: string;
+  apiCode: string;
+  shopCode: string;
+  sign: string;
+  templateId: string;
+};
 
 const ROOM_DRAFT_STORAGE_KEY = 'erp-zhsunyco-room-board-drafts';
 const MOBILE_USERNAME_STORAGE_KEY = 'erp-zhsunyco-mobile-user-name';
+const LEGACY_API_CONFIG_STORAGE_KEY = 'erp-zhsunyco-legacy-esl-api-config';
 const CAMERA_BARCODE_HINT = '카메라를 바코드에 가까이 대고 잠시 멈추면 자동 등록됩니다.';
 const ROOM_BOARD_PREVIEW_SLOT_COUNT = 4;
 const ZHSUNYCO_MOBILE_BASE_URL = 'http://www.zhsunyco.com.cn';
+const DEFAULT_LEGACY_API_CONFIG: LegacyEslApiConfig = {
+  baseUrl: '',
+  apiCode: 'default',
+  shopCode: '',
+  sign: '',
+  templateId: '',
+};
 
 function compareDateKeys(left?: string | null, right?: string | null) {
   return String(left || '').localeCompare(String(right || ''), 'ko-KR', {
@@ -156,6 +181,26 @@ function getBoardPreviewSlots(draft: RoomBoardDraft) {
 function formatPreviewPatientMeta(slot: RoomBoardPatientSlot) {
   const values = [slot.age ? `${slot.age}세` : '', slot.gender].filter(Boolean);
   return values.length > 0 ? values.join(' / ') : '나이 · 성별 미입력';
+}
+
+function buildLegacyDirectProduct(draft: RoomBoardDraft) {
+  const slots = getBoardPreviewSlots(draft);
+  const extend = Object.fromEntries(
+    slots.flatMap((slot, index) => {
+      const valueIndex = index * 2 + 1;
+      return [
+        [`e${String(valueIndex).padStart(3, '0')}`, `${slot.bedNumber}번 ${slot.patientName || '공실'}`],
+        [`e${String(valueIndex + 1).padStart(3, '0')}`, formatPreviewPatientMeta(slot)],
+      ];
+    }),
+  );
+
+  return {
+    pc: draft.roomNumber,
+    pn: slots.map((slot) => `${slot.bedNumber}:${slot.patientName || '공실'}`).join(' / '),
+    pp: draft.patientSlots.filter((slot) => String(slot.patientName || '').trim()).length,
+    extend,
+  };
 }
 
 function stringifyDiagnosticValue(value: unknown) {
@@ -247,6 +292,11 @@ export default function ZhsunycoEslSync(_props: Props) {
   const [mobilePassword, setMobilePassword] = useState('');
   const [mobileBleChecking, setMobileBleChecking] = useState(false);
   const [mobileBlePreflight, setMobileBlePreflight] = useState<MobileBlePreflightResult | null>(null);
+  const [legacyApiConfig, setLegacyApiConfig] = useState<LegacyEslApiConfig>(DEFAULT_LEGACY_API_CONFIG);
+  const [legacyBleSearching, setLegacyBleSearching] = useState(false);
+  const [legacyBleDirectSending, setLegacyBleDirectSending] = useState(false);
+  const [legacyBleSearchResult, setLegacyBleSearchResult] = useState<LegacyBleActionResult | null>(null);
+  const [legacyBleDirectResult, setLegacyBleDirectResult] = useState<LegacyBleActionResult | null>(null);
   const deviceRegistrationInputRef = useRef<HTMLInputElement | null>(null);
   const deviceRegistrationVideoRef = useRef<HTMLVideoElement | null>(null);
   const cameraScanControlsRef = useRef<ScannerControlsLike | null>(null);
@@ -261,6 +311,14 @@ export default function ZhsunycoEslSync(_props: Props) {
       const savedMobileUserName = localStorage.getItem(MOBILE_USERNAME_STORAGE_KEY);
       if (savedMobileUserName) {
         setMobileUserName(savedMobileUserName);
+      }
+
+      const savedLegacyApiConfig = localStorage.getItem(LEGACY_API_CONFIG_STORAGE_KEY);
+      if (savedLegacyApiConfig) {
+        setLegacyApiConfig({
+          ...DEFAULT_LEGACY_API_CONFIG,
+          ...(JSON.parse(savedLegacyApiConfig) as Partial<LegacyEslApiConfig>),
+        });
       }
     } catch {
       // ignore local storage failures
@@ -287,6 +345,14 @@ export default function ZhsunycoEslSync(_props: Props) {
       // ignore local storage failures
     }
   }, [mobileUserName]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LEGACY_API_CONFIG_STORAGE_KEY, JSON.stringify(legacyApiConfig));
+    } catch {
+      // ignore local storage failures
+    }
+  }, [legacyApiConfig]);
 
   const loadRooms = useCallback(async () => {
     setLoadingRooms(true);
@@ -381,6 +447,13 @@ export default function ZhsunycoEslSync(_props: Props) {
       patientSlots: draft.patientSlots.map((slot, slotIndex) => (slotIndex === index ? { ...slot, ...patch } : slot)),
     }));
   }, [updateSelectedDraft]);
+
+  const updateLegacyApiField = useCallback(
+    <Key extends keyof LegacyEslApiConfig,>(key: Key, value: LegacyEslApiConfig[Key]) => {
+      setLegacyApiConfig((prev) => ({ ...prev, [key]: value }));
+    },
+    [],
+  );
 
   const resetSelectedRoomFromSource = useCallback(() => {
     if (!selectedRoom) return;
@@ -575,11 +648,15 @@ export default function ZhsunycoEslSync(_props: Props) {
     if (!nextRoomNumber) return;
     setPreviewRoomNumber(nextRoomNumber);
     setMobileBlePreflight(null);
+    setLegacyBleSearchResult(null);
+    setLegacyBleDirectResult(null);
   }, [selectedRoomNumber]);
 
   const closePreview = useCallback(() => {
     setPreviewRoomNumber('');
     setMobileBlePreflight(null);
+    setLegacyBleSearchResult(null);
+    setLegacyBleDirectResult(null);
   }, []);
 
   const runMobileBlePreflight = useCallback(async (draft: RoomBoardDraft) => {
@@ -638,6 +715,115 @@ export default function ZhsunycoEslSync(_props: Props) {
       setMobileBleChecking(false);
     }
   }, [mobilePassword, mobileUserName]);
+
+  const runLegacyBleSearch = useCallback(async (draft: RoomBoardDraft) => {
+    if (!draft.deviceId.trim()) {
+      toast('기기 바코드를 먼저 등록해 주세요.', 'error');
+      return;
+    }
+
+    if (!legacyApiConfig.baseUrl.trim() || !legacyApiConfig.shopCode.trim() || !legacyApiConfig.sign.trim()) {
+      toast('공식 API 주소, 매장코드, sign 값을 입력해 주세요.', 'error');
+      return;
+    }
+
+    setLegacyBleSearching(true);
+    setLegacyBleSearchResult(null);
+
+    try {
+      const response = await fetch('/api/esl/zhsunyco', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'legacyBleSearch',
+          config: {
+            baseUrl: legacyApiConfig.baseUrl.trim(),
+            shopCode: legacyApiConfig.shopCode.trim(),
+            legacyApiCode: legacyApiConfig.apiCode.trim() || 'default',
+            legacyApiSign: legacyApiConfig.sign.trim(),
+          },
+          payload: {
+            deviceId: draft.deviceId.trim(),
+          },
+        }),
+      });
+
+      const parsed = (await response.json().catch(() => null)) as LegacyBleActionResult | null;
+      if (!response.ok || !parsed?.ok) {
+        throw new Error(parsed?.error || '공식 BLE 검색 요청에 실패했습니다.');
+      }
+
+      setLegacyBleSearchResult(parsed);
+      toast('공식 API로 LED 점멸 요청을 보냈습니다.', 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '공식 BLE 검색 요청에 실패했습니다.';
+      setLegacyBleSearchResult({ ok: false, error: message });
+      toast(message, 'error');
+    } finally {
+      setLegacyBleSearching(false);
+    }
+  }, [legacyApiConfig]);
+
+  const runLegacyBleDirect = useCallback(async (draft: RoomBoardDraft) => {
+    if (!draft.deviceId.trim()) {
+      toast('기기 바코드를 먼저 등록해 주세요.', 'error');
+      return;
+    }
+
+    if (!legacyApiConfig.baseUrl.trim() || !legacyApiConfig.shopCode.trim() || !legacyApiConfig.sign.trim()) {
+      toast('공식 API 주소, 매장코드, sign 값을 입력해 주세요.', 'error');
+      return;
+    }
+
+    const templateId = Number(legacyApiConfig.templateId);
+    if (!Number.isFinite(templateId) || templateId <= 0) {
+      toast('직접 전송용 template ID를 숫자로 입력해 주세요.', 'error');
+      return;
+    }
+
+    setLegacyBleDirectSending(true);
+    setLegacyBleDirectResult(null);
+
+    try {
+      const response = await fetch('/api/esl/zhsunyco', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'legacyBleDirect',
+          config: {
+            baseUrl: legacyApiConfig.baseUrl.trim(),
+            shopCode: legacyApiConfig.shopCode.trim(),
+            legacyApiCode: legacyApiConfig.apiCode.trim() || 'default',
+            legacyApiSign: legacyApiConfig.sign.trim(),
+          },
+          payload: {
+            deviceId: draft.deviceId.trim(),
+            templateId,
+            product: buildLegacyDirectProduct(draft),
+            led: [{ r: 0, g: 100, b: 0, timeOn: 100, time: 5 }],
+          },
+        }),
+      });
+
+      const parsed = (await response.json().catch(() => null)) as LegacyBleActionResult | null;
+      if (!response.ok || !parsed?.ok) {
+        throw new Error(parsed?.error || '공식 BLE 직접 전송 요청에 실패했습니다.');
+      }
+
+      setLegacyBleDirectResult(parsed);
+      toast('공식 API로 즉시 전송을 요청했습니다.', 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '공식 BLE 직접 전송 요청에 실패했습니다.';
+      setLegacyBleDirectResult({ ok: false, error: message });
+      toast(message, 'error');
+    } finally {
+      setLegacyBleDirectSending(false);
+    }
+  }, [legacyApiConfig]);
 
   return (
     <div className="space-y-4">
@@ -940,6 +1126,87 @@ export default function ZhsunycoEslSync(_props: Props) {
                   </button>
                 </div>
 
+                <div className="mt-6 border-t border-[var(--border)] pt-4">
+                  <div className="text-base font-bold text-[var(--foreground)]">공식 ESL API 테스트</div>
+                  <div className="mt-2 text-sm text-[var(--toss-gray-3)]">
+                    문서의 <code>esl_ble/search</code>, <code>esl_ble/direct</code>를 바로 호출합니다. 직접 전송은 템플릿이
+                    <code>pc</code>, <code>pn</code>, <code>pp</code>, <code>e001~e008</code> 필드를 읽도록 맞춰져 있어야 합니다.
+                  </div>
+
+                  <div className="mt-4 grid gap-3">
+                    <label className="space-y-1">
+                      <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">공식 API 주소</span>
+                      <input
+                        value={legacyApiConfig.baseUrl}
+                        onChange={(event) => updateLegacyApiField('baseUrl', event.target.value)}
+                        placeholder="http://127.0.0.1"
+                        className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
+                      />
+                    </label>
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="space-y-1">
+                        <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">API 코드</span>
+                        <input
+                          value={legacyApiConfig.apiCode}
+                          onChange={(event) => updateLegacyApiField('apiCode', event.target.value)}
+                          placeholder="default"
+                          className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
+                        />
+                      </label>
+                      <label className="space-y-1">
+                        <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">매장코드</span>
+                        <input
+                          value={legacyApiConfig.shopCode}
+                          onChange={(event) => updateLegacyApiField('shopCode', event.target.value)}
+                          placeholder="001"
+                          className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="space-y-1">
+                        <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">sign</span>
+                        <input
+                          value={legacyApiConfig.sign}
+                          onChange={(event) => updateLegacyApiField('sign', event.target.value)}
+                          placeholder="80805d794841f1b4"
+                          className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
+                        />
+                      </label>
+                      <label className="space-y-1">
+                        <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">template ID</span>
+                        <input
+                          value={legacyApiConfig.templateId}
+                          onChange={(event) => updateLegacyApiField('templateId', event.target.value)}
+                          placeholder="11"
+                          className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => void runLegacyBleSearch(previewDraft)}
+                        disabled={legacyBleSearching}
+                        className="rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] disabled:opacity-60"
+                      >
+                        {legacyBleSearching ? 'LED 점멸 요청 중...' : 'LED 점멸 확인'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void runLegacyBleDirect(previewDraft)}
+                        disabled={legacyBleDirectSending}
+                        className="rounded-[var(--radius-md)] bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                      >
+                        {legacyBleDirectSending ? '직접 전송 요청 중...' : '직접 전송 테스트'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 {mobileBlePreflight ? (
                   <div className="mt-4 space-y-3">
                     <div
@@ -1088,6 +1355,57 @@ export default function ZhsunycoEslSync(_props: Props) {
                         <div className="mt-1 break-all text-[11px] text-[var(--toss-gray-3)]">
                           {(mobileBlePreflight.browserBle.characteristicUuids || []).join(', ') || '-'}
                         </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {legacyBleSearchResult || legacyBleDirectResult ? (
+                  <div className="mt-4 space-y-3">
+                    {legacyBleSearchResult ? (
+                      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-[12px] font-bold text-[var(--foreground)]">LED 점멸 응답</div>
+                          <div
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              legacyBleSearchResult.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                            }`}
+                          >
+                            {legacyBleSearchResult.ok ? 'OK' : legacyBleSearchResult.error || 'ERROR'}
+                          </div>
+                        </div>
+                        <div className="mt-2 text-[11px] text-[var(--toss-gray-3)]">
+                          {(legacyBleSearchResult.normalizedBaseUrl || '-') +
+                            ' / ' +
+                            (legacyBleSearchResult.storeCode || '-') +
+                            ' / ' +
+                            (legacyBleSearchResult.apiCode || 'default')}
+                        </div>
+                        <pre className="mt-2 max-h-32 overflow-auto rounded-[var(--radius-md)] bg-slate-950 px-3 py-2 text-[11px] text-slate-100">
+                          {stringifyDiagnosticValue(legacyBleSearchResult.upstream || legacyBleSearchResult.error)}
+                        </pre>
+                      </div>
+                    ) : null}
+
+                    {legacyBleDirectResult ? (
+                      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-[12px] font-bold text-[var(--foreground)]">직접 전송 응답</div>
+                          <div
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              legacyBleDirectResult.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                            }`}
+                          >
+                            {legacyBleDirectResult.ok ? 'OK' : legacyBleDirectResult.error || 'ERROR'}
+                          </div>
+                        </div>
+                        <pre className="mt-2 max-h-32 overflow-auto rounded-[var(--radius-md)] bg-slate-950 px-3 py-2 text-[11px] text-slate-100">
+                          {stringifyDiagnosticValue(legacyBleDirectResult.upstream || legacyBleDirectResult.error)}
+                        </pre>
+                        <div className="mt-3 text-[11px] font-bold text-[var(--toss-gray-3)]">전송 payload</div>
+                        <pre className="mt-2 max-h-40 overflow-auto rounded-[var(--radius-md)] bg-slate-950 px-3 py-2 text-[11px] text-slate-100">
+                          {stringifyDiagnosticValue(legacyBleDirectResult.requestBody)}
+                        </pre>
                       </div>
                     ) : null}
                   </div>
