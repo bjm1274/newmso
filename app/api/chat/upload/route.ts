@@ -247,6 +247,7 @@ export async function POST(request: NextRequest) {
         const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
         return NextResponse.json({
           success: true,
+          provider: 'supabase',
           bucket,
           path: filePath,
           fileName: normalizedFileName,
