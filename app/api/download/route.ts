@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isAllowedPublicStorageUrl } from '@/lib/object-storage';
 import { readSessionFromRequest } from '@/lib/server-session';
 
 export const runtime = 'nodejs';
@@ -8,11 +9,16 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 
 /** Supabase Storage URL만 허용 (보안) */
 function isAllowedUrl(url: string): boolean {
-  if (!SUPABASE_URL || !url) return false;
+  if (!url) return false;
   try {
     const parsed = new URL(url);
-    const base = new URL(SUPABASE_URL);
-    return parsed.hostname === base.hostname;
+    if (SUPABASE_URL) {
+      const base = new URL(SUPABASE_URL);
+      if (parsed.hostname === base.hostname) {
+        return true;
+      }
+    }
+    return isAllowedPublicStorageUrl(url);
   } catch {
     return false;
   }

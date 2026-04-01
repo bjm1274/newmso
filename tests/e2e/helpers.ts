@@ -1132,9 +1132,11 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       contentType: 'application/json',
       body: JSON.stringify({
         success: true,
+        provider: 'supabase',
         bucket: 'pchos-files',
         path,
         token: 'mock-upload-token',
+        signedUrl: `http://127.0.0.1:3000/storage/v1/object/sign/pchos-files/${path}?token=mock-upload-token`,
         url: `http://127.0.0.1:3000/storage/v1/object/public/pchos-files/${path}`,
       }),
     });

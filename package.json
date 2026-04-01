@@ -7,11 +7,14 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "migrate:chat-storage-to-r2": "node scripts/migrate-chat-storage-to-r2.mjs",
     "test:e2e": "playwright test --grep-invert @real-db",
     "test:e2e:headed": "playwright test --grep-invert @real-db --headed",
     "test:e2e:real": "playwright test --grep @real-db"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1021.0",
+    "@aws-sdk/s3-request-presigner": "^3.1021.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
