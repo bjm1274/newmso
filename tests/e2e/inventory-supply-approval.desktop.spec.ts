@@ -49,7 +49,7 @@ test("final approval of a supply request creates inventory workflow and notifica
         company: "SY INC.",
         company_id: "support-company-1",
         department: "경영지원팀",
-        created_at: "2026-03-10T09:00:00.000Z",
+        created_at: "2026-04-10T09:00:00.000Z",
       },
     ],
     approvals: [
@@ -65,7 +65,7 @@ test("final approval of a supply request creates inventory workflow and notifica
         current_approver_id: fakeUser.id,
         approver_line: [fakeUser.id],
         status: "대기",
-        created_at: "2026-03-10T09:00:00.000Z",
+        created_at: "2026-04-10T09:00:00.000Z",
         meta_data: {
           items: [
             {
