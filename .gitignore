@@ -45,3 +45,8 @@ vercel.ts
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+tmp_bugreport/
+tmp_bugreport_*/
+tmp_zhsunyco_*
+
