@@ -469,11 +469,41 @@ test('op check workspace guards unsaved changes, supports quick navigation, and 
         company_id: extraFeaturesUser.company_id,
       },
     ],
+    opPatientChecks: [
+      {
+        id: 'op-patient-check-workspace-2',
+        schedule_post_id: 'schedule-post-workspace-2',
+        patient_name: 'Patient Beta',
+        chart_no: 'CH-200',
+        surgery_name: 'Beta Surgery',
+        schedule_date: todayKey,
+        schedule_time: '11:00',
+        schedule_room: 'Room 2',
+        prep_items: [],
+        consumable_items: [],
+        notes: '',
+        status: '준비완료',
+      },
+    ],
   });
 
   await page.getByTestId('op-check-calendar-toggle').click();
   await page.getByTestId('op-check-calendar-day-' + todayKey).click();
   await expect(page.getByTestId('op-check-workspace-modal')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Patient Alpha' }).first()).toBeVisible();
+  await expect(page.getByTestId('op-check-workspace-header-summary')).toBeVisible();
+  await expect(page.getByTestId('op-check-workspace-status-filter-prep-complete')).toContainText('1');
+  const workspaceDetailHeaderPosition = await page
+    .getByTestId('op-check-workspace-detail-header')
+    .evaluate((node) => window.getComputedStyle(node).position);
+  expect(workspaceDetailHeaderPosition).not.toBe('sticky');
+
+  await page.getByTestId('op-check-workspace-status-filter-prep-complete').click();
+  await expect(page.getByRole('heading', { name: 'Patient Beta' }).first()).toBeVisible();
+  await expect(page.getByTestId('op-check-workspace-schedule-card-schedule-post-workspace-1')).toHaveCount(0);
+
+  await page.getByTestId('op-check-workspace-status-filter-reset').click();
+  await page.getByTestId('op-check-workspace-schedule-card-schedule-post-workspace-1').click();
   await expect(page.getByRole('heading', { name: 'Patient Alpha' }).first()).toBeVisible();
 
   await page.getByTestId('op-check-notes-textarea').fill('draft workspace note');
@@ -490,9 +520,11 @@ test('op check workspace guards unsaved changes, supports quick navigation, and 
   await expect(page.getByRole('heading', { name: 'Patient Beta' }).first()).toBeVisible();
 
   await page.getByTestId('op-check-section-toggle-prep').click();
+  await expect(page.getByTestId('op-check-section-toggle-prep')).toContainText('펼치기');
   await expect(page.getByTestId('op-check-section-content-prep')).toHaveCount(0);
   await page.getByTestId('op-check-section-toggle-prep').click();
-  await expect(page.getByTestId('op-check-section-content-prep')).toBeVisible();
+  await expect(page.getByTestId('op-check-section-toggle-prep')).toContainText('접기');
+  await expect(page.getByTestId('op-check-section-content-prep')).toHaveCount(1);
 
   await page.getByTestId('op-check-workspace-close').click();
   await expect(page.getByTestId('op-check-workspace-modal')).toHaveCount(0);
