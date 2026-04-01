@@ -5,6 +5,7 @@ import { resolveApprovalDelegateConfig } from '@/lib/approval-workflow';
 import { calculateApprovedAnnualLeaveUsage } from '@/lib/annual-leave-ledger';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { useLocalDateKey } from '@/lib/use-local-date-key';
 
 interface Props {
   user: Record<string, unknown>;
@@ -124,6 +125,7 @@ export default function RoleDashboard({
   const [teamCount, setTeamCount] = useState(0);
   const [teamCheckedIn, setTeamCheckedIn] = useState(0);
   const [birthdayStaff, setBirthdayStaff] = useState<BirthdayStaffItem[]>([]);
+  const currentDateKey = useLocalDateKey();
 
   const isAdmin = user?.role === 'admin' || user?.company === 'SY INC.' || (user?.permissions as Record<string, unknown>)?.mso;
   const isManager = MANAGER_POSITIONS.includes(user?.position as string);
@@ -146,7 +148,7 @@ export default function RoleDashboard({
           ...(omittedColumns.has('meta_data') ? [] : ['meta_data']),
         ];
 
-        let query = supabase
+        const query = supabase
           .from('approvals')
           .select(selectColumns.join(', '))
           .eq('status', '대기');
@@ -213,12 +215,11 @@ export default function RoleDashboard({
     if (!user?.id) return;
 
     const fetchToday = async () => {
-      const today = new Date().toISOString().slice(0, 10);
       const { data } = await supabase
         .from('attendances')
         .select('check_in_time, check_out_time, status')
         .eq('staff_id', user.id)
-        .eq('work_date', today)
+        .eq('work_date', currentDateKey)
         .maybeSingle();
 
       if (data) {
@@ -361,7 +362,6 @@ export default function RoleDashboard({
       const fetchTeam = async () => {
         if (!user?.department) return;
 
-        const today = new Date().toISOString().slice(0, 10);
         const [{ count: totalCount }, { count: checkedInCount }] = await Promise.all([
           supabase
             .from('staff_members')
@@ -371,7 +371,7 @@ export default function RoleDashboard({
           supabase
             .from('attendances')
             .select('*', { count: 'exact', head: true })
-            .eq('work_date', today)
+            .eq('work_date', currentDateKey)
             .not('check_in_time', 'is', null),
         ]);
 
@@ -383,7 +383,7 @@ export default function RoleDashboard({
       fetchExpiringItems();
       fetchTeam();
     }
-  }, [fetchPending, isAdmin, isManager, user?.department, user?.id]);
+  }, [currentDateKey, fetchPending, isAdmin, isManager, user?.department, user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;

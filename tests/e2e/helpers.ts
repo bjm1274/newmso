@@ -233,6 +233,24 @@ function normalizeComparableValue(value: any) {
   return String(value);
 }
 
+function resolveFilterFieldValue(row: any, key: string) {
+  if (!key.includes('->>')) {
+    return row?.[key];
+  }
+
+  const [baseKey, ...pathSegments] = key.split('->>').map((segment) => segment.trim()).filter(Boolean);
+  let currentValue = row?.[baseKey];
+
+  for (const segment of pathSegments) {
+    if (!currentValue || typeof currentValue !== 'object' || Array.isArray(currentValue)) {
+      return null;
+    }
+    currentValue = currentValue?.[segment];
+  }
+
+  return currentValue;
+}
+
 function parseInValues(raw: string) {
   const inner = raw.slice(4, -1);
   if (!inner) return [];
@@ -251,54 +269,54 @@ function applyQueryFilters(rows: any[], url: URL) {
 
     if (rawValue.startsWith('eq.')) {
       const expected = decodeURIComponent(rawValue.slice(3));
-      filtered = filtered.filter((row) => String(normalizeComparableValue(row[key]) ?? '') === expected);
+      filtered = filtered.filter((row) => String(normalizeComparableValue(resolveFilterFieldValue(row, key)) ?? '') === expected);
       continue;
     }
 
     if (rawValue.startsWith('neq.')) {
       const expected = decodeURIComponent(rawValue.slice(4));
-      filtered = filtered.filter((row) => String(normalizeComparableValue(row[key]) ?? '') !== expected);
+      filtered = filtered.filter((row) => String(normalizeComparableValue(resolveFilterFieldValue(row, key)) ?? '') !== expected);
       continue;
     }
 
     if (rawValue.startsWith('gte.')) {
       const expected = decodeURIComponent(rawValue.slice(4));
-      filtered = filtered.filter((row) => String(normalizeComparableValue(row[key]) ?? '') >= expected);
+      filtered = filtered.filter((row) => String(normalizeComparableValue(resolveFilterFieldValue(row, key)) ?? '') >= expected);
       continue;
     }
 
     if (rawValue.startsWith('gt.')) {
       const expected = decodeURIComponent(rawValue.slice(3));
-      filtered = filtered.filter((row) => String(normalizeComparableValue(row[key]) ?? '') > expected);
+      filtered = filtered.filter((row) => String(normalizeComparableValue(resolveFilterFieldValue(row, key)) ?? '') > expected);
       continue;
     }
 
     if (rawValue.startsWith('lte.')) {
       const expected = decodeURIComponent(rawValue.slice(4));
-      filtered = filtered.filter((row) => String(normalizeComparableValue(row[key]) ?? '') <= expected);
+      filtered = filtered.filter((row) => String(normalizeComparableValue(resolveFilterFieldValue(row, key)) ?? '') <= expected);
       continue;
     }
 
     if (rawValue.startsWith('lt.')) {
       const expected = decodeURIComponent(rawValue.slice(3));
-      filtered = filtered.filter((row) => String(normalizeComparableValue(row[key]) ?? '') < expected);
+      filtered = filtered.filter((row) => String(normalizeComparableValue(resolveFilterFieldValue(row, key)) ?? '') < expected);
       continue;
     }
 
     if (rawValue.startsWith('in.(') && rawValue.endsWith(')')) {
       const expected = parseInValues(rawValue);
-      filtered = filtered.filter((row) => expected.includes(String(normalizeComparableValue(row[key]) ?? '')));
+      filtered = filtered.filter((row) => expected.includes(String(normalizeComparableValue(resolveFilterFieldValue(row, key)) ?? '')));
       continue;
     }
 
     if (rawValue.startsWith('is.')) {
       const expected = rawValue.slice(3);
       if (expected === 'null') {
-        filtered = filtered.filter((row) => row[key] == null);
+        filtered = filtered.filter((row) => resolveFilterFieldValue(row, key) == null);
       } else if (expected === 'not.null') {
-        filtered = filtered.filter((row) => row[key] != null);
+        filtered = filtered.filter((row) => resolveFilterFieldValue(row, key) != null);
       } else {
-        filtered = filtered.filter((row) => String(normalizeComparableValue(row[key]) ?? '') === expected);
+        filtered = filtered.filter((row) => String(normalizeComparableValue(resolveFilterFieldValue(row, key)) ?? '') === expected);
       }
     }
   }
@@ -1491,9 +1509,10 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       }
 
       if (method === 'PATCH') {
-        const targetId = url.searchParams.get('id')?.replace('eq.', '') || null;
-        notifications = markNotificationsRead(notifications, targetId);
-        return json(route, notifications);
+        const body = request.postDataJSON() || {};
+        const { nextRows, updatedRows } = patchRowsMatchingFilters(notifications, url, body);
+        notifications = nextRows;
+        return json(route, wantsObject ? updatedRows[0] ?? null : updatedRows);
       }
 
       if (method === 'POST') {

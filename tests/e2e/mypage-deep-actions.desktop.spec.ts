@@ -178,6 +178,53 @@ test('mypage commute enables today check-in after midnight even when yesterday c
   expect(runtimeErrors).toEqual([]);
 });
 
+test('mypage dashboard refreshes today attendance after midnight when the page stays open', async ({
+  page,
+}) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const dashboardUser = {
+    ...fakeUser,
+    role: 'manager',
+    position: '팀장',
+  };
+
+  await installMutableDateMock(page, '2026-03-30T23:58:00+09:00');
+
+  await mockSupabase(page, {
+    staffMembers: [dashboardUser],
+    attendances: [
+      {
+        id: 'attendances-yesterday-open',
+        staff_id: dashboardUser.id,
+        work_date: '2026-03-30',
+        check_in_time: '2026-03-30T08:17:00',
+        check_out_time: null,
+        status: 'present',
+      },
+    ],
+    approvals: [],
+  });
+
+  await seedSession(page, {
+    user: dashboardUser,
+  });
+
+  await openMyPage(page);
+  const yesterdayAttendanceValue = page.getByTestId('mypage-profile-tab').getByText('08:17');
+  await expect(yesterdayAttendanceValue).toBeVisible();
+
+  await page.evaluate(() => {
+    // @ts-expect-error browser test shim
+    window.__setMockNow('2026-03-31T08:20:00+09:00');
+    window.dispatchEvent(new Event('focus'));
+  });
+
+  await expect
+    .poll(async () => await yesterdayAttendanceValue.count(), { timeout: 4000 })
+    .toBe(0);
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('mypage commute marks check-in as late when the assigned shift start time has passed', async ({
   page,
 }) => {

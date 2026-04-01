@@ -13,6 +13,7 @@ import {
 } from '@/lib/profile-photo';
 import { calculateApprovedAnnualLeaveUsage } from '@/lib/annual-leave-ledger';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
+import { useLocalDateKey } from '@/lib/use-local-date-key';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import type { StaffMember } from '@/types';
 
@@ -1258,6 +1259,7 @@ function sanitizeCommuteSummaryItems(items: Array<{ date?: string | null; status
 
 function LeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record<string, unknown>) {
   const user = (_rawUser ?? {}) as Record<string, unknown>;
+  const currentDateKey = useLocalDateKey();
   const [summary, setSummary] = useState<{
     total: number;
     used: number;
@@ -1325,13 +1327,12 @@ function LeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record<strin
             .limit(60)).data as CommuteStatusRow[] | null) || []
         : [];
 
-      const today = new Date().toISOString().slice(0, 10);
       const todayAttendance: TodayAttendanceStatusRow | null = staffId
         ? ((await supabase
             .from('attendances')
             .select('status')
             .eq('staff_id', staffId)
-            .eq('work_date', today)
+            .eq('work_date', currentDateKey)
             .maybeSingle()).data as TodayAttendanceStatusRow | null)
         : null;
 
@@ -1377,7 +1378,7 @@ function LeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record<strin
     return () => {
       cancelled = true;
     };
-  }, [user?.id, user?.name, user?.employee_no, user?.auth_user_id]);
+  }, [currentDateKey, user?.id, user?.name, user?.employee_no, user?.auth_user_id]);
 
   if (!summary) {
     return (

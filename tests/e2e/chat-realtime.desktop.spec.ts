@@ -519,6 +519,116 @@ test("chat opens a room and re-clicking the room list keeps the view aligned to 
     .toBe(true);
 });
 
+test("chat marks notifications as read when a message arrives in the already open room", async ({ page }) => {
+  await mockSupabase(page, {
+    chatRooms: [
+      {
+        id: "00000000-0000-0000-0000-000000000000",
+        name: "Notice",
+        type: "notice",
+        members: [],
+        created_at: "2026-03-08T00:00:00.000Z",
+        last_message_at: "2026-03-08T00:00:00.000Z",
+      },
+      {
+        id: "room-open-read",
+        name: "Open Read Room",
+        type: "group",
+        members: [fakeUser.id, "peer-open-read"],
+        created_at: "2026-03-08T09:00:00.000Z",
+        last_message_at: "2026-03-08T10:00:00.000Z",
+        last_message_preview: "already here",
+      },
+    ],
+    staffMembers: [
+      fakeUser,
+      {
+        ...fakeUser,
+        id: "peer-open-read",
+        name: "Open Read Peer",
+        employee_no: "E2E-CHAT-321",
+      },
+    ],
+    messages: [
+      {
+        id: "msg-open-read-seed",
+        room_id: "room-open-read",
+        sender_id: fakeUser.id,
+        content: "already here",
+        created_at: "2026-03-08T10:00:00.000Z",
+        is_deleted: false,
+        staff: { name: fakeUser.name, photo_url: null },
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: "\uCC44\uD305",
+      erp_chat_last_room: "room-open-read",
+    },
+  });
+
+  await page.goto(
+    `/main?${new URLSearchParams({ open_menu: "\uCC44\uD305" }).toString()}`,
+  );
+  await expect(page.getByTestId("chat-view")).toBeVisible();
+  await page.getByTestId("chat-room-room-open-read").click();
+  await expect(page.getByTestId("chat-message-input")).toBeVisible();
+
+  await page.evaluate(async (userId) => {
+    await fetch("/rest/v1/notifications", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        id: "notification-chat-open-room-1",
+        user_id: userId,
+        type: "message",
+        title: "Open room unread",
+        body: "This should be marked read immediately",
+        read_at: null,
+        created_at: "2026-03-08T10:01:00.000Z",
+        metadata: {
+          room_id: "room-open-read",
+          id: "msg-open-read-live",
+          message_id: "msg-open-read-live",
+          type: "message",
+        },
+      }),
+    });
+  }, fakeUser.id);
+
+  await page.evaluate(() => {
+    window.dispatchEvent(
+      new CustomEvent("erp-mock-chat-message-insert", {
+        detail: {
+          row: {
+            id: "msg-open-read-live",
+            room_id: "room-open-read",
+            sender_id: "peer-open-read",
+            sender_name: "Open Read Peer",
+            content: "arrived while room was already open",
+            created_at: "2026-03-08T10:01:00.000Z",
+            is_deleted: false,
+          },
+        },
+      }),
+    );
+  });
+
+  await expect
+    .poll(async () => {
+      return page.evaluate(async () => {
+        const response = await fetch("/rest/v1/notifications?id=eq.notification-chat-open-room-1&select=*");
+        const rows = await response.json();
+        return Boolean(rows?.[0]?.read_at);
+      });
+    })
+    .toBe(true);
+});
+
 test("chat global search jumps to the selected message and keeps the query highlighted", async ({ page }) => {
   const longMessages = Array.from({ length: 60 }, (_, index) => ({
     id: `msg-search-${index + 1}`,
