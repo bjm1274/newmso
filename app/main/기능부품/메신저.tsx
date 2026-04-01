@@ -3,6 +3,11 @@ import { toast } from '@/lib/toast';
 import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import {
+  buildInternalStorageDownloadUrl,
+  extractStorageUrlExtension,
+  isInternalStorageObjectUrl,
+} from '@/lib/object-storage-url';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { bindPageRefresh } from '@/lib/realtime-maintenance';
 import {
@@ -33,13 +38,74 @@ const CHAT_ROOM_KEY = 'erp_chat_last_room';
 const CHAT_ACTIVE_ROOM_KEY = 'erp_chat_active_room';
 const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
 const MOBILE_CHAT_MEDIA_QUERY = '(max-width: 767px), (hover: none) and (pointer: coarse)';
+const WARD_MESSAGE_META_PREFIX = '[[WARD_MESSAGE_META]]';
+const WARD_MESSAGE_META_SUFFIX = '[[/WARD_MESSAGE_META]]';
+const WARD_QUICK_REPLY_OPTIONS = [
+  { id: 'confirm', label: '확인 후 올리겠습니다', text: '확인했습니다. 환자 확인 후 올리겠습니다.' },
+  { id: 'delay', label: '준비중으로 지연', text: '현재 환자 준비 중으로 조금 지연되고 있습니다.' },
+  { id: 'moving', label: '이동 시작했습니다', text: '환자 이동 시작했습니다. 곧 올리겠습니다.' },
+  { id: 'after-care', label: '처치 후 올리겠습니다', text: '처치 마무리 후 바로 올리겠습니다.' },
+] as const;
 
 function isMobileChatViewport() {
   return typeof window !== 'undefined' && window.matchMedia(MOBILE_CHAT_MEDIA_QUERY).matches;
 }
 
+type WardMessageMeta = {
+  type?: string;
+  patient_name?: string;
+  chart_no?: string;
+  surgery_name?: string;
+  schedule_room?: string;
+  schedule_time?: string;
+};
+
+function stripHiddenMessageMetaBlocks(value: unknown): string {
+  return String(value || '')
+    .replace(/\[\[SCHEDULE_META\]\][\s\S]*?\[\[\/SCHEDULE_META\]\]/g, '')
+    .replace(/\[\[BOARD_META\]\][\s\S]*?\[\[\/BOARD_META\]\]/g, '')
+    .replace(/\[\[WARD_MESSAGE_META\]\][\s\S]*?\[\[\/WARD_MESSAGE_META\]\]/g, '')
+    .trim();
+}
+
+function extractWardMessageMeta(value: unknown): {
+  displayContent: string;
+  meta: WardMessageMeta | null;
+} {
+  const raw = String(value || '');
+  const start = raw.indexOf(WARD_MESSAGE_META_PREFIX);
+  const end = raw.indexOf(WARD_MESSAGE_META_SUFFIX);
+
+  if (start < 0 || end < 0 || end <= start) {
+    return {
+      displayContent: stripHiddenMessageMetaBlocks(raw),
+      meta: null,
+    };
+  }
+
+  const displayContent = stripHiddenMessageMetaBlocks(
+    `${raw.slice(0, start)}${raw.slice(end + WARD_MESSAGE_META_SUFFIX.length)}`,
+  );
+  const metaText = raw.slice(start + WARD_MESSAGE_META_PREFIX.length, end).trim();
+
+  try {
+    return {
+      displayContent,
+      meta: JSON.parse(metaText) as WardMessageMeta,
+    };
+  } catch {
+    return {
+      displayContent,
+      meta: null,
+    };
+  }
+}
+
 /** 원본 파일명으로 다운로드되도록 프록시 URL 생성 */
 function buildDownloadUrl(fileUrl: string, fileName: string): string {
+  if (isInternalStorageObjectUrl(fileUrl)) {
+    return buildInternalStorageDownloadUrl(fileUrl, fileName);
+  }
   return `/api/download?url=${encodeURIComponent(fileUrl)}&name=${encodeURIComponent(fileName)}`;
 }
 const CHAT_ROOM_PREFS_KEY = 'erp_chat_room_prefs';
@@ -71,12 +137,12 @@ function sortChatRoomsWithNoticeFirst(rooms: ChatRoom[]): ChatRoom[] {
 }
 
 function isImageUrl(url: string): boolean {
-  const ext = url.split('.').pop()?.toLowerCase();
+  const ext = extractStorageUrlExtension(url);
   return /^(jpg|jpeg|png|gif|webp|bmp|svg|heic|heif|avif)$/.test(ext || '');
 }
 
 function isVideoUrl(url: string): boolean {
-  const ext = url.split('.').pop()?.toLowerCase();
+  const ext = extractStorageUrlExtension(url);
   return /^(mp4|webm|mov|m4v|avi|mkv)$/.test(ext || '');
 }
 
@@ -95,8 +161,10 @@ function extractFileNameFromUrl(url: string | null | undefined): string {
   const rawUrl = String(url || '').trim();
   if (!rawUrl) return '첨부파일';
   try {
-    const parsed = new URL(rawUrl);
-    const lastSegment = decodeURIComponent(parsed.pathname.split('/').pop() || '') || '첨부파일';
+    const parsed = new URL(rawUrl, 'https://local-storage-proxy.test');
+    const keyFromQuery = parsed.searchParams.get('key');
+    const source = decodeURIComponent(keyFromQuery || parsed.pathname || '');
+    const lastSegment = decodeURIComponent(source.split('/').pop() || '') || '첨부파일';
     // {타임스탬프}_{UUID}__{원본파일명} 패턴: 원본 파일명 추출
     const withOriginal = lastSegment.match(/^\d+_[0-9a-f-]{36}__(.+)$/i);
     if (withOriginal) return withOriginal[1];
@@ -161,7 +229,7 @@ function getMessageDisplayText(
   fileUrl?: string | null,
   fallback: unknown = ''
 ): string {
-  const rawContent = String(content || '').trim();
+  const rawContent = stripHiddenMessageMetaBlocks(content);
   if (rawContent) return rawContent;
   if (String(fileName || '').trim() || String(fileUrl || '').trim()) {
     return getAttachmentDisplayName(fileName, fileUrl);
@@ -362,6 +430,7 @@ type SendMessageOptions = {
   fileName?: string;
   contentOverride?: string;
   clearComposerIfUnchangedFrom?: string;
+  replyToIdOverride?: string | null;
   albumId?: string | null;
   albumIndex?: number | null;
   albumTotal?: number | null;
@@ -790,6 +859,7 @@ export default function ChatView({
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [editingMessageDraft, setEditingMessageDraft] = useState('');
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [wardQuickReplySendingMessageId, setWardQuickReplySendingMessageId] = useState<string | null>(null);
   const [deliveryStates, setDeliveryStates] = useState<Record<string, DeliveryState>>({});
   const [showScrollToLatest, setShowScrollToLatest] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -836,9 +906,10 @@ export default function ChatView({
   };
 
   const renderMessageContent = (content: string, isMine = false, highlightQuery = '') => {
-    if (!content) return null;
+    const visibleContent = stripHiddenMessageMetaBlocks(content);
+    if (!visibleContent) return null;
     const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const parts = content.split(urlRegex);
+    const parts = visibleContent.split(urlRegex);
     return parts.map((part, i) => {
       if (part.match(urlRegex)) {
         return (
@@ -3661,6 +3732,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     fileName,
     contentOverride,
     clearComposerIfUnchangedFrom,
+    replyToIdOverride,
     albumId,
     albumIndex,
     albumTotal,
@@ -3681,7 +3753,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     const resolvedFileName = retryPayload?.fileName ?? fileName ?? null;
     const resolvedFileSizeBytes = retryPayload?.fileSizeBytes ?? fileSizeBytes ?? null;
     const resolvedFileKind = retryPayload?.fileKind ?? fileKind ?? null;
-    const resolvedReplyToId = retryPayload?.replyToId ?? replyTo?.id ?? null;
+    const resolvedReplyToId =
+      retryPayload?.replyToId ??
+      (typeof replyToIdOverride === 'undefined' ? replyTo?.id ?? null : replyToIdOverride);
     const resolvedAlbumId = retryPayload?.albumId ?? albumId ?? null;
     const resolvedAlbumIndex = retryPayload?.albumIndex ?? albumIndex ?? null;
     const resolvedAlbumTotal = retryPayload?.albumTotal ?? albumTotal ?? null;
@@ -3868,6 +3942,25 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     }
   }, [selectedRoomId, user?.id, user?.name, user?.avatar_url, replyTo, canWriteNotice, scrollToBottom, broadcastChatSync, emitTypingState, triggerChatPush, selectedRoom, visibleRoomIds, insertChatMessage]);
 
+  const sendWardQuickReply = useCallback(
+    async (message: ChatMessage, replyText: string) => {
+      const messageId = String(message.id || '').trim();
+      if (!messageId || wardQuickReplySendingMessageId === messageId) return;
+
+      setWardQuickReplySendingMessageId(messageId);
+      try {
+        await handleSendMessage({
+          contentOverride: replyText,
+          clearComposerIfUnchangedFrom: '__ward-quick-reply__',
+          replyToIdOverride: messageId,
+        });
+      } finally {
+        setWardQuickReplySendingMessageId(null);
+      }
+    },
+    [handleSendMessage, wardQuickReplySendingMessageId],
+  );
+
   const retryFailedMessage = useCallback(async (messageId: string) => {
     await handleSendMessage({ retryMessageId: messageId });
   }, [handleSendMessage]);
@@ -3973,60 +4066,61 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         }),
       });
       const payload = await response.json().catch(() => null) as {
+        provider?: 'supabase' | 'r2';
         bucket?: string;
         path?: string;
         token?: string;
         signedUrl?: string;
         url?: string;
+        headers?: Record<string, string>;
         error?: string;
       } | null;
-      if (!response.ok || !payload?.bucket || !payload?.path || !payload?.token) {
+      if (!response.ok || !payload?.path || !payload?.signedUrl || !payload?.provider) {
         throw new Error(payload?.error || `파일 업로드 준비에 실패했습니다. (HTTP ${response.status})`);
       }
 
-      const uploadClient = supabase.storage.from(payload.bucket) as typeof supabase.storage extends {
-        from: (...args: unknown[]) => infer TStorageClient;
-      }
-        ? TStorageClient & {
-            uploadToSignedUrl?: (
-              path: string,
-              token: string,
-              fileBody: File,
-              options?: Record<string, unknown>,
-            ) => Promise<{ error: { message?: string } | null }>;
-          }
-        : {
-            uploadToSignedUrl?: (
-              path: string,
-              token: string,
-              fileBody: File,
-              options?: Record<string, unknown>,
-            ) => Promise<{ error: { message?: string } | null }>;
-          };
-
-      const needsDirectUpload = typeof uploadClient.uploadToSignedUrl !== 'function';
       let uploadErrorMessage = '';
-      if (!needsDirectUpload && typeof uploadClient.uploadToSignedUrl === 'function') {
-        const uploadResult = await uploadClient.uploadToSignedUrl(payload.path, payload.token, file, {
-          contentType: file.type || 'application/octet-stream',
-          upsert: false,
-          cacheControl: '3600',
-        });
-        uploadErrorMessage = uploadResult.error?.message || '';
+      if (payload.provider === 'supabase' && payload.bucket && payload.token) {
+        const uploadClient = supabase.storage.from(payload.bucket) as typeof supabase.storage extends {
+          from: (...args: unknown[]) => infer TStorageClient;
+        }
+          ? TStorageClient & {
+              uploadToSignedUrl?: (
+                path: string,
+                token: string,
+                fileBody: File,
+                options?: Record<string, unknown>,
+              ) => Promise<{ error: { message?: string } | null }>;
+            }
+          : {
+              uploadToSignedUrl?: (
+                path: string,
+                token: string,
+                fileBody: File,
+                options?: Record<string, unknown>,
+              ) => Promise<{ error: { message?: string } | null }>;
+            };
+
+        if (typeof uploadClient.uploadToSignedUrl === 'function') {
+          const uploadResult = await uploadClient.uploadToSignedUrl(payload.path, payload.token, file, {
+            contentType: file.type || 'application/octet-stream',
+            upsert: false,
+            cacheControl: '3600',
+          });
+          uploadErrorMessage = uploadResult.error?.message || '';
+        }
       }
 
-      if (needsDirectUpload || uploadErrorMessage) {
-        if (!payload.signedUrl) {
-          throw new Error(uploadErrorMessage || 'Storage 직접 업로드에 실패했습니다.');
-        }
-
+      if (payload.provider !== 'supabase' || uploadErrorMessage) {
         const directUploadResponse = await fetch(payload.signedUrl, {
           method: 'PUT',
-          headers: {
-            'content-type': file.type || 'application/octet-stream',
-            'x-upsert': 'false',
-            'cache-control': '3600',
-          },
+          headers: payload.provider === 'r2'
+            ? payload.headers || { 'content-type': file.type || 'application/octet-stream' }
+            : {
+                'content-type': file.type || 'application/octet-stream',
+                'x-upsert': 'false',
+                'cache-control': '3600',
+              },
           body: file,
         });
 
@@ -4036,7 +4130,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       }
 
       const publicUrl =
-        payload.url || supabase.storage.from(payload.bucket).getPublicUrl(payload.path).data.publicUrl;
+        payload.url || (
+          payload.provider === 'supabase' && payload.bucket
+            ? supabase.storage.from(payload.bucket).getPublicUrl(payload.path).data.publicUrl
+            : ''
+        );
       const fileKind = getFileKind(file.type || '');
       return await handleSendMessage({
         fileUrl: publicUrl,
@@ -4054,11 +4152,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       const msg = (err as Error)?.message || String(err);
       const hint = msg.includes('Unauthorized')
         ? '로그인 세션이 만료되었을 수 있습니다. 다시 로그인 후 시도해 주세요.'
-        : msg.includes('버킷') || msg.includes('bucket') || msg.includes('not found')
-          ? 'Supabase Storage에 pchos-files 또는 board-attachments 버킷이 실제로 생성되어 있는지 확인해 주세요.'
+        : msg.includes('버킷') || msg.includes('bucket') || msg.includes('not found') || msg.includes('r2')
+          ? 'Cloudflare R2 설정 또는 Supabase Storage 버킷 구성이 올바른지 확인해 주세요.'
           : msg.includes('413') || msg.toLowerCase().includes('entity too large')
             ? '서버 요청 한도를 초과했습니다. 이 경우 직접 업로드 경로가 반영된 최신 버전으로 다시 실행해 주세요.'
-          : msg;
+            : msg;
       toast(`파일 업로드에 실패했습니다.\n\n${hint}`, 'error');
       return false;
     } finally {
@@ -5360,6 +5458,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 const isSystemInvite = typeof msg.content === 'string' && msg.content.startsWith('[초대]');
                 const systemText = isSystemInvite ? (msg.content as string).replace(/^\[초대\]\s*/, '') : '';
                 const isContinuous = !showDateDivider && !isSystemInvite && String(msg.sender_id) === lastSenderId;
+                const wardMessageMeta = !isDeletedMessage ? extractWardMessageMeta(msg.content) : { displayContent: '', meta: null };
+                const showWardQuickReplies =
+                  !isMine &&
+                  !isDeletedMessage &&
+                  wardMessageMeta.meta?.type === 'op_ward_request';
+                const isWardQuickReplySending = wardQuickReplySendingMessageId === String(msg.id || '');
                 lastSenderId = String(msg.sender_id);
 
                 return (
@@ -5514,6 +5618,33 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             </span>
                           </div>
                         </div>
+                        {showWardQuickReplies && (
+                          <div
+                            data-testid={`chat-ward-quick-replies-${msg.id}`}
+                            className="mt-2 flex max-w-[78%] flex-col gap-1 md:max-w-[72%]"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <p className="px-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                              빠른 응답
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {WARD_QUICK_REPLY_OPTIONS.map((option) => (
+                                <button
+                                  key={option.id}
+                                  type="button"
+                                  data-testid={`chat-ward-quick-reply-${msg.id}-${option.id}`}
+                                  disabled={isWardQuickReplySending}
+                                  onClick={() => {
+                                    void sendWardQuickReply(msg, option.text);
+                                  }}
+                                  className="rounded-full border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)] hover:border-[var(--accent)] hover:bg-[var(--toss-blue-light)] disabled:cursor-wait disabled:opacity-60"
+                                >
+                                  {option.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         {isMine && deliveryStateLabel && (
                           <div className="mt-1 flex flex-wrap items-center justify-end gap-2">
                             <span

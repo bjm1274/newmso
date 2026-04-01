@@ -220,3 +220,82 @@ test('chat still renders room messages when optional message columns are missing
 
   expect(runtimeErrors).toEqual([]);
 });
+
+test('chat shows ward quick replies for received op ward messages and sends the selected reply', async ({
+  page,
+}) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const wardMessageContent =
+    '[수술실 메시지] Ward Patient 환자 (차트: CH-033) 좌측 테스트 수술명 수술 준비가 완료되었습니다.\n' +
+    '환자 처치 후 수술실로 올려주세요.\n' +
+    '수술실:1 / 수술시간:09:00\n' +
+    '[[WARD_MESSAGE_META]]{"type":"op_ward_request","patient_name":"Ward Patient","chart_no":"CH-033","surgery_name":"좌측 테스트 수술명","schedule_room":"1","schedule_time":"09:00"}[[/WARD_MESSAGE_META]]';
+
+  await mockSupabase(page, {
+    staffMembers: [fakeUser, peerOne],
+    chatRooms: [
+      {
+        id: noticeRoomId,
+        name: '공지메시지',
+        type: 'notice',
+        members: [fakeUser.id],
+        created_at: '2026-03-08T00:00:00.000Z',
+        last_message_at: '2026-03-08T00:00:00.000Z',
+      },
+      {
+        id: 'room-ward-direct',
+        name: '',
+        type: 'direct',
+        members: [fakeUser.id, peerOne.id],
+        created_at: '2026-03-08T09:00:00.000Z',
+        last_message_at: '2026-03-08T10:00:00.000Z',
+        last_message_preview: wardMessageContent,
+        created_by: peerOne.id,
+      },
+    ],
+    messages: [
+      {
+        id: 'msg-ward-request-1',
+        room_id: 'room-ward-direct',
+        sender_id: peerOne.id,
+        content: wardMessageContent,
+        created_at: '2026-03-08T10:00:00.000Z',
+        is_deleted: false,
+        staff: { name: peerOne.name, photo_url: null },
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '\uCC44\uD305',
+      erp_chat_last_room: 'room-ward-direct',
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent('\uCC44\uD305')}`);
+
+  await expect(page.getByTestId('chat-view')).toBeVisible();
+  await expect(page.getByTestId('chat-message-msg-ward-request-1')).toContainText('Ward Patient');
+  await expect(page.getByTestId('chat-message-msg-ward-request-1')).not.toContainText('WARD_MESSAGE_META');
+  await expect(page.getByTestId('chat-ward-quick-replies-msg-ward-request-1')).toBeVisible();
+
+  await page.getByTestId('chat-ward-quick-reply-msg-ward-request-1-confirm').click();
+  await expect(page.getByText('확인했습니다. 환자 확인 후 올리겠습니다.').last()).toBeVisible();
+
+  const persistedMessages = await page.evaluate(async () => {
+    const response = await fetch('/rest/v1/messages?room_id=eq.room-ward-direct&select=*');
+    return response.json();
+  });
+
+  expect(
+    Array.isArray(persistedMessages) &&
+      persistedMessages.some(
+        (message: any) =>
+          String(message?.content || '').includes('확인했습니다. 환자 확인 후 올리겠습니다.') &&
+          String(message?.reply_to_id || '') === 'msg-ward-request-1',
+      ),
+  ).toBeTruthy();
+
+  expect(runtimeErrors).toEqual([]);
+});
