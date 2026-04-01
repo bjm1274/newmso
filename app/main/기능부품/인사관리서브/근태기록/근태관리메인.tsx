@@ -794,7 +794,8 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
 
         {viewMode === 'calendar' && (
           <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl p-4 shadow-sm">
-            <div className="grid grid-cols-7 gap-4">
+            <div className="overflow-x-auto custom-scrollbar -mx-1 px-1">
+            <div className="grid min-w-[560px] grid-cols-7 gap-2 md:gap-4">
               {['일', '월', '화', '수', '목', '금', '토'].map((day, idx) => (
                 <div key={day} className={`text-center text-[12px] font-bold uppercase pb-3 mb-2 border-b border-[var(--border-subtle)] dark:border-zinc-800 ${idx === 0 ? 'text-rose-500' : idx === 6 ? 'text-blue-500' : 'text-[var(--toss-gray-4)]'}`}>{day}</div>
               ))}
@@ -829,6 +830,7 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
                   </div>
                 );
               })}
+            </div>
             </div>
           </div>
         )}
