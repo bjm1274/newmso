@@ -244,7 +244,7 @@ test('inventory walkthrough opens each submenu in order without runtime errors',
   await openInventorySubMenu(page, '이관');
   await expect(page.getByRole('heading', { name: '재고 이관', exact: true })).toBeVisible();
   await expect(page.getByTestId('inventory-transfer-view')).toBeVisible();
-  await page.getByRole('button', { name: '이관 이력' }).click();
+  await page.getByLabel('이력 탭').click();
   await expect(page.getByTestId('inventory-transfer-history')).toBeVisible();
 
   await openInventorySubMenu(page, '발주');

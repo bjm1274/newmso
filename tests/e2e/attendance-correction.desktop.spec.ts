@@ -40,7 +40,7 @@ test('attendance correction submit works with the legacy attendance_corrections 
   await page.getByTestId('sidebar-menu-approval').click();
   await expect(page.getByTestId('approval-view')).toBeVisible();
   await page.getByRole('button', { name: '작성하기' }).click();
-  await page.getByTestId('approval-form-type-8').click();
+  await page.getByRole('button', { name: '출결정정', exact: true }).click();
   await expect(page.getByTestId('attendance-correction-view')).toBeVisible();
 
   await expect(
@@ -94,7 +94,7 @@ test('attendance correction form keeps pending items out of the compose screen a
   await page.getByTestId('sidebar-menu-approval').click();
   await expect(page.getByTestId('approval-view')).toBeVisible();
   await page.getByRole('button', { name: '작성하기' }).click();
-  await page.getByTestId('approval-form-type-8').click();
+  await page.getByRole('button', { name: '출결정정', exact: true }).click();
   await expect(page.getByTestId('attendance-correction-view')).toBeVisible();
 
   await expect(page.getByRole('button', { name: '결재 대기' })).toHaveCount(0);

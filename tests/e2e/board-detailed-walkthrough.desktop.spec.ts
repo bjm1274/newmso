@@ -56,6 +56,37 @@ async function openBoardMenu(page: Page, boardName: string) {
   await expect(page.getByRole('heading', { name: boardName })).toBeVisible();
 }
 
+function parseBoardMonthLabel(label: string) {
+  const match = label.match(/^(\d{4})년 (\d{1,2})월$/);
+  if (!match) {
+    throw new Error(`Unexpected board month label: ${label}`);
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  return year * 12 + month;
+}
+
+async function goToBoardCalendarMonth(page: Page, targetLabel: string) {
+  const boardView = page.getByTestId('board-view');
+  const monthHeading = boardView.getByText(/^\d{4}년 \d{1,2}월$/).first();
+  const targetValue = parseBoardMonthLabel(targetLabel);
+
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    const currentLabel = ((await monthHeading.textContent()) || '').trim();
+    if (currentLabel === targetLabel) {
+      return;
+    }
+
+    const currentValue = parseBoardMonthLabel(currentLabel);
+    await page
+      .getByRole('button', { name: currentValue < targetValue ? '다음달' : '이전달' })
+      .click();
+  }
+
+  throw new Error(`Failed to navigate board calendar to ${targetLabel}`);
+}
+
 test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
 });
@@ -159,7 +190,7 @@ test('schedule post appears on the calendar immediately after registration', asy
   await page.reload();
   await expect(page.getByTestId('board-view')).toBeVisible();
   await openBoardMenu(page, SURGERY_BOARD);
-  await page.getByRole('button', { name: '\uB2E4\uC74C\uB2EC' }).click();
+  await goToBoardCalendarMonth(page, '2026년 4월');
   await expect(page.getByText('2026\uB144 4\uC6D4')).toBeVisible();
   await expect(page.getByTestId('board-calendar-day-count-2026-04-15')).toHaveText('1\uAC74');
 
@@ -203,7 +234,7 @@ test('mri schedule survives refresh and keeps contrast flag', async ({ page }) =
   await page.reload();
   await expect(page.getByTestId('board-view')).toBeVisible();
   await openBoardMenu(page, MRI_BOARD);
-  await page.getByRole('button', { name: '\uB2E4\uC74C\uB2EC' }).click();
+  await goToBoardCalendarMonth(page, '2026년 4월');
   await expect(page.getByText('2026\uB144 4\uC6D4')).toBeVisible();
   await expect(page.getByTestId('board-calendar-day-count-2026-04-18')).toHaveText('1\uAC74');
   await page.getByTestId('board-calendar-day-count-2026-04-18').click();

@@ -563,11 +563,12 @@ function AttachmentListCard({
   className = '',
 }: AttachmentListCardProps) {
   const isClickable = typeof onActivate === 'function';
+  const bubbleAlignmentClass = tone === 'accent' ? 'items-end text-right' : 'items-start text-left';
 
   if (layout === 'bubble') {
     if (kind === 'image') {
       return (
-        <div className={`space-y-1 ${className}`}>
+        <div className={`inline-flex max-w-full flex-col gap-1 ${bubbleAlignmentClass} ${className}`}>
           <div className="relative group inline-block">
             <button
               type="button"
@@ -599,7 +600,7 @@ function AttachmentListCard({
 
     if (kind === 'video') {
       return (
-        <div className={`space-y-1 ${className}`}>
+        <div className={`inline-flex max-w-full flex-col gap-1 ${bubbleAlignmentClass} ${className}`}>
           <video controls className="max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] bg-black border border-[var(--border)]">
             <source src={url} />
           </video>
@@ -619,7 +620,7 @@ function AttachmentListCard({
 
     return (
       <div
-        className={`p-3 rounded-[var(--radius-md)] border shadow-sm min-w-0 sm:min-w-[200px] ${
+        className={`inline-flex max-w-full min-w-0 flex-col p-3 rounded-[var(--radius-md)] border shadow-sm sm:min-w-[200px] ${
           tone === 'accent'
             ? 'bg-white/95 border-white/40 text-slate-900'
             : 'bg-[var(--toss-gray-0)] border-[var(--border)] text-[var(--foreground)]'
@@ -5440,9 +5441,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   const timeStr = created.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
 
                   return (
-                    <div key={`album-${albumItem.album_id || albumItem.id}`} className={showDateDivider ? 'mt-1 md:mt-2' : 'mt-0.5'}>
+                    <div key={`album-${albumItem.album_id || albumItem.id}`} className={showDateDivider ? 'mt-0.5 md:mt-1' : 'mt-[2px]'}>
                       {showDateDivider && (
-                        <div className="my-0.5 flex items-center justify-center gap-1 md:my-2 md:gap-2">
+                        <div className="my-0.5 flex items-center justify-center gap-1 md:my-1 md:gap-2">
                           <div className="flex-1 h-px bg-[var(--border)]" />
                           <span className="px-2.5 py-0.5 rounded-full bg-[var(--muted)] text-[10px] font-semibold text-[var(--toss-gray-3)] shrink-0">{dateLabel}</span>
                           <div className="flex-1 h-px bg-[var(--border)]" />
@@ -5550,9 +5551,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 lastSenderId = String(msg.sender_id);
 
                 return (
-                  <div key={msg.id} data-testid={`chat-message-row-${msg.id}`} className={isContinuous ? 'mt-0.5' : 'mt-1 md:mt-2'}>
+                  <div key={msg.id} data-testid={`chat-message-row-${msg.id}`} className={isContinuous ? 'mt-[2px]' : 'mt-0.5 md:mt-1'}>
                     {showDateDivider && (
-                      <div className="my-0.5 flex items-center justify-center gap-1 md:my-2 md:gap-2">
+                      <div className="my-0.5 flex items-center justify-center gap-1 md:my-1 md:gap-2">
                         <div className="flex-1 h-px bg-[var(--border)]" />
                         <span className="px-2.5 py-0.5 rounded-full bg-[var(--muted)] text-[10px] font-semibold text-[var(--toss-gray-3)] shrink-0">
                           {dateLabel}
@@ -5766,7 +5767,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           </p>
                         )}
                         <div
-                          className={`mt-0.5 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:opacity-100 ${isMine ? 'flex-row-reverse' : ''}`}
+                          className={`flex items-center gap-1 overflow-hidden opacity-0 pointer-events-none transition-all max-h-0 ${isMine ? 'flex-row-reverse' : ''} group-hover:mt-0.5 group-hover:max-h-10 group-hover:opacity-100 group-hover:pointer-events-auto [@media(hover:none)]:mt-0.5 [@media(hover:none)]:max-h-10 [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto`}
                           onClick={e => e.stopPropagation()}
                         >
                           <button
