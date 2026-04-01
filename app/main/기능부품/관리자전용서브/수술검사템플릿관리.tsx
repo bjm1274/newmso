@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import OperationCheckView from '../OP체크';
 
 type Template = {
   id: string;
@@ -25,7 +26,12 @@ const BODY_PARTS = [
   { id: 'other', label: '기타' },
 ];
 
-export default function SurgeryExamTemplateManager() {
+type SurgeryExamTemplateManagerProps = {
+  user?: unknown;
+};
+
+export default function SurgeryExamTemplateManager({ user }: SurgeryExamTemplateManagerProps) {
+  const [activeTab, setActiveTab] = useState<'catalogs' | 'opCheck'>('catalogs');
   const [surgeryTemplates, setSurgeryTemplates] = useState<Template[]>([]);
   const [mriTemplates, setMriTemplates] = useState<Template[]>([]);
   const [newSurgeryName, setNewSurgeryName] = useState('');
@@ -125,171 +131,201 @@ export default function SurgeryExamTemplateManager() {
   };
 
   return (
-    <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 shadow-sm space-y-4">
-      <h2 className="text-base font-semibold text-[var(--foreground)] tracking-tight mb-2">
-        수술 · 검사명 템플릿 관리
-      </h2>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* 수술 템플릿 */}
-        <section className="space-y-3">
-          <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
-            <span className="text-lg">🏥</span>
-            수술명 템플릿
-          </h3>
-          <div className="space-y-2">
-            <div className="flex items-center gap-3 p-2 bg-[var(--muted)] rounded-[var(--radius-lg)] border border-[var(--border)]">
-              <span className="text-[11px] font-semibold text-[var(--toss-gray-4)] shrink-0">부위 선택</span>
-              <select
-                value={newSurgeryPart}
-                onChange={(e) => setNewSurgeryPart(e.target.value)}
-                className="px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] text-xs font-bold bg-[var(--card)] min-w-[160px]"
-              >
-                {BODY_PARTS.map((p) => (
-                  <option key={p.id} value={p.id}>{p.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex gap-2">
-              <input
-                value={newSurgeryName}
-                onChange={(e) => setNewSurgeryName(e.target.value)}
-                placeholder="예: 전방십자인대 재건술"
-                className="flex-1 px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] text-xs font-bold"
-              />
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => addTemplate('surgery')}
-                className="px-4 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-[11px] font-semibold disabled:opacity-50"
-              >
-                추가
-              </button>
-            </div>
-          </div>
-          <div className="border border-[var(--border)] rounded-[var(--radius-md)] p-3 max-h-64 overflow-y-auto custom-scrollbar space-y-1 bg-[var(--muted)]/40">
-            {surgeryTemplates.length === 0 ? (
-              <p className="text-[11px] text-[var(--toss-gray-3)] font-bold text-center py-4">
-                등록된 수술명 템플릿이 없습니다.
-              </p>
-            ) : (
-              surgeryTemplates.map((t) => (
-                <div
-                  key={t.id}
-                  className="flex items-center justify-between gap-2 px-3 py-2 rounded-[var(--radius-md)] bg-[var(--card)] border border-[var(--border)] text-[11px]"
-                >
-                  <span
-                    className={`flex-1 truncate font-bold ${
-                      t.is_active ? 'text-[var(--foreground)]' : 'text-[var(--toss-gray-3)] line-through'
-                    }`}
-                  >
-                    {t.name}
-                    {t.body_part && (
-                      <span className="ml-1.5 text-[11px] font-normal text-[var(--toss-gray-3)]">
-                        ({BODY_PARTS.find((p) => p.id === t.body_part)?.label ?? t.body_part})
-                      </span>
-                    )}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => toggleActive('surgery', t)}
-                    className="px-2 py-1 rounded-[var(--radius-md)] text-[11px] font-semibold border border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
-                  >
-                    {t.is_active ? '숨기기' : '보이기'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeTemplate('surgery', t.id)}
-                    className="px-2 py-1 rounded-[var(--radius-md)] text-[11px] font-semibold text-red-500 hover:bg-red-500/10"
-                  >
-                    삭제
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
-
-        {/* MRI 템플릿 */}
-        <section className="space-y-3">
-          <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
-            <span className="text-lg">🔬</span>
-            MRI 검사명 템플릿
-          </h3>
-          <div className="space-y-2">
-            <div className="flex items-center gap-3 p-2 bg-[var(--muted)] rounded-[var(--radius-lg)] border border-[var(--border)]">
-              <span className="text-[11px] font-semibold text-[var(--toss-gray-4)] shrink-0">부위 선택</span>
-              <select
-                value={newMriPart}
-                onChange={(e) => setNewMriPart(e.target.value)}
-                className="px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] text-xs font-bold bg-[var(--card)] min-w-[160px]"
-              >
-                {BODY_PARTS.map((p) => (
-                  <option key={p.id} value={p.id}>{p.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex gap-2">
-              <input
-                value={newMriName}
-                onChange={(e) => setNewMriName(e.target.value)}
-                placeholder="예: 요추부 MRI"
-                className="flex-1 px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] text-xs font-bold"
-              />
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => addTemplate('mri')}
-                className="px-4 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-[11px] font-semibold disabled:opacity-50"
-              >
-                추가
-              </button>
-            </div>
-          </div>
-          <div className="border border-[var(--border)] rounded-[var(--radius-md)] p-3 max-h-64 overflow-y-auto custom-scrollbar space-y-1 bg-[var(--muted)]/40">
-            {mriTemplates.length === 0 ? (
-              <p className="text-[11px] text-[var(--toss-gray-3)] font-bold text-center py-4">
-                등록된 검사명 템플릿이 없습니다.
-              </p>
-            ) : (
-              mriTemplates.map((t) => (
-                <div
-                  key={t.id}
-                  className="flex items-center justify-between gap-2 px-3 py-2 rounded-[var(--radius-md)] bg-[var(--card)] border border-[var(--border)] text-[11px]"
-                >
-                  <span
-                    className={`flex-1 truncate font-bold ${
-                      t.is_active ? 'text-[var(--foreground)]' : 'text-[var(--toss-gray-3)] line-through'
-                    }`}
-                  >
-                    {t.name}
-                    {t.body_part && (
-                      <span className="ml-1.5 text-[11px] font-normal text-[var(--toss-gray-3)]">
-                        ({BODY_PARTS.find((p) => p.id === t.body_part)?.label ?? t.body_part})
-                      </span>
-                    )}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => toggleActive('mri', t)}
-                    className="px-2 py-1 rounded-[var(--radius-md)] text-[11px] font-semibold border border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
-                  >
-                    {t.is_active ? '숨기기' : '보이기'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeTemplate('mri', t.id)}
-                    className="px-2 py-1 rounded-[var(--radius-md)] text-[11px] font-semibold text-red-500 hover:bg-red-500/10"
-                  >
-                    삭제
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
+    <div className="space-y-4">
+      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm">
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => setActiveTab('catalogs')}
+            className={`rounded-[var(--radius-md)] px-4 py-2 text-[11px] font-bold transition-all ${
+              activeTab === 'catalogs'
+                ? 'bg-[var(--accent)] text-white shadow-sm'
+                : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
+            }`}
+          >
+            수술 · 검사명 템플릿
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('opCheck')}
+            className={`rounded-[var(--radius-md)] px-4 py-2 text-[11px] font-bold transition-all ${
+              activeTab === 'opCheck'
+                ? 'bg-[var(--accent)] text-white shadow-sm'
+                : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
+            }`}
+          >
+            OP체크 템플릿
+          </button>
+        </div>
       </div>
+
+      {activeTab === 'catalogs' ? (
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 shadow-sm space-y-4">
+          <h2 className="text-base font-semibold text-[var(--foreground)] tracking-tight mb-2">
+            수술 · 검사명 템플릿 관리
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
+                <span className="text-lg">🏥</span>
+                수술명 템플릿
+              </h3>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 p-2 bg-[var(--muted)] rounded-[var(--radius-lg)] border border-[var(--border)]">
+                  <span className="text-[11px] font-semibold text-[var(--toss-gray-4)] shrink-0">부위 선택</span>
+                  <select
+                    value={newSurgeryPart}
+                    onChange={(e) => setNewSurgeryPart(e.target.value)}
+                    className="px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] text-xs font-bold bg-[var(--card)] min-w-[160px]"
+                  >
+                    {BODY_PARTS.map((p) => (
+                      <option key={p.id} value={p.id}>{p.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    value={newSurgeryName}
+                    onChange={(e) => setNewSurgeryName(e.target.value)}
+                    placeholder="예: 전방십자인대 재건술"
+                    className="flex-1 px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] text-xs font-bold"
+                  />
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => addTemplate('surgery')}
+                    className="px-4 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-[11px] font-semibold disabled:opacity-50"
+                  >
+                    추가
+                  </button>
+                </div>
+              </div>
+              <div className="border border-[var(--border)] rounded-[var(--radius-md)] p-3 max-h-64 overflow-y-auto custom-scrollbar space-y-1 bg-[var(--muted)]/40">
+                {surgeryTemplates.length === 0 ? (
+                  <p className="text-[11px] text-[var(--toss-gray-3)] font-bold text-center py-4">
+                    등록된 수술명 템플릿이 없습니다.
+                  </p>
+                ) : (
+                  surgeryTemplates.map((t) => (
+                    <div
+                      key={t.id}
+                      className="flex items-center justify-between gap-2 px-3 py-2 rounded-[var(--radius-md)] bg-[var(--card)] border border-[var(--border)] text-[11px]"
+                    >
+                      <span
+                        className={`flex-1 truncate font-bold ${
+                          t.is_active ? 'text-[var(--foreground)]' : 'text-[var(--toss-gray-3)] line-through'
+                        }`}
+                      >
+                        {t.name}
+                        {t.body_part && (
+                          <span className="ml-1.5 text-[11px] font-normal text-[var(--toss-gray-3)]">
+                            ({BODY_PARTS.find((p) => p.id === t.body_part)?.label ?? t.body_part})
+                          </span>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => toggleActive('surgery', t)}
+                        className="px-2 py-1 rounded-[var(--radius-md)] text-[11px] font-semibold border border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
+                      >
+                        {t.is_active ? '숨기기' : '보이기'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeTemplate('surgery', t.id)}
+                        className="px-2 py-1 rounded-[var(--radius-md)] text-[11px] font-semibold text-red-500 hover:bg-red-500/10"
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
+                <span className="text-lg">🔬</span>
+                MRI 검사명 템플릿
+              </h3>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 p-2 bg-[var(--muted)] rounded-[var(--radius-lg)] border border-[var(--border)]">
+                  <span className="text-[11px] font-semibold text-[var(--toss-gray-4)] shrink-0">부위 선택</span>
+                  <select
+                    value={newMriPart}
+                    onChange={(e) => setNewMriPart(e.target.value)}
+                    className="px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] text-xs font-bold bg-[var(--card)] min-w-[160px]"
+                  >
+                    {BODY_PARTS.map((p) => (
+                      <option key={p.id} value={p.id}>{p.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    value={newMriName}
+                    onChange={(e) => setNewMriName(e.target.value)}
+                    placeholder="예: 요추부 MRI"
+                    className="flex-1 px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] text-xs font-bold"
+                  />
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => addTemplate('mri')}
+                    className="px-4 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-[11px] font-semibold disabled:opacity-50"
+                  >
+                    추가
+                  </button>
+                </div>
+              </div>
+              <div className="border border-[var(--border)] rounded-[var(--radius-md)] p-3 max-h-64 overflow-y-auto custom-scrollbar space-y-1 bg-[var(--muted)]/40">
+                {mriTemplates.length === 0 ? (
+                  <p className="text-[11px] text-[var(--toss-gray-3)] font-bold text-center py-4">
+                    등록된 검사명 템플릿이 없습니다.
+                  </p>
+                ) : (
+                  mriTemplates.map((t) => (
+                    <div
+                      key={t.id}
+                      className="flex items-center justify-between gap-2 px-3 py-2 rounded-[var(--radius-md)] bg-[var(--card)] border border-[var(--border)] text-[11px]"
+                    >
+                      <span
+                        className={`flex-1 truncate font-bold ${
+                          t.is_active ? 'text-[var(--foreground)]' : 'text-[var(--toss-gray-3)] line-through'
+                        }`}
+                      >
+                        {t.name}
+                        {t.body_part && (
+                          <span className="ml-1.5 text-[11px] font-normal text-[var(--toss-gray-3)]">
+                            ({BODY_PARTS.find((p) => p.id === t.body_part)?.label ?? t.body_part})
+                          </span>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => toggleActive('mri', t)}
+                        className="px-2 py-1 rounded-[var(--radius-md)] text-[11px] font-semibold border border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
+                      >
+                        {t.is_active ? '숨기기' : '보이기'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeTemplate('mri', t.id)}
+                        className="px-2 py-1 rounded-[var(--radius-md)] text-[11px] font-semibold text-red-500 hover:bg-red-500/10"
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+          </div>
+        </div>
+      ) : (
+        <OperationCheckView user={user as any} viewMode="templates" title="OP체크 템플릿" />
+      )}
     </div>
   );
 }
-

@@ -30,6 +30,7 @@ const WARD_MESSAGE_RECENTS_STORAGE_PREFIX = 'erp_op_check_ward_message_recents';
 type ScheduleStatus = (typeof STATUS_OPTIONS)[number];
 
 type TemplateScope = 'surgery' | 'anesthesia';
+type OpCheckViewMode = 'patients' | 'templates';
 type WorkspaceSortKey = 'time' | 'status' | 'room' | 'name';
 type WorkspaceSectionKey = 'prep' | 'consumable' | 'notes';
 
@@ -275,6 +276,8 @@ function stripHiddenMetaBlocks(value: unknown) {
     .replace(/\[\[SCHEDULE_META\]\][\s\S]*?\[\[\/SCHEDULE_META\]\]/g, '')
     .replace(/\[\[BOARD_META\]\][\s\S]*?\[\[\/BOARD_META\]\]/g, '')
     .replace(/\[\[WARD_MESSAGE_META\]\][\s\S]*?\[\[\/WARD_MESSAGE_META\]\]/g, '')
+    .replace(/\[\[(?:SCHEDULE_META|BOARD_META|WARD_MESSAGE_META)\]\][\s\S]*$/g, '')
+    .replace(/\s{2,}/g, ' ')
     .trim();
 }
 
@@ -765,13 +768,18 @@ export default function OperationCheckView({
   staffs,
   selectedCo,
   selectedCompanyId,
+  viewMode = 'patients',
+  title,
 }: {
   user?: OpCheckViewUser | null;
   staffs?: StaffMember[];
   selectedCo?: string | null;
   selectedCompanyId?: string | null;
+  viewMode?: OpCheckViewMode;
+  title?: string;
 }) {
-  const [activeTab, setActiveTab] = useState<'patients' | 'templates'>('patients');
+  const activeTab: OpCheckViewMode = viewMode === 'templates' ? 'templates' : 'patients';
+  const headerTitle = title || (activeTab === 'templates' ? 'OP체크 템플릿' : 'OP체크');
   const [loading, setLoading] = useState(true);
   const [savingCheck, setSavingCheck] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
@@ -1333,7 +1341,7 @@ export default function OperationCheckView({
           id: String(existingCheck.id || ''),
           schedule_post_id: schedule.id,
           patient_name: schedule.patient_name,
-          chart_no: String(existingCheck.chart_no || schedule.chart_no || '').trim(),
+          chart_no: stripHiddenMetaBlocks(existingCheck.chart_no || schedule.chart_no || ''),
           surgery_name: schedule.surgery_name,
           surgery_template_id: String(existingCheck.surgery_template_id || matchedSurgeryTemplate?.id || '').trim(),
           anesthesia_type: existingAnesthesiaType,
@@ -1357,7 +1365,7 @@ export default function OperationCheckView({
         id: null,
         schedule_post_id: schedule.id,
         patient_name: schedule.patient_name,
-        chart_no: schedule.chart_no,
+        chart_no: stripHiddenMetaBlocks(schedule.chart_no),
         surgery_name: schedule.surgery_name,
         surgery_template_id: String(matchedSurgeryTemplate?.id || '').trim(),
         anesthesia_type: '',
@@ -1568,6 +1576,9 @@ export default function OperationCheckView({
   const workspaceVisibleScheduleCount = workspaceSchedules.length;
   const workspaceSelectedOrderLabel =
     workspaceSelectedIndex >= 0 ? `${workspaceSelectedIndex + 1} / ${workspaceVisibleScheduleCount}` : `0 / ${workspaceVisibleScheduleCount}`;
+  const workspaceDisplayChartNo = stripHiddenMetaBlocks(checkForm?.chart_no);
+  const workspaceDisplayScheduleTime = stripHiddenMetaBlocks(checkForm?.schedule_time || '미정') || '미정';
+  const workspaceDisplayScheduleRoom = stripHiddenMetaBlocks(checkForm?.schedule_room || '미정') || '미정';
 
   const prepSummaryText = useMemo(
     () => (checkForm ? summarizeChecklistItems(checkForm.prep_items) : '등록된 항목 없음'),
@@ -1698,17 +1709,6 @@ export default function OperationCheckView({
     if (!nextSchedule) return;
     handleScheduleSelection(nextSchedule, true);
   }, [filteredSchedules, getPreferredScheduleForDate, handleScheduleSelection, selectedDate, selectedDateSchedules, selectedSchedule]);
-
-  const handleTabChange = useCallback(
-    (nextTab: 'patients' | 'templates') => {
-      if (nextTab === activeTab) return;
-      if (activeTab === 'patients' && nextTab !== 'patients' && !confirmWorkspaceTransition('템플릿 설정으로 이동하기')) {
-        return;
-      }
-      setActiveTab(nextTab);
-    },
-    [activeTab, confirmWorkspaceTransition],
-  );
 
   useEffect(() => {
     if (!dayWorkspaceOpen || activeTab !== 'patients' || typeof window === 'undefined') return;
@@ -2048,7 +2048,6 @@ export default function OperationCheckView({
       notes: String(template.notes || '').trim(),
       is_active: template.is_active !== false,
     });
-    setActiveTab('templates');
   }, []);
 
   const quickStatusChange = useCallback(async (newStatus: string) => {
@@ -2690,6 +2689,8 @@ export default function OperationCheckView({
             const currentStatus = String(savedRow?.status || '준비중');
             const selected = post.id === selectedScheduleId;
             const isRowLayout = layout === 'row';
+            const displayChartNo = stripHiddenMetaBlocks(post.chart_no);
+            const displayScheduleRoom = stripHiddenMetaBlocks(post.schedule_room || '');
             const statusAccentClass =
               isRowLayout
                 ? currentStatus === '수술중'
@@ -2765,8 +2766,8 @@ export default function OperationCheckView({
                     isRowLayout ? 'mt-2 text-[10px]' : 'mt-1.5 text-[11px]'
                   }`}
                 >
-                  <span>{post.schedule_room || '방 미정'}</span>
-                  {post.chart_no ? <span>· 차트 {post.chart_no}</span> : null}
+                  <span>{displayScheduleRoom || '방 미정'}</span>
+                  {displayChartNo ? <span>· 차트 {displayChartNo}</span> : null}
                   {post.surgery_fasting ? (
                     <span
                       className={`rounded-[var(--radius-md)] bg-rose-50 font-bold text-rose-600 ${
@@ -2794,14 +2795,14 @@ export default function OperationCheckView({
   ) : (
     <div
       data-testid="op-check-workspace-detail-header"
-      className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm"
+      className="self-start rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-2.5 shadow-sm"
     >
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2.5">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-lg font-bold text-[var(--foreground)]">{checkForm.patient_name}</h3>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <h3 className="text-[17px] font-bold text-[var(--foreground)]">{checkForm.patient_name}</h3>
             <span
-              className={`rounded-[var(--radius-md)] px-2 py-0.5 text-[11px] font-bold ${
+              className={`rounded-[var(--radius-md)] px-1.5 py-0.5 text-[10px] font-bold ${
                 checkForm.status === '수술중'
                   ? 'bg-orange-100 text-orange-700'
                   : checkForm.status === '완료'
@@ -2813,52 +2814,52 @@ export default function OperationCheckView({
             >
               {checkForm.status}
             </span>
-            <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2 py-0.5 text-[11px] font-bold text-[var(--toss-gray-4)]">
+            <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--toss-gray-4)]">
               작업 순서 {workspaceSelectedOrderLabel}
             </span>
             {checkFormIsDirty ? (
               <span
                 data-testid="op-check-workspace-dirty-indicator"
-                className="rounded-[var(--radius-md)] bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800"
+                className="rounded-[var(--radius-md)] bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800"
               >
                 미저장
               </span>
             ) : null}
             {selectedScheduleHiddenByFilters ? (
-              <span className="rounded-[var(--radius-md)] bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-600">
+              <span className="rounded-[var(--radius-md)] bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-600">
                 필터 숨김
               </span>
             ) : null}
           </div>
-          <p className="mt-1 truncate text-[13px] font-medium text-[var(--toss-gray-3)]">{checkForm.surgery_name}</p>
+          <p className="mt-1 truncate text-[12px] font-medium text-[var(--toss-gray-3)]">{checkForm.surgery_name}</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-1.5">
-          <div className="rounded-[var(--radius-md)] bg-[var(--muted)]/35 px-2.5 py-2">
-            <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">수술 시간</p>
-            <p className="mt-1 text-sm font-bold text-[var(--foreground)]">{checkForm.schedule_time || '미정'}</p>
+        <div className="grid grid-cols-2 gap-1">
+          <div className="rounded-[var(--radius-md)] bg-[var(--muted)]/35 px-2 py-1.5">
+            <p className="text-[9px] font-semibold text-[var(--toss-gray-3)]">수술 시간</p>
+            <p className="mt-0.5 text-[13px] font-bold text-[var(--foreground)]">{workspaceDisplayScheduleTime}</p>
           </div>
-          <div className="rounded-[var(--radius-md)] bg-[var(--muted)]/35 px-2.5 py-2">
-            <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">수술실</p>
-            <p className="mt-1 text-sm font-bold text-[var(--foreground)]">{checkForm.schedule_room || '미정'}</p>
+          <div className="rounded-[var(--radius-md)] bg-[var(--muted)]/35 px-2 py-1.5">
+            <p className="text-[9px] font-semibold text-[var(--toss-gray-3)]">수술실</p>
+            <p className="mt-0.5 text-[13px] font-bold text-[var(--foreground)]">{workspaceDisplayScheduleRoom}</p>
           </div>
-          <div className="rounded-[var(--radius-md)] bg-[var(--muted)]/35 px-2.5 py-2">
-            <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">차트번호</p>
-            <p className="mt-1 truncate text-sm font-bold text-[var(--foreground)]">{checkForm.chart_no || '-'}</p>
+          <div className="rounded-[var(--radius-md)] bg-[var(--muted)]/35 px-2 py-1.5">
+            <p className="text-[9px] font-semibold text-[var(--toss-gray-3)]">차트번호</p>
+            <p className="mt-0.5 truncate text-[13px] font-bold text-[var(--foreground)]">{workspaceDisplayChartNo || '-'}</p>
           </div>
-          <div className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)]/70 px-2.5 py-2">
-            <p className="text-[10px] font-semibold text-[var(--accent)]">당일 현황</p>
-            <p className="mt-1 text-sm font-bold text-[var(--accent)]">{workspaceSelectedOrderLabel}</p>
+          <div className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)]/70 px-2 py-1.5">
+            <p className="text-[9px] font-semibold text-[var(--accent)]">당일 현황</p>
+            <p className="mt-0.5 text-[13px] font-bold text-[var(--accent)]">{workspaceSelectedOrderLabel}</p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-end gap-1">
           <button
             type="button"
             data-testid="op-check-workspace-prev"
             onClick={() => handleWorkspaceStep(-1)}
             disabled={workspaceSelectedIndex <= 0}
-            className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-[12px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] disabled:opacity-40"
+            className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] disabled:opacity-40"
           >
             ← 이전
           </button>
@@ -2867,14 +2868,14 @@ export default function OperationCheckView({
             data-testid="op-check-workspace-next"
             onClick={() => handleWorkspaceStep(1)}
             disabled={workspaceSelectedIndex < 0 || workspaceSelectedIndex >= workspaceSchedules.length - 1}
-            className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-[12px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] disabled:opacity-40"
+            className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] disabled:opacity-40"
           >
             다음 →
           </button>
           <button
             type="button"
             onClick={() => setPrintModalOpen(true)}
-            className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-[12px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+            className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
           >
             출력
           </button>
@@ -2883,7 +2884,7 @@ export default function OperationCheckView({
             data-testid="op-check-record-save"
             onClick={() => void savePatientCheck()}
             disabled={savingCheck}
-            className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-[12px] font-bold text-white disabled:opacity-60"
+            className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-60"
           >
             {savingCheck ? '저장 중...' : '저장'}
           </button>
@@ -3255,34 +3256,12 @@ export default function OperationCheckView({
       <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h2 className="text-xl font-bold text-[var(--foreground)]">OP체크</h2>
+            <h2 className="text-xl font-bold text-[var(--foreground)]">{headerTitle}</h2>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => handleTabChange('patients')}
-              className={`rounded-full px-4 py-2 text-sm font-bold transition-colors ${
-                activeTab === 'patients'
-                  ? 'bg-[var(--accent)] text-white'
-                  : 'border border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-4)]'
-              }`}
-            >
-              환자별 확인
-            </button>
-            <button
-              type="button"
-              onClick={() => handleTabChange('templates')}
-              className={`rounded-full px-4 py-2 text-sm font-bold transition-colors ${
-                activeTab === 'templates'
-                  ? 'bg-[var(--accent)] text-white'
-                  : 'border border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-4)]'
-              }`}
-            >
-              템플릿 설정
-            </button>
+          {activeTab === 'patients' ? (
             <div
               data-testid="op-check-patient-search-card"
-              className={`w-full min-w-[220px] max-w-[320px] ${activeTab === 'patients' ? '' : 'hidden'}`}
+              className="w-full min-w-[220px] max-w-[320px]"
             >
               <input
                 data-testid="op-check-search"
@@ -3292,7 +3271,7 @@ export default function OperationCheckView({
                 className="w-full rounded-full border border-[var(--border)] px-4 py-2 text-sm font-medium"
               />
             </div>
-          </div>
+          ) : null}
         </div>
       </div>
 
@@ -3888,7 +3867,7 @@ export default function OperationCheckView({
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col">
-              <div className="grid gap-3 border-b border-[var(--border)] bg-[var(--muted)]/20 px-4 py-3 xl:grid-cols-[minmax(0,1fr)_380px]">
+              <div className="grid gap-3 border-b border-[var(--border)] bg-[var(--muted)]/20 px-4 py-3 xl:items-start xl:grid-cols-[minmax(0,1fr)_minmax(312px,336px)]">
                 <aside className="min-w-0">
                   <div className="mb-2 flex items-center justify-between gap-2 px-1">
                     <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
@@ -3947,11 +3926,11 @@ export default function OperationCheckView({
                 <h2 className="text-xl font-bold">수술 소모품 사용 내역서</h2>
                 <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
                   <div><span className="font-semibold text-gray-500">환자명</span> <span className="ml-2 font-bold">{checkForm.patient_name}</span></div>
-                  {checkForm.chart_no && <div><span className="font-semibold text-gray-500">차트번호</span> <span className="ml-2 font-bold">{checkForm.chart_no}</span></div>}
+                  {workspaceDisplayChartNo && <div><span className="font-semibold text-gray-500">차트번호</span> <span className="ml-2 font-bold">{workspaceDisplayChartNo}</span></div>}
                   <div><span className="font-semibold text-gray-500">수술명</span> <span className="ml-2 font-bold">{checkForm.surgery_name}</span></div>
                   {checkForm.anesthesia_type && <div><span className="font-semibold text-gray-500">마취방법</span> <span className="ml-2">{checkForm.anesthesia_type}</span></div>}
                   <div><span className="font-semibold text-gray-500">수술일</span> <span className="ml-2">{formatDateLabel(checkForm.schedule_date)}</span></div>
-                  <div><span className="font-semibold text-gray-500">수술실</span> <span className="ml-2">{checkForm.schedule_room || '-'}</span></div>
+                  <div><span className="font-semibold text-gray-500">수술실</span> <span className="ml-2">{workspaceDisplayScheduleRoom}</span></div>
                   {checkForm.surgery_started_at && <div><span className="font-semibold text-gray-500">수술 시작</span> <span className="ml-2">{new Date(checkForm.surgery_started_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span></div>}
                   {checkForm.surgery_ended_at && <div><span className="font-semibold text-gray-500">수술 종료</span> <span className="ml-2">{new Date(checkForm.surgery_ended_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span></div>}
                 </div>

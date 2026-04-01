@@ -346,7 +346,7 @@ export default function AdminView(props: Record<string, unknown>) {
               testIdPrefix="admin-operations-tab"
             />
             {operationsTab === '알림자동화' && <NotificationAutomation user={user} />}
-            {operationsTab === '수술검사템플릿' && <SurgeryExamTemplateManager />}
+            {operationsTab === '수술검사템플릿' && <SurgeryExamTemplateManager user={user} />}
             {operationsTab === '팝업관리' && <PopupManager />}
           </>
         )}
