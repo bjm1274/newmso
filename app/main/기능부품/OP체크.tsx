@@ -37,7 +37,15 @@ import {
   resolveWardStaffCandidates,
   stripHiddenMetaBlocks,
 } from './op-check-utils';
-import { OpCheckScheduleList, OpCheckStatusFilterTabs } from './op-check-components';
+import {
+  OpCheckScheduleList,
+  OpCheckStatusFilterTabs,
+  OpCheckWorkspaceChecklistSection,
+  OpCheckWorkspaceHeader,
+  OpCheckWorkspaceMetaPanel,
+  OpCheckWorkspaceNotesSection,
+  OpCheckWorkspaceProgressPanel,
+} from './op-check-components';
 
 const SCHEDULE_META_PREFIX = '[[SCHEDULE_META]]';
 const SCHEDULE_META_SUFFIX = '[[/SCHEDULE_META]]';
@@ -2622,104 +2630,24 @@ export default function OperationCheckView({
       <p className="mt-1 text-[11px] font-medium text-[var(--toss-gray-3)]">수술환자 목록에서 바로 선택할 수 있습니다.</p>
     </div>
   ) : (
-    <div
-      data-testid="op-check-workspace-detail-header"
-      className="self-start rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-2.5 shadow-sm"
-    >
-      <div className="flex flex-col gap-2.5">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <h3 className="text-[17px] font-bold text-[var(--foreground)]">{checkForm.patient_name}</h3>
-            <span
-              className={`rounded-[var(--radius-md)] px-1.5 py-0.5 text-[10px] font-bold ${
-                checkForm.status === '수술중'
-                  ? 'bg-orange-100 text-orange-700'
-                  : checkForm.status === '완료'
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : checkForm.status === '준비완료'
-                      ? 'bg-[var(--accent)]/10 text-[var(--accent)]'
-                      : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
-              }`}
-            >
-              {checkForm.status}
-            </span>
-            <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--toss-gray-4)]">
-              작업 순서 {workspaceSelectedOrderLabel}
-            </span>
-            {checkFormIsDirty ? (
-              <span
-                data-testid="op-check-workspace-dirty-indicator"
-                className="rounded-[var(--radius-md)] bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800"
-              >
-                미저장
-              </span>
-            ) : null}
-            {selectedScheduleHiddenByFilters ? (
-              <span className="rounded-[var(--radius-md)] bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-600">
-                필터 숨김
-              </span>
-            ) : null}
-          </div>
-          <p className="mt-1 truncate text-[12px] font-medium text-[var(--toss-gray-3)]">{checkForm.surgery_name}</p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-1">
-          <div className="rounded-[var(--radius-md)] bg-[var(--muted)]/35 px-2 py-1.5">
-            <p className="text-[9px] font-semibold text-[var(--toss-gray-3)]">수술 시간</p>
-            <p className="mt-0.5 text-[13px] font-bold text-[var(--foreground)]">{workspaceDisplayScheduleTime}</p>
-          </div>
-          <div className="rounded-[var(--radius-md)] bg-[var(--muted)]/35 px-2 py-1.5">
-            <p className="text-[9px] font-semibold text-[var(--toss-gray-3)]">수술실</p>
-            <p className="mt-0.5 text-[13px] font-bold text-[var(--foreground)]">{workspaceDisplayScheduleRoom}</p>
-          </div>
-          <div className="rounded-[var(--radius-md)] bg-[var(--muted)]/35 px-2 py-1.5">
-            <p className="text-[9px] font-semibold text-[var(--toss-gray-3)]">차트번호</p>
-            <p className="mt-0.5 truncate text-[13px] font-bold text-[var(--foreground)]">{workspaceDisplayChartNo || '-'}</p>
-          </div>
-          <div className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)]/70 px-2 py-1.5">
-            <p className="text-[9px] font-semibold text-[var(--accent)]">당일 현황</p>
-            <p className="mt-0.5 text-[13px] font-bold text-[var(--accent)]">{workspaceSelectedOrderLabel}</p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-end gap-1">
-          <button
-            type="button"
-            data-testid="op-check-workspace-prev"
-            onClick={() => handleWorkspaceStep(-1)}
-            disabled={workspaceSelectedIndex <= 0}
-            className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] disabled:opacity-40"
-          >
-            ← 이전
-          </button>
-          <button
-            type="button"
-            data-testid="op-check-workspace-next"
-            onClick={() => handleWorkspaceStep(1)}
-            disabled={workspaceSelectedIndex < 0 || workspaceSelectedIndex >= workspaceSchedules.length - 1}
-            className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] disabled:opacity-40"
-          >
-            다음 →
-          </button>
-          <button
-            type="button"
-            onClick={() => setPrintModalOpen(true)}
-            className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
-          >
-            출력
-          </button>
-          <button
-            type="button"
-            data-testid="op-check-record-save"
-            onClick={() => void savePatientCheck()}
-            disabled={savingCheck}
-            className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-60"
-          >
-            {savingCheck ? '저장 중...' : '저장'}
-          </button>
-        </div>
-      </div>
-    </div>
+    <OpCheckWorkspaceHeader
+      patientName={checkForm.patient_name}
+      status={checkForm.status}
+      orderLabel={workspaceSelectedOrderLabel}
+      surgeryName={checkForm.surgery_name}
+      scheduleTime={workspaceDisplayScheduleTime}
+      scheduleRoom={workspaceDisplayScheduleRoom}
+      chartNo={workspaceDisplayChartNo || '-'}
+      isDirty={checkFormIsDirty}
+      hiddenByFilters={selectedScheduleHiddenByFilters}
+      prevDisabled={workspaceSelectedIndex <= 0}
+      nextDisabled={workspaceSelectedIndex < 0 || workspaceSelectedIndex >= workspaceSchedules.length - 1}
+      saving={savingCheck}
+      onPrev={() => handleWorkspaceStep(-1)}
+      onNext={() => handleWorkspaceStep(1)}
+      onPrint={() => setPrintModalOpen(true)}
+      onSave={() => void savePatientCheck()}
+    />
   );
 
   const patientWorkspaceDetailContent = !selectedSchedule || !checkForm ? (
@@ -2735,323 +2663,79 @@ export default function OperationCheckView({
   ) : (
     <>
       <div className="grid gap-4 xl:grid-cols-2">
-      <div className="h-full rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <p className="mb-3 text-[11px] font-semibold text-[var(--toss-gray-3)]">수술 진행 상황</p>
-        <div className="flex items-center gap-0">
-          {(['준비중', '준비완료', '수술중', '완료'] as const).map((step, idx) => {
-            const stepIdx = ['준비중', '준비완료', '수술중', '완료'].indexOf(checkForm?.status || '준비중');
-            const currentIdx = idx;
-            const isPast = currentIdx < stepIdx;
-            const isCurrent = currentIdx === stepIdx;
-            return (
-              <div key={step} className="flex flex-1 items-center">
-                <div className="flex flex-1 flex-col items-center gap-1">
-                  <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold transition-colors ${
-                      isCurrent
-                        ? 'bg-[var(--accent)] text-white shadow-sm'
-                        : isPast
-                          ? 'bg-emerald-500 text-white'
-                          : 'bg-[var(--muted)] text-[var(--toss-gray-3)]'
-                    }`}
-                  >
-                    {isPast ? '✓' : idx + 1}
-                  </div>
-                  <span
-                    className={`text-[10px] font-bold ${
-                      isCurrent ? 'text-[var(--accent)]' : isPast ? 'text-emerald-600' : 'text-[var(--toss-gray-3)]'
-                    }`}
-                  >
-                    {step}
-                  </span>
-                </div>
-                {idx < 3 && (
-                  <div
-                    className={`h-0.5 flex-1 transition-colors ${
-                      isPast || isCurrent ? 'bg-[var(--accent)]/40' : 'bg-[var(--border)]'
-                    }`}
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <OpCheckWorkspaceProgressPanel
+          status={checkForm.status}
+          saving={savingCheck}
+          onQuickStatusChange={(status) => void quickStatusChange(status)}
+          onOpenWardMessage={() => void openWardMsgModal()}
+        />
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          {checkForm?.status === '준비중' && (
-            <button
-              type="button"
-              onClick={() => void quickStatusChange('준비완료')}
-              disabled={savingCheck}
-              className="rounded-[var(--radius-md)] bg-emerald-500 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 disabled:opacity-60"
-            >
-              준비 완료 처리
-            </button>
-          )}
-          {checkForm?.status === '준비완료' && (
-            <>
-              <button
-                type="button"
-                aria-label="병동팀 메시지 보내기"
-                onClick={() => void openWardMsgModal()}
-                className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white hover:opacity-90"
-              >
-                메시지 전송
-              </button>
-              <button
-                type="button"
-                onClick={() => void quickStatusChange('수술중')}
-                disabled={savingCheck}
-                className="rounded-[var(--radius-md)] bg-orange-500 px-4 py-2 text-sm font-bold text-white hover:bg-orange-600 disabled:opacity-60"
-              >
-                인계(수술시작)
-              </button>
-              <button
-                type="button"
-                onClick={() => void quickStatusChange('완료')}
-                disabled={savingCheck}
-                className="rounded-[var(--radius-md)] bg-emerald-500 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 disabled:opacity-60"
-              >
-                수술완료
-              </button>
-            </>
-          )}
-          {checkForm?.status === '수술중' && (
-            <>
-              <span className="flex items-center gap-2 rounded-[var(--radius-md)] bg-orange-50 px-4 py-2 text-sm font-bold text-orange-700">
-                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-orange-500" />
-                수술 진행 중
-              </span>
-              <button
-                type="button"
-                onClick={() => void quickStatusChange('완료')}
-                disabled={savingCheck}
-                className="rounded-[var(--radius-md)] bg-emerald-500 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 disabled:opacity-60"
-              >
-                수술완료
-              </button>
-            </>
-          )}
-          {checkForm?.status === '완료' && (
-            <span className="flex items-center gap-2 rounded-[var(--radius-md)] bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700">
-              ✓ 수술 완료
-            </span>
-          )}
-          {checkForm?.status === '준비중' && (
-            <button
-              type="button"
-              aria-label="병동팀 메시지 보내기"
-              onClick={() => void openWardMsgModal()}
-              className="rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
-            >
-              메시지 전송
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* 마취 유형 */}
-          <label className="flex shrink-0 items-center gap-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">
-            마취 유형
-            <input
-              data-testid="op-check-anesthesia-select"
-              list="op-check-anesthesia-options"
-              value={checkForm.anesthesia_type}
-              onChange={(event) =>
-                setCheckForm((prev) => (prev ? { ...prev, anesthesia_type: event.target.value } : prev))
-              }
-              placeholder="예: 전신마취"
-              className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-sm font-medium"
-            />
-          </label>
-
-          {/* 특수 조건 배지 */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {selectedSchedule.surgery_fasting ? (
-              <span className="rounded-[var(--radius-md)] bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700">금식</span>
-            ) : null}
-            {selectedSchedule.surgery_inpatient ? (
-              <span className="rounded-[var(--radius-md)] bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-700">입원</span>
-            ) : null}
-            {selectedSchedule.surgery_guardian ? (
-              <span className="rounded-[var(--radius-md)] bg-violet-50 px-2 py-0.5 text-[11px] font-bold text-violet-700">보호자</span>
-            ) : null}
-            {selectedSchedule.surgery_caregiver ? (
-              <span className="rounded-[var(--radius-md)] bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700">간병인</span>
-            ) : null}
-            {selectedSchedule.surgery_transfusion ? (
-              <span className="rounded-[var(--radius-md)] bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">수혈</span>
-            ) : null}
-            <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2 py-0.5 text-[11px] font-medium text-[var(--toss-gray-3)]">
-              템플릿 {checkForm.applied_template_ids.length}개
-            </span>
-          </div>
-
-          {/* 타임스탬프 */}
-          {(checkForm.surgery_started_at || checkForm.surgery_ended_at || checkForm.ward_message_sent_at || deductingInventory) && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              {checkForm.ward_message_sent_at && (
-                <span className="rounded-[var(--radius-md)] bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
-                  병동 {new Date(checkForm.ward_message_sent_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} 발송
-                </span>
-              )}
-              {checkForm.surgery_started_at && (
-                <span className="rounded-[var(--radius-md)] bg-orange-50 px-2 py-0.5 text-[11px] font-medium text-orange-700">
-                  시작 {new Date(checkForm.surgery_started_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              )}
-              {checkForm.surgery_ended_at && (
-                <span className="rounded-[var(--radius-md)] bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                  종료 {new Date(checkForm.surgery_ended_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              )}
-              {checkForm.surgery_started_at && checkForm.surgery_ended_at && (
-                <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2 py-0.5 text-[11px] font-medium text-[var(--toss-gray-4)]">
-                  총 {Math.round((new Date(checkForm.surgery_ended_at).getTime() - new Date(checkForm.surgery_started_at).getTime()) / 60000)}분
-                </span>
-              )}
-              {deductingInventory && (
-                <span className="rounded-[var(--radius-md)] bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">재고 차감 중...</span>
-              )}
-            </div>
-          )}
-
-          {/* 기본 항목 불러오기 */}
-          <button
-            type="button"
-            data-testid="op-check-apply-template"
-            onClick={mergeTemplateItemsIntoForm}
-            className="ml-auto rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
-          >
-            기본 항목 불러오기
-          </button>
-        </div>
-      </div>
+        <OpCheckWorkspaceMetaPanel
+          anesthesiaType={checkForm.anesthesia_type}
+          appliedTemplateCount={checkForm.applied_template_ids.length}
+          surgeryFasting={selectedSchedule.surgery_fasting}
+          surgeryInpatient={selectedSchedule.surgery_inpatient}
+          surgeryGuardian={selectedSchedule.surgery_guardian}
+          surgeryCaregiver={selectedSchedule.surgery_caregiver}
+          surgeryTransfusion={selectedSchedule.surgery_transfusion}
+          surgeryStartedAt={checkForm.surgery_started_at}
+          surgeryEndedAt={checkForm.surgery_ended_at}
+          wardMessageSentAt={checkForm.ward_message_sent_at}
+          deductingInventory={deductingInventory}
+          onAnesthesiaTypeChange={(value) =>
+            setCheckForm((prev) => (prev ? { ...prev, anesthesia_type: value } : prev))
+          }
+          onApplyTemplate={mergeTemplateItemsIntoForm}
+        />
 
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <h4 className="text-base font-bold text-[var(--foreground)]">수술 전 준비 체크</h4>
-            <p className="text-[12px] font-medium text-[var(--toss-gray-3)]">
-              {workspaceSections.prep
-                ? '수술명과 마취 유형 템플릿을 바탕으로 필요한 준비사항을 환자별로 확인합니다.'
-                : prepSummaryText}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {workspaceSections.prep ? (
-              <button
-                type="button"
-                data-testid="op-check-prep-add"
-                onClick={() => updateCheckFormList('prep_items', (items) => [...items, createChecklistItem('patient-prep')])}
-                className="rounded-full border border-[var(--border)] px-4 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
-              >
-                준비항목 추가
-              </button>
-            ) : null}
-            <button
-              type="button"
-              data-testid="op-check-section-toggle-prep"
-              onClick={() => toggleWorkspaceSection('prep')}
-              className="rounded-full border border-[var(--border)] px-4 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
-            >
-              {workspaceSections.prep ? '접기' : '펼치기'}
-            </button>
-          </div>
-        </div>
-        {workspaceSections.prep ? (
-          <div data-testid="op-check-section-content-prep">
-            {renderItemRows(checkForm.prep_items, 'prep', (next) => updateCheckFormList('prep_items', () => next))}
-          </div>
-        ) : null}
-      </div>
+        <OpCheckWorkspaceChecklistSection
+          title="수술 전 준비 체크"
+          collapsedSummary={prepSummaryText}
+          expandedSummary="수술명과 마취 유형 템플릿을 바탕으로 필요한 준비사항을 환자별로 확인합니다."
+          expanded={workspaceSections.prep}
+          onToggle={() => toggleWorkspaceSection('prep')}
+          toggleTestId="op-check-section-toggle-prep"
+          contentTestId="op-check-section-content-prep"
+          addButtonLabel="준비항목 추가"
+          addButtonTestId="op-check-prep-add"
+          onAdd={() => updateCheckFormList('prep_items', (items) => [...items, createChecklistItem('patient-prep')])}
+        >
+          {renderItemRows(checkForm.prep_items, 'prep', (next) => updateCheckFormList('prep_items', () => next))}
+        </OpCheckWorkspaceChecklistSection>
 
-      <div
-        className={`h-full rounded-[var(--radius-xl)] border p-4 shadow-sm transition-colors ${
-          checkForm?.status === '수술중'
-            ? 'border-orange-300 bg-orange-50/50 dark:bg-orange-900/10'
-            : 'border-[var(--border)] bg-[var(--card)]'
-        }`}
-      >
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <h4 className={`text-base font-bold ${checkForm?.status === '수술중' ? 'text-orange-700' : 'text-[var(--foreground)]'}`}>
-              수술 중 의료소모품 사용 체크
-              {checkForm?.status === '수술중' && (
-                <span className="ml-2 inline-block animate-pulse rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold text-white">
-                  실시간 입력
-                </span>
-              )}
-            </h4>
-            <p className="text-[12px] font-medium text-[var(--toss-gray-3)]">
-              {workspaceSections.consumable ? '실제 사용한 소모품을 체크하고 수량과 메모를 남겨 관리합니다.' : consumableSummaryText}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {workspaceSections.consumable ? (
-              <button
-                type="button"
-                data-testid="op-check-consumable-add"
-                onClick={() =>
-                  updateCheckFormList('consumable_items', (items) => [...items, createChecklistItem('patient-consumable')])
-                }
-                className="rounded-full border border-[var(--border)] px-4 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
-              >
-                소모품 추가
-              </button>
-            ) : null}
-            <button
-              type="button"
-              data-testid="op-check-section-toggle-consumable"
-              onClick={() => toggleWorkspaceSection('consumable')}
-              className="rounded-full border border-[var(--border)] px-4 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
-            >
-              {workspaceSections.consumable ? '접기' : '펼치기'}
-            </button>
-          </div>
-        </div>
-        {workspaceSections.consumable ? (
-          <div data-testid="op-check-section-content-consumable">
-            {renderItemRows(checkForm.consumable_items, 'consumable', (next) =>
-              updateCheckFormList('consumable_items', () => next)
-            )}
-          </div>
-        ) : null}
-      </div>
+        <OpCheckWorkspaceChecklistSection
+          title="수술 중 의료소모품 사용 체크"
+          collapsedSummary={consumableSummaryText}
+          expandedSummary="실제 사용한 소모품을 체크하고 수량과 메모를 남겨 관리합니다."
+          expanded={workspaceSections.consumable}
+          onToggle={() => toggleWorkspaceSection('consumable')}
+          toggleTestId="op-check-section-toggle-consumable"
+          contentTestId="op-check-section-content-consumable"
+          addButtonLabel="소모품 추가"
+          addButtonTestId="op-check-consumable-add"
+          onAdd={() =>
+            updateCheckFormList('consumable_items', (items) => [...items, createChecklistItem('patient-consumable')])
+          }
+          active={checkForm.status === '수술중'}
+          activeBadgeLabel={checkForm.status === '수술중' ? '실시간 입력' : undefined}
+        >
+          {renderItemRows(checkForm.consumable_items, 'consumable', (next) =>
+            updateCheckFormList('consumable_items', () => next)
+          )}
+        </OpCheckWorkspaceChecklistSection>
 
       </div>
 
-      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">환자별 메모</label>
-          <button
-            type="button"
-            data-testid="op-check-section-toggle-notes"
-            onClick={() => toggleWorkspaceSection('notes')}
-            className="rounded-full border border-[var(--border)] px-4 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
-          >
-            {workspaceSections.notes ? '접기' : '펼치기'}
-          </button>
-        </div>
-        {workspaceSections.notes ? (
-          <div data-testid="op-check-section-content-notes">
-            <textarea
-              data-testid="op-check-notes-textarea"
-              value={checkForm.notes}
-              onChange={(event) => setCheckForm((prev) => (prev ? { ...prev, notes: event.target.value } : prev))}
-              placeholder="수술 전/중 특이사항, 추가 준비 요청, 소모품 사용 메모를 남겨주세요."
-              className="mt-2 min-h-[120px] w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-4 py-3 text-sm font-medium"
-            />
-          </div>
-        ) : (
-          <p className="mt-2 text-sm font-medium text-[var(--toss-gray-3)]">{notesSummaryText}</p>
-        )}
-      </div>
+      <OpCheckWorkspaceNotesSection
+        expanded={workspaceSections.notes}
+        summary={notesSummaryText}
+        value={checkForm.notes}
+        onToggle={() => toggleWorkspaceSection('notes')}
+        onChange={(value) => setCheckForm((prev) => (prev ? { ...prev, notes: value } : prev))}
+      />
     </>
   );
 

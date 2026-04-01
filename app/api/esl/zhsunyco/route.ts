@@ -12,10 +12,47 @@ type RouteConfig = {
   notifyRefresh?: boolean;
   shopCode?: string;
   customerStoreCode?: string;
+  legacyApiCode?: string;
+  legacyApiSign?: string;
 };
 
 type MobileBlePreflightPayload = {
   deviceId?: string;
+};
+
+type LegacyBleSearchPayload = {
+  deviceId?: string;
+  deviceIds?: string[];
+};
+
+type LegacyBleProductPayload = {
+  pc?: string;
+  pn?: string;
+  pp?: string | number | null;
+  extend?: Record<string, unknown>;
+};
+
+type LegacyBleLedPayload = {
+  r?: number | string | null;
+  g?: number | string | null;
+  b?: number | string | null;
+  timeOn?: number | string | null;
+  time?: number | string | null;
+};
+
+type LegacyBleDirectCommandPayload = {
+  eslCode?: string;
+  templateId?: number | string | null;
+  product?: LegacyBleProductPayload;
+  led?: LegacyBleLedPayload[];
+};
+
+type LegacyBleDirectPayload = {
+  commands?: LegacyBleDirectCommandPayload[];
+  deviceId?: string;
+  templateId?: number | string | null;
+  product?: LegacyBleProductPayload;
+  led?: LegacyBleLedPayload[];
 };
 
 type BoundBleDeviceSummary = {
@@ -57,6 +94,8 @@ type RouteBody =
   | { action: 'queryStores'; config?: RouteConfig }
   | { action: 'pushGoods'; config?: RouteConfig; payload?: ZhsunycoGoodsPayloadRow[] }
   | { action: 'bindDevice'; config?: RouteConfig; payload?: BindDevicePayload }
+  | { action: 'legacyBleSearch'; config?: RouteConfig; payload?: LegacyBleSearchPayload }
+  | { action: 'legacyBleDirect'; config?: RouteConfig; payload?: LegacyBleDirectPayload }
   | { action: 'mobileTest'; config?: RouteConfig }
   | { action: 'mobileTemplates'; config?: RouteConfig }
   | { action: 'mobileBlePreflight'; config?: RouteConfig; payload?: MobileBlePreflightPayload };
@@ -177,6 +216,113 @@ function validateConfig(config?: RouteConfig) {
     notifyRefresh: config?.notifyRefresh !== false,
     shopCode: String(config?.shopCode || '').trim(),
     customerStoreCode: String(config?.customerStoreCode || '').trim(),
+    legacyApiCode: String(config?.legacyApiCode || '').trim(),
+    legacyApiSign: String(config?.legacyApiSign || '').trim(),
+  };
+}
+
+function validateLegacyApiConfig(config: ReturnType<typeof validateConfig>) {
+  const storeCode = String(config.shopCode || config.customerStoreCode || '').trim();
+  if (!storeCode) {
+    throw new Error('공식 ESL API용 매장코드가 필요합니다.');
+  }
+
+  const sign = String(config.legacyApiSign || '').trim();
+  if (!sign) {
+    throw new Error('공식 ESL API sign 값이 필요합니다.');
+  }
+
+  return {
+    apiCode: String(config.legacyApiCode || 'default').trim() || 'default',
+    sign,
+    storeCode,
+  };
+}
+
+function buildLegacyApiUrl(baseUrl: string, apiCode: string, resourcePath: string) {
+  const trimmedPath = String(resourcePath || '').replace(/^\/+/g, '');
+  return `${baseUrl}/api/${encodeURIComponent(apiCode)}/${trimmedPath}`;
+}
+
+async function postLegacyApi(
+  baseUrl: string,
+  apiCode: string,
+  resourcePath: string,
+  body: Record<string, unknown>,
+) {
+  return fetchUpstream(buildLegacyApiUrl(baseUrl, apiCode, resourcePath), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+function isLegacyApiMessageFailure(parsed: { json: UpstreamJson | null; rawText: string }) {
+  const jsonValue = parsed.json as unknown;
+  const messageSource =
+    typeof jsonValue === 'string'
+      ? jsonValue
+      : typeof parsed.rawText === 'string'
+        ? parsed.rawText
+        : '';
+
+  const normalized = messageSource.trim().toLowerCase();
+  if (!normalized) return false;
+  return normalized.startsWith('miss ') || normalized.startsWith('invalid ') || normalized.includes('error');
+}
+
+function normalizeLegacyLedEntry(value: LegacyBleLedPayload) {
+  const red = toNullableNumber(value.r) ?? 0;
+  const green = toNullableNumber(value.g) ?? 0;
+  const blue = toNullableNumber(value.b) ?? 0;
+  const timeOn = toNullableNumber(value.timeOn) ?? 100;
+  const time = toNullableNumber(value.time) ?? 5;
+
+  return {
+    r: red,
+    g: green,
+    b: blue,
+    time_on: timeOn,
+    time,
+  };
+}
+
+function buildLegacyBleDirectCommand(payload: LegacyBleDirectCommandPayload) {
+  const eslCode = String(payload.eslCode || '').trim();
+  const templateId = toNullableNumber(payload.templateId);
+  if (!eslCode || templateId === null) {
+    return null;
+  }
+
+  const productInput = isObject(payload.product) ? payload.product : {};
+  const extendInput = isObject(productInput.extend) ? productInput.extend : {};
+  const extendEntries = Object.entries(extendInput)
+    .map(([key, value]) => [String(key).trim(), String(value ?? '').trim()] as const)
+    .filter(([key, value]) => key && value);
+
+  const product: Record<string, unknown> = {
+    pc: String(productInput.pc || '').trim(),
+    pn: String(productInput.pn || '').trim(),
+  };
+
+  const priceValue = productInput.pp;
+  if (priceValue !== null && priceValue !== undefined && String(priceValue).trim()) {
+    product.pp = typeof priceValue === 'number' ? priceValue : String(priceValue).trim();
+  }
+
+  if (extendEntries.length > 0) {
+    product.extend = Object.fromEntries(extendEntries);
+  }
+
+  const led = Array.isArray(payload.led) ? payload.led.map(normalizeLegacyLedEntry) : [];
+
+  return {
+    esl_code: eslCode,
+    template_id: templateId,
+    product,
+    ...(led.length > 0 ? { led } : {}),
   };
 }
 
@@ -424,6 +570,99 @@ export async function POST(request: NextRequest) {
             '35323032-4c53-4545-4c42-4b4e494c4f57',
           ],
         },
+      });
+    }
+
+    if (body.action === 'legacyBleSearch') {
+      const legacyConfig = validateLegacyApiConfig(config);
+      const payload = isObject(body.payload) ? (body.payload as LegacyBleSearchPayload) : {};
+      const deviceIds = Array.from(
+        new Set(
+          [
+            ...(Array.isArray(payload.deviceIds) ? payload.deviceIds : []),
+            payload.deviceId,
+          ]
+            .map((value) => String(value || '').trim())
+            .filter(Boolean),
+        ),
+      );
+
+      if (deviceIds.length === 0) {
+        return buildErrorResponse('LED 점멸 확인용 ESL 코드가 필요합니다.');
+      }
+
+      const requestBody = {
+        store_code: legacyConfig.storeCode,
+        f1: deviceIds,
+        is_base64: '0',
+        sign: legacyConfig.sign,
+      };
+
+      const searchResult = await postLegacyApi(config.baseUrl, legacyConfig.apiCode, 'esl_ble/search', requestBody);
+
+      if (!searchResult.response.ok || isLegacyApiMessageFailure(searchResult)) {
+        return buildErrorResponse(
+          `공식 BLE 검색 실패: ${extractUpstreamMessage(searchResult, searchResult.response.status)}`,
+          502,
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        normalizedBaseUrl: config.baseUrl,
+        apiCode: legacyConfig.apiCode,
+        storeCode: legacyConfig.storeCode,
+        deviceIds,
+        requestBody,
+        upstream: searchResult.json ?? searchResult.rawText,
+      });
+    }
+
+    if (body.action === 'legacyBleDirect') {
+      const legacyConfig = validateLegacyApiConfig(config);
+      const payload = isObject(body.payload) ? (body.payload as LegacyBleDirectPayload) : {};
+      const commandInputs = Array.isArray(payload.commands)
+        ? payload.commands
+        : [
+            {
+              eslCode: payload.deviceId,
+              templateId: payload.templateId,
+              product: payload.product,
+              led: payload.led,
+            } satisfies LegacyBleDirectCommandPayload,
+          ];
+
+      const commands = commandInputs
+        .map((command) => buildLegacyBleDirectCommand(command))
+        .filter((command): command is NonNullable<ReturnType<typeof buildLegacyBleDirectCommand>> => Boolean(command));
+
+      if (commands.length === 0) {
+        return buildErrorResponse('직접 전송용 ESL 코드와 template ID가 필요합니다.');
+      }
+
+      const requestBody = {
+        store_code: legacyConfig.storeCode,
+        f1: commands,
+        is_base64: '0',
+        sign: legacyConfig.sign,
+      };
+
+      const directResult = await postLegacyApi(config.baseUrl, legacyConfig.apiCode, 'esl_ble/direct', requestBody);
+
+      if (!directResult.response.ok || isLegacyApiMessageFailure(directResult)) {
+        return buildErrorResponse(
+          `공식 BLE 직접 전송 실패: ${extractUpstreamMessage(directResult, directResult.response.status)}`,
+          502,
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        normalizedBaseUrl: config.baseUrl,
+        apiCode: legacyConfig.apiCode,
+        storeCode: legacyConfig.storeCode,
+        requestBody,
+        upstream: directResult.json ?? directResult.rawText,
       });
     }
 
