@@ -730,6 +730,7 @@ test('admin-configured default references auto-apply, notify recipients, and app
         quantity: 20,
         stock: 20,
         min_quantity: 5,
+        unit: 'BOX',
         company: 'SY INC.',
         company_id: 'mso-company-id',
         department: '경영지원팀',
