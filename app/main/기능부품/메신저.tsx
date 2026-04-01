@@ -1250,17 +1250,8 @@ export default function ChatView({
       });
       void (async () => {
         try {
-          const notificationTasks = targetRoomIds.map((targetRoomId) =>
-            supabase
-              .from('notifications')
-              .update({ read_at: readAt })
-              .eq('user_id', effectiveChatUserId)
-              .in('type', ['message', 'mention'])
-              .is('read_at', null)
-              .filter('metadata->>room_id', 'eq', targetRoomId)
-          );
           await Promise.allSettled([
-            ...notificationTasks,
+            markConversationNotificationsAsRead(targetRoomIds, readAt),
             supabase.from('room_read_cursors').upsert(
               targetRoomIds.map((targetRoomId) => ({
                 user_id: effectiveChatUserId,
@@ -1271,9 +1262,6 @@ export default function ChatView({
             ),
           ]);
           broadcastChatSync('message-read', roomId);
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('erp-notification-read'));
-          }
         } catch { /* ignore */ }
       })();
     }
@@ -1560,6 +1548,35 @@ export default function ChatView({
       }, { onConflict: 'user_id,room_id' });
     } catch (error) {
       console.warn('room_read_cursors upsert skip', error);
+    }
+  }, [effectiveChatUserId]);
+
+  const markConversationNotificationsAsRead = useCallback(async (
+    roomIds: Array<string | null | undefined>,
+    readAt?: string | null
+  ) => {
+    if (!effectiveChatUserId) return;
+
+    const targetRoomIds = Array.from(
+      new Set(roomIds.map((roomId) => String(roomId || '').trim()).filter(Boolean))
+    );
+    if (targetRoomIds.length === 0) return;
+
+    const resolvedReadAt = readAt || new Date().toISOString();
+    await Promise.allSettled(
+      targetRoomIds.map((targetRoomId) =>
+        supabase
+          .from('notifications')
+          .update({ read_at: resolvedReadAt })
+          .eq('user_id', effectiveChatUserId)
+          .in('type', ['message', 'mention'])
+          .is('read_at', null)
+          .filter('metadata->>room_id', 'eq', targetRoomId)
+      )
+    );
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('erp-notification-read'));
     }
   }, [effectiveChatUserId]);
 
@@ -2271,6 +2288,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 persistRoomReadCursor(targetRoomId, readAt)
               )
             );
+            await markConversationNotificationsAsRead(
+              [...(conversationRoomIds.length > 0 ? conversationRoomIds : [roomId]), currentConversationRoomId],
+              readAt
+            );
             broadcastChatSync('message-read', roomId);
           })
           .catch(() => {});
@@ -2308,6 +2329,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     claimIncomingRealtimeMessage,
     effectiveChatUserId,
     isRoomAccessibleToCurrentUser,
+    markConversationNotificationsAsRead,
     persistMessageReads,
     persistRoomReadCursor,
     updateUnreadForRooms,

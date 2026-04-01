@@ -5,6 +5,7 @@ import {
   lockApprovalMeta,
   resolveApprovalDelegateConfig,
 } from '@/lib/approval-workflow';
+import { notificationMatchesApprovalId } from '@/lib/notification-metadata';
 import { processFinalApprovalEffects } from '@/lib/server-approval-processing';
 
 type ApprovalRow = Record<string, unknown>;
@@ -21,6 +22,11 @@ type ActorContext = {
 type StaffRow = {
   id: string;
   permissions?: Record<string, unknown> | null;
+};
+
+type NotificationRow = {
+  id: string;
+  metadata?: Record<string, unknown> | null;
 };
 
 export type ApprovalTransitionResult = {
@@ -207,6 +213,53 @@ async function updateApprovalRecord(
   }
 
   return (data || null) as ApprovalRow | null;
+}
+
+async function markApprovalNotificationsAsRead(
+  supabase: SupabaseClient,
+  actorId: string | null,
+  approvalIds: string[]
+) {
+  const normalizedActorId = String(actorId || '').trim();
+  const normalizedApprovalIds = Array.from(
+    new Set(approvalIds.map((id) => String(id || '').trim()).filter(Boolean))
+  );
+
+  if (!normalizedActorId || normalizedApprovalIds.length === 0) {
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('id, metadata')
+    .eq('user_id', normalizedActorId)
+    .in('type', ['approval', 'inventory'])
+    .is('read_at', null)
+    .limit(500);
+
+  if (error) {
+    throw error;
+  }
+
+  const matchedIds = ((data || []) as NotificationRow[])
+    .filter((row) =>
+      normalizedApprovalIds.some((approvalId) => notificationMatchesApprovalId(row.metadata, approvalId))
+    )
+    .map((row) => String(row.id || '').trim())
+    .filter(Boolean);
+
+  if (matchedIds.length === 0) {
+    return;
+  }
+
+  const { error: updateError } = await supabase
+    .from('notifications')
+    .update({ read_at: new Date().toISOString() })
+    .in('id', matchedIds);
+
+  if (updateError) {
+    throw updateError;
+  }
 }
 
 async function transitionSingleApproval(params: {
@@ -515,6 +568,18 @@ export async function transitionApprovals(params: {
   const failCount = results.length - successCount;
   const finalApprovalCount = results.filter((result) => result.ok && result.finalApproval).length;
   const warningCount = results.reduce((sum, result) => sum + result.warnings.length, 0);
+
+  const successfulApprovalIds = results
+    .filter((result) => result.ok)
+    .map((result) => result.approvalId);
+
+  if (successfulApprovalIds.length > 0) {
+    try {
+      await markApprovalNotificationsAsRead(supabase, actor.id, successfulApprovalIds);
+    } catch {
+      // Approval state should win even if notification cleanup is delayed.
+    }
+  }
 
   return {
     results,

@@ -123,6 +123,13 @@ function getDisplayStatus(log: CommuteLog | null | undefined) {
   return String(log?.displayStatus || log?.status || '').trim();
 }
 
+function formatLocalDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export default function CommuteRecord({ user, onRequestCorrection }: CommuteRecordProps) {
   const normalizedUser = normalizeStaffLike((user ?? {}) as Record<string, unknown>);
   const [resolvedUser, setResolvedUser] = useState<Record<string, unknown>>(normalizedUser);
@@ -134,6 +141,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const effectiveUserId = getStaffLikeId(resolvedUser);
+  const currentDateKey = formatLocalDateKey(currentTime);
   const lastResolvedLocationRef = useRef<{
     latitude: number;
     longitude: number;
@@ -153,6 +161,16 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     workedMinutes: number;
   } | null>(null);
   const checkOutSuccessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeTodayLog =
+    todayLog && String((todayLog as Record<string, unknown>)?.date || '').slice(0, 10) === currentDateKey
+      ? todayLog
+      : null;
+  const staleOpenLog =
+    logs.find(
+      (log) =>
+        !log.check_out &&
+        String(log.date || '').slice(0, 10) !== currentDateKey,
+    ) || null;
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -220,25 +238,29 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
   useEffect(() => {
     if (effectiveUserId) {
-      initCommuteData();
+      void initCommuteData();
     }
   }, [effectiveUserId, currentMonth]);
 
+  useEffect(() => {
+    if (!effectiveUserId) return;
+    void fetchTodayLog(currentDateKey);
+  }, [effectiveUserId, currentDateKey]);
+
   const initCommuteData = async () => {
     setLoading(true);
-    await Promise.all([fetchTodayLog(), fetchMonthlyLogs()]);
+    await Promise.all([fetchTodayLog(currentDateKey), fetchMonthlyLogs()]);
     setLoading(false);
   };
 
-  const fetchTodayLog = async () => {
-    const today = new Date().toLocaleDateString('en-CA');
+  const fetchTodayLog = async (targetDate = formatLocalDateKey(new Date())) => {
     const userId = effectiveUserId;
     if (!userId) return;
     const { data } = await supabase
       .from('attendance')
       .select('*')
       .eq('staff_id', userId)
-      .eq('date', today)
+      .eq('date', targetDate)
       .maybeSingle();
     setTodayLog(data || null);
   };
@@ -685,7 +707,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
     // 2. 위치 인증 성공 시 DB 기록 시작
     const now = new Date();
-    const today = now.toLocaleDateString('en-CA');
+    const today = formatLocalDateKey(now);
     const timeString = now.toISOString();
     const userId = effectiveUserId;
     const userDepartment = (resolvedUser as Record<string, unknown>)?.department as string | undefined;
@@ -757,11 +779,11 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         if (loc) void fetchWeather(loc.latitude, loc.longitude);
 
       } else {
-        if (!todayLog) return;
-        const checkInIso = todayLog.check_in as string | null;
+        if (!activeTodayLog) return;
+        const checkInIso = activeTodayLog.check_in as string | null;
         const lateThreshold = await resolveLateThreshold(today, userDepartment);
         const earlyLeaveMinutes = calculateEarlyLeaveMinutes(today, timeString, lateThreshold);
-        const finalStatus = earlyLeaveMinutes > 0 ? '조퇴' : ((todayLog.status as string) || '정상');
+        const finalStatus = earlyLeaveMinutes > 0 ? '조퇴' : ((activeTodayLog.status as string) || '정상');
         const { data, error } = await supabase
           .from('attendance')
           .update({ check_out: timeString, status: finalStatus })
@@ -830,9 +852,9 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
             {currentTime.toLocaleTimeString('ko-KR')}
           </h2>
           <div className="flex flex-wrap items-center gap-2 mt-1">
-            <span className={`w-2 h-2 rounded-full animate-pulse ${todayLog ? (todayLog.check_out ? 'bg-[var(--toss-gray-3)]' : 'bg-green-500/100') : 'bg-red-500/100'}`}></span>
+            <span className={`w-2 h-2 rounded-full animate-pulse ${activeTodayLog ? (activeTodayLog.check_out ? 'bg-[var(--toss-gray-3)]' : 'bg-green-500/100') : 'bg-red-500/100'}`}></span>
             <span className="text-sm font-bold mr-1">
-              {todayLog ? (todayLog.check_out ? '퇴근 완료' : '근무 중') : '출근 전'}
+              {activeTodayLog ? (activeTodayLog.check_out ? '퇴근 완료' : '근무 중') : '출근 전'}
             </span>
             {distance !== null && (
               <span className={`px-2 py-0.5 rounded-full text-[11px] ${distance <= ALLOWED_RADIUS_METER ? 'bg-green-500/100/20 text-green-400' : 'bg-red-500/100/20 text-red-400'}`}>
@@ -843,7 +865,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         </div>
 
         <div className="flex gap-3 z-10 shrink-0">
-          {!todayLog && (
+          {!activeTodayLog && (
             <button
               data-testid="commute-check-in-button"
               onClick={() => handleCommute('in')}
@@ -854,7 +876,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
               <span className="text-[11px] font-normal opacity-70">GPS 인증 필요</span>
             </button>
           )}
-          {todayLog && !todayLog.check_out && (
+          {activeTodayLog && !activeTodayLog.check_out && (
             <button
               data-testid="commute-check-out-button"
               onClick={() => handleCommute('out')}
@@ -867,6 +889,12 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
           )}
         </div>
       </div>
+
+      {staleOpenLog ? (
+        <div className="rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] font-semibold text-amber-800">
+          전날 미퇴근 기록이 남아 있습니다. 오늘 출근은 그대로 진행할 수 있고, 필요하면 출결 정정으로 어제 기록을 보정해 주세요.
+        </div>
+      ) : null}
 
       {/* 출근 완료 성공 모달 */}
       {showCheckInSuccess && (

@@ -6,6 +6,7 @@ import { readSessionFromRequest } from '@/lib/server-session';
 import { isNamedSystemMasterAccount } from '@/lib/system-master';
 import { runBackup } from '@/lib/backup-cron';
 import { processPendingChatPushJobs } from '@/lib/chat-push-dispatch';
+import { selectSystemMasterStaffRows } from '@/lib/system-master-staff-query';
 import { processDueTodoRemindersServer } from '@/lib/todo-reminder-cron';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 
@@ -75,6 +76,7 @@ type QueryErrorLike = {
   code?: string | null;
   message?: string | null;
   details?: string | null;
+  hint?: string | null;
 } | null | undefined;
 
 function isLooseRecord(value: unknown): value is LooseRecord {
@@ -112,23 +114,6 @@ type ApprovalRow = LooseRecord & {
   status?: string | null;
   current_approver_id?: string | null;
 };
-
-const STAFF_SYSTEM_MASTER_SELECT = [
-  'id',
-  'name',
-  'employee_no',
-  'company',
-  'department',
-  'position',
-  'role',
-  'status',
-  'email',
-  'phone',
-  'resident_no',
-  'bank_name',
-  'bank_account',
-  'base_salary',
-].join(', ');
 
 const AUDIT_LOG_SELECT = [
   'id',
@@ -321,7 +306,17 @@ function isMissingColumnError(error: QueryErrorLike, columnName: string) {
   if (!error) return false;
   const code = String(error?.code || '');
   const message = String(error?.message || error?.details || '').toLowerCase();
-  return code === '42703' && message.includes(columnName.toLowerCase());
+  const hint = String(error?.hint || '').toLowerCase();
+  const needle = columnName.toLowerCase();
+  return (
+    (code === '42703' || !code) &&
+    (
+      message.includes(`column ${needle}`) ||
+      message.includes(`"${needle}"`) ||
+      message.includes(`'${needle}'`) ||
+      hint.includes(needle)
+    )
+  );
 }
 
 function isMissingRelationError(error: QueryErrorLike, relationName?: string) {
@@ -835,11 +830,20 @@ export async function GET(request: NextRequest) {
 
     const supabase = getAdminClient();
 
-    const { data: staffRows, error: staffError } = await supabase
-      .from('staff_members')
-      .select(STAFF_SYSTEM_MASTER_SELECT)
-      .order('employee_no', { ascending: true })
-      .limit(500);
+    const { data: staffRows, error: staffError } = await selectSystemMasterStaffRows<StaffRow>(
+      async ({ select, orderColumn }) => {
+        const result = await supabase
+          .from('staff_members')
+          .select(select)
+          .order(orderColumn, { ascending: true })
+          .limit(500);
+
+        return {
+          data: (result.data || null) as StaffRow[] | null,
+          error: result.error,
+        };
+      },
+    );
 
     if (staffError) {
       return NextResponse.json({ error: '직원 데이터를 불러오는 중 오류가 발생했습니다.' }, { status: 500 });

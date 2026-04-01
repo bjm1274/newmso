@@ -22,6 +22,7 @@ import {
   shouldSendDelayNotification,
 } from '@/lib/approval-workflow';
 import { isMissingColumnError, withMissingColumnFallback } from '@/lib/supabase-compat';
+import { notificationMatchesApprovalId } from '@/lib/notification-metadata';
 import type { StaffMember } from '@/types';
 import {
   buildSupplyRequestWorkflowItems,
@@ -694,6 +695,60 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
 
     return normalizeSupplyRequestItems(metaData.items);
   }, []);
+
+  const markApprovalNotificationsAsRead = useCallback(async (approvalIds: string[]) => {
+    const normalizedApprovalIds = Array.from(
+      new Set(approvalIds.map((approvalId) => String(approvalId || '').trim()).filter(Boolean))
+    );
+
+    if (normalizedApprovalIds.length === 0) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('erp-notification-read'));
+      }
+      return;
+    }
+
+    try {
+      const effectiveUserId = String(user?.id || '').trim();
+      if (!effectiveUserId) return;
+
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('id, metadata')
+        .eq('user_id', effectiveUserId)
+        .in('type', ['approval', 'inventory'])
+        .is('read_at', null)
+        .limit(500);
+
+      if (error) {
+        throw error;
+      }
+
+      const matchedIds = ((data || []) as Array<{ id: string; metadata?: Record<string, unknown> | null }>)
+        .filter((row) =>
+          normalizedApprovalIds.some((approvalId) => notificationMatchesApprovalId(row.metadata, approvalId))
+        )
+        .map((row) => String(row.id || '').trim())
+        .filter(Boolean);
+
+      if (matchedIds.length > 0) {
+        const { error: updateError } = await supabase
+          .from('notifications')
+          .update({ read_at: new Date().toISOString() })
+          .in('id', matchedIds);
+
+        if (updateError) {
+          throw updateError;
+        }
+      }
+    } catch (notificationError) {
+      console.warn('approval notification cleanup skipped', notificationError);
+    } finally {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('erp-notification-read'));
+      }
+    }
+  }, [user?.id]);
 
   const renderSupplyRequestItemsHtml = useCallback((metaData: Record<string, unknown> | null | undefined) => {
     const items = getSupplyRequestItems(metaData);
@@ -2309,6 +2364,9 @@ window.onload = () => window.print();
         toast(`일부 후처리에 확인이 필요합니다. 경고 ${payload.summary.warningCount}건`, 'warning');
       }
       fetchApprovals();
+      void markApprovalNotificationsAsRead(
+        payload.results.filter((result) => result.ok).map((result) => result.approvalId)
+      );
     } catch (error) {
       toast(
         error instanceof Error ? error.message : '일괄 승인 처리에 실패했습니다.',
@@ -2350,6 +2408,9 @@ window.onload = () => window.print();
         toast(`${payload.summary.successCount}건이 일괄 반려 처리되었습니다.`, 'success');
       }
       fetchApprovals();
+      void markApprovalNotificationsAsRead(
+        payload.results.filter((result) => result.ok).map((result) => result.approvalId)
+      );
     } catch (error) {
       toast(
         error instanceof Error ? error.message : '일괄 반려 처리에 실패했습니다.',
@@ -2403,6 +2464,7 @@ window.onload = () => window.print();
           toast('승인되어 다음 결재자에게 진행되었습니다.');
         }
         fetchApprovals();
+        void markApprovalNotificationsAsRead([String(result.approvalId || item.id || '')]);
         return;
       }
       if (result?.error) {
@@ -2715,6 +2777,7 @@ window.onload = () => window.print();
         toast("승인되어 다음 결재자에게 진행되었습니다.");
       }
       fetchApprovals();
+      void markApprovalNotificationsAsRead([String(item.id || '')]);
     } else {
       toast("승인 처리에 실패했습니다. " + (appError?.message || ""), 'error');
     }
@@ -2753,6 +2816,7 @@ window.onload = () => window.print();
       if (result?.ok) {
         toast('반려 처리되었습니다.', 'success');
         fetchApprovals();
+        void markApprovalNotificationsAsRead([String(result.approvalId || item.id || '')]);
         return;
       }
       if (result?.error) {
@@ -2782,6 +2846,7 @@ window.onload = () => window.print();
     if (!rejectResult.error) {
       toast("반려 처리되었습니다.", 'success');
       fetchApprovals();
+      void markApprovalNotificationsAsRead([String(item.id || '')]);
       return;
     }
     const { error } = await supabase
@@ -2791,6 +2856,7 @@ window.onload = () => window.print();
     if (!error) {
       toast("반려 처리되었습니다.", 'success');
       fetchApprovals();
+      void markApprovalNotificationsAsRead([String(item.id || '')]);
     } else {
       toast("반려 처리에 실패했습니다. " + (error?.message || ""), 'error');
     }
