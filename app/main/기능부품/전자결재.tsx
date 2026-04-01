@@ -3259,12 +3259,12 @@ window.onload = () => window.print();
       return Boolean(approvalDateFrom || approvalDateTo);
     }
 
-    if (viewMode === '결재함' && !approvalDateTouched && approvalMonth === defaultApprovalMonth) {
+    if (!approvalDateTouched && approvalMonth === defaultApprovalMonth) {
       return false;
     }
 
     return Boolean(approvalMonth);
-  }, [approvalDateFrom, approvalDateMode, approvalDateTo, approvalDateTouched, approvalMonth, defaultApprovalMonth, viewMode]);
+  }, [approvalDateFrom, approvalDateMode, approvalDateTo, approvalDateTouched, approvalMonth, defaultApprovalMonth]);
 
   const hasApprovalFilterOverrides =
     approvalDocumentFilter !== ALL_DOCUMENT_FILTER ||

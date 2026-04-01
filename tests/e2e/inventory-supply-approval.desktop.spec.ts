@@ -736,3 +736,148 @@ test("inventory notifications open the inventory panel and focus the matching ap
   await expect(approvalCard).toBeVisible();
   await expect(approvalCard).toHaveAttribute("data-highlighted", "true");
 });
+
+test("inventory operations user can cancel a manual ordered supply item back to order-required", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.confirm = () => true;
+  });
+
+  const inventoryOpsUser = {
+    ...fakeUser,
+    id: "inventory-ops-cancel-1",
+    name: "Inventory Ops",
+    company: "SY INC.",
+    company_id: "support-company-1",
+    department: "경영지원팀",
+    permissions: {
+      ...fakeUser.permissions,
+      mso: true,
+      inventory: true,
+      approval: true,
+      menu_재고관리: true,
+      inventory_현황: true,
+      inventory_발주: true,
+    },
+  };
+
+  const approvalPatchBodies: Array<Record<string, any>> = [];
+  page.on("request", (request) => {
+    if (
+      request.method() === "PATCH" &&
+      request.url().includes("/rest/v1/approvals")
+    ) {
+      approvalPatchBodies.push(JSON.parse(request.postData() || "{}"));
+    }
+  });
+
+  await mockSupabase(page, {
+    staffMembers: [inventoryOpsUser],
+    approvals: [
+      {
+        id: "approval-supply-cancel-1",
+        type: "물품신청",
+        title: "Cancel Ordered Supply Request",
+        content: "Need manual order",
+        sender_id: "requester-user-cancel-1",
+        sender_name: "Requester",
+        sender_company: "E2E Clinic",
+        company_id: "clinic-company-cancel-1",
+        status: "승인",
+        created_at: "2026-04-01T09:00:00.000Z",
+        meta_data: {
+          items: [
+            {
+              name: "No Stock Cement",
+              qty: 1,
+              dept: "수술실",
+              purpose: "수술용",
+            },
+          ],
+          inventory_workflow: {
+            status: "completed",
+            source_company: "SY INC.",
+            source_department: "경영지원팀",
+            updated_at: "2026-04-01T09:10:00.000Z",
+            items: [
+              {
+                request_index: 0,
+                name: "No Stock Cement",
+                qty: 1,
+                dept: "수술실",
+                purpose: "수술용",
+                available_qty: 0,
+                shortage_qty: 1,
+                source_inventory_id: null,
+                source_company: "SY INC.",
+                source_department: "경영지원팀",
+                recommended_action: "order",
+                status: "ordered",
+                processed_at: "2026-04-01T09:10:00.000Z",
+                processed_by_id: inventoryOpsUser.id,
+                processed_by_name: inventoryOpsUser.name,
+                order_approval_requested: false,
+                note: "기준 재고가 없어 수동 발주가 필요합니다.",
+              },
+            ],
+            summary: {
+              total_count: 1,
+              issue_ready_count: 0,
+              order_required_count: 0,
+              issued_count: 0,
+              ordered_count: 1,
+            },
+          },
+        },
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    user: inventoryOpsUser,
+    localStorage: {
+      erp_last_menu: "재고관리",
+      erp_inventory_view: "현황",
+    },
+  });
+
+  await page.goto(
+    `/main?${new URLSearchParams({ open_menu: "재고관리" }).toString()}`,
+  );
+
+  await expect(page.getByTestId("inventory-view")).toBeVisible();
+  const cancelButton = page.getByTestId(
+    "inventory-supply-history-cancel-order-approval-supply-cancel-1-0",
+  );
+  await expect(cancelButton).toBeVisible();
+  await cancelButton.click();
+
+  await expect.poll(() => approvalPatchBodies.length).toBe(1);
+
+  expect(approvalPatchBodies[0]?.meta_data?.inventory_workflow).toMatchObject({
+    status: "processing",
+    summary: {
+      total_count: 1,
+      issue_ready_count: 0,
+      order_required_count: 1,
+      issued_count: 0,
+      ordered_count: 0,
+    },
+  });
+  expect(
+    approvalPatchBodies[0]?.meta_data?.inventory_workflow?.items?.[0],
+  ).toMatchObject({
+    name: "No Stock Cement",
+    qty: 1,
+    status: "order_required",
+    processed_at: null,
+    processed_by_id: null,
+    processed_by_name: null,
+    order_approval_requested: false,
+  });
+
+  await expect(
+    page.getByTestId("inventory-supply-order-approval-supply-cancel-1-0"),
+  ).toBeVisible();
+});

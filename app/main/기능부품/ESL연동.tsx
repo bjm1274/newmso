@@ -141,7 +141,6 @@ export default function ZhsunycoEslSync(_props: Props) {
   const [roomDrafts, setRoomDrafts] = useState<Record<string, RoomBoardDraft>>({});
   const [selectedRoomNumber, setSelectedRoomNumber] = useState('');
   const [loadingRooms, setLoadingRooms] = useState(true);
-  const [summary, setSummary] = useState('');
   const [bleBusy, setBleBusy] = useState(false);
   const [bleStatus, setBleStatus] = useState('BLE 기기 스캔 전');
   const [bleDeviceName, setBleDeviceName] = useState('');
@@ -201,15 +200,9 @@ export default function ZhsunycoEslSync(_props: Props) {
         });
         return next;
       });
-      setSummary(
-        nextRooms.length > 0
-          ? `${selectedDate} 기준 병실 ${nextRooms.length}개를 불러왔습니다.`
-          : `${selectedDate} 기준 병실 설정이 없습니다.`,
-      );
     } catch (error) {
       console.error('Failed to load handover room configs:', error);
       setRooms([]);
-      setSummary('병실 설정을 불러오지 못했습니다.');
       toast('병실 설정을 불러오지 못했습니다.', 'error');
     } finally {
       setLoadingRooms(false);
@@ -358,24 +351,9 @@ export default function ZhsunycoEslSync(_props: Props) {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-          <div className="max-w-3xl">
-            <h2 className="text-lg font-bold text-[var(--foreground)]">입원실 안내판 ESL 준비</h2>
-            <p className="mt-2 text-sm text-[var(--toss-gray-3)]">
-              제조사가 제공한 연결 방법을 바탕으로, 우리 프로그램 안에서 병실 데이터 작성과 BLE 기기 연결을 직접 처리하는
-              화면입니다. 클라우드 입력은 제거하고 직결 흐름만 남겼습니다.
-            </p>
-          </div>
-          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/20 px-4 py-3 text-[12px] leading-6 text-[var(--toss-gray-3)]">
-            <div>1. 인계노트에서 병실 구성 불러오기</div>
-            <div>2. 병실별 기기 바코드와 레이아웃 메모 정리</div>
-            <div>3. 프로그램 안에서 BLE 기기 스캔</div>
-            <div>4. 직결 전송 데이터 완성</div>
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-[220px_auto]">
+      <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h2 className="text-lg font-bold text-[var(--foreground)]">입원실 안내판 ESL 준비</h2>
           <label className="space-y-1">
             <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">병실 기준 날짜</span>
             <input
@@ -386,19 +364,6 @@ export default function ZhsunycoEslSync(_props: Props) {
             />
           </label>
         </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => void loadRooms()}
-            disabled={loadingRooms}
-            className="rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2 text-[12px] font-semibold text-[var(--foreground)] disabled:opacity-60"
-          >
-            {loadingRooms ? '불러오는 중...' : '병실 데이터 새로고침'}
-          </button>
-        </div>
-
-        {summary ? <p className="mt-3 text-[12px] font-semibold text-[var(--foreground)]">{summary}</p> : null}
       </section>
 
       <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
