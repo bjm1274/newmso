@@ -1,4 +1,4 @@
-export const CHAT_ROOM_SELECT = [
+const CHAT_ROOM_COLUMNS = [
   'id',
   'name',
   'type',
@@ -8,9 +8,11 @@ export const CHAT_ROOM_SELECT = [
   'last_message',
   'last_message_at',
   'last_message_preview',
-].join(', ');
+];
 
-export const CHAT_MESSAGE_SELECT = [
+export const CHAT_ROOM_SELECT = CHAT_ROOM_COLUMNS.join(', ');
+
+const CHAT_MESSAGE_COLUMNS = [
   'id',
   'room_id',
   'sender_id',
@@ -24,7 +26,24 @@ export const CHAT_MESSAGE_SELECT = [
   'is_deleted',
   'reply_to_id',
   'album_id',
-].join(', ');
+];
+
+export const CHAT_MESSAGE_OPTIONAL_COLUMNS = [
+  'sender_name',
+  'file_url',
+  'file_name',
+  'file_kind',
+  'message_type',
+  'is_deleted',
+  'reply_to_id',
+  'album_id',
+] as const;
+
+export const CHAT_MESSAGE_SELECT = CHAT_MESSAGE_COLUMNS.join(', ');
+
+export function buildChatMessageSelect(omittedColumns?: ReadonlySet<string>) {
+  return CHAT_MESSAGE_COLUMNS.filter((column) => !omittedColumns?.has(column)).join(', ');
+}
 
 export const POLL_SELECT = [
   'id',

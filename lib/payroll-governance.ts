@@ -86,7 +86,7 @@ export interface PayrollMonthlyComparison {
 }
 
 type PayrollRecordLike = {
-  staff_id?: string | null;
+  staff_id?: string | number | null;
   total_taxable?: number | null;
   total_taxfree?: number | null;
   total_deduction?: number | null;

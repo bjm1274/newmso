@@ -24,6 +24,7 @@ const ANESTHESIA_OPTIONS = ['전신마취', '척추마취', '국소마취', '수
 const ITEM_SUGGESTION_ID = 'op-check-item-suggestions';
 const MIGRATION_FILE = 'supabase_migrations/20260331_op_check_foundation.sql';
 const WARD_MESSAGE_FAVORITES_STORAGE_PREFIX = 'erp_op_check_ward_message_favorites';
+const WARD_MESSAGE_RECENTS_STORAGE_PREFIX = 'erp_op_check_ward_message_recents';
 
 type TemplateScope = 'surgery' | 'anesthesia';
 type WorkspaceSortKey = 'time' | 'status' | 'room' | 'name';
@@ -117,6 +118,79 @@ type QueryResult<T> = {
   error: unknown;
 };
 
+type OpCheckViewUser = Partial<Pick<StaffMember, 'id' | 'name' | 'company' | 'company_id'>> &
+  Record<string, unknown>;
+
+const OP_CHECK_BOARD_POST_REQUIRED_COLUMNS = ['id', 'title', 'content', 'company', 'created_at'] as const;
+const OP_CHECK_BOARD_POST_OPTIONAL_COLUMNS = [
+  'company_id',
+  'schedule_date',
+  'schedule_time',
+  'schedule_room',
+  'patient_name',
+  'surgery_fasting',
+  'surgery_inpatient',
+  'surgery_guardian',
+  'surgery_caregiver',
+  'surgery_transfusion',
+] as const;
+const OP_CHECK_TEMPLATE_SELECT = [
+  'id',
+  'company_id',
+  'company_name',
+  'template_scope',
+  'template_name',
+  'surgery_template_id',
+  'surgery_name',
+  'anesthesia_type',
+  'prep_items',
+  'consumable_items',
+  'notes',
+  'is_active',
+  'created_by',
+  'created_by_name',
+  'created_at',
+  'updated_at',
+].join(', ');
+const OP_PATIENT_CHECK_REQUIRED_COLUMNS = [
+  'id',
+  'schedule_post_id',
+  'company_id',
+  'company_name',
+  'patient_name',
+  'chart_no',
+  'surgery_name',
+  'surgery_template_id',
+  'anesthesia_type',
+  'schedule_date',
+  'schedule_time',
+  'schedule_room',
+  'prep_items',
+  'consumable_items',
+  'notes',
+  'status',
+  'applied_template_ids',
+  'created_by',
+  'created_by_name',
+  'updated_by',
+  'updated_by_name',
+  'created_at',
+  'updated_at',
+] as const;
+const OP_PATIENT_CHECK_OPTIONAL_COLUMNS = [
+  'surgery_started_at',
+  'surgery_ended_at',
+  'ward_message_sent_at',
+] as const;
+
+function buildSelectColumns(
+  requiredColumns: readonly string[],
+  optionalColumns: readonly string[] = [],
+  omittedColumns?: ReadonlySet<string>,
+) {
+  return [...requiredColumns, ...optionalColumns.filter((column) => !omittedColumns?.has(column))].join(', ');
+}
+
 function createLocalId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -126,6 +200,18 @@ function normalizeLookupValue(value: unknown) {
     .trim()
     .replace(/\s+/g, '')
     .toLowerCase();
+}
+
+function buildWardSearchVariants(value: unknown) {
+  const normalized = normalizeLookupValue(value);
+  if (!normalized) return [] as string[];
+
+  return Array.from(
+    new Set([
+      normalized,
+      normalized.replace(/\d+/g, ''),
+    ].filter(Boolean)),
+  );
 }
 
 function filterWardStaffsByCompany<T extends { company?: string | null; company_id?: string | null }>(
@@ -151,6 +237,17 @@ function filterWardStaffsByCompany<T extends { company?: string | null; company_
 
     return true;
   });
+}
+
+function resolveWardStaffCandidates<T extends { company?: string | null; company_id?: string | null }>(
+  data: T[] | null | undefined,
+  companyId: unknown,
+  companyName: unknown,
+) {
+  const rows = data || [];
+  const filtered = filterWardStaffsByCompany(rows, companyId, companyName);
+  if (filtered.length === 0) return rows;
+  return [...filtered, ...rows.filter((row) => !filtered.includes(row))];
 }
 
 function normalizeDateValue(value: unknown) {
@@ -225,10 +322,18 @@ function normalizeWardStaffList(data: WardStaffRow[] | null | undefined, senderI
   return Array.from(deduped.values());
 }
 
-function getWardFavoriteStorageKey(userId: unknown, companyId: unknown) {
+function getWardScopedStorageKey(prefix: string, userId: unknown, companyId: unknown) {
   const normalizedUserId = String(userId || 'anonymous').trim() || 'anonymous';
   const normalizedCompanyId = String(companyId || 'global').trim() || 'global';
-  return `${WARD_MESSAGE_FAVORITES_STORAGE_PREFIX}:${normalizedUserId}:${normalizedCompanyId}`;
+  return `${prefix}:${normalizedUserId}:${normalizedCompanyId}`;
+}
+
+function getWardFavoriteStorageKey(userId: unknown, companyId: unknown) {
+  return getWardScopedStorageKey(WARD_MESSAGE_FAVORITES_STORAGE_PREFIX, userId, companyId);
+}
+
+function getWardRecentStorageKey(userId: unknown, companyId: unknown) {
+  return getWardScopedStorageKey(WARD_MESSAGE_RECENTS_STORAGE_PREFIX, userId, companyId);
 }
 
 function getChatRoomMemberIds(room: ChatRoomMemberLookupRow) {
@@ -401,6 +506,52 @@ function getScheduleStatusOrder(status: unknown) {
   const normalizedStatus = String(status || '').trim();
   const matchedIndex = STATUS_OPTIONS.findIndex((item) => item === normalizedStatus);
   return matchedIndex >= 0 ? matchedIndex : 0;
+}
+
+function updateRecentTargetIds(currentIds: string[], nextIds: string[]) {
+  return Array.from(
+    new Set(
+      [...nextIds, ...currentIds]
+        .map((value) => String(value || '').trim())
+        .filter(Boolean),
+    ),
+  ).slice(0, 8);
+}
+
+function buildWardMessageTemplateOptions(checkForm: PatientCheckState | null) {
+  if (!checkForm) return [] as Array<{ id: string; label: string; text: string }>;
+
+  const patientName = stripHiddenMetaBlocks(checkForm.patient_name);
+  const chartNo = stripHiddenMetaBlocks(checkForm.chart_no);
+  const surgeryName = stripHiddenMetaBlocks(checkForm.surgery_name);
+  const scheduleRoom = stripHiddenMetaBlocks(checkForm.schedule_room || '미정') || '미정';
+  const scheduleTime = stripHiddenMetaBlocks(checkForm.schedule_time || '미정') || '미정';
+  const patientLabel = `${patientName} 환자${chartNo ? ` (차트: ${chartNo})` : ''}`;
+  const scheduleLabel = `수술실:${scheduleRoom} / 수술시간:${scheduleTime}`;
+
+  return [
+    {
+      id: 'prep-complete',
+      label: '기본 안내',
+      text:
+        `[수술실 메시지] ${patientLabel} ${surgeryName} 수술 준비가 완료되었습니다.\n` +
+        `환자 처치 후 수술실로 올려주세요.\n${scheduleLabel}`,
+    },
+    {
+      id: 'move-request',
+      label: '이동 요청',
+      text:
+        `[수술실 이동 요청] ${patientLabel} ${surgeryName} 준비 완료되었습니다.\n` +
+        `지금 수술실로 이동 부탁드립니다.\n${scheduleLabel}`,
+    },
+    {
+      id: 'after-treatment',
+      label: '검사 후 이동',
+      text:
+        `[수술실 이동 요청] ${patientLabel} ${surgeryName} 예정입니다.\n` +
+        `검사/처치 완료 후 수술실로 올려주세요.\n${scheduleLabel}`,
+    },
+  ];
 }
 
 function sortSchedulesForWorkspace(
@@ -595,7 +746,7 @@ export default function OperationCheckView({
   selectedCo,
   selectedCompanyId,
 }: {
-  user?: Record<string, any>;
+  user?: OpCheckViewUser | null;
   staffs?: StaffMember[];
   selectedCo?: string | null;
   selectedCompanyId?: string | null;
@@ -625,6 +776,7 @@ export default function OperationCheckView({
   const [wardMsgTargets, setWardMsgTargets] = useState<string[]>([]);
   const [wardStaffs, setWardStaffs] = useState<WardStaffRow[]>([]);
   const [wardFavoriteTargets, setWardFavoriteTargets] = useState<string[]>([]);
+  const [wardRecentTargets, setWardRecentTargets] = useState<string[]>([]);
   const [wardRecipientPickerOpen, setWardRecipientPickerOpen] = useState(false);
   const [wardRecipientSearch, setWardRecipientSearch] = useState('');
   const [sendingMsg, setSendingMsg] = useState(false);
@@ -658,6 +810,15 @@ export default function OperationCheckView({
     [selectedCompanyId, selectedScheduleCompanyId, user?.company_id, user?.id],
   );
 
+  const wardRecentStorageKey = useMemo(
+    () =>
+      getWardRecentStorageKey(
+        user?.id,
+        selectedScheduleCompanyId || selectedCompanyId || user?.company_id,
+      ),
+    [selectedCompanyId, selectedScheduleCompanyId, user?.company_id, user?.id],
+  );
+
   const wardStaffMap = useMemo(
     () => new Map(wardStaffs.map((staff) => [staff.id, staff])),
     [wardStaffs],
@@ -676,17 +837,70 @@ export default function OperationCheckView({
     [wardFavoriteTargets, wardStaffMap],
   );
 
+  const recentWardStaffs = useMemo(
+    () =>
+      wardRecentTargets
+        .map((targetId) => wardStaffMap.get(targetId))
+        .filter(Boolean) as WardStaffRow[],
+    [wardRecentTargets, wardStaffMap],
+  );
+
   const filteredWardStaffs = useMemo(() => {
-    const lookup = normalizeLookupValue(deferredWardRecipientSearch);
+    const lookupVariants = buildWardSearchVariants(deferredWardRecipientSearch);
 
     return wardStaffs.filter((staff) => {
       if (wardMsgTargets.includes(staff.id)) return false;
-      if (!lookup) return true;
-      return [staff.name, staff.department, staff.position].some((value) =>
-        normalizeLookupValue(value).includes(lookup),
+      if (lookupVariants.length === 0) return true;
+
+      const staffSearchValues = [staff.name, staff.department, staff.position, staff.company]
+        .flatMap((value) => buildWardSearchVariants(value));
+
+      return lookupVariants.some((lookup) =>
+        staffSearchValues.some((value) => value.includes(lookup)),
       );
     });
   }, [deferredWardRecipientSearch, wardMsgTargets, wardStaffs]);
+
+  const recommendedWardStaffs = useMemo(() => {
+    return [...wardStaffs]
+      .filter((staff) => !wardMsgTargets.includes(staff.id))
+      .map((staff) => {
+        const normalizedDepartment = normalizeLookupValue(staff.department);
+        let score = 0;
+        if (normalizedDepartment.includes('병동')) score += 5;
+        if (normalizedDepartment.includes('간호')) score += 2;
+        if (wardRecentTargets.includes(staff.id)) score += 3;
+        if (wardFavoriteTargets.includes(staff.id)) score += 2;
+        return {
+          staff,
+          score,
+        };
+      })
+      .sort((left, right) => {
+        const scoreDiff = right.score - left.score;
+        if (scoreDiff !== 0) return scoreDiff;
+        return String(left.staff.name || '').localeCompare(String(right.staff.name || ''), 'ko');
+      })
+      .filter((entry, index) => entry.score > 0 || index < 5)
+      .slice(0, 5)
+      .map((entry) => entry.staff);
+  }, [wardFavoriteTargets, wardMsgTargets, wardRecentTargets, wardStaffs]);
+
+  const normalizedWardMessageText = useMemo(
+    () => stripHiddenMetaBlocks(wardMsgText).trim(),
+    [wardMsgText],
+  );
+
+  const wardMessageValidationText = useMemo(() => {
+    if (wardMsgTargets.length === 0) return '받는 사람을 1명 이상 선택하세요.';
+    if (!normalizedWardMessageText) return '메시지 내용을 입력하세요.';
+    return '';
+  }, [normalizedWardMessageText, wardMsgTargets.length]);
+
+  const wardMessageTemplates = useMemo(
+    () => buildWardMessageTemplateOptions(checkForm),
+    [checkForm],
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -706,6 +920,21 @@ export default function OperationCheckView({
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
+      const raw = window.localStorage.getItem(wardRecentStorageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      setWardRecentTargets(
+        Array.isArray(parsed)
+          ? Array.from(new Set(parsed.map((value) => String(value || '').trim()).filter(Boolean))).slice(0, 8)
+          : [],
+      );
+    } catch {
+      setWardRecentTargets([]);
+    }
+  }, [wardRecentStorageKey]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
       window.localStorage.setItem(
         wardFavoriteStorageKey,
         JSON.stringify(Array.from(new Set(wardFavoriteTargets))),
@@ -716,9 +945,25 @@ export default function OperationCheckView({
   }, [wardFavoriteStorageKey, wardFavoriteTargets]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(
+        wardRecentStorageKey,
+        JSON.stringify(Array.from(new Set(wardRecentTargets)).slice(0, 8)),
+      );
+    } catch {
+      // localStorage save failures should not block the modal UX.
+    }
+  }, [wardRecentStorageKey, wardRecentTargets]);
+
+  useEffect(() => {
     if (!showWardMsgModal || wardStaffs.length === 0) return;
     const availableIds = new Set(wardStaffs.map((staff) => staff.id));
     setWardFavoriteTargets((prev) => {
+      const next = prev.filter((targetId) => availableIds.has(targetId));
+      return next.length === prev.length ? prev : next;
+    });
+    setWardRecentTargets((prev) => {
       const next = prev.filter((targetId) => availableIds.has(targetId));
       return next.length === prev.length ? prev : next;
     });
@@ -734,53 +979,44 @@ export default function OperationCheckView({
 
     try {
       const [scheduleRes, templateRes, patientCheckRes, surgeryTemplateRes, inventoryRes] = await Promise.all([
-        withMissingColumnFallback(
-          async () => {
-            return supabase
+        withMissingColumnsFallback<BoardPost[]>(
+          async (omittedColumns): Promise<QueryResult<BoardPost[]>> => {
+            const result = await supabase
               .from('board_posts')
-              .select('*')
+              .select(
+                buildSelectColumns(
+                  OP_CHECK_BOARD_POST_REQUIRED_COLUMNS,
+                  OP_CHECK_BOARD_POST_OPTIONAL_COLUMNS,
+                  omittedColumns,
+                ),
+              )
               .eq('board_type', '수술일정')
               .order('created_at', { ascending: true });
+            return result as unknown as QueryResult<BoardPost[]>;
           },
-          async () => {
-            return supabase
-              .from('board_posts')
-              .select('*')
-              .eq('board_type', '수술일정')
-              .order('created_at', { ascending: true });
-          },
+          [...OP_CHECK_BOARD_POST_OPTIONAL_COLUMNS],
         ),
-        withMissingColumnFallback(
-          async () => {
-            return supabase
-              .from('op_check_templates')
-              .select('*')
-              .order('template_scope', { ascending: true })
-              .order('template_name', { ascending: true });
-          },
-          async () => {
-            return supabase
-              .from('op_check_templates')
-              .select('*')
-              .order('template_scope', { ascending: true })
-              .order('template_name', { ascending: true });
-          },
-        ),
-        withMissingColumnFallback(
-          async () => {
-            return supabase
+        supabase
+          .from('op_check_templates')
+          .select(OP_CHECK_TEMPLATE_SELECT)
+          .order('template_scope', { ascending: true })
+          .order('template_name', { ascending: true }) as unknown as Promise<QueryResult<OpCheckTemplate[]>>,
+        withMissingColumnsFallback<OpPatientCheck[]>(
+          async (omittedColumns): Promise<QueryResult<OpPatientCheck[]>> => {
+            const result = await supabase
               .from('op_patient_checks')
-              .select('*')
+              .select(
+                buildSelectColumns(
+                  OP_PATIENT_CHECK_REQUIRED_COLUMNS,
+                  OP_PATIENT_CHECK_OPTIONAL_COLUMNS,
+                  omittedColumns,
+                ),
+              )
               .order('schedule_date', { ascending: true })
               .order('schedule_time', { ascending: true });
+            return result as unknown as QueryResult<OpPatientCheck[]>;
           },
-          async () => {
-            return supabase
-              .from('op_patient_checks')
-              .select('*')
-              .order('schedule_date', { ascending: true })
-              .order('schedule_time', { ascending: true });
-          },
+          [...OP_PATIENT_CHECK_OPTIONAL_COLUMNS],
         ),
         withOptionalQueryFallback<SurgeryTemplateRow[]>(
           async (): Promise<QueryResult<SurgeryTemplateRow[]>> =>
@@ -1520,11 +1756,23 @@ export default function OperationCheckView({
         updated_at: new Date().toISOString(),
       };
 
-      const { data, error } = await supabase
-        .from('op_patient_checks')
-        .upsert(payload, { onConflict: 'schedule_post_id' })
-        .select('*')
-        .single();
+      const { data, error } = await withMissingColumnsFallback<OpPatientCheck>(
+        async (omittedColumns): Promise<QueryResult<OpPatientCheck>> => {
+          const result = await supabase
+            .from('op_patient_checks')
+            .upsert(payload, { onConflict: 'schedule_post_id' })
+            .select(
+              buildSelectColumns(
+                OP_PATIENT_CHECK_REQUIRED_COLUMNS,
+                OP_PATIENT_CHECK_OPTIONAL_COLUMNS,
+                omittedColumns,
+              ),
+            )
+            .single();
+          return result as unknown as QueryResult<OpPatientCheck>;
+        },
+        [...OP_PATIENT_CHECK_OPTIONAL_COLUMNS],
+      );
 
       if (error) throw error;
 
@@ -1618,12 +1866,12 @@ export default function OperationCheckView({
         updated_at: new Date().toISOString(),
       };
 
-      const response = templateEditor.id
+      const response = (templateEditor.id
         ? await supabase
             .from('op_check_templates')
             .update(payload)
             .eq('id', templateEditor.id)
-            .select('*')
+            .select(OP_CHECK_TEMPLATE_SELECT)
             .single()
         : await supabase
             .from('op_check_templates')
@@ -1631,8 +1879,8 @@ export default function OperationCheckView({
               ...payload,
               created_at: new Date().toISOString(),
             })
-            .select('*')
-            .single();
+            .select(OP_CHECK_TEMPLATE_SELECT)
+            .single()) as unknown as QueryResult<OpCheckTemplate>;
 
       if (response.error) throw response.error;
 
@@ -1725,7 +1973,13 @@ export default function OperationCheckView({
           return supabase
             .from('op_patient_checks')
             .upsert(payload, { onConflict: 'schedule_post_id' })
-            .select('*')
+            .select(
+              buildSelectColumns(
+                OP_PATIENT_CHECK_REQUIRED_COLUMNS,
+                OP_PATIENT_CHECK_OPTIONAL_COLUMNS,
+                omittedColumns,
+              ),
+            )
             .single() as unknown as Promise<{ data: OpPatientCheck | null; error: unknown }>;
         },
         ['surgery_started_at', 'surgery_ended_at', 'ward_message_sent_at'],
@@ -1790,13 +2044,7 @@ export default function OperationCheckView({
 
   const openWardMsgModal = useCallback(async () => {
     if (!checkForm || !selectedSchedule) return;
-    const patientName = stripHiddenMetaBlocks(checkForm.patient_name);
-    const chartNo = stripHiddenMetaBlocks(checkForm.chart_no);
-    const surgeryName = stripHiddenMetaBlocks(checkForm.surgery_name);
-    const scheduleRoom = stripHiddenMetaBlocks(checkForm.schedule_room || '미정') || '미정';
-    const scheduleTime = stripHiddenMetaBlocks(checkForm.schedule_time || '미정') || '미정';
-    const defaultMsg = `[수술실 메시지] ${patientName} 환자${chartNo ? ` (차트: ${chartNo})` : ''} ${surgeryName} 수술 준비가 완료되었습니다.\n환자 처치 후 수술실로 올려주세요.\n수술실: ${scheduleRoom} / 수술 시간: ${scheduleTime}`;
-    setWardMsgText(defaultMsg);
+    setWardMsgText(wardMessageTemplates[0]?.text || '');
     setWardMsgTargets([]);
     setWardRecipientSearch('');
     setWardRecipientPickerOpen(false);
@@ -1812,7 +2060,7 @@ export default function OperationCheckView({
       if (hasPrefetchedStaffs) {
         setWardStaffs(
           normalizeWardStaffList(
-            filterWardStaffsByCompany(staffs, companyId, companyName) as WardStaffRow[],
+            resolveWardStaffCandidates(staffs, companyId, companyName) as WardStaffRow[],
             senderId,
           ),
         );
@@ -1823,7 +2071,7 @@ export default function OperationCheckView({
           .order('name');
         setWardStaffs(
           normalizeWardStaffList(
-            filterWardStaffsByCompany((data || []) as WardStaffRow[], companyId, companyName),
+            resolveWardStaffCandidates((data || []) as WardStaffRow[], companyId, companyName),
             senderId,
           ),
         );
@@ -1838,14 +2086,14 @@ export default function OperationCheckView({
     selectedCompanyId,
     selectedSchedule,
     staffs,
+    wardMessageTemplates,
     user?.company,
     user?.company_id,
     user?.id,
   ]);
 
   const sendWardMessage = useCallback(async () => {
-    const normalizedMessage = stripHiddenMetaBlocks(wardMsgText).trim();
-    if (!wardMsgTargets.length || !normalizedMessage) {
+    if (!wardMsgTargets.length || !normalizedWardMessageText) {
       toast('받는 사람과 메시지 내용을 입력해 주세요.', 'warning');
       return;
     }
@@ -1887,6 +2135,7 @@ export default function OperationCheckView({
 
       let successCount = 0;
       let failedCount = 0;
+      const successfulTargetIds: string[] = [];
       const companyId = String(selectedSchedule?.company_id || user?.company_id || '').trim();
       for (const targetId of wardMsgTargets) {
         let roomId = existingRoomMap.get(targetId);
@@ -1928,13 +2177,14 @@ export default function OperationCheckView({
         if (roomId) {
           const { error: msgErr } = await supabase
             .from('messages')
-            .insert({ room_id: roomId, sender_id: senderId, content: normalizedMessage });
+            .insert({ room_id: roomId, sender_id: senderId, content: normalizedWardMessageText });
           if (msgErr) {
             failedCount++;
             console.error('메시지 저장 실패', msgErr);
             continue;
           }
           successCount++;
+          successfulTargetIds.push(targetId);
         }
       }
       if (successCount > 0) {
@@ -1957,7 +2207,8 @@ export default function OperationCheckView({
           );
           setCheckForm((prev) => (prev ? { ...prev, ward_message_sent_at: now } : prev));
         }
-        setWardMsgText(normalizedMessage);
+        setWardMsgText(normalizedWardMessageText);
+        setWardRecentTargets((prev) => updateRecentTargetIds(prev, successfulTargetIds));
         if (failedCount > 0) {
           toast(`병동팀 ${successCount}명에게 전송했고 ${failedCount}명은 실패했습니다.`, 'warning');
         } else {
@@ -1974,7 +2225,7 @@ export default function OperationCheckView({
     } finally {
       setSendingMsg(false);
     }
-  }, [checkForm, selectedSchedule?.company_id, wardMsgTargets, wardMsgText, wardStaffMap, user?.id, user?.company_id]);
+  }, [checkForm, normalizedWardMessageText, selectedSchedule?.company_id, wardMsgTargets, wardStaffMap, user?.id, user?.company_id]);
 
   // #8 소모품 재고 차감
   const deductInventoryItems = useCallback(async (items: ChecklistItemDraft[]) => {
@@ -3564,6 +3815,60 @@ export default function OperationCheckView({
                 </p>
                 <div className="space-y-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/20 p-3">
                   <div>
+                    <p className="mb-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">추천 받는 사람</p>
+                    <div className="flex flex-wrap gap-2">
+                      {recommendedWardStaffs.length === 0 ? (
+                        <p className="text-[11px] font-medium text-[var(--toss-gray-3)]">
+                          추천 가능한 병동 인원이 아직 없습니다.
+                        </p>
+                      ) : (
+                        recommendedWardStaffs.map((staff) => (
+                          <button
+                            key={staff.id}
+                            type="button"
+                            onClick={() => addWardMessageTarget(staff.id)}
+                            data-testid={`op-check-ward-recommended-chip-${staff.id}`}
+                            className="rounded-full border border-[var(--border)] bg-white px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)] hover:border-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
+                          >
+                            {staff.name}
+                            {staff.department ? ` · ${staff.department}` : ''}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">최근 보낸 사람</p>
+                    <div className="flex flex-wrap gap-2">
+                      {recentWardStaffs.length === 0 ? (
+                        <p className="text-[11px] font-medium text-[var(--toss-gray-3)]">
+                          최근 전송한 사람이 아직 없습니다.
+                        </p>
+                      ) : (
+                        recentWardStaffs.map((staff) => {
+                          const selected = wardMsgTargets.includes(staff.id);
+                          return (
+                            <button
+                              key={staff.id}
+                              type="button"
+                              onClick={() => (selected ? removeWardMessageTarget(staff.id) : addWardMessageTarget(staff.id))}
+                              data-testid={`op-check-ward-recent-chip-${staff.id}`}
+                              className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold ${
+                                selected
+                                  ? 'border-[var(--accent)] bg-[var(--toss-blue-light)] text-[var(--accent)]'
+                                  : 'border-[var(--border)] bg-white text-[var(--foreground)] hover:border-[var(--accent)]'
+                              }`}
+                            >
+                              {staff.name}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
                     <p className="mb-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">즐겨찾는 사람</p>
                     <div className="flex flex-wrap gap-2">
                       {favoriteWardStaffs.length === 0 ? (
@@ -3755,6 +4060,26 @@ export default function OperationCheckView({
               {/* 메시지 내용 */}
               <div>
                 <p className="mb-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">메시지 내용</p>
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {wardMessageTemplates.map((template) => {
+                    const selectedTemplate = normalizedWardMessageText === stripHiddenMetaBlocks(template.text).trim();
+                    return (
+                      <button
+                        key={template.id}
+                        type="button"
+                        onClick={() => setWardMsgText(template.text)}
+                        data-testid={`op-check-ward-template-${template.id}`}
+                        className={`rounded-full px-3 py-1.5 text-[11px] font-bold ${
+                          selectedTemplate
+                            ? 'bg-[var(--accent)] text-white'
+                            : 'border border-[var(--border)] bg-white text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
+                        }`}
+                      >
+                        {template.label}
+                      </button>
+                    );
+                  })}
+                </div>
                 <textarea
                   value={wardMsgText}
                   onChange={(e) => setWardMsgText(e.target.value)}
@@ -3762,6 +4087,18 @@ export default function OperationCheckView({
                   className="min-h-[120px] w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-medium"
                   placeholder="전송할 메시지를 입력해 주세요."
                 />
+                {wardMessageValidationText ? (
+                  <p
+                    data-testid="op-check-ward-validation-text"
+                    className="mt-2 text-[11px] font-semibold text-rose-600"
+                  >
+                    {wardMessageValidationText}
+                  </p>
+                ) : (
+                  <p className="mt-2 text-[11px] font-medium text-[var(--toss-gray-3)]">
+                    최근/추천/즐겨찾기에서 받는 사람을 빠르게 추가할 수 있습니다.
+                  </p>
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-1">
@@ -3775,7 +4112,7 @@ export default function OperationCheckView({
                 <button
                   type="button"
                   onClick={() => void sendWardMessage()}
-                  disabled={sendingMsg || wardMsgTargets.length === 0}
+                  disabled={sendingMsg || wardMsgTargets.length === 0 || !normalizedWardMessageText}
                   data-testid="op-check-ward-message-send"
                   className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
                 >
