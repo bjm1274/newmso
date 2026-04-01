@@ -152,8 +152,24 @@ test('op check links schedules, applies templates, and saves a patient record', 
     ],
   });
 
+  await page.setViewportSize({ width: 1440, height: 1200 });
+  await expect(page.getByTestId('op-check-patient-search-card')).toBeVisible();
+  await expect(page.getByTestId('op-check-patient-calendar-card')).toBeVisible();
+  await expect(page.getByTestId('op-check-patient-summary-card')).toBeVisible();
+  const patientTopGridColumnCount = await page.getByTestId('op-check-patient-top-grid').evaluate((node) => {
+    return window
+      .getComputedStyle(node)
+      .gridTemplateColumns.split(' ')
+      .filter((value) => value.trim().length > 0).length;
+  });
+  expect(patientTopGridColumnCount).toBeGreaterThanOrEqual(3);
+
+  await page.getByTestId('op-check-calendar-toggle').click();
   await page.getByTestId('op-check-calendar-day-' + todayKey).click();
   await expect(page.getByTestId('op-check-workspace-modal')).toBeVisible();
+  await expect(page.getByTestId('op-check-workspace-header-summary')).toBeVisible();
+  await expect(page.getByTestId('op-check-workspace-sidebar-summary')).toBeVisible();
+  await expect(page.getByTestId('op-check-workspace-detail-meta')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Patient Alpha' }).first()).toBeVisible();
   await expect(page.locator('input[value="Knee set"]').first()).toBeVisible();
   await expect(page.locator('input[value="Screw set"]').first()).toBeVisible();
@@ -165,7 +181,8 @@ test('op check links schedules, applies templates, and saves a patient record', 
   await expect(page.locator('input[value="Propofol"]').first()).toBeVisible();
 
   await page.getByTestId('op-check-record-save').click();
-  await expect(page.getByTestId('op-check-schedule-card-schedule-post-1')).toContainText('저장됨 · 준비중');
+  await expect(page.getByText('환자별 OP체크를 저장했습니다.')).toBeVisible();
+  await expect(page.getByTestId('op-check-schedule-card-schedule-post-1')).toContainText('준비중');
 
   expect(runtimeErrors).toEqual([]);
 });
@@ -196,6 +213,7 @@ test('op check stays available when optional surgery template and inventory sour
     missingInventoryItemsSchema: true,
   });
 
+  await page.getByTestId('op-check-calendar-toggle').click();
   await expect(page.getByTestId('op-check-calendar-day-' + todayKey)).toContainText('Fallback Patient');
   await expect(page.getByTestId('op-check-schedule-card-schedule-post-optional-fallback')).toBeVisible();
   await page.getByTestId('op-check-schedule-card-schedule-post-optional-fallback').click();
@@ -252,6 +270,7 @@ test('op check follows the selected company scope for MSO users', async ({ page 
     }
   );
 
+  await page.getByTestId('op-check-calendar-toggle').click();
   await expect(page.getByTestId('op-check-calendar-day-' + todayKey)).toContainText('Scoped Patient');
   await expect(page.getByTestId('op-check-schedule-card-schedule-post-selected-company')).toBeVisible();
   await page.getByTestId('op-check-schedule-card-schedule-post-selected-company').click();
@@ -352,8 +371,7 @@ test('op check ward messages use dropdown recipients, keep favorites, and send s
   await page.getByTestId('op-check-ward-favorite-chip-' + favoriteStaffId).click();
   await expect(page.getByTestId('op-check-ward-message-send')).toContainText('1명');
   await page.getByTestId('op-check-ward-message-send').click();
-
-  await expect(page.getByText(/병동 메시지 .* 발송/)).toBeVisible();
+  await expect(page.getByTestId('op-check-ward-message-close')).toHaveCount(0);
   const favoriteIds = await page.evaluate((storageKey) => {
     const raw = window.localStorage.getItem(storageKey);
     return raw ? JSON.parse(raw) : [];
@@ -453,6 +471,7 @@ test('op check workspace guards unsaved changes, supports quick navigation, and 
     ],
   });
 
+  await page.getByTestId('op-check-calendar-toggle').click();
   await page.getByTestId('op-check-calendar-day-' + todayKey).click();
   await expect(page.getByTestId('op-check-workspace-modal')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Patient Alpha' }).first()).toBeVisible();
