@@ -31,7 +31,7 @@ function resolveApprovalCategory(item: ApprovalArchiveSource) {
     type === '출결정정' ||
     type === '인사명령'
   ) {
-    return '서식';
+    return '양식';
   }
   return '기타';
 }
