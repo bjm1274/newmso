@@ -107,9 +107,15 @@ type PayrollMainProps = {
   staffs?: Staff[];
   selectedCo?: string;
   onRefresh?: () => void;
+  showAdminPolicyTabs?: boolean;
 };
 
-export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: PayrollMainProps) {
+export default function PayrollMain({
+  staffs = [],
+  selectedCo,
+  onRefresh,
+  showAdminPolicyTabs = true,
+}: PayrollMainProps) {
   const [activeTab, setActiveTab] = useState('대시보드');
   const [selectedStaffId, setSelectedStaffId] = useState<string | number | null>(null);
   const [checkedIds, setCheckedIds] = useState<(string | number)[]>([]);
@@ -294,6 +300,22 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: Payr
     { id: '무급결근차감', label: '무급 결근 차감', icon: '📉' },
   ];
 
+  const adminOnlyPayrollTabIds = new Set<string>([
+    '?듯빀?ㅼ젙',
+    '湲됱뿬怨좊룄??',
+  ]);
+  const hiddenAdminPayrollTabIds = new Set<string>([tabs[4].id, tabs[15].id]);
+  adminOnlyPayrollTabIds.forEach((tabId) => hiddenAdminPayrollTabIds.add(tabId));
+  const visibleTabs = showAdminPolicyTabs
+    ? tabs
+    : tabs.filter((tab) => !hiddenAdminPayrollTabIds.has(tab.id));
+
+  useEffect(() => {
+    if (!visibleTabs.some((tab) => tab.id === activeTab)) {
+      setActiveTab(visibleTabs[0]?.id || tabs[0]?.id);
+    }
+  }, [activeTab, tabs, visibleTabs]);
+
   return (
     <div
       className="flex flex-col h-full animate-in fade-in duration-500 app-page"
@@ -314,7 +336,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: Payr
           <div className="h-6 w-[1px] bg-[var(--border)] mx-1" />
 
           <nav className="no-scrollbar overflow-x-auto flex gap-1">
-            {tabs.map((tab) => (
+            {visibleTabs.map((tab) => (
               <button
                 key={tab.id}
                 data-testid={`payroll-tab-${tab.id}`}

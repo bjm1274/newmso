@@ -6,7 +6,13 @@ import ContractList from './계약문서/계약서명단';
 import ContractPreview from './계약문서/계약서미리보기';
 import ContractTemplateEditor from './계약문서/계약서양식편집';
 
-export default function ContractMain({ staffs, selectedCo, onRefresh }: Record<string, unknown>) {
+export default function ContractMain({
+  staffs,
+  selectedCo,
+  onRefresh,
+  showAdminPolicyTabs = true,
+  showTemplateEditor = true,
+}: Record<string, unknown>) {
   const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
   const [checkedIds, setCheckedIds] = useState<number[]>([]);
   const [contracts, setContracts] = useState<any[]>([]);
@@ -39,6 +45,18 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: Record<s
   };
 
   useEffect(() => { fetchContracts(); }, []);
+
+  const visibleTabs = [
+    '怨꾩빟?꾪솴',
+    ...(showAdminPolicyTabs ? ['?좉퇋/蹂寃쎄퀎?쎌꽌', '?곕큺怨꾩빟媛깆떊'] : []),
+    ...(showTemplateEditor ? ['?묒떇 ?몄쭛'] : []),
+  ];
+
+  useEffect(() => {
+    if (!visibleTabs.includes(activeTab)) {
+      setActiveTab(visibleTabs[0] || '怨꾩빟?꾪솴');
+    }
+  }, [activeTab, visibleTabs]);
 
   const handleRequestSignature = async () => {
     if (checkedIds.length === 0) return toast("직원을 선택해주세요.", 'warning');
@@ -174,7 +192,9 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: Record<s
           <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tight">전자 계약 및 법적 비과세 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo as string}]</span></h2>
           <div className="flex gap-0.5 p-1 app-tab-bar w-fit mt-2">
             {['계약현황', '신규/변경계약서', '연봉계약갱신', '양식 편집'].map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 text-xs font-medium rounded-md transition-all whitespace-nowrap ${activeTab === tab ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--card)]/60'}`}>{tab}</button>
+              visibleTabs.includes(tab) ? (
+                <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 text-xs font-medium rounded-md transition-all whitespace-nowrap ${activeTab === tab ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--card)]/60'}`}>{tab}</button>
+              ) : null
             ))}
           </div>
         </div>

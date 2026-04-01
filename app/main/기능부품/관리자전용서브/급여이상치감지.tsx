@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
-const DEFAULT_THRESHOLD = 20;
+export const DEFAULT_THRESHOLD = 20;
 
 type StaffLike = {
   id?: string | number | null;
@@ -35,6 +35,17 @@ type AnomalyRow = {
   diff: number;
   pct: number;
   severity: Severity;
+};
+
+export type PayrollAnomalyAnalysis = {
+  currentMonth: string;
+  previousMonth: string;
+  threshold: number;
+  allData: AnomalyRow[];
+  visibleAnomalies: AnomalyRow[];
+  newPayments: AnomalyRow[];
+  criticalCount: number;
+  warningCount: number;
 };
 
 function toMonthValue(date: Date) {
@@ -86,28 +97,134 @@ function addLookupEntry(map: Map<string, StaffLike>, key: unknown, staff: StaffL
   map.set(normalized, staff);
 }
 
+function buildStaffLookup(staffs: StaffLike[]) {
+  const lookup = new Map<string, StaffLike>();
+
+  for (const staff of staffs) {
+    if (!staff) continue;
+    addLookupEntry(lookup, staff.id, staff);
+    addLookupEntry(lookup, staff.staff_id, staff);
+    addLookupEntry(lookup, staff.employee_no, staff);
+    addLookupEntry(lookup, staff.employeeNo, staff);
+    addLookupEntry(lookup, staff.staff_number, staff);
+    addLookupEntry(lookup, staff.emp_no, staff);
+  }
+
+  return lookup;
+}
+
+export async function detectPayrollAnomalies({
+  currentMonth = toMonthValue(new Date()),
+  threshold = DEFAULT_THRESHOLD,
+  staffs = [],
+}: {
+  currentMonth?: string;
+  threshold?: number;
+  staffs?: StaffLike[];
+} = {}): Promise<PayrollAnomalyAnalysis> {
+  const previousMonth = getPreviousMonth(currentMonth);
+  const staffLookup = buildStaffLookup(staffs);
+
+  const [currentResult, previousResult] = await Promise.all([
+    supabase.from('payroll_records').select('staff_id, net_pay').eq('year_month', currentMonth),
+    supabase.from('payroll_records').select('staff_id, net_pay').eq('year_month', previousMonth),
+  ]);
+
+  if (currentResult.error) throw currentResult.error;
+  if (previousResult.error) throw previousResult.error;
+
+  const currentRows = (currentResult.data ?? []) as PayrollRow[];
+  const previousRows = (previousResult.data ?? []) as PayrollRow[];
+
+  const currentMap = new Map<string, PayrollRow>();
+  const previousMap = new Map<string, PayrollRow>();
+
+  for (const row of currentRows) {
+    if (!row?.staff_id) continue;
+    currentMap.set(String(row.staff_id), row);
+  }
+
+  for (const row of previousRows) {
+    if (!row?.staff_id) continue;
+    previousMap.set(String(row.staff_id), row);
+  }
+
+  const staffIds = new Set<string>([
+    ...Array.from(currentMap.keys()),
+    ...Array.from(previousMap.keys()),
+  ]);
+
+  const allData: AnomalyRow[] = [];
+
+  for (const staffId of staffIds) {
+    const currentAmount = Number(currentMap.get(staffId)?.net_pay ?? 0);
+    const previousAmount = Number(previousMap.get(staffId)?.net_pay ?? 0);
+    const diff = currentAmount - previousAmount;
+    const pct =
+      previousAmount === 0
+        ? currentAmount > 0
+          ? 100
+          : 0
+        : (diff / previousAmount) * 100;
+
+    let type: AnomalyType | null = null;
+    let severity: Severity = 'info';
+
+    if (previousAmount > 0 && currentAmount === 0) {
+      type = '급여누락';
+      severity = 'critical';
+    } else if (previousAmount === 0 && currentAmount > 0) {
+      type = '신규지급';
+      severity = 'info';
+    } else if (Math.abs(pct) >= threshold) {
+      type = pct > 0 ? '급여급증' : '급여급감';
+      severity = Math.abs(pct) >= 50 ? 'critical' : 'warning';
+    }
+
+    if (!type) continue;
+
+    allData.push({
+      staffId,
+      staff: staffLookup.get(staffId),
+      type,
+      current: currentAmount,
+      previous: previousAmount,
+      diff,
+      pct,
+      severity,
+    });
+  }
+
+  allData.sort((a, b) => {
+    const severityOrder: Record<Severity, number> = { critical: 0, warning: 1, info: 2 };
+    const severityGap = severityOrder[a.severity] - severityOrder[b.severity];
+    if (severityGap !== 0) return severityGap;
+    return Math.abs(b.diff) - Math.abs(a.diff);
+  });
+
+  const visibleAnomalies = allData.filter((item) => item.type !== '신규지급');
+  const newPayments = allData.filter((item) => item.type === '신규지급');
+  const criticalCount = visibleAnomalies.filter((item) => item.severity === 'critical').length;
+  const warningCount = visibleAnomalies.filter((item) => item.severity === 'warning').length;
+
+  return {
+    currentMonth,
+    previousMonth,
+    threshold,
+    allData,
+    visibleAnomalies,
+    newPayments,
+    criticalCount,
+    warningCount,
+  };
+}
+
 export default function SalaryAnomalyDetector({ staffs = [] as StaffLike[] }) {
   const [currentMonth, setCurrentMonth] = useState(() => toMonthValue(new Date()));
   const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD);
   const [loading, setLoading] = useState(false);
   const [allData, setAllData] = useState<AnomalyRow[]>([]);
   const [historicalStaffNames, setHistoricalStaffNames] = useState<Record<string, string>>({});
-
-  const staffLookup = useMemo(() => {
-    const lookup = new Map<string, StaffLike>();
-
-    for (const staff of staffs) {
-      if (!staff) continue;
-      addLookupEntry(lookup, staff.id, staff);
-      addLookupEntry(lookup, staff.staff_id, staff);
-      addLookupEntry(lookup, staff.employee_no, staff);
-      addLookupEntry(lookup, staff.employeeNo, staff);
-      addLookupEntry(lookup, staff.staff_number, staff);
-      addLookupEntry(lookup, staff.emp_no, staff);
-    }
-
-    return lookup;
-  }, [staffs]);
 
   const getStaffIdentifier = useCallback((staff?: StaffLike, staffId?: string) => {
     if (!staff) {
@@ -173,96 +290,23 @@ export default function SalaryAnomalyDetector({ staffs = [] as StaffLike[] }) {
   }, []);
 
   const analyze = useCallback(async () => {
-    const previousMonth = getPreviousMonth(currentMonth);
     setLoading(true);
 
     try {
-      const [currentResult, previousResult] = await Promise.all([
-        supabase.from('payroll_records').select('staff_id, net_pay').eq('year_month', currentMonth),
-        supabase.from('payroll_records').select('staff_id, net_pay').eq('year_month', previousMonth),
-      ]);
-
-      if (currentResult.error) throw currentResult.error;
-      if (previousResult.error) throw previousResult.error;
-
-      const currentRows = (currentResult.data ?? []) as PayrollRow[];
-      const previousRows = (previousResult.data ?? []) as PayrollRow[];
-
-      const currentMap = new Map<string, PayrollRow>();
-      const previousMap = new Map<string, PayrollRow>();
-
-      for (const row of currentRows) {
-        if (!row?.staff_id) continue;
-        currentMap.set(String(row.staff_id), row);
-      }
-
-      for (const row of previousRows) {
-        if (!row?.staff_id) continue;
-        previousMap.set(String(row.staff_id), row);
-      }
-
-      const staffIds = new Set<string>([
-        ...Array.from(currentMap.keys()),
-        ...Array.from(previousMap.keys()),
-      ]);
-
-      const nextRows: AnomalyRow[] = [];
-
-      for (const staffId of staffIds) {
-        const currentAmount = Number(currentMap.get(staffId)?.net_pay ?? 0);
-        const previousAmount = Number(previousMap.get(staffId)?.net_pay ?? 0);
-        const diff = currentAmount - previousAmount;
-        const pct =
-          previousAmount === 0
-            ? currentAmount > 0
-              ? 100
-              : 0
-            : (diff / previousAmount) * 100;
-
-        let type: AnomalyType | null = null;
-        let severity: Severity = 'info';
-
-        if (previousAmount > 0 && currentAmount === 0) {
-          type = '급여누락';
-          severity = 'critical';
-        } else if (previousAmount === 0 && currentAmount > 0) {
-          type = '신규지급';
-          severity = 'info';
-        } else if (Math.abs(pct) >= threshold) {
-          type = pct > 0 ? '급여급증' : '급여급감';
-          severity = Math.abs(pct) >= 50 ? 'critical' : 'warning';
-        }
-
-        if (!type) continue;
-
-        const staff = staffLookup.get(staffId);
-        nextRows.push({
-          staffId,
-          staff,
-          type,
-          current: currentAmount,
-          previous: previousAmount,
-          diff,
-          pct,
-          severity,
-        });
-      }
-
-      nextRows.sort((a, b) => {
-        const severityOrder: Record<Severity, number> = { critical: 0, warning: 1, info: 2 };
-        const severityGap = severityOrder[a.severity] - severityOrder[b.severity];
-        if (severityGap !== 0) return severityGap;
-        return Math.abs(b.diff) - Math.abs(a.diff);
+      const result = await detectPayrollAnomalies({
+        currentMonth,
+        threshold,
+        staffs,
       });
 
-      setAllData(nextRows);
+      setAllData(result.allData);
     } catch (error) {
       console.error('급여 이상치 분석 실패:', error);
       setAllData([]);
     } finally {
       setLoading(false);
     }
-  }, [currentMonth, staffLookup, threshold]);
+  }, [currentMonth, staffs, threshold]);
 
   useEffect(() => {
     void analyze();

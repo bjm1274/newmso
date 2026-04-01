@@ -352,6 +352,54 @@ test('supply approval shows requested items in detail and print view, then can b
   expect(runtimeErrors).toEqual([]);
 });
 
+test('approval inbox hides recalled documents even if the user is in the approval line', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    staffMembers: [requester, firstApprover],
+    approvals: [
+      {
+        id: 'approval-recalled-hidden-1',
+        type: '업무협조',
+        title: '회수된 문서',
+        content: '결재함에서 보이면 안 됩니다.',
+        sender_id: requester.id,
+        sender_name: requester.name,
+        sender_company: requester.company,
+        company_id: requester.company_id,
+        current_approver_id: null,
+        approver_line: [firstApprover.id],
+        status: '회수',
+        created_at: '2026-03-18T10:00:00.000Z',
+        meta_data: {
+          form_slug: 'cooperation',
+          form_name: '업무협조',
+          recalled_at: '2026-03-18T11:00:00.000Z',
+          recalled_by: requester.id,
+        },
+      },
+    ],
+    companies: [
+      { id: 'hospital-1', name: '테스트병원', type: 'HOSPITAL', is_active: true },
+      { id: 'mso-company-id', name: 'SY INC.', type: 'MSO', is_active: true },
+    ],
+  });
+
+  await seedSession(page, {
+    user: firstApprover,
+    localStorage: {
+      erp_last_menu: '전자결재',
+      erp_last_subview: '결재함',
+      erp_permission_prompt_shown: '1',
+    },
+  });
+
+  await openApprovalInbox(page);
+
+  await expect(page.getByTestId('approval-card-approval-recalled-hidden-1')).toHaveCount(0);
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('final approval for an attendance correction syncs attendance records', async ({ page }) => {
   const runtimeErrors = trackRuntimeErrors(page);
   const correctionDate = '2026-03-18';

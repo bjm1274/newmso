@@ -22,6 +22,7 @@ import ConsumableStats from './재고관리서브/소모품통계';
 import DeliveryConfirmation from './재고관리서브/납품확인서';
 import InventoryDemandForecast from './재고관리서브/재고수요예측';
 import SupplierDocumentWorkspace from './재고관리서브/SupplierDocumentWorkspace';
+import AssetLoanSettingsAdminView from './관리자전용서브/비품대여물품설정';
 import {
   buildSupplyRequestWorkflowItems,
   fetchSupportInventoryRows,
@@ -38,7 +39,7 @@ import {
 
 const INV_VIEW_KEY = 'erp_inventory_view';
 
-const INVENTORY_VIEWS = ['UDI', '발주', '스캔', '등록', '현황', '이력', '자산', 'AS반품', '거래처', '재고실사', '이관', '카테고리', '소모품통계', '납품확인서', '수요예측'] as const;
+const INVENTORY_VIEWS = ['UDI', '발주', '스캔', '등록', '현황', '이력', '자산', '비품대여설정', 'AS반품', '거래처', '재고실사', '이관', '카테고리', '소모품통계', '납품확인서', '수요예측'] as const;
 const LEGACY_VIEWS = ['명세서', '유통기한'] as const;
 const VALID_VIEWS = [...INVENTORY_VIEWS, ...LEGACY_VIEWS];
 const EXPIRY_SOON_MS = 30 * 24 * 60 * 60 * 1000;
@@ -115,6 +116,7 @@ const INVENTORY_VIEW_META: Record<string, { title: string; description: string }
   납품확인서: { title: '납품 확인서', description: '' },
   UDI: { title: 'UDI 관리', description: '' },
   자산: { title: '자산 QR', description: '' },
+  비품대여설정: { title: '비품대여 설정', description: '' },
   거래처: { title: '거래처 · 명세서', description: '' },
   카테고리: { title: '카테고리 관리', description: '' },
   AS반품: { title: 'AS / 반품', description: '' },
@@ -131,8 +133,41 @@ function formatCurrency(value: number) {
   return `${Number(value || 0).toLocaleString('ko-KR')}원`;
 }
 
+function normalizeInventoryQueryError(error: unknown) {
+  if (error instanceof Error) {
+    const errorRecord = error as Error & Record<string, unknown>;
+    return {
+      message: error.message,
+      details: errorRecord.details ?? null,
+      hint: errorRecord.hint ?? null,
+      code: errorRecord.code ?? null,
+      status: errorRecord.status ?? null,
+    };
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    const errorRecord = error as Record<string, unknown>;
+    return {
+      message: typeof errorRecord.message === 'string' ? errorRecord.message : JSON.stringify(errorRecord),
+      details: errorRecord.details ?? null,
+      hint: errorRecord.hint ?? null,
+      code: errorRecord.code ?? null,
+      status: errorRecord.status ?? null,
+    };
+  }
+
+  return {
+    message: typeof error === 'string' ? error : String(error),
+    details: null,
+    hint: null,
+    code: null,
+    status: null,
+  };
+}
+
 export default function IntegratedInventoryManagement({
   user,
+  staffs = [],
   depts = [],
   selectedCo,
   selectedCompanyId,
@@ -143,6 +178,7 @@ export default function IntegratedInventoryManagement({
   onConsumeInitialWorkflowApprovalId,
 }: {
   user?: StaffMember;
+  staffs?: StaffMember[];
   depts?: Array<string | { name?: string }>;
   selectedCo?: string;
   selectedCompanyId?: string | null;
@@ -441,8 +477,25 @@ export default function IntegratedInventoryManagement({
           fetchSupportInventoryRows(),
         ]);
 
-      if (approvalsError) throw approvalsError;
-      if (inventoryError) throw inventoryError;
+      if (approvalsError) {
+        console.error('승인된 물품신청 처리 목록 로드 실패:', {
+          source: 'approvals',
+          ...normalizeInventoryQueryError(approvalsError),
+        });
+        setPendingSupplyApprovals([]);
+        setCompletedSupplyApprovals([]);
+        return;
+      }
+
+      if (inventoryError) {
+        console.error('승인된 물품신청 처리 목록 로드 실패:', {
+          source: 'support_inventory',
+          ...normalizeInventoryQueryError(inventoryError),
+        });
+        setPendingSupplyApprovals([]);
+        setCompletedSupplyApprovals([]);
+        return;
+      }
 
       const nextPendingApprovals: ApprovalRecord[] = [];
       const nextCompletedApprovals: ApprovalRecord[] = [];
@@ -497,7 +550,10 @@ export default function IntegratedInventoryManagement({
       setPendingSupplyApprovals(nextPendingApprovals);
       setCompletedSupplyApprovals(nextCompletedApprovals);
     } catch (error) {
-      console.error('승인된 물품신청 처리 목록 로드 실패:', error);
+      console.error('승인된 물품신청 처리 목록 로드 실패:', {
+        source: 'workflow_processing',
+        ...normalizeInventoryQueryError(error),
+      });
       setPendingSupplyApprovals([]);
       setCompletedSupplyApprovals([]);
     }
@@ -1829,6 +1885,7 @@ export default function IntegratedInventoryManagement({
             </div>
           )}
           {activeView === '자산' && <QRAssetManager user={user} inventory={inventory} fetchInventory={() => fetchInventory(selectedCo)} />}
+          {activeView === '비품대여설정' && <AssetLoanSettingsAdminView staffs={staffs as any} user={user as any} />}
           {activeView === 'AS반품' && <ASReturnManagement user={user} />}
           {activeView === '거래처' && (
             <SupplierDocumentWorkspace

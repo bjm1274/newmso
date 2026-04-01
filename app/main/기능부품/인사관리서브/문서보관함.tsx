@@ -50,10 +50,12 @@ export default function DocumentRepository({
   user,
   selectedCo,
   linkedTarget,
+  canManageDocuments = false,
 }: {
   user: any;
   selectedCo: string;
   linkedTarget?: { id?: string; name?: string };
+  canManageDocuments?: boolean;
 }) {
   const [docs, setDocs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,6 +115,9 @@ export default function DocumentRepository({
   const isReadOnlySelected = Boolean(selected?.source_type === 'approval' || selected?.read_only);
 
   const handleSave = async () => {
+    if (!canManageDocuments) {
+      return toast('문서 생성/수정은 관리자 전용입니다.', 'warning');
+    }
     if (isReadOnlySelected) {
       return toast('전자결재 문서는 문서보관함에서 읽기 전용으로만 확인할 수 있습니다.', 'warning');
     }
@@ -212,6 +217,10 @@ export default function DocumentRepository({
 
   const handleDelete = async (doc: any) => {
     if (!doc?.id) return;
+    if (!canManageDocuments) {
+      toast('문서 삭제는 관리자 전용입니다.', 'warning');
+      return;
+    }
     if (doc?.source_type === 'approval' || doc?.read_only) {
       toast('전자결재 문서는 문서보관함에서 삭제할 수 없습니다.', 'warning');
       return;
@@ -332,7 +341,10 @@ export default function DocumentRepository({
           />
           <button
             onClick={handleNew}
-            className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-semibold rounded-[var(--radius-md)] hover:bg-[var(--accent)]"
+            disabled={!canManageDocuments}
+            className={`px-4 py-2 bg-[var(--accent)] text-white text-sm font-semibold rounded-[var(--radius-md)] ${
+              canManageDocuments ? 'hover:bg-[var(--accent)]' : 'hidden'
+            }`}
           >
             + 새 문서
           </button>
@@ -422,7 +434,10 @@ export default function DocumentRepository({
                 <button
                   type="button"
                   onClick={() => handleDelete(selected)}
-                  className="px-3 py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] border border-red-100 text-red-600 hover:bg-red-500/10"
+                  disabled={!canManageDocuments}
+                  className={`px-3 py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] border border-red-100 text-red-600 ${
+                    canManageDocuments ? 'hover:bg-red-500/10' : 'hidden'
+                  }`}
                 >
                   선택 문서 삭제
                 </button>
@@ -476,7 +491,7 @@ export default function DocumentRepository({
             </div>
           ) : (
             /* 일반 문서 편집 폼 */
-            <fieldset className="space-y-4" disabled={isReadOnlySelected}>
+            <fieldset className="space-y-4" disabled={isReadOnlySelected || !canManageDocuments}>
               <div>
                 <label className="block text-sm font-semibold text-[var(--toss-gray-4)] mb-2">제목</label>
                 <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full px-4 py-2 rounded-[var(--radius-md)] border border-[var(--border)] text-[var(--foreground)]" placeholder="문서 제목" />
@@ -510,7 +525,7 @@ export default function DocumentRepository({
           )}
           <div className="flex gap-2">
             {selected?.category !== '근로계약서' && (
-              <button onClick={handleSave} disabled={saving} className="px-4 py-2 bg-[var(--accent)] text-white font-semibold rounded-[var(--radius-md)] hover:bg-[var(--accent)] disabled:opacity-50">저장</button>
+              <button onClick={handleSave} disabled={saving || !canManageDocuments} className="px-4 py-2 bg-[var(--accent)] text-white font-semibold rounded-[var(--radius-md)] hover:bg-[var(--accent)] disabled:opacity-50">저장</button>
             )}
             {selected && <button onClick={() => { setSelected(null); setForm({ title: '', category: '규정', content: '' }); }} className="px-4 py-2 bg-[var(--muted)] text-[var(--toss-gray-4)] font-semibold rounded-[var(--radius-md)]">취소</button>}
           </div>

@@ -34,6 +34,25 @@ function canAccessAdminSubMenu(user: ErpUser | null, subMenuId: string) {
   return canAccessAdminSection(user, subMenuId);
 }
 
+const ADMIN_PARENT_SUBVIEW_MAP: Record<string, string> = {
+  알림자동화: '운영설정',
+  수술검사템플릿: '운영설정',
+  팝업관리: '운영설정',
+  급여이상치: '감사센터',
+};
+
+function isLegacyOfficialDocumentAdminTarget(menuId?: string | null, subViewId?: string | null) {
+  return menuId === '관리자' && subViewId === '공문서대장';
+}
+
+function getDisplayedSubView(mainMenuId: string, subViewId: string) {
+  if (mainMenuId !== '관리자') {
+    return subViewId;
+  }
+
+  return ADMIN_PARENT_SUBVIEW_MAP[subViewId] || subViewId;
+}
+
 function buildSubMenuTestId(mainMenuId: string, subMenuId: string) {
   const slug = `${mainMenuId}-${subMenuId}`
     .split('')
@@ -202,8 +221,51 @@ function MainPageContent() {
           : { menuId: '인사관리', subViewId: '구성원' };
       }
 
+      if (
+        menuId === '인사관리' &&
+        (
+          subViewId === '교육' ||
+          subViewId === '오프보딩' ||
+          subViewId === '입퇴사·교육센터' ||
+          subViewId === '인력생애주기센터'
+        )
+      ) {
+        return { menuId: '인사관리', subViewId: '입퇴사·교육센터' };
+      }
+
+      if (
+        menuId === '인사관리' &&
+        (subViewId === '건강검진' ||
+          subViewId === '면허/자격증' ||
+          subViewId === '의료기기점검' ||
+          subViewId === '사고보고서' ||
+          subViewId === '자격·안전센터' ||
+          subViewId === '규정준수센터')
+      ) {
+        return { menuId: '인사관리', subViewId: '자격·안전센터' };
+      }
+
+      if (
+        menuId === '인사관리' &&
+        (subViewId === '문서보관함' || subViewId === '증명서' || subViewId === '서류제출')
+      ) {
+        return { menuId: '인사관리', subViewId: '문서센터' };
+      }
+
       if (menuId === '관리자' && subViewId === '조직도') {
         return { menuId: '관리자', subViewId: '회사관리' };
+      }
+
+      if (menuId === '관리자' && subViewId === '비품대여설정') {
+        return { menuId: '재고관리', subViewId: '비품대여설정' };
+      }
+
+      if (isLegacyOfficialDocumentAdminTarget(menuId, subViewId)) {
+        return { menuId: '전자결재', subViewId: '작성하기' };
+      }
+
+      if (menuId === '인사관리' && subViewId === '비품대여') {
+        return { menuId: '재고관리', subViewId: '비품대여설정' };
       }
 
       return { menuId, subViewId };
@@ -361,6 +423,12 @@ function MainPageContent() {
           }
           if (shouldHonorSubViewIntent) {
             setSubView(preferredInitialSubView);
+          }
+          if (isLegacyOfficialDocumentAdminTarget(savedMenu, savedSubView)) {
+            setInitialApprovalIntent({
+              viewMode: '작성하기',
+              formType: '공문발송',
+            });
           }
         }
 
@@ -554,10 +622,16 @@ function MainPageContent() {
       const resolvedMenu = resolvedNavigation?.menuId
         ? normalizeMainMenuForUser(user, resolvedNavigation.menuId)
         : targetMenu;
-      const resolvedSubView = targetSubView ?? resolvedNavigation?.subViewId ?? null;
+      const resolvedSubView = resolvedNavigation?.subViewId ?? targetSubView ?? null;
 
       if (resolvedMenu) setMainMenu(resolvedMenu);
       if (resolvedSubView) setSubView(resolvedSubView);
+      if (isLegacyOfficialDocumentAdminTarget(targetMenu, targetSubView ?? savedSubView)) {
+        setInitialApprovalIntent({
+          viewMode: '작성하기',
+          formType: '공문발송',
+        });
+      }
       if (openApprovalId) {
         setInitialApprovalIntent({
           approvalId: openApprovalId,
@@ -762,13 +836,18 @@ function MainPageContent() {
 
       return true;
     });
+  const selectableSubMenus = useMemo(
+    () => currentSubMenus.filter((subMenu) => !subMenu.hidden),
+    [currentSubMenus]
+  );
   const currentSubMenuGroups = useMemo(
     () =>
       mainMenu === '관리자' || mainMenu === '재고관리'
-        ? Array.from(new Set(currentSubMenus.map((subMenu) => subMenu.group))).filter(Boolean)
+        ? Array.from(new Set(selectableSubMenus.map((subMenu) => subMenu.group))).filter(Boolean)
         : [],
-    [currentSubMenus, mainMenu]
+    [mainMenu, selectableSubMenus]
   );
+  const displayedSubView = getDisplayedSubView(mainMenu, subView);
   const subgroupLabels: Record<string, string> = {
     '재고 대시보드': '📊 재고 대시보드',
     '입출고 운영': '📦 입출고 운영',
@@ -802,10 +881,10 @@ function MainPageContent() {
       return;
     }
 
-    if (!currentSubMenus.some((s) => s.id === subView)) {
-      setSubView(currentSubMenus[0].id);
+    if (!currentSubMenus.some((s) => s.id === subView) && selectableSubMenus.length > 0) {
+      setSubView(selectableSubMenus[0].id);
     }
-  }, [currentSubMenus, mainMenu, resolveLegacyNavigation, subView, user]);
+  }, [currentSubMenus, mainMenu, resolveLegacyNavigation, selectableSubMenus, subView, user]);
 
   const clearMenuNavigationTargets = useCallback(() => {
     setInitialMyPageTab(null);
@@ -867,15 +946,15 @@ function MainPageContent() {
         return;
       }
 
-      if (currentSubMenus.length > 0) {
-        setSubView(currentSubMenus[0].id);
+      if (selectableSubMenus.length > 0) {
+        setSubView(selectableSubMenus[0].id);
       }
       return;
     }
 
     setMainMenu(menu);
     if (sub !== undefined) setSubView(sub);
-  }, [clearMenuNavigationTargets, currentSubMenus, mainMenu, resetPersistedMenuState]);
+  }, [clearMenuNavigationTargets, mainMenu, resetPersistedMenuState, selectableSubMenus]);
 
   const handleSubViewChange = useCallback((nextSubView: string) => {
     setSubView(nextSubView);
@@ -913,7 +992,7 @@ function MainPageContent() {
         onMenuChange={handleMenuChange}
       />
 
-      {currentSubMenus.length > 0 && (
+      {selectableSubMenus.length > 0 && (
         <aside className="no-scrollbar scroll-smooth snap-x snap-mandatory flex w-full shrink-0 flex-row gap-0.5 overflow-x-auto border-b border-[var(--border)] bg-[var(--card)] px-2 py-1.5 md:sticky md:top-0 md:max-h-[100dvh] md:w-[var(--submenu-width)] md:flex-col md:snap-none md:overflow-x-visible md:overflow-y-auto md:border-r md:border-b-0 md:px-2 md:py-3 md:gap-0.5">
           {(() => {
             if (mainMenu === '관리자' || mainMenu === '재고관리') {
@@ -924,17 +1003,17 @@ function MainPageContent() {
                   <div className="hidden md:block px-2 pt-2 pb-0.5 text-[9px] font-bold text-[var(--zinc-400)] uppercase tracking-widest select-none">
                     {(subgroupLabels[groupName!] || groupName)?.replace(/^[^\s]+ /, '')}
                   </div>
-                  {currentSubMenus.filter(s => s.group === groupName).map(sub => (
+                  {selectableSubMenus.filter(s => s.group === groupName).map(sub => (
                     <button
                       key={sub.id}
                       onClick={() => handleSubViewChange(sub.id)}
                       data-testid={buildSubMenuTestId(mainMenu, sub.id)}
-                      className={`touch-manipulation flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-2 md:py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all duration-150 whitespace-nowrap md:flex md:items-center md:gap-1.5 ${subView === sub.id
+                      className={`touch-manipulation flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-2 md:py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all duration-150 whitespace-nowrap md:flex md:items-center md:gap-1.5 ${displayedSubView === sub.id
                         ? 'bg-[var(--accent)] text-white shadow-sm'
                         : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] active:bg-[var(--muted)] active:text-[var(--foreground)]'
                       }`}
                     >
-                      <span className="hidden md:inline text-[12px] shrink-0" style={{ opacity: subView === sub.id ? 1 : 0.65 }}>{sub.icon || '·'}</span>
+                      <span className="hidden md:inline text-[12px] shrink-0" style={{ opacity: displayedSubView === sub.id ? 1 : 0.65 }}>{sub.icon || '·'}</span>
                       <span className="truncate">{sub.label}</span>
                     </button>
                   ))}
@@ -942,17 +1021,17 @@ function MainPageContent() {
               ));
             }
 
-            return currentSubMenus.map((sub) => (
+            return selectableSubMenus.map((sub) => (
               <button
                 key={sub.id}
                 onClick={() => handleSubViewChange(sub.id)}
                 data-testid={buildSubMenuTestId(mainMenu, sub.id)}
-                className={`touch-manipulation flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-2 md:py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all duration-150 whitespace-nowrap md:flex md:items-center md:gap-1.5 ${subView === sub.id
+                className={`touch-manipulation flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-2 md:py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all duration-150 whitespace-nowrap md:flex md:items-center md:gap-1.5 ${displayedSubView === sub.id
                   ? 'bg-[var(--accent)] text-white shadow-sm'
                   : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] active:bg-[var(--muted)] active:text-[var(--foreground)]'
                 }`}
               >
-                <span className="hidden md:inline text-[12px] shrink-0" style={{ opacity: subView === sub.id ? 1 : 0.65 }}>{sub.icon || '·'}</span>
+                <span className="hidden md:inline text-[12px] shrink-0" style={{ opacity: displayedSubView === sub.id ? 1 : 0.65 }}>{sub.icon || '·'}</span>
                 <span className="truncate">{sub.label}</span>
               </button>
             ));
@@ -973,6 +1052,10 @@ function MainPageContent() {
           onOpenChatRoom={(roomId: string) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); }}
           onOpenMessage={(roomId: string, messageId: string) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); setInitialOpenMessageId(messageId); }}
           onOpenApproval={handleOpenApproval}
+          onOpenAdmin={(nextSubView?: string) => {
+            setMainMenu('관리자');
+            setSubView(nextSubView || '감사센터');
+          }}
           onOpenInventory={(intent: { view?: string | null; approvalId?: string | null } | undefined) => {
             setMainMenu('재고관리');
             setSubView(intent?.view || '현황');

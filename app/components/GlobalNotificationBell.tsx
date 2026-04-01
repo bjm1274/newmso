@@ -140,6 +140,15 @@ export default function GlobalNotificationBell({
       return;
     }
 
+    if (notification.metadata?.open_menu === '관리자') {
+      const openSubView =
+        typeof notification.metadata?.open_subview === 'string' && notification.metadata.open_subview.trim()
+          ? notification.metadata.open_subview
+          : '감사센터';
+      router.push(`/main?open_menu=관리자&open_subview=${encodeURIComponent(openSubView)}`);
+      return;
+    }
+
     if (notification.type === 'approval') {
       router.push('/main?open_menu=전자결재');
       return;

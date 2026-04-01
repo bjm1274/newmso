@@ -32,6 +32,7 @@ export const EXTRA_FEATURE_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'extra_마감보고', label: '마감보고' },
   { key: 'extra_직원평가', label: '직원평가' },
   { key: 'extra_입금실시간조회', label: '입금 실시간 조회' },
+  { key: 'extra_ESL연동', label: 'ESL 연동' },
   { key: 'extra_OP체크', label: 'OP체크' },
 ];
 
@@ -70,7 +71,6 @@ export const HR_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'hr_경조사', label: '경조사' },
   { key: 'hr_면허자격증', label: '면허 / 자격증' },
   { key: 'hr_의료기기점검', label: '의료기기점검' },
-  { key: 'hr_비품대여', label: '비품대여' },
   { key: 'hr_사고보고서', label: '사고보고서' },
   { key: 'hr_계약', label: '계약' },
   { key: 'hr_문서보관함', label: '문서보관함' },

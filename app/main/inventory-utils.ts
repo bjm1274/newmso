@@ -446,13 +446,13 @@ export async function fetchSupportInventoryRows(client: SupabaseClient = supabas
     () =>
       client
         .from('inventory')
-        .select(INVENTORY_SELECT_COLUMNS)
+        .select('*')
         .eq('company', INVENTORY_SUPPORT_COMPANY)
         .eq('department', INVENTORY_SUPPORT_DEPARTMENT) as PromiseLike<SupabaseCompatResult<LooseRecord[]>>,
     () =>
       client
         .from('inventory')
-        .select(INVENTORY_SELECT_COLUMNS)
+        .select('*')
         .eq('company', INVENTORY_SUPPORT_COMPANY) as PromiseLike<SupabaseCompatResult<LooseRecord[]>>,
     'department',
   );

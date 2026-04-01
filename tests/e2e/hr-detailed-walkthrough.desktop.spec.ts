@@ -71,7 +71,6 @@ test('hr walkthrough opens each submenu in practical order without runtime error
       hr_경조사: true,
       hr_면허자격증: true,
       hr_의료기기점검: true,
-      hr_비품대여: true,
       hr_사고보고서: true,
       hr_계약: true,
       hr_문서보관함: true,
@@ -288,16 +287,18 @@ test('hr walkthrough opens each submenu in practical order without runtime error
   await openHrMenu(page, '구성원');
   await expect(page.getByTestId('new-staff-button')).toBeVisible();
 
-  await openHrMenu(page, '인사발령');
+  await openHrMenu(page, '인사변동');
+  await page.getByTestId('personnel-suite-0').click();
   await expect(page.getByRole('heading', { name: /인사발령 관리/ })).toBeVisible();
 
-  await openHrMenu(page, '포상/징계');
+  await page.getByTestId('personnel-suite-1').click();
   await expect(page.getByRole('heading', { name: /포상/ })).toBeVisible();
 
-  await openHrMenu(page, '교육');
+  await openHrMenu(page, '입퇴사·교육센터');
+  await page.getByTestId('lifecycle-suite-0').click();
   await expect(page.getByText(/Compliance/)).toBeVisible();
 
-  await openHrMenu(page, '오프보딩');
+  await page.getByTestId('lifecycle-suite-1').click();
   await expect(page.getByTestId('offboarding-view')).toBeVisible();
 
   await openHrWorkspace(page, '근태 · 급여');
@@ -319,10 +320,6 @@ test('hr walkthrough opens each submenu in practical order without runtime error
   await expect(page.getByText(/교대근무 및 스케줄링 간트 차트/)).toBeVisible();
   await page.getByTestId('shift-suite-1').click();
   await expect(page.getByTestId('roster-pattern-planner')).toBeVisible();
-  await page.getByTestId('shift-suite-2').click();
-  await expect(page.getByTestId('roster-rule-manager')).toBeVisible();
-  await page.getByTestId('shift-suite-3').click();
-  await expect(page.getByTestId('roster-pattern-manager')).toBeVisible();
 
   await openHrMenu(page, '연차/휴가');
   await expect(page.getByTestId('leave-management-view')).toBeVisible();
@@ -330,12 +327,12 @@ test('hr walkthrough opens each submenu in practical order without runtime error
   await expect(page.getByText(/근로기준법 기준 연차·휴가 안내/)).toBeVisible();
   await page.getByTestId('leave-tab-연차-대시보드').click();
   await expect(page.getByText(/연차 종합 대시보드/)).toBeVisible();
-  await page.getByTestId('leave-tab-연차사용촉진-자동화').click();
-  await expect(page.getByRole('heading', { name: /연차사용촉진 자동화 시스템/ })).toBeVisible();
-  await page.getByTestId('leave-tab-연차-자동부여-설정').click();
-  await expect(page.getByText(/연차 자동 부여 로직 설정/)).toBeVisible();
-  await page.getByTestId('leave-tab-공휴일-달력').click();
-  await expect(page.getByRole('heading', { name: /공휴일 자동 반영 달력/ })).toBeVisible();
+  await page.getByTestId('leave-tab-연차-원장').click();
+  await expect(page.getByTestId('annual-leave-ledger-view')).toBeVisible();
+  await page.getByTestId('leave-tab-근태-차감-시뮬레이터').click();
+  await expect(page.getByTestId('attendance-deduction-simulator-view')).toBeVisible();
+  await page.getByTestId('leave-tab-근태-이상-탐지').click();
+  await expect(page.getByTestId('attendance-anomaly-panel-view')).toBeVisible();
 
   await openHrMenu(page, '급여');
   await page.getByRole('button', { name: '급여 메인' }).click();
@@ -345,7 +342,6 @@ test('hr walkthrough opens each submenu in practical order without runtime error
     '급여정산',
     '급여대장',
     '연말퇴직정산',
-    '통합설정',
     '급여시뮬레이터',
     '4대보험EDI',
     '퇴직연금',
@@ -356,7 +352,6 @@ test('hr walkthrough opens each submenu in practical order without runtime error
     '총인건비예측',
     '세전세후',
     '미지급수당',
-    '급여고도화',
     '무급결근차감',
   ]) {
     await page.getByTestId(`payroll-tab-${payrollTabId}`).click();
@@ -369,36 +364,34 @@ test('hr walkthrough opens each submenu in practical order without runtime error
 
   await openHrWorkspace(page, '복지 · 문서');
 
-  await openHrMenu(page, '건강검진');
+  await openHrMenu(page, '자격·안전센터');
+  await page.getByTestId('compliance-suite-0').click();
   await expect(page.getByRole('heading', { name: /건강검진 관리/ })).toBeVisible();
+
+  await page.getByTestId('compliance-suite-1').click();
+  await expect(page.getByRole('heading', { name: /면허·자격증 관리/ })).toBeVisible();
+
+  await page.getByTestId('compliance-suite-2').click();
+  await expect(page.getByRole('heading', { name: /의료기기 정기점검 관리/ })).toBeVisible();
+
+  await page.getByTestId('compliance-suite-3').click();
+  await expect(page.getByRole('heading', { name: /사고 보고서 관리/ })).toBeVisible();
 
   await openHrMenu(page, '경조사');
   await expect(page.getByRole('heading', { name: /경조사 관리/ })).toBeVisible();
-
-  await openHrMenu(page, '면허/자격증');
-  await expect(page.getByRole('heading', { name: /면허·자격증 관리/ })).toBeVisible();
-
-  await openHrMenu(page, '의료기기점검');
-  await expect(page.getByRole('heading', { name: /의료기기 정기점검 관리/ })).toBeVisible();
-
-  await openHrMenu(page, '비품대여');
-  await expect(page.getByRole('heading', { name: /비품\/장비 대여 관리/ })).toBeVisible();
-
-  await openHrMenu(page, '사고보고서');
-  await expect(page.getByRole('heading', { name: /사고 보고서 관리/ })).toBeVisible();
 
   await openHrMenu(page, '계약');
   await expect(page.getByRole('heading', { name: /전자 계약 및 법적 비과세 관리/ })).toBeVisible();
   await page.getByRole('button', { name: '계약서 자동생성' }).click();
   await expect(page.getByTestId('contract-utility-auto-generator')).toBeVisible();
 
-  await openHrMenu(page, '문서보관함');
+  await openHrMenu(page, '문서센터');
   await expect(page.getByRole('heading', { name: /문서 보관함/ })).toBeVisible();
 
-  await openHrMenu(page, '증명서');
+  await page.getByTestId('document-center-1').click();
   await expect(page.getByRole('heading', { name: /증명서 발급 센터/ })).toBeVisible();
 
-  await openHrMenu(page, '서류제출');
+  await page.getByTestId('document-center-2').click();
   await expect(page.getByRole('heading', { name: /스마트 서류 제출/ })).toBeVisible();
 
   await openHrMenu(page, '캘린더');

@@ -1,7 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { canAccessApprovalSection } from '@/lib/access-control';
+import { canAccessApprovalSection, hasPermission } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { syncApprovalToDocumentRepository } from '@/lib/approval-document-archive';
 import { ensureApprovedAnnualLeaveRequest, isAnnualLeaveType, syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
@@ -37,6 +37,10 @@ import {
   toLooseRecordArray,
 } from '@/app/main/inventory-utils';
 import { extractLeaveRequestMeta } from '@/lib/leave-notice';
+import {
+  extractOfficialDocRequest,
+  syncOfficialDocumentLogFromApproval,
+} from '@/lib/official-document-approval';
 import AttendanceForms from './전자결재서브/근태신청양식';
 import SuppliesForm from './전자결재서브/비품구매양식';
 import AdminForms from './전자결재서브/관리행정양식';
@@ -44,6 +48,7 @@ import FormRequest from './전자결재서브/양식신청';
 import AttendanceCorrectionForm from './전자결재서브/출결정정양식';
 import RepairRequestForm from './전자결재서브/수리요청서양식';
 import AnnualLeavePlanForm from './전자결재서브/연차사용계획서양식';
+import OfficialDocumentDispatchForm from './전자결재서브/공문발송양식';
 
 import { useActionDialog } from '@/app/components/useActionDialog';
 
@@ -55,6 +60,7 @@ const APPROVAL_OPTIONAL_INSERT_COLUMNS = ['company_id', 'approver_line', 'doc_nu
 const APPROVAL_REFERENCE_DEFAULTS_KEY = 'approval_reference_defaults';
 const APPROVAL_REFERENCE_ALL_KEY = 'all';
 const ALL_DOCUMENT_FILTER = '전체 문서';
+const APPROVAL_INBOX_HIDDEN_STATUSES = new Set(['회수']);
 
 const APPROVAL_VIEWS = ['기안함', '결재함', '참조 문서함', '작성하기'] as const;
 const APPROVER_POSITIONS = ['팀장', '간호과장', '실장', '부장', '본부장', '총무부장', '진료부장', '간호부장', '이사', '병원장', '원장', '대표'];
@@ -66,6 +72,7 @@ const BUILTIN_FORM_TYPE_DEFINITIONS = [
   { slug: 'repair_request', name: '수리요청서' },
   { slug: 'draft_business', name: '업무기안' },
   { slug: 'cooperation', name: '업무협조' },
+  { slug: 'official_document_dispatch', name: '공문발송' },
   { slug: 'generic', name: '양식신청' },
   { slug: 'attendance_fix', name: '출결정정' },
 ] as const;
@@ -318,6 +325,7 @@ function normalizeComposeFormType(value?: string) {
   if (!value || value === '인사명령') return '연차/휴가';
   if (value === 'attendance_fix' || value === '출결정정' || value === '출결 정정') return '출결정정';
   if (value === '휴가신청' || value === 'leave') return '연차/휴가';
+  if (value === 'official_document_dispatch' || value === '공문발송' || value === '공문서대장') return '공문발송';
   return value;
 }
 
@@ -481,12 +489,32 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
   );
 
   const BUILTIN_FORM_TYPES = useMemo(
-    () => ['연차/휴가', '연차계획서', '연장근무', '물품신청', '수리요청서', '업무기안', '업무협조', '양식신청', '출결정정'],
+    () => ['연차/휴가', '연차계획서', '연장근무', '물품신청', '수리요청서', '업무기안', '업무협조', '공문발송', '양식신청', '출결정정'],
     []
   );
+  const hasLegacyOfficialDocumentAccess = useMemo(
+    () => hasPermission(user, 'admin_공문서대장'),
+    [user]
+  );
+  const hasGeneralApprovalAccess = useMemo(
+    () => hasPermission(user, 'approval'),
+    [user]
+  );
+  const canUseOfficialDocumentForm = useMemo(
+    () => Boolean(user?.role === 'admin' || user?.permissions?.mso === true || hasLegacyOfficialDocumentAccess || hasPermission(user, 'admin')),
+    [hasLegacyOfficialDocumentAccess, user]
+  );
+  const officialDocumentComposeOnly = hasLegacyOfficialDocumentAccess && !hasGeneralApprovalAccess;
   const composeFormTabs = useMemo(
-    () => [...BUILTIN_FORM_TYPES, ...customFormTypes.map((item) => item.slug)],
-    [customFormTypes]
+    () => [
+      ...BUILTIN_FORM_TYPES.filter((item) => {
+        if (item === '공문발송') return canUseOfficialDocumentForm;
+        if (officialDocumentComposeOnly) return false;
+        return true;
+      }),
+      ...(officialDocumentComposeOnly ? [] : customFormTypes.map((item) => item.slug)),
+    ],
+    [BUILTIN_FORM_TYPES, canUseOfficialDocumentForm, customFormTypes, officialDocumentComposeOnly]
   );
   const activeComposeFormMeta = useMemo(() => {
     const normalizedFormType = normalizeComposeFormType(formType);
@@ -643,6 +671,12 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
   }, [approverLine, approverTemplates, ccLine, persistApproverTemplates, templateNameInput]);
   const resolveApprovalTemplateMeta = useCallback((item: Record<string, unknown>) => {
     const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+    if (extractOfficialDocRequest(metaData)) {
+      return {
+        slug: 'official_document_dispatch',
+        name: '공문발송',
+      };
+    }
     const rawSlug = String(metaData?.form_slug || '').trim();
     const rawType = String(item?.type || '').trim();
     const rawName = String(metaData?.form_name || '').trim();
@@ -664,6 +698,17 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
       name: rawName || rawType || '양식신청',
     };
   }, [customFormTypes]);
+
+  useEffect(() => {
+    if (composeFormTabs.length === 0) return;
+    if (composeFormTabs.includes(formType)) return;
+
+    const nextFormType = normalizeComposeFormType(composeFormTabs[0]);
+    setFormType(nextFormType);
+    if (ccLine.length === 0) {
+      applyDefaultReferenceUsers(nextFormType);
+    }
+  }, [applyDefaultReferenceUsers, ccLine.length, composeFormTabs, formType]);
 
   const resolveApprovalTemplateDesign = useCallback((item: Record<string, unknown>) => {
     const template = resolveApprovalTemplateMeta(item);
@@ -1955,7 +2000,21 @@ window.onload = () => window.print();
     }
 
     setViewMode(nextView);
+    isHydratingComposeRef.current = true;
     setFormType(nextFormType);
+    setFormTitle(String(initialComposeRequest?.title || ''));
+    setFormContent(String(initialComposeRequest?.content || ''));
+    setExtraData(
+      initialComposeRequest?.extraData && typeof initialComposeRequest.extraData === 'object'
+        ? { ...(initialComposeRequest.extraData as Record<string, unknown>) }
+        : {}
+    );
+    setSupplyInventoryReview(null);
+    const requestedApproverLine = resolveApprovalStaffLine(
+      initialComposeRequest?.approverLine ?? initialComposeRequest?.approver_line,
+      approvalDirectoryStaffs
+    );
+    setApproverLine(requestedApproverLine);
     const requestedCcUsers = normalizeApprovalCcUsers(
       initialComposeRequest?.cc_users ?? initialComposeRequest?.ccLine,
       approvalDirectoryStaffs
@@ -2017,6 +2076,15 @@ window.onload = () => window.print();
           )
         )
       );
+    }
+
+    if (
+      nextFormType === '물품신청' &&
+      initialComposeRequest?.extraData &&
+      typeof initialComposeRequest.extraData === 'object' &&
+      Array.isArray((initialComposeRequest.extraData as Record<string, unknown>).items)
+    ) {
+      setSuppliesLoadKey((key) => key + 1);
     }
 
     onConsumeComposeRequest?.();
@@ -2767,6 +2835,13 @@ window.onload = () => window.print();
           } catch (_) { }
         }
 
+        try {
+          await syncOfficialDocumentLogFromApproval(supabase, item);
+        } catch (officialDocError) {
+          console.error('공문서 발송대장 반영 실패:', officialDocError);
+          toast('최종 승인되었지만 공문서 발송대장 반영에는 실패했습니다. 관리자 화면에서 다시 확인해주세요.', 'warning');
+        }
+
         if (supplyApprovalSummary) {
           toast(`최종 승인되었습니다. 경영지원팀에 처리 알림을 보냈습니다.\n출고 가능 ${supplyApprovalSummary.issue_ready_count}건, 발주 필요 ${supplyApprovalSummary.order_required_count}건`, 'success');
         } else {
@@ -2920,6 +2995,11 @@ window.onload = () => window.print();
 
   const handleSubmit = async (options?: { skipSupplyInventoryReview?: boolean }) => {
     const trimmedTitle = formTitle.trim();
+    const officialDocumentRequest =
+      formType === '공문발송'
+        ? extractOfficialDocRequest(extraData)
+        : null;
+
     if (!user?.id) {
       toast("로그인한 직원 계정으로만 기안할 수 있습니다.");
       return;
@@ -2956,6 +3036,11 @@ window.onload = () => window.print();
         toast("모든 사용 예정일을 입력해주세요.", 'warning');
         return;
       }
+    }
+
+    if (formType === '공문발송' && !officialDocumentRequest) {
+      toast('발송 예정일, 수신처, 공문 제목을 입력해주세요.', 'warning');
+      return;
     }
 
     const normalizedSupplyItems =
@@ -2997,6 +3082,12 @@ window.onload = () => window.print();
         delegateName: leaveMeta?.delegateName || String(extraData.delegateName || '').trim(),
         delegateDepartment: leaveMeta?.delegateDepartment || String(extraData.delegateDepartment || '').trim(),
         delegatePosition: leaveMeta?.delegatePosition || String(extraData.delegatePosition || '').trim(),
+      };
+    } else if (formType === '공문발송' && officialDocumentRequest) {
+      nextExtraData = {
+        ...extraData,
+        official_doc_request: officialDocumentRequest,
+        request_category: 'official_document_dispatch',
       };
     }
 
@@ -3096,6 +3187,8 @@ window.onload = () => window.print();
   const approvalBaseList = useMemo(() => {
     const uid = user?.id != null ? String(user.id) : '';
     return visibleApprovals.filter((a) => {
+      const status = String(a.status || '').trim();
+      if (APPROVAL_INBOX_HIDDEN_STATUSES.has(status)) return false;
       const lineIds = resolveApprovalLineIds(a);
       const currentApproverId = resolveCurrentApproverId(a);
       return lineIds.some((id: string) => String(id) === uid) || String(currentApproverId || '') === uid;
@@ -3654,6 +3747,14 @@ window.onload = () => window.print();
                   />
                 ) : formType === '연차계획서' ? (
                   <AnnualLeavePlanForm user={user} staffs={staffs} setExtraData={setExtraData} setFormTitle={setFormTitle} />
+                ) : formType === '공문발송' ? (
+                  <OfficialDocumentDispatchForm
+                    user={user}
+                    extraData={extraData}
+                    setExtraData={setExtraData}
+                    setFormTitle={setFormTitle}
+                    setFormContent={setFormContent}
+                  />
                 ) : (
                   <AdminForms staffs={staffs as { id: string; name: string; position: string }[]} formType={formType} setExtraData={setExtraData} />
                 )}
@@ -3661,20 +3762,29 @@ window.onload = () => window.print();
 
               {formType !== '양식신청' && (
                 <div className="space-y-4 pt-8 md:pt-10 border-t border-[var(--border)]">
-                  <input
-                    data-testid="approval-title-input"
-                    value={formTitle}
-                    onChange={e => setFormTitle(e.target.value)}
-                    className="w-full p-4 md:p-5 bg-[var(--muted)] rounded-[var(--radius-md)] font-bold outline-none text-lg md:text-xl focus:ring-2 focus:ring-[var(--accent)]/20 border border-[var(--border)] transition-all"
-                    placeholder="기안 제목을 입력하세요"
-                  />
-                  <textarea
-                    data-testid="approval-content-input"
-                    value={formContent}
-                    onChange={e => setFormContent(e.target.value)}
-                    className="w-full h-48 md:h-56 p-4 md:p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] outline-none text-sm font-bold leading-relaxed border border-[var(--border)] focus:ring-2 focus:ring-[var(--accent)]/20 transition-all"
-                    placeholder="상세 사유 및 내용을 입력하세요."
-                  />
+                  {formType !== '공문발송' && (
+                    <>
+                      <input
+                        data-testid="approval-title-input"
+                        value={formTitle}
+                        onChange={e => setFormTitle(e.target.value)}
+                        className="w-full p-4 md:p-5 bg-[var(--muted)] rounded-[var(--radius-md)] font-bold outline-none text-lg md:text-xl focus:ring-2 focus:ring-[var(--accent)]/20 border border-[var(--border)] transition-all"
+                        placeholder="기안 제목을 입력하세요"
+                      />
+                      <textarea
+                        data-testid="approval-content-input"
+                        value={formContent}
+                        onChange={e => setFormContent(e.target.value)}
+                        className="w-full h-48 md:h-56 p-4 md:p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] outline-none text-sm font-bold leading-relaxed border border-[var(--border)] focus:ring-2 focus:ring-[var(--accent)]/20 transition-all"
+                        placeholder="상세 사유 및 내용을 입력하세요."
+                      />
+                    </>
+                  )}
+                  {formType === '공문발송' && (
+                    <div className="rounded-[var(--radius-md)] border border-sky-200 bg-sky-50 px-4 py-3 text-[12px] font-semibold text-sky-700">
+                      공문 양식 입력값이 결재 제목과 본문에 자동 반영됩니다. 승인 후 발송대장으로 자동 이관됩니다.
+                    </div>
+                  )}
                   <button
                     data-testid="approval-submit-button"
                     onClick={() => {
@@ -3878,6 +3988,7 @@ window.onload = () => window.print();
                   const isBulkTarget = viewMode === '결재함' && canUserApproveItem(item);
                   const isChecked = selectedApprovalIds.includes(itemId);
                   const templateMeta = resolveApprovalTemplateMeta(item);
+                  const isOfficialDocumentItem = templateMeta.slug === 'official_document_dispatch';
                   const templateDesign = resolveApprovalTemplateDesign(item);
                   const itemMetaData = item.meta_data as Record<string, unknown> | null | undefined;
                   const cardCcUsers = normalizeApprovalCcUsers(itemMetaData?.cc_users, approvalDirectoryStaffs);
@@ -3912,7 +4023,7 @@ window.onload = () => window.print();
                           className="w-7 h-7 shrink-0 rounded-md flex items-center justify-center text-[11px] shadow-inner transition-colors"
                           style={{ backgroundColor: alphaColor(templateDesign.primaryColor, 0.12), color: templateDesign.primaryColor || '#155eef' }}
                         >
-                          {itemType === '물품신청' ? '📦' : itemType === '양식신청' ? '📄' : itemType === '인사명령' ? '🎖️' : itemType === '수리요청서' ? '🔧' : '📋'}
+                          {isOfficialDocumentItem ? '📨' : itemType === '물품신청' ? '📦' : itemType === '양식신청' ? '📄' : itemType === '인사명령' ? '🎖️' : itemType === '수리요청서' ? '🔧' : '📋'}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap gap-0.5 mb-0 items-center">

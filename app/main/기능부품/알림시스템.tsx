@@ -3,8 +3,10 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { sound } from '@/lib/sounds';
 import { isNamedSystemMasterAccount } from '@/lib/system-master';
+import { canAccessAdminSection } from '@/lib/access-control';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { bindChannelHealthcheck, bindPageRefresh } from '@/lib/realtime-maintenance';
+import { detectPayrollAnomalies } from './관리자전용서브/급여이상치감지';
 
 /**
  * [실시간 알림 엔진 + KakaoTalk 스타일 Toast UI]
@@ -698,7 +700,7 @@ interface UserLike {
 
 // ─── 메인 컴포넌트 ───
 export default function NotificationSystem({
-  user: rawUser, onOpenChatRoom, onOpenMessage, onOpenApproval, onOpenInventory, onOpenBoard, onOpenPost,
+  user: rawUser, onOpenChatRoom, onOpenMessage, onOpenApproval, onOpenInventory, onOpenBoard, onOpenPost, onOpenAdmin,
 }: {
   user: UserLike | null | undefined;
   onOpenChatRoom?: (roomId: string) => void;
@@ -707,6 +709,7 @@ export default function NotificationSystem({
   onOpenInventory?: (intent?: { view?: string | null; approvalId?: string | null }) => void;
   onOpenBoard?: (boardId?: string) => void;
   onOpenPost?: (boardId: string, postId: string) => void;
+  onOpenAdmin?: (subView?: string) => void;
 }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -998,11 +1001,17 @@ export default function NotificationSystem({
       else if (t === 'board') {
         if (notif.data?.post_id && onOpenPost) onOpenPost(notif.data.board_type || '공지사항', notif.data.post_id);
         else if (onOpenBoard) onOpenBoard(notif.data?.board_type);
+      } else if (t === 'notification' && notif.data?.open_menu === '관리자' && onOpenAdmin) {
+        onOpenAdmin(
+          typeof notif.data?.open_subview === 'string' && notif.data.open_subview.trim()
+            ? notif.data.open_subview
+            : '감사센터'
+        );
       } else if (t === 'notification' && notif.data?.post_id && onOpenPost) {
         onOpenPost(notif.data.board_type || '공지사항', notif.data.post_id);
       }
     };
-  }, [removeToast, onOpenMessage, onOpenChatRoom, onOpenApproval, onOpenInventory, onOpenPost, onOpenBoard]);
+  }, [removeToast, onOpenAdmin, onOpenMessage, onOpenChatRoom, onOpenApproval, onOpenInventory, onOpenPost, onOpenBoard]);
 
   // ─── Supabase Realtime 구독 ───
   useEffect(() => {
@@ -1192,6 +1201,49 @@ export default function NotificationSystem({
       }
     };
 
+    const queuePayrollAnomalyAlert = async () => {
+      if (!canAccessAdminSection(user, '급여이상치')) {
+        return;
+      }
+
+      try {
+        const analysis = await detectPayrollAnomalies();
+
+        if (analysis.visibleAnomalies.length === 0) {
+          return;
+        }
+
+        const dedupeKey = [
+          'payroll-anomaly',
+          analysis.currentMonth,
+          analysis.visibleAnomalies.length,
+          analysis.criticalCount,
+          analysis.warningCount,
+        ].join(':');
+
+        await insertNoti(
+          {
+            type: 'notification',
+            title: '⚠️ 급여 이상치 감지',
+            body: `${analysis.currentMonth} 급여 이상치 ${analysis.visibleAnomalies.length}건 (심각 ${analysis.criticalCount} / 주의 ${analysis.warningCount})`,
+            data: {
+              type: 'notification',
+              open_menu: '관리자',
+              open_subview: '급여이상치',
+              current_month: analysis.currentMonth,
+              anomaly_count: analysis.visibleAnomalies.length,
+              critical_count: analysis.criticalCount,
+              warning_count: analysis.warningCount,
+            },
+          },
+          dedupeKey,
+          60_000
+        );
+      } catch (error) {
+        console.error('급여 이상치 관리자 알림 생성 실패:', error);
+      }
+    };
+
     const nTableChannel = supabase.channel(`noti-db-${uid}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` }, (payload: Record<string, unknown>) => {
         emitIncomingNotification(payload.new as Record<string, unknown>);
@@ -1201,6 +1253,7 @@ export default function NotificationSystem({
         if (status === 'SUBSCRIBED') {
           void fetchUnreadNotificationsSince(mountedAt);
           void processDueTodoReminders();
+          void queuePayrollAnomalyAlert();
         }
       });
 
@@ -1400,7 +1453,7 @@ export default function NotificationSystem({
       unbindTodoReminderPoll();
       channels.forEach(ch => supabase.removeChannel(ch));
     };
-  }, [user?.department, user?.name, user?.permissions?.inventory, claimCrossTabNotificationAsync, effectiveUserId, emitIncomingNotification, syncBadge]);
+  }, [user?.department, user?.name, user?.permissions, claimCrossTabNotificationAsync, effectiveUserId, emitIncomingNotification, syncBadge]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !effectiveUserId) return;
