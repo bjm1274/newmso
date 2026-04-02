@@ -161,6 +161,22 @@ function resolveAttachmentKind(
   return isImageUrl(resolvedUrl) ? 'image' : isVideoUrl(resolvedUrl) ? 'video' : 'file';
 }
 
+function sortAlbumMessages<T extends Pick<ChatMessage, 'album_index' | 'created_at'>>(messages: T[]): T[] {
+  return [...messages].sort((a, b) => {
+    const aIndex = Number.isFinite(Number(a.album_index)) ? Number(a.album_index) : Number.MAX_SAFE_INTEGER;
+    const bIndex = Number.isFinite(Number(b.album_index)) ? Number(b.album_index) : Number.MAX_SAFE_INTEGER;
+
+    if (aIndex !== bIndex) return aIndex - bIndex;
+
+    return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+  });
+}
+
+function extractFirstLinkUrl(value: string | null | undefined): string {
+  const urlMatch = String(value || '').match(/https?:\/\/[^\s]+/);
+  return urlMatch ? urlMatch[0] : '';
+}
+
 function extractFileNameFromUrl(url: string | null | undefined): string {
   const rawUrl = String(url || '').trim();
   if (!rawUrl) return '첨부파일';
@@ -374,10 +390,15 @@ type PresenceInfo = {
 
 type AttachmentPreviewKind = 'image' | 'video' | 'file';
 
-type AttachmentPreview = {
+type AttachmentPreviewItem = {
   url: string;
   name: string;
   kind: AttachmentPreviewKind;
+};
+
+type AttachmentPreview = {
+  items: AttachmentPreviewItem[];
+  activeIndex: number;
 };
 
 type MessageRetryPayload = {
@@ -457,6 +478,7 @@ type AttachmentQuickActionsProps = {
   url: string;
   name: string;
   onPreview: () => void;
+  onReply?: (() => void) | null;
   variant?: AttachmentQuickActionsVariant;
   className?: string;
 };
@@ -465,6 +487,7 @@ function AttachmentQuickActions({
   url,
   name,
   onPreview,
+  onReply,
   variant = 'pill',
   className = '',
 }: AttachmentQuickActionsProps) {
@@ -489,6 +512,12 @@ function AttachmentQuickActions({
   const previewClassByVariant: Record<AttachmentQuickActionsVariant, string> = {
     pill: `${actionClassByVariant.pill} bg-blue-500/10 dark:bg-blue-900/30 text-[var(--accent)] hover:text-blue-600`,
     subtle: `${actionClassByVariant.subtle} text-[var(--accent)] hover:text-blue-600`,
+    overlay: actionClassByVariant.overlay,
+  };
+
+  const replyClassByVariant: Record<AttachmentQuickActionsVariant, string> = {
+    pill: `${actionClassByVariant.pill} bg-amber-50 dark:bg-amber-900/30 text-amber-700 hover:text-amber-800`,
+    subtle: `${actionClassByVariant.subtle} text-amber-700 hover:text-amber-800`,
     overlay: actionClassByVariant.overlay,
   };
 
@@ -517,6 +546,19 @@ function AttachmentQuickActions({
       >
         미리보기
       </button>
+      {onReply ? (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onReply();
+          }}
+          className={replyClassByVariant[variant]}
+        >
+          답글
+        </button>
+      ) : null}
       <button type="button" onClick={handleShare} className={shareClassByVariant[variant]}>
         공유
       </button>
@@ -539,6 +581,7 @@ type AttachmentListCardProps = {
   meta?: string | null;
   badgeLabel?: string | null;
   onPreview: () => void;
+  onReply?: (() => void) | null;
   onActivate?: (() => void) | null;
   actionVariant?: AttachmentQuickActionsVariant;
   layout?: 'list' | 'bubble';
@@ -554,6 +597,7 @@ function AttachmentListCard({
   meta,
   badgeLabel,
   onPreview,
+  onReply,
   onActivate,
   actionVariant = 'subtle',
   layout = 'list',
@@ -585,6 +629,7 @@ function AttachmentListCard({
                 url={url}
                 name={name}
                 onPreview={onPreview}
+                onReply={onReply}
                 variant="overlay"
               />
             </div>
@@ -603,6 +648,7 @@ function AttachmentListCard({
             url={url}
             name={name}
             onPreview={onPreview}
+            onReply={onReply}
             variant={tone === 'accent' ? 'overlay' : 'subtle'}
             className="mt-2"
           />
@@ -634,6 +680,7 @@ function AttachmentListCard({
               url={url}
               name={name}
               onPreview={onPreview}
+              onReply={onReply}
               variant="pill"
               className="mt-2"
             />
@@ -703,6 +750,7 @@ function AttachmentListCard({
             url={url}
             name={name}
             onPreview={onPreview}
+            onReply={onReply}
             variant={actionVariant}
             className="mt-2"
           />
@@ -1889,6 +1937,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [addMemberSearch, setAddMemberSearch] = useState('');
   const [attachmentPreview, setAttachmentPreview] = useState<AttachmentPreview | null>(null);
+  const activeAttachmentPreview = attachmentPreview
+    ? attachmentPreview.items[attachmentPreview.activeIndex] ?? null
+    : null;
+  const attachmentPreviewCount = attachmentPreview?.items.length ?? 0;
+  const canNavigateAttachmentPreview = attachmentPreviewCount > 1;
   const [attachmentZoom, setAttachmentZoom] = useState(1);
   const [attachmentOffset, setAttachmentOffset] = useState({ x: 0, y: 0 });
   const attachmentZoomRef = useRef(1);
@@ -1930,26 +1983,90 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     setAttachmentOffset({ x: 0, y: 0 });
   }, []);
 
-  const openAttachmentPreview = useCallback(
-    (url: string | null | undefined, fileName?: string | null, forcedKind?: AttachmentPreviewKind) => {
+  const buildAttachmentPreviewItem = useCallback(
+    (
+      url: string | null | undefined,
+      fileName?: string | null,
+      forcedKind?: AttachmentPreviewKind,
+    ): AttachmentPreviewItem | null => {
       const resolvedUrl = String(url || '').trim();
-      if (!resolvedUrl) return;
+      if (!resolvedUrl) return null;
 
-      const resolvedKind: AttachmentPreviewKind =
-        forcedKind || resolveAttachmentKind(resolvedUrl, null);
-
-      setAttachmentPreview({
+      return {
         url: resolvedUrl,
         name: getAttachmentDisplayName(fileName, resolvedUrl),
-        kind: resolvedKind,
+        kind: forcedKind || resolveAttachmentKind(resolvedUrl, null),
+      };
+    },
+    []
+  );
+
+  const openAttachmentPreviewGallery = useCallback(
+    (items: AttachmentPreviewItem[], startIndex = 0) => {
+      const normalizedItems = items.filter((item) => String(item?.url || '').trim());
+      if (!normalizedItems.length) return;
+
+      const normalizedIndex = Math.max(0, Math.min(normalizedItems.length - 1, startIndex));
+      setAttachmentPreview({
+        items: normalizedItems,
+        activeIndex: normalizedIndex,
       });
     },
     []
   );
 
+  const openAttachmentPreview = useCallback(
+    (url: string | null | undefined, fileName?: string | null, forcedKind?: AttachmentPreviewKind) => {
+      const previewItem = buildAttachmentPreviewItem(url, fileName, forcedKind);
+      if (!previewItem) return;
+
+      openAttachmentPreviewGallery([previewItem], 0);
+    },
+    [buildAttachmentPreviewItem, openAttachmentPreviewGallery]
+  );
+
   useEffect(() => {
     resetAttachmentImageTransform();
-  }, [attachmentPreview?.kind, attachmentPreview?.url, resetAttachmentImageTransform]);
+  }, [activeAttachmentPreview?.kind, activeAttachmentPreview?.url, resetAttachmentImageTransform]);
+
+  const moveAttachmentPreview = useCallback((delta: number) => {
+    setAttachmentPreview((prev) => {
+      if (!prev || prev.items.length <= 1) return prev;
+
+      const nextIndex = (prev.activeIndex + delta + prev.items.length) % prev.items.length;
+      if (nextIndex === prev.activeIndex) return prev;
+
+      return {
+        ...prev,
+        activeIndex: nextIndex,
+      };
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!attachmentPreview) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeAttachmentPreview();
+        return;
+      }
+
+      if (!canNavigateAttachmentPreview) return;
+
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        moveAttachmentPreview(-1);
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        moveAttachmentPreview(1);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [attachmentPreview, canNavigateAttachmentPreview, closeAttachmentPreview, moveAttachmentPreview]);
 
   const applyAttachmentZoom = useCallback(
     (nextZoom: number) => {
@@ -2023,13 +2140,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   );
 
   useEffect(() => {
-    if (!attachmentPreview) return;
+    if (!activeAttachmentPreview) return;
     const handleWindowKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        closeAttachmentPreview();
-        return;
-      }
-      if (attachmentPreview.kind !== 'image') return;
+      if (activeAttachmentPreview.kind !== 'image') return;
       if (event.key === '+' || event.key === '=') {
         event.preventDefault();
         nudgeAttachmentZoom(0.25);
@@ -2044,7 +2157,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
     window.addEventListener('keydown', handleWindowKeyDown);
     return () => window.removeEventListener('keydown', handleWindowKeyDown);
-  }, [applyAttachmentZoom, attachmentPreview, closeAttachmentPreview, nudgeAttachmentZoom]);
+  }, [activeAttachmentPreview, applyAttachmentZoom, nudgeAttachmentZoom]);
 
   const [threadRoot, setThreadRoot] = useState<ChatMessage | null>(null);
 
@@ -4571,6 +4684,49 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     [messages]
   );
 
+  const openAttachmentPreviewForMessage = useCallback(
+    (message: ChatMessage) => {
+      const attachmentUrl = String(message.file_url || '').trim();
+      if (!attachmentUrl) return;
+
+      const previewKind = resolveAttachmentKind(attachmentUrl, message.file_kind);
+      if (previewKind === 'image' && message.album_id) {
+        const albumMessages = sortAlbumMessages(
+          messages.filter(
+            (candidate) =>
+              !candidate.is_deleted &&
+              String(candidate.album_id || '') === String(message.album_id || '') &&
+              resolveAttachmentKind(candidate.file_url, candidate.file_kind) === 'image'
+          )
+        );
+
+        if (albumMessages.length > 1) {
+          const previewItems = albumMessages
+            .map((candidate) =>
+              buildAttachmentPreviewItem(
+                candidate.file_url,
+                candidate.file_name,
+                resolveAttachmentKind(candidate.file_url, candidate.file_kind)
+              )
+            )
+            .filter((item): item is AttachmentPreviewItem => Boolean(item));
+          const startIndex = Math.max(
+            0,
+            albumMessages.findIndex((candidate) => String(candidate.id) === String(message.id))
+          );
+
+          if (previewItems.length > 1) {
+            openAttachmentPreviewGallery(previewItems, startIndex);
+            return;
+          }
+        }
+      }
+
+      openAttachmentPreview(attachmentUrl, message.file_name || null, previewKind);
+    },
+    [buildAttachmentPreviewItem, messages, openAttachmentPreview, openAttachmentPreviewGallery]
+  );
+
   const mentionCandidates = useMemo(() => {
     if (!showMentionList) return [];
     const base =
@@ -4866,9 +5022,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
     // album 아이템을 첫 번째 메시지 위치에 삽입
     for (const aid of albumOrder) {
-      const msgs = albumMap.get(aid)!;
-      msgs.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
-      const representative = msgs[0];
+      const msgs = sortAlbumMessages(albumMap.get(aid)!);
+      const representative =
+        msgs.find((message) => Number(message.album_index) === 0) ||
+        msgs.find((message) => String(message.content || '').trim()) ||
+        msgs[0];
       const albumItem = {
         ...representative,
         type: 'album',
@@ -5434,9 +5592,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   // 그리드 레이아웃: 1장=1열, 2장=2열, 3장=2+1, 4장=2+2, 5+장=3열
                   const gridCols = count === 1 ? 'grid-cols-1' : count <= 4 ? 'grid-cols-2' : 'grid-cols-3';
                   const timeStr = created.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+                  const albumReplyTarget =
+                    albumMsgs.find((message) => String(message.content || '').trim()) ||
+                    albumMsgs[0] ||
+                    albumItem;
 
                   return (
-                    <div key={`album-${albumItem.album_id || albumItem.id}`} className={showDateDivider ? 'mt-0.5 md:mt-1' : 'mt-[2px]'}>
+                    <div
+                      data-testid={`chat-album-${albumItem.album_id || albumItem.id}`}
+                      key={`album-${albumItem.album_id || albumItem.id}`}
+                      className={showDateDivider ? 'mt-0.5 md:mt-1' : 'mt-[2px]'}
+                    >
                       {showDateDivider && (
                         <div className="my-0.5 flex items-center justify-center gap-1 md:my-1 md:gap-2">
                           <div className="flex-1 h-px bg-[var(--border)]" />
@@ -5466,7 +5632,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                 key={m.id}
                                 className={`relative overflow-hidden bg-[var(--muted)] ${count === 3 && idx === 2 ? 'col-span-2' : ''} ${count === 5 && idx === 3 ? 'col-span-1' : ''}`}
                                 style={{ aspectRatio: count === 1 ? '4/3' : '1/1' }}
-                                onClick={() => openAttachmentPreview(m.file_url, m.file_name, 'image')}
+                                onClick={() => openAttachmentPreviewForMessage(m)}
                                 aria-label={`${m.file_name || `앨범 사진 ${idx + 1}`} 미리보기`}
                               >
                                 <img
@@ -5483,7 +5649,19 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                               </button>
                             ))}
                           </div>
-                          <span className="text-[10px] text-[var(--toss-gray-3)] mx-1">{timeStr} · 사진 {count}장</span>
+                          <div className={`mx-1 flex items-center gap-2 text-[10px] ${isMineAlbum ? 'justify-end' : 'justify-start'}`}>
+                            <span className="text-[var(--toss-gray-3)]">{timeStr} · 사진 {count}장</span>
+                            {albumReplyTarget ? (
+                              <button
+                                type="button"
+                                data-testid={`chat-album-reply-${albumItem.album_id || albumItem.id}`}
+                                onClick={() => startReplyToMessage(albumReplyTarget)}
+                                className="font-bold text-amber-700 transition-colors hover:text-amber-800"
+                              >
+                                답글
+                              </button>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -5823,10 +6001,19 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
           {/* 앨범(다중 이미지) 미리보기 패널 */}
           {pendingAlbumFiles.length > 0 && (
-            <div className="mb-1 flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--accent)]/30 bg-blue-500/10 dark:bg-blue-950/20 px-3 py-2">
+            <div
+              data-testid="chat-pending-album-panel"
+              className="mb-1 flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--accent)]/30 bg-blue-500/10 dark:bg-blue-950/20 px-3 py-2"
+            >
               <div className="flex items-center justify-between">
                 <span className="text-[12px] font-bold text-[var(--accent)]">📷 사진 {pendingAlbumFiles.length}장 묶어 보내기</span>
-                <button onClick={cancelAlbumUpload} className="text-[11px] text-[var(--toss-gray-3)] hover:text-red-500 font-semibold">취소</button>
+                <button
+                  data-testid="chat-pending-album-cancel-button"
+                  onClick={cancelAlbumUpload}
+                  className="text-[11px] text-[var(--toss-gray-3)] hover:text-red-500 font-semibold"
+                >
+                  취소
+                </button>
               </div>
               {/* 썸네일 그리드 */}
               <div className="flex gap-1.5 flex-wrap">
@@ -5855,6 +6042,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               <div className="flex items-center gap-2">
                 <button
                   type="button"
+                  data-testid="chat-pending-album-send-button"
                   onClick={() => void sendAlbum()}
                   disabled={fileUploading}
                   className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50 flex items-center gap-1"
@@ -5922,8 +6110,24 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             ? 'bg-[var(--muted)] border-[var(--border)] opacity-80 pointer-events-none'
             : 'bg-[var(--muted)] border-[var(--border)] focus-within:bg-[var(--card)] focus-within:ring-2 focus-within:ring-[var(--accent)]/50'
             }`}>
-            <input type="file" ref={fileInputRef} className="hidden" onChange={handleAttachmentSelect} accept="image/*,.heic,.heif,.avif,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.hwp,.hwpx,.csv" multiple />
-            <input type="file" ref={albumFileInputRef} className="hidden" onChange={handleAlbumFileSelect} accept="image/*" multiple />
+            <input
+              data-testid="chat-file-input"
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              onChange={handleAttachmentSelect}
+              accept="image/*,.heic,.heif,.avif,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.hwp,.hwpx,.csv"
+              multiple
+            />
+            <input
+              data-testid="chat-album-file-input"
+              type="file"
+              ref={albumFileInputRef}
+              className="hidden"
+              onChange={handleAlbumFileSelect}
+              accept="image/*"
+              multiple
+            />
             {/* 통합 첨부 버튼 */}
             <button
               onClick={() => fileInputRef.current?.click()}
@@ -6050,7 +6254,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   </div>
                   <div className="grid grid-cols-3 gap-1 rounded-2xl overflow-hidden">
                     {sharedMediaPreviewMessages.map((m) => (
-                      <div key={m.id} className="aspect-square bg-[var(--tab-bg)] dark:bg-zinc-800 relative group cursor-pointer" onClick={() => m.file_url && openAttachmentPreview(m.file_url, m.file_name || null, resolveAttachmentKind(m.file_url, m.file_kind))}>
+                      <div
+                        key={m.id}
+                        className="aspect-square bg-[var(--tab-bg)] dark:bg-zinc-800 relative group cursor-pointer"
+                        onClick={() => openAttachmentPreviewForMessage(m)}
+                      >
                         {resolveAttachmentKind(m.file_url, m.file_kind) === 'image' ? (
                           <img
                             src={m.file_url || ''}
@@ -6065,7 +6273,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             <AttachmentQuickActions
                               url={m.file_url}
                               name={getAttachmentDisplayName(m.file_name, m.file_url)}
-                              onPreview={() => openAttachmentPreview(m.file_url, m.file_name || null, resolveAttachmentKind(m.file_url, m.file_kind))}
+                              onPreview={() => openAttachmentPreviewForMessage(m)}
+                              onReply={() => startReplyToMessage(m)}
                               variant="overlay"
                             />
                           </div>
@@ -6102,7 +6311,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           name={attachmentName}
                           kind="file"
                           meta={`${(m.staff as { name?: string } | null | undefined)?.name || '알 수 없음'} · ${new Date(m.created_at || 0).toLocaleDateString()}`}
-                          onPreview={() => openAttachmentPreview(fileUrl, attachmentName, 'file')}
+                          onPreview={() => openAttachmentPreviewForMessage(m)}
+                          onReply={() => startReplyToMessage(m)}
                           actionVariant="subtle"
                         />
                       );
@@ -6119,13 +6329,58 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider px-1">링크</p>
                   <div className="space-y-2">
                     {sharedLinkPreviewMessages.map((m) => {
-                      const urlMatch = (m.content || '').match(/https?:\/\/[^\s]+/);
-                      const url = urlMatch ? urlMatch[0] : '';
+                      const url = extractFirstLinkUrl(m.content);
                       return (
-                        <a key={m.id} href={url} target="_blank" rel="noreferrer" className="block p-3 bg-[var(--tab-bg)] dark:bg-zinc-800/50 rounded-xl border border-[var(--border-subtle)] dark:border-zinc-800 hover:border-emerald-500 transition-colors">
-                          <p className="text-[11px] font-bold truncate text-emerald-600 mb-0.5">{url}</p>
-                          <p className="text-[10px] text-[var(--toss-gray-4)] truncate">{(m.staff as { name?: string } | null | undefined)?.name} · {new Date(m.created_at || 0).toLocaleDateString()}</p>
-                        </a>
+                        <div
+                          key={m.id}
+                          data-testid={`chat-shared-link-${m.id}`}
+                          className="p-3 bg-[var(--tab-bg)] dark:bg-zinc-800/50 rounded-xl border border-[var(--border-subtle)] dark:border-zinc-800"
+                        >
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block hover:opacity-90 transition-opacity"
+                          >
+                            <p className="text-[11px] font-bold truncate text-emerald-600 mb-0.5">{url}</p>
+                            <p className="text-[10px] text-[var(--toss-gray-4)] truncate">
+                              {(m.staff as { name?: string } | null | undefined)?.name} · {new Date(m.created_at || 0).toLocaleDateString()}
+                            </p>
+                          </a>
+                          <div className="mt-2 flex items-center gap-2 flex-wrap text-[10px] font-bold">
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-emerald-600 hover:text-emerald-700"
+                            >
+                              열기
+                            </a>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  if (!navigator?.clipboard?.writeText) throw new Error('clipboard unavailable');
+                                  await navigator.clipboard.writeText(url);
+                                  toast('링크를 복사했습니다.');
+                                } catch {
+                                  toast('링크 복사에 실패했습니다.', 'error');
+                                }
+                              }}
+                              className="text-[var(--toss-gray-4)] hover:text-[var(--foreground)]"
+                            >
+                              복사
+                            </button>
+                            <button
+                              type="button"
+                              data-testid={`chat-shared-link-reply-${m.id}`}
+                              onClick={() => startReplyToMessage(m)}
+                              className="text-amber-700 hover:text-amber-800"
+                            >
+                              답글
+                            </button>
+                          </div>
+                        </div>
                       );
                     })}
                     {sharedLinkPreviewMessages.length === 0 && (
@@ -6735,7 +6990,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                               hour: '2-digit',
                               minute: '2-digit',
                             })}`}
-                            onPreview={() => openAttachmentPreview(attachmentUrl, attachmentName, attachmentKind)}
+                            onPreview={() => openAttachmentPreviewForMessage(m)}
+                            onReply={() => startReplyToMessage(m)}
                             actionVariant="subtle"
                             className="mt-2"
                           />
@@ -7126,7 +7382,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       kind={previewKind}
                       summary={m.content || null}
                       meta={new Date(m.created_at || 0).toLocaleDateString()}
-                      onPreview={() => openAttachmentPreview(furl, attachmentName, previewKind)}
+                      onPreview={() => openAttachmentPreviewForMessage(m)}
+                      onReply={() => startReplyToMessage(m)}
                       actionVariant="subtle"
                     />
                   );
@@ -7474,11 +7731,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       )}
 
       {/* ── 이미지 전체화면 미리보기 모달 ── */}
-      {attachmentPreview && (
+      {attachmentPreview && activeAttachmentPreview && (
         <div
+          data-testid="chat-attachment-preview-modal"
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-sm"
           onClick={closeAttachmentPreview}
-          onKeyDown={(e) => { if (e.key === 'Escape') closeAttachmentPreview(); }}
           tabIndex={-1}
         >
           {/* 상단 버튼 바 - safe-area 적용 */}
@@ -7487,35 +7744,45 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             style={{ paddingTop: 'calc(env(safe-area-inset-top, 12px) + 12px)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            {attachmentPreview.kind === 'image' && (
-              <div className="mr-auto inline-flex items-center gap-1 rounded-full bg-white/15 p-1 text-white shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => nudgeAttachmentZoom(-0.25)}
-                  className="h-9 min-w-9 rounded-full px-2 text-sm font-bold transition-colors hover:bg-white/15"
-                  aria-label="축소"
+            <div className="mr-auto flex items-center gap-2 text-white">
+              {activeAttachmentPreview.kind === 'image' && (
+                <div className="inline-flex items-center gap-1 rounded-full bg-white/15 p-1 text-white shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => nudgeAttachmentZoom(-0.25)}
+                    className="h-9 min-w-9 rounded-full px-2 text-sm font-bold transition-colors hover:bg-white/15"
+                    aria-label="축소"
+                  >
+                    -
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetAttachmentImageTransform}
+                    className="h-9 min-w-[68px] rounded-full px-3 text-[11px] font-bold transition-colors hover:bg-white/15"
+                  >
+                    {Math.round(attachmentZoom * 100)}%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => nudgeAttachmentZoom(0.25)}
+                    className="h-9 min-w-9 rounded-full px-2 text-sm font-bold transition-colors hover:bg-white/15"
+                    aria-label="확대"
+                  >
+                    +
+                  </button>
+                </div>
+              )}
+              {attachmentPreviewCount > 1 ? (
+                <div
+                  data-testid="chat-attachment-preview-counter"
+                  className="rounded-full bg-white/15 px-3 py-2 text-[11px] font-semibold shadow-sm"
                 >
-                  -
-                </button>
-                <button
-                  type="button"
-                  onClick={resetAttachmentImageTransform}
-                  className="h-9 min-w-[68px] rounded-full px-3 text-[11px] font-bold transition-colors hover:bg-white/15"
-                >
-                  {Math.round(attachmentZoom * 100)}%
-                </button>
-                <button
-                  type="button"
-                  onClick={() => nudgeAttachmentZoom(0.25)}
-                  className="h-9 min-w-9 rounded-full px-2 text-sm font-bold transition-colors hover:bg-white/15"
-                  aria-label="확대"
-                >
-                  +
-                </button>
-              </div>
-            )}
+                  {attachmentPreview.activeIndex + 1} / {attachmentPreviewCount}
+                </div>
+              ) : null}
+            </div>
             <a
-              href={attachmentPreview.url}
+              href={activeAttachmentPreview.url}
               target="_blank"
               rel="noopener noreferrer"
               className="h-11 inline-flex items-center justify-center rounded-full bg-white/15 hover:bg-white/30 px-4 text-white text-xs font-semibold transition-colors"
@@ -7523,7 +7790,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               새 창
             </a>
             <a
-              href={buildDownloadUrl(attachmentPreview.url, attachmentPreview.name ?? '')}
+              href={buildDownloadUrl(activeAttachmentPreview.url, activeAttachmentPreview.name ?? '')}
               onClick={(e) => e.stopPropagation()}
               className="h-11 inline-flex items-center justify-center rounded-full bg-white/15 hover:bg-white/30 px-4 text-white text-xs font-semibold transition-colors"
               aria-label="다운로드"
@@ -7539,11 +7806,39 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               ✕
             </button>
           </div>
+          {canNavigateAttachmentPreview && activeAttachmentPreview.kind === 'image' && (
+            <>
+              <button
+                type="button"
+                data-testid="chat-attachment-preview-prev-button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  moveAttachmentPreview(-1);
+                }}
+                className="absolute left-3 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-2xl text-white transition-colors hover:bg-white/30 md:left-6"
+                aria-label="이전 사진"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                data-testid="chat-attachment-preview-next-button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  moveAttachmentPreview(1);
+                }}
+                className="absolute right-3 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-2xl text-white transition-colors hover:bg-white/30 md:right-6"
+                aria-label="다음 사진"
+              >
+                ›
+              </button>
+            </>
+          )}
           <div
             className="max-w-[92vw] max-h-[88vh] w-full flex items-center justify-center"
             onClick={(e) => e.stopPropagation()}
           >
-            {attachmentPreview.kind === 'image' ? (
+            {activeAttachmentPreview.kind === 'image' ? (
               <div
                 className={`flex max-w-[92vw] max-h-[80vh] items-center justify-center overflow-hidden rounded-xl ${attachmentZoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'}`}
                 style={{ touchAction: attachmentZoom > 1 ? 'none' : 'manipulation' }}
@@ -7555,8 +7850,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 onDoubleClick={handleAttachmentImageDoubleClick}
               >
                 <img
-                  src={attachmentPreview.url}
-                  alt={attachmentPreview.name || '미리보기'}
+                  src={activeAttachmentPreview.url}
+                  alt={activeAttachmentPreview.name || '미리보기'}
+                  data-testid="chat-attachment-preview-image"
                   className="max-w-[92vw] max-h-[80vh] rounded-xl object-contain shadow-sm select-none"
                   style={{
                     transform: `translate3d(${attachmentOffset.x}px, ${attachmentOffset.y}px, 0) scale(${attachmentZoom})`,
@@ -7566,27 +7862,27 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   draggable={false}
                 />
               </div>
-            ) : attachmentPreview.kind === 'video' ? (
+            ) : activeAttachmentPreview.kind === 'video' ? (
               <video
-                src={attachmentPreview.url}
+                src={activeAttachmentPreview.url}
                 controls
                 autoPlay
                 playsInline
                 className="max-w-[92vw] max-h-[88vh] rounded-xl bg-black shadow-sm"
               />
-            ) : /\.pdf(\?|#|$)/i.test(attachmentPreview.url) ? (
+            ) : /\.pdf(\?|#|$)/i.test(activeAttachmentPreview.url) ? (
               <iframe
-                src={attachmentPreview.url}
-                title={attachmentPreview.name}
+                src={activeAttachmentPreview.url}
+                title={activeAttachmentPreview.name}
                 className="w-[92vw] h-[88vh] rounded-xl bg-[var(--card)] shadow-sm"
               />
             ) : (
               <div className="w-full max-w-md rounded-[var(--radius-xl)] bg-[var(--card)] p-6 shadow-sm text-left">
-                <p className="text-sm font-bold text-[var(--foreground)] break-all">{attachmentPreview.name}</p>
-                <p className="mt-2 text-xs text-[var(--toss-gray-4)] break-all">{attachmentPreview.url}</p>
+                <p className="text-sm font-bold text-[var(--foreground)] break-all">{activeAttachmentPreview.name}</p>
+                <p className="mt-2 text-xs text-[var(--toss-gray-4)] break-all">{activeAttachmentPreview.url}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <a
-                    href={attachmentPreview.url}
+                    href={activeAttachmentPreview.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center rounded-lg bg-[var(--accent)] px-3 py-2 text-xs font-bold text-white"
@@ -7594,7 +7890,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     새 창 열기
                   </a>
                   <a
-                    href={buildDownloadUrl(attachmentPreview.url, attachmentPreview.name ?? '')}
+                    href={buildDownloadUrl(activeAttachmentPreview.url, activeAttachmentPreview.name ?? '')}
                     className="inline-flex items-center rounded-lg bg-[var(--tab-bg)] px-3 py-2 text-xs font-bold text-[var(--foreground)]"
                   >
                     다운로드

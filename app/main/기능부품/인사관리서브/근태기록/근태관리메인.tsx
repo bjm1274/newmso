@@ -461,7 +461,7 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
       const loadLegacyPendingApprovals = async () => {
         let query = supabase
           .from('approvals')
-          .select('id, sender_id, sender_name, sender_company, status, current_approver_id, rejection_comment, meta_data, created_at')
+          .select('id, sender_id, sender_name, sender_company, status, current_approver_id, meta_data, created_at')
           .eq('type', LEGACY_ROSTER_APPROVAL_TYPE)
           .eq('status', LEGACY_APPROVAL_PENDING_STATUS)
           .order('created_at', { ascending: false });
@@ -657,7 +657,6 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
         const { error: approvalError } = await supabase.from('approvals').update({
           status: LEGACY_APPROVAL_APPROVED_STATUS,
           current_approver_id: null,
-          rejection_comment: null,
           meta_data: {
             ...metaData,
             roster_approval_status: 'approved',
@@ -763,7 +762,6 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
         const { error } = await supabase.from('approvals').update({
           status: LEGACY_APPROVAL_REJECTED_STATUS,
           current_approver_id: null,
-          rejection_comment: reason,
           meta_data: {
             ...metaData,
             roster_approval_status: 'rejected',
