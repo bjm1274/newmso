@@ -518,9 +518,17 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         working_hours_per_week: 신규직원.working_hours_per_week || 40,
         working_days_per_week: 신규직원.working_days_per_week || 5,
         base_salary: 신규직원.base_salary,
-        other_taxfree: 신규직원.other_taxfree ?? 0, position_allowance: 신규직원.position_allowance ?? 0,
-        overtime_allowance: 신규직원.overtime_allowance ?? 0, night_work_allowance: 신규직원.night_work_allowance ?? 0,
-        holiday_work_allowance: 신규직원.holiday_work_allowance ?? 0, annual_leave_pay: 신규직원.annual_leave_pay ?? 0
+        meal_allowance: 신규직원.meal_allowance ?? 0,
+        night_duty_allowance: 신규직원.night_duty_allowance ?? 0,
+        vehicle_allowance: 신규직원.vehicle_allowance ?? 0,
+        childcare_allowance: 신규직원.childcare_allowance ?? 0,
+        research_allowance: 신규직원.research_allowance ?? 0,
+        other_taxfree: 신규직원.other_taxfree ?? 0,
+        position_allowance: 신규직원.position_allowance ?? 0,
+        overtime_allowance: 신규직원.overtime_allowance ?? 0,
+        night_work_allowance: 신규직원.night_work_allowance ?? 0,
+        holiday_work_allowance: 신규직원.holiday_work_allowance ?? 0,
+        annual_leave_pay: 신규직원.annual_leave_pay ?? 0
       };
 
       if (편집모드 && 선택된직원ID) {
