@@ -4,6 +4,7 @@ export type RosterGenerationRule = {
   id: string;
   name: string;
   companyName?: string;
+  companyId?: string | null;
   teamKeywords: string[];
   description: string;
   avoidDayAfterNight: boolean;
@@ -73,13 +74,14 @@ function normalizeRule(rule: RosterGenerationRule): RosterGenerationRule {
   };
 }
 
-export function buildDefaultGenerationRule(companyName = ''): RosterGenerationRule {
+export function buildDefaultGenerationRule(companyName = '', companyId: string | null = null): RosterGenerationRule {
   const stamp = Date.now();
 
   return {
     id: `roster-rule-${stamp}`,
     name: '',
     companyName,
+    companyId,
     teamKeywords: [],
     description: '',
     avoidDayAfterNight: true,
@@ -129,6 +131,7 @@ export function normalizeGenerationRule(record: unknown): RosterGenerationRule |
     id,
     name,
     companyName: String(source.companyName || '').trim(),
+    companyId: String(source.companyId || '').trim() || null,
     teamKeywords: normalizeKeywordList(source.teamKeywords),
     description: String(source.description || '').trim(),
     avoidDayAfterNight: source.avoidDayAfterNight !== false,

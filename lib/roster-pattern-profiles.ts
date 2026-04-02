@@ -19,6 +19,7 @@ export type RosterPatternProfile = {
   id: string;
   name: string;
   companyName?: string;
+  companyId?: string | null;
   teamKeywords: string[];
   description: string;
   staffGroups: RosterPatternStaffGroup[];
@@ -60,13 +61,14 @@ function normalizeShiftIds(value: unknown) {
     .filter((item, index, list) => list.indexOf(item) === index);
 }
 
-export function buildDefaultPatternProfile(companyName = ''): RosterPatternProfile {
+export function buildDefaultPatternProfile(companyName = '', companyId: string | null = null): RosterPatternProfile {
   const stamp = Date.now();
 
   return {
     id: `roster-pattern-${stamp}`,
     name: '',
     companyName,
+    companyId,
     teamKeywords: [],
     description: '',
     staffGroups: [
@@ -143,6 +145,7 @@ export function normalizePatternProfile(record: unknown): RosterPatternProfile |
     id,
     name,
     companyName: String(source.companyName || '').trim(),
+    companyId: String(source.companyId || '').trim() || null,
     teamKeywords: normalizeKeywordList(source.teamKeywords),
     description: String(source.description || '').trim(),
     staffGroups: groups,

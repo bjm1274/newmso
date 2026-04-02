@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push';
 import { sendFcmBatch } from '@/lib/firebase-admin';
+import { isWithinPushQuietHours } from '@/lib/push-quiet-hours';
 
 type NotificationRow = {
   id: string;
@@ -30,6 +31,7 @@ export type NotificationRepushResult = {
   skipped: number;
   pushDisabled: boolean;
   errors: string[];
+  reason?: string;
 };
 
 const DEFAULT_DELAY_MINUTES = 10;
@@ -111,6 +113,21 @@ export async function processUnreadNotificationRepushServer(
 ): Promise<NotificationRepushResult> {
   const supabase = getAdminClient();
   const now = new Date();
+
+  if (isWithinPushQuietHours(now)) {
+    return {
+      ok: true,
+      scanned: 0,
+      eligible: 0,
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+      pushDisabled: false,
+      errors: [],
+      reason: 'quiet-hours',
+    };
+  }
+
   const nowIso = now.toISOString();
   const cutoffIso = new Date(now.getTime() - DEFAULT_DELAY_MINUTES * 60 * 1000).toISOString();
   const scopedUserIds = normalizeScopedUserIds(userIds);

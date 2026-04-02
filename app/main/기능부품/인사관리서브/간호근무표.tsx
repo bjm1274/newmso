@@ -46,7 +46,8 @@ const SPECIAL_SHIFT_OPTIONS: ShiftOption[] = [
 const PATTERN_OPTIONS = [
   { value: '상근', label: '상근', desc: '평일 주 근무, 주말 휴무' },
   { value: '2교대', label: '2교대', desc: '주 근무와 보조 근무를 교차 배치' },
-  { value: '3교대', label: '3교대', desc: '주/보조/야간 근무를 순환 배치' },
+  { value: '3교대', label: '3교대 (4일 주기)', desc: 'D-E-N-휴 4일 주기 단순 3교대' },
+  { value: '3교대(8일)', label: '3교대 (8일 주기)', desc: '의료기관 표준 D-D-E-E-N-N-휴-휴 8일 3교대' },
   { value: '2일근무1일휴무', label: '2일근무 1일휴무', desc: '근무 2일 후 휴무 1일' },
   { value: '1일근무1일휴무', label: '1일근무 1일휴무', desc: '근무 1일 후 휴무 1일' },
   { value: '야간전담', label: '야간전담', desc: '야간 근무 중심으로 순환 배치' },
@@ -92,21 +93,21 @@ function sortWorkShifts(list: WorkShift[]) {
 
 function getShiftColorClass(name: string) {
   const normalized = normalizeShiftName(name);
-  if (normalized.includes('휴무') || normalized.includes('off') || normalized.includes('비번') || normalized.includes('오프')) return 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]';
+  if (normalized.includes('휴무') || normalized.includes('off') || normalized.includes('비번') || normalized.includes('오프') || name.toUpperCase().includes('/O')) return 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]';
   if (normalized.includes('휴가') || normalized.includes('연차')) return 'bg-green-500/20 text-green-600';
   if (normalized.includes('교육')) return 'bg-yellow-500/20 text-yellow-700';
-  if (normalized.includes('데이') || normalized.includes('day') || normalized.includes('주간') || normalized.includes('상근')) return 'bg-blue-500/20 text-blue-700';
-  if (normalized.includes('이브') || normalized.includes('evening') || normalized.includes('eve') || normalized.includes('오후')) return 'bg-orange-500/20 text-orange-700';
-  if (normalized.includes('나이트') || normalized.includes('night') || normalized.includes('야간')) return 'bg-purple-500/20 text-purple-700';
+  if (normalized.includes('데이') || normalized.includes('day') || normalized.includes('주간') || normalized.includes('상근') || name.toUpperCase().includes('/D') || name.toUpperCase().includes(' D') || name.toUpperCase().endsWith('D')) return 'bg-blue-500/20 text-blue-700';
+  if (normalized.includes('이브') || normalized.includes('evening') || normalized.includes('eve') || normalized.includes('오후') || name.toUpperCase().includes('/E') || name.toUpperCase().includes(' E') || name.toUpperCase().endsWith('E')) return 'bg-orange-500/20 text-orange-700';
+  if (normalized.includes('나이트') || normalized.includes('night') || normalized.includes('야간') || name.toUpperCase().includes('/N') || name.toUpperCase().includes(' N') || name.toUpperCase().endsWith('N')) return 'bg-purple-500/20 text-purple-700';
   return 'bg-emerald-100 text-emerald-700';
 }
 
 function getShiftShortLabel(name: string) {
   const normalized = normalizeShiftName(name);
-  if (normalized.includes('데이') || normalized.includes('day') || normalized.includes('주간') || normalized.includes('상근')) return 'D';
-  if (normalized.includes('이브') || normalized.includes('evening') || normalized.includes('eve') || normalized.includes('오후')) return 'E';
-  if (normalized.includes('나이트') || normalized.includes('night') || normalized.includes('야간')) return 'N';
-  if (normalized.includes('휴무') || normalized.includes('off') || normalized.includes('비번') || normalized.includes('오프')) return '휴';
+  if (normalized.includes('데이') || normalized.includes('day') || normalized.includes('주간') || normalized.includes('상근') || name.toUpperCase().includes('/D') || name.toUpperCase().includes(' D') || name.toUpperCase().endsWith('D')) return 'D';
+  if (normalized.includes('이브') || normalized.includes('evening') || normalized.includes('eve') || normalized.includes('오후') || name.toUpperCase().includes('/E') || name.toUpperCase().includes(' E') || name.toUpperCase().endsWith('E')) return 'E';
+  if (normalized.includes('나이트') || normalized.includes('night') || normalized.includes('야간') || name.toUpperCase().includes('/N') || name.toUpperCase().includes(' N') || name.toUpperCase().endsWith('N')) return 'N';
+  if (normalized.includes('휴무') || normalized.includes('off') || normalized.includes('비번') || normalized.includes('오프') || name.toUpperCase().includes('/O')) return '휴';
   if (normalized.includes('휴가') || normalized.includes('연차')) return '휴가';
   if (normalized.includes('교육')) return '교육';
   const trimmed = String(name || '').trim();
@@ -198,6 +199,10 @@ function buildPatternToken({
       const sequence = [primary, secondary, tertiary, OFF_TOKEN];
       return sequence[(dateIndex + startOffset) % sequence.length];
     }
+    case '3교대(8일)': {
+      const sequence = [primary, primary, secondary, secondary, tertiary, tertiary, OFF_TOKEN, OFF_TOKEN];
+      return sequence[(dateIndex + startOffset) % sequence.length];
+    }
     case '2일근무1일휴무': {
       const sequence = [primary, secondary, OFF_TOKEN];
       return sequence[(dateIndex + startOffset) % sequence.length];
@@ -217,7 +222,7 @@ function buildPatternToken({
 }
 
 function isNightPattern(pattern: string) {
-  return pattern === '3교대' || pattern === '야간전담';
+  return pattern === '3교대' || pattern === '3교대(8일)' || pattern === '야간전담';
 }
 
 function clampNightShiftCount(value: number, days: number) {
@@ -228,6 +233,7 @@ function clampNightShiftCount(value: number, days: number) {
 function inferDefaultNightShiftCount(pattern: string, days: number) {
   if (pattern === '야간전담') return Math.ceil(days / 2);
   if (pattern === '3교대') return Math.max(1, Math.round(days / 4));
+  if (pattern === '3교대(8일)') return Math.max(1, Math.round(days / 4));
   return 0;
 }
 

@@ -95,105 +95,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
         `기본급을 먼저 직원 등록 화면에서 입력해 주세요.\n\n문제 대상: ${names}`, 'success');
       return;
     }
-    if (false) {
-      const verificationRowsPreview1 = selectedStaffs.map((staff: StaffMember) => {
-      const data = settlementData[staff.id];
-      const advancePay = Number(data?.advance_pay) || 0;
-      const isAdvanceOnly = advancePay > 0;
-      const calc = isAdvanceOnly ? null : calculateSalary(staff.id);
-      return {
-        staffId: staff.id,
-        staffName: staff.name,
-        companyName: staff.company,
-        grossPay: isAdvanceOnly ? advancePay : Number(calc?.total || 0),
-        taxablePay: isAdvanceOnly ? 0 : Number(calc?.taxable || 0),
-        taxFreePay: isAdvanceOnly ? 0 : Number(calc?.taxfree || 0),
-        deductionTotal: isAdvanceOnly ? 0 : Number(calc?.deduction || 0),
-        netPay: isAdvanceOnly ? advancePay : Number(calc?.net || 0),
-        customDeduction: Number(data?.custom_deduction || 0),
-        attendanceDeduction: Number(data?.attendance_deduction || 0),
-        advancePay,
-        baseSalary: Number(data?.base_salary || 0),
-        applyTax: data?.apply_tax !== false,
-        exactTaxConfigured: hasExactIncomeTaxBracket(taxInsuranceRates),
-        bankName: String(staff.bank_name || ''),
-        bankAccount: String(staff.bank_account || ''),
-      };
-    });
-    const verificationReportPreview1 = buildPayrollVerificationReport(verificationRowsPreview1, {
-      requireExactTaxTable: false,
-    });
-    if (false && verificationReportPreview1.errorCount > 0) {
-      toast(`검산 리포트에 오류 ${verificationReport.errorCount}건이 있어 확정할 수 없습니다.`, 'error');
-      return;
-    }
 
-    const verificationRowsPreview2 = selectedStaffs.map((staff: StaffMember) => {
-      const data = settlementData[staff.id];
-      const advancePay = Number(data?.advance_pay) || 0;
-      const isAdvanceOnly = advancePay > 0;
-      const calc = isAdvanceOnly ? null : calculateSalary(staff.id);
-      return {
-        staffId: staff.id,
-        staffName: staff.name,
-        companyName: staff.company,
-        grossPay: isAdvanceOnly ? advancePay : Number(calc?.total || 0),
-        taxablePay: isAdvanceOnly ? 0 : Number(calc?.taxable || 0),
-        taxFreePay: isAdvanceOnly ? 0 : Number(calc?.taxfree || 0),
-        deductionTotal: isAdvanceOnly ? 0 : Number(calc?.deduction || 0),
-        netPay: isAdvanceOnly ? advancePay : Number(calc?.net || 0),
-        customDeduction: Number(data?.custom_deduction || 0),
-        attendanceDeduction: Number(data?.attendance_deduction || 0),
-        advancePay,
-        baseSalary: Number(data?.base_salary || 0),
-        applyTax: data?.apply_tax !== false,
-        exactTaxConfigured: hasExactIncomeTaxBracket(taxInsuranceRates),
-        bankName: String(staff.bank_name || ''),
-        bankAccount: String(staff.bank_account || ''),
-      };
-    });
-    const verificationReportPreview2 = buildPayrollVerificationReport(verificationRowsPreview2, {
-      requireExactTaxTable: false,
-    });
-    if (false && verificationReportPreview2.errorCount > 0) {
-      toast(`검산 리포트에 오류 ${verificationReport.errorCount}건이 있어 확정할 수 없습니다.`, 'error');
-      return;
-    }
-
-    const finalizeVerificationRows = selectedStaffs.map((staff: StaffMember) => {
-      const data = settlementData[staff.id];
-      const advancePay = Number(data?.advance_pay) || 0;
-      const isAdvanceOnly = advancePay > 0;
-      const calc = isAdvanceOnly ? null : calculateSalary(staff.id);
-      return {
-        staffId: staff.id,
-        staffName: staff.name,
-        companyName: staff.company,
-        grossPay: isAdvanceOnly ? advancePay : Number(calc?.total || 0),
-        taxablePay: isAdvanceOnly ? 0 : Number(calc?.taxable || 0),
-        taxFreePay: isAdvanceOnly ? 0 : Number(calc?.taxfree || 0),
-        deductionTotal: isAdvanceOnly ? 0 : Number(calc?.deduction || 0),
-        netPay: isAdvanceOnly ? advancePay : Number(calc?.net || 0),
-        customDeduction: Number(data?.custom_deduction || 0),
-        attendanceDeduction: Number(data?.attendance_deduction || 0),
-        advancePay,
-        baseSalary: Number(data?.base_salary || 0),
-        applyTax: data?.apply_tax !== false,
-        exactTaxConfigured: hasExactIncomeTaxBracket(taxInsuranceRates),
-        bankName: String(staff.bank_name || ''),
-        bankAccount: String(staff.bank_account || ''),
-      };
-    });
-    const finalizeVerificationReport = buildPayrollVerificationReport(finalizeVerificationRows, {
-      requireExactTaxTable: false,
-    });
-    if (false && finalizeVerificationReport.errorCount > 0) {
-      toast(`검산 리포트에 오류 ${finalizeVerificationReport.errorCount}건이 있어 확정할 수 없습니다.`, 'error');
-      return;
-    }
-
-      setLoading(true); // next-step
-    }
     try {
       const staffIds = selectedStaffs.map((s: StaffMember) => s.id);
       const [year, month] = yearMonth.split('-').map((value) => Number(value));
@@ -475,8 +377,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       // 2. 건강보험 - 의료급여 수급자는 제외(0원)
       if (!isMedicalBenefit) {
         health_insurance = Math.floor(total_taxable * taxInsuranceRates.health_insurance_rate);
-        // 장기요양보험 = 건강보험료 × 12.95% (2026년 법적 기준, 국민건강보험법 시행령)
-        long_term_care = Math.floor(health_insurance * 0.1295);
+        // 장기요양보험 = 과세소득 × DB 저장 요율 (국민건강보험법 시행령)
+        long_term_care = Math.floor(total_taxable * taxInsuranceRates.long_term_care_rate);
       }
 
       // 3. 고용보험 - 두루누리 80% 지원 적용 시 20%만 부과
