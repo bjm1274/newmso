@@ -718,6 +718,7 @@ export default function NotificationSystem({
   const didPrimeNotificationsRef = useRef(false);
   const mountedAtRef = useRef(new Date().toISOString());
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const chatPushFlushInFlightRef = useRef(false);
   const onActionRef = useRef<(n: ToastItem) => void>(() => { });
   const tabIdRef = useRef(
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -1594,6 +1595,22 @@ export default function NotificationSystem({
     if (!effectiveUserId) return;
     if (typeof window === 'undefined') return;
 
+    const flushPendingChatPushQueue = async () => {
+      if (chatPushFlushInFlightRef.current) return;
+      chatPushFlushInFlightRef.current = true;
+      try {
+        await fetch('/api/notifications/chat-push-flush', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ limit: 12 }),
+        });
+      } catch {
+        // ignore queue recovery failures
+      } finally {
+        chatPushFlushInFlightRef.current = false;
+      }
+    };
+
     const dispatchUnreadRepush = async () => {
       if (!hasPushSubscriptionActive(effectiveUserId)) return;
       try {
@@ -1607,18 +1624,41 @@ export default function NotificationSystem({
       }
     };
 
-    void dispatchUnreadRepush();
-    const handleWindowFocus = () => {
+    const recoverPushDelivery = () => {
+      void flushPendingChatPushQueue();
       void dispatchUnreadRepush();
     };
+
+    let chatSyncTimer: number | null = null;
+    const handleChatSync = (event: Event) => {
+      const customEvent = event as CustomEvent<{ action?: string }>;
+      if (customEvent.detail?.action !== 'message-sent') return;
+      if (chatSyncTimer) {
+        window.clearTimeout(chatSyncTimer);
+      }
+      chatSyncTimer = window.setTimeout(() => {
+        chatSyncTimer = null;
+        void flushPendingChatPushQueue();
+      }, 2500);
+    };
+
+    void dispatchUnreadRepush();
+    void flushPendingChatPushQueue();
     const interval = window.setInterval(() => {
-      void dispatchUnreadRepush();
+      recoverPushDelivery();
     }, 5 * 60 * 1000);
-    window.addEventListener('focus', handleWindowFocus);
+    window.addEventListener('focus', recoverPushDelivery);
+    window.addEventListener('online', recoverPushDelivery);
+    window.addEventListener('erp-chat-sync', handleChatSync as EventListener);
 
     return () => {
       window.clearInterval(interval);
-      window.removeEventListener('focus', handleWindowFocus);
+      if (chatSyncTimer) {
+        window.clearTimeout(chatSyncTimer);
+      }
+      window.removeEventListener('focus', recoverPushDelivery);
+      window.removeEventListener('online', recoverPushDelivery);
+      window.removeEventListener('erp-chat-sync', handleChatSync as EventListener);
     };
   }, [effectiveUserId]);
 

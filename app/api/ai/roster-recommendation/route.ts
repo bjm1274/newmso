@@ -83,6 +83,15 @@ type RequestBody = {
   monthDates: string[];
   workShifts: RequestWorkShift[];
   staffs: RequestStaff[];
+  constraints?: {
+    targetOffDays: number;
+    targetNightDays: number;
+    minDayReq: number;
+    minEveReq: number;
+    minNightReq: number;
+    enableSkillMix: boolean;
+  };
+  preAssigned?: Record<string, string>;
 };
 
 type GeminiRecommendationResponse = {
@@ -229,6 +238,13 @@ function deriveTeamHint({ selectedDepartment, workShifts }: RequestBody) {
   };
 }
 
+function isSeniorStaff(staff: RequestStaff) {
+  const pos = normalizeShiftName(staff.position || '');
+  const role = normalizeShiftName(staff.role || '');
+  const keywords = ['수간호사', '책임', '파트장', '팀장', '부장', '과장', 'senior', 'charge', 'leader'];
+  return keywords.some(k => pos.includes(k) || role.includes(k));
+}
+
 function buildPrompt(payload: RequestBody) {
   const teamHint = deriveTeamHint(payload);
   const shiftLines = payload.workShifts
@@ -255,6 +271,7 @@ function buildPrompt(payload: RequestBody) {
       [
         `- staffId: ${staff.id}`,
         `name: ${staff.name}`,
+        `seniority: ${isSeniorStaff(staff) ? 'Senior/Charge' : 'Junior/Regular'}`,
         `employeeNo: ${staff.employeeNo || '-'}`,
         `position: ${staff.position || '-'}`,
         `role: ${staff.role || '-'}`,
@@ -284,6 +301,32 @@ function buildPrompt(payload: RequestBody) {
     '불필요한 평일 OFF는 만들지 말고, 주간 팀은 평일 근무 + 주말 휴무 위주로 편성하세요.',
     '직원별 assignments는 사람이 읽어도 자연스럽게 이어지는 월간 초안이어야 합니다.',
     '반드시 모든 직원을 staffPlans에 포함하세요.',
+    '',
+    '## 🛑 필수 금지 패턴 (피로도 방지, 절대 원칙)',
+    '- E-D 금지: 이브닝(Evening) 근무 다음 날 데이(Day) 근무는 절대 금지합니다. 수면 부족이 야기됩니다.',
+    '- N-D / N-E 금지: 나이트(Night) 근무 다음 날 데이나 이브닝 배치 금지. 나이트 후에는 반드시 오프(OFF)나 휴식을 최소 1일 보장하세요.',
+    '- 퐁당퐁당 근무 지양: 가급적 하루짜리 OFF나 1일짜리 근무가 연달아 발생하는 것을 막고, 뭉쳐서 편성하세요.',
+    '',
+    '## ⚖️ 주말 휴무(Weekend OFF) 공정성',
+    '- 1인당 최소 주말(토, 일) OFF를 2일 이상 의무적으로 배정하여 공평하게 휴무를 보장하세요.',
+    '',
+    '## 🌟 연차/숙련도 분배 (Skill Mix)',
+    payload.constraints?.enableSkillMix 
+      ? '- 각 시간대(Day/Evening/Night)별 근무에 반드시 직급이 높거나 연차가 높은 숙련자(Senior/Charge)가 1명 이상 포함되도록 섞으세요.' 
+      : '- 숙련도 배분 옵션이 꺼져있으므로 최소 인원 만족에만 집중하세요.',
+    '',
+    '## 🛡️ 일일 필수 인력 & 월간 목표 제약 (Constraint Override)',
+    '- 기본 병동 3교대 패턴(예: D-D-E-E-N-N-휴-휴)을 깨서라도 아래 인력을 무조건 맞춰야 합니다.',
+    `- 최소 Day 인원: 매일 ${payload.constraints?.minDayReq ?? 1}명 이상 (Day 밴드)`,
+    `- 최소 Evening 인원: 매일 ${payload.constraints?.minEveReq ?? 1}명 이상 (해당 듀티 존재 시)`,
+    `- 최소 Night 인원: 매일 ${payload.constraints?.minNightReq ?? 1}명 이상 (해당 듀티 존재 시)`,
+    `- 1인당 월간 목표 OFF 수: 총 ${payload.constraints?.targetOffDays ?? 8}일 내외 최대 보장`,
+    `- 1인당 월간 나이트 한도: 최대 ${payload.constraints?.targetNightDays ?? 6}회 절대 초과 금지`,
+    '',
+    '## ✋ 직원별 희망 오프 및 사전 고정 스케줄 (가장 중요)',
+    payload.preAssigned && Object.keys(payload.preAssigned).length > 0 
+      ? `- 이미 배정된 근무 정보(주로 희망 오프)가 있습니다: ${JSON.stringify(payload.preAssigned)} \n- 사용자(관리자)가 입력한 위 사전 데이터는 절대로 덮어쓰거나 무시하면 안 됩니다. 해당 직원의 해당 날짜는 반드시 지정된 shiftId를 그대로 유지한 채 나머지 빈 칸만 최적화하여 작성하세요.` 
+      : '- 사전 픽스된 근무표가 없습니다. 자유롭게 편성하세요.',
     '',
     `로컬 팀 힌트: ${teamHint.mode}`,
     `로컬 팀 힌트 이유: ${teamHint.reason}`,
@@ -430,6 +473,8 @@ export async function POST(request: NextRequest) {
       monthDates: Array.isArray(body.monthDates) ? body.monthDates.map(String) : [],
       workShifts: Array.isArray(body.workShifts) ? body.workShifts : [],
       staffs: Array.isArray(body.staffs) ? body.staffs : [],
+      constraints: body.constraints,
+      preAssigned: body.preAssigned,
     };
 
     if (!payload.selectedMonth || !payload.selectedCompany || !payload.selectedDepartment) {

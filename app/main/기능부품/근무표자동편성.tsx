@@ -30,6 +30,11 @@ import {
   normalizeStoredRosterSnapshot,
   type StoredRosterSnapshot,
 } from '@/lib/roster-snapshot-history';
+import {
+  deleteRosterPolicyStorageRecord,
+  loadRosterPolicyStorageRecords,
+  upsertRosterPolicyStorageRecord,
+} from '@/lib/roster-policy-storage';
 import { isKoreanPublicHoliday } from '@/lib/korean-public-holidays';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
@@ -64,6 +69,29 @@ const NEW_NURSE_TENURE_MONTHS = 12;
 type ManualAssignmentMap = Record<string, string>;
 type PreferredOffSelectionMap = Record<string, string[]>;
 type WizardStep = 1 | 2 | 3 | 4;
+
+function parseRosterUpdatedAt(value: string | null | undefined) {
+  const timestamp = Date.parse(String(value || ''));
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function mergeRosterItemsByRecency<T extends { id: string; updatedAt?: string | null }>(...collections: T[][]) {
+  const merged = new Map<string, T>();
+
+  collections.flat().forEach((item) => {
+    const id = String(item?.id || '').trim();
+    if (!id) return;
+
+    const current = merged.get(id);
+    if (!current || parseRosterUpdatedAt(item.updatedAt) >= parseRosterUpdatedAt(current.updatedAt)) {
+      merged.set(id, item);
+    }
+  });
+
+  return Array.from(merged.values()).sort(
+    (left, right) => parseRosterUpdatedAt(right.updatedAt) - parseRosterUpdatedAt(left.updatedAt)
+  );
+}
 
 const PATTERN_OPTIONS = [
   { value: '상근', label: '상근', desc: '평일 근무, 주말 휴무' },
@@ -2445,28 +2473,81 @@ function formatShiftHours(shift: WorkShift) {
   return `${String(shift.start_time).slice(0, 5)} - ${String(shift.end_time).slice(0, 5)}`;
 }
 
+function loadStoredPatternProfiles() {
+  if (typeof window === 'undefined') return [] as RosterPatternProfile[];
+
+  try {
+    const raw = window.localStorage.getItem(ROSTER_PATTERN_PROFILE_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((profile) => normalizePatternProfile(profile))
+      .filter((profile): profile is RosterPatternProfile => profile !== null);
+  } catch (error) {
+    console.error('근무 패턴 프로파일 로드 실패:', error);
+    return [];
+  }
+}
+
+function loadStoredGenerationRules() {
+  if (typeof window === 'undefined') return [] as RosterGenerationRule[];
+
+  try {
+    const raw = window.localStorage.getItem(ROSTER_GENERATION_RULE_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((rule) => normalizeGenerationRule(rule))
+      .filter((rule): rule is RosterGenerationRule => rule !== null);
+  } catch (error) {
+    console.error('근무 규칙 로드 실패:', error);
+    return [];
+  }
+}
+
 export default function AutoRosterPlanner({
   user,
   staffs = [],
   selectedCo = '전체',
   panelMode = 'planner',
   adminMode = false,
+  onAssignmentsSaved,
 }: {
   user?: StaffMember;
   staffs?: StaffMember[];
   selectedCo?: string;
   panelMode?: 'planner' | 'patterns' | 'rules';
   adminMode?: boolean;
+  onAssignmentsSaved?: () => void;
 }) {
   const canAccess = isManagerOrHigher(user);
   const isAdmin = adminMode;
   const canManageRosterPolicies = adminMode;
+  const canManageRosterAssignments = adminMode || canAccess;
   const ownDepartment = getDepartmentName(user);
   const activeStaffs = useMemo(() => staffs.filter((staff) => staff?.status !== '퇴사'), [staffs]);
   const companyOptions = useMemo(
     () => Array.from(new Set(activeStaffs.map((staff) => staff.company).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ko')),
     [activeStaffs]
   );
+  const companyIdByName = useMemo(() => {
+    const next = new Map<string, string>();
+
+    activeStaffs.forEach((staff) => {
+      const companyName = String(staff.company || '').trim();
+      const companyId = String(staff.company_id || '').trim();
+
+      if (companyName && companyId && !next.has(companyName)) {
+        next.set(companyName, companyId);
+      }
+    });
+
+    return next;
+  }, [activeStaffs]);
 
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [selectedCompany, setSelectedCompany] = useState('');
@@ -2524,6 +2605,10 @@ export default function AutoRosterPlanner({
   const [highlightedRosterTarget, setHighlightedRosterTarget] = useState('');
   const [rosterSnapshots, setRosterSnapshots] = useState<StoredRosterSnapshot<GeminiRosterRecommendation>[]>([]);
   const [selectedSnapshotId, setSelectedSnapshotId] = useState('');
+  const selectedCompanyId = useMemo(
+    () => (selectedCompany ? companyIdByName.get(selectedCompany) || null : null),
+    [companyIdByName, selectedCompany]
+  );
   const [pendingSnapshotMeta, setPendingSnapshotMeta] = useState<{
     source: 'generated' | 'saved';
     label: string;
@@ -2533,6 +2618,40 @@ export default function AutoRosterPlanner({
     () => buildRosterSnapshotStorageKey(selectedCompany, selectedDepartment, selectedMonth),
     [selectedCompany, selectedDepartment, selectedMonth]
   );
+
+  const resolvePolicyCompanyId = (companyName?: string, explicitCompanyId?: string | null) => {
+    const normalizedExplicit = String(explicitCompanyId || '').trim();
+    if (normalizedExplicit) return normalizedExplicit;
+
+    const normalizedCompanyName = String(companyName || '').trim();
+    if (!normalizedCompanyName) return null;
+
+    return companyIdByName.get(normalizedCompanyName) || null;
+  };
+
+  const buildPatternProfileStorageRecord = (profile: RosterPatternProfile) => {
+    const companyName = String(profile.companyName || '').trim() || '전체';
+    const companyId = resolvePolicyCompanyId(companyName, profile.companyId);
+
+    return {
+      ...profile,
+      companyName,
+      companyId,
+      updatedAt: profile.updatedAt || new Date().toISOString(),
+    };
+  };
+
+  const buildGenerationRuleStorageRecord = (rule: RosterGenerationRule) => {
+    const companyName = String(rule.companyName || '').trim() || '전체';
+    const companyId = resolvePolicyCompanyId(companyName, rule.companyId);
+
+    return {
+      ...rule,
+      companyName,
+      companyId,
+      updatedAt: rule.updatedAt || new Date().toISOString(),
+    };
+  };
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -2584,6 +2703,166 @@ export default function AutoRosterPlanner({
       console.error('근무규칙 로드 실패:', error);
     }
   }, []);
+
+  useEffect(() => {
+    const localProfiles = mergeRosterItemsByRecency(readCachedPatternProfiles(), loadStoredPatternProfiles());
+    if (localProfiles.length > 0) {
+      setSavedPatternProfiles(localProfiles);
+      writeCachedPatternProfiles(localProfiles);
+    }
+
+    const localRules = mergeRosterItemsByRecency(readCachedGenerationRules(), loadStoredGenerationRules());
+    if (localRules.length > 0) {
+      setSavedGenerationRules(localRules);
+      writeCachedGenerationRules(localRules);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const syncUserId = typeof user?.id === 'string' ? user.id : null;
+
+    const resolveCompanyId = (companyName?: string, explicitCompanyId?: string | null) => {
+      const normalizedExplicit = String(explicitCompanyId || '').trim();
+      if (normalizedExplicit) return normalizedExplicit;
+
+      const normalizedCompanyName = String(companyName || '').trim();
+      if (!normalizedCompanyName) return null;
+
+      return companyIdByName.get(normalizedCompanyName) || null;
+    };
+
+    const hydrateSharedPolicies = async () => {
+      try {
+        const [patternResult, ruleResult] = await Promise.all([
+          loadRosterPolicyStorageRecords('pattern_profile'),
+          loadRosterPolicyStorageRecords('generation_rule'),
+        ]);
+        if (cancelled) return;
+
+        const remoteProfiles = patternResult.records
+          .map((record) => {
+            const payload = record.payload || {};
+            return normalizePatternProfile({
+              ...payload,
+              id: record.policyId,
+              name: record.name,
+              companyName: record.companyName,
+              companyId: record.companyId,
+              updatedAt: record.updatedAt || String((payload as Record<string, unknown>).updatedAt || ''),
+            });
+          })
+          .filter((profile): profile is RosterPatternProfile => profile !== null);
+        const remoteRules = ruleResult.records
+          .map((record) => {
+            const payload = record.payload || {};
+            return normalizeGenerationRule({
+              ...payload,
+              id: record.policyId,
+              name: record.name,
+              companyName: record.companyName,
+              companyId: record.companyId,
+              updatedAt: record.updatedAt || String((payload as Record<string, unknown>).updatedAt || ''),
+            });
+          })
+          .filter((rule): rule is RosterGenerationRule => rule !== null);
+
+        const mergedProfiles = mergeRosterItemsByRecency(
+          readCachedPatternProfiles(),
+          loadStoredPatternProfiles(),
+          remoteProfiles,
+        );
+        const mergedRules = mergeRosterItemsByRecency(
+          readCachedGenerationRules(),
+          loadStoredGenerationRules(),
+          remoteRules,
+        );
+
+        setSavedPatternProfiles(mergedProfiles);
+        setSavedGenerationRules(mergedRules);
+        writeCachedPatternProfiles(mergedProfiles);
+        writeCachedGenerationRules(mergedRules);
+
+        if (canManageRosterPolicies && patternResult.storageAvailable) {
+          const remoteProfilesById = new Map(remoteProfiles.map((profile) => [profile.id, profile]));
+          const profilesToSync = mergedProfiles
+            .map((profile) => {
+              const companyName = String(profile.companyName || '').trim() || '전체';
+              const companyId = resolveCompanyId(companyName, profile.companyId);
+              return {
+                ...profile,
+                companyName,
+                companyId,
+                updatedAt: profile.updatedAt || new Date().toISOString(),
+              };
+            })
+            .filter((profile) => {
+              const remoteProfile = remoteProfilesById.get(profile.id);
+              return !remoteProfile || parseRosterUpdatedAt(profile.updatedAt) > parseRosterUpdatedAt(remoteProfile.updatedAt);
+            });
+
+          await Promise.all(
+            profilesToSync.map((profile) =>
+              upsertRosterPolicyStorageRecord({
+                policyType: 'pattern_profile',
+                policyId: profile.id,
+                companyId: profile.companyId,
+                companyName: profile.companyName,
+                name: profile.name,
+                payload: profile as unknown as Record<string, unknown>,
+                createdBy: syncUserId,
+                updatedBy: syncUserId,
+                updatedAt: profile.updatedAt,
+              })
+            )
+          );
+        }
+
+        if (canManageRosterPolicies && ruleResult.storageAvailable) {
+          const remoteRulesById = new Map(remoteRules.map((rule) => [rule.id, rule]));
+          const rulesToSync = mergedRules
+            .map((rule) => {
+              const companyName = String(rule.companyName || '').trim() || '전체';
+              const companyId = resolveCompanyId(companyName, rule.companyId);
+              return {
+                ...rule,
+                companyName,
+                companyId,
+                updatedAt: rule.updatedAt || new Date().toISOString(),
+              };
+            })
+            .filter((rule) => {
+              const remoteRule = remoteRulesById.get(rule.id);
+              return !remoteRule || parseRosterUpdatedAt(rule.updatedAt) > parseRosterUpdatedAt(remoteRule.updatedAt);
+            });
+
+          await Promise.all(
+            rulesToSync.map((rule) =>
+              upsertRosterPolicyStorageRecord({
+                policyType: 'generation_rule',
+                policyId: rule.id,
+                companyId: rule.companyId,
+                companyName: rule.companyName,
+                name: rule.name,
+                payload: rule as unknown as Record<string, unknown>,
+                createdBy: syncUserId,
+                updatedBy: syncUserId,
+                updatedAt: rule.updatedAt,
+              })
+            )
+          );
+        }
+      } catch (error) {
+        console.error('근무표 공용 정책 저장소 동기화 실패:', error);
+      }
+    };
+
+    void hydrateSharedPolicies();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canManageRosterPolicies, companyIdByName, user?.id]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -4334,11 +4613,47 @@ export default function AutoRosterPlanner({
   };
 
   const resetPatternDraft = () => {
-    setPatternDraft(buildDefaultPatternProfile(selectedCompany));
+    setPatternDraft(buildDefaultPatternProfile(selectedCompany, selectedCompanyId));
   };
 
   const resetGenerationRuleDraft = () => {
-    setGenerationRuleDraft(buildDefaultGenerationRule(selectedCompany));
+    setGenerationRuleDraft(buildDefaultGenerationRule(selectedCompany, selectedCompanyId));
+  };
+
+  const syncPatternProfileToSharedStorage = async (profile: RosterPatternProfile) => {
+    const record = buildPatternProfileStorageRecord(profile);
+
+    const result = await upsertRosterPolicyStorageRecord({
+      policyType: 'pattern_profile',
+      policyId: record.id,
+      companyId: record.companyId,
+      companyName: record.companyName || '전체',
+      name: record.name,
+      payload: record as unknown as Record<string, unknown>,
+      createdBy: typeof user?.id === 'string' ? user.id : null,
+      updatedBy: typeof user?.id === 'string' ? user.id : null,
+      updatedAt: record.updatedAt,
+    });
+
+    return result.storageAvailable;
+  };
+
+  const syncGenerationRuleToSharedStorage = async (rule: RosterGenerationRule) => {
+    const record = buildGenerationRuleStorageRecord(rule);
+
+    const result = await upsertRosterPolicyStorageRecord({
+      policyType: 'generation_rule',
+      policyId: record.id,
+      companyId: record.companyId,
+      companyName: record.companyName || '전체',
+      name: record.name,
+      payload: record as unknown as Record<string, unknown>,
+      createdBy: typeof user?.id === 'string' ? user.id : null,
+      updatedBy: typeof user?.id === 'string' ? user.id : null,
+      updatedAt: record.updatedAt,
+    });
+
+    return result.storageAvailable;
   };
 
   const updatePatternDraftField = (
@@ -4531,17 +4846,20 @@ export default function AutoRosterPlanner({
       ...patternDraft,
       name: nextName,
       companyName: selectedCompany,
+      companyId: selectedCompanyId,
       description: patternDraft.description.trim(),
       updatedAt: new Date().toISOString(),
     };
 
-    setSavedPatternProfiles((prev) => {
-      const nextProfiles = [nextProfile, ...prev.filter((profile) => profile.id !== nextProfile.id)];
-      persistPatternProfiles(nextProfiles);
-      return nextProfiles;
-    });
+    const nextProfiles = [nextProfile, ...savedPatternProfiles.filter((profile) => profile.id !== nextProfile.id)];
+    setSavedPatternProfiles(nextProfiles);
+    persistPatternProfiles(nextProfiles);
     setSelectedPatternProfileId(nextProfile.id);
     resetPatternDraft();
+    void syncPatternProfileToSharedStorage(nextProfile).catch((error) => {
+      console.error('근무 패턴 공용 저장 실패:', error);
+      toast('근무 패턴을 공용 저장소에 동기화하지 못했습니다. 현재 브라우저에는 저장되었습니다.', 'warning');
+    });
     toast(`"${nextName}" 교대방식 패턴을 저장했습니다.`, 'success');
   };
 
@@ -4550,17 +4868,19 @@ export default function AutoRosterPlanner({
       toast('근무 패턴 삭제는 관리자 전용입니다.', 'warning');
       return;
     }
-    setSavedPatternProfiles((prev) => {
-      const nextProfiles = prev.filter((profile) => profile.id !== profileId);
-      persistPatternProfiles(nextProfiles);
-      return nextProfiles;
-    });
+    const nextProfiles = savedPatternProfiles.filter((profile) => profile.id !== profileId);
+    setSavedPatternProfiles(nextProfiles);
+    persistPatternProfiles(nextProfiles);
     if (selectedPatternProfileId === profileId) {
       setSelectedPatternProfileId('');
     }
     if (patternDraft.id === profileId) {
       resetPatternDraft();
     }
+    void deleteRosterPolicyStorageRecord('pattern_profile', profileId).catch((error) => {
+      console.error('근무 패턴 공용 삭제 실패:', error);
+      toast('근무 패턴 공용 저장소 삭제에 실패했습니다. 현재 브라우저 기준으로는 삭제되었습니다.', 'warning');
+    });
   };
 
   const editGenerationRule = (rule: RosterGenerationRule) => {
@@ -4590,6 +4910,7 @@ export default function AutoRosterPlanner({
       ...generationRuleDraft,
       name: nextName,
       companyName: selectedCompany,
+      companyId: selectedCompanyId,
       description: generationRuleDraft.description.trim(),
       maxConsecutiveEveningShifts: Math.max(
         0,
@@ -4623,13 +4944,15 @@ export default function AutoRosterPlanner({
       updatedAt: new Date().toISOString(),
     };
 
-    setSavedGenerationRules((prev) => {
-      const nextRules = [nextRule, ...prev.filter((rule) => rule.id !== nextRule.id)];
-      persistGenerationRules(nextRules);
-      return nextRules;
-    });
+    const nextRules = [nextRule, ...savedGenerationRules.filter((rule) => rule.id !== nextRule.id)];
+    setSavedGenerationRules(nextRules);
+    persistGenerationRules(nextRules);
     setSelectedGenerationRuleId(nextRule.id);
     resetGenerationRuleDraft();
+    void syncGenerationRuleToSharedStorage(nextRule).catch((error) => {
+      console.error('근무 규칙 공용 저장 실패:', error);
+      toast('근무 규칙을 공용 저장소에 동기화하지 못했습니다. 현재 브라우저에는 저장되었습니다.', 'warning');
+    });
     toast(`"${nextName}" 근무규칙을 저장했습니다.`, 'success');
   };
 
@@ -4638,17 +4961,19 @@ export default function AutoRosterPlanner({
       toast('근무 규칙 삭제는 관리자 전용입니다.', 'warning');
       return;
     }
-    setSavedGenerationRules((prev) => {
-      const nextRules = prev.filter((rule) => rule.id !== ruleId);
-      persistGenerationRules(nextRules);
-      return nextRules;
-    });
+    const nextRules = savedGenerationRules.filter((rule) => rule.id !== ruleId);
+    setSavedGenerationRules(nextRules);
+    persistGenerationRules(nextRules);
     if (selectedGenerationRuleId === ruleId) {
       setSelectedGenerationRuleId('');
     }
     if (generationRuleDraft.id === ruleId) {
       resetGenerationRuleDraft();
     }
+    void deleteRosterPolicyStorageRecord('generation_rule', ruleId).catch((error) => {
+      console.error('근무 규칙 공용 삭제 실패:', error);
+      toast('근무 규칙 공용 저장소 삭제에 실패했습니다. 현재 브라우저 기준으로는 삭제되었습니다.', 'warning');
+    });
   };
 
   const requestGeminiRecommendation = async () => {
@@ -5713,7 +6038,7 @@ export default function AutoRosterPlanner({
   };
 
   const saveAssignments = async () => {
-    if (!canManageRosterPolicies) {
+    if (!canManageRosterAssignments) {
       toast('월간 근무표 저장은 관리자 전용입니다.', 'warning');
       return;
     }
@@ -5762,6 +6087,7 @@ export default function AutoRosterPlanner({
         label: `${selectedMonth} ${selectedDepartment} 저장본`,
         warningCount: rosterWarningReport.items.length,
       });
+      onAssignmentsSaved?.();
       toast(`${selectedDepartment} 팀 ${enabledRows.length}명의 ${selectedMonth} 근무표를 저장했습니다.`, 'success');
     } catch (error: unknown) {
       console.error('근무표 저장 실패:', error);
@@ -6684,7 +7010,7 @@ export default function AutoRosterPlanner({
               <button
                 type="button"
                 onClick={saveAssignments}
-                disabled={!canManageRosterPolicies || saving || loadingShifts || previewRows.length === 0}
+                disabled={!canManageRosterAssignments || saving || loadingShifts || previewRows.length === 0}
                 className="rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {saving ? '저장 중...' : '월간 근무표 저장'}
@@ -7116,7 +7442,7 @@ export default function AutoRosterPlanner({
             <button
               type="button"
               onClick={saveAssignments}
-              disabled={!canManageRosterPolicies || saving || loadingShifts || previewRows.length === 0}
+              disabled={!canManageRosterAssignments || saving || loadingShifts || previewRows.length === 0}
               className="rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving ? '저장 중...' : '월간 근무표 저장'}

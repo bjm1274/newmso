@@ -18,7 +18,7 @@ const OPERATION_CRONS = [
   { path: '/api/cron/backup', schedule: '매일 00:00', label: '정기 전체 백업' },
   { path: '/api/cron/chat-retention', schedule: '매일 02:00', label: '채팅 보관정책 정리' },
   { path: '/api/cron/push-subscription-cleanup', schedule: '매일 12:00', label: '푸시 구독 정리' },
-  { path: '/api/cron/chat-push-dispatch', schedule: '매일 04:00', label: '채팅 푸시 큐 백업 처리' },
+  { path: '/api/cron/chat-push-dispatch', schedule: '매일 08:00', label: '채팅 푸시 큐 백업 처리' },
   { path: '/api/cron/leave-notice-announcements', schedule: '매일 17:00', label: '연차 휴무 공지메시지 발송' },
   { path: '/api/cron/todo-reminders', schedule: '매시간', label: '할일 리마인더 처리' },
 ] as const;

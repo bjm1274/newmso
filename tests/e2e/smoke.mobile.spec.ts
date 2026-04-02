@@ -495,6 +495,8 @@ test('mobile chat uses Enter for a newline and sends only from the send button',
   await page.goto('/main?open_menu=채팅');
   await expect(page.getByTestId('chat-view')).toBeVisible();
 
+  await page.getByTestId('chat-room-room-1').click();
+
   const composer = page.getByTestId('chat-message-input');
   await composer.fill('모바일 첫줄');
   await composer.press('Enter');

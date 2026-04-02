@@ -1,9 +1,11 @@
 'use client';
 import { toast } from '@/lib/toast';
+import type { StaffMember as AppStaffMember } from '@/types';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../../공통/SmartDatePicker';
 import SmartMonthPicker from '../../공통/SmartMonthPicker';
+import AutoRosterPlanner from '../../근무표자동편성';
 
 type StaffMember = {
   id: string;
@@ -11,15 +13,21 @@ type StaffMember = {
   position: string;
   department: string;
   company: string;
+  shift_type?: string;
   [key: string]: unknown;
 };
+
+const ROSTER_CREATOR_POSITIONS = ['간호과장', '간호부장', '실장'];
+const ROSTER_APPROVER_POSITIONS = ['총무부장', '이사'];
+const ROSTER_APPROVER_COMPANIES = ['SY INC.'];
 
 type AttendanceMainProps = {
   staffs: StaffMember[];
   selectedCo: string;
+  user?: AppStaffMember | Record<string, unknown> | null;
 };
 
-export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainProps) {
+export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceMainProps) {
   const [viewMode, setViewMode] = useState<'daily' | 'monthly' | 'calendar' | 'dashboard' | 'schedule'>('monthly');
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
@@ -29,6 +37,33 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
   const [shiftAssignments, setShiftAssignments] = useState<Record<string, string>>({}); // key: `${staff_id}_${work_date}` -> shift_id or ''
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
+
+  // Roster planner
+  const [rosterTeam, setRosterTeam] = useState<string>('전체');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [approvalPending, setApprovalPending] = useState(false);
+  const [approvalStatus, setApprovalStatus] = useState<'idle'|'pending'|'approved'|'rejected'>('idle');
+  const [approvalRejectReason, setApprovalRejectReason] = useState('');
+  const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
+  const [rosterWarnings, setRosterWarnings] = useState<string[]>([]);
+  const [showShiftWizard, setShowShiftWizard] = useState(false);
+  const [showAiModal, setShowAiModal] = useState(false);
+  
+  // AI Config State
+  const [aiConfig, setAiConfig] = useState({
+    targetOffDays: 8,
+    targetNightDays: 6,
+    minDayReq: 1,
+    minEveReq: 1,
+    minNightReq: 1,
+    enableSkillMix: false,
+  });
+
+  // Shift Swap State
+  const [showSwapModal, setShowSwapModal] = useState(false);
+  const [swapData, setSwapData] = useState<{ staffId: string; date: string; currentShiftId: string | null } | null>(null);
+  const [pendingSwaps, setPendingSwaps] = useState<any[]>([]);
+  
   const [bulkRangeType, setBulkRangeType] = useState<'day' | 'week' | 'month' | 'custom'>('day');
   const [bulkStartDate, setBulkStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [bulkEndDate, setBulkEndDate] = useState(new Date().toISOString().slice(0, 10));
@@ -81,26 +116,32 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
     });
   }, [viewMode]);
 
-  // 근무표 편성: 선택 월의 shift_assignments 로드
-  useEffect(() => {
-    if (viewMode !== 'schedule' || filtered.length === 0) return;
+  const loadShiftAssignments = async () => {
+    if (viewMode !== 'schedule' || filtered.length === 0) {
+      setShiftAssignments({});
+      return;
+    }
     const [y, m] = selectedMonth.split('-').map(Number);
     const lastDay = new Date(y, m, 0).getDate();
     const start = `${selectedMonth}-01`;
     const end = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`;
-    supabase
+    const { data } = await supabase
       .from('shift_assignments')
       .select('staff_id, work_date, shift_id')
       .in('staff_id', filtered.map((s: StaffMember) => s.id))
       .gte('work_date', start)
-      .lte('work_date', end)
-      .then(({ data }) => {
-        const map: Record<string, string> = {};
-        (data || []).forEach((r: Record<string, unknown>) => {
-          map[`${r.staff_id}_${r.work_date}`] = (r.shift_id as string) || '';
-        });
-        setShiftAssignments(map);
-      });
+      .lte('work_date', end);
+
+    const map: Record<string, string> = {};
+    (data || []).forEach((r: Record<string, unknown>) => {
+      map[`${r.staff_id}_${r.work_date}`] = (r.shift_id as string) || '';
+    });
+    setShiftAssignments(map);
+  };
+
+  // 근무표 편성: 선택 월의 shift_assignments 로드
+  useEffect(() => {
+    void loadShiftAssignments();
   }, [viewMode, selectedMonth, filtered]);
 
   const setAssignment = (staffId: string, workDate: string, shiftId: string | null) => {
@@ -114,6 +155,260 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
         { onConflict: 'staff_id,work_date' }
       )
       .then(() => { });
+  };
+
+  // Position-based access
+  const userPosition = String(user?.position || '');
+  const userRole = String(user?.role || '');
+  const userCompany = String(user?.company || '');
+  const canCreateRoster = ROSTER_CREATOR_POSITIONS.includes(userPosition) || ['admin', 'master'].includes(userRole) || ['최고관리자', '시스템관리자', '대표', '관리자'].includes(userPosition);
+  const canApproveRoster = ROSTER_APPROVER_POSITIONS.includes(userPosition) || (ROSTER_APPROVER_COMPANIES.includes(userCompany) && userPosition === '이사') || ['admin', 'master'].includes(userRole) || ['최고관리자', '시스템관리자'].includes(userPosition);
+
+  // Team list
+  const teamList = useMemo(() => {
+    const teams = Array.from(new Set(filtered.map((s: StaffMember) => s.department).filter(Boolean)));
+    return ['전체', ...teams.sort()];
+  }, [filtered]);
+
+  const rosterFiltered = useMemo(() => {
+    if (rosterTeam === '전체') return filtered;
+    return filtered.filter((s: StaffMember) => s.department === rosterTeam);
+  }, [filtered, rosterTeam]);
+
+  const handleSwapRequest = async (targetDate: string, reason: string) => {
+    if (!swapData || !user) return;
+    try {
+      const { error } = await supabase.from('roster_swap_requests').insert({
+        company_name: selectedCo || '본사',
+        team_name: rosterTeam,
+        requested_by: user.id,
+        requested_by_name: user.name,
+        staff_id: swapData.staffId,
+        work_date: swapData.date,
+        target_date: targetDate,
+        current_shift_id: swapData.currentShiftId,
+        reason: reason,
+        status: 'pending'
+      });
+      if (error) throw error;
+      toast('근무 교환 요청이 전송되었습니다.');
+      setShowSwapModal(false);
+    } catch (e) {
+      toast('교환 요청 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleApproveSwap = async (req: any) => {
+    try {
+      setAssignment(req.staff_id, req.work_date, null);
+      const { error } = await supabase.from('roster_swap_requests').update({ status: 'approved', approved_by: user?.id }).eq('id', req.id);
+      if (error) throw error;
+      setPendingSwaps(p => p.filter(x => x.id !== req.id));
+      toast('교환 요청을 승인했습니다.');
+    } catch (e) {
+      toast('승인 중 오류 발생');
+    }
+  };
+
+  const handleRejectSwap = async (req: any, reason: string) => {
+    await supabase.from('roster_swap_requests').update({ status: 'rejected', reject_reason: reason }).eq('id', req.id);
+    setPendingSwaps(p => p.filter(x => x.id !== req.id));
+    toast('교환 요청을 반려했습니다.');
+  };
+
+  // Validate schedule for labor law
+  const validateSchedule = useMemo(() => {
+    if (viewMode !== 'schedule') return [];
+    const warnings: string[] = [];
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+
+    rosterFiltered.forEach((staff: StaffMember) => {
+      // Check 52h per week
+      for (let weekStart = 1; weekStart <= lastDay; weekStart += 7) {
+        let weekHours = 0;
+        for (let d = weekStart; d < weekStart + 7 && d <= lastDay; d++) {
+          const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
+          const key = `${staff.id}_${dStr}`;
+          const shiftId = shiftAssignments[key];
+          if (shiftId) {
+            const shift = workShifts.find((s: any) => s.id === shiftId);
+            if (shift?.start_time && shift?.end_time) {
+              const [sh, sm] = shift.start_time.split(':').map(Number);
+              const [eh, em] = shift.end_time.split(':').map(Number);
+              let hours = (eh * 60 + em - sh * 60 - sm) / 60;
+              if (hours < 0) hours += 24; // overnight
+              weekHours += hours;
+            } else {
+              weekHours += 8; // default 8h
+            }
+          }
+        }
+        if (weekHours > 52) {
+          const weekNum = Math.ceil(weekStart / 7);
+          warnings.push(`⚠️ 주 52시간 초과: ${staff.name} (${Math.round(weekHours)}h, ${weekNum}주차)`);
+        }
+      }
+
+      // Check consecutive 7+ days
+      let consecutive = 0;
+      let startDay = 0;
+      for (let d = 1; d <= lastDay; d++) {
+        const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
+        const key = `${staff.id}_${dStr}`;
+        if (shiftAssignments[key]) {
+          if (consecutive === 0) startDay = d;
+          consecutive++;
+          if (consecutive >= 7) {
+            warnings.push(`⚠️ 연속 7일 근무: ${staff.name} (${selectedMonth}-${String(startDay).padStart(2, '0')} ~ ${dStr})`);
+          }
+        } else {
+          consecutive = 0;
+        }
+      }
+    });
+    return warnings;
+  }, [viewMode, shiftAssignments, rosterFiltered, workShifts, selectedMonth]);
+
+  // Fetch pending approvals & swaps
+  useEffect(() => {
+    if (viewMode !== 'schedule') return;
+    if (canApproveRoster || canCreateRoster) {
+      supabase.from('roster_approval_requests').select('*').eq('status', 'pending').order('created_at', { ascending: false }).then(({ data }) => {
+        setPendingApprovals(data || []);
+      });
+      // Hypothetical swap requests table
+      supabase.from('roster_swap_requests').select('*').eq('status', 'pending').order('created_at', { ascending: false }).then(({ data }) => {
+        setPendingSwaps(data || []);
+      });
+    }
+  }, [viewMode, canApproveRoster, canCreateRoster]);
+
+  const submitAiGenerate = async () => {
+    setShowAiModal(false);
+    setAiLoading(true);
+    try {
+      const teamStaffs = rosterFiltered.map((s: StaffMember) => ({
+        id: s.id, name: s.name, department: s.department, position: s.position, shiftType: s.shift_type || '',
+      }));
+      const res = await fetch('/api/ai/roster-recommendation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          staffs: teamStaffs, 
+          workShifts: workShifts, 
+          selectedMonth: selectedMonth, 
+          selectedDepartment: rosterTeam,
+          selectedCompany: selectedCo || '본사',
+          monthDates: daysArray.map(d => `${selectedMonth}-${String(d).padStart(2, '0')}`),
+          constraints: aiConfig,
+          preAssigned: shiftAssignments
+        }),
+      });
+      if (!res.ok) throw new Error('AI 응답 오류');
+      const result = await res.json();
+      // Apply AI result to grid
+      const newAssignments = { ...shiftAssignments };
+      (result.staffPlans || result.assignments || []).forEach((plan: any) => {
+        (plan.assignments || []).forEach((a: any) => {
+          const shift = workShifts.find((s: any) => s.name === a.shift_name || s.id === a.shift_id);
+          if (shift) {
+            newAssignments[`${plan.staff_id || plan.staffId}_${a.work_date || a.date}`] = shift.id;
+          }
+        });
+      });
+      setShiftAssignments(newAssignments);
+      toast('AI 근무표 생성 완료! 수정 후 승인요청 해주세요.', 'success');
+    } catch (e) {
+      console.error(e);
+      toast('AI 근무표 생성 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleSubmitApproval = async () => {
+    if (!user?.id) return toast('로그인 정보를 확인해주세요.', 'error');
+    const assignments = Object.entries(shiftAssignments)
+      .filter(([, v]) => v)
+      .map(([k, v]) => {
+        const [staff_id, work_date] = k.split('_');
+        return { staff_id, work_date, shift_id: v };
+      });
+    if (assignments.length === 0) return toast('근무표에 배정된 근무가 없습니다.', 'warning');
+
+    setApprovalPending(true);
+    try {
+      const { error } = await supabase.from('roster_approval_requests').insert({
+        company_name: selectedCo === '전체' ? (userCompany || '') : selectedCo,
+        team_name: rosterTeam,
+        year_month: selectedMonth,
+        assignments,
+        requested_by: user.id,
+        requested_by_name: user.name || '',
+        status: 'pending',
+      });
+      if (error) throw error;
+      setApprovalStatus('pending');
+      toast('승인요청이 전송되었습니다. 총무부장/이사의 승인을 기다려주세요.', 'success');
+    } catch (e) {
+      console.error(e);
+      toast('승인요청 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setApprovalPending(false);
+    }
+  };
+
+  const handleApprove = async (request: any) => {
+    try {
+      // 1. Update status
+      await supabase.from('roster_approval_requests').update({
+        status: 'approved', approved_by: user?.id, updated_at: new Date().toISOString(),
+      }).eq('id', request.id);
+
+      // 2. Apply to shift_assignments
+      const companyName = request.company_name;
+      for (const a of (request.assignments || [])) {
+        await supabase.from('shift_assignments').upsert(
+          { staff_id: a.staff_id, work_date: a.work_date, shift_id: a.shift_id, company_name: companyName },
+          { onConflict: 'staff_id,work_date' }
+        );
+      }
+
+      // 3. Save to document_repository
+      const shiftNames = workShifts.reduce((m: Record<string,string>, s: any) => { m[s.id] = s.name; return m; }, {});
+      const staffNames = staffs.reduce((m: Record<string,string>, s: StaffMember) => { m[s.id] = s.name; return m; }, {});
+      const docContent = (request.assignments || []).map((a: any) =>
+        `${staffNames[a.staff_id] || a.staff_id}\t${a.work_date}\t${shiftNames[a.shift_id] || a.shift_id}`
+      ).join('\n');
+
+      await supabase.from('document_repository').insert({
+        title: `[근무표] ${request.team_name || '전체'} ${request.year_month} 승인`,
+        category: '규정',
+        content: `승인일: ${new Date().toLocaleDateString('ko-KR')}\n승인자: ${user?.name || ''}\n요청자: ${request.requested_by_name || ''}\n\n직원명\t근무일\t근무형태\n${docContent}`,
+        company_name: companyName || '전체',
+        created_by: user?.id,
+        version: 1,
+      });
+
+      setPendingApprovals(prev => prev.filter(p => p.id !== request.id));
+      toast('근무표가 승인되어 적용되었습니다. 문서보관함에도 저장되었습니다.', 'success');
+    } catch (e) {
+      console.error(e);
+      toast('승인 처리 중 오류가 발생했습니다.', 'error');
+    }
+  };
+
+  const handleReject = async (request: any, reason: string) => {
+    try {
+      await supabase.from('roster_approval_requests').update({
+        status: 'rejected', approved_by: user?.id, reject_reason: reason, updated_at: new Date().toISOString(),
+      }).eq('id', request.id);
+      setPendingApprovals(prev => prev.filter(p => p.id !== request.id));
+      toast('근무표가 반려되었습니다.', 'success');
+    } catch (e) {
+      toast('반려 처리 중 오류가 발생했습니다.', 'error');
+    }
   };
 
   // 월별 일수 계산
@@ -167,7 +462,7 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
                 { id: 'dashboard', label: '대시보드', icon: '📊' },
                 { id: 'daily', label: '일별 현황', icon: '📋' },
                 { id: 'monthly', label: '월별 대장', icon: '📅' },
-                { id: 'schedule', label: '근무표 편성', icon: '📝' },
+                ...((canCreateRoster || canApproveRoster) ? [{ id: 'schedule', label: '근무표 생성', icon: '📝' }] : []),
                 { id: 'calendar', label: '근태 달력', icon: '🗓️' }
               ].map(mode => (
                 <button
@@ -309,33 +604,126 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
               <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
                 <div>
                   <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                    <span className="text-xl">✨</span> 스마트 근무 편성
+                    <span className="text-xl">📋</span> 근무표 생성
+                    {approvalStatus === 'pending' && <span className="px-2 py-0.5 rounded-[var(--radius-md)] bg-amber-100 text-amber-700 text-[10px] font-bold animate-pulse">승인 대기중</span>}
                   </h3>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const standardShift = workShifts.find(sh => sh.name.includes('통상') || sh.name.includes('일반') || sh.name.includes('주간') || sh.name.includes('9to6'));
-                    if (!standardShift) {
-                      toast('통상/일반/주간 이라는 이름이 포함된 근무형태가 부재합니다.');
-                      return;
-                    }
-                    if (!confirm('현재 화면의 모든 직원에 대해 평일(월~금)을 모두 통상근무로 채우시겠습니까? (기존 데이터에 덮어씁니다)')) return;
-                    filtered.forEach((s: StaffMember) => {
-                      daysArray.forEach((d) => {
-                        const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
-                        const dayOfWeek = new Date(dStr).getDay();
-                        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-                          setAssignment(s.id, dStr, standardShift.id);
-                        }
-                      });
-                    });
-                  }}
-                  className="px-4 py-2 bg-blue-500/10 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-500/20 dark:border-blue-800/50 font-bold text-[11px] rounded-xl shadow-sm hover:bg-blue-500/20 dark:hover:bg-blue-900/50 transition-all self-start md:self-auto shrink-0 flex items-center gap-2"
-                >
-                  <span className="text-sm">🏢</span> 통상근무(평일) 일괄 채우기
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <select
+                    value={rosterTeam}
+                    onChange={(e) => setRosterTeam(e.target.value)}
+                    className="px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] text-[11px] font-bold text-foreground bg-[var(--card)]"
+                  >
+                    {teamList.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  {canCreateRoster && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setShowAiModal(true)}
+                        disabled={aiLoading}
+                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-blue-500 text-white border-0 font-bold text-[11px] rounded-xl shadow-sm hover:shadow-md transition-all disabled:opacity-50 shrink-0"
+                      >
+                        {aiLoading ? (
+                          <><svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> AI 생성중...</>
+                        ) : (
+                          <><span className="text-sm">🤖</span> AI 자동 생성</>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowShiftWizard(true)}
+                        className="px-4 py-2 bg-purple-500/10 text-purple-600 border border-purple-500/20 font-bold text-[11px] rounded-xl shadow-sm hover:bg-purple-500/20 transition-all shrink-0 flex items-center gap-2"
+                      >
+                        <span className="text-sm">🪄</span> 3교대 마법사
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const standardShift = workShifts.find(sh => sh.name.includes('통상') || sh.name.includes('일반') || sh.name.includes('주간') || sh.name.includes('9to6'));
+                          if (!standardShift) {
+                            toast('통상/일반/주간 이라는 이름이 포함된 근무형태가 부재합니다.');
+                            return;
+                          }
+                          if (!confirm('현재 화면의 모든 직원에 대해 평일(월~금)을 모두 통상근무로 채우시겠습니까?')) return;
+                          rosterFiltered.forEach((s: StaffMember) => {
+                            daysArray.forEach((d) => {
+                              const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
+                              const dayOfWeek = new Date(dStr).getDay();
+                              if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                                setAssignment(s.id, dStr, standardShift.id);
+                              }
+                            });
+                          });
+                        }}
+                        className="px-4 py-2 bg-blue-500/10 text-blue-600 border border-blue-500/20 font-bold text-[11px] rounded-xl shadow-sm hover:bg-blue-500/20 transition-all shrink-0 flex items-center gap-2"
+                      >
+                        <span className="text-sm">🏢</span> 통상근무 일괄
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
+
+              {/* Approval panel for approvers */}
+              {canApproveRoster && pendingApprovals.length > 0 && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl p-3 space-y-2">
+                  <p className="text-[11px] font-bold text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                    <span className="text-base">📨</span> 승인 대기 근무표 {pendingApprovals.length}건
+                  </p>
+                  {pendingApprovals.map((req: any) => (
+                    <div key={req.id} className="bg-white dark:bg-zinc-800 border border-amber-200/50 dark:border-zinc-700 rounded-lg p-3 flex flex-col md:flex-row md:items-center gap-3">
+                      <div className="flex-1 text-[11px]">
+                        <p className="font-bold text-foreground">{req.team_name || '전체'} · {req.year_month}</p>
+                        <p className="text-[var(--toss-gray-4)] mt-0.5">요청: {req.requested_by_name} · {new Date(req.created_at).toLocaleDateString('ko-KR')}</p>
+                        <p className="text-[var(--toss-gray-3)] mt-0.5">{(req.assignments || []).length}건 배정</p>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <button onClick={() => handleApprove(req)} className="px-3 py-1.5 bg-emerald-500 text-white text-[11px] font-bold rounded-lg hover:bg-emerald-600 transition-colors">✅ 승인</button>
+                        <button onClick={() => {
+                          const reason = prompt('반려 사유를 입력하세요:');
+                          if (reason) handleReject(req, reason);
+                        }} className="px-3 py-1.5 bg-rose-500 text-white text-[11px] font-bold rounded-lg hover:bg-rose-600 transition-colors">❌ 반려</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Swap requests panel */}
+              {(canApproveRoster || canCreateRoster) && pendingSwaps.length > 0 && (
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-xl p-3 space-y-2">
+                  <p className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                    <span className="text-base">🔄</span> 근무 교환(Swap) 요청 {pendingSwaps.length}건
+                  </p>
+                  {pendingSwaps.map((req: any) => (
+                    <div key={req.id} className="bg-white dark:bg-zinc-800 border border-emerald-200/50 dark:border-zinc-700 rounded-lg p-3 flex flex-col md:flex-row md:items-center gap-3">
+                      <div className="flex-1 text-[11px]">
+                        <p className="font-bold text-foreground">{req.requested_by_name} ➔ {req.work_date} 근무 변경 희망</p>
+                        <p className="text-[var(--toss-gray-4)] mt-0.5">사유: {req.reason || '사유 미입력'}</p>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <button onClick={() => handleApproveSwap(req)} className="px-3 py-1.5 bg-emerald-500 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-600">승인</button>
+                        <button onClick={() => {
+                          const r = prompt('반려 사유:');
+                          if (r) handleRejectSwap(req, r);
+                        }} className="px-3 py-1.5 bg-rose-500 text-white text-[10px] font-bold rounded-lg hover:bg-rose-600">반려</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Labor law warnings */}
+              {validateSchedule.length > 0 && (
+                <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/50 rounded-xl p-3">
+                  <p className="text-[11px] font-bold text-rose-700 dark:text-rose-400 mb-1 flex items-center gap-1"><span>🚨</span> 근로기준법 위반 경고</p>
+                  {validateSchedule.slice(0, 10).map((w, i) => (
+                    <p key={i} className="text-[10px] text-rose-600 dark:text-rose-400 font-medium">{w}</p>
+                  ))}
+                  {validateSchedule.length > 10 && <p className="text-[10px] text-rose-400">... 외 {validateSchedule.length - 10}건</p>}
+                </div>
+              )}
 
               <div className="flex flex-wrap items-center gap-2 bg-[var(--card)] dark:bg-zinc-800 p-2 rounded-2xl border border-[var(--border)] dark:border-zinc-700 shadow-sm w-fit">
                 <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider mx-3">Toolbox</span>
@@ -390,7 +778,7 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {filtered.map((s: StaffMember) => (
+                  {rosterFiltered.map((s: StaffMember) => (
                     <tr key={s.id} className="hover:bg-[var(--tab-bg)]/50 dark:hover:bg-zinc-800/30 group">
                       <td className="px-4 py-3 sticky left-0 bg-[var(--card)] dark:bg-zinc-900 group-hover:bg-[var(--tab-bg)] dark:group-hover:bg-zinc-800/80 z-10 border-r border-[var(--border)] dark:border-zinc-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] transition-colors">
                         <div className="flex flex-col">
@@ -418,11 +806,17 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
                             key={d}
                             className={`p-1 border-r border-[var(--border)] dark:border-zinc-800 min-w-[44px] cursor-pointer select-none transition-colors border-b-0 border-t-0 active:bg-blue-500/10 dark:active:bg-blue-900/20 active:ring-inset active:ring-2 active:ring-blue-400 ${cellColor}`}
                             onMouseDown={() => {
-                              if (activeTool === 'eraser') setAssignment(s.id, dStr, null);
-                              else if (activeTool) setAssignment(s.id, dStr, activeTool);
+                              if (canCreateRoster) {
+                                if (activeTool === 'eraser') setAssignment(s.id, dStr, null);
+                                else if (activeTool) setAssignment(s.id, dStr, activeTool);
+                              } else {
+                                // Regular nurse click -> request swap
+                                setSwapData({ staffId: s.id, date: dStr, currentShiftId: value });
+                                setShowSwapModal(true);
+                              }
                             }}
                             onMouseEnter={(e) => {
-                              if (e.buttons === 1) { // 1 is left click drag
+                              if (e.buttons === 1 && canCreateRoster) { // 1 is left click drag
                                 if (activeTool === 'eraser') setAssignment(s.id, dStr, null);
                                 else if (activeTool) setAssignment(s.id, dStr, activeTool);
                               }
@@ -439,6 +833,146 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
                 </tbody>
               </table>
             </div>
+
+            {/* Submit approval button */}
+            {canCreateRoster && (
+              <div className="p-4 border-t border-[var(--border)] dark:border-zinc-800 bg-[var(--tab-bg)]/50 flex items-center justify-between gap-3">
+                <div className="text-[11px] text-[var(--toss-gray-4)] font-medium">
+                  {Object.values(shiftAssignments).filter(Boolean).length}건 배정됨
+                  {validateSchedule.length > 0 && <span className="text-rose-500 ml-2">⚠️ 경고 {validateSchedule.length}건</span>}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSubmitApproval}
+                  disabled={approvalPending || approvalStatus === 'pending'}
+                  className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold text-[12px] rounded-xl shadow-md hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
+                >
+                  {approvalPending ? '전송중...' : approvalStatus === 'pending' ? '⏳ 승인 대기중' : '💾 승인요청'}
+                </button>
+              </div>
+            )}
+            
+            {/* Shift Wizard Modal */}
+            {showShiftWizard && (
+              <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-2 md:p-4 animate-in fade-in duration-200">
+                <div className="bg-[var(--background)] rounded-2xl w-full max-w-[1400px] h-full max-h-[95vh] overflow-hidden flex flex-col shadow-2xl relative border border-[var(--border)] dark:border-zinc-800">
+                  <div className="p-4 border-b border-[var(--border)] dark:border-zinc-800 flex justify-between items-center bg-[var(--card)] dark:bg-zinc-900 shrink-0">
+                    <h3 className="font-bold text-lg flex items-center gap-2"><span className="text-2xl">🪄</span> 병동 3교대 패턴 관리 마법사</h3>
+                    <button onClick={() => setShowShiftWizard(false)} className="w-8 h-8 flex items-center justify-center bg-[var(--muted)]/50 rounded-full hover:bg-[var(--muted)] transition-colors font-bold text-foreground">✕</button>
+                  </div>
+                  <div className="flex-1 overflow-auto custom-scrollbar relative">
+                    <AutoRosterPlanner
+                      staffs={staffs as AppStaffMember[]}
+                      selectedCo={selectedCo}
+                      user={(user as AppStaffMember) || undefined}
+                      onAssignmentsSaved={() => {
+                        void loadShiftAssignments();
+                        setShowShiftWizard(false);
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* AI Generator Settings Modal */}
+            {showAiModal && (
+              <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                <div className="bg-[var(--background)] rounded-2xl w-full max-w-lg shadow-2xl relative border border-[var(--border)] dark:border-zinc-800">
+                  <div className="p-4 border-b border-[var(--border)] dark:border-zinc-800 flex justify-between items-center bg-[var(--card)] dark:bg-zinc-900 rounded-t-2xl">
+                    <h3 className="font-bold text-lg flex items-center gap-2"><span className="text-2xl">🤖</span> AI 스마트 우선순위 설정</h3>
+                    <button onClick={() => setShowAiModal(false)} className="w-8 h-8 flex items-center justify-center bg-[var(--muted)]/50 rounded-full hover:bg-[var(--muted)] transition-colors font-bold text-foreground">✕</button>
+                  </div>
+                  <div className="p-5 space-y-6">
+                    <div className="space-y-3">
+                      <h4 className="text-[12px] font-bold text-blue-600 flex items-center gap-1"><span className="text-sm">🎯</span> 월간 개인 목표 수치</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">인당 기본 보장 OFF (일)</span>
+                          <input type="number" min={0} max={15} value={aiConfig.targetOffDays} onChange={e => setAiConfig(p => ({ ...p, targetOffDays: Number(e.target.value) }))} className="px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] text-sm font-bold" />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">인당 나이트 한도 (회)</span>
+                          <input type="number" min={0} max={15} value={aiConfig.targetNightDays} onChange={e => setAiConfig(p => ({ ...p, targetNightDays: Number(e.target.value) }))} className="px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] text-sm font-bold" />
+                        </label>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <h4 className="text-[12px] font-bold text-rose-600 flex items-center gap-1"><span className="text-sm">🛡️</span> 일일 필수 최소 인력 방어</h4>
+                      <p className="text-[10px] text-[var(--toss-gray-4)] leading-relaxed">이 방어 조건을 맞추기 위해 AI가 고정 거울 패턴(예: D-D-E-E-N-N)을 깨고 유동적으로 인력을 배치하여 병원 실무와 가장 비슷한 근무를 계산합니다.</p>
+                      <div className="grid grid-cols-3 gap-3">
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[11px] font-bold text-[var(--toss-gray-4)] text-center">Day 최소</span>
+                          <input type="number" min={0} max={10} value={aiConfig.minDayReq} onChange={e => setAiConfig(p => ({ ...p, minDayReq: Number(e.target.value) }))} className="px-3 py-2 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-900/10 text-center text-blue-700 dark:text-blue-400 font-bold" />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[11px] font-bold text-[var(--toss-gray-4)] text-center">Eve 최소</span>
+                          <input type="number" min={0} max={10} value={aiConfig.minEveReq} onChange={e => setAiConfig(p => ({ ...p, minEveReq: Number(e.target.value) }))} className="px-3 py-2 rounded-xl border border-orange-200 dark:border-orange-900 bg-orange-50/50 dark:bg-orange-900/10 text-center text-orange-700 dark:text-orange-400 font-bold" />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[11px] font-bold text-[var(--toss-gray-4)] text-center">Night 최소</span>
+                          <input type="number" min={0} max={10} value={aiConfig.minNightReq} onChange={e => setAiConfig(p => ({ ...p, minNightReq: Number(e.target.value) }))} className="px-3 py-2 rounded-xl border border-purple-200 dark:border-purple-900 bg-purple-50/50 dark:bg-purple-900/10 text-center text-purple-700 dark:text-purple-400 font-bold" />
+                        </label>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-3 pt-2">
+                      <h4 className="text-[12px] font-bold text-emerald-600 flex items-center gap-1"><span className="text-sm">🌟</span> 연차/숙련도(Skill Mix) 분배</h4>
+                      <label className="flex items-start gap-3 p-3 rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50/50 dark:bg-emerald-900/10 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors">
+                        <input type="checkbox" checked={aiConfig.enableSkillMix} onChange={e => setAiConfig(p => ({ ...p, enableSkillMix: e.target.checked }))} className="mt-0.5 rounded border-emerald-500 text-emerald-600 focus:ring-emerald-500 w-4 h-4" />
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[12px] font-bold text-emerald-800 dark:text-emerald-400">각 듀티(D/E/N)별 시니어(경력자/수간호사) 필수 배치 켜기</span>
+                          <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-500">활성화 시, AI가 신규 간호사만으로 듀티가 채워지지 않도록 각 시간대에 숙련자를 프롬프트 규칙에 따라 1명 이상 강제 교차 배정합니다.</span>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                  <div className="p-4 border-t border-[var(--border)] dark:border-zinc-800 bg-[var(--card)] dark:bg-zinc-900 rounded-b-2xl flex md:flex-row flex-col gap-2">
+                    <button onClick={() => setShowAiModal(false)} className="flex-1 px-4 py-3 rounded-xl bg-[var(--muted)] text-[var(--toss-gray-4)] text-[12px] font-bold">취소</button>
+                    <button onClick={submitAiGenerate} className="flex-[2] px-4 py-3 rounded-xl bg-gradient-to-r from-violet-500 to-blue-500 text-white text-[12px] font-bold flex items-center justify-center gap-2 shadow-sm">
+                      <span className="text-xl leading-none">✨</span> 위 조건으로 생성 시작
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Shift Swap Modal */}
+            {showSwapModal && swapData && (
+              <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200 backdrop-blur-sm">
+                <div className="bg-[var(--background)] rounded-2xl w-full max-w-sm shadow-2xl relative border border-[var(--border)] dark:border-zinc-800 overflow-hidden">
+                  <div className="p-4 border-b border-[var(--border)] dark:border-zinc-800 bg-emerald-50 dark:bg-emerald-900/20 flex justify-between items-center">
+                    <h3 className="font-bold text-sm flex items-center gap-2 text-emerald-800 dark:text-emerald-400"><span className="text-xl">🔄</span> 근무 교환 신청</h3>
+                    <button onClick={() => setShowSwapModal(false)} className="text-emerald-800/50 hover:text-emerald-800">✕</button>
+                  </div>
+                  <div className="p-5 space-y-4">
+                    <div className="bg-[var(--tab-bg)] dark:bg-zinc-800/50 p-3 rounded-xl border border-[var(--border)] dark:border-zinc-700">
+                      <p className="text-[10px] font-bold text-[var(--toss-gray-4)] mb-1 uppercase">선택된 근무</p>
+                      <p className="text-[13px] font-bold">{swapData.date} ({rosterFiltered.find(f => f.id === swapData.staffId)?.name || '본인'})</p>
+                      <p className="text-[11px] text-emerald-600 font-bold mt-1">현재: {workShifts.find(w => w.id === swapData.currentShiftId)?.name || 'OFF'}</p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">교환 사유 (수간호사/관리자 확인용)</p>
+                      <textarea id="swapReason" rows={3} placeholder="예: 개인 사정으로 인한 데이-나이트 교환 희망" className="w-full px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] text-sm outline-none focus:ring-2 ring-emerald-500/20" />
+                    </div>
+
+                    <button 
+                      onClick={() => {
+                        const reason = (document.getElementById('swapReason') as HTMLTextAreaElement).value;
+                        if (!reason) return alert('사유를 입력해주세요.');
+                        handleSwapRequest(swapData.date, reason);
+                      }}
+                      className="w-full py-3 bg-emerald-500 text-white font-bold text-sm rounded-xl hover:bg-emerald-600 shadow-md transition-all"
+                    >
+                      교환 요청 보내기
+                    </button>
+                    <p className="text-[10px] text-center text-[var(--toss-gray-3)]">관리자 승인 후 최종 반영됩니다.</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

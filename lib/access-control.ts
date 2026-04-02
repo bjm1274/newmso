@@ -50,7 +50,6 @@ const EXTRA_FEATURE_PERMISSION_KEYS: Record<string, string> = {
   입금실시간조회: 'extra_입금실시간조회',
   수술상담: 'extra_수술상담',
   OP체크: 'extra_OP체크',
-  ESL연동: 'extra_ESL연동',
 };
 
 const STRICT_EXTRA_FEATURE_PERMISSION_KEYS = new Set([
@@ -84,6 +83,7 @@ const HR_PERMISSION_KEYS: Record<string, string> = {
   오프보딩: 'hr_오프보딩',
   근태: 'hr_근태',
   교대근무: 'hr_교대근무',
+  근무표생성: 'hr_근무표생성',
   '연차/휴가': 'hr_연차휴가',
   급여: 'hr_급여',
   건강검진: 'hr_건강검진',
@@ -144,7 +144,6 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   menu_관리자: ['admin', ...Object.values(ADMIN_PERMISSION_KEYS)],
   extra_조직도: ['menu_조직도'],
   extra_인계노트: ['handover_read'],
-  extra_ESL연동: ['inventory', 'menu_재고관리'],
   approval_기안함: ['approval', 'admin_공문서대장'],
   approval_결재함: ['approval'],
   approval_참조문서함: ['approval'],
@@ -156,6 +155,7 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   hr_오프보딩: ['hr_구성원', 'hr'],
   hr_근태: ['hr'],
   hr_교대근무: ['hr'],
+  hr_근무표생성: ['hr_교대근무', 'hr_근태', 'hr'],
   hr_연차휴가: ['hr_근태', 'hr'],
   hr_급여: ['hr'],
   hr_건강검진: ['hr_구성원', 'hr'],
