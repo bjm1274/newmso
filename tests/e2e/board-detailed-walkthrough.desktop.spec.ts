@@ -7,6 +7,7 @@ const FREE_BOARD = '\uC790\uC720\uAC8C\uC2DC\uD310';
 const CONDOLENCE_BOARD = '\uACBD\uC870\uC0AC';
 const SURGERY_BOARD = '\uC218\uC220\uC77C\uC815';
 const MRI_BOARD = 'MRI\uC77C\uC815';
+const GUIDE_BOARD = '\uC5C5\uBB34\uAC00\uC774\uB4DC';
 
 function trackRuntimeErrors(page: Page) {
   const errors: string[] = [];
@@ -147,6 +148,182 @@ test('board detailed walkthrough clicks through each board menu in practical ord
   await openBoardMenu(page, MRI_BOARD);
   await page.getByTestId('board-toggle-new-post').click();
   await expect(page.getByTestId('board-new-post-form')).toBeVisible();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('board notice list survives a missing is_pinned column', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    missingBoardPostColumns: ['is_pinned'],
+    boardPosts: [
+      {
+        id: 'board-post-legacy-pinless-1',
+        board_type: NOTICE_BOARD,
+        title: 'Legacy notice without is_pinned',
+        content: 'Fallback select should still load this post.',
+        author_name: 'E2E Tester',
+        company: 'E2E Clinic',
+        company_id: '22222222-2222-2222-2222-222222222222',
+        created_at: '2026-03-31T09:00:00.000Z',
+        views: 3,
+      },
+    ],
+    boardPostComments: [],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: BOARD_MENU,
+      erp_last_subview: NOTICE_BOARD,
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent(BOARD_MENU)}`);
+
+  await expect(page.getByTestId('board-view')).toBeVisible();
+  await openBoardMenu(page, NOTICE_BOARD);
+  await expect(page.getByTestId('board-post-board-post-legacy-pinless-1')).toBeVisible();
+  await expect(page.getByText('Legacy notice without is_pinned')).toBeVisible();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('board switch ignores a slower previous board response', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const surgeryRows = [
+    {
+      id: 'board-post-slow-surgery-1',
+      board_type: SURGERY_BOARD,
+      title: 'Slow surgery post',
+      content: 'This row should not remain after switching boards.',
+      author_name: 'E2E Tester',
+      company: 'E2E Clinic',
+      company_id: '22222222-2222-2222-2222-222222222222',
+      created_at: '2026-03-31T09:00:00.000Z',
+      views: 1,
+    },
+  ];
+  const noticeRows = [
+    {
+      id: 'board-post-fast-notice-1',
+      board_type: NOTICE_BOARD,
+      title: 'Fast notice post',
+      content: 'The notice board should win the race.',
+      author_name: 'E2E Tester',
+      company: 'E2E Clinic',
+      company_id: '22222222-2222-2222-2222-222222222222',
+      created_at: '2026-04-01T09:00:00.000Z',
+      views: 2,
+    },
+  ];
+
+  await mockSupabase(page, {
+    boardPosts: [...surgeryRows, ...noticeRows],
+    boardPostComments: [],
+  });
+
+  await page.route('**/rest/v1/board_posts**', async (route) => {
+    const url = new URL(route.request().url());
+    const rawBoardType = String(url.searchParams.get('board_type') || '');
+    const boardType = rawBoardType.startsWith('eq.') ? decodeURIComponent(rawBoardType.slice(3)) : '';
+    const rows =
+      boardType === SURGERY_BOARD
+        ? surgeryRows
+        : boardType === NOTICE_BOARD
+          ? noticeRows
+          : [];
+
+    if (boardType === SURGERY_BOARD) {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    } else if (boardType === NOTICE_BOARD) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(rows),
+    });
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: BOARD_MENU,
+      erp_last_subview: SURGERY_BOARD,
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent(BOARD_MENU)}`);
+
+  await expect(page.getByTestId('board-view')).toBeVisible();
+  await openBoardMenu(page, NOTICE_BOARD);
+  await expect(page.getByText('Fast notice post')).toBeVisible();
+  await page.waitForTimeout(700);
+  await expect(page.getByText('Fast notice post')).toBeVisible();
+  await expect(page.getByText('Slow surgery post')).toHaveCount(0);
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('guide board uploads and displays onboarding materials for new staff', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    boardPosts: [],
+    boardPostComments: [],
+  });
+
+  await page.route('**/api/board/upload', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        fileName: 'joint-guide.pdf',
+        type: 'file',
+        url: 'http://127.0.0.1:3000/mock/joint-guide.pdf',
+      }),
+    });
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: BOARD_MENU,
+      erp_last_subview: GUIDE_BOARD,
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent(BOARD_MENU)}`);
+
+  await expect(page.getByTestId('board-view')).toBeVisible();
+  await openBoardMenu(page, GUIDE_BOARD);
+  await expect(page.getByTestId('guide-library-view')).toBeVisible();
+
+  await page.getByTestId('guide-open-compose').click();
+  await expect(page.getByTestId('guide-form')).toBeVisible();
+  await page.getByTestId('guide-title-input').fill('인공관절 수술 준비 가이드');
+  await page.getByTestId('guide-department-input').fill('수술실');
+  await page.getByTestId('guide-kind-select').selectOption('education');
+  await page.getByTestId('guide-audience-select').selectOption('new_hire');
+  await page.getByTestId('guide-keywords-input').fill('인공관절, 멸균, 신규교육');
+  await page
+    .getByTestId('guide-description-input')
+    .fill('1. 수술 준비물 확인\n2. 마취 준비 체크\n3. 멸균 기구 확인\n4. 인계 포인트 정리');
+  await page.getByTestId('guide-file-input').setInputFiles({
+    name: 'joint-guide.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('guide-pdf'),
+  });
+  await page.getByTestId('guide-save').click();
+
+  await expect(page.getByTestId('guide-card-board-post-1')).toBeVisible();
+  await expect(page.getByTestId('guide-detail')).toContainText('인공관절 수술 준비 가이드');
+  await expect(page.getByTestId('guide-detail')).toContainText('신규직원');
+  await expect(page.getByTestId('guide-detail')).toContainText('수술실');
+  await expect(page.getByTestId('guide-detail')).toContainText('joint-guide.pdf');
+  await expect(page.getByRole('link', { name: /joint-guide\.pdf/i })).toBeVisible();
 
   expect(runtimeErrors).toEqual([]);
 });

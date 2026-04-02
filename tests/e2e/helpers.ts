@@ -152,6 +152,7 @@ export type MockFixtures = {
   messageBookmarks?: any[];
   messageInsertFailures?: number;
   missingMessageColumns?: string[];
+  missingBoardPostColumns?: string[];
   approvals?: any[];
   payrollRecords?: any[];
   boardPosts?: any[];
@@ -452,6 +453,7 @@ function buildFixtures(overrides: MockFixtures = {}) {
     missingSurgeryTemplatesSchema: overrides.missingSurgeryTemplatesSchema ?? false,
     missingInventoryItemsSchema: overrides.missingInventoryItemsSchema ?? false,
     missingMessageColumns: overrides.missingMessageColumns ?? [],
+    missingBoardPostColumns: overrides.missingBoardPostColumns ?? [],
     dailyClosures: overrides.dailyClosures ?? [],
     dailyClosureItems: overrides.dailyClosureItems ?? [],
     dailyChecks: overrides.dailyChecks ?? [],
@@ -712,6 +714,7 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   const missingSurgeryTemplatesSchema = fixtures.missingSurgeryTemplatesSchema;
   const missingInventoryItemsSchema = fixtures.missingInventoryItemsSchema;
   const missingMessageColumns = new Set(fixtures.missingMessageColumns ?? []);
+  const missingBoardPostColumns = new Set(fixtures.missingBoardPostColumns ?? []);
   let dailyClosures = [...fixtures.dailyClosures];
   let dailyClosureItems = [...fixtures.dailyClosureItems];
   let dailyChecks = [...fixtures.dailyChecks];
@@ -1114,6 +1117,40 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
     };
   };
 
+  const readMultipartUploadMeta = (route: Route) => {
+    const bodyBuffer = route.request().postDataBuffer();
+    const text = bodyBuffer ? bodyBuffer.toString('utf8') : '';
+    const fileNameMatch = text.match(/filename="([^"]+)"/i);
+    const mimeTypeMatch = text.match(/Content-Type:\s*([^\r\n;]+)/i);
+
+    return {
+      size: bodyBuffer?.length ?? null,
+      fileName: fileNameMatch?.[1] || 'approval-attachment.bin',
+      mimeType: mimeTypeMatch?.[1] || 'application/octet-stream',
+    };
+  };
+
+  await page.route('**/api/approvals/upload', async (route) => {
+    const { fileName, mimeType, size } = readMultipartUploadMeta(route);
+    const extension = fileName.includes('.') ? fileName.split('.').pop()?.trim().toLowerCase() || 'bin' : 'bin';
+    const path = `approvals/mock-${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
+
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        provider: 'supabase',
+        bucket: 'pchos-files',
+        path,
+        fileName,
+        mimeType,
+        size,
+        url: `http://127.0.0.1:3000/storage/v1/object/public/pchos-files/${path}`,
+      }),
+    });
+  });
+
   await page.route('**/api/chat/upload', async (route) => {
     const body = route.request().postDataJSON?.() as
       | { fileName?: string; mimeType?: string; fileSize?: number }
@@ -1356,6 +1393,12 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
 
     if (path.includes('/board_posts')) {
       if (method === 'GET') {
+        const missingSelectColumn = Array.from(missingBoardPostColumns).find((column) =>
+          String(url.searchParams.get('select') || '').includes(column)
+        );
+        if (missingSelectColumn) {
+          return missingColumn(route, missingSelectColumn, 'board_posts');
+        }
         return json(route, firstOrList(applyQueryFilters(boardPosts, url), wantsObject));
       }
 

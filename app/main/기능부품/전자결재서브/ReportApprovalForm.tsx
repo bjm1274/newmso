@@ -140,7 +140,10 @@ export default function ReportApprovalForm({
   };
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm animate-in fade-in duration-300">
+    <div
+      data-testid="approval-report-view"
+      className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm animate-in fade-in duration-300"
+    >
       <div className="border-b border-[var(--border)] bg-emerald-50/70 px-4 py-3">
         <h4 className="text-sm font-bold text-emerald-800">보고서 작성</h4>
         <p className="mt-1 text-[11px] font-semibold text-emerald-700/80">
@@ -155,6 +158,7 @@ export default function ReportApprovalForm({
               보고서 종류
             </label>
             <select
+              data-testid="approval-report-type"
               value={reportType}
               onChange={(event) => handleReportTypeChange(event.target.value)}
               className="w-full rounded-[var(--radius-md)] bg-[var(--card)] p-3 text-xs font-semibold outline-none shadow-sm focus:ring-2 focus:ring-emerald-200"
@@ -173,6 +177,7 @@ export default function ReportApprovalForm({
               관련 부서
             </label>
             <input
+              data-testid="approval-report-department"
               type="text"
               value={String(extraData.report_department || '').trim()}
               onChange={(event) => patchExtraData({ report_department: event.target.value })}
@@ -187,6 +192,7 @@ export default function ReportApprovalForm({
             보고 주제
           </label>
           <input
+            data-testid="approval-report-subject"
             type="text"
             value={String(extraData.report_subject || '').trim()}
             onChange={(event) => patchExtraData({ report_subject: event.target.value })}
@@ -202,6 +208,7 @@ export default function ReportApprovalForm({
                 사건 발생일
               </label>
               <SmartDatePicker
+                data-testid="approval-report-incident-date"
                 value={String(extraData.incident_date || '').trim()}
                 onChange={(value) => patchExtraData({ incident_date: value })}
                 inputClassName="h-11 rounded-[var(--radius-md)] bg-[var(--card)] px-4 text-xs font-bold"
@@ -212,6 +219,7 @@ export default function ReportApprovalForm({
                 발생 장소
               </label>
               <input
+                data-testid="approval-report-incident-location"
                 type="text"
                 value={String(extraData.incident_location || '').trim()}
                 onChange={(event) => patchExtraData({ incident_location: event.target.value })}
@@ -229,6 +237,7 @@ export default function ReportApprovalForm({
                 대상 월
               </label>
               <SmartMonthPicker
+                data-testid="approval-report-month"
                 value={String(extraData.report_month || '').trim()}
                 onChange={(value) => patchExtraData({ report_month: value })}
                 inputClassName="h-11 rounded-[var(--radius-md)] bg-[var(--card)] px-4 text-xs font-bold"
@@ -239,6 +248,7 @@ export default function ReportApprovalForm({
                 보고 기준일
               </label>
               <SmartDatePicker
+                data-testid="approval-report-target-date"
                 value={String(extraData.report_target_date || '').trim()}
                 onChange={(value) => patchExtraData({ report_target_date: value })}
                 inputClassName="h-11 rounded-[var(--radius-md)] bg-[var(--card)] px-4 text-xs font-bold"
@@ -255,6 +265,7 @@ export default function ReportApprovalForm({
                   출장 시작일
                 </label>
                 <SmartDatePicker
+                  data-testid="approval-report-trip-start-date"
                   value={String(extraData.trip_start_date || '').trim()}
                   onChange={(value) => patchExtraData({ trip_start_date: value })}
                   inputClassName="h-11 rounded-[var(--radius-md)] bg-[var(--card)] px-4 text-xs font-bold"
@@ -265,6 +276,7 @@ export default function ReportApprovalForm({
                   출장 종료일
                 </label>
                 <SmartDatePicker
+                  data-testid="approval-report-trip-end-date"
                   value={String(extraData.trip_end_date || '').trim()}
                   onChange={(value) => patchExtraData({ trip_end_date: value })}
                   inputClassName="h-11 rounded-[var(--radius-md)] bg-[var(--card)] px-4 text-xs font-bold"
@@ -278,6 +290,7 @@ export default function ReportApprovalForm({
                   출장지
                 </label>
                 <input
+                  data-testid="approval-report-trip-destination"
                   type="text"
                   value={String(extraData.trip_destination || '').trim()}
                   onChange={(event) => patchExtraData({ trip_destination: event.target.value })}
@@ -290,6 +303,7 @@ export default function ReportApprovalForm({
                   출장 목적
                 </label>
                 <input
+                  data-testid="approval-report-trip-purpose"
                   type="text"
                   value={String(extraData.trip_purpose || '').trim()}
                   onChange={(event) => patchExtraData({ trip_purpose: event.target.value })}
@@ -307,6 +321,7 @@ export default function ReportApprovalForm({
               보고 일자
             </label>
             <SmartDatePicker
+              data-testid="approval-report-daily-date"
               value={String(extraData.report_target_date || '').trim()}
               onChange={(value) => patchExtraData({ report_target_date: value })}
               inputClassName="h-11 rounded-[var(--radius-md)] bg-[var(--card)] px-4 text-xs font-bold"
@@ -321,6 +336,7 @@ export default function ReportApprovalForm({
                 보고 시작일
               </label>
               <SmartDatePicker
+                data-testid="approval-report-period-start"
                 value={String(extraData.report_period_start || '').trim()}
                 onChange={(value) => patchExtraData({ report_period_start: value })}
                 inputClassName="h-11 rounded-[var(--radius-md)] bg-[var(--card)] px-4 text-xs font-bold"
@@ -331,6 +347,7 @@ export default function ReportApprovalForm({
                 보고 종료일
               </label>
               <SmartDatePicker
+                data-testid="approval-report-period-end"
                 value={String(extraData.report_period_end || '').trim()}
                 onChange={(value) => patchExtraData({ report_period_end: value })}
                 inputClassName="h-11 rounded-[var(--radius-md)] bg-[var(--card)] px-4 text-xs font-bold"
@@ -351,6 +368,7 @@ export default function ReportApprovalForm({
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
+              data-testid="approval-report-file-button"
               className="rounded-[var(--radius-md)] border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 transition-all hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {uploading ? '업로드 중...' : '파일 선택'}
@@ -359,6 +377,7 @@ export default function ReportApprovalForm({
 
           <input
             ref={fileInputRef}
+            data-testid="approval-report-file-input"
             type="file"
             multiple
             onChange={handleFileSelect}
@@ -383,7 +402,12 @@ export default function ReportApprovalForm({
                   className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/50 px-3 py-2"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-bold text-[var(--foreground)]">{attachment.name}</p>
+                    <p
+                      data-testid={`approval-report-attachment-name-${index}`}
+                      className="truncate text-xs font-bold text-[var(--foreground)]"
+                    >
+                      {attachment.name}
+                    </p>
                     <p className="mt-0.5 text-[11px] font-semibold text-[var(--toss-gray-4)]">
                       {formatApprovalAttachmentSize(attachment.size) || '크기 정보 없음'}
                     </p>

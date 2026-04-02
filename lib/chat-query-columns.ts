@@ -26,6 +26,8 @@ const CHAT_MESSAGE_COLUMNS = [
   'is_deleted',
   'reply_to_id',
   'album_id',
+  'album_index',
+  'album_total',
 ];
 
 export const CHAT_MESSAGE_OPTIONAL_COLUMNS = [
@@ -37,6 +39,8 @@ export const CHAT_MESSAGE_OPTIONAL_COLUMNS = [
   'is_deleted',
   'reply_to_id',
   'album_id',
+  'album_index',
+  'album_total',
 ] as const;
 
 export const CHAT_MESSAGE_SELECT = CHAT_MESSAGE_COLUMNS.join(', ');
