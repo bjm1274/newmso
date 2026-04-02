@@ -77,8 +77,8 @@ export const BACKUP_GROUPS: BackupGroupDefinition[] = [
   },
   {
     id: 'board',
-    label: '게시판/위키',
-    description: '게시글, 댓글, 좋아요, 사내위키 문서',
+    label: '게시판/업무가이드',
+    description: '게시글, 댓글, 좋아요, 업무가이드 및 레거시 위키 문서',
     tables: [
       'board_posts',
       'board_post_comments',

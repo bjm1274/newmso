@@ -51,6 +51,10 @@ async function openApprovalSubMenu(page: Page, subMenuId: string) {
   await expect(page.getByTestId('approval-view')).toBeVisible();
 }
 
+async function selectComposeFormTab(page: Page, label: string) {
+  await page.getByRole('button', { name: label, exact: true }).click();
+}
+
 test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
 });
@@ -231,20 +235,23 @@ test('approval walkthrough opens each submenu in order without runtime errors', 
   await page.getByTestId('approval-approver-select').selectOption(directApprover.id);
   await expect(page.getByText(`1. ${directApprover.name} ${directApprover.position}`)).toBeVisible();
 
-  await page.getByTestId('approval-form-type-0').click();
+  await selectComposeFormTab(page, '연차/휴가');
   await expect(page.getByTestId('approval-leave-type-select')).toBeVisible();
   await expect(page.getByTestId('approval-leave-start-date')).toBeVisible();
   await expect(page.getByTestId('approval-title-input')).toBeVisible();
   await expect(page.getByTestId('approval-submit-button')).toBeVisible();
 
-  await page.getByTestId('approval-form-type-3').click();
+  await selectComposeFormTab(page, '물품신청');
   await expect(page.getByTestId('supplies-add-row-button')).toBeVisible();
   await expect(page.getByTestId('supplies-item-name-0')).toBeVisible();
 
-  await page.getByTestId('approval-form-type-7').click();
+  await selectComposeFormTab(page, '보고서작성');
+  await expect(page.getByTestId('approval-report-view')).toBeVisible();
+
+  await selectComposeFormTab(page, '양식신청');
   await expect(page.getByTestId('form-request-view')).toBeVisible();
 
-  await page.getByTestId('approval-form-type-8').click();
+  await selectComposeFormTab(page, '출결정정');
   await expect(page.getByTestId('attendance-correction-view')).toBeVisible();
 
   expect(runtimeErrors).toEqual([]);

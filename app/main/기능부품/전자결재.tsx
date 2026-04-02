@@ -128,7 +128,7 @@ type SupplyInventoryReviewRow = {
 };
 
 type SupplyInventoryReviewState = {
-  items: Array<{ name: string; qty: number; unit: string; dept: string; purpose: string }>;
+  items: Array<{ name: string; qty: number; unit: string; category: string; dept: string; purpose: string }>;
   rows: SupplyInventoryReviewRow[];
   notice?: string | null;
 };
@@ -302,6 +302,10 @@ function getCurrentMonthValue() {
   return `${year}-${month}`;
 }
 
+function getCurrentDateValue() {
+  return toLocalDateKey(new Date());
+}
+
 function getDateRangeFromMonth(monthValue: string) {
   if (!monthValue || !/^\d{4}-\d{2}$/.test(monthValue)) {
     return { from: '', to: '' };
@@ -318,6 +322,37 @@ function getDateRangeFromMonth(monthValue: string) {
   return {
     from: `${yearText}-${monthText}-01`,
     to: `${yearText}-${monthText}-${String(lastDay).padStart(2, '0')}`,
+  };
+}
+
+function getDateRangeFromWeek(dateValue: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+    return { from: '', to: '' };
+  }
+
+  const [yearText, monthText, dayText] = dateValue.split('-');
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return { from: '', to: '' };
+  }
+
+  const anchorDate = new Date(year, month - 1, day);
+  if (Number.isNaN(anchorDate.getTime())) {
+    return { from: '', to: '' };
+  }
+
+  const dayOfWeek = anchorDate.getDay();
+  const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const weekStart = new Date(anchorDate);
+  weekStart.setDate(anchorDate.getDate() - diffToMonday);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+
+  return {
+    from: toLocalDateKey(weekStart),
+    to: toLocalDateKey(weekEnd),
   };
 }
 
@@ -455,12 +490,14 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
   const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대기' | '승인' | '반려'>('전체');
   const [approvalDocumentFilter, setApprovalDocumentFilter] = useState(ALL_DOCUMENT_FILTER);
   const [approvalKeyword, setApprovalKeyword] = useState('');
-  const [approvalDateMode, setApprovalDateMode] = useState<'month' | 'range'>('month');
+  const [approvalDateMode, setApprovalDateMode] = useState<'month' | 'week' | 'range'>('month');
   const [approvalMonth, setApprovalMonth] = useState(getCurrentMonthValue);
+  const [approvalWeekDate, setApprovalWeekDate] = useState(getCurrentDateValue);
   const [approvalDateFrom, setApprovalDateFrom] = useState('');
   const [approvalDateTo, setApprovalDateTo] = useState('');
   const [approvalDateTouched, setApprovalDateTouched] = useState(false);
   const defaultApprovalMonth = useMemo(() => getCurrentMonthValue(), []);
+  const defaultApprovalWeekDate = useMemo(() => getCurrentDateValue(), []);
   const [savedApproverLine, setSavedApproverLine] = useState<StaffMember[]>([]);
   // 결재선 다중 템플릿 (name + line 배열)
   const [approverTemplates, setApproverTemplates] = useState<ApproverTemplate[]>([]);
@@ -744,6 +781,7 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
         name: string;
         qty: number;
         unit: string;
+        category: string;
         dept: string;
         purpose: string;
       }>;
@@ -818,7 +856,7 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
             <tr>
               <th>품목명</th>
               <th>수량</th>
-              <th>사용 부서</th>
+              <th>품목구분</th>
               <th>용도</th>
             </tr>
           </thead>
@@ -829,7 +867,7 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
                   <tr>
                     <td>${escapeHtml(row.name || '-')}</td>
                     <td>${escapeHtml(`${row.qty} ${row.unit}`)}</td>
-                    <td>${escapeHtml(row.dept || '-')}</td>
+                    <td>${escapeHtml(row.category || '-')}</td>
                     <td>${escapeHtml(row.purpose || '-')}</td>
                   </tr>`
               )
@@ -855,7 +893,7 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
               <tr>
                 <th className="px-3 py-2 text-left font-bold text-[var(--toss-gray-4)]">품목명</th>
                 <th className="px-3 py-2 text-left font-bold text-[var(--toss-gray-4)]">수량</th>
-                <th className="px-3 py-2 text-left font-bold text-[var(--toss-gray-4)]">사용 부서</th>
+                <th className="px-3 py-2 text-left font-bold text-[var(--toss-gray-4)]">품목구분</th>
                 <th className="px-3 py-2 text-left font-bold text-[var(--toss-gray-4)]">용도</th>
               </tr>
             </thead>
@@ -864,7 +902,7 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
                 <tr key={`${row.name}-${row.qty}-${row.unit}-${index}`} className="border-t border-[var(--border)]">
                   <td className="px-3 py-2 font-semibold text-[var(--foreground)]">{row.name || '-'}</td>
                   <td className="px-3 py-2 font-bold text-[var(--accent)]">{`${row.qty} ${row.unit}`}</td>
-                  <td className="px-3 py-2 text-[var(--toss-gray-4)]">{row.dept || '-'}</td>
+                  <td className="px-3 py-2 text-[var(--toss-gray-4)]">{row.category || '-'}</td>
                   <td className="px-3 py-2 text-[var(--toss-gray-4)]">{row.purpose || '-'}</td>
                 </tr>
               ))}
@@ -877,7 +915,7 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
 
   const buildSupplyInventoryReviewRows = useCallback(
     (
-      items: Array<{ name: string; qty: number; unit: string; dept: string; purpose: string }>,
+      items: Array<{ name: string; qty: number; unit: string; category: string; dept: string; purpose: string }>,
       supportInventoryRows: any[] = [],
       surgeryInventoryRows: any[] = [],
     ) => {
@@ -928,7 +966,7 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
   );
 
   const prepareSupplyInventoryReview = useCallback(
-    async (items: Array<{ name: string; qty: number; unit: string; dept: string; purpose: string }>) => {
+    async (items: Array<{ name: string; qty: number; unit: string; category: string; dept: string; purpose: string }>) => {
       const companyName = String(user?.company || '').trim();
       const notices: string[] = [];
       let supportInventoryRows: any[] = [];
@@ -2198,12 +2236,24 @@ window.onload = () => window.print();
     }
 
     if ('dateMode' in initialComposeRequest) {
-      setApprovalDateMode(initialComposeRequest.dateMode === 'range' ? 'range' : 'month');
+      const requestedDateMode = String(initialComposeRequest.dateMode || '').trim();
+      setApprovalDateMode(
+        requestedDateMode === 'range'
+          ? 'range'
+          : requestedDateMode === 'week'
+            ? 'week'
+            : 'month',
+      );
     }
 
     if ('month' in initialComposeRequest) {
       const requestedMonth = String(initialComposeRequest.month || '').trim();
       setApprovalMonth(/^\d{4}-\d{2}$/.test(requestedMonth) ? requestedMonth : defaultApprovalMonth);
+    }
+
+    if ('weekDate' in initialComposeRequest || initialComposeRequest.dateMode === 'week') {
+      const requestedWeekDate = String(initialComposeRequest.weekDate || initialComposeRequest.dateFrom || '').trim().slice(0, 10);
+      setApprovalWeekDate(/^\d{4}-\d{2}-\d{2}$/.test(requestedWeekDate) ? requestedWeekDate : defaultApprovalWeekDate);
     }
 
     if ('dateFrom' in initialComposeRequest) {
@@ -2242,7 +2292,7 @@ window.onload = () => window.print();
     }
 
     onConsumeComposeRequest?.();
-  }, [approvalDirectoryStaffs, defaultApprovalMonth, defaultApprovalView, initialComposeRequest, onConsumeComposeRequest, resolveAccessibleView, resolveDefaultReferenceUsersForForm]);
+  }, [approvalDirectoryStaffs, defaultApprovalMonth, defaultApprovalView, defaultApprovalWeekDate, initialComposeRequest, onConsumeComposeRequest, resolveAccessibleView, resolveDefaultReferenceUsersForForm]);
 
   useEffect(() => {
     if (!selectedApprovalId) return;
@@ -3418,14 +3468,25 @@ window.onload = () => window.print();
   }, [approvalDirectoryStaffs, getLeaveRequestSummary]);
 
   const effectiveApprovalDateRange = useMemo(() => {
-    return approvalDateMode === 'month'
-      ? getDateRangeFromMonth(approvalMonth)
-      : { from: approvalDateFrom, to: approvalDateTo };
-  }, [approvalDateFrom, approvalDateMode, approvalDateTo, approvalMonth]);
+    if (approvalDateMode === 'month') {
+      return getDateRangeFromMonth(approvalMonth);
+    }
+    if (approvalDateMode === 'week') {
+      return getDateRangeFromWeek(approvalWeekDate);
+    }
+    return { from: approvalDateFrom, to: approvalDateTo };
+  }, [approvalDateFrom, approvalDateMode, approvalDateTo, approvalMonth, approvalWeekDate]);
 
   const shouldApplyApprovalDateFilter = useMemo(() => {
     if (approvalDateMode === 'range') {
       return Boolean(approvalDateFrom || approvalDateTo);
+    }
+
+    if (approvalDateMode === 'week') {
+      if (!approvalDateTouched && approvalWeekDate === defaultApprovalWeekDate) {
+        return false;
+      }
+      return Boolean(approvalWeekDate);
     }
 
     if (!approvalDateTouched && approvalMonth === defaultApprovalMonth) {
@@ -3433,13 +3494,14 @@ window.onload = () => window.print();
     }
 
     return Boolean(approvalMonth);
-  }, [approvalDateFrom, approvalDateMode, approvalDateTo, approvalDateTouched, approvalMonth, defaultApprovalMonth]);
+  }, [approvalDateFrom, approvalDateMode, approvalDateTo, approvalDateTouched, approvalMonth, approvalWeekDate, defaultApprovalMonth, defaultApprovalWeekDate]);
 
   const hasApprovalFilterOverrides =
     approvalDocumentFilter !== ALL_DOCUMENT_FILTER ||
     Boolean(approvalKeyword) ||
     approvalDateMode !== 'month' ||
     approvalMonth !== defaultApprovalMonth ||
+    approvalWeekDate !== defaultApprovalWeekDate ||
     Boolean(approvalDateFrom) ||
     Boolean(approvalDateTo);
 
@@ -4023,13 +4085,20 @@ window.onload = () => window.print();
                     value={approvalDateMode}
                     onChange={(e) => {
                       setApprovalDateTouched(true);
-                      setApprovalDateMode(e.target.value === 'range' ? 'range' : 'month');
+                      setApprovalDateMode(
+                        e.target.value === 'range'
+                          ? 'range'
+                          : e.target.value === 'week'
+                            ? 'week'
+                            : 'month',
+                      );
                     }}
                     className="h-10 w-full sm:w-auto sm:min-w-[116px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
                     aria-label="조회 기간 유형"
                     data-testid="approval-date-mode"
                   >
                     <option value="month">월별</option>
+                    <option value="week">주간별</option>
                     <option value="range">기간지정</option>
                   </select>
                   {approvalDateMode === 'month' ? (
@@ -4044,6 +4113,25 @@ window.onload = () => window.print();
                       aria-label="조회 월"
                       data-testid="approval-month-filter"
                     />
+                  ) : approvalDateMode === 'week' ? (
+                    <>
+                      <input
+                        type="date"
+                        value={approvalWeekDate}
+                        onChange={(e) => {
+                          setApprovalDateTouched(true);
+                          setApprovalWeekDate(e.target.value);
+                        }}
+                        className="h-10 w-full sm:w-auto sm:min-w-[150px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                        aria-label="조회 주간 기준일"
+                        data-testid="approval-week-filter"
+                      />
+                      <span className="text-sm font-semibold text-[var(--toss-gray-3)]">
+                        {effectiveApprovalDateRange.from && effectiveApprovalDateRange.to
+                          ? `${effectiveApprovalDateRange.from} ~ ${effectiveApprovalDateRange.to}`
+                          : '주간 범위 미지정'}
+                      </span>
+                    </>
                   ) : (
                     <>
                       <input
@@ -4079,6 +4167,7 @@ window.onload = () => window.print();
                         setApprovalKeyword('');
                         setApprovalDateMode('month');
                         setApprovalMonth(defaultApprovalMonth);
+                        setApprovalWeekDate(defaultApprovalWeekDate);
                         setApprovalDateFrom('');
                         setApprovalDateTo('');
                         setApprovalDateTouched(false);

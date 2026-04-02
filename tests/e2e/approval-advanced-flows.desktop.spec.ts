@@ -81,6 +81,10 @@ function trackRuntimeErrors(page: Page) {
   return errors;
 }
 
+async function selectComposeFormTab(page: Page, label: string) {
+  await page.getByRole('button', { name: label, exact: true }).click();
+}
+
 async function openApprovalInbox(page: Page) {
   await page.goto('/main?open_menu=전자결재&open_subview=결재함');
   await expect(page.getByTestId('approval-view')).toBeVisible();
@@ -681,7 +685,7 @@ test('custom approval form submits and its PDF print HTML is generated', async (
 
   await openApprovalCompose(page);
   await page.getByTestId('approval-approver-select').selectOption(firstApprover.id);
-  await page.getByTestId('approval-form-type-9').click();
+  await selectComposeFormTab(page, '시설점검');
   await page.getByTestId('approval-title-input').fill('E2E 시설점검 상신');
   await page.getByTestId('approval-content-input').fill('시설 점검 요청 본문입니다.');
   const insert = waitForApprovalInsert(page);

@@ -20,12 +20,138 @@ type StaffMember = {
 const ROSTER_CREATOR_POSITIONS = ['간호과장', '간호부장', '실장'];
 const ROSTER_APPROVER_POSITIONS = ['총무부장', '이사'];
 const ROSTER_APPROVER_COMPANIES = ['SY INC.'];
+const OFF_SHIFT_TOKEN = '__OFF__';
+const LEGACY_ROSTER_APPROVAL_TYPE = 'roster_schedule_approval';
+const LEGACY_APPROVAL_PENDING_STATUS = '\uB300\uAE30';
+const LEGACY_APPROVAL_APPROVED_STATUS = '\uC2B9\uC778';
+const LEGACY_APPROVAL_REJECTED_STATUS = '\uBC18\uB824';
 
 type AttendanceMainProps = {
   staffs: StaffMember[];
   selectedCo: string;
   user?: AppStaffMember | Record<string, unknown> | null;
 };
+
+function padDay(day: number) {
+  return String(day).padStart(2, '0');
+}
+
+function buildAttendanceKey(staffId: string, workDate: string) {
+  return `${staffId}_${workDate}`;
+}
+
+function isMissingRosterWorkflowTableError(error: unknown, tableName: string) {
+  const payload = error as {
+    code?: string | null;
+    message?: string | null;
+    details?: string | null;
+    hint?: string | null;
+  } | null;
+  const code = String(payload?.code || '').trim();
+  const message = [payload?.message, payload?.details, payload?.hint]
+    .map((value) => String(value || '').toLowerCase())
+    .join(' ');
+
+  return (
+    code === '42P01' ||
+    code === 'PGRST205' ||
+    message.includes(tableName.toLowerCase()) ||
+    (message.includes('schema cache') && message.includes('could not find the table'))
+  );
+}
+
+function mapLegacyApprovalRequest(row: any) {
+  const metaData =
+    row?.meta_data && typeof row.meta_data === 'object' && !Array.isArray(row.meta_data)
+      ? (row.meta_data as Record<string, unknown>)
+      : {};
+  const rawStatus = String(row?.status || '').trim();
+
+  return {
+    id: row?.id,
+    company_name: String(metaData.company_name || row?.sender_company || '').trim(),
+      team_name: String(metaData.team_name || '').trim() || '전체',
+    year_month: String(metaData.year_month || '').trim(),
+    assignments: Array.isArray(metaData.assignments) ? metaData.assignments : [],
+    requested_by: String(row?.sender_id || '').trim() || null,
+    requested_by_name: String(row?.sender_name || '').trim() || null,
+    status:
+      rawStatus === LEGACY_APPROVAL_PENDING_STATUS
+        ? 'pending'
+        : rawStatus === LEGACY_APPROVAL_APPROVED_STATUS
+          ? 'approved'
+          : rawStatus === LEGACY_APPROVAL_REJECTED_STATUS
+            ? 'rejected'
+            : rawStatus,
+    created_at: row?.created_at || null,
+    meta_data: metaData,
+    _source: 'approvals',
+  };
+}
+
+function isLegacyApprovalRequest(request: any) {
+  return String(request?._source || '').trim() === 'approvals';
+}
+
+function resolveAttendanceStatus(attendance: any, isWeekend = false) {
+  const rawStatus = String(attendance?.status || '').trim();
+  if (rawStatus === 'present' || rawStatus === 'late' || rawStatus === 'early_leave') {
+    if (attendance?.check_in_time || attendance?.check_out_time) return rawStatus;
+    return '';
+  }
+  if (rawStatus) return rawStatus;
+  if (attendance?.check_in_time || attendance?.check_out_time) return 'present';
+  return isWeekend ? 'holiday' : '';
+}
+
+function isWorkedAttendanceStatus(status: string) {
+  return status === 'present';
+}
+
+function buildMonthCalendarCells(selectedMonth: string) {
+  const [year, month] = selectedMonth.split('-').map(Number);
+  if (!Number.isFinite(year) || !Number.isFinite(month)) return [];
+
+  const firstDay = new Date(year, month - 1, 1);
+  const lastDay = new Date(year, month, 0).getDate();
+  const leadingEmptyCells = firstDay.getDay();
+  const cells: Array<{ key: string; dateStr: string | null; day: number | null; isCurrentMonth: boolean; isWeekend: boolean }> = [];
+
+  for (let index = 0; index < leadingEmptyCells; index += 1) {
+    cells.push({
+      key: `empty-leading-${index}`,
+      dateStr: null,
+      day: null,
+      isCurrentMonth: false,
+      isWeekend: index === 0,
+    });
+  }
+
+  for (let day = 1; day <= lastDay; day += 1) {
+    const dateStr = `${selectedMonth}-${padDay(day)}`;
+    const weekday = new Date(dateStr).getDay();
+    cells.push({
+      key: dateStr,
+      dateStr,
+      day,
+      isCurrentMonth: true,
+      isWeekend: weekday === 0 || weekday === 6,
+    });
+  }
+
+  while (cells.length % 7 !== 0) {
+    const index = cells.length;
+    cells.push({
+      key: `empty-trailing-${index}`,
+      dateStr: null,
+      day: null,
+      isCurrentMonth: false,
+      isWeekend: index % 7 === 0,
+    });
+  }
+
+  return cells;
+}
 
 export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceMainProps) {
   const [viewMode, setViewMode] = useState<'daily' | 'monthly' | 'calendar' | 'dashboard' | 'schedule'>('monthly');
@@ -67,13 +193,61 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
   const [bulkRangeType, setBulkRangeType] = useState<'day' | 'week' | 'month' | 'custom'>('day');
   const [bulkStartDate, setBulkStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [bulkEndDate, setBulkEndDate] = useState(new Date().toISOString().slice(0, 10));
-  const [bulkStatus, setBulkStatus] = useState<string>('present');
+  const [bulkStatus, setBulkStatus] = useState<string>('absent');
   const [bulkSaving, setBulkSaving] = useState(false);
 
   const filtered = useMemo(
     () => selectedCo === '전체' ? staffs : staffs.filter((s: StaffMember) => s.company === selectedCo),
     [selectedCo, staffs]
   );
+
+  const attendanceMap = useMemo(() => {
+    const map = new Map<string, any>();
+    attendanceData.forEach((attendance) => {
+      const staffId = String(attendance?.staff_id || '').trim();
+      const workDate = String(attendance?.work_date || '').trim();
+      if (!staffId || !workDate) return;
+      map.set(buildAttendanceKey(staffId, workDate), attendance);
+    });
+    return map;
+  }, [attendanceData]);
+
+  const calendarCells = useMemo(() => buildMonthCalendarCells(selectedMonth), [selectedMonth]);
+
+  const calendarAttendanceSummary = useMemo(() => {
+    const summary = new Map<string, { worked: number; lateOrEarly: number; absentOrLeave: number; totalRecords: number }>();
+
+    attendanceData.forEach((attendance) => {
+      const workDate = String(attendance?.work_date || '').trim();
+      if (!workDate || !workDate.startsWith(`${selectedMonth}-`)) return;
+
+      const dayOfWeek = new Date(workDate).getDay();
+      const status = resolveAttendanceStatus(attendance, dayOfWeek === 0 || dayOfWeek === 6);
+      if (!summary.has(workDate)) {
+        summary.set(workDate, { worked: 0, lateOrEarly: 0, absentOrLeave: 0, totalRecords: 0 });
+      }
+
+      const current = summary.get(workDate)!;
+      current.totalRecords += 1;
+
+      if (status === 'late' || status === 'early_leave') {
+        current.worked += 1;
+        current.lateOrEarly += 1;
+        return;
+      }
+
+      if (status === 'present') {
+        current.worked += 1;
+        return;
+      }
+
+      if (status === 'absent' || status === 'annual_leave' || status === 'sick_leave' || status === 'half_leave') {
+        current.absentOrLeave += 1;
+      }
+    });
+
+    return summary;
+  }, [attendanceData, selectedMonth]);
 
   const fetchAttendance = async () => {
     setLoading(true);
@@ -201,7 +375,11 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
   const handleApproveSwap = async (req: any) => {
     try {
       setAssignment(req.staff_id, req.work_date, null);
-      const { error } = await supabase.from('roster_swap_requests').update({ status: 'approved', approved_by: user?.id }).eq('id', req.id);
+      const { error } = await supabase.from('roster_swap_requests').update({
+        status: 'approved',
+        approved_by: user?.id,
+        approved_at: new Date().toISOString(),
+      }).eq('id', req.id);
       if (error) throw error;
       setPendingSwaps(p => p.filter(x => x.id !== req.id));
       toast('교환 요청을 승인했습니다.');
@@ -211,7 +389,12 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
   };
 
   const handleRejectSwap = async (req: any, reason: string) => {
-    await supabase.from('roster_swap_requests').update({ status: 'rejected', reject_reason: reason }).eq('id', req.id);
+    await supabase.from('roster_swap_requests').update({
+      status: 'rejected',
+      reject_reason: reason,
+      rejected_by: user?.id,
+      rejected_at: new Date().toISOString(),
+    }).eq('id', req.id);
     setPendingSwaps(p => p.filter(x => x.id !== req.id));
     toast('교환 요청을 반려했습니다.');
   };
@@ -274,20 +457,65 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
   useEffect(() => {
     if (viewMode !== 'schedule') return;
     if (canApproveRoster || canCreateRoster) {
-      supabase.from('roster_approval_requests').select('*').eq('status', 'pending').order('created_at', { ascending: false }).then(({ data }) => {
+      const userId = String(user?.id || '').trim();
+      const loadLegacyPendingApprovals = async () => {
+        let query = supabase
+          .from('approvals')
+          .select('id, sender_id, sender_name, sender_company, status, current_approver_id, rejection_comment, meta_data, created_at')
+          .eq('type', LEGACY_ROSTER_APPROVAL_TYPE)
+          .eq('status', LEGACY_APPROVAL_PENDING_STATUS)
+          .order('created_at', { ascending: false });
+
+        if (userId) {
+          query = query.or(`current_approver_id.eq.${userId},sender_id.eq.${userId}`);
+        }
+
+        const { data, error } = await query;
+        if (error) {
+          console.error('legacy roster approval list fetch failed:', error);
+          setPendingApprovals([]);
+          return;
+        }
+
+        setPendingApprovals((data || []).map(mapLegacyApprovalRequest));
+      };
+
+      supabase.from('roster_approval_requests').select('*').eq('status', 'pending').order('created_at', { ascending: false }).then(async ({ data, error }) => {
+        if (error) {
+          if (!isMissingRosterWorkflowTableError(error, 'roster_approval_requests')) {
+            console.error('근무표 승인 대기 목록 조회 실패:', error);
+            setPendingApprovals([]);
+            return;
+          }
+          await loadLegacyPendingApprovals();
+          return;
+        }
         setPendingApprovals(data || []);
       });
       // Hypothetical swap requests table
-      supabase.from('roster_swap_requests').select('*').eq('status', 'pending').order('created_at', { ascending: false }).then(({ data }) => {
+      supabase.from('roster_swap_requests').select('*').eq('status', 'pending').order('created_at', { ascending: false }).then(({ data, error }) => {
+        if (error) {
+          if (!isMissingRosterWorkflowTableError(error, 'roster_swap_requests')) {
+            console.error('근무 교환 요청 조회 실패:', error);
+          }
+          setPendingSwaps([]);
+          return;
+        }
         setPendingSwaps(data || []);
       });
     }
-  }, [viewMode, canApproveRoster, canCreateRoster]);
+  }, [viewMode, canApproveRoster, canCreateRoster, user?.id]);
 
   const submitAiGenerate = async () => {
     setShowAiModal(false);
     setAiLoading(true);
     try {
+      const monthDates = daysArray.map((day) => `${selectedMonth}-${String(day).padStart(2, '0')}`);
+      const validShiftIds = new Set(workShifts.map((shift: any) => String(shift.id)));
+      const offShift = workShifts.find((shift: any) => {
+        const name = String(shift?.name || '').toLowerCase();
+        return name.includes('off') || name.includes('오프') || name.includes('휴무') || name === 'o';
+      });
       const teamStaffs = rosterFiltered.map((s: StaffMember) => ({
         id: s.id, name: s.name, department: s.department, position: s.position, shiftType: s.shift_type || '',
       }));
@@ -300,28 +528,73 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
           selectedMonth: selectedMonth, 
           selectedDepartment: rosterTeam,
           selectedCompany: selectedCo || '본사',
-          monthDates: daysArray.map(d => `${selectedMonth}-${String(d).padStart(2, '0')}`),
+          monthDates,
           constraints: aiConfig,
           preAssigned: shiftAssignments
         }),
       });
       if (!res.ok) throw new Error('AI 응답 오류');
       const result = await res.json();
-      // Apply AI result to grid
+
       const newAssignments = { ...shiftAssignments };
+      rosterFiltered.forEach((staff: StaffMember) => {
+        monthDates.forEach((date) => {
+          newAssignments[`${staff.id}_${date}`] = '';
+        });
+      });
+
+      let appliedCount = 0;
       (result.staffPlans || result.assignments || []).forEach((plan: any) => {
-        (plan.assignments || []).forEach((a: any) => {
-          const shift = workShifts.find((s: any) => s.name === a.shift_name || s.id === a.shift_id);
+        const staffId = String(plan?.staff_id || plan?.staffId || '').trim();
+        if (!staffId) return;
+
+        const legacyAssignments = Array.isArray(plan?.assignments) ? plan.assignments : [];
+        if (legacyAssignments.length > 0 && typeof legacyAssignments[0] === 'string') {
+          legacyAssignments.forEach((token: any, index: number) => {
+            const workDate = monthDates[index];
+            if (!workDate) return;
+
+            const normalizedToken = String(token || '').trim();
+            const nextShiftId =
+              normalizedToken === OFF_SHIFT_TOKEN
+                ? String(offShift?.id || '')
+                : validShiftIds.has(normalizedToken)
+                  ? normalizedToken
+                  : '';
+
+            if (!nextShiftId && normalizedToken && normalizedToken !== OFF_SHIFT_TOKEN) {
+              return;
+            }
+
+            newAssignments[`${staffId}_${workDate}`] = nextShiftId;
+            if (nextShiftId) {
+              appliedCount += 1;
+            }
+          });
+          return;
+        }
+
+        legacyAssignments.forEach((assignment: any) => {
+          const workDate = String(assignment?.work_date || assignment?.date || '').trim().slice(0, 10);
+          if (!workDate) return;
+          const shift = workShifts.find((s: any) => s.name === assignment?.shift_name || s.id === assignment?.shift_id);
           if (shift) {
-            newAssignments[`${plan.staff_id || plan.staffId}_${a.work_date || a.date}`] = shift.id;
+            newAssignments[`${staffId}_${workDate}`] = shift.id;
+            appliedCount += 1;
           }
         });
       });
+
+      if (appliedCount === 0) {
+        throw new Error('AI 결과를 현재 근무표에 반영하지 못했습니다. 응답 형식 또는 근무유형 설정을 확인해주세요.');
+      }
+
       setShiftAssignments(newAssignments);
+      setApprovalStatus('idle');
       toast('AI 근무표 생성 완료! 수정 후 승인요청 해주세요.', 'success');
     } catch (e) {
       console.error(e);
-      toast('AI 근무표 생성 중 오류가 발생했습니다.', 'error');
+      toast((e as Error)?.message || 'AI 근무표 생성 중 오류가 발생했습니다.', 'error');
     } finally {
       setAiLoading(false);
     }
@@ -339,21 +612,32 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
 
     setApprovalPending(true);
     try {
-      const { error } = await supabase.from('roster_approval_requests').insert({
-        company_name: selectedCo === '전체' ? (userCompany || '') : selectedCo,
-        team_name: rosterTeam,
-        year_month: selectedMonth,
-        assignments,
-        requested_by: user.id,
-        requested_by_name: user.name || '',
-        status: 'pending',
+      const response = await fetch('/api/roster/approval-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyName: selectedCo === '전체' ? (userCompany || '') : selectedCo,
+          teamName: rosterTeam,
+          yearMonth: selectedMonth,
+          assignments,
+        }),
       });
-      if (error) throw error;
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.error || '승인요청 중 오류가 발생했습니다.');
+      }
+
       setApprovalStatus('pending');
-      toast('승인요청이 전송되었습니다. 총무부장/이사의 승인을 기다려주세요.', 'success');
+      toast(
+        Number(payload?.notifiedApproverCount || 0) > 0
+          ? `승인요청이 전송되었습니다. 승인자 ${payload.notifiedApproverCount}명에게 알림을 보냈습니다.`
+          : '승인요청이 전송되었습니다. 총무부장/이사의 승인을 기다려주세요.',
+        'success',
+      );
     } catch (e) {
       console.error(e);
-      toast('승인요청 중 오류가 발생했습니다.', 'error');
+      toast((e as Error)?.message || '승인요청 중 오류가 발생했습니다.', 'error');
     } finally {
       setApprovalPending(false);
     }
@@ -361,10 +645,36 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
 
   const handleApprove = async (request: any) => {
     try {
+      const nowIso = new Date().toISOString();
+      const legacyRequest = isLegacyApprovalRequest(request);
+
       // 1. Update status
-      await supabase.from('roster_approval_requests').update({
-        status: 'approved', approved_by: user?.id, updated_at: new Date().toISOString(),
-      }).eq('id', request.id);
+      if (legacyRequest) {
+        const metaData =
+          request?.meta_data && typeof request.meta_data === 'object' && !Array.isArray(request.meta_data)
+            ? request.meta_data
+            : {};
+        const { error: approvalError } = await supabase.from('approvals').update({
+          status: LEGACY_APPROVAL_APPROVED_STATUS,
+          current_approver_id: null,
+          rejection_comment: null,
+          meta_data: {
+            ...metaData,
+            roster_approval_status: 'approved',
+            roster_approved_by: user?.id || null,
+            roster_approved_at: nowIso,
+          },
+        }).eq('id', request.id);
+        if (approvalError) throw approvalError;
+      } else {
+        const { error: approvalError } = await supabase.from('roster_approval_requests').update({
+          status: 'approved',
+          approved_by: user?.id,
+          approved_at: nowIso,
+          updated_at: nowIso,
+        }).eq('id', request.id);
+        if (approvalError) throw approvalError;
+      }
 
       // 2. Apply to shift_assignments
       const companyName = request.company_name;
@@ -391,6 +701,47 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
         version: 1,
       });
 
+      if (request.requested_by) {
+        await supabase.from('notifications').insert({
+          user_id: request.requested_by,
+          type: 'approval',
+          title: `📋 근무표 승인 완료: ${request.team_name || '전체'} ${request.year_month}`,
+          body: `${user?.name || '확인자'}님이 근무표를 승인했습니다.`,
+          metadata: {
+            id: request.id,
+            approval_id: legacyRequest ? request.id : null,
+            roster_request_id: request.id,
+            type: 'approval',
+            approval_view: 'roster_schedule',
+            approval_source: legacyRequest ? 'approvals' : 'roster_approval_requests',
+            approval_status: 'approved',
+            team_name: request.team_name || '전체',
+            year_month: request.year_month || selectedMonth,
+          },
+        });
+      }
+
+      if (false && request.requested_by) {
+        await supabase.from('notifications').insert({
+          user_id: request.requested_by,
+          type: 'approval',
+          title: `📋 근무표 반려: ${request.team_name || '전체'} ${request.year_month}`,
+          body: `${user?.name || '확인자'}님이 근무표를 반려했습니다.`,
+          metadata: {
+            id: request.id,
+            approval_id: legacyRequest ? request.id : null,
+            roster_request_id: request.id,
+            type: 'approval',
+            approval_view: 'roster_schedule',
+            approval_source: legacyRequest ? 'approvals' : 'roster_approval_requests',
+            approval_status: 'rejected',
+            reject_reason: null,
+            team_name: request.team_name || '전체',
+            year_month: request.year_month || selectedMonth,
+          },
+        });
+      }
+
       setPendingApprovals(prev => prev.filter(p => p.id !== request.id));
       toast('근무표가 승인되어 적용되었습니다. 문서보관함에도 저장되었습니다.', 'success');
     } catch (e) {
@@ -401,12 +752,63 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
 
   const handleReject = async (request: any, reason: string) => {
     try {
-      await supabase.from('roster_approval_requests').update({
-        status: 'rejected', approved_by: user?.id, reject_reason: reason, updated_at: new Date().toISOString(),
-      }).eq('id', request.id);
+      const nowIso = new Date().toISOString();
+      const legacyRequest = isLegacyApprovalRequest(request);
+
+      if (legacyRequest) {
+        const metaData =
+          request?.meta_data && typeof request.meta_data === 'object' && !Array.isArray(request.meta_data)
+            ? request.meta_data
+            : {};
+        const { error } = await supabase.from('approvals').update({
+          status: LEGACY_APPROVAL_REJECTED_STATUS,
+          current_approver_id: null,
+          rejection_comment: reason,
+          meta_data: {
+            ...metaData,
+            roster_approval_status: 'rejected',
+            roster_rejected_by: user?.id || null,
+            roster_rejected_at: nowIso,
+            roster_reject_reason: reason,
+          },
+        }).eq('id', request.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('roster_approval_requests').update({
+          status: 'rejected',
+          rejected_by: user?.id,
+          rejected_at: nowIso,
+          reject_reason: reason,
+          updated_at: nowIso,
+        }).eq('id', request.id);
+        if (error) throw error;
+      }
+
+      if (request.requested_by) {
+        await supabase.from('notifications').insert({
+          user_id: request.requested_by,
+          type: 'approval',
+          title: `📋 근무표 반려: ${request.team_name || '전체'} ${request.year_month}`,
+          body: `${user?.name || '승인자'}님이 근무표를 반려했습니다.`,
+          metadata: {
+            id: request.id,
+            approval_id: legacyRequest ? request.id : null,
+            roster_request_id: request.id,
+            type: 'approval',
+            approval_view: 'roster_schedule',
+            approval_source: legacyRequest ? 'approvals' : 'roster_approval_requests',
+            approval_status: 'rejected',
+            reject_reason: reason,
+            team_name: request.team_name || '전체',
+            year_month: request.year_month || selectedMonth,
+          },
+        });
+      }
+
       setPendingApprovals(prev => prev.filter(p => p.id !== request.id));
       toast('근무표가 반려되었습니다.', 'success');
     } catch (e) {
+      console.error(e);
       toast('반려 처리 중 오류가 발생했습니다.', 'error');
     }
   };
@@ -421,18 +823,23 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
   const stats = useMemo(() => {
-    const total = attendanceData.length;
-    const present = attendanceData.filter((a: any) => a.status === 'present').length;
-    const late = attendanceData.filter((a: any) => a.status === 'late').length;
-    const earlyLeave = attendanceData.filter((a: any) => a.status === 'early_leave').length;
-    const absent = attendanceData.filter((a: any) => a.status === 'absent').length;
+    const resolvedStatuses = attendanceData.map((attendance: any) =>
+      resolveAttendanceStatus(attendance, false),
+    );
+    const total = resolvedStatuses.filter(Boolean).length;
+    const present = resolvedStatuses.filter((status) => status === 'present').length;
+    const late = resolvedStatuses.filter((status) => status === 'late').length;
+    const earlyLeave = resolvedStatuses.filter((status) => status === 'early_leave').length;
+    const absent = resolvedStatuses.filter((status) => status === 'absent').length;
     const rate = total > 0 ? Math.round((present / total) * 100) : 0;
 
     const atRiskStaff: Record<string, unknown>[] = [];
     filtered.forEach((s: StaffMember) => {
-      const myAtts = attendanceData.filter((a: any) => a.staff_id === s.id);
-      const lates = myAtts.filter((a: any) => a.status === 'late').length;
-      const absents = myAtts.filter((a: any) => a.status === 'absent').length;
+      const myStatuses = attendanceData
+        .filter((a: any) => a.staff_id === s.id)
+        .map((attendance: any) => resolveAttendanceStatus(attendance, false));
+      const lates = myStatuses.filter((status) => status === 'late').length;
+      const absents = myStatuses.filter((status) => status === 'absent').length;
       if (lates >= 3 || absents >= 2) {
         atRiskStaff.push({ name: s.name, dept: s.department, lates, absents });
       }
@@ -532,11 +939,13 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
                   </thead>
                   <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                     {filtered.map((s: StaffMember) => {
-                      const att = attendanceData.find((a: any) => a.staff_id === s.id && a.work_date === selectedDate);
+                      const att = attendanceMap.get(buildAttendanceKey(s.id, selectedDate));
                       const checkIn = att?.check_in_time ? new Date(att.check_in_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-';
                       const checkOut = att?.check_out_time ? new Date(att.check_out_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-';
                       const mins = att?.work_hours_minutes ?? 0;
                       const workHrs = mins ? `${Math.floor(mins / 60)}h ${mins % 60}m` : '-';
+                      const selectedDayOfWeek = new Date(selectedDate).getDay();
+                      const resolvedStatus = resolveAttendanceStatus(att, selectedDayOfWeek === 0 || selectedDayOfWeek === 6);
 
                       const statusMap: Record<string, { label: string, color: string, bg: string }> = {
                         present: { label: '정상 출근', color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/30 ring-emerald-200' },
@@ -546,10 +955,11 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
                         sick_leave: { label: '병가', color: 'text-purple-700 dark:text-purple-400', bg: 'bg-purple-500/10 dark:bg-purple-900/30 ring-purple-200' },
                         annual_leave: { label: '연차', color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-500/10 dark:bg-blue-900/30 ring-blue-200' },
                         holiday: { label: '휴일', color: 'text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]', bg: 'bg-[var(--tab-bg)] dark:bg-zinc-800 ring-zinc-200' },
-                        half_leave: { label: '반차', color: 'text-cyan-700 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-900/30 ring-cyan-200' }
+                        half_leave: { label: '반차', color: 'text-cyan-700 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-900/30 ring-cyan-200' },
+                        missing: { label: '기록 없음', color: 'text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]', bg: 'bg-[var(--page-bg)] dark:bg-zinc-800/80 ring-zinc-200' },
                       };
 
-                      const statusObj = statusMap[att?.status || 'present'] || statusMap.present;
+                      const statusObj = statusMap[resolvedStatus || 'missing'] || statusMap.missing;
 
                       return (
                         <tr key={s.id} className="hover:bg-[var(--tab-bg)]/50 dark:hover:bg-zinc-800/30 transition-colors group cursor-default">
@@ -1015,10 +1425,10 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
                         </td>
                         {daysArray.map((d) => {
                           const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
-                          const att = attendanceData.find((a: any) => a.staff_id === s.id && a.work_date === dStr);
+                          const att = attendanceMap.get(buildAttendanceKey(s.id, dStr));
                           const dayOfWeek = new Date(dStr).getDay();
                           const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                          const status = att?.status || (isWeekend ? 'holiday' : '');
+                          const status = resolveAttendanceStatus(att, isWeekend);
 
                           let label = '';
                           let cellClass = 'text-[var(--toss-gray-3)] dark:text-[var(--toss-gray-4)]';
@@ -1029,7 +1439,7 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
                           } else if (status === 'holiday' || isWeekend) {
                             label = '휴';
                             cellClass = 'text-red-400 bg-red-500/10/50 dark:bg-red-900/10';
-                          } else if (status === 'present' || att) {
+                          } else if (isWorkedAttendanceStatus(status)) {
                             label = '출';
                             cellClass = 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20';
                             workDays++;
@@ -1247,11 +1657,8 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
                     onChange={(e) => setBulkStatus(e.target.value)}
                     className="w-full bg-[var(--tab-bg)] dark:bg-zinc-800/50 border border-[var(--border)] dark:border-zinc-700 rounded-xl px-4 py-3 text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none cursor-pointer transition-shadow"
                   >
-                    <option value="present">🟢 정상 출근</option>
-                    <option value="late">🟠 지각</option>
-                    <option value="early_leave">🟡 조퇴</option>
-                    <option value="half_leave">🔵 반차</option>
                     <option value="absent">🔴 결근</option>
+                    <option value="half_leave">🔵 반차</option>
                     <option value="annual_leave">🟣 연차</option>
                     <option value="sick_leave">🩺 병가</option>
                     <option value="holiday">⚪ 휴일</option>
@@ -1294,6 +1701,10 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
                         dates.push(cur.toISOString().slice(0, 10));
                         cur.setDate(cur.getDate() + 1);
                       }
+                      if (['present', 'late', 'early_leave'].includes(bulkStatus)) {
+                        toast('정상 출근/지각/조퇴는 실제 출퇴근 기록 또는 개별 정정으로만 처리해주세요.', 'warning');
+                        return;
+                      }
                       const rows = staffIds.flatMap((staffId: string) =>
                         dates.map((work_date) => ({
                           staff_id: staffId,
@@ -1333,35 +1744,59 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
               {['일', '월', '화', '수', '목', '금', '토'].map((day, idx) => (
                 <div key={day} className={`text-center text-[12px] font-bold uppercase pb-3 mb-2 border-b border-[var(--border-subtle)] dark:border-zinc-800 ${idx === 0 ? 'text-rose-500' : idx === 6 ? 'text-blue-500' : 'text-[var(--toss-gray-4)]'}`}>{day}</div>
               ))}
-              {Array.from({ length: 35 }).map((_, i) => {
-                const day = i - 1; // 데모용 날짜 오프셋
-                const isCurrentMonth = day > 0 && day <= 28;
-                const isSunday = i % 7 === 0;
+              {calendarCells.map((cell) => {
+                const summary = cell.dateStr ? calendarAttendanceSummary.get(cell.dateStr) : null;
+                const isSelected = cell.dateStr === selectedDate;
+                const workedCount = summary?.worked || 0;
+                const issueCount = (summary?.absentOrLeave || 0) + (summary?.lateOrEarly || 0);
 
                 return (
-                  <div key={i} className={`min-h-[130px] p-3 border rounded-2xl transition-all ${isCurrentMonth ? 'bg-[var(--card)] dark:bg-zinc-800/50 border-[var(--border)] dark:border-zinc-700 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 cursor-pointer' : 'bg-[var(--tab-bg)]/50 dark:bg-zinc-900/30 border-transparent opacity-40'}`}>
-                    {isCurrentMonth && (
+                  <button
+                    key={cell.key}
+                    type="button"
+                    onClick={() => {
+                      if (!cell.dateStr) return;
+                      setSelectedDate(cell.dateStr);
+                      setViewMode('daily');
+                    }}
+                    className={`min-h-[130px] p-3 border rounded-2xl transition-all text-left ${
+                      cell.isCurrentMonth
+                        ? isSelected
+                          ? 'bg-blue-500/10 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 shadow-sm'
+                          : 'bg-[var(--card)] dark:bg-zinc-800/50 border-[var(--border)] dark:border-zinc-700 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 cursor-pointer'
+                        : 'bg-[var(--tab-bg)]/50 dark:bg-zinc-900/30 border-transparent opacity-40'
+                    }`}
+                    disabled={!cell.isCurrentMonth}
+                  >
+                    {cell.isCurrentMonth && cell.day != null && (
                       <div className="flex flex-col h-full">
-                        <span className={`text-sm font-bold flex justify-between items-center ${isSunday ? 'text-rose-500' : 'text-foreground'}`}>
-                          {day}
-                          {day === 14 && <span className="w-1.5 h-1.5 rounded-full bg-blue-500/100"></span>}
+                        <span className={`text-sm font-bold flex justify-between items-center ${cell.isWeekend ? 'text-rose-500' : 'text-foreground'}`}>
+                          {cell.day}
+                          {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>}
                         </span>
 
                         <div className="mt-auto space-y-1.5">
-                          <div className="px-2 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-[9px] font-bold rounded-lg flex justify-between items-center group">
-                            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> 정상</span>
-                            <span className="bg-emerald-200 dark:bg-emerald-800 px-1.5 rounded-md text-emerald-800 dark:text-emerald-200">{filtered.length}</span>
-                          </div>
-                          {(day % 3 === 0) && (
+                          {workedCount > 0 ? (
+                            <div className="px-2 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-[9px] font-bold rounded-lg flex justify-between items-center group">
+                              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> 출근</span>
+                              <span className="bg-emerald-200 dark:bg-emerald-800 px-1.5 rounded-md text-emerald-800 dark:text-emerald-200">{workedCount}</span>
+                            </div>
+                          ) : (
+                            <div className="px-2 py-1.5 bg-[var(--tab-bg)] dark:bg-zinc-800 text-[9px] font-bold rounded-lg flex justify-between items-center text-[var(--toss-gray-4)]">
+                              <span>기록 없음</span>
+                              <span>-</span>
+                            </div>
+                          )}
+                          {issueCount > 0 && (
                             <div className="px-2 py-1.5 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 text-[9px] font-bold rounded-lg flex justify-between items-center">
-                              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span> 결/연</span>
-                              <span className="bg-rose-200 dark:bg-rose-800 px-1.5 rounded-md text-rose-800 dark:text-rose-200">{day % 4 + 1}</span>
+                              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span> 지각/결근/휴가</span>
+                              <span className="bg-rose-200 dark:bg-rose-800 px-1.5 rounded-md text-rose-800 dark:text-rose-200">{issueCount}</span>
                             </div>
                           )}
                         </div>
                       </div>
                     )}
-                  </div>
+                  </button>
                 );
               })}
             </div>
