@@ -1,5 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import {
+  getReportApprovalSummary,
+  normalizeApprovalAttachments,
+} from './approval-report-utils';
 
 type ApprovalArchiveSource = Record<string, unknown>;
 
@@ -33,11 +37,14 @@ function resolveApprovalCategory(item: ApprovalArchiveSource) {
   ) {
     return '양식';
   }
+  if (type === '보고서작성') return '보고서';
   return '기타';
 }
 
 function buildApprovalArchiveContent(item: ApprovalArchiveSource) {
   const metaData = (item.meta_data || {}) as Record<string, unknown>;
+  const reportSummary = getReportApprovalSummary(metaData);
+  const attachments = normalizeApprovalAttachments(metaData.attachments);
   const ccUsers = Array.isArray(metaData.cc_users)
     ? metaData.cc_users
         .map((entry) => {
@@ -56,6 +63,40 @@ function buildApprovalArchiveContent(item: ApprovalArchiveSource) {
 
   if (ccUsers.length > 0) {
     headerLines.push(`참조자: ${ccUsers.join(', ')}`);
+  }
+
+  if (reportSummary.reportTypeLabel) {
+    headerLines.push(`보고서종류: ${reportSummary.reportTypeLabel}`);
+  }
+  if (reportSummary.reportMonthLabel) {
+    headerLines.push(`대상월: ${reportSummary.reportMonthLabel}`);
+  }
+  if (reportSummary.reportPeriodLabel) {
+    headerLines.push(`보고기간: ${reportSummary.reportPeriodLabel}`);
+  }
+  if (reportSummary.reportTargetDateLabel) {
+    headerLines.push(`보고일자: ${reportSummary.reportTargetDateLabel}`);
+  }
+  if (reportSummary.incidentDateLabel) {
+    headerLines.push(`사건발생일: ${reportSummary.incidentDateLabel}`);
+  }
+  if (reportSummary.incidentLocation) {
+    headerLines.push(`발생장소: ${reportSummary.incidentLocation}`);
+  }
+  if (reportSummary.tripDateLabel) {
+    headerLines.push(`출장기간: ${reportSummary.tripDateLabel}`);
+  }
+  if (reportSummary.tripDestination) {
+    headerLines.push(`출장지: ${reportSummary.tripDestination}`);
+  }
+  if (reportSummary.tripPurpose) {
+    headerLines.push(`출장목적: ${reportSummary.tripPurpose}`);
+  }
+  if (reportSummary.relatedDepartment) {
+    headerLines.push(`관련부서: ${reportSummary.relatedDepartment}`);
+  }
+  if (attachments.length > 0) {
+    headerLines.push(`첨부파일: ${attachments.map((attachment) => attachment.name).join(', ')}`);
   }
 
   const body = String(item.content || '').trim();

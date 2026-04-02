@@ -23,6 +23,13 @@ import {
 } from '@/lib/approval-workflow';
 import { isMissingColumnError, withMissingColumnFallback } from '@/lib/supabase-compat';
 import { notificationMatchesApprovalId } from '@/lib/notification-metadata';
+import { buildInternalStorageDownloadUrl, isInternalStorageObjectUrl } from '@/lib/object-storage-url';
+import {
+  formatApprovalAttachmentSize,
+  getReportApprovalSummary,
+  getReportApprovalValidationMessage,
+  normalizeApprovalAttachments,
+} from '@/lib/approval-report-utils';
 import type { StaffMember } from '@/types';
 import {
   buildSupplyRequestWorkflowItems,
@@ -49,6 +56,7 @@ import AttendanceCorrectionForm from './전자결재서브/출결정정양식';
 import RepairRequestForm from './전자결재서브/수리요청서양식';
 import AnnualLeavePlanForm from './전자결재서브/연차사용계획서양식';
 import OfficialDocumentDispatchForm from './전자결재서브/공문발송양식';
+import ReportApprovalForm from './전자결재서브/ReportApprovalForm';
 
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { APPROVAL_VIEW_KEY } from '@/app/main/navigation-state';
@@ -70,6 +78,7 @@ const BUILTIN_FORM_TYPE_DEFINITIONS = [
   { slug: 'overtime', name: '연장근무' },
   { slug: 'purchase', name: '물품신청' },
   { slug: 'repair_request', name: '수리요청서' },
+  { slug: 'report', name: '보고서작성' },
   { slug: 'draft_business', name: '업무기안' },
   { slug: 'cooperation', name: '업무협조' },
   { slug: 'official_document_dispatch', name: '공문발송' },
@@ -325,6 +334,7 @@ function normalizeComposeFormType(value?: string) {
   if (!value || value === '인사명령') return '연차/휴가';
   if (value === 'attendance_fix' || value === '출결정정' || value === '출결 정정') return '출결정정';
   if (value === '휴가신청' || value === 'leave') return '연차/휴가';
+  if (value === 'report' || value === '보고서작성' || value === '보고서 작성') return '보고서작성';
   if (value === 'official_document_dispatch' || value === '공문발송' || value === '공문서대장') return '공문발송';
   return value;
 }
@@ -490,7 +500,7 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
   );
 
   const BUILTIN_FORM_TYPES = useMemo(
-    () => ['연차/휴가', '연차계획서', '연장근무', '물품신청', '수리요청서', '업무기안', '업무협조', '공문발송', '양식신청', '출결정정'],
+    () => ['연차/휴가', '연차계획서', '연장근무', '물품신청', '수리요청서', '보고서작성', '업무기안', '업무협조', '공문발송', '양식신청', '출결정정'],
     []
   );
   const hasLegacyOfficialDocumentAccess = useMemo(
@@ -1070,19 +1080,160 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
     );
   }, [getLeaveRequestSummary]);
 
+  const renderReportInfoHtml = useCallback((metaData: Record<string, unknown> | null | undefined) => {
+    const summary = getReportApprovalSummary(metaData);
+    if (!summary.reportTypeLabel) return '';
+
+    const rows = [
+      ['보고서 종류', summary.reportTypeLabel],
+      ['관련 부서', summary.relatedDepartment],
+      ['보고 주제', summary.reportSubject],
+      ['대상 월', summary.reportMonthLabel],
+      ['보고 일자', summary.reportTargetDateLabel],
+      ['보고 기간', summary.reportPeriodLabel],
+      ['사건 발생일', summary.incidentDateLabel],
+      ['발생 장소', summary.incidentLocation],
+      ['출장 기간', summary.tripDateLabel],
+      ['출장지', summary.tripDestination],
+      ['출장 목적', summary.tripPurpose],
+    ].filter(([, value]) => value);
+
+    if (rows.length === 0) return '';
+
+    return `
+      <div class="section">
+        <div class="section-title">보고서 정보</div>
+        <table class="supply-table">
+          <tbody>
+            ${rows
+              .map(
+                ([label, value]) => `
+                  <tr>
+                    <th>${escapeHtml(label)}</th>
+                    <td>${escapeHtml(value)}</td>
+                  </tr>`
+              )
+              .join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }, []);
+
+  const renderReportInfoPanel = useCallback((metaData: Record<string, unknown> | null | undefined) => {
+    const summary = getReportApprovalSummary(metaData);
+    if (!summary.reportTypeLabel) return null;
+
+    const rows = [
+      { label: '보고서 종류', value: summary.reportTypeLabel },
+      { label: '관련 부서', value: summary.relatedDepartment },
+      { label: '보고 주제', value: summary.reportSubject },
+      { label: '대상 월', value: summary.reportMonthLabel },
+      { label: '보고 일자', value: summary.reportTargetDateLabel },
+      { label: '보고 기간', value: summary.reportPeriodLabel },
+      { label: '사건 발생일', value: summary.incidentDateLabel },
+      { label: '발생 장소', value: summary.incidentLocation },
+      { label: '출장 기간', value: summary.tripDateLabel },
+      { label: '출장지', value: summary.tripDestination },
+      { label: '출장 목적', value: summary.tripPurpose },
+    ].filter((row) => row.value);
+
+    if (rows.length === 0) return null;
+
+    return (
+      <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)]">
+        <div className="border-b border-[var(--border)] px-4 py-3">
+          <h4 className="text-sm font-bold text-[var(--foreground)]">보고서 정보</h4>
+        </div>
+        <div className="grid gap-0 divide-y divide-[var(--border)] text-xs">
+          {rows.map((row) => (
+            <div key={row.label} className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 px-4 py-3">
+              <span className="font-bold text-[var(--toss-gray-4)]">{row.label}</span>
+              <span className="text-[var(--foreground)]">{row.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }, []);
+
+  const renderApprovalAttachmentsHtml = useCallback((metaData: Record<string, unknown> | null | undefined) => {
+    const attachments = normalizeApprovalAttachments(metaData?.attachments);
+    if (attachments.length === 0) return '';
+
+    return `
+      <div class="section">
+        <div class="section-title">첨부파일</div>
+        <table class="supply-table">
+          <thead>
+            <tr>
+              <th>파일명</th>
+              <th>크기</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${attachments
+              .map(
+                (attachment) => `
+                  <tr>
+                    <td>${escapeHtml(attachment.name)}</td>
+                    <td>${escapeHtml(formatApprovalAttachmentSize(attachment.size) || '-')}</td>
+                  </tr>`
+              )
+              .join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }, []);
+
+  const renderApprovalAttachmentsPanel = useCallback((metaData: Record<string, unknown> | null | undefined) => {
+    const attachments = normalizeApprovalAttachments(metaData?.attachments);
+    if (attachments.length === 0) return null;
+
+    return (
+      <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)]">
+        <div className="border-b border-[var(--border)] px-4 py-3">
+          <h4 className="text-sm font-bold text-[var(--foreground)]">첨부파일</h4>
+        </div>
+        <div className="space-y-2 p-4">
+          {attachments.map((attachment, index) => {
+            const href = isInternalStorageObjectUrl(attachment.url)
+              ? buildInternalStorageDownloadUrl(attachment.url, attachment.name)
+              : attachment.url;
+
+            return (
+              <a
+                key={`${attachment.url}-${attachment.name}-${index}`}
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/60 px-3 py-2 transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--muted)]"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-bold text-[var(--foreground)]">{attachment.name}</p>
+                  <p className="mt-0.5 text-[11px] font-semibold text-[var(--toss-gray-4)]">
+                    {formatApprovalAttachmentSize(attachment.size) || '다운로드'}
+                  </p>
+                </div>
+                <span className="shrink-0 text-[11px] font-bold text-[var(--accent)]">다운로드</span>
+              </a>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }, []);
+
   const openApprovalPrintView = useCallback((item: Record<string, unknown>) => {
     const design = resolveApprovalTemplateDesign(item);
     const templateMeta = resolveApprovalTemplateMeta(item);
     const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
     const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, approvalDirectoryStaffs);
+    const reportInfoSection = renderReportInfoHtml(metaData);
     const leaveRequestSection = renderLeaveRequestInfoHtml(metaData);
     const supplyItemsSection = renderSupplyRequestItemsHtml(metaData);
-    const contentSection = `
-      <div class="body">
-        <div class="doc-title">${escapeHtml(item?.title || '(제목 없음)')}</div>
-        <div class="content">${escapeHtml(item?.content || '-').replace(/\n/g, '<br>')}</div>
-      </div>
-    `;
+    const attachmentSection = renderApprovalAttachmentsHtml(metaData);
     const autoPrintScript = `<script>
 window.onafterprint = () => {
   try { if (window.opener && !window.opener.closed) window.opener.focus(); } catch (error) {}
@@ -1152,8 +1303,10 @@ window.onload = () => window.print();
       <div class="doc-title">${escapeHtml(item?.title || '(제목 없음)')}</div>
       <div class="content">${escapeHtml(item?.content || '-').replace(/\n/g, '<br>')}</div>
     </div>
+    ${reportInfoSection}
     ${leaveRequestSection}
     ${supplyItemsSection}
+    ${attachmentSection}
     ${referenceSection}
     ${design.showSignArea === false ? '' : `<div class="approval-line">${approvalBoxes}</div>`}
     <div class="footer">
@@ -1210,7 +1363,7 @@ window.onload = () => window.print();
     }
     win.document.write(html);
     win.document.close();
-  }, [approvalDirectoryStaffs, renderLeaveRequestInfoHtml, renderSupplyRequestItemsHtml, resolveApprovalTemplateDesign, resolveApprovalTemplateMeta]);
+  }, [approvalDirectoryStaffs, renderApprovalAttachmentsHtml, renderLeaveRequestInfoHtml, renderReportInfoHtml, renderSupplyRequestItemsHtml, resolveApprovalTemplateDesign, resolveApprovalTemplateMeta]);
 
   // 결재자 후보: 부서장 이상(팀장·부장·병원장 등)만 표시 (staffs는 이미 메인에서 회사별로 불러옴)
   const approverCandidates = useMemo(() => {
@@ -3044,6 +3197,14 @@ window.onload = () => window.print();
       return;
     }
 
+    if (formType === '보고서작성') {
+      const reportValidationMessage = getReportApprovalValidationMessage(extraData);
+      if (reportValidationMessage) {
+        toast(reportValidationMessage, 'warning');
+        return;
+      }
+    }
+
     const normalizedSupplyItems =
       formType === '물품신청'
         ? normalizeSupplyRequestItems(Array.isArray(extraData?.items) ? (extraData.items as any[]) : [])
@@ -3089,6 +3250,14 @@ window.onload = () => window.print();
         ...extraData,
         official_doc_request: officialDocumentRequest,
         request_category: 'official_document_dispatch',
+      };
+    } else if (formType === '보고서작성') {
+      const reportSummary = getReportApprovalSummary(extraData);
+      nextExtraData = {
+        ...extraData,
+        report_type_label: reportSummary.reportTypeLabel,
+        attachments: reportSummary.attachments,
+        request_category: 'report',
       };
     }
 
@@ -3747,6 +3916,13 @@ window.onload = () => window.print();
                   />
                 ) : formType === '수리요청서' ? (
                   <RepairRequestForm setExtraData={setExtraData} />
+                ) : formType === '보고서작성' ? (
+                  <ReportApprovalForm
+                    extraData={extraData}
+                    setExtraData={setExtraData}
+                    formTitle={formTitle}
+                    setFormTitle={setFormTitle}
+                  />
                 ) : formType === '양식신청' ? (
                   <FormRequest user={user} staffs={staffs} approverLine={approverLine} ccLine={ccLine} />
                 ) : formType === '출결정정' ? (
@@ -4303,8 +4479,10 @@ window.onload = () => window.print();
                   </div>
                 )}
                 <div className="text-sm text-[var(--toss-gray-4)] whitespace-pre-wrap border-t border-[var(--border)] pt-4">{detailContent || '-'}</div>
+                {renderReportInfoPanel(detailMetaData)}
                 {renderLeaveRequestInfoPanel(detailMetaData)}
                 {renderSupplyRequestItemsPanel(detailMetaData)}
+                {renderApprovalAttachmentsPanel(detailMetaData)}
               </div>
               {detailStatus === '대기' && (
                 <div className="p-4 md:p-4 border-t border-[var(--border)] safe-area-pb">

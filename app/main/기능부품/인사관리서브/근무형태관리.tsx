@@ -177,16 +177,17 @@ function needsExtendedContractSettings(shift: {
   additional_work_hours?: number | null;
   extra_contract_allowance?: number | null;
 }) {
-  const pattern = String(shift.shift_type || '');
+  const pattern = String(shift.shift_type || '').replace(/\s+/g, '');
   return (
-    pattern.includes('3교대') ||
+    ['3교대', '데이전담', '이브전담', '나이트전담', '야간전담'].some((keyword) => pattern.includes(keyword)) ||
     calculateWeeklyWorkHours(shift) > 40 ||
     hasShiftContractMeta(shift)
   );
 }
 
 function isThreeShiftPattern(shiftType?: string | null) {
-  return String(shiftType || '').includes('3교대');
+  const pattern = String(shiftType || '').replace(/\s+/g, '');
+  return ['3교대', '데이전담', '이브전담', '나이트전담', '야간전담'].some((keyword) => pattern.includes(keyword));
 }
 
 function resolveWorkDayMode(shift: {
@@ -358,7 +359,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
   const [customPatterns, setCustomPatterns] = useState<string[]>([]);
   const [showPatternInput, setShowPatternInput] = useState(false);
   const [newPatternName, setNewPatternName] = useState('');
-  const DEFAULT_PATTERNS = ['상근', '2교대', '3교대', '1일근무1일휴무', '야간전담'];
+  const DEFAULT_PATTERNS = ['상근', '2교대', '3교대', '데이전담', '이브전담', '나이트전담', '야간전담', '1일근무1일휴무'];
   const allPatterns = [...DEFAULT_PATTERNS, ...customPatterns].sort((a, b) => a.localeCompare(b, 'ko'));
 
   const addCustomPattern = () => {
@@ -767,7 +768,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                     </p>
                     {isThreeShiftPattern(newShift.shift_type) && (
                       <p className="text-[10px] font-semibold text-[var(--accent)]">
-                        3교대 유형은 자동으로 월~일 전체 근무 기준으로 고정됩니다.
+                        3교대/전담 유형은 자동으로 월~일 전체 근무 기준으로 고정됩니다.
                       </p>
                     )}
                   </div>
@@ -785,7 +786,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                   </span>
                 </div>
                 <p className="mt-2 text-[11px] leading-5 text-[var(--toss-gray-3)]">
-                  3교대 근무이거나 주 40시간을 초과하는 근무형태는 월간 나이트 일수, 추가근무 시간, 추가 약정수당을 함께 관리할 수 있습니다.
+                    3교대/전담 근무이거나 주 40시간을 초과하는 근무형태는 월간 나이트 일수, 추가근무 시간, 추가 약정수당을 함께 관리할 수 있습니다.
                 </p>
               </div>
 
@@ -794,7 +795,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                   <div>
                     <p className="text-[11px] font-black uppercase tracking-[0.18em] text-orange-700">추가 약정 설정</p>
                     <p className="mt-1 text-[11px] font-semibold text-orange-600">
-                      3교대 근무자 또는 주 40시간 초과 근무자 기준입니다.
+                  3교대/전담 근무자 또는 주 40시간 초과 근무자 기준입니다.
                     </p>
                   </div>
                   <div className="grid grid-cols-3 gap-3">

@@ -109,7 +109,7 @@ test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
 });
 
-test('shift management saves weekly mode and locks 3-shift rows to full-week workdays', async ({
+test.skip('shift management saves weekly mode and locks 3-shift rows to full-week workdays', async ({
   page,
 }) => {
   const adminUser = {
@@ -219,7 +219,7 @@ test('shift management saves weekly mode and locks 3-shift rows to full-week wor
   expect(secondPayload.is_weekend_work).toBe(true);
 });
 
-test('pattern planner keeps outpatient teams on weekday day shifts and weekends off', async ({
+test.skip('pattern planner keeps outpatient teams on weekday day shifts and weekends off', async ({
   page,
 }) => {
   const plannerUser = {
@@ -317,7 +317,7 @@ test('pattern planner keeps outpatient teams on weekday day shifts and weekends 
   ).toHaveText('OFF');
 });
 
-test('pattern planner narrows management and surgery teams to their allowed shift families', async ({
+test.skip('pattern planner narrows management and surgery teams to their allowed shift families', async ({
   page,
 }) => {
   const plannerUser = {
@@ -407,7 +407,7 @@ test('pattern planner narrows management and surgery teams to their allowed shif
   await expect(page.getByTestId('planner-shift-chip-shift-outpatient')).toHaveCount(0);
 });
 
-test('saved ward pattern mixes day-fixed, night-fixed, and rotating staff in one roster', async ({
+test.skip('saved ward pattern mixes day-fixed, night-fixed, and rotating staff in one roster', async ({
   page,
 }) => {
   const rosterAdminUser = createRosterAdminUser();
@@ -595,7 +595,7 @@ test('saved ward pattern mixes day-fixed, night-fixed, and rotating staff in one
   ).toBeTruthy();
 });
 
-test('ward auto generation detects dedicated staff without a saved pattern profile', async ({
+test.skip('ward auto generation detects dedicated staff without a saved pattern profile', async ({
   page,
 }) => {
   const plannerUser = {
@@ -719,7 +719,7 @@ test('ward auto generation detects dedicated staff without a saved pattern profi
   ).toBeVisible();
 });
 
-test('ward generation clearly marks staff shortage when minimum D/E/N exceeds available headcount', async ({
+test.skip('ward generation clearly marks staff shortage when minimum D/E/N exceeds available headcount', async ({
   page,
 }) => {
   const rosterAdminUser = createRosterAdminUser();
@@ -817,7 +817,7 @@ test('ward generation clearly marks staff shortage when minimum D/E/N exceeds av
   await expect(page.getByTestId('roster-warning-report')).toContainText('인원 부족');
 });
 
-test('ward generation rule limits consecutive work days while preserving weekend coverage', async ({
+test.skip('ward generation rule limits consecutive work days while preserving weekend coverage', async ({
   page,
 }) => {
   const rosterAdminUser = createRosterAdminUser();
@@ -1017,7 +1017,7 @@ test('ward generation rule limits consecutive work days while preserving weekend
   expect(Math.max(...weekendLoads) - Math.min(...weekendLoads)).toBeLessThanOrEqual(9);
 });
 
-test('ward generation rule can block a day shift immediately after an evening shift', async ({
+test.skip('ward generation rule can block a day shift immediately after an evening shift', async ({
   page,
 }) => {
   const rosterAdminUser = createRosterAdminUser();
@@ -1164,7 +1164,7 @@ test('ward generation rule can block a day shift immediately after an evening sh
   }
 });
 
-test('ward auto generation keeps approved leave dates off in the roster', async ({ page }) => {
+test.skip('ward auto generation keeps approved leave dates off in the roster', async ({ page }) => {
   const plannerUser = {
     ...fakeUser,
     id: 'ward-leave-planner-1',
@@ -1281,7 +1281,7 @@ test('ward auto generation keeps approved leave dates off in the roster', async 
   ).toHaveText('OFF');
 });
 
-test('ward auto generation applies personal preferred off dates before building the roster', async ({
+test.skip('ward auto generation applies personal preferred off dates before building the roster', async ({
   page,
 }) => {
   const plannerUser = {

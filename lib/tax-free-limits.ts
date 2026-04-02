@@ -18,7 +18,7 @@ export const MINIMUM_WAGE_2026 = 10_320; // 시급 (2026년 확정)
 
 /** 근로·임금 정보 기본값: 미입력(0)일 때 적용 (학습 문서 §9·§14.2) */
 export const DAILY_STANDARD_HOURS = 8;   // 일 소정근로시간
-export const WEEKLY_STANDARD_HOURS = 48;  // 주 소정근로시간(주휴포함)
+export const WEEKLY_STANDARD_HOURS = 48;  // 주 소정근로+주휴 환산 시간(40+8)
 export const MONTHLY_STANDARD_HOURS = 209; // 월 소정근로시간(주휴포함)
 export const WEEKLY_MAX_HOURS = 52; // 주 52시간
 export const ANNUAL_LEAVE_FIRST_YEAR = 11; // 1년 미만

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push';
 import { sendFcmBatch } from '@/lib/firebase-admin';
+import { shouldDeferStaleChatPush } from '@/lib/push-quiet-hours';
 
 type MessageRow = {
   id: string;
@@ -124,6 +125,24 @@ function buildQueueFailurePatch(attemptCount: number, error: unknown, supportsRe
     last_error: message,
     next_attempt_at: retryAt.toISOString(),
     dead_lettered_at: exhausted ? now.toISOString() : null,
+  };
+}
+
+function buildQuietHoursDeferredPatch(job: QueueJobRow, supportsRetryColumns: boolean) {
+  if (!supportsRetryColumns || !job.created_at) {
+    return null;
+  }
+
+  const quietHoursDecision = shouldDeferStaleChatPush(job.created_at);
+  if (!quietHoursDecision.defer || !quietHoursDecision.resumeAt) {
+    return null;
+  }
+
+  return {
+    processing_started_at: null,
+    last_error: 'quiet-hours-deferred',
+    next_attempt_at: quietHoursDecision.resumeAt.toISOString(),
+    dead_lettered_at: null,
   };
 }
 
@@ -644,6 +663,13 @@ export async function processPendingChatPushJobs(limit = 25) {
   let skipped = 0;
 
   for (const job of jobs) {
+    const quietHoursPatch = buildQuietHoursDeferredPatch(job, queueSelection.supportsRetryColumns);
+    if (quietHoursPatch) {
+      skipped += 1;
+      await updateChatPushJobById(supabase, job.id, quietHoursPatch);
+      continue;
+    }
+
     const nextAttemptCount = Number(job.attempt_count || 0) + 1;
     await updateChatPushJobById(supabase, job.id, {
       processing_started_at: new Date().toISOString(),
