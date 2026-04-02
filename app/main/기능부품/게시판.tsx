@@ -7,13 +7,13 @@ import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { CHAT_FOCUS_KEY, CHAT_ROOM_KEY } from '@/app/main/navigation-state';
 import SmartDatePicker from './공통/SmartDatePicker';
-import WikiDashboard from './게시판서브/사내위키';
+import GuideLibrary from './게시판서브/업무가이드';
 import type { StaffMember, BoardPost, ScheduleItem, AttachmentItem } from '@/types';
 const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
 // 공지사항·경조사 게시글 등록 시 공지 채팅방 자동 전송 대상 게시판
 const BOARD_AUTO_CHAT_TYPES = new Set(['공지사항', '경조사']);
 
-const BOARD_IDS = ['공지사항', '자유게시판', '익명소리함', '경조사', '수술일정', 'MRI일정', '직원제안함', '사내위키'];
+const BOARD_IDS = ['공지사항', '자유게시판', '익명소리함', '경조사', '수술일정', 'MRI일정', '직원제안함', '업무가이드'];
 const BOARD_POST_OPTIONAL_COLUMNS = [
   // 초기 스키마에 없거나 나중에 추가된 컬럼 (없어도 쿼리 정상 동작)
   'board_id',         // 일부 환경에 없을 수 있음 (사용하지 않는 레거시 컬럼)
@@ -22,6 +22,7 @@ const BOARD_POST_OPTIONAL_COLUMNS = [
   'tags',
   'attachments',
   'likes_count',
+  'is_pinned',
   'status',
   'scheduled_publish_at',
   'schedule_date',
@@ -48,7 +49,6 @@ const BOARD_POST_REQUIRED_SELECT_COLUMNS = [
   'is_anonymous',
   'poll',
   'poll_votes',
-  'is_pinned',
 ] as const;
 const BOARD_TEMPLATE_REQUIRED_SELECT_COLUMNS = ['id', 'name'] as const;
 const BOARD_TEMPLATE_OPTIONAL_COLUMNS = ['sort_order', 'body_part'] as const;
@@ -554,6 +554,8 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   // 댓글 대댓글용 부모 댓글 ID
   const [replyParentId, setReplyParentId] = useState<string | null>(null);
   const readMarkingRef = useRef<Set<string>>(new Set());
+  const boardFetchSeqRef = useRef(0);
+  const previousBoardRef = useRef(activeBoard);
 
   // 알림 등에서 딥링크 ID로 진입 시 해당 게시물 모달 즉시 열기
   useEffect(() => {
@@ -592,7 +594,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     { id: '수술일정', label: '🏥 수술일정표', icon: '🏥' },
     { id: 'MRI일정', label: '🔬 MRI일정표', icon: '🔬' },
     { id: '직원제안함', label: '💡 직원 제안함', icon: '💡' },
-    { id: '사내위키', label: '📚 사내위키', icon: '📚' }
+    { id: '업무가이드', label: '📚 업무가이드', icon: '📚' }
   ];
   const visibleBoards = useMemo(
     () => boards.filter((board) => canAccessBoard(user, board.id, 'read')),
@@ -607,7 +609,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     수술일정: { title: '수술일정', description: '' },
     MRI일정: { title: 'MRI일정', description: '' },
     직원제안함: { title: '직원 제안함', description: '' },
-    사내위키: { title: '사내위키', description: '업무 지식과 운영 문서를 팀 단위로 정리합니다.' },
+    업무가이드: { title: '업무가이드', description: '신규 직원 교육자료와 인수인계 문서를 부서별로 정리합니다.' },
   };
   const currentBoardMeta = boardMetaMap[activeBoard] || {
     title: activeBoard || '게시판',
@@ -805,9 +807,15 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   }, [activeBoard, scheduleHour, scheduleMinute, schedulePeriod]);
 
   const fetchPosts = async () => {
+    const requestedBoard = activeBoard;
+    const fetchSeq = ++boardFetchSeqRef.current;
     // 유저 정보가 아직 로드되지 않은 경우(인증 초기화 중) posts를 초기화하지 않음
     if (!user) return;
-    if (!canAccessBoard(user, activeBoard, 'read')) {
+    if (!canAccessBoard(user, requestedBoard, 'read')) {
+      setPosts([]);
+      return;
+    }
+    if (requestedBoard === '업무가이드') {
       setPosts([]);
       return;
     }
@@ -817,14 +825,23 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         const result = await supabase
           .from('board_posts')
           .select(buildSelectColumns(BOARD_POST_REQUIRED_SELECT_COLUMNS, BOARD_POST_OPTIONAL_COLUMNS, omittedColumns))
-          .eq('board_type', activeBoard)
+          .eq('board_type', requestedBoard)
           .order('created_at', { ascending: false });
         return result as unknown as QueryResult<BoardPostRow[]>;
       },
       [...BOARD_POST_OPTIONAL_COLUMNS]
     );
+    if (fetchSeq !== boardFetchSeqRef.current) {
+      return;
+    }
+
+    if (!data) {
+      setPosts([]);
+      return;
+    }
+
     if (data) {
-      if (activeBoard === '익명소리함') {
+      if (requestedBoard === '익명소리함') {
         const isAdmin = user?.permissions?.mso || user?.role === 'admin' || user?.permissions?.hr;
         if (!isAdmin) {
           setPosts([]);
@@ -942,6 +959,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   }, [currentTemplates, resolvedBodyPart]);
 
   useEffect(() => {
+    const boardChanged = previousBoardRef.current !== activeBoard;
+    previousBoardRef.current = activeBoard;
+    if (boardChanged) {
+      setPosts([]);
+    }
     fetchPosts();
     void loadBoardAudience();
     // 내 좋아요 목록 로드
@@ -1808,9 +1830,9 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       data-testid="board-view"
     >
       {/* 상세 메뉴(공지사항·자유게시판 등)는 메인 좌측 사이드바에서 게시판 호버/클릭 시 플라이아웃으로 선택 */}
-      {activeBoard === '사내위키' ? (
+      {activeBoard === '업무가이드' ? (
         <div className="flex-1 min-h-0">
-          <WikiDashboard
+          <GuideLibrary
             user={user}
             selectedCo={selectedCo}
             selectedCompanyId={selectedCompanyId}
@@ -1838,8 +1860,8 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
             </div>
           </header>
 
-          {/* 새 게시물 작성 폼 (사내위키일 때는 표시 안함) */}
-          {showNewPost && activeBoard !== '사내위키' && (
+          {/* 새 게시물 작성 폼 (업무가이드일 때는 표시 안함) */}
+          {showNewPost && activeBoard !== '업무가이드' && (
             <div data-testid="board-new-post-form" className="bg-[var(--card)] p-4 md:p-4 border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h3 className="text-lg font-bold text-[var(--foreground)]">새 게시물 작성</h3>

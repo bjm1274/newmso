@@ -8,7 +8,10 @@ import {
   INVENTORY_SUPPORT_COMPANY,
   INVENTORY_SUPPORT_DEPARTMENT,
   normalizeInventoryUnit,
+  normalizeSupplyRequestCategory,
   normalizeSupplyRequestItems,
+  SUPPLY_REQUEST_CATEGORY_OPTIONS,
+  type SupplyRequestCategory,
   type SupplyRequestItemUnit,
   type SupplyRequestMonthlySuggestion,
 } from '@/app/main/inventory-utils';
@@ -18,7 +21,7 @@ type SupplyRow = {
   qty: number;
   unit: SupplyRequestItemUnit;
   currentStock: number | null;
-  dept: string;
+  category: SupplyRequestCategory | '';
   purpose: string;
   suggestions: InventoryCatalogItem[];
 };
@@ -39,7 +42,6 @@ type SuppliesFormProps = {
 
 const MONTHLY_STATS_VISIBLE_LIMIT = 8;
 const MONTHLY_STATS_FETCH_LIMIT = 200;
-const DEPARTMENTS = ['병동부', '수술부', '외래부', '검사실', '총무부', '원무부', '진료부', '관리팀', '영양팀'];
 
 function defaultRow(overrides: Partial<Omit<SupplyRow, 'suggestions'>> = {}): SupplyRow {
   return {
@@ -47,7 +49,7 @@ function defaultRow(overrides: Partial<Omit<SupplyRow, 'suggestions'>> = {}): Su
     qty: 1,
     unit: 'EA',
     currentStock: null,
-    dept: '',
+    category: '',
     purpose: '',
     suggestions: [],
     ...overrides,
@@ -92,13 +94,13 @@ function buildRowFromUnknown(input: unknown): SupplyRow {
     qty: sanitizeQuantity(row.qty || row.quantity),
     unit: normalizeInventoryUnit(row.unit),
     currentStock: row.currentStock == null ? null : Number(row.currentStock) || 0,
-    dept: String(row.dept || row.department || '').trim(),
+    category: normalizeSupplyRequestCategory(row.category || row.item_category || row.classification),
     purpose: String(row.purpose || row.reason || '').trim(),
   });
 }
 
 function hasMeaningfulRow(row: SupplyRow) {
-  return Boolean(row.name.trim() || row.dept.trim() || row.purpose.trim() || row.qty > 1);
+  return Boolean(row.name.trim() || row.category.trim() || row.purpose.trim() || row.qty > 1);
 }
 
 export default function SuppliesForm({ setExtraData, initialItems, user }: SuppliesFormProps) {
@@ -108,11 +110,19 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
     }
     return [defaultRow()];
   });
-  const [bulkDept, setBulkDept] = useState('');
   const [inventory, setInventory] = useState<any[]>([]);
   const [monthlySuggestions, setMonthlySuggestions] = useState<SupplyRequestMonthlySuggestion[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsExpanded, setStatsExpanded] = useState(false);
+  const requesterDepartment = useMemo(() => {
+    const currentDepartment = String(user?.department || user?.team || '').trim();
+    if (currentDepartment) {
+      return currentDepartment;
+    }
+    return normalizeSupplyRequestItems(Array.isArray(initialItems) ? (initialItems as any[]) : [])
+      .map((item) => item.dept)
+      .find(Boolean) || '';
+  }, [initialItems, user?.department, user?.team]);
 
   const inventoryCatalog = useMemo(() => {
     const merged = new Map<string, InventoryCatalogItem>();
@@ -213,60 +223,35 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
   }, [inventoryCatalog]);
 
   useEffect(() => {
+    const normalizedItems = normalizeSupplyRequestItems(
+      items.map((item) => ({
+        ...item,
+        dept: requesterDepartment,
+      })),
+    );
+
     setExtraData({
-      items: normalizeSupplyRequestItems(items),
+      items: normalizedItems,
+      requester_department: requesterDepartment || null,
       inventory_source_company: INVENTORY_SUPPORT_COMPANY,
       inventory_source_department: INVENTORY_SUPPORT_DEPARTMENT,
     });
-  }, [items, setExtraData]);
+  }, [items, requesterDepartment, setExtraData]);
 
-  const departmentOptions = useMemo(() => {
-    return Array.from(
-      new Set(
-        [
-          ...DEPARTMENTS,
-          String(user?.department || '').trim(),
-          String(user?.team || '').trim(),
-          ...items.map((item) => String(item.dept || '').trim()),
-          ...monthlySuggestions.map((suggestion) => String(suggestion.dept || '').trim()),
-        ].filter(Boolean),
-      ),
-    );
-  }, [items, monthlySuggestions, user?.department, user?.team]);
-
-  const statsTargetDepartment = useMemo(() => {
-    const normalizedBulkDept = String(bulkDept || '').trim();
-    if (normalizedBulkDept) return normalizedBulkDept;
-
-    const currentUserDepartment = String(user?.department || user?.team || '').trim();
-    if (currentUserDepartment) return currentUserDepartment;
-
-    return items
-      .map((item) => String(item.dept || '').trim())
-      .find(Boolean) || '';
-  }, [bulkDept, items, user?.department, user?.team]);
-
-  const scopedMonthlySuggestions = useMemo(() => {
-    const normalizedDepartment = statsTargetDepartment.toLowerCase();
-    if (!normalizedDepartment) return [];
-
-    return monthlySuggestions
-      .filter((suggestion) => String(suggestion.dept || '').trim().toLowerCase() === normalizedDepartment)
-      .slice(0, MONTHLY_STATS_VISIBLE_LIMIT);
-  }, [monthlySuggestions, statsTargetDepartment]);
+  const visibleMonthlySuggestions = useMemo(
+    () => monthlySuggestions.slice(0, MONTHLY_STATS_VISIBLE_LIMIT),
+    [monthlySuggestions],
+  );
 
   const statsSummaryText = useMemo(() => {
-    if (!statsTargetDepartment) {
-      return '사용 부서를 선택하면 해당 부서 기준 통계를 볼 수 있습니다.';
-    }
     if (statsLoading) {
-      return `${statsTargetDepartment} 기준 최근 30일 통계를 불러오는 중입니다.`;
+      return '최근 30일 물품신청 통계를 불러오는 중입니다.';
     }
-    if (scopedMonthlySuggestions.length === 0) {
-      return `${statsTargetDepartment} 기준 최근 30일 통계가 없습니다.`;
+    if (visibleMonthlySuggestions.length === 0) {
+      return '최근 30일 통계가 없습니다.';
     }
-    return `${statsTargetDepartment} 기준 추천 ${scopedMonthlySuggestions.length}개`;
-  }, [scopedMonthlySuggestions.length, statsLoading, statsTargetDepartment]);
+    return `최근 30일 추천 ${visibleMonthlySuggestions.length}개`;
+  }, [statsLoading, visibleMonthlySuggestions.length]);
 
   const handleSearch = (index: number, value: string) => {
     const keyword = value.trim().toLowerCase();
@@ -312,13 +297,18 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
     );
   };
 
-  const updateItemField = (index: number, key: 'qty' | 'dept' | 'purpose', value: unknown) => {
+  const updateItemField = (index: number, key: 'qty' | 'category' | 'purpose', value: unknown) => {
     setItems((prev) =>
       prev.map((item, itemIndex) =>
         itemIndex === index
           ? {
               ...item,
-              [key]: key === 'qty' ? sanitizeQuantity(value) : value,
+              [key]:
+                key === 'qty'
+                  ? sanitizeQuantity(value)
+                  : key === 'category'
+                    ? normalizeSupplyRequestCategory(value)
+                    : value,
             }
           : item,
       ),
@@ -333,19 +323,9 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
     setItems((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
   };
 
-  const applyBulkDept = () => {
-    if (!bulkDept) return;
-    setItems((prev) => prev.map((item) => ({ ...item, dept: bulkDept })));
-  };
-
   const applyMonthlyStats = () => {
-    if (!statsTargetDepartment) {
-      toast('사용 부서를 선택하면 부서별 통계를 불러올 수 있습니다.', 'warning');
-      return;
-    }
-
-    if (scopedMonthlySuggestions.length === 0) {
-      toast(`${statsTargetDepartment} 부서의 최근 30일 추천 통계가 아직 없습니다.`, 'warning');
+    if (visibleMonthlySuggestions.length === 0) {
+      toast('최근 30일 추천 통계가 아직 없습니다.', 'warning');
       return;
     }
 
@@ -353,14 +333,14 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
       const meaningfulRows = prev.filter(hasMeaningfulRow);
       const nextRows = meaningfulRows.length > 0 ? [...meaningfulRows] : [];
 
-      scopedMonthlySuggestions.forEach((suggestion) => {
+      visibleMonthlySuggestions.forEach((suggestion) => {
         const matchedInventory = inventoryCatalog.find(
           (entry) => entry.name.toLowerCase() === suggestion.name.toLowerCase(),
         );
         const existingIndex = nextRows.findIndex(
           (row) =>
             row.name.trim().toLowerCase() === suggestion.name.toLowerCase() &&
-            row.dept.trim() === suggestion.dept &&
+            row.category.trim() === suggestion.category &&
             row.purpose.trim() === suggestion.purpose,
         );
 
@@ -379,7 +359,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
             name: suggestion.name,
             qty: suggestion.average_qty,
             unit: matchedInventory ? matchedInventory.unit : 'EA',
-            dept: suggestion.dept,
+            category: normalizeSupplyRequestCategory(suggestion.category),
             purpose: suggestion.purpose,
             currentStock: matchedInventory ? matchedInventory.stock : null,
           }),
@@ -389,7 +369,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
       return nextRows.length > 0 ? nextRows : [defaultRow()];
     });
 
-    toast(`${statsTargetDepartment} 부서 통계 기준으로 자주 신청한 물품을 채웠습니다.`, 'success');
+    toast('최근 신청 통계 기준으로 자주 신청한 물품을 채웠습니다.', 'success');
   };
 
   return (
@@ -424,36 +404,20 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
             type="button"
             data-testid="supplies-stats-fill-button"
             onClick={applyMonthlyStats}
-            disabled={statsLoading || scopedMonthlySuggestions.length === 0}
+            disabled={statsLoading || visibleMonthlySuggestions.length === 0}
             className="inline-flex items-center justify-center gap-1 rounded-full bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-40"
           >
             통계치 입력
           </button>
         </div>
-        <div className="flex flex-col gap-2 text-[11px] font-semibold text-[var(--toss-gray-4)] sm:flex-row sm:flex-wrap sm:items-center">
-          <span>사용 부서 일괄 적용</span>
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:flex sm:items-center">
-            <select
-              value={bulkDept}
-              onChange={(event) => setBulkDept(event.target.value)}
-              className="min-h-[44px] rounded-[var(--radius-md)] border-none bg-[var(--card)] px-3 py-2 text-[13px] font-bold text-[var(--foreground)] shadow-sm outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-            >
-              <option value="">선택...</option>
-              {departmentOptions.map((department) => (
-                <option key={department} value={department}>
-                  {department}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={applyBulkDept}
-              disabled={!bulkDept}
-              className="min-h-[44px] rounded-[var(--radius-md)] bg-black px-4 py-2 text-[12px] font-semibold text-white transition-opacity disabled:opacity-40"
-            >
-              전체 적용
-            </button>
-          </div>
+        <div className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--toss-gray-4)]">
+          <span>신청부서</span>
+          <span
+            data-testid="supplies-requester-department"
+            className="inline-flex min-h-[44px] items-center rounded-[var(--radius-md)] bg-[var(--card)] px-3 py-2 text-[13px] font-black text-[var(--foreground)] shadow-sm"
+          >
+            {requesterDepartment || '미지정'}
+          </span>
         </div>
       </div>
 
@@ -466,7 +430,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
           className="flex w-full items-center justify-between gap-3 text-left"
         >
           <div className="min-w-0">
-            <p className="text-[12px] font-black text-[var(--foreground)]">부서별 통계치 입력</p>
+            <p className="text-[12px] font-black text-[var(--foreground)]">최근 신청 통계치 입력</p>
             <p
               data-testid="supplies-stats-summary"
               className="mt-1 text-[11px] font-semibold leading-relaxed text-[var(--toss-gray-3)]"
@@ -481,27 +445,20 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
 
         {statsExpanded ? (
           <div data-testid="supplies-stats-panel" className="mt-3">
-            {!statsTargetDepartment ? (
-              <div
-                data-testid="supplies-stats-empty"
-                className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)] px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)]"
-              >
-                사용 부서를 먼저 선택하면 해당 부서 기준 추천 통계를 볼 수 있습니다.
-              </div>
-            ) : statsLoading ? (
+            {statsLoading ? (
               <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)] px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                {statsTargetDepartment} 기준 추천 품목을 불러오는 중입니다.
+                최근 신청 기준 추천 품목을 불러오는 중입니다.
               </div>
-            ) : scopedMonthlySuggestions.length === 0 ? (
+            ) : visibleMonthlySuggestions.length === 0 ? (
               <div
                 data-testid="supplies-stats-empty"
                 className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)] px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)]"
               >
-                {statsTargetDepartment} 기준 최근 30일 추천 통계가 없습니다.
+                최근 30일 추천 통계가 없습니다.
               </div>
             ) : (
               <div className="grid gap-2 md:grid-cols-2">
-                {scopedMonthlySuggestions.map((suggestion, index) => (
+                {visibleMonthlySuggestions.map((suggestion, index) => (
                   <div
                     key={suggestion.key}
                     data-testid={`supplies-stats-item-${index}`}
@@ -511,7 +468,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
                       <div className="min-w-0">
                         <p className="truncate text-[12px] font-black text-[var(--foreground)]">{suggestion.name}</p>
                         <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                          {suggestion.dept || '부서 미지정'}
+                          {suggestion.category || '품목구분 미지정'}
                           {suggestion.purpose ? ` · ${suggestion.purpose}` : ''}
                         </p>
                       </div>
@@ -618,17 +575,17 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
                   </label>
 
                   <label className="block space-y-1.5">
-                    <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">사용부서</span>
+                    <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">품목구분</span>
                     <select
-                      data-testid={`supplies-item-dept-mobile-${index}`}
-                      value={item.dept}
-                      onChange={(event) => updateItemField(index, 'dept', event.target.value)}
+                      data-testid={`supplies-item-category-mobile-${index}`}
+                      value={item.category}
+                      onChange={(event) => updateItemField(index, 'category', event.target.value)}
                       className="h-12 w-full rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-3 text-sm font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                     >
-                      <option value="">부서 선택</option>
-                      {departmentOptions.map((department) => (
-                        <option key={department} value={department}>
-                          {department}
+                      <option value="">품목구분 선택</option>
+                      {SUPPLY_REQUEST_CATEGORY_OPTIONS.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
                         </option>
                       ))}
                     </select>
@@ -663,7 +620,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
                 <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">물품명</th>
                 <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">수량</th>
                 <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">용도</th>
-                <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">사용부서</th>
+                <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">품목구분</th>
               </tr>
             </thead>
             <tbody>
@@ -751,15 +708,15 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
                   </td>
                   <td className="px-1.5 py-1.5 align-middle">
                     <select
-                      data-testid={`supplies-item-dept-${index}`}
-                      value={item.dept}
-                      onChange={(event) => updateItemField(index, 'dept', event.target.value)}
+                      data-testid={`supplies-item-category-${index}`}
+                      value={item.category}
+                      onChange={(event) => updateItemField(index, 'category', event.target.value)}
                       className="h-10 w-full max-w-[88px] rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-1.5 text-[10px] font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                     >
-                      <option value="">부서 선택</option>
-                      {departmentOptions.map((department) => (
-                        <option key={department} value={department}>
-                          {department}
+                      <option value="">구분 선택</option>
+                      {SUPPLY_REQUEST_CATEGORY_OPTIONS.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
                         </option>
                       ))}
                     </select>

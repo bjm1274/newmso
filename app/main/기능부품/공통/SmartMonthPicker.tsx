@@ -8,6 +8,7 @@ interface SmartMonthPickerProps {
     className?: string;
     inputClassName?: string;
     disabled?: boolean;
+    'data-testid'?: string;
 }
 
 const SmartMonthPicker: React.FC<SmartMonthPickerProps> = ({
@@ -16,7 +17,8 @@ const SmartMonthPicker: React.FC<SmartMonthPickerProps> = ({
     placeholder = "0000-00",
     className = "",
     inputClassName = "",
-    disabled = false
+    disabled = false,
+    'data-testid': dataTestId,
 }) => {
     const dateInputRef = useRef<HTMLInputElement>(null);
 
@@ -41,6 +43,7 @@ const SmartMonthPicker: React.FC<SmartMonthPickerProps> = ({
     return (
         <div className={`relative flex items-center ${className}`}>
             <input
+                data-testid={dataTestId}
                 type="text"
                 value={value || ''}
                 onChange={handleTextChange}

@@ -459,8 +459,6 @@ export default function WorkStatus({ user }: { user?: any }) {
     return grouped;
   }, [assignments, staffMap]);
 
-  const defaultStaffCount = useMemo(() => filteredStaffs.length, [filteredStaffs]);
-
   const selectedDateRows = useMemo(() => {
     const activeStaffIds = new Set(
       todayAttendance
@@ -478,12 +476,6 @@ export default function WorkStatus({ user }: { user?: any }) {
         const staff = staffMap.get(assignment.staff_id);
         if (!staff) return;
         const key = assignment.shift_id || 'none';
-        if (!grouped.has(key)) grouped.set(key, []);
-        grouped.get(key)?.push(staff);
-      });
-    } else {
-      filteredStaffs.forEach((staff) => {
-        const key = staff.shift_id || 'none';
         if (!grouped.has(key)) grouped.set(key, []);
         grouped.get(key)?.push(staff);
       });
@@ -520,16 +512,15 @@ export default function WorkStatus({ user }: { user?: any }) {
             .filter((row) => row.staffs.length > 0)
         : baseRows;
 
-    const selectedCounts = assignmentCountsByDate.get(selectedDateKey);
-    const fallbackCounts = hasExplicitAssignments
-      ? selectedCounts || buildEmptyCounts()
-      : baseRows.reduce((acc, row) => {
-          const next = cloneCounts(acc);
-          next.total += row.staffs.length;
-          if (row.band === 'D' || row.band === 'E' || row.band === 'N') next[row.band] += row.staffs.length;
-          else next.OTHER += row.staffs.length;
-          return next;
-        }, buildEmptyCounts());
+    const fallbackCounts =
+      assignmentCountsByDate.get(selectedDateKey) ||
+      baseRows.reduce((acc, row) => {
+        const next = cloneCounts(acc);
+        next.total += row.staffs.length;
+        if (row.band === 'D' || row.band === 'E' || row.band === 'N') next[row.band] += row.staffs.length;
+        else next.OTHER += row.staffs.length;
+        return next;
+      }, buildEmptyCounts());
 
     const visibleCounts =
       showActiveOnly && selectedDateKey === todayKey
@@ -548,7 +539,7 @@ export default function WorkStatus({ user }: { user?: any }) {
       counts: visibleCounts,
       activeStaffCount: activeStaffIds.size,
     };
-  }, [assignmentCountsByDate, assignments, filteredStaffs, selectedDateKey, shiftMap, showActiveOnly, staffMap, todayAttendance, todayKey]);
+  }, [assignmentCountsByDate, assignments, selectedDateKey, shiftMap, showActiveOnly, staffMap, todayAttendance, todayKey]);
 
   return (
     <div className="space-y-5" data-testid="work-status-view">
@@ -736,8 +727,7 @@ export default function WorkStatus({ user }: { user?: any }) {
               }
 
               const dayKey = toDateKey(cell);
-              const explicitStaffCount = staffNamesByDate.get(dayKey)?.length || 0;
-              const totalStaff = explicitStaffCount > 0 ? explicitStaffCount : defaultStaffCount;
+              const totalStaff = staffNamesByDate.get(dayKey)?.length || 0;
               const isSelected = dayKey === selectedDateKey;
               const isToday = dayKey === todayKey;
 
@@ -817,7 +807,7 @@ export default function WorkStatus({ user }: { user?: any }) {
             <div className="max-h-[calc(90vh-92px)] overflow-y-auto p-5">
               {!selectedDateRows.hasExplicitAssignments ? (
                 <div className="mb-4 rounded-[var(--radius-lg)] border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] font-medium text-amber-700">
-                  선택일의 실제 배정표가 없어 기본 근무형태 기준으로 보여주고 있습니다.
+                  선택일에 등록된 근무 배정표가 없습니다.
                 </div>
               ) : null}
 

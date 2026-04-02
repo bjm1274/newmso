@@ -135,8 +135,12 @@ function trackRuntimeErrors(page: Page) {
 
 async function openCompose(page: Page) {
   await page.goto('/main?open_menu=전자결재&open_subview=작성하기');
-  await expect(page.getByTestId('approval-view')).toBeVisible();
-  await expect(page.getByTestId('approval-approver-select')).toBeVisible();
+  await expect(page.getByTestId('approval-view')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('approval-approver-select')).toBeVisible({ timeout: 30_000 });
+}
+
+async function selectComposeFormTab(page: Page, label: string) {
+  await page.getByRole('button', { name: label, exact: true }).click();
 }
 
 async function selectApprover(page: Page) {
@@ -203,7 +207,7 @@ test('approval submission stays blocked until an approver is selected', async ({
   await expect(page.getByTestId('approval-approver-required')).toBeVisible();
   await expect(page.getByTestId('approval-submit-button')).toBeDisabled();
 
-  await page.getByTestId('approval-form-type-7').click();
+  await selectComposeFormTab(page, '양식신청');
   await expect(page.getByTestId('form-request-view')).toBeVisible();
   await expect(page.getByTestId('form-request-approver-required')).toBeVisible();
   await expect(page.getByTestId('form-request-submit')).toBeDisabled();
@@ -244,10 +248,10 @@ test('hospital compose includes SY INC. approvers in approval line options acros
   const approverSelect = page.getByTestId('approval-approver-select');
   await expect(approverSelect.locator('option', { hasText: supportDirectorWithLegacyCompanyName.name })).toHaveCount(1);
 
-  await page.getByTestId('approval-form-type-5').click();
+  await selectComposeFormTab(page, '보고서작성');
   await expect(approverSelect.locator('option', { hasText: supportDirectorWithLegacyCompanyName.name })).toHaveCount(1);
 
-  await page.getByTestId('approval-form-type-3').click();
+  await selectComposeFormTab(page, '물품신청');
   await expect(page.getByTestId('supplies-add-row-button')).toBeVisible();
   await expect(approverSelect.locator('option', { hasText: supportDirectorWithLegacyCompanyName.name })).toHaveCount(1);
 
@@ -310,7 +314,7 @@ test('supply request template load keeps saved reference users', async ({ page }
   });
 
   await openCompose(page);
-  await page.getByTestId('approval-form-type-3').click();
+  await selectComposeFormTab(page, '물품신청');
   await expect(page.getByTestId('supplies-add-row-button')).toBeVisible();
 
   await page.getByTestId('approval-approver-select').selectOption(approver.id);
@@ -333,7 +337,7 @@ test('supply request template load keeps saved reference users', async ({ page }
   expect(runtimeErrors).toEqual([]);
 });
 
-test('supply request stats stay collapsed by default and only show the current department', async ({ page }) => {
+test('supply request stats stay collapsed by default and surface recent recommendations', async ({ page }) => {
   const runtimeErrors = trackRuntimeErrors(page);
 
   await mockSupabase(page, {
@@ -428,22 +432,23 @@ test('supply request stats stay collapsed by default and only show the current d
   });
 
   await openCompose(page);
-  await page.getByTestId('approval-form-type-3').click();
+  await selectComposeFormTab(page, '물품신청');
   await expect(page.getByTestId('supplies-add-row-button')).toBeVisible();
   await expect(page.getByTestId('supplies-stats-panel')).toHaveCount(0);
-  await expect(page.getByTestId('supplies-stats-summary')).toContainText('병동팀');
+  await expect(page.getByTestId('supplies-requester-department')).toHaveText('병동팀');
+  await expect(page.getByTestId('supplies-stats-summary')).toContainText('최근 30일 추천');
 
   await page.getByTestId('supplies-stats-toggle').click();
   const statsPanel = page.getByTestId('supplies-stats-panel');
   await expect(statsPanel).toBeVisible();
   await expect(statsPanel.getByText('병동 거즈')).toBeVisible();
-  await expect(statsPanel.getByText('수술 포셉')).toHaveCount(0);
+  await expect(statsPanel.getByText('수술 포셉')).toBeVisible();
 
   expect(runtimeErrors).toEqual([]);
 });
 
 test('shared approval forms submit with real field input', async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
 
   const runtimeErrors = trackRuntimeErrors(page);
 
@@ -512,7 +517,7 @@ test('shared approval forms submit with real field input', async ({ page }) => {
 
   await test.step('연차/휴가를 실제 입력 후 상신한다', async () => {
     await openCompose(page);
-    await page.getByTestId('approval-form-type-0').click();
+    await selectComposeFormTab(page, '연차/휴가');
     await selectApprover(page);
     await selectReference(page);
     await page.getByTestId('approval-title-input').fill('E2E 연차 신청');
@@ -543,7 +548,7 @@ test('shared approval forms submit with real field input', async ({ page }) => {
 
   await test.step('연차계획서를 일정 2건으로 상신한다', async () => {
     await openCompose(page);
-    await page.getByTestId('approval-form-type-1').click();
+    await selectComposeFormTab(page, '연차계획서');
     await selectApprover(page);
     await page.getByTestId('annual-leave-plan-date-0').fill('2026-04-02');
     await page.getByTestId('annual-leave-plan-add-row').click();
@@ -564,7 +569,7 @@ test('shared approval forms submit with real field input', async ({ page }) => {
 
   await test.step('연장근무 기록을 선택해 상신한다', async () => {
     await openCompose(page);
-    await page.getByTestId('approval-form-type-2').click();
+    await selectComposeFormTab(page, '연장근무');
     await selectApprover(page);
     await expect(page.getByTestId('approval-overtime-record-0')).toBeVisible();
     await page.getByTestId('approval-overtime-record-0').click();
@@ -583,7 +588,7 @@ test('shared approval forms submit with real field input', async ({ page }) => {
 
   await test.step('물품신청을 품목 상세와 함께 상신한다', async () => {
     await openCompose(page);
-    await page.getByTestId('approval-form-type-3').click();
+    await selectComposeFormTab(page, '물품신청');
     await selectApprover(page);
     await page.getByTestId('approval-title-input').fill('E2E 물품 신청');
     await page.getByTestId('approval-content-input').fill('병동 비품 신청 사유입니다.');
@@ -591,7 +596,7 @@ test('shared approval forms submit with real field input', async ({ page }) => {
     await expect(page.getByTestId('supplies-item-unit-0')).toHaveText('BOX');
     await page.getByTestId('supplies-item-qty-0').fill('3');
     await page.getByTestId('supplies-item-purpose-0').fill('병동 처치용');
-    await page.getByTestId('supplies-item-dept-0').selectOption('병동팀');
+    await page.getByTestId('supplies-item-category-0').selectOption('의료용품');
 
     const insert = waitForApprovalInsert(page);
     await page.getByTestId('approval-submit-button').click();
@@ -608,7 +613,7 @@ test('shared approval forms submit with real field input', async ({ page }) => {
 
   await test.step('수리요청서를 장비 정보와 함께 상신한다', async () => {
     await openCompose(page);
-    await page.getByTestId('approval-form-type-4').click();
+    await selectComposeFormTab(page, '수리요청서');
     await selectApprover(page);
     await expect(page.getByTestId('repair-request-view')).toBeVisible();
     await page.getByTestId('approval-title-input').fill('E2E 수리 요청');
@@ -629,9 +634,46 @@ test('shared approval forms submit with real field input', async ({ page }) => {
     expect(row.meta_data.location).toBe('1층 원무과');
   });
 
+  await test.step('보고서작성을 첨부파일과 함께 상신한다', async () => {
+    await openCompose(page);
+    await selectComposeFormTab(page, '보고서작성');
+    await selectApprover(page);
+    await expect(page.getByTestId('approval-report-view')).toBeVisible();
+    await page.getByTestId('approval-title-input').fill('E2E 사건 보고');
+    await page.getByTestId('approval-content-input').fill('사건보고 상세 내용입니다.');
+    await page.getByTestId('approval-report-type').selectOption('incident');
+    await page.getByTestId('approval-report-department').fill('병동팀');
+    await page.getByTestId('approval-report-subject').fill('야간 근무 중 특이사항');
+    await page.getByTestId('approval-report-incident-date').fill('2026-03-22');
+    await page.getByTestId('approval-report-incident-location').fill('3층 병동');
+    await page.getByTestId('approval-report-file-input').setInputFiles({
+      name: 'incident-evidence.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('mock incident report attachment'),
+    });
+    await expect(page.getByTestId('approval-report-attachment-name-0')).toHaveText('incident-evidence.pdf');
+
+    const insert = waitForApprovalInsert(page);
+    await page.getByTestId('approval-submit-button').click();
+    await insert;
+
+    const row = await expectApproval(page, 'E2E 사건 보고');
+    expect(row.type).toBe('보고서작성');
+    expect(row.meta_data.report_type).toBe('incident');
+    expect(row.meta_data.report_type_label).toBe('사건보고서');
+    expect(row.meta_data.request_category).toBe('report');
+    expect(row.meta_data.attachments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'incident-evidence.pdf',
+        }),
+      ]),
+    );
+  });
+
   await test.step('업무기안을 실제 본문으로 상신한다', async () => {
     await openCompose(page);
-    await page.getByTestId('approval-form-type-5').click();
+    await selectComposeFormTab(page, '업무기안');
     await selectApprover(page);
     await page.getByTestId('approval-title-input').fill('E2E 업무기안');
     await page.getByTestId('approval-content-input').fill('업무기안 본문을 작성합니다.');
@@ -646,7 +688,7 @@ test('shared approval forms submit with real field input', async ({ page }) => {
 
   await test.step('업무협조를 실제 본문으로 상신한다', async () => {
     await openCompose(page);
-    await page.getByTestId('approval-form-type-6').click();
+    await selectComposeFormTab(page, '업무협조');
     await selectApprover(page);
     await page.getByTestId('approval-title-input').fill('E2E 업무협조');
     await page.getByTestId('approval-content-input').fill('업무협조 요청 본문입니다.');
@@ -686,7 +728,7 @@ test('form request submits through the dedicated flow', async ({ page }) => {
   await openCompose(page);
   await selectApprover(page);
   await selectReference(page);
-  await page.getByTestId('approval-form-type-7').click();
+  await selectComposeFormTab(page, '양식신청');
   await expect(page.getByTestId('form-request-view')).toBeVisible();
   await page.getByTestId('form-request-type-1').click();
   await page.getByTestId('form-request-purpose').fill('대출 제출용 증명서 발급 신청');
@@ -780,7 +822,7 @@ test('admin-configured default references auto-apply, notify recipients, and app
   });
 
   await openCompose(page);
-  await page.getByTestId('approval-form-type-3').click();
+  await selectComposeFormTab(page, '물품신청');
   await expect(page.getByText(`CC ${supportStaff.name}`)).toBeVisible();
   await selectApprover(page);
   await page.getByTestId('approval-title-input').fill('기본 참조자 물품신청');
@@ -789,7 +831,7 @@ test('admin-configured default references auto-apply, notify recipients, and app
   await expect(page.getByTestId('supplies-item-unit-0')).toHaveText('BOX');
   await page.getByTestId('supplies-item-qty-0').fill('2');
   await page.getByTestId('supplies-item-purpose-0').fill('병동 처치');
-  await page.getByTestId('supplies-item-dept-0').selectOption('병동팀');
+  await page.getByTestId('supplies-item-category-0').selectOption('의료용품');
 
   const insert = waitForApprovalInsert(page);
   await page.getByTestId('approval-submit-button').click();

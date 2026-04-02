@@ -44,6 +44,7 @@ const INVENTORY_SELECT_COLUMNS = [
 
 export const INVENTORY_SUPPORT_COMPANY = 'SY INC.';
 export const INVENTORY_SUPPORT_DEPARTMENT = '경영지원팀';
+export const SUPPLY_REQUEST_CATEGORY_OPTIONS = ['의약품', '의료용품', '보조기', '사무용품', '기타'] as const;
 
 function isLooseRecord(value: unknown): value is LooseRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -205,6 +206,7 @@ export type SupplyRequestWorkflowItem = {
   request_index: number;
   name: string;
   qty: number;
+  category: string;
   dept: string;
   purpose: string;
   available_qty: number;
@@ -222,9 +224,17 @@ export type SupplyRequestWorkflowItem = {
 };
 
 export type SupplyRequestItemUnit = 'EA' | 'BOX';
+export type SupplyRequestCategory = (typeof SUPPLY_REQUEST_CATEGORY_OPTIONS)[number];
 
 export function normalizeInventoryUnit(value: unknown): SupplyRequestItemUnit {
   return String(value || '').trim().toUpperCase() === 'BOX' ? 'BOX' : 'EA';
+}
+
+export function normalizeSupplyRequestCategory(value: unknown): SupplyRequestCategory | '' {
+  const normalized = String(value || '').trim();
+  return SUPPLY_REQUEST_CATEGORY_OPTIONS.includes(normalized as SupplyRequestCategory)
+    ? (normalized as SupplyRequestCategory)
+    : '';
 }
 
 export function normalizeSupplyRequestItems(rawItems: LooseRecord[] = []) {
@@ -233,6 +243,7 @@ export function normalizeSupplyRequestItems(rawItems: LooseRecord[] = []) {
       name: String(item?.name || item?.item_name || '').trim(),
       qty: Math.max(1, Number(item?.qty) || 1),
       unit: normalizeInventoryUnit(item?.unit || item?.quantity_unit || item?.request_unit),
+      category: normalizeSupplyRequestCategory(item?.category || item?.item_category || item?.classification),
       dept: String(item?.dept || item?.department || '').trim(),
       purpose: String(item?.purpose || item?.reason || '').trim(),
     }))
@@ -242,7 +253,7 @@ export function normalizeSupplyRequestItems(rawItems: LooseRecord[] = []) {
 export type SupplyRequestMonthlySuggestion = {
   key: string;
   name: string;
-  dept: string;
+  category: string;
   purpose: string;
   total_qty: number;
   line_count: number;
@@ -260,7 +271,7 @@ export function buildSupplyRequestMonthlySuggestions(
     {
       key: string;
       name: string;
-      dept: string;
+      category: string;
       purpose: string;
       total_qty: number;
       line_count: number;
@@ -283,13 +294,13 @@ export function buildSupplyRequestMonthlySuggestions(
     items.forEach((item) => {
       const key = [
         item.name.trim().toLowerCase(),
-        item.dept.trim().toLowerCase(),
+        item.category.trim().toLowerCase(),
         item.purpose.trim().toLowerCase(),
       ].join('::');
       const current = grouped.get(key) || {
         key,
         name: item.name,
-        dept: item.dept,
+        category: item.category,
         purpose: item.purpose,
         total_qty: 0,
         line_count: 0,
@@ -315,7 +326,7 @@ export function buildSupplyRequestMonthlySuggestions(
       return {
         key: item.key,
         name: item.name,
-        dept: item.dept,
+        category: item.category,
         purpose: item.purpose,
         total_qty: item.total_qty,
         line_count: item.line_count,
@@ -386,6 +397,7 @@ export function buildSupplyRequestWorkflowItems(
       request_index: index,
       name: item.name,
       qty: item.qty,
+      category: item.category,
       dept: item.dept,
       purpose: item.purpose,
       available_qty: availableQty,
