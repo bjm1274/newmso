@@ -545,18 +545,18 @@ export async function POST(request: NextRequest) {
       const taskCountQuery = deviceId ? `?${new URLSearchParams({ esl_code: deviceId }).toString()}` : '';
       const taskListQuery = deviceId ? `?${new URLSearchParams({ page: '1', limit: '20', esl_code: deviceId }).toString()}` : '';
 
-      const queryVariants = [
+      const initialTaskQueryVariants = [
         { label: '기본 조회', query: '' },
         ...(deviceId
           ? [
               { label: 'esl_code', query: `?${new URLSearchParams({ esl_code: deviceId }).toString()}` },
-              { label: 'deviceId', query: `?${new URLSearchParams({ deviceId }).toString()}` },
-              { label: 'code', query: `?${new URLSearchParams({ code: deviceId }).toString()}` },
+              { label: 'deviceId(입력 바코드)', query: `?${new URLSearchParams({ deviceId }).toString()}` },
+              { label: 'code(입력 바코드)', query: `?${new URLSearchParams({ code: deviceId }).toString()}` },
             ]
           : []),
       ];
 
-      const [licenseResult, triggerResult, bleQueryResult, deviceLookupResult, taskCountResult, taskListResult, ...taskResults] = await Promise.all([
+      const [licenseResult, triggerResult, bleQueryResult, deviceLookupResult, taskCountResult, taskListResult, ...initialTaskResults] = await Promise.all([
         fetchUpstream(`${config.baseUrl}/mobile/query/license`, { method: 'GET' }, { mode: 'token', value: token }),
         fetchUpstream(`${config.baseUrl}/mobile/trigger/task${triggerQuery}`, { method: 'GET' }, { mode: 'token', value: token }),
         deviceId
@@ -571,13 +571,13 @@ export async function POST(request: NextRequest) {
         deviceId
           ? fetchUpstream(`${config.baseUrl}/mobile/getTaskList/ble${taskListQuery}`, { method: 'GET' }, { mode: 'token', value: token })
           : Promise.resolve(null),
-        ...queryVariants.map((variant) =>
+        ...initialTaskQueryVariants.map((variant) =>
           fetchUpstream(`${config.baseUrl}/mobile/getTask/ble${variant.query}`, { method: 'GET' }, { mode: 'token', value: token }),
         ),
       ]);
 
-      const taskAttempts = taskResults.map((result, index) => {
-        const variant = queryVariants[index];
+      const taskAttempts = initialTaskResults.map((result, index) => {
+        const variant = initialTaskQueryVariants[index];
         const errorCode = Number(result.json?.error_code);
         const ok = result.response.ok && (!Number.isFinite(errorCode) || errorCode === 0);
         return {
@@ -590,6 +590,54 @@ export async function POST(request: NextRequest) {
 
       const deviceLookupOk = deviceLookupResult ? isUpstreamJsonOk(deviceLookupResult.json, deviceLookupResult.response) : false;
       const boundDevice = deviceLookupOk ? buildBoundBleDeviceSummary(deviceLookupResult?.json?.device) : null;
+      const extraTaskQueryVariants = Array.from(
+        new Map(
+          [
+            boundDevice?.id != null
+              ? {
+                  label: `device.id(${boundDevice.id})`,
+                  query: `?${new URLSearchParams({ deviceId: String(boundDevice.id) }).toString()}`,
+                }
+              : null,
+            boundDevice?.productCode
+              ? {
+                  label: `product_code(${boundDevice.productCode})`,
+                  query: `?${new URLSearchParams({ code: String(boundDevice.productCode) }).toString()}`,
+                }
+              : null,
+            boundDevice?.eslCode && boundDevice.eslCode !== deviceId
+              ? {
+                  label: `esl_code(${boundDevice.eslCode})`,
+                  query: `?${new URLSearchParams({ esl_code: String(boundDevice.eslCode) }).toString()}`,
+                }
+              : null,
+          ]
+            .filter((variant): variant is { label: string; query: string } => Boolean(variant))
+            .map((variant) => [variant.query, variant]),
+        ).values(),
+      );
+      const extraTaskResults = extraTaskQueryVariants.length
+        ? await Promise.all(
+            extraTaskQueryVariants.map((variant) =>
+              fetchUpstream(`${config.baseUrl}/mobile/getTask/ble${variant.query}`, { method: 'GET' }, { mode: 'token', value: token }),
+            ),
+          )
+        : [];
+      if (extraTaskResults.length > 0) {
+        taskAttempts.push(
+          ...extraTaskResults.map((result, index) => {
+            const variant = extraTaskQueryVariants[index];
+            const errorCode = Number(result.json?.error_code);
+            const ok = result.response.ok && (!Number.isFinite(errorCode) || errorCode === 0);
+            return {
+              label: variant?.label || `추가 시도 ${index + 1}`,
+              query: variant?.query || '',
+              ok,
+              upstream: result.json ?? result.rawText,
+            };
+          }),
+        );
+      }
       const bleQueryList = Array.isArray(bleQueryResult?.json?.list) ? bleQueryResult.json.list : [];
       const waitingCount = toNullableNumber(taskCountResult?.json?.waiting);
       const errorTaskCount = toNullableNumber(taskCountResult?.json?.error);
