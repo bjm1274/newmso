@@ -756,7 +756,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                   vehicle_allowance: Number((s as any).vehicle_allowance || 0),
                   childcare_allowance: Number((s as any).childcare_allowance || 0),
                   research_allowance: Number((s as any).research_allowance || 0),
-                  other_taxfree: 0,
+                  other_taxfree: Number((s as any).other_taxfree || 0),
                   extra_allowance: 0,
                   overtime_pay: 0,
                   bonus: 0,
