@@ -338,8 +338,7 @@ async function erpShowIncomingNotification(rawPayload) {
     tag: payload.tag,
     requireInteraction: false,
     renotify: false,
-    silent: false,
-    vibrate: [200, 100, 200],
+    vibrate: [1000],
     data: payload.data,
     actions: [
       { action: 'open', title: '확인하기' },

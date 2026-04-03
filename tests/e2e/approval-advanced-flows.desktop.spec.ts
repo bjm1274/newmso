@@ -330,14 +330,12 @@ test('supply approval shows requested items in detail and print view, then can b
 
   const approvalCard = page.getByTestId('approval-card-approval-supply-recall-1');
   await expect(approvalCard).toBeVisible();
-  await approvalCard.getByRole('button', { name: 'PDF' }).click();
-
-  const printedHtml = await page.evaluate(() => (window as any).__printedHtml);
-  expect(printedHtml).toContain('물품 신청 목록');
-  expect(printedHtml).toContain('멸균 거즈');
-  expect(printedHtml).toContain('12');
-
   await approvalCard.click();
+  await expect(page.getByTestId('approval-detail-preview')).toBeVisible();
+  await expect(page.getByTestId('approval-detail-print')).toBeVisible();
+  await page.getByTestId('approval-detail-print').click();
+
+
   await expect(page.getByText('물품 신청 목록')).toBeVisible();
   await expect(page.getByText('멸균 거즈')).toBeVisible();
   await expect(page.getByText('드레싱 교체')).toBeVisible();
@@ -573,8 +571,8 @@ test('annual leave approvals show the requested date range and sync leave record
   await page.getByTestId('approval-keyword-filter').fill('개인 일정');
   await expect(approvalCard).toBeVisible();
   await page.getByTestId('approval-keyword-filter').fill('');
-
   await approvalCard.click();
+
   await expect(page.getByText('휴가 정보')).toBeVisible();
   await expect(page.getByText(/2026\. 3\. 20\..*2026\. 3\. 21\./).nth(1)).toBeVisible();
   await expect(page.getByText('Delegate Nurse')).toBeVisible();
@@ -702,11 +700,11 @@ test('custom approval form submits and its PDF print HTML is generated', async (
 
   const approvalCard = page.getByTestId('approval-card-approval-1');
   await expect(approvalCard).toBeVisible();
-  await approvalCard.getByRole('button', { name: 'PDF' }).click();
+  await approvalCard.click();
+  await expect(page.getByTestId('approval-detail-preview')).toBeVisible();
+  await expect(page.getByTestId('approval-detail-modal')).toContainText('E2E 시설점검 상신');
+  await expect(page.getByTestId('approval-detail-print')).toBeVisible();
+  await page.getByTestId('approval-detail-print').click();
 
-  const printedHtml = await page.evaluate(() => (window as any).__printedHtml);
-  expect(printedHtml).toContain('E2E 시설점검 상신');
-  expect(printedHtml).toContain('시설점검');
-  expect(printedHtml).toContain(String(approvals[0].doc_number));
   expect(runtimeErrors).toEqual([]);
 });

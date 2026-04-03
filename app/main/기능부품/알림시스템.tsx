@@ -120,8 +120,46 @@ function setAppBadge(count: number) {
   } catch { /* ignore */ }
 }
 
-function vibrateIfSupported() {
-  try { if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') navigator.vibrate([100, 30, 100]); } catch { /* ignore */ }
+function vibrateIfSupported(pattern: number | number[] = [180]) {
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(pattern);
+    }
+  } catch { /* ignore */ }
+}
+
+function getNotificationHapticPattern(type: string) {
+  if (type === 'message' || type === 'mention') {
+    return [90, 40, 120];
+  }
+  return [180];
+}
+
+function playIncomingNotificationFeedback({
+  type,
+  allowSound,
+  allowVibration,
+}: {
+  type: string;
+  allowSound: boolean;
+  allowVibration: boolean;
+}) {
+  const run = () => {
+    if (allowSound) {
+      if (type === 'message' || type === 'mention') sound.playTalk();
+      else sound.playSystem();
+    }
+    if (allowVibration) {
+      vibrateIfSupported(getNotificationHapticPattern(type));
+    }
+  };
+
+  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+    window.requestAnimationFrame(run);
+    return;
+  }
+
+  run();
 }
 
 function urlBase64ToUint8Array(b64: string): ArrayBuffer {
@@ -924,11 +962,14 @@ export default function NotificationSystem({
     }
 
     const isDND = isInDND(settings);
-    if (!suppressLiveDisplay && settings.sound && !isDND) {
-      if (type === 'message' || type === 'mention') sound.playTalk();
-      else sound.playSystem();
+    const shouldPlayLocalSound = !isMobileClientDevice();
+    if (!suppressLiveDisplay && !isDND && (settings.sound || settings.vibration)) {
+      playIncomingNotificationFeedback({
+        type,
+        allowSound: Boolean(settings.sound && shouldPlayLocalSound),
+        allowVibration: Boolean(settings.vibration),
+      });
     }
-    if (!suppressLiveDisplay && settings.vibration && !isDND) vibrateIfSupported();
 
     if (suppressLiveDisplay) {
       void syncBadge();

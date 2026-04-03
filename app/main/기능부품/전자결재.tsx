@@ -1263,7 +1263,7 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
     );
   }, []);
 
-  const openApprovalPrintView = useCallback((item: Record<string, unknown>) => {
+  const buildApprovalPrintHtml = useCallback((item: Record<string, unknown>, options?: { autoPrint?: boolean }) => {
     const design = resolveApprovalTemplateDesign(item);
     const templateMeta = resolveApprovalTemplateMeta(item);
     const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
@@ -1272,13 +1272,13 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
     const leaveRequestSection = renderLeaveRequestInfoHtml(metaData);
     const supplyItemsSection = renderSupplyRequestItemsHtml(metaData);
     const attachmentSection = renderApprovalAttachmentsHtml(metaData);
-    const autoPrintScript = `<script>
+    const autoPrintScript = options?.autoPrint ? `<script>
 window.onafterprint = () => {
   try { if (window.opener && !window.opener.closed) window.opener.focus(); } catch (error) {}
   try { window.close(); } catch (error) {}
 };
 window.onload = () => window.print();
-</script>`;
+</script>` : '';
 
     const approvalBoxes = Array.isArray(item?.approver_line)
       ? item.approver_line.map((_: string, index: number) => (
@@ -1355,6 +1355,11 @@ window.onload = () => window.print();
   ${autoPrintScript}
 </body>
 </html>`;
+    return html;
+  }, [approvalDirectoryStaffs, renderApprovalAttachmentsHtml, renderLeaveRequestInfoHtml, renderReportInfoHtml, renderSupplyRequestItemsHtml, resolveApprovalTemplateDesign, resolveApprovalTemplateMeta]);
+
+  const openApprovalPrintView = useCallback((item: Record<string, unknown>) => {
+    const html = buildApprovalPrintHtml(item, { autoPrint: true });
 
     const isMobilePrintFlow =
       typeof navigator !== 'undefined' &&
@@ -1389,7 +1394,7 @@ window.onload = () => window.print();
         cleanup();
       };
 
-      iframe.srcdoc = html.replace(autoPrintScript, '');
+      iframe.srcdoc = buildApprovalPrintHtml(item);
       document.body.appendChild(iframe);
       return;
     }
@@ -1401,7 +1406,7 @@ window.onload = () => window.print();
     }
     win.document.write(html);
     win.document.close();
-  }, [approvalDirectoryStaffs, renderApprovalAttachmentsHtml, renderLeaveRequestInfoHtml, renderReportInfoHtml, renderSupplyRequestItemsHtml, resolveApprovalTemplateDesign, resolveApprovalTemplateMeta]);
+  }, [buildApprovalPrintHtml]);
 
   // 결재자 후보: 부서장 이상(팀장·부장·병원장 등)만 표시 (staffs는 이미 메인에서 회사별로 불러옴)
   const approverCandidates = useMemo(() => {
@@ -4394,13 +4399,6 @@ window.onload = () => window.print();
                       )}
 
                       <div className="flex flex-wrap gap-1 shrink-0 pt-0" onClick={(e) => e.stopPropagation()}>
-                        <button type="button" onClick={() => {
-                          openApprovalPrintView(item);
-                          return;
-                          const win = window.open('', '_blank')!;
-                          win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>결재문서</title><style>body{font-family:'Malgun Gothic',sans-serif;padding:30px;max-width:800px;margin:0 auto}h1{font-size:20px;text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:20px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;font-size:12px}.meta div{border:1px solid #ccc;padding:8px;border-radius:4px}.content{border:1px solid #ccc;padding:15px;min-height:200px;font-size:13px;line-height:1.6;border-radius:4px}.approval-line{margin-top:20px;display:flex;gap:10px}.sig-box{border:1px solid #ccc;padding:10px;min-width:80px;text-align:center;font-size:11px}@media print{button{display:none}}</style></head><body><h1>결 재 문 서</h1><div class="meta"><div><strong>문서번호:</strong> ${itemDocNumber || '-'}</div><div><strong>기안일:</strong> ${new Date(itemCreatedAt).toLocaleDateString('ko-KR')}</div><div><strong>기안자:</strong> ${itemSenderName}</div><div><strong>소속:</strong> ${itemSenderCompany}</div><div><strong>문서종류:</strong> ${itemType}</div><div><strong>상태:</strong> ${itemStatus}</div></div><h3 style="font-size:16px;margin-bottom:10px">${itemTitle}</h3><div class="content">${((item.content as string) || '').replace(/\n/g, '<br>')}</div><div class="approval-line">${((item.approver_line as string[]) || []).map((id: string, i: number) => `<div class="sig-box">${i + 1}단계<br><br><br>(인)</div>`).join('')}</div><script>window.onload=()=>window.print()</script></body></html>`);
-                          win.document.close();
-                        }} className="touch-manipulation min-h-[36px] px-3 py-1.5 bg-[var(--tab-bg)] text-[var(--toss-gray-4)] border border-[var(--border)] rounded-md text-[10px] font-semibold hover:bg-[var(--muted)] active:bg-[var(--muted)]">PDF</button>
                         {canUserRecallItem(item) && (
                           <button
                             type="button"
@@ -4469,22 +4467,20 @@ window.onload = () => window.print();
         const detailLockSnapshot = resolveApprovalLockSnapshot(item);
         const templateMeta = resolveApprovalTemplateMeta(item);
         const templateDesign = resolveApprovalTemplateDesign(item);
+        const detailDocNumber = String(item?.doc_number || detailMetaData?.doc_number || '').trim();
+        const detailPreviewHtml = buildApprovalPrintHtml(item);
         return (
           <div
             data-testid="approval-detail-modal"
-            className="fixed inset-0 z-[110] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/50"
+            className="fixed inset-0 z-[110] flex items-end justify-center bg-black/60 backdrop-blur-sm md:items-center md:p-4"
             onClick={() => setSelectedApprovalId(null)}
           >
             <div
-              className="bg-[var(--card)] rounded-t-[16px] md:rounded-[var(--radius-md)] shadow-sm max-w-lg w-full max-h-[90dvh] overflow-hidden flex flex-col"
+              className="flex h-[100dvh] w-full flex-col overflow-hidden bg-[#edf2f7] md:h-[94dvh] md:max-w-5xl md:rounded-[28px] md:border md:border-white/70 md:shadow-[0_36px_120px_-48px_rgba(15,23,42,0.85)]"
               onClick={(e) => e.stopPropagation()}
             >
               <div
-                className="px-3 py-2 md:px-4 md:py-3 border-b flex items-center justify-between"
-                style={{
-                  borderColor: alphaColor(templateDesign.borderColor, 0.9),
-                  background: `linear-gradient(135deg, ${alphaColor(templateDesign.primaryColor, 0.12)} 0%, rgba(255,255,255,0) 70%)`,
-                }}
+                className="flex items-start justify-between gap-3 border-b border-slate-200/80 bg-white/90 px-4 py-3 md:px-6 md:py-4"
               >
                 <div className="min-w-0">
                   <span
@@ -4497,7 +4493,17 @@ window.onload = () => window.print();
                 </div>
                 <button type="button" onClick={() => setSelectedApprovalId(null)} className="p-2 rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]">✕</button>
               </div>
-              <div className="p-3 md:p-4 overflow-y-auto flex-1">
+              <div className="flex-1 overflow-y-auto px-3 py-4 md:px-6 md:py-5">
+                <div className="mx-auto mb-4 w-full max-w-[860px] overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_28px_80px_-42px_rgba(15,23,42,0.65)]">
+                  <iframe
+                    data-testid="approval-detail-preview"
+                    title={`${detailTitle || templateMeta.name || '결재 문서'}${detailDocNumber ? ` (${detailDocNumber})` : ''} 미리보기`}
+                    srcDoc={detailPreviewHtml}
+                    className="block w-full border-0 bg-white"
+                    style={{ height: 'min(1120px, calc(100dvh - 290px))' }}
+                  />
+                </div>
+                <div className="mx-auto w-full max-w-[860px] rounded-[22px] border border-slate-200/80 bg-white/90 p-4 shadow-[0_16px_48px_-38px_rgba(15,23,42,0.6)] md:p-5">
                 <h3 className="font-bold text-[var(--foreground)] text-[15px] mb-0.5">{detailTitle || '(제목 없음)'}</h3>
                 <p className="text-[10px] text-[var(--toss-gray-3)] mb-2.5">기안자: {detailSenderName} · {new Date(detailCreatedAt).toLocaleString('ko-KR')}</p>
                 {detailCcUsers.length > 0 && (
@@ -4572,6 +4578,7 @@ window.onload = () => window.print();
                 {renderLeaveRequestInfoPanel(detailMetaData)}
                 {renderSupplyRequestItemsPanel(detailMetaData)}
                 {renderApprovalAttachmentsPanel(detailMetaData)}
+                </div>
               </div>
               {detailStatus === '대기' && (
                 <div className="p-4 md:p-4 border-t border-[var(--border)] safe-area-pb">
@@ -4596,6 +4603,30 @@ window.onload = () => window.print();
                   )}
                 </div>
               )}
+              <div className="border-t border-slate-200/80 bg-white/92 px-4 py-3 md:px-6 md:py-4 safe-area-pb">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <p className="text-[11px] font-medium text-slate-500">
+                    상세 미리보기는 출력용 문서 형식입니다. 필요할 때만 문서출력을 눌러 주세요.
+                  </p>
+                  <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedApprovalId(null)}
+                      className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-500 transition-colors hover:bg-slate-50"
+                    >
+                      닫기
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="approval-detail-print"
+                      onClick={() => openApprovalPrintView(item)}
+                      className="rounded-[16px] border border-[var(--accent)]/15 bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white transition-opacity hover:opacity-95"
+                    >
+                      문서출력
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         );

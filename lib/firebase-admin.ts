@@ -23,7 +23,7 @@ export async function sendFcmNotification(
     };
 
     const messageId = payload.data?.message_id || '';
-    const collapseKey = messageId ? `chat-msg-${messageId}` : undefined;
+    const collapseKey = payload.data?.tag || (messageId ? `chat-msg-${messageId}` : undefined);
 
     await admin.messaging(app).send({
       token: fcmToken,
