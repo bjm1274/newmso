@@ -78,6 +78,49 @@ test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
 });
 
+test('op check lets staff switch between patient work and template settings in place', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await prepareExtraFeature(page, {
+    staffMembers: [extraFeaturesUser],
+    surgeryTemplates: [
+      {
+        id: 'surgery-template-knee',
+        name: 'Knee Scope',
+        is_active: true,
+        sort_order: 1,
+      },
+    ],
+    opCheckTemplates: [
+      {
+        id: 'op-template-surgery-knee',
+        template_scope: 'surgery',
+        template_name: 'Knee Prep',
+        surgery_template_id: 'surgery-template-knee',
+        surgery_name: 'Knee Scope',
+        prep_items: [{ id: 'prep-1', name: 'Knee set' }],
+        consumable_items: [],
+        company_name: extraFeaturesUser.company,
+        company_id: extraFeaturesUser.company_id,
+        is_active: true,
+      },
+    ],
+  });
+
+  await expect(page.getByTestId('op-check-mode-switcher')).toBeVisible();
+  await expect(page.getByTestId('op-check-patient-top-grid')).toBeVisible();
+
+  await page.getByTestId('op-check-mode-templates').click();
+  await expect(page.getByTestId('op-check-template-layout')).toBeVisible();
+  await expect(page.getByTestId('op-check-template-save')).toBeVisible();
+  await expect(page.getByTestId('op-check-patient-top-grid')).toHaveCount(0);
+
+  await page.getByTestId('op-check-mode-patients').click();
+  await expect(page.getByTestId('op-check-patient-top-grid')).toBeVisible();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('op check links schedules, applies templates, and saves a patient record', async ({ page }) => {
   const runtimeErrors = trackRuntimeErrors(page);
   const todayKey = getTodayKey();

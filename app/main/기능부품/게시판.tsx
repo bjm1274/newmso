@@ -594,7 +594,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     { id: '수술일정', label: '🏥 수술일정표', icon: '🏥' },
     { id: 'MRI일정', label: '🔬 MRI일정표', icon: '🔬' },
     { id: '직원제안함', label: '💡 직원 제안함', icon: '💡' },
-    { id: '업무가이드', label: '📚 업무가이드', icon: '📚' }
+    { id: '업무가이드', label: '📚 업무공유', icon: '📚' }
   ];
   const visibleBoards = useMemo(
     () => boards.filter((board) => canAccessBoard(user, board.id, 'read')),
@@ -609,7 +609,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     수술일정: { title: '수술일정', description: '' },
     MRI일정: { title: 'MRI일정', description: '' },
     직원제안함: { title: '직원 제안함', description: '' },
-    업무가이드: { title: '업무가이드', description: '회사별 / 팀별 메뉴에서 업무자료 공유와 팀 할일 공유를 함께 관리합니다.' },
+    업무가이드: { title: '업무공유', description: '회사별 / 팀별 메뉴에서 업무자료, 인수인계, 팀 할일을 함께 관리합니다.' },
   };
   const currentBoardMeta = boardMetaMap[activeBoard] || {
     title: activeBoard || '게시판',

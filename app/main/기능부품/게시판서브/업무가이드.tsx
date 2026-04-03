@@ -8,6 +8,7 @@ import { toast } from '@/lib/toast';
 import type { AttachmentItem, BoardPost, StaffMember } from '@/types';
 
 const GUIDE_BOARD_TYPE = '업무가이드';
+const GUIDE_DISPLAY_NAME = '업무공유';
 const GUIDE_TASK_BOARD_TYPE = '업무가이드_팀할일';
 
 const ATTACHMENTS_META_PREFIX = '[[ATTACHMENTS_META]]';
@@ -348,7 +349,7 @@ function formatDateOnly(value: unknown) {
 }
 
 function getGuideKindLabel(kind: GuideKind) {
-  return kind === 'handover' ? '인수인계자료' : '교육자료';
+  return kind === 'handover' ? '업무 인수인계' : '업무자료';
 }
 
 function getGuideAudienceLabel(audience: GuideAudience) {
@@ -659,7 +660,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
       setStaffDirectory(((staffResult.data || []) as OrgStaffRow[]) ?? []);
     } catch (error) {
       console.error('guide workspace load failed', error);
-      toast('업무가이드 화면을 불러오지 못했습니다.', 'error');
+      toast(`${GUIDE_DISPLAY_NAME} 화면을 불러오지 못했습니다.`, 'error');
     } finally {
       setLoading(false);
     }
@@ -805,6 +806,14 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
     return counts;
   }, [companyTeams, viewerScopedTasks]);
 
+  const handoverCountsByTeamKey = useMemo(() => {
+    const counts: Record<string, number> = {};
+    companyTeams.forEach((team) => {
+      counts[team.key] = viewerScopedResources.filter((item) => matchesTeamScope(item, team) && item.kind === 'handover').length;
+    });
+    return counts;
+  }, [companyTeams, viewerScopedResources]);
+
   const teamResources = useMemo(() => {
     if (!activeTeam) return [];
     return viewerScopedResources.filter((item) => matchesTeamScope(item, activeTeam));
@@ -854,6 +863,9 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
   }, [activeTeam, taskFilter, viewerScopedTasks]);
 
   const activeCompanyLabel = selectedCompany?.companyName || companyFilter || selectedCo || currentCompanyName || '기본 기관';
+  const activeTeamResourceCount = activeTeam ? resourceCountsByTeamKey[activeTeam.key] || 0 : 0;
+  const activeTeamTaskCount = activeTeam ? taskCountsByTeamKey[activeTeam.key] || 0 : 0;
+  const activeTeamHandoverCount = activeTeam ? handoverCountsByTeamKey[activeTeam.key] || 0 : 0;
 
   const uploadGuideAttachment = useCallback(async (file: File) => {
     const formData = new FormData();
@@ -906,7 +918,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
     const normalizedDescription = description.trim();
 
     if (!canWrite) {
-      toast('업무가이드 작성 권한이 없습니다.', 'warning');
+      toast(`${GUIDE_DISPLAY_NAME} 작성 권한이 없습니다.`, 'warning');
       return;
     }
     if (!targetTeam) {
@@ -1216,30 +1228,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto custom-scrollbar p-4 md:p-5" data-testid="guide-library-view">
       <header className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]">
-              업무가이드
-            </div>
-            <h2 className="text-xl font-bold text-[var(--foreground)]">업무가이드</h2>
-            <p className="text-sm font-semibold leading-6 text-[var(--toss-gray-3)]">
-              조직도 기준 회사와 팀 메뉴를 따라 들어가서 업무자료 게시글, 첨부 문서, 팀별 할일을 한 화면에서 함께 관리하세요.
-            </p>
-          </div>
-
-          <div className="flex flex-col items-start gap-2 rounded-[var(--radius-lg)] bg-[var(--muted)] p-4 text-xs font-semibold text-[var(--toss-gray-3)] xl:min-w-[260px]">
-            <span>표시 기관: {activeCompanyLabel || '기본 기관'}</span>
-            <span>선택 팀: {activeTeam?.teamName || '팀 선택 대기'}</span>
-            <span>업무자료: {filteredResources.length}건</span>
-            <span>팀 할일: {activeTeamTasks.length}건</span>
-            <span>팀 인원: {activeTeam?.memberCount || 0}명</span>
-            {!canWrite ? (
-              <span className="mt-2 rounded-full bg-white px-3 py-1 text-[11px] text-[var(--foreground)]">
-                읽기 전용
-              </span>
-            ) : null}
-          </div>
-        </div>
+        <h2 className="text-xl font-bold text-[var(--foreground)]">{GUIDE_DISPLAY_NAME}</h2>
       </header>
 
       {showComposer && (
@@ -1247,9 +1236,9 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-lg font-bold text-[var(--foreground)]">{editingResourceId ? '업무자료 게시글 수정' : '업무자료 게시글 등록'}</h3>
+                <h3 className="text-lg font-bold text-[var(--foreground)]">{editingResourceId ? `${GUIDE_DISPLAY_NAME} 게시글 수정` : `${GUIDE_DISPLAY_NAME} 게시글 등록`}</h3>
                 <p className="mt-1 text-xs font-semibold text-[var(--toss-gray-3)]">
-                  선택한 회사와 팀 기준으로 게시글, 첨부 자료, 교육 포인트를 함께 올릴 수 있습니다.
+                  선택한 회사와 팀 기준으로 업무자료, 첨부 문서, 업무 인수인계를 함께 등록할 수 있습니다.
                 </p>
               </div>
               <button
@@ -1317,15 +1306,15 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
 
             <div className="grid gap-4 lg:grid-cols-2">
               <label className="space-y-2">
-                <span className="text-xs font-bold text-[var(--foreground)]">자료 구분</span>
+                <span className="text-xs font-bold text-[var(--foreground)]">공유 유형</span>
                 <select
                   data-testid="guide-kind-select"
                   value={kind}
                   onChange={(event) => setKind(normalizeGuideKind(event.target.value))}
                   className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
                 >
-                  <option value="education">교육자료</option>
-                  <option value="handover">인수인계자료</option>
+                  <option value="education">업무자료</option>
+                  <option value="handover">업무 인수인계</option>
                 </select>
               </label>
 
@@ -1443,96 +1432,73 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
         </section>
       )}
 
-      <section className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
-        <div className="space-y-4">
-          {companyOptions.length > 1 && (
-            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm" data-testid="guide-company-menu">
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm font-bold text-[var(--foreground)]">회사별 메뉴</p>
-                  <p className="mt-1 text-xs font-semibold text-[var(--toss-gray-3)]">조직도에 등록된 회사 기준으로 팀 메뉴를 전환합니다.</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {companyOptions.map((companyName) => (
-                    <button
-                      key={companyName}
-                      type="button"
-                      onClick={() => setCompanyFilter(companyName)}
-                      className={`rounded-full px-3 py-1.5 text-xs font-bold ${
-                        companyFilter === companyName ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--foreground)]'
-                      }`}
-                    >
-                      {companyName}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
+      <section className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
+        <div className="space-y-3">
           <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm" data-testid="guide-team-menu">
             <div className="space-y-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-sm font-bold text-[var(--foreground)]">조직도 기반 팀 메뉴</p>
-                  <p className="mt-1 text-xs font-semibold leading-5 text-[var(--toss-gray-3)]">
-                    회사와 팀을 선택하면 해당 팀의 업무자료 공유와 팀 할일 공유만 따로 모아 볼 수 있습니다.
-                  </p>
+              <div className="flex flex-col gap-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-[var(--foreground)]">회사 / 팀 선택</p>
+                  </div>
+                  {canWrite ? (
+                    <button
+                      type="button"
+                      data-testid="guide-open-compose"
+                      onClick={() => startCreate(activeTeam)}
+                      className="rounded-full bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm hover:opacity-95"
+                    >
+                      {activeTeam ? `+ ${activeTeam.teamName}` : '+ 게시글'}
+                    </button>
+                  ) : null}
                 </div>
-                {canWrite ? (
-                  <button
-                    type="button"
-                    data-testid="guide-open-compose"
-                    onClick={() => startCreate(activeTeam)}
-                    className="rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-bold text-white shadow-sm hover:opacity-95"
-                  >
-                    {activeTeam ? `+ ${activeTeam.teamName} 게시글 작성` : '+ 게시글 작성'}
-                  </button>
+
+                <div className="grid gap-3">
+                  <label className="space-y-1.5">
+                    <span className="text-[11px] font-bold text-[var(--foreground)]">회사 선택</span>
+                    <select
+                      data-testid="guide-company-select"
+                      value={companyFilter}
+                      onChange={(event) => setCompanyFilter(event.target.value)}
+                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                    >
+                      {companyOptions.map((companyName) => (
+                        <option key={companyName} value={companyName}>
+                          {companyName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="space-y-1.5">
+                    <span className="text-[11px] font-bold text-[var(--foreground)]">팀 선택</span>
+                    <select
+                      data-testid="guide-team-filter-select"
+                      value={selectedTeamKey}
+                      onChange={(event) => setSelectedTeamKey(event.target.value)}
+                      disabled={!companyTeams.length}
+                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold outline-none focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:bg-[var(--muted)]"
+                    >
+                      <option value="">{companyTeams.length ? '팀 선택' : '등록된 팀 없음'}</option>
+                      {selectedCompany?.divisions.map((division) => (
+                        <optgroup key={division.name} label={division.name}>
+                          {division.teams.map((team) => (
+                            <option key={team.key} value={team.key}>
+                              {division.name} / {team.teamName}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                {!activeTeam ? (
+                  <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-4 py-4 text-center text-sm font-semibold text-[var(--toss-gray-3)]">
+                    조직도에 등록된 팀이 없습니다.
+                  </div>
                 ) : null}
               </div>
-
-              {selectedCompany?.divisions.length ? (
-                <div className="space-y-3">
-                  {selectedCompany.divisions.map((division) => (
-                    <div key={division.name} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/50 p-3">
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <p className="text-xs font-bold text-[var(--foreground)]">{division.name}</p>
-                        <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">{division.teams.length}팀</span>
-                      </div>
-                      <div className="grid gap-2">
-                        {division.teams.map((team) => (
-                          <button
-                            key={team.key}
-                            type="button"
-                            onClick={() => setSelectedTeamKey(team.key)}
-                            className={`rounded-[var(--radius-lg)] border px-3 py-3 text-left transition ${
-                              selectedTeamKey === team.key
-                                ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]'
-                                : 'border-[var(--border)] bg-white hover:border-[var(--accent)]/40'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <p className="text-sm font-bold text-[var(--foreground)]">{team.teamName}</p>
-                                <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                                  인원 {team.memberCount}명 · 자료 {resourceCountsByTeamKey[team.key] || 0}건 · 할일 {taskCountsByTeamKey[team.key] || 0}건
-                                </p>
-                              </div>
-                              <span className="rounded-full bg-[var(--muted)] px-2.5 py-1 text-[10px] font-bold text-[var(--foreground)]">
-                                TEAM
-                              </span>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-4 py-6 text-center text-sm font-semibold text-[var(--toss-gray-3)]">
-                  조직도에 등록된 팀이 없습니다.
-                </div>
-              )}
             </div>
           </div>
 
@@ -1556,7 +1522,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                       kindFilter === value ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--foreground)]'
                     }`}
                   >
-                    {value === 'all' ? '전체 자료' : value === 'education' ? '교육자료' : '인수인계자료'}
+                    {value === 'all' ? '전체 자료' : value === 'education' ? '업무자료' : '업무 인수인계'}
                   </button>
                 ))}
               </div>
@@ -1583,10 +1549,10 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-bold text-[var(--foreground)]">
-                    {activeTeam ? `${activeTeam.teamName} 업무자료 공유` : '업무자료 공유'}
+                    {activeTeam ? `${activeTeam.teamName} 업무자료 · 인수인계 공유` : '업무자료 · 인수인계 공유'}
                   </p>
                   <p className="mt-1 text-xs font-semibold leading-5 text-[var(--toss-gray-3)]">
-                    선택한 팀의 게시글과 첨부 자료를 한 번에 확인할 수 있습니다.
+                    선택한 팀의 게시글, 첨부 문서, 업무 인수인계를 한 번에 확인할 수 있습니다.
                   </p>
                 </div>
                 <span className="rounded-full bg-[var(--muted)] px-3 py-1 text-xs font-bold text-[var(--foreground)]">
@@ -1597,13 +1563,13 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
 
             {loading ? (
               <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-8 text-center text-sm font-semibold text-[var(--toss-gray-3)]">
-                업무가이드 화면을 불러오는 중입니다.
+                {GUIDE_DISPLAY_NAME} 화면을 불러오는 중입니다.
               </div>
             ) : filteredResources.length === 0 ? (
               <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-8 text-center">
-                <p className="text-base font-bold text-[var(--foreground)]">등록된 업무자료가 없습니다.</p>
+                <p className="text-base font-bold text-[var(--foreground)]">등록된 업무공유 자료가 없습니다.</p>
                 <p className="mt-2 text-sm font-semibold text-[var(--toss-gray-3)]">
-                  {activeTeam ? `${activeTeam.teamName} 팀의 첫 업무자료 게시글과 파일을 등록해 보세요.` : '왼쪽에서 팀을 선택해 주세요.'}
+                  {activeTeam ? `${activeTeam.teamName} 팀의 첫 업무자료 또는 인수인계 게시글과 파일을 등록해 보세요.` : '왼쪽에서 팀을 선택해 주세요.'}
                 </p>
               </div>
             ) : (
@@ -1645,29 +1611,6 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
           </div>
         </div>
         <div className="min-w-0 space-y-4">
-          <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">Team Workspace</p>
-                <h3 className="mt-1 text-2xl font-bold text-[var(--foreground)]">
-                  {activeTeam ? `${activeCompanyLabel} · ${activeTeam.teamName}` : '팀을 선택해 주세요'}
-                </h3>
-                <p className="mt-2 text-sm font-semibold text-[var(--toss-gray-3)]">
-                  {activeTeam
-                    ? `${activeTeam.divisionName || '기타'} 소속 팀입니다. 업무자료 공유와 팀별 할일 공유를 이 화면에서 같이 관리할 수 있습니다.`
-                    : '조직도 기반 팀 메뉴를 먼저 선택하면 업무자료와 할일이 함께 열립니다.'}
-                </p>
-              </div>
-              {activeTeam ? (
-                <div className="flex gap-2 text-xs font-semibold text-[var(--toss-gray-3)]">
-                  <span className="rounded-full bg-[var(--muted)] px-3 py-1">인원 {activeTeam.memberCount}명</span>
-                  <span className="rounded-full bg-[var(--muted)] px-3 py-1">자료 {resourceCountsByTeamKey[activeTeam.key] || 0}건</span>
-                  <span className="rounded-full bg-[var(--muted)] px-3 py-1">할일 {taskCountsByTeamKey[activeTeam.key] || 0}건</span>
-                </div>
-              ) : null}
-            </div>
-          </div>
-
           {selectedResource ? (
             <article data-testid="guide-detail" className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
               <div className="flex flex-col gap-4 border-b border-[var(--border)] pb-5">
@@ -1793,10 +1736,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
             </article>
           ) : (
             <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-10 text-center shadow-sm">
-              <p className="text-lg font-bold text-[var(--foreground)]">보고 싶은 업무자료를 선택해 주세요.</p>
-              <p className="mt-2 text-sm font-semibold text-[var(--toss-gray-3)]">
-                팀 메뉴에서 선택한 회사와 팀 기준으로 자료 상세와 첨부 파일을 오른쪽에서 확인할 수 있습니다.
-              </p>
+              <p className="text-lg font-bold text-[var(--foreground)]">보고 싶은 공유자료를 선택해 주세요.</p>
             </div>
           )}
 
@@ -1808,7 +1748,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                     {activeTeam ? `${activeTeam.teamName} 팀별 할일 공유` : '팀별 할일 공유'}
                   </h3>
                   <p className="mt-1 text-xs font-semibold text-[var(--toss-gray-3)]">
-                    선택한 팀에서 같이 처리해야 할 작업을 등록하고 상태를 함께 관리할 수 있습니다.
+                    선택한 팀에서 같이 처리해야 할 작업과 인수인계 후속 할일을 함께 관리할 수 있습니다.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
