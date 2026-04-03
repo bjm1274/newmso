@@ -479,6 +479,7 @@ type AttachmentQuickActionsProps = {
   name: string;
   onPreview: () => void;
   onReply?: (() => void) | null;
+  replyTestId?: string;
   variant?: AttachmentQuickActionsVariant;
   className?: string;
 };
@@ -488,6 +489,7 @@ function AttachmentQuickActions({
   name,
   onPreview,
   onReply,
+  replyTestId,
   variant = 'pill',
   className = '',
 }: AttachmentQuickActionsProps) {
@@ -549,6 +551,7 @@ function AttachmentQuickActions({
       {onReply ? (
         <button
           type="button"
+          data-testid={replyTestId}
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -582,6 +585,7 @@ type AttachmentListCardProps = {
   badgeLabel?: string | null;
   onPreview: () => void;
   onReply?: (() => void) | null;
+  replyTestId?: string;
   onActivate?: (() => void) | null;
   actionVariant?: AttachmentQuickActionsVariant;
   layout?: 'list' | 'bubble';
@@ -598,6 +602,7 @@ function AttachmentListCard({
   badgeLabel,
   onPreview,
   onReply,
+  replyTestId,
   onActivate,
   actionVariant = 'subtle',
   layout = 'list',
@@ -630,6 +635,7 @@ function AttachmentListCard({
                 name={name}
                 onPreview={onPreview}
                 onReply={onReply}
+                replyTestId={replyTestId}
                 variant="overlay"
               />
             </div>
@@ -649,6 +655,7 @@ function AttachmentListCard({
             name={name}
             onPreview={onPreview}
             onReply={onReply}
+            replyTestId={replyTestId}
             variant={tone === 'accent' ? 'overlay' : 'subtle'}
             className="mt-2"
           />
@@ -681,6 +688,7 @@ function AttachmentListCard({
               name={name}
               onPreview={onPreview}
               onReply={onReply}
+              replyTestId={replyTestId}
               variant="pill"
               className="mt-2"
             />
@@ -751,6 +759,7 @@ function AttachmentListCard({
             name={name}
             onPreview={onPreview}
             onReply={onReply}
+            replyTestId={replyTestId}
             variant={actionVariant}
             className="mt-2"
           />
@@ -5993,7 +6002,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           }}
         >
           {replyTo && (
-            <div className="mb-1 flex items-center justify-between rounded-[var(--radius-lg)] border border-[var(--toss-blue-light)] bg-[var(--toss-blue-light)] px-2 py-1 animate-in slide-in-from-bottom-2">
+            <div
+              data-testid="chat-reply-banner"
+              className="mb-1 flex items-center justify-between rounded-[var(--radius-lg)] border border-[var(--toss-blue-light)] bg-[var(--toss-blue-light)] px-2 py-1 animate-in slide-in-from-bottom-2"
+            >
               <p className="text-[11px] font-bold text-[var(--accent)]">@{(replyTo.staff as { name?: string } | null | undefined)?.name}님에게 답글 작성 중...</p>
               <button onClick={() => setReplyTo(null)} className="text-[var(--accent)] hover:text-[var(--accent)] font-semibold">닫기</button>
             </div>
@@ -6246,6 +6258,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">사진 및 동영상</p>
                     <button
                       type="button"
+                      data-testid="chat-open-media-archive-media"
                       onClick={() => openMediaArchive('media')}
                       className="inline-flex items-center rounded-full bg-[var(--accent)]/10 px-2.5 py-1 text-[10px] font-bold text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/15"
                     >
@@ -6294,6 +6307,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">파일</p>
                     <button
                       type="button"
+                      data-testid="chat-open-media-archive-file"
                       onClick={() => openMediaArchive('file')}
                       className="inline-flex items-center rounded-full bg-[var(--accent)]/10 px-2.5 py-1 text-[10px] font-bold text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/15"
                     >
@@ -6313,6 +6327,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           meta={`${(m.staff as { name?: string } | null | undefined)?.name || '알 수 없음'} · ${new Date(m.created_at || 0).toLocaleDateString()}`}
                           onPreview={() => openAttachmentPreviewForMessage(m)}
                           onReply={() => startReplyToMessage(m)}
+                          replyTestId={`chat-file-reply-${m.id}`}
                           actionVariant="subtle"
                         />
                       );
@@ -6992,6 +7007,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             })}`}
                             onPreview={() => openAttachmentPreviewForMessage(m)}
                             onReply={() => startReplyToMessage(m)}
+                            replyTestId={`chat-attachment-reply-${m.id}`}
                             actionVariant="subtle"
                             className="mt-2"
                           />
@@ -7345,10 +7361,19 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       {showMediaPanel && (
         <>
           <div className="fixed inset-0 bg-black/5 z-[100] md:z-30 animate-in fade-in" onClick={() => setShowMediaPanel(false)} />
-          <aside className="fixed top-0 right-0 bottom-0 w-80 bg-[var(--card)] border-l border-[var(--border)] shadow-sm z-[101] md:z-40 flex flex-col animate-in slide-in-from-right duration-300">
+          <aside
+            data-testid="chat-media-panel"
+            className="fixed top-0 right-0 bottom-0 w-80 bg-[var(--card)] border-l border-[var(--border)] shadow-sm z-[101] md:z-40 flex flex-col animate-in slide-in-from-right duration-300"
+          >
             <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
               <span className="text-xs font-black text-[var(--toss-gray-4)] uppercase tracking-widest">첨부 내역</span>
-              <button onClick={() => setShowMediaPanel(false)} className="p-2 text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-xl">닫기</button>
+              <button
+                data-testid="chat-media-panel-close"
+                onClick={() => setShowMediaPanel(false)}
+                className="p-2 text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-xl"
+              >
+                닫기
+              </button>
             </div>
 
             <div className="flex p-2 gap-1 bg-[var(--tab-bg)] dark:bg-zinc-900 border-b border-[var(--border)]">
@@ -7384,6 +7409,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       meta={new Date(m.created_at || 0).toLocaleDateString()}
                       onPreview={() => openAttachmentPreviewForMessage(m)}
                       onReply={() => startReplyToMessage(m)}
+                      replyTestId={`chat-media-reply-${m.id}`}
                       actionVariant="subtle"
                     />
                   );
@@ -7815,7 +7841,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   event.stopPropagation();
                   moveAttachmentPreview(-1);
                 }}
-                className="absolute left-3 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-2xl text-white transition-colors hover:bg-white/30 md:left-6"
+                className="absolute top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-2xl text-white transition-colors hover:bg-white/30"
+                style={{ left: 'max(12px, calc(var(--sidebar-width, 72px) + 12px))' }}
                 aria-label="이전 사진"
               >
                 ‹

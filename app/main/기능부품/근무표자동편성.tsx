@@ -36,6 +36,7 @@ import {
   upsertRosterPolicyStorageRecord,
 } from '@/lib/roster-policy-storage';
 import { isKoreanPublicHoliday } from '@/lib/korean-public-holidays';
+import { filterRosterShiftsForDepartment } from '@/lib/roster-shift-team-filter';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import SmartMonthPicker from './공통/SmartMonthPicker';
@@ -2512,6 +2513,8 @@ function loadStoredGenerationRules() {
 export default function AutoRosterPlanner({
   user,
   staffs = [],
+  initialDepartment,
+  initialMonth,
   selectedCo = '전체',
   panelMode = 'planner',
   adminMode = false,
@@ -2519,6 +2522,8 @@ export default function AutoRosterPlanner({
 }: {
   user?: StaffMember;
   staffs?: StaffMember[];
+  initialDepartment?: string;
+  initialMonth?: string;
   selectedCo?: string;
   panelMode?: 'planner' | 'patterns' | 'rules';
   adminMode?: boolean;
@@ -2549,7 +2554,7 @@ export default function AutoRosterPlanner({
     return next;
   }, [activeStaffs]);
 
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState(initialMonth || new Date().toISOString().slice(0, 7));
   const [selectedCompany, setSelectedCompany] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [workShifts, setWorkShifts] = useState<WorkShift[]>([]);
@@ -2605,6 +2610,12 @@ export default function AutoRosterPlanner({
   const [highlightedRosterTarget, setHighlightedRosterTarget] = useState('');
   const [rosterSnapshots, setRosterSnapshots] = useState<StoredRosterSnapshot<GeminiRosterRecommendation>[]>([]);
   const [selectedSnapshotId, setSelectedSnapshotId] = useState('');
+
+  useEffect(() => {
+    if (!initialMonth || selectedMonth === initialMonth) return;
+    setSelectedMonth(initialMonth);
+  }, [initialMonth, selectedMonth]);
+
   const selectedCompanyId = useMemo(
     () => (selectedCompany ? companyIdByName.get(selectedCompany) || null : null),
     [companyIdByName, selectedCompany]
@@ -2968,13 +2979,21 @@ export default function AutoRosterPlanner({
 
   useEffect(() => {
     if (!departmentOptions.length) return;
-    const defaultDepartment = departmentOptions.includes(ownDepartment)
-      ? ownDepartment
-      : departmentOptions.find((department) => department !== '전체 부서') || departmentOptions[0] || '';
+    const forcedDepartment =
+      initialDepartment && departmentOptions.includes(initialDepartment) ? initialDepartment : '';
+    const defaultDepartment =
+      forcedDepartment ||
+      (departmentOptions.includes(ownDepartment)
+        ? ownDepartment
+        : departmentOptions.find((department) => department !== '전체 부서') || departmentOptions[0] || '');
+    if (forcedDepartment && selectedDepartment !== forcedDepartment) {
+      setSelectedDepartment(forcedDepartment);
+      return;
+    }
     if (!selectedDepartment || !departmentOptions.includes(selectedDepartment) || selectedDepartment === '전체 부서') {
       setSelectedDepartment(defaultDepartment);
     }
-  }, [departmentOptions, ownDepartment, selectedDepartment]);
+  }, [departmentOptions, initialDepartment, ownDepartment, selectedDepartment]);
 
   useEffect(() => {
     if (!selectedCompany) {
@@ -3036,8 +3055,15 @@ export default function AutoRosterPlanner({
     () => workShifts.filter((shift) => shift.id !== offShift?.id),
     [offShift?.id, workShifts]
   );
+  const teamScopedWorkingShifts = useMemo(() => {
+    const scopedShifts = filterRosterShiftsForDepartment(selectedDepartment, workingShifts, {
+      includeOffShift: false,
+    });
+    return scopedShifts.length > 0 ? scopedShifts : workingShifts;
+  }, [selectedDepartment, workingShifts]);
+  const defaultShiftPool = teamScopedWorkingShifts.length > 0 ? teamScopedWorkingShifts : workingShifts;
 
-  const defaultShiftOrder = useMemo(() => buildDefaultShiftOrder(workingShifts), [workingShifts]);
+  const defaultShiftOrder = useMemo(() => buildDefaultShiftOrder(defaultShiftPool), [defaultShiftPool]);
   const companyPatternProfiles = useMemo(
     () =>
       savedPatternProfiles.filter(
@@ -3068,23 +3094,19 @@ export default function AutoRosterPlanner({
   );
   const selectedPatternProfile = useMemo(
     () =>
-      matchingPatternProfiles.find((profile) => profile.id === selectedPatternProfileId) ||
-      companyPatternProfiles.find((profile) => profile.id === selectedPatternProfileId) ||
-      null,
-    [companyPatternProfiles, matchingPatternProfiles, selectedPatternProfileId]
+      matchingPatternProfiles.find((profile) => profile.id === selectedPatternProfileId) || null,
+    [matchingPatternProfiles, selectedPatternProfileId]
   );
   const selectedGenerationRule = useMemo(
     () =>
-      matchingGenerationRules.find((rule) => rule.id === selectedGenerationRuleId) ||
-      companyGenerationRules.find((rule) => rule.id === selectedGenerationRuleId) ||
-      null,
-    [companyGenerationRules, matchingGenerationRules, selectedGenerationRuleId]
+      matchingGenerationRules.find((rule) => rule.id === selectedGenerationRuleId) || null,
+    [matchingGenerationRules, selectedGenerationRuleId]
   );
   const patternRecommendedShiftIds = useMemo(() => {
     if (!selectedPatternProfile) return [];
-    const validShiftIds = new Set(workingShifts.map((shift) => shift.id));
+    const validShiftIds = new Set(defaultShiftPool.map((shift) => shift.id));
     return getPatternProfileShiftIds(selectedPatternProfile).filter((shiftId) => validShiftIds.has(shiftId));
-  }, [selectedPatternProfile, workingShifts]);
+  }, [defaultShiftPool, selectedPatternProfile]);
   const teamRecommendationCategory = useMemo(
     () => getTeamRecommendationCategory(selectedDepartment),
     [selectedDepartment]
@@ -3098,16 +3120,16 @@ export default function AutoRosterPlanner({
     () =>
       patternRecommendedShiftIds.length > 0
         ? patternRecommendedShiftIds
-        : recommendShiftIdsForTeam(selectedDepartment, workingShifts),
-    [patternRecommendedShiftIds, selectedDepartment, workingShifts]
+        : recommendShiftIdsForTeam(selectedDepartment, defaultShiftPool),
+    [defaultShiftPool, patternRecommendedShiftIds, selectedDepartment]
   );
   const recommendedAiShifts = useMemo(() => {
     if (recommendedAiShiftIds.length === 0) {
-      return usesStrictTeamRecommendation ? [] : workingShifts;
+      return usesStrictTeamRecommendation ? [] : defaultShiftPool;
     }
     const recommendedIdSet = new Set(recommendedAiShiftIds);
-    return workingShifts.filter((shift) => recommendedIdSet.has(shift.id));
-  }, [recommendedAiShiftIds, usesStrictTeamRecommendation, workingShifts]);
+    return defaultShiftPool.filter((shift) => recommendedIdSet.has(shift.id));
+  }, [defaultShiftPool, recommendedAiShiftIds, usesStrictTeamRecommendation]);
   const monthDates = useMemo(() => getMonthDates(selectedMonth), [selectedMonth]);
   const monthDateSet = useMemo(() => new Set(monthDates), [monthDates]);
   const preferredOffStorageKey = useMemo(
@@ -3183,13 +3205,13 @@ export default function AutoRosterPlanner({
           ? recommendedAiShiftIds
           : usesStrictTeamRecommendation
             ? []
-            : workingShifts.map((shift) => shift.id);
+            : defaultShiftPool.map((shift) => shift.id);
       const validShiftIds = new Set(recommendedBaseIds);
       const filtered = prev.filter((shiftId) => validShiftIds.has(shiftId));
       if (filtered.length > 0) return filtered;
       return recommendedBaseIds;
     });
-  }, [recommendedAiShiftIds, usesStrictTeamRecommendation, workingShifts]);
+  }, [defaultShiftPool, recommendedAiShiftIds, usesStrictTeamRecommendation]);
 
   const targetStaffs = useMemo(() => {
     return activeStaffs.filter((staff) => {
@@ -3219,14 +3241,14 @@ export default function AutoRosterPlanner({
           buildInitialConfig(
             staff,
             index,
-            defaultShiftOrder.length ? defaultShiftOrder : workingShifts,
+            defaultShiftOrder.length ? defaultShiftOrder : defaultShiftPool,
             monthDates.length
           )
       );
     });
 
     return nextMap;
-  }, [defaultShiftOrder, monthDates.length, staffConfigs, targetStaffs, workingShifts]);
+  }, [defaultShiftOrder, defaultShiftPool, monthDates.length, staffConfigs, targetStaffs]);
   const defaultWizardSelectedStaffIds = useMemo(() => {
     const enabledIds = orderedTargetStaffIds.filter((staffId) => staffConfigs[staffId]?.enabled !== false);
     return enabledIds.length > 0 ? enabledIds : orderedTargetStaffIds;
@@ -3306,7 +3328,7 @@ export default function AutoRosterPlanner({
             buildInitialConfig(
               staff,
               index,
-              defaultShiftOrder.length ? defaultShiftOrder : workingShifts,
+              defaultShiftOrder.length ? defaultShiftOrder : defaultShiftPool,
               monthDates.length
             );
           next[staffId] = {
@@ -3374,9 +3396,9 @@ export default function AutoRosterPlanner({
   const effectivePlannerCustomPatternSequence = useMemo(
     () =>
       isCustomPattern(effectivePlannerPattern)
-        ? normalizeCustomPatternSequence(plannerCustomPatternSequence, workingShifts)
+        ? normalizeCustomPatternSequence(plannerCustomPatternSequence, defaultShiftPool)
         : [],
-    [effectivePlannerPattern, plannerCustomPatternSequence, workingShifts]
+    [defaultShiftPool, effectivePlannerPattern, plannerCustomPatternSequence]
   );
   const effectivePlannerWeeklyTemplateWeeks = useMemo(
     () =>
@@ -3394,21 +3416,21 @@ export default function AutoRosterPlanner({
   );
 
   useEffect(() => {
-    if (!workingShifts.length) return;
-    const validShiftIds = new Set(workingShifts.map((shift) => shift.id));
-    const fallbackPrimary = defaultShiftOrder[0]?.id || workingShifts[0]?.id || '';
+    if (!defaultShiftPool.length) return;
+    const validShiftIds = new Set(defaultShiftPool.map((shift) => shift.id));
+    const fallbackPrimary = defaultShiftOrder[0]?.id || defaultShiftPool[0]?.id || '';
     const fallbackSecondary = defaultShiftOrder[1]?.id || fallbackPrimary;
     const fallbackTertiary = defaultShiftOrder[2]?.id || fallbackSecondary || fallbackPrimary;
 
     setPlannerPrimaryShiftId((prev) => (!prev || !validShiftIds.has(prev) ? fallbackPrimary : prev));
     setPlannerSecondaryShiftId((prev) => (!prev || !validShiftIds.has(prev) ? fallbackSecondary : prev));
     setPlannerTertiaryShiftId((prev) => (!prev || !validShiftIds.has(prev) ? fallbackTertiary : prev));
-  }, [defaultShiftOrder, workingShifts]);
+  }, [defaultShiftOrder, defaultShiftPool]);
 
   useEffect(() => {
-    if (!targetStaffs.length || !workingShifts.length) return;
-    const validShiftIds = new Set(workingShifts.map((shift) => shift.id));
-    const fallbackPrimary = defaultShiftOrder[0]?.id || workingShifts[0]?.id || '';
+    if (!targetStaffs.length || !defaultShiftPool.length) return;
+    const validShiftIds = new Set(defaultShiftPool.map((shift) => shift.id));
+    const fallbackPrimary = defaultShiftOrder[0]?.id || defaultShiftPool[0]?.id || '';
     const fallbackSecondary = defaultShiftOrder[1]?.id || fallbackPrimary;
     const fallbackTertiary = defaultShiftOrder[2]?.id || fallbackSecondary || fallbackPrimary;
 
@@ -3417,8 +3439,8 @@ export default function AutoRosterPlanner({
       targetStaffs.forEach((staff, index) => {
         const current = prev[staff.id];
         const baseConfig =
-          current || buildInitialConfig(staff, index, defaultShiftOrder.length ? defaultShiftOrder : workingShifts, monthDates.length);
-        const nextPattern = baseConfig.pattern || inferPattern(staff, workingShifts);
+          current || buildInitialConfig(staff, index, defaultShiftOrder.length ? defaultShiftOrder : defaultShiftPool, monthDates.length);
+        const nextPattern = baseConfig.pattern || inferPattern(staff, defaultShiftPool);
         const nextPrimaryShiftId = validShiftIds.has(baseConfig.primaryShiftId) ? baseConfig.primaryShiftId : fallbackPrimary;
         const nextSecondaryShiftId = validShiftIds.has(baseConfig.secondaryShiftId) ? baseConfig.secondaryShiftId : fallbackSecondary;
         const nextTertiaryShiftId = validShiftIds.has(baseConfig.tertiaryShiftId) ? baseConfig.tertiaryShiftId : fallbackTertiary;
@@ -3449,7 +3471,7 @@ export default function AutoRosterPlanner({
                     monthDates.length
                   )
                 : 0,
-              customPatternSequence: normalizeCustomPatternSequence(baseConfig.customPatternSequence || [], workingShifts),
+              customPatternSequence: normalizeCustomPatternSequence(baseConfig.customPatternSequence || [], defaultShiftPool),
               weeklyTemplateWeeks: nextWeeklyTemplateWeeks,
             }
           : {
@@ -3466,13 +3488,13 @@ export default function AutoRosterPlanner({
                     monthDates.length
                   )
                 : 0,
-              customPatternSequence: normalizeCustomPatternSequence(baseConfig.customPatternSequence || [], workingShifts),
+              customPatternSequence: normalizeCustomPatternSequence(baseConfig.customPatternSequence || [], defaultShiftPool),
               weeklyTemplateWeeks: nextWeeklyTemplateWeeks,
             };
       });
       return next;
     });
-  }, [defaultShiftOrder, monthDates.length, targetStaffs, workingShifts]);
+  }, [defaultShiftOrder, defaultShiftPool, monthDates.length, targetStaffs]);
 
   useEffect(() => {
     if (!isNightPattern(effectivePlannerPattern)) {
@@ -3486,23 +3508,23 @@ export default function AutoRosterPlanner({
   }, [effectivePlannerPattern, monthDates.length]);
 
   useEffect(() => {
-    if (!workingShifts.length) return;
+    if (!defaultShiftPool.length) return;
     if (!isCustomPattern(effectivePlannerPattern)) {
       setPlannerCustomPatternSequence([]);
       return;
     }
 
     setPlannerCustomPatternSequence((prev) => {
-      const normalized = normalizeCustomPatternSequence(prev, workingShifts).filter(
+      const normalized = normalizeCustomPatternSequence(prev, defaultShiftPool).filter(
         (token) => token === OFF_SHIFT_TOKEN || plannerShiftIds.includes(token)
       );
       if (normalized.length > 0) return normalized;
       return buildDefaultCustomPatternSequence(plannerShiftIds);
     });
-  }, [effectivePlannerPattern, plannerShiftIds, workingShifts]);
+  }, [defaultShiftPool, effectivePlannerPattern, plannerShiftIds]);
 
   useEffect(() => {
-    if (!workingShifts.length) return;
+    if (!defaultShiftPool.length) return;
     if (!isWeeklyTemplatePattern(effectivePlannerPattern)) {
       setPlannerWeeklyTemplateWeeks([]);
       return;
@@ -3511,21 +3533,21 @@ export default function AutoRosterPlanner({
     setPlannerWeeklyTemplateWeeks((prev) =>
       normalizeWeeklyTemplateWeeks(prev, plannerShiftIds, prev.length || 1)
     );
-  }, [effectivePlannerPattern, plannerShiftIds, workingShifts.length]);
+  }, [defaultShiftPool.length, effectivePlannerPattern, plannerShiftIds]);
 
   const wizardRequiredShiftCount = getRequiredShiftCount(wizardPattern);
   const wizardUsesCustomPattern = isCustomPattern(wizardPattern);
   const wizardUsesWeeklyTemplate = isWeeklyTemplatePattern(wizardPattern);
   const orderedWizardShiftIds = useMemo(
-    () => workingShifts.filter((shift) => wizardShiftIds.includes(shift.id)).map((shift) => shift.id),
-    [wizardShiftIds, workingShifts]
+    () => defaultShiftPool.filter((shift) => wizardShiftIds.includes(shift.id)).map((shift) => shift.id),
+    [defaultShiftPool, wizardShiftIds]
   );
   const effectiveWizardCustomPatternSequence = useMemo(
     () =>
       wizardUsesCustomPattern
-        ? normalizeCustomPatternSequence(wizardCustomPatternSequence, workShifts)
+        ? normalizeCustomPatternSequence(wizardCustomPatternSequence, defaultShiftPool)
         : [],
-    [wizardCustomPatternSequence, wizardUsesCustomPattern, workShifts]
+    [defaultShiftPool, wizardCustomPatternSequence, wizardUsesCustomPattern]
   );
   const effectiveWizardWeeklyTemplateWeeks = useMemo(
     () =>
@@ -3576,11 +3598,11 @@ export default function AutoRosterPlanner({
   const wizardOverrideShiftOptions = useMemo(
     () =>
       orderedWizardShiftIds.length > 0
-        ? workingShifts.filter((shift) => orderedWizardShiftIds.includes(shift.id))
+        ? defaultShiftPool.filter((shift) => orderedWizardShiftIds.includes(shift.id))
         : defaultShiftOrder.length > 0
           ? defaultShiftOrder
-          : workingShifts,
-    [defaultShiftOrder, orderedWizardShiftIds, workingShifts]
+          : defaultShiftPool,
+    [defaultShiftOrder, defaultShiftPool, orderedWizardShiftIds]
   );
 
   useEffect(() => {
@@ -3597,15 +3619,15 @@ export default function AutoRosterPlanner({
     if (!wizardOpen || !wizardSelectedPresetId) return;
 
     setWizardShiftIds((prev) =>
-      workingShifts.filter((shift) => prev.includes(shift.id)).map((shift) => shift.id)
+      defaultShiftPool.filter((shift) => prev.includes(shift.id)).map((shift) => shift.id)
     );
-  }, [wizardOpen, wizardSelectedPresetId, workingShifts]);
+  }, [defaultShiftPool, wizardOpen, wizardSelectedPresetId]);
 
   useEffect(() => {
     if (!wizardOpen || !wizardSelectedPresetId || !wizardUsesCustomPattern) return;
 
     setWizardCustomPatternSequence((prev) => {
-      const normalized = normalizeCustomPatternSequence(prev, workShifts).filter(
+      const normalized = normalizeCustomPatternSequence(prev, defaultShiftPool).filter(
         (token) => token === OFF_SHIFT_TOKEN || orderedWizardShiftIds.includes(token)
       );
       if (normalized.length > 0) return normalized;
@@ -3757,7 +3779,7 @@ export default function AutoRosterPlanner({
     currentShiftId: string;
     baseShiftId: string;
   }) => {
-    const shiftSequence = [OFF_SHIFT_TOKEN, ...workingShifts.map((shift) => shift.id)];
+    const shiftSequence = [OFF_SHIFT_TOKEN, ...defaultShiftPool.map((shift) => shift.id)];
     if (!shiftSequence.length) return;
 
     const currentIndex = Math.max(shiftSequence.findIndex((shiftId) => shiftId === currentShiftId), 0);
@@ -3768,7 +3790,7 @@ export default function AutoRosterPlanner({
   const previewRows = useMemo<PreviewRow[]>(() => {
     if (!aiRecommendation?.staffPlans?.length) return [];
 
-    const validShiftIds = new Set(workingShifts.map((shift) => shift.id));
+    const validShiftIds = new Set(defaultShiftPool.map((shift) => shift.id));
     const planByStaffId = new Map(
       aiRecommendation.staffPlans.map((plan) => [String(plan.staffId || ''), plan])
     );
@@ -3820,7 +3842,7 @@ export default function AutoRosterPlanner({
         };
       })
       .filter((row): row is PreviewRow => Boolean(row));
-  }, [aiRecommendation, enabledTargetStaffs, manualAssignments, monthDates, workShifts, workingShifts]);
+  }, [aiRecommendation, defaultShiftPool, enabledTargetStaffs, manualAssignments, monthDates, workShifts]);
 
   const serializePreviewRows = (rows: PreviewRow[]) =>
     rows.map((row) => ({
@@ -4539,8 +4561,8 @@ export default function AutoRosterPlanner({
   };
 
   const selectedAiShifts = useMemo(
-    () => workingShifts.filter((shift) => selectedAiShiftIds.includes(shift.id)),
-    [selectedAiShiftIds, workingShifts]
+    () => defaultShiftPool.filter((shift) => selectedAiShiftIds.includes(shift.id)),
+    [defaultShiftPool, selectedAiShiftIds]
   );
   const plannerPatternPreviewGroups = useMemo<PlannerPatternPreviewGroup[]>(() => {
     if (enabledTargetStaffs.length === 0) return [];
@@ -5214,7 +5236,7 @@ export default function AutoRosterPlanner({
           buildInitialConfig(
             staff,
             0,
-            defaultShiftOrder.length ? defaultShiftOrder : workingShifts,
+            defaultShiftOrder.length ? defaultShiftOrder : defaultShiftPool,
             monthDates.length
           );
         const resolvedGroup = resolvePlannerPatternGroup({
@@ -5445,7 +5467,7 @@ export default function AutoRosterPlanner({
     setStaffConfigs((prev) => {
       const current =
         prev[staff.id] ||
-        buildInitialConfig(staff, index, defaultShiftOrder.length ? defaultShiftOrder : workingShifts, monthDates.length);
+        buildInitialConfig(staff, index, defaultShiftOrder.length ? defaultShiftOrder : defaultShiftPool, monthDates.length);
       const nextPattern = patch.pattern ?? current.pattern;
       const nextNightShiftCount = Object.prototype.hasOwnProperty.call(patch, 'nightShiftCount')
         ? patch.nightShiftCount || 0
@@ -5691,8 +5713,8 @@ export default function AutoRosterPlanner({
       normalizedPreset,
       orderedWizardShiftIds
         .concat(defaultShiftOrder.map((shift) => shift.id))
-        .concat(workingShifts.map((shift) => shift.id)),
-      workingShifts
+        .concat(defaultShiftPool.map((shift) => shift.id)),
+      defaultShiftPool
     );
     if (resolvedShiftIds.length === 0) {
       toast('적용할 근무유형이 없습니다. 먼저 근무유형을 등록하세요.', 'success');
@@ -5819,8 +5841,8 @@ export default function AutoRosterPlanner({
       normalizedPreset,
       plannerShiftIds
         .concat(defaultShiftOrder.map((shift) => shift.id))
-        .concat(workingShifts.map((shift) => shift.id)),
-      workingShifts
+        .concat(defaultShiftPool.map((shift) => shift.id)),
+      defaultShiftPool
     );
     if (resolvedShiftIds.length === 0) {
       toast('적용할 근무유형이 없습니다. 먼저 근무유형을 등록하세요.', 'success');
@@ -5982,7 +6004,7 @@ export default function AutoRosterPlanner({
       targetStaffs.forEach((staff, index) => {
         const current =
           prev[staff.id] ||
-          buildInitialConfig(staff, index, defaultShiftOrder.length ? defaultShiftOrder : workingShifts, monthDates.length);
+          buildInitialConfig(staff, index, defaultShiftOrder.length ? defaultShiftOrder : defaultShiftPool, monthDates.length);
         const selectedIndex = selectedIndexMap.get(String(staff.id));
 
         next[staff.id] = {
@@ -6926,7 +6948,7 @@ export default function AutoRosterPlanner({
                 data-testid="roster-pattern-profile-select"
               >
                 <option value="">팀 기준 기본 규칙</option>
-                {companyPatternProfiles.map((profile) => (
+                {matchingPatternProfiles.map((profile) => (
                   <option key={profile.id} value={profile.id}>
                     {profile.name}
                   </option>
@@ -6943,7 +6965,7 @@ export default function AutoRosterPlanner({
                 data-testid="roster-generation-rule-select"
               >
                 <option value="">팀 기준 기본 규칙</option>
-                {companyGenerationRules.map((rule) => (
+                {matchingGenerationRules.map((rule) => (
                   <option key={rule.id} value={rule.id}>
                     {rule.name}
                   </option>
@@ -7870,7 +7892,7 @@ export default function AutoRosterPlanner({
                 {targetStaffs.map((staff, index) => {
                   const config =
                     staffConfigs[staff.id] ||
-                    buildInitialConfig(staff, index, defaultShiftOrder.length ? defaultShiftOrder : workingShifts, monthDates.length);
+                    buildInitialConfig(staff, index, defaultShiftOrder.length ? defaultShiftOrder : defaultShiftPool, monthDates.length);
                   const requiredShiftCount = getRequiredShiftCount(config.pattern);
                   const availablePatternOptions =
                     config.pattern === CUSTOM_PATTERN_VALUE

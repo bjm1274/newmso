@@ -20,18 +20,59 @@ function trackRuntimeErrors(page: Page) {
   return errors;
 }
 
+const CHAT_MENU = '\uCC44\uD305';
+const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
+const CLIPBOARD_ROOM_ID = 'room-clipboard';
+const ALBUM_PANEL_LABEL = '\uC0AC\uC9C4 3\uC7A5 \uBB36\uC5B4 \uBCF4\uB0B4\uAE30';
+
 const peerUser = {
   ...fakeUser,
   id: 'chat-clipboard-peer',
   employee_no: 'E2E-CHAT-CLIP-002',
   name: 'Clipboard Peer',
-  department: '병동팀',
-  position: '사원',
+  department: 'Ward',
+  position: 'Staff',
 };
+
+function buildNoticeRoom() {
+  return {
+    id: NOTICE_ROOM_ID,
+    name: '공지',
+    type: 'notice',
+    members: [fakeUser.id],
+    created_at: '2026-03-08T00:00:00.000Z',
+    last_message_at: '2026-03-08T00:00:00.000Z',
+  };
+}
+
+function buildClipboardRoom() {
+  return {
+    id: CLIPBOARD_ROOM_ID,
+    name: 'Clipboard Test Room',
+    type: 'group',
+    members: [fakeUser.id, peerUser.id],
+    created_at: '2026-03-08T09:00:00.000Z',
+    last_message_at: '2026-03-08T09:00:00.000Z',
+    created_by: fakeUser.id,
+  };
+}
 
 test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
 });
+
+async function openClipboardChat(page: Page) {
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: CHAT_MENU,
+      erp_chat_last_room: CLIPBOARD_ROOM_ID,
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent(CHAT_MENU)}`);
+  await expect(page.getByTestId('chat-view')).toBeVisible();
+  await page.getByTestId(`chat-room-${CLIPBOARD_ROOM_ID}`).click();
+}
 
 async function pasteClipboardImage(page: Page) {
   await page.evaluate(() => {
@@ -77,50 +118,42 @@ async function dropAttachmentFile(page: Page) {
   });
 }
 
-async function countSavedClipboardImages(page: Page) {
-  const savedMessages = await page.evaluate(async () => {
-    const response = await fetch('/rest/v1/messages?room_id=eq.room-clipboard&select=*');
+async function getSavedClipboardMessages(page: Page) {
+  const savedMessages = await page.evaluate(async (roomId) => {
+    const response = await fetch(`/rest/v1/messages?room_id=eq.${roomId}&select=*`);
     return response.json();
-  });
-  return Array.isArray(savedMessages)
-    ? savedMessages.filter((message) => {
-        const fileUrl = String(message?.file_url || '');
-        return (
-          message?.file_kind === 'image' &&
-          fileUrl.includes('/storage/v1/object/public/pchos-files/chat/') &&
-          fileUrl.endsWith('.png')
-        );
-      }).length
-    : 0;
+  }, CLIPBOARD_ROOM_ID);
+
+  return Array.isArray(savedMessages) ? savedMessages : [];
+}
+
+async function countSavedClipboardImages(page: Page) {
+  const savedMessages = await getSavedClipboardMessages(page);
+  return savedMessages.filter((message) => {
+    const fileUrl = String(message?.file_url || '');
+    return (
+      message?.file_kind === 'image' &&
+      fileUrl.includes('/storage/v1/object/public/pchos-files/chat/') &&
+      fileUrl.endsWith('.png')
+    );
+  }).length;
 }
 
 async function getSavedClipboardImageMessages(page: Page) {
-  const savedMessages = await page.evaluate(async () => {
-    const response = await fetch('/rest/v1/messages?room_id=eq.room-clipboard&select=*');
-    return response.json();
+  const savedMessages = await getSavedClipboardMessages(page);
+  return savedMessages.filter((message) => {
+    const fileUrl = String(message?.file_url || '');
+    return (
+      message?.file_kind === 'image' &&
+      fileUrl.includes('/storage/v1/object/public/pchos-files/chat/') &&
+      fileUrl.endsWith('.png')
+    );
   });
-
-  return Array.isArray(savedMessages)
-    ? savedMessages.filter((message) => {
-        const fileUrl = String(message?.file_url || '');
-        return (
-          message?.file_kind === 'image' &&
-          fileUrl.includes('/storage/v1/object/public/pchos-files/chat/') &&
-          fileUrl.endsWith('.png')
-        );
-      })
-    : [];
 }
 
 async function getSavedClipboardAttachmentMessages(page: Page) {
-  const savedMessages = await page.evaluate(async () => {
-    const response = await fetch('/rest/v1/messages?room_id=eq.room-clipboard&select=*');
-    return response.json();
-  });
-
-  return Array.isArray(savedMessages)
-    ? savedMessages.filter((message) => String(message?.file_url || '').includes('/storage/v1/object/public/'))
-    : [];
+  const savedMessages = await getSavedClipboardMessages(page);
+  return savedMessages.filter((message) => String(message?.file_url || '').includes('/storage/v1/object/public/'));
 }
 
 test('chat composer asks for confirmation before sending a pasted clipboard image', async ({ page }) => {
@@ -128,48 +161,11 @@ test('chat composer asks for confirmation before sending a pasted clipboard imag
 
   await mockSupabase(page, {
     staffMembers: [fakeUser, peerUser],
-    chatRooms: [
-      {
-        id: '00000000-0000-0000-0000-000000000000',
-        name: '공지메시지',
-        type: 'notice',
-        members: [fakeUser.id],
-        created_at: '2026-03-08T00:00:00.000Z',
-        last_message_at: '2026-03-08T00:00:00.000Z',
-      },
-      {
-        id: 'room-clipboard',
-        name: '클립보드 테스트방',
-        type: 'group',
-        members: [fakeUser.id, peerUser.id],
-        created_at: '2026-03-08T09:00:00.000Z',
-        last_message_at: '2026-03-08T09:00:00.000Z',
-        created_by: fakeUser.id,
-      },
-    ],
+    chatRooms: [buildNoticeRoom(), buildClipboardRoom()],
     messages: [],
   });
 
-  await page.route('**/storage/v1/object/**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ Key: 'mock-chat-upload' }),
-    });
-  });
-
-  await seedSession(page, {
-    localStorage: {
-      erp_last_menu: '채팅',
-      erp_chat_last_room: 'room-clipboard',
-    },
-  });
-
-  await page.goto(`/main?open_menu=${encodeURIComponent('채팅')}`);
-
-  await expect(page.getByTestId('chat-view')).toBeVisible();
-  await expect(page.getByTestId('chat-room-room-clipboard')).toBeVisible();
-  await page.getByTestId('chat-room-room-clipboard').click();
+  await openClipboardChat(page);
   await page.getByTestId('chat-message-input').click();
 
   await pasteClipboardImage(page);
@@ -189,47 +185,11 @@ test('chat composer can cancel a pasted clipboard image before upload', async ({
 
   await mockSupabase(page, {
     staffMembers: [fakeUser, peerUser],
-    chatRooms: [
-      {
-        id: '00000000-0000-0000-0000-000000000000',
-        name: '공지메시지',
-        type: 'notice',
-        members: [fakeUser.id],
-        created_at: '2026-03-08T00:00:00.000Z',
-        last_message_at: '2026-03-08T00:00:00.000Z',
-      },
-      {
-        id: 'room-clipboard',
-        name: '클립보드 테스트방',
-        type: 'group',
-        members: [fakeUser.id, peerUser.id],
-        created_at: '2026-03-08T09:00:00.000Z',
-        last_message_at: '2026-03-08T09:00:00.000Z',
-        created_by: fakeUser.id,
-      },
-    ],
+    chatRooms: [buildNoticeRoom(), buildClipboardRoom()],
     messages: [],
   });
 
-  await page.route('**/storage/v1/object/**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ Key: 'mock-chat-upload' }),
-    });
-  });
-
-  await seedSession(page, {
-    localStorage: {
-      erp_last_menu: '채팅',
-      erp_chat_last_room: 'room-clipboard',
-    },
-  });
-
-  await page.goto(`/main?open_menu=${encodeURIComponent('채팅')}`);
-
-  await expect(page.getByTestId('chat-view')).toBeVisible();
-  await page.getByTestId('chat-room-room-clipboard').click();
+  await openClipboardChat(page);
   await page.getByTestId('chat-message-input').click();
 
   await pasteClipboardImage(page);
@@ -247,47 +207,11 @@ test('chat composer asks for confirmation before sending a dropped attachment', 
 
   await mockSupabase(page, {
     staffMembers: [fakeUser, peerUser],
-    chatRooms: [
-      {
-        id: '00000000-0000-0000-0000-000000000000',
-        name: '공지메시지',
-        type: 'notice',
-        members: [fakeUser.id],
-        created_at: '2026-03-08T00:00:00.000Z',
-        last_message_at: '2026-03-08T00:00:00.000Z',
-      },
-      {
-        id: 'room-clipboard',
-        name: '클립보드 테스트방',
-        type: 'group',
-        members: [fakeUser.id, peerUser.id],
-        created_at: '2026-03-08T09:00:00.000Z',
-        last_message_at: '2026-03-08T09:00:00.000Z',
-        created_by: fakeUser.id,
-      },
-    ],
+    chatRooms: [buildNoticeRoom(), buildClipboardRoom()],
     messages: [],
   });
 
-  await page.route('**/storage/v1/object/**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ Key: 'mock-chat-upload' }),
-    });
-  });
-
-  await seedSession(page, {
-    localStorage: {
-      erp_last_menu: '채팅',
-      erp_chat_last_room: 'room-clipboard',
-    },
-  });
-
-  await page.goto(`/main?open_menu=${encodeURIComponent('채팅')}`);
-
-  await expect(page.getByTestId('chat-view')).toBeVisible();
-  await page.getByTestId('chat-room-room-clipboard').click();
+  await openClipboardChat(page);
 
   await dropAttachmentFile(page);
 
@@ -314,49 +238,13 @@ test('chat file picker can queue and send both photo and document attachments', 
 
   await mockSupabase(page, {
     staffMembers: [fakeUser, peerUser],
-    chatRooms: [
-      {
-        id: '00000000-0000-0000-0000-000000000000',
-        name: '공지메시지',
-        type: 'notice',
-        members: [fakeUser.id],
-        created_at: '2026-03-08T00:00:00.000Z',
-        last_message_at: '2026-03-08T00:00:00.000Z',
-      },
-      {
-        id: 'room-clipboard',
-        name: '파일선택 테스트방',
-        type: 'group',
-        members: [fakeUser.id, peerUser.id],
-        created_at: '2026-03-08T09:00:00.000Z',
-        last_message_at: '2026-03-08T09:00:00.000Z',
-        created_by: fakeUser.id,
-      },
-    ],
+    chatRooms: [buildNoticeRoom(), buildClipboardRoom()],
     messages: [],
   });
 
-  await page.route('**/storage/v1/object/**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ Key: 'mock-chat-upload' }),
-    });
-  });
+  await openClipboardChat(page);
 
-  await seedSession(page, {
-    localStorage: {
-      erp_last_menu: '채팅',
-      erp_chat_last_room: 'room-clipboard',
-    },
-  });
-
-  await page.goto(`/main?open_menu=${encodeURIComponent('채팅')}`);
-
-  await expect(page.getByTestId('chat-view')).toBeVisible();
-  await page.getByTestId('chat-room-room-clipboard').click();
-
-  await page.locator('input[type="file"]').first().setInputFiles([
+  await page.getByTestId('chat-file-input').setInputFiles([
     {
       name: 'iphone-photo.heic',
       mimeType: 'image/heic',
@@ -386,6 +274,185 @@ test('chat file picker can queue and send both photo and document attachments', 
   expect(runtimeErrors).toEqual([]);
 });
 
+test('chat album picker sends multiple photos as one bundle and preview can move left and right', async ({
+  page,
+}) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    staffMembers: [fakeUser, peerUser],
+    chatRooms: [buildNoticeRoom(), buildClipboardRoom()],
+    messages: [],
+  });
+
+  await openClipboardChat(page);
+
+  await page.getByTestId('chat-album-file-input').setInputFiles([
+    {
+      name: 'album-photo-1.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1]),
+    },
+    {
+      name: 'album-photo-2.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 2]),
+    },
+    {
+      name: 'album-photo-3.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 3]),
+    },
+  ]);
+
+  await expect(page.getByTestId('chat-pending-album-panel')).toBeVisible();
+  await expect(page.getByTestId('chat-pending-album-panel')).toContainText(ALBUM_PANEL_LABEL);
+
+  await page.getByTestId('chat-pending-album-send-button').click();
+  await expect(page.getByTestId('chat-pending-album-panel')).toBeHidden();
+
+  await expect
+    .poll(async () => {
+      const savedMessages = await getSavedClipboardMessages(page);
+      return savedMessages.filter((message) => String(message?.album_id || '').trim()).length;
+    })
+    .toBe(3);
+
+  const savedAlbumMessages = (await getSavedClipboardMessages(page))
+    .filter((message) => String(message?.album_id || '').trim())
+    .sort((a, b) => Number(a?.album_index ?? 999) - Number(b?.album_index ?? 999));
+
+  expect(new Set(savedAlbumMessages.map((message) => String(message?.album_id || ''))).size).toBe(1);
+  expect(String(savedAlbumMessages[0]?.album_id || '')).not.toBe('');
+  expect(savedAlbumMessages.map((message) => message?.album_index ?? null)).toEqual([0, 1, 2]);
+  expect(savedAlbumMessages.map((message) => message?.album_total ?? null)).toEqual([3, 3, 3]);
+
+  const album = page.locator('[data-testid^="chat-album-"]').first();
+  await expect(album).toBeVisible();
+  await album.locator('button').first().click();
+
+  await expect(page.getByTestId('chat-attachment-preview-modal')).toBeVisible();
+  await expect(page.getByTestId('chat-attachment-preview-counter')).toHaveText('1 / 3');
+
+  const previewImage = page.getByTestId('chat-attachment-preview-image');
+  const firstSrc = await previewImage.getAttribute('src');
+
+  await page.getByTestId('chat-attachment-preview-next-button').click();
+  await expect(page.getByTestId('chat-attachment-preview-counter')).toHaveText('2 / 3');
+  await expect
+    .poll(async () => page.getByTestId('chat-attachment-preview-image').getAttribute('src'))
+    .not.toBe(firstSrc);
+
+  await page.getByTestId('chat-attachment-preview-prev-button').click();
+  await expect(page.getByTestId('chat-attachment-preview-counter')).toHaveText('1 / 3');
+
+  await page.getByTestId('chat-attachment-preview-modal').getByLabel('\uB2EB\uAE30').click();
+  await expect(page.getByTestId('chat-attachment-preview-modal')).toBeHidden();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('chat can start replies from photo, file, and link cards', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    staffMembers: [fakeUser, peerUser],
+    chatRooms: [buildNoticeRoom(), buildClipboardRoom()],
+    messages: [
+      {
+        id: 'msg-image-1',
+        room_id: CLIPBOARD_ROOM_ID,
+        sender_id: peerUser.id,
+        content: 'Please review this photo.',
+        file_url: 'http://127.0.0.1:3000/storage/v1/object/public/pchos-files/chat/reply-photo-1.png',
+        file_name: 'reply-photo-1.png',
+        file_kind: 'image',
+        created_at: '2026-03-08T10:00:00.000Z',
+        is_deleted: false,
+        staff: { name: peerUser.name, photo_url: null, position: peerUser.position },
+      },
+      {
+        id: 'msg-file-1',
+        room_id: CLIPBOARD_ROOM_ID,
+        sender_id: peerUser.id,
+        content: 'Please review this file.',
+        file_url: 'http://127.0.0.1:3000/storage/v1/object/public/pchos-files/chat/manual.pdf',
+        file_name: 'manual.pdf',
+        file_kind: 'file',
+        created_at: '2026-03-08T10:10:00.000Z',
+        is_deleted: false,
+        staff: { name: peerUser.name, photo_url: null, position: peerUser.position },
+      },
+      {
+        id: 'msg-link-1',
+        room_id: CLIPBOARD_ROOM_ID,
+        sender_id: peerUser.id,
+        content: 'Please review this link: https://example.com/report',
+        created_at: '2026-03-08T10:20:00.000Z',
+        is_deleted: false,
+        staff: { name: peerUser.name, photo_url: null, position: peerUser.position },
+      },
+    ],
+  });
+
+  await openClipboardChat(page);
+
+  await page.getByTestId('chat-open-drawer').click();
+  await page.getByTestId('chat-open-media-archive-media').click();
+  await expect(page.getByTestId('chat-media-panel')).toBeVisible();
+  await page.getByTestId('chat-media-reply-msg-image-1').click();
+  await expect(page.getByTestId('chat-reply-banner')).toBeVisible();
+  await page.getByTestId('chat-media-panel-close').click();
+  await page.getByTestId('chat-message-input').fill('reply photo');
+  await page.getByTestId('chat-send-button').click();
+  await expect
+    .poll(async () => {
+      const savedMessages = await getSavedClipboardMessages(page);
+      return savedMessages.some(
+        (message) =>
+          String(message?.content || '') === 'reply photo' &&
+          String(message?.reply_to_id || '') === 'msg-image-1'
+      );
+    })
+    .toBeTruthy();
+
+  await page.getByTestId('chat-open-drawer').click();
+  await page.getByTestId('chat-file-reply-msg-file-1').click();
+  await expect(page.getByTestId('chat-reply-banner')).toBeVisible();
+  await page.getByTestId('chat-room-drawer').locator('button').first().click();
+  await page.getByTestId('chat-message-input').fill('reply file');
+  await page.getByTestId('chat-send-button').click();
+  await expect
+    .poll(async () => {
+      const savedMessages = await getSavedClipboardMessages(page);
+      return savedMessages.some(
+        (message) =>
+          String(message?.content || '') === 'reply file' &&
+          String(message?.reply_to_id || '') === 'msg-file-1'
+      );
+    })
+    .toBeTruthy();
+
+  await page.getByTestId('chat-open-drawer').click();
+  await page.getByTestId('chat-shared-link-reply-msg-link-1').click();
+  await expect(page.getByTestId('chat-reply-banner')).toBeVisible();
+  await page.getByTestId('chat-room-drawer').locator('button').first().click();
+  await page.getByTestId('chat-message-input').fill('reply link');
+  await page.getByTestId('chat-send-button').click();
+  await expect
+    .poll(async () => {
+      const savedMessages = await getSavedClipboardMessages(page);
+      return savedMessages.some(
+        (message) =>
+          String(message?.content || '') === 'reply link' &&
+          String(message?.reply_to_id || '') === 'msg-link-1'
+      );
+    })
+    .toBeTruthy();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('chat falls back to app-server upload when direct storage upload fails', async ({ page }) => {
   const runtimeErrors = trackRuntimeErrors(page);
   let uploadPlanCalls = 0;
@@ -395,7 +462,7 @@ test('chat falls back to app-server upload when direct storage upload fails', as
     staffMembers: [fakeUser, peerUser],
     chatRooms: [
       {
-        id: 'room-clipboard',
+        id: CLIPBOARD_ROOM_ID,
         name: '',
         type: 'direct',
         members: [fakeUser.id, peerUser.id],
@@ -447,19 +514,9 @@ test('chat falls back to app-server upload when direct storage upload fails', as
     await route.abort('failed');
   });
 
-  await seedSession(page, {
-    localStorage: {
-      erp_last_menu: '채팅',
-      erp_chat_last_room: 'room-clipboard',
-    },
-  });
+  await openClipboardChat(page);
 
-  await page.goto(`/main?open_menu=${encodeURIComponent('채팅')}`);
-
-  await expect(page.getByTestId('chat-view')).toBeVisible();
-  await page.getByTestId('chat-room-room-clipboard').click();
-
-  await page.locator('input[type="file"]').first().setInputFiles({
+  await page.getByTestId('chat-file-input').setInputFiles({
     name: 'fallback-image.png',
     mimeType: 'image/png',
     buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
@@ -471,17 +528,12 @@ test('chat falls back to app-server upload when direct storage upload fails', as
 
   await expect
     .poll(async () => {
-      const savedMessages = await page.evaluate(async () => {
-        const response = await fetch('/rest/v1/messages?room_id=eq.room-clipboard&select=*');
-        return response.json();
-      });
-      return Array.isArray(savedMessages)
-        ? savedMessages.some(
-            (message) =>
-              String(message?.file_name || '') === 'fallback-image.png' &&
-              String(message?.file_url || '').includes('/api/storage/object?provider=r2'),
-          )
-        : false;
+      const savedMessages = await getSavedClipboardMessages(page);
+      return savedMessages.some(
+        (message) =>
+          String(message?.file_name || '') === 'fallback-image.png' &&
+          String(message?.file_url || '').includes('/api/storage/object?provider=r2'),
+      );
     })
     .toBeTruthy();
 
