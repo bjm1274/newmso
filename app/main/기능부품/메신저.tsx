@@ -2686,14 +2686,23 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const fetchData = useCallback(async () => {
     if (!selectedRoomId) return;
     const roomIdForFetch = String(selectedRoomId);
+    const requestSeq = fetchDataRequestSeqRef.current + 1;
+    fetchDataRequestSeqRef.current = requestSeq;
+    const isCurrentRequest = () =>
+      fetchDataRequestSeqRef.current === requestSeq &&
+      String(selectedRoomIdRef.current || '') === roomIdForFetch;
+
     const { data: roomRows } = (await supabase.from('chat_rooms').select(CHAT_ROOM_SELECT)) as {
       data: ChatRoom[] | null;
       error: unknown;
     };
+    if (!isCurrentRequest()) return;
     const repairedRooms = await repairDirectRooms(roomRows || []);
+    if (!isCurrentRequest()) return;
     const selectedRoomRecord =
       repairedRooms.find(( room: ChatRoom) => String(room.id) === roomIdForFetch) || null;
     const list = await syncChatRoomsState(repairedRooms);
+    if (!isCurrentRequest()) return;
 
     if (!selectedRoomRecord || !isRoomAccessibleToCurrentUser(selectedRoomRecord)) {
       const fallbackRoomId =
@@ -2720,6 +2729,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     if (canonicalDirectRoom?.id && String(canonicalDirectRoom.id) !== roomIdForFetch) {
       setRoom(String(canonicalDirectRoom.id));
     }
+    if (!isCurrentRequest()) return;
     const roomIdsToLoad = Array.from(
       new Set(
         selectedRoomKey
@@ -2745,6 +2755,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       console.error('채팅 메시지 불러오기 실패:', messagesError);
       return;
     }
+    if (!isCurrentRequest()) return;
     const loadedMessages = Array.isArray(msgs) ? msgs : [];
     if (msgs) {
       const enrichedMessages = loadedMessages.map((msg: ChatMessage) => {
@@ -2766,6 +2777,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       });
     }
 
+    const messageIds = loadedMessages.map((msg: ChatMessage) => String(msg.id || '')).filter(Boolean);
+    const roomMemberIds = getEffectiveRoomMemberIds(selectedRoomRecord);
     const fetchedRoomSummary = buildRoomSummaryFromMessages(roomIdForFetch, loadedMessages);
     applyRoomSummaryToState(roomIdForFetch, fetchedRoomSummary);
     const currentPreviewText =
@@ -2777,17 +2790,53 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     ) {
       await persistRoomSummary(roomIdForFetch, fetchedRoomSummary);
     }
+    if (!isCurrentRequest()) return;
+
+    const [
+      roomReadCursorsResult,
+      bookmarksResult,
+      pinnedResult,
+      reactionsResult,
+      pollsResult,
+    ] = await Promise.allSettled([
+      messageIds.length > 0 && roomMemberIds.length > 0
+        ? supabase
+            .from('room_read_cursors')
+            .select('user_id, last_read_at')
+            .in('room_id', roomIdsToLoad)
+            .in('user_id', roomMemberIds)
+        : Promise.resolve({ data: [], error: null }),
+      effectiveTodoUserId && messageIds.length > 0
+        ? supabase
+            .from('message_bookmarks')
+            .select('message_id')
+            .eq('user_id', effectiveTodoUserId)
+            .in('message_id', messageIds)
+        : Promise.resolve({ data: [], error: null }),
+      supabase
+        .from('pinned_messages')
+        .select('message_id')
+        .eq('room_id', roomIdForFetch),
+      messageIds.length > 0
+        ? supabase
+            .from('message_reactions')
+            .select('message_id, emoji, user_id')
+            .in('message_id', messageIds)
+        : Promise.resolve({ data: [], error: null }),
+      supabase
+        .from('polls')
+        .select(POLL_SELECT)
+        .eq('room_id', roomIdForFetch) as PromiseLike<{ data: PollItem[] | null; error: unknown }>,
+    ]);
+    if (!isCurrentRequest()) return;
 
     if (msgs?.length) {
-      const ids = msgs.map(( m: ChatMessage) => String(m.id));
-      const roomMemberIds = getEffectiveRoomMemberIds(selectedRoomRecord);
       const nextRoomReadCursorMap: Record<string, string> = {};
-      if (roomMemberIds.length > 0) {
-        const { data: cursors } = await supabase
-          .from('room_read_cursors')
-          .select('user_id, last_read_at')
-          .in('room_id', roomIdsToLoad)
-          .in('user_id', roomMemberIds);
+      if (roomMemberIds.length > 0 && roomReadCursorsResult.status === 'fulfilled') {
+        const { data: cursors, error: cursorsError } = roomReadCursorsResult.value;
+        if (cursorsError) {
+          console.error('읽음 커서 불러오기 실패:', cursorsError);
+        }
         (cursors || []).forEach((cursor: Record<string, unknown>) => {
           const memberId = String(cursor.user_id || '');
           const lastReadAt = String(cursor.last_read_at || '');
@@ -2797,6 +2846,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             nextRoomReadCursorMap[memberId] = mergedReadAt;
           }
         });
+      } else if (roomReadCursorsResult.status === 'rejected') {
+        console.error('읽음 커서 불러오기 실패:', roomReadCursorsResult.reason);
       }
       setRoomReadCursorMap(nextRoomReadCursorMap);
 
@@ -2812,18 +2863,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       });
       setReadCounts(counts);
       if (effectiveTodoUserId) {
-        try {
-          const { data: bookmarks, error: bookmarkError } = await supabase
-            .from('message_bookmarks')
-            .select('message_id')
-            .eq('user_id', effectiveTodoUserId)
-            .in('message_id', ids);
-          if (bookmarkError) throw bookmarkError;
-          const nextBookmarkIds = (bookmarks || []).map((bookmark: Record<string, unknown>) => String(bookmark.message_id));
+        if (bookmarksResult.status === 'fulfilled' && !bookmarksResult.value.error) {
+          const nextBookmarkIds = (bookmarksResult.value.data || []).map((bookmark: Record<string, unknown>) => String(bookmark.message_id));
           setBookmarkedIds(new Set(nextBookmarkIds));
           writeStoredBookmarks(effectiveTodoUserId, nextBookmarkIds);
-        } catch {
-          setBookmarkedIds(new Set(readStoredBookmarks(effectiveTodoUserId).filter((bookmarkId) => ids.includes(bookmarkId))));
+        } else {
+          setBookmarkedIds(new Set(readStoredBookmarks(effectiveTodoUserId).filter((bookmarkId) => messageIds.includes(bookmarkId))));
         }
       }
     } else {
@@ -2833,10 +2878,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     }
 
     try {
-      const { data: pinned, error: pinnedError } = await supabase
-        .from('pinned_messages')
-        .select('message_id')
-        .eq('room_id', roomIdForFetch);
+      if (pinnedResult.status === 'rejected') throw pinnedResult.reason;
+      const { data: pinned, error: pinnedError } = pinnedResult.value;
       if (pinnedError) throw pinnedError;
       const nextPinnedIds = (pinned || []).map((item: Record<string, unknown>) => String(item.message_id)).slice(-1);
       setPinnedIds(nextPinnedIds);
@@ -2864,6 +2907,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 }>
           );
           if (pinnedRowsError) throw pinnedRowsError;
+          if (!isCurrentRequest()) return;
           (pinnedRows || []).forEach((msg: ChatMessage) => {
             pinnedLookup.set(String(msg.id), {
               ...msg,
@@ -2881,11 +2925,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       }
     } catch (error) {
       console.error('공지 메시지 불러오기 실패:', error);
+      setPinnedIds([]);
       setPersistedPinnedMessages([]);
     }
 
     try {
-      const { data: reacts } = await supabase.from('message_reactions').select('message_id, emoji, user_id');
+      if (reactionsResult.status === 'rejected') throw reactionsResult.reason;
+      const { data: reacts, error: reactionsError } = reactionsResult.value;
+      if (reactionsError) throw reactionsError;
       const reactMap: Record<string, Record<string, number>> = {};
       const reactionUsersMap: ReactionUsersByMessage = {};
       reacts?.forEach(( r: Record<string, unknown>) => {
@@ -2932,27 +2979,39 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     }
 
     try {
-      const { data: dbPolls } = (await supabase
-        .from('polls')
-        .select(POLL_SELECT)
-        .eq('room_id', roomIdForFetch)) as { data: PollItem[] | null; error: unknown };
+      if (pollsResult.status === 'rejected') throw pollsResult.reason;
+      const { data: dbPolls, error: pollsError } = pollsResult.value;
+      if (pollsError) throw pollsError;
       if (dbPolls?.length) {
         setPolls(dbPolls);
       } else {
         setPolls([]);
       }
-      const { data: votes } = await supabase.from('poll_votes').select('poll_id, option_index');
-      const vMap: Record<string, Record<number, number>> = {};
-      votes?.forEach((v: Record<string, unknown>) => {
-        const pollId = v.poll_id as string;
-        const optIdx = v.option_index as number;
-        if (!vMap[pollId]) vMap[pollId] = {};
-        vMap[pollId][optIdx] = (vMap[pollId][optIdx] || 0) + 1;
-      });
-      setPollVotes(vMap);
+      const pollIds = (dbPolls || []).map((poll) => String(poll.id || '')).filter(Boolean);
+      if (pollIds.length === 0) {
+        setPollVotes({});
+      } else {
+        const { data: votes, error: pollVotesError } = await supabase
+          .from('poll_votes')
+          .select('poll_id, option_index')
+          .in('poll_id', pollIds);
+        if (pollVotesError) throw pollVotesError;
+        if (!isCurrentRequest()) return;
+        const vMap: Record<string, Record<number, number>> = {};
+        votes?.forEach((v: Record<string, unknown>) => {
+          const pollId = v.poll_id as string;
+          const optIdx = v.option_index as number;
+          if (!vMap[pollId]) vMap[pollId] = {};
+          vMap[pollId][optIdx] = (vMap[pollId][optIdx] || 0) + 1;
+        });
+        setPollVotes(vMap);
+      }
     } catch (error) {
       console.error('투표 데이터 불러오기 실패:', error);
+      setPolls([]);
+      setPollVotes({});
     }
+    if (!isCurrentRequest()) return;
 
     // 읽음 커서/message_reads 쓰기는 방 선택 시(setRoom)와 실시간 새 메시지 수신 시에만 수행.
     // fetchData 내부에서 호출하면 realtime → fetchData 무한 루프 발생하므로 제거.
