@@ -257,6 +257,10 @@ function getMessageDisplayText(
   return String(fallback ?? '');
 }
 
+function getDeletedMessagePreviewText() {
+  return '삭제된 메시지입니다.';
+}
+
 function getPendingAttachmentDisplayName(file: File): string {
   const rawName = String(file.name || '').trim();
   if (rawName) return rawName;
@@ -292,6 +296,20 @@ function isMessageReadByCursor(messageCreatedAt: string | null | undefined, last
   const cursorTime = new Date(lastReadAt).getTime();
   if (!Number.isFinite(messageTime) || !Number.isFinite(cursorTime)) return false;
   return cursorTime >= messageTime;
+}
+
+function getLatestReadCursor(
+  currentValue: string | null | undefined,
+  nextValue: string | null | undefined
+): string | null {
+  if (!nextValue) return currentValue || null;
+  if (!currentValue) return nextValue;
+
+  const currentTime = new Date(currentValue).getTime();
+  const nextTime = new Date(nextValue).getTime();
+  if (!Number.isFinite(currentTime)) return Number.isFinite(nextTime) ? nextValue : currentValue;
+  if (!Number.isFinite(nextTime)) return currentValue;
+  return nextTime >= currentTime ? nextValue : currentValue;
 }
 
 function isActiveNoticeMember(staff: StaffMember | null | undefined): boolean {
@@ -445,6 +463,26 @@ function buildChatMessageInsertPayload(
     album_index: payload.albumIndex ?? null,
     album_total: payload.albumTotal ?? null,
   };
+}
+
+function shouldTriggerImmediateChatPush(payload: {
+  albumId?: string | null;
+  albumIndex?: number | null;
+  albumTotal?: number | null;
+}) {
+  const albumId = String(payload.albumId || '').trim();
+  const albumTotal = Number(payload.albumTotal ?? 0);
+  const albumIndex = Number(payload.albumIndex ?? Number.NaN);
+
+  if (!albumId || !Number.isFinite(albumTotal) || albumTotal <= 1) {
+    return true;
+  }
+
+  if (!Number.isFinite(albumIndex)) {
+    return true;
+  }
+
+  return albumIndex >= albumTotal - 1;
 }
 
 type SendMessageOptions = {
@@ -907,6 +945,7 @@ export default function ChatView({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const pendingScrollMsgIdRef = useRef<string | null>(null);
   const pendingBottomAlignRoomIdRef = useRef<string | null>(null);
+  const fetchDataRequestSeqRef = useRef(0);
   const timelineItemCountRef = useRef(0);
   const [omniSearch, setOmniSearch] = useState('');
   const [chatSearch, setChatSearch] = useState('');
@@ -1411,48 +1450,6 @@ export default function ChatView({
     }
   };
 
-  const handleRoomListClick = (roomId: string) => {
-    const normalizedRoomId = String(roomId || '').trim();
-    const isSameRoom = normalizedRoomId !== '' && String(selectedRoomIdRef.current || '') === normalizedRoomId;
-
-    setRoom(normalizedRoomId || null);
-
-    if (!normalizedRoomId || typeof window === 'undefined') return;
-
-    const alignToLatestFromListClick = () => {
-      if (selectedRoomIdRef.current !== normalizedRoomId) return;
-
-      const listEl = messageListRef.current;
-      if (listEl) {
-        listEl.scrollTop = listEl.scrollHeight;
-      } else {
-        scrollRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
-      }
-
-      if (!isMobileChatViewport()) {
-        composerRef.current?.scrollIntoView({
-          behavior: 'auto',
-          block: 'end',
-          inline: 'nearest',
-        });
-      }
-
-      isNearBottomRef.current = true;
-      setShowScrollToLatest(false);
-
-      if (isSameRoom && pendingBottomAlignRoomIdRef.current === normalizedRoomId) {
-        pendingBottomAlignRoomIdRef.current = null;
-      }
-    };
-
-    window.requestAnimationFrame(() => {
-      alignToLatestFromListClick();
-      window.requestAnimationFrame(alignToLatestFromListClick);
-    });
-    window.setTimeout(alignToLatestFromListClick, 120);
-    window.setTimeout(alignToLatestFromListClick, 260);
-  };
-
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -1637,11 +1634,24 @@ export default function ChatView({
 
     isNearBottomRef.current = true;
     setShowScrollToLatest(false);
-
-    if (pendingBottomAlignRoomIdRef.current === roomId) {
-      pendingBottomAlignRoomIdRef.current = null;
-    }
   }, []);
+
+  const handleRoomListClick = useCallback((roomId: string) => {
+    const normalizedRoomId = String(roomId || '').trim();
+    if (!normalizedRoomId) {
+      setRoom(null);
+      return;
+    }
+
+    const isSameRoom = String(selectedRoomIdRef.current || '') === normalizedRoomId;
+    if (isSameRoom) {
+      pendingBottomAlignRoomIdRef.current = normalizedRoomId;
+      alignRoomToLatest(normalizedRoomId, 'auto');
+      return;
+    }
+
+    setRoom(normalizedRoomId);
+  }, [alignRoomToLatest]);
 
   const persistMessageReads = useCallback(async (messageIds: string[]) => {
     if (!effectiveChatUserId || messageIds.length === 0) return;
@@ -1742,6 +1752,11 @@ export default function ChatView({
   const updateScrollPositionState = useCallback(() => {
     const listEl = messageListRef.current;
     if (!listEl) return;
+    if (selectedRoomId && pendingBottomAlignRoomIdRef.current === selectedRoomId) {
+      isNearBottomRef.current = true;
+      setShowScrollToLatest(false);
+      return;
+    }
     const nearBottom = listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight < 96;
     isNearBottomRef.current = nearBottom;
     setShowScrollToLatest(!nearBottom && Boolean(selectedRoomId));
@@ -2274,19 +2289,23 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       };
     }
 
-    let latestVisibleMessage: ChatMessage | undefined;
-    let latestVisibleTime = Number.NEGATIVE_INFINITY;
-    sourceMessages.forEach((message: ChatMessage) => {
-      if (String(message.room_id || '') !== targetRoomId || message.is_deleted) return;
+    const roomScopedMessages = sourceMessages.filter(
+      (message: ChatMessage) => String(message.room_id || '').trim() === targetRoomId
+    );
+    const summarySourceMessages = roomScopedMessages.length > 0 ? roomScopedMessages : sourceMessages;
+
+    let latestMessage: ChatMessage | undefined;
+    let latestMessageTime = Number.NEGATIVE_INFINITY;
+    summarySourceMessages.forEach((message: ChatMessage) => {
       const createdAt = new Date(message.created_at || 0).getTime();
       if (!Number.isFinite(createdAt)) return;
-      if (createdAt >= latestVisibleTime) {
-        latestVisibleTime = createdAt;
-        latestVisibleMessage = message;
+      if (createdAt >= latestMessageTime) {
+        latestMessageTime = createdAt;
+        latestMessage = message;
       }
     });
 
-    if (!latestVisibleMessage) {
+    if (!latestMessage) {
       return {
         last_message: null,
         last_message_preview: null,
@@ -2294,18 +2313,20 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       };
     }
 
-    const resolvedLatestVisibleMessage = latestVisibleMessage as ChatMessage;
-    const previewText = getMessageDisplayText(
-      resolvedLatestVisibleMessage.content,
-      resolvedLatestVisibleMessage.file_name,
-      resolvedLatestVisibleMessage.file_url,
-      ''
-    ) || null;
+    const resolvedLatestMessage = latestMessage as ChatMessage;
+    const previewText = resolvedLatestMessage.is_deleted
+      ? getDeletedMessagePreviewText()
+      : getMessageDisplayText(
+          resolvedLatestMessage.content,
+          resolvedLatestMessage.file_name,
+          resolvedLatestMessage.file_url,
+          ''
+        ) || null;
 
     return {
       last_message: previewText,
       last_message_preview: previewText,
-      last_message_at: resolvedLatestVisibleMessage.created_at || null,
+      last_message_at: resolvedLatestMessage.created_at || null,
     };
   }, []);
 
@@ -2724,8 +2745,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       console.error('채팅 메시지 불러오기 실패:', messagesError);
       return;
     }
+    const loadedMessages = Array.isArray(msgs) ? msgs : [];
     if (msgs) {
-      const enrichedMessages = msgs.map((msg: ChatMessage) => {
+      const enrichedMessages = loadedMessages.map((msg: ChatMessage) => {
         const matchedStaff = resolveStaffProfile(msg.sender_id);
         return {
           ...msg,
@@ -2744,6 +2766,18 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       });
     }
 
+    const fetchedRoomSummary = buildRoomSummaryFromMessages(roomIdForFetch, loadedMessages);
+    applyRoomSummaryToState(roomIdForFetch, fetchedRoomSummary);
+    const currentPreviewText =
+      selectedRoomRecord?.last_message_preview ?? selectedRoomRecord?.last_message ?? null;
+    const currentPreviewAt = selectedRoomRecord?.last_message_at ?? null;
+    if (
+      currentPreviewText !== fetchedRoomSummary.last_message_preview ||
+      currentPreviewAt !== fetchedRoomSummary.last_message_at
+    ) {
+      await persistRoomSummary(roomIdForFetch, fetchedRoomSummary);
+    }
+
     if (msgs?.length) {
       const ids = msgs.map(( m: ChatMessage) => String(m.id));
       const roomMemberIds = getEffectiveRoomMemberIds(selectedRoomRecord);
@@ -2752,13 +2786,16 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         const { data: cursors } = await supabase
           .from('room_read_cursors')
           .select('user_id, last_read_at')
-          .eq('room_id', roomIdForFetch)
+          .in('room_id', roomIdsToLoad)
           .in('user_id', roomMemberIds);
         (cursors || []).forEach((cursor: Record<string, unknown>) => {
           const memberId = String(cursor.user_id || '');
           const lastReadAt = String(cursor.last_read_at || '');
           if (!memberId || !lastReadAt) return;
-          nextRoomReadCursorMap[memberId] = lastReadAt;
+          const mergedReadAt = getLatestReadCursor(nextRoomReadCursorMap[memberId], lastReadAt);
+          if (mergedReadAt) {
+            nextRoomReadCursorMap[memberId] = mergedReadAt;
+          }
         });
       }
       setRoomReadCursorMap(nextRoomReadCursorMap);
@@ -2940,7 +2977,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         pendingBottomAlignRoomIdRef.current = null;
       }
     }
-  }, [selectedRoomId, user?.id, effectiveChatUserId, effectiveTodoUserId, repairDirectRooms, syncChatRoomsState, resolveStaffProfile, alignRoomToLatest, getEffectiveRoomMemberIds, isRoomAccessibleToCurrentUser]);
+  }, [selectedRoomId, user?.id, effectiveChatUserId, effectiveTodoUserId, repairDirectRooms, syncChatRoomsState, resolveStaffProfile, alignRoomToLatest, getEffectiveRoomMemberIds, isRoomAccessibleToCurrentUser, buildRoomSummaryFromMessages, applyRoomSummaryToState, persistRoomSummary]);
 
   const applyRoomMemberChange = useCallback(async ({
     roomId,
@@ -3144,9 +3181,15 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, () => fetchData())
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'room_read_cursors', filter: `room_id=eq.${selectedRoomId}` }, (payload: Record<string, unknown>) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'room_read_cursors' }, (payload: Record<string, unknown>) => {
         // 자신의 커서 업데이트는 낙관적으로 처리됨 — full refetch 생략하여 메시지 수신 지연 방지
-        const updatedUserId = (payload.new as Record<string, unknown> | null)?.user_id;
+        const updatedRow =
+          (payload.new as Record<string, unknown> | null) ||
+          (payload.old as Record<string, unknown> | null) ||
+          null;
+        const updatedRoomId = String(updatedRow?.room_id || '').trim();
+        if (!updatedRoomId || !isRoomInSelectedConversation(updatedRoomId, chatRoomsRef.current)) return;
+        const updatedUserId = updatedRow?.user_id;
         if (updatedUserId && String(updatedUserId) === String(effectiveChatUserId || '')) return;
         fetchData();
       })
@@ -3175,7 +3218,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       disposed = true;
       supabase.removeChannel(channel);
     };
-  }, [selectedRoomId, roomRealtimeRetryToken, fetchData, effectiveTodoUserId, user?.id, handleIncomingRealtimeMessage, scheduleRealtimeReconnect]);
+  }, [selectedRoomId, roomRealtimeRetryToken, fetchData, effectiveTodoUserId, user?.id, handleIncomingRealtimeMessage, scheduleRealtimeReconnect, isRoomInSelectedConversation, effectiveChatUserId]);
 
   useEffect(() => {
     if (!selectedRoomId) {
@@ -4093,7 +4136,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         )
       );
       broadcastChatSync('message-sent', roomId);
-      void triggerChatPush(String(inserted.room_id), String(inserted.id));
+      if (shouldTriggerImmediateChatPush({
+        albumId: inserted.album_id,
+        albumIndex: inserted.album_index,
+        albumTotal: inserted.album_total,
+      })) {
+        void triggerChatPush(String(inserted.room_id), String(inserted.id));
+      }
       return true;
     } else {
       setDeliveryStates((prev) => ({
@@ -4991,7 +5040,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     if (deferredChatSearch.trim()) {
       const q = deferredChatSearch.toLowerCase();
       return msgs.filter((m) =>
-        ((m.is_deleted ? '삭제된 메시지입니다' : (m.content || ''))).toLowerCase().includes(q) ||
+        ((m.is_deleted ? getDeletedMessagePreviewText() : (m.content || ''))).toLowerCase().includes(q) ||
         ((m.staff as { name?: string } | null | undefined)?.name || '').toLowerCase().includes(q)
       );
     }
@@ -5102,7 +5151,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           : message
       )
     );
-    syncRoomSummaryFromMessages(msg.room_id, nextMessagesSnapshot);
+    syncRoomSummaryFromMessages(msg.room_id || selectedRoomId, nextMessagesSnapshot);
     await supabase.from('messages').update({ is_deleted: true }).eq('id', msg.id);
     // 감사 로그 기록
     try {
@@ -5197,7 +5246,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           : message
       )
     );
-    syncRoomSummaryFromMessages(targetMessage.room_id, nextMessagesSnapshot);
+    syncRoomSummaryFromMessages(targetMessage.room_id || selectedRoomId, nextMessagesSnapshot);
 
     const { error } = await supabase
       .from('messages')
@@ -5209,7 +5258,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       fetchData();
       return;
     }
-  }, [editingMessage, editingMessageDraft, fetchData, syncRoomSummaryFromMessages]);
+  }, [editingMessage, editingMessageDraft, fetchData, selectedRoomId, syncRoomSummaryFromMessages]);
 
   return (
     <div data-testid="chat-view" className="flex flex-1 min-h-0 overflow-hidden relative font-sans bg-[var(--background)] md:h-[100dvh] md:max-h-[100dvh] md:bg-[var(--card)]">
@@ -5815,7 +5864,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             ) : null;
                           })()}
                           <div className={`leading-relaxed ${(msg.content && !isDeletedMessage) ? 'mb-0.5' : ''}`}>
-                            {isDeletedMessage ? '삭제된 메시지입니다.' : renderMessageContent(msg.content || '', isMine, activeMessageHighlightQuery)}
+                            {isDeletedMessage ? getDeletedMessagePreviewText() : renderMessageContent(msg.content || '', isMine, activeMessageHighlightQuery)}
                           </div>
                           {!isDeletedMessage && msg.file_url && (() => {
                             const furl = msg.file_url!;

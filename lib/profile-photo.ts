@@ -1,5 +1,18 @@
 const PROFILE_PHOTO_BUCKET = 'profiles';
 const PLACEHOLDER_SUPABASE_URL = 'https://placeholder.supabase.co';
+const STAFF_ALLOWANCE_KEYS = [
+  'meal_allowance',
+  'night_duty_allowance',
+  'vehicle_allowance',
+  'childcare_allowance',
+  'research_allowance',
+  'other_taxfree',
+  'position_allowance',
+  'overtime_allowance',
+  'night_work_allowance',
+  'holiday_work_allowance',
+  'annual_leave_pay',
+] as const;
 
 function cleanString(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -10,6 +23,12 @@ function cleanString(value: unknown): string | null {
 function asRecord(value: unknown): Record<string, any> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   return value as Record<string, any>;
+}
+
+function cleanFiniteNumber(value: unknown): number | null {
+  if (value === null || typeof value === 'undefined' || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function getSupabasePublicBaseUrl(): string | null {
@@ -65,6 +84,7 @@ export function normalizeProfileUser<T>(source: T): T {
 
   const base = source as Record<string, any>;
   const permissions = asRecord(base.permissions);
+  const payrollAllowances = asRecord(permissions.payroll_allowances);
   const extension =
     cleanString(base.extension) ||
     cleanString(permissions.extension);
@@ -90,8 +110,11 @@ export function normalizeProfileUser<T>(source: T): T {
   if (photoUrl) {
     normalizedPermissions.profile_photo_url = photoUrl;
   }
+  if (Object.keys(payrollAllowances).length > 0) {
+    normalizedPermissions.payroll_allowances = payrollAllowances;
+  }
 
-  return {
+  const normalizedBase = {
     ...base,
     permissions: normalizedPermissions,
     extension,
@@ -101,7 +124,19 @@ export function normalizeProfileUser<T>(source: T): T {
     profile_photo_updated_at: photoUpdatedAt,
     avatar_url: photoUrl,
     photo_url: photoUrl,
-  } as T;
+  } as Record<string, any>;
+
+  for (const key of STAFF_ALLOWANCE_KEYS) {
+    const topLevelValue = cleanFiniteNumber(base[key]);
+    const fallbackValue = cleanFiniteNumber(payrollAllowances[key] ?? permissions[key]);
+    if (topLevelValue !== null) {
+      normalizedBase[key] = topLevelValue;
+    } else if (fallbackValue !== null) {
+      normalizedBase[key] = fallbackValue;
+    }
+  }
+
+  return normalizedBase as T;
 }
 
 export function withProfilePhotoMetadata<T>(

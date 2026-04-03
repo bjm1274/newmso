@@ -173,3 +173,76 @@ test('chat reverse actions can unpin, vote, remove a participant, and edit/delet
 
   expect(runtimeErrors).toEqual([]);
 });
+
+test('chat room list shows deleted placeholder after removing the latest message', async ({
+  page,
+}) => {
+  page.on('dialog', async (dialog) => {
+    await dialog.accept();
+  });
+
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    staffMembers: [fakeUser, peerOne],
+    chatRooms: [
+      {
+        id: '00000000-0000-0000-0000-000000000000',
+        name: '공지메시지',
+        type: 'notice',
+        members: [fakeUser.id],
+        created_at: '2026-03-08T00:00:00.000Z',
+        last_message_at: '2026-03-08T00:00:00.000Z',
+      },
+      {
+        id: 'room-delete-preview',
+        name: '삭제 미리보기 방',
+        type: 'group',
+        members: [fakeUser.id, peerOne.id],
+        created_at: '2026-03-08T09:00:00.000Z',
+        last_message_at: '2026-03-08T10:00:00.000Z',
+        last_message_preview: '삭제 대상 메시지',
+        created_by: fakeUser.id,
+      },
+    ],
+    messages: [
+      {
+        id: 'msg-delete-preview',
+        room_id: 'room-delete-preview',
+        sender_id: fakeUser.id,
+        content: '삭제 대상 메시지',
+        created_at: '2026-03-08T10:00:00.000Z',
+        is_deleted: false,
+        staff: { name: fakeUser.name, photo_url: null, position: fakeUser.position },
+        chat_rooms: {
+          id: 'room-delete-preview',
+          name: '삭제 미리보기 방',
+          type: 'group',
+          members: [fakeUser.id, peerOne.id],
+        },
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '채팅',
+      erp_chat_last_room: 'room-delete-preview',
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent('채팅')}`);
+
+  await expect(page.getByTestId('chat-view')).toBeVisible();
+  await expect(page.getByTestId('chat-room-room-delete-preview')).toContainText('삭제 대상 메시지');
+
+  await page.getByTestId('chat-message-msg-delete-preview').click();
+  await page.getByTestId('chat-message-action-delete').click();
+  await expect(page.getByTestId('chat-room-room-delete-preview')).toContainText('삭제된 메시지입니다.');
+
+  await page.reload();
+  await expect(page.getByTestId('chat-view')).toBeVisible();
+  await expect(page.getByTestId('chat-room-room-delete-preview')).toContainText('삭제된 메시지입니다.');
+
+  expect(runtimeErrors).toEqual([]);
+});

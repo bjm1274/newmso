@@ -12,6 +12,9 @@ type MessageRow = {
   created_at: string;
   file_url: string | null;
   file_kind: string | null;
+  album_id: string | null;
+  album_index: number | null;
+  album_total: number | null;
 };
 
 type ChatRoomRow = {
@@ -213,18 +216,49 @@ async function selectPendingChatPushJobs(supabase: SupabaseClient, limit: number
   throw retryAwareRes.error;
 }
 
+function toFiniteNumber(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getAlbumPushContext(message: MessageRow) {
+  const albumId = String(message.album_id || '').trim();
+  const albumIndex = toFiniteNumber(message.album_index);
+  const albumTotal = toFiniteNumber(message.album_total);
+  const isAlbumBatch = Boolean(albumId && albumTotal && albumTotal > 1);
+  const isLastAlbumItem = Boolean(
+    isAlbumBatch &&
+    albumIndex !== null &&
+    albumTotal !== null &&
+    albumIndex >= albumTotal - 1,
+  );
+
+  return {
+    albumId: albumId || null,
+    albumIndex,
+    albumTotal,
+    isAlbumBatch,
+    isLastAlbumItem,
+    notificationTag: isAlbumBatch ? `chat-album-${albumId}` : `chat-msg-${message.id}`,
+  };
+}
+
 function buildPreview(message: MessageRow) {
+  const albumContext = getAlbumPushContext(message);
   const content = String(message.content || '').trim();
   if (content) return content.slice(0, 80);
+  if (albumContext.isAlbumBatch && message.file_kind === 'image' && albumContext.albumTotal) {
+    return `사진 ${albumContext.albumTotal}장을 보냈습니다.`;
+  }
   if (message.file_kind === 'image') return '사진을 보냈습니다.';
   if (message.file_kind === 'video') return '동영상을 보냈습니다.';
   if (message.file_url) return '파일을 보냈습니다.';
   return '새 메시지가 도착했습니다.';
 }
 
-function buildDeterministicNotificationId(userId: string, messageId: string) {
+function buildDeterministicNotificationId(userId: string, stableKey: string) {
   const bytes = createHash('sha256')
-    .update(`chat-notification:${userId}:${messageId}`)
+    .update(`chat-notification:${userId}:${stableKey}`)
     .digest()
     .subarray(0, 16);
 
@@ -318,7 +352,7 @@ export async function dispatchChatPushForMessage(params: {
     Promise.all([
       supabase
         .from('messages')
-        .select('id, room_id, sender_id, content, created_at, file_url, file_kind')
+        .select('id, room_id, sender_id, content, created_at, file_url, file_kind, album_id, album_index, album_total')
         .eq('id', params.messageId)
         .single(),
       supabase
@@ -349,9 +383,26 @@ export async function dispatchChatPushForMessage(params: {
   const message = messageRes.data as MessageRow;
   const room = roomRes.data as ChatRoomRow;
   const senderId = String(message.sender_id || '');
+  const albumContext = getAlbumPushContext(message);
 
   if (params.expectedSenderId && senderId !== String(params.expectedSenderId)) {
     throw new Error('Only the message sender can trigger chat push.');
+  }
+
+  if (albumContext.isAlbumBatch && !albumContext.isLastAlbumItem) {
+    await updateChatPushJobByMessageId(supabase, params.messageId, {
+      processed_at: new Date().toISOString(),
+      processing_started_at: null,
+      last_error: 'album-batch-intermediate-suppressed',
+    });
+    return {
+      sent: 0,
+      failed: 0,
+      targets: 0,
+      notificationsCreated: 0,
+      pushDisabled: false,
+      reason: 'album-batch-intermediate',
+    } satisfies ChatPushDispatchResult;
   }
 
   const members = Array.isArray(room.members) ? room.members.map((id) => String(id)) : [];
@@ -436,12 +487,16 @@ export async function dispatchChatPushForMessage(params: {
   }
 
   const staleNotificationIds = new Set<string>();
+  const notificationStableKey =
+    albumContext.isAlbumBatch && albumContext.albumId
+      ? `album:${albumContext.albumId}`
+      : `message:${params.messageId}`;
   const notificationRows: NotificationInsertRow[] = targetIds.map((targetId) => {
     const preferred = choosePreferredChatNotification(existingNotificationsByUser.get(targetId) || []);
     preferred?.staleIds.forEach((id) => staleNotificationIds.add(id));
 
     return {
-      id: preferred?.keep?.id || buildDeterministicNotificationId(targetId, params.messageId),
+      id: preferred?.keep?.id || buildDeterministicNotificationId(targetId, notificationStableKey),
       user_id: targetId,
       type: 'message',
       title,
@@ -450,11 +505,17 @@ export async function dispatchChatPushForMessage(params: {
         room_id: params.roomId,
         id: params.messageId,
         message_id: params.messageId,
+        album_id: albumContext.albumId,
+        album_index: albumContext.albumIndex,
+        album_total: albumContext.albumTotal,
         sender_name: senderName,
         room_name: room.name || '',
         type: 'message',
         created_at: message.created_at,
-        dedupe_key: `chat:${params.messageId}:${targetId}`,
+        dedupe_key:
+          albumContext.isAlbumBatch && albumContext.albumId
+            ? `chat:album:${albumContext.albumId}:${targetId}`
+            : `chat:${params.messageId}:${targetId}`,
       },
       read_at: null,
       created_at: message.created_at || new Date().toISOString(),
@@ -533,16 +594,21 @@ export async function dispatchChatPushForMessage(params: {
   let failed = 0;
   const expiredIds: string[] = [];
   const successfulFcmTokens = new Set<string>();
+  const notificationTag = albumContext.notificationTag;
   const payloadData = {
     room_id: params.roomId,
     message_id: params.messageId,
     created_at: message.created_at,
     type: 'message',
+    tag: notificationTag,
+    ...(albumContext.albumId ? { album_id: albumContext.albumId } : {}),
+    ...(albumContext.albumIndex !== null ? { album_index: String(albumContext.albumIndex) } : {}),
+    ...(albumContext.albumTotal !== null ? { album_total: String(albumContext.albumTotal) } : {}),
   };
   const webPushPayload = JSON.stringify({
     title,
     body: previewBody,
-    tag: `chat-msg-${params.messageId}`,
+    tag: notificationTag,
     data: payloadData,
   });
 

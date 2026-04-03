@@ -3,7 +3,7 @@ import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { StaffMember } from '@/types';
 import { supabase } from '@/lib/supabase';
-import { isMissingColumnError } from '@/lib/supabase-compat';
+import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import { getChecklistTargetDate, getDefaultChecklist } from '@/lib/hr-checklists';
 import StaffHistoryTimeline from './인사이력타임라인';
@@ -45,6 +45,53 @@ const TAXFREE_SALARY_FIELDS = [
   { key: 'research_allowance', label: '연구비' },
   { key: 'other_taxfree', label: '기타 비과세' },
 ] as const;
+
+const STAFF_MUTATION_ALLOWANCE_COLUMNS = [
+  'meal_allowance',
+  'night_duty_allowance',
+  'vehicle_allowance',
+  'childcare_allowance',
+  'research_allowance',
+  'other_taxfree',
+  'position_allowance',
+  'overtime_allowance',
+  'night_work_allowance',
+  'holiday_work_allowance',
+  'annual_leave_pay',
+] as const;
+
+function buildStaffMutationPayload(
+  payload: Record<string, unknown>,
+  omittedColumns: ReadonlySet<string>,
+) {
+  if (omittedColumns.size === 0) {
+    return payload;
+  }
+
+  const nextPayload: Record<string, unknown> = { ...payload };
+  const permissions =
+    nextPayload.permissions && typeof nextPayload.permissions === 'object' && !Array.isArray(nextPayload.permissions)
+      ? { ...(nextPayload.permissions as Record<string, unknown>) }
+      : {};
+  const fallbackAllowances =
+    permissions.payroll_allowances && typeof permissions.payroll_allowances === 'object' && !Array.isArray(permissions.payroll_allowances)
+      ? { ...(permissions.payroll_allowances as Record<string, unknown>) }
+      : {};
+
+  omittedColumns.forEach((columnName) => {
+    if (!(columnName in nextPayload)) return;
+    if ((STAFF_MUTATION_ALLOWANCE_COLUMNS as readonly string[]).includes(columnName)) {
+      fallbackAllowances[columnName] = nextPayload[columnName];
+    }
+    delete nextPayload[columnName];
+  });
+
+  if (Object.keys(fallbackAllowances).length > 0) {
+    permissions.payroll_allowances = fallbackAllowances;
+  }
+  nextPayload.permissions = permissions;
+  return nextPayload;
+}
 
 const MONTHLY_STANDARD_HOURS = 209;
 
@@ -535,12 +582,25 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         const beforeStaff = 직원목록.find((staff: StaffMember) => String(staff.id) === String(선택된직원ID)) || null;
         const afterStaff = {
           ...beforeStaff,
-          ...commonData,
+          /* ...commonData,
           annual_leave_total: 신규직원.연차총개수,
           annual_leave_used: 신규직원.연차사용개수,
         };
 
-        const { error: updateErr } = await supabase.from('staff_members').update({
+        const updatePayload = {
+          ...commonData,
+          annual_leave_total: afterStaff.annual_leave_total,
+          annual_leave_used: afterStaff.annual_leave_used,
+        };
+        const { error: updateErr } = await withMissingColumnsFallback(
+          (omittedColumns) =>
+            supabase
+              .from('staff_members')
+              .update(buildStaffMutationPayload(updatePayload, omittedColumns))
+              .eq('id', String(afterStaff.id || ''))
+              .select(),
+          [...STAFF_MUTATION_ALLOWANCE_COLUMNS],
+        );
           ...commonData,
           annual_leave_total: 신규직원.연차총개수,
           annual_leave_used: 신규직원.연차사용개수
@@ -1665,4 +1725,3 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     </div>
   );
 }
-
