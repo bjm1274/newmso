@@ -251,7 +251,12 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
           childcare_allowance: s.childcare_allowance || 0,
           research_allowance: s.research_allowance || 0,
           other_taxfree: s.other_taxfree || 0,
-          extra_allowance: Number(s.overtime_allowance || 0) + Number(s.night_work_allowance || 0) + Number(s.holiday_work_allowance || 0) + Number(s.annual_leave_pay || 0),
+          extra_allowance:
+            Number(s.position_allowance || 0) +
+            Number(s.overtime_allowance || 0) +
+            Number(s.night_work_allowance || 0) +
+            Number(s.holiday_work_allowance || 0) +
+            Number(s.annual_leave_pay || 0),
           overtime_pay: 0,
           bonus: 0,
           apply_tax: (s.permissions?.insurance as Record<string, unknown>)?.income_tax !== false,
@@ -681,7 +686,12 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                   childcare_allowance: Number((s as any).childcare_allowance || 0),
                   research_allowance: Number((s as any).research_allowance || 0),
                   other_taxfree: Number((s as any).other_taxfree || 0),
-                  extra_allowance: 0,
+                  extra_allowance:
+                    Number((s as any).position_allowance || 0) +
+                    Number((s as any).overtime_allowance || 0) +
+                    Number((s as any).night_work_allowance || 0) +
+                    Number((s as any).holiday_work_allowance || 0) +
+                    Number((s as any).annual_leave_pay || 0),
                   overtime_pay: 0,
                   bonus: 0,
                   custom_deduction: 0,

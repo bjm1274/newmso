@@ -115,6 +115,84 @@ test('regular payroll settlement stores dependent deductions in the finalized re
   await expect(page.getByTestId('salary-settlement-complete-step')).toBeVisible();
 });
 
+test('regular payroll settlement includes saved position allowance in taxable pay', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.confirm = () => true;
+  });
+
+  const yearMonth = new Date().toISOString().slice(0, 7);
+  const payrollStaff = {
+    id: 'payroll-position-1',
+    employee_no: 'PAY-POS-001',
+    name: '직책수당직원',
+    company: fakeUser.company,
+    company_id: fakeUser.company_id,
+    department: fakeUser.department,
+    position: '팀장',
+    base_salary: 3200000,
+    position_allowance: 250000,
+    meal_allowance: 0,
+    night_duty_allowance: 0,
+    vehicle_allowance: 0,
+    childcare_allowance: 0,
+    research_allowance: 0,
+    other_taxfree: 0,
+    overtime_allowance: 0,
+    night_work_allowance: 0,
+    holiday_work_allowance: 0,
+    annual_leave_pay: 0,
+    permissions: {},
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [payrollStaff],
+    payrollRecords: [],
+    attendances: [],
+  });
+
+  await seedSession(page, {
+    user: {
+      ...fakeUser,
+      company: payrollStaff.company,
+      department: payrollStaff.department,
+    },
+    localStorage: {
+      erp_last_menu: '인사관리',
+      erp_last_subview: '급여',
+      erp_hr_tab: '급여',
+      erp_hr_workspace: '근태 및 급여',
+    },
+  });
+
+  await page.goto(`/main?${new URLSearchParams({ open_menu: '인사관리' }).toString()}`);
+
+  await expect(page.getByTestId('payroll-view')).toBeVisible();
+  await page.getByTestId('hr-company-select').selectOption(fakeUser.company);
+  await page.getByTestId('payroll-tab-급여정산').click();
+  await page.getByTestId('run-payroll-regular-button').click();
+  await expect(page.getByTestId('salary-settlement-view')).toBeVisible();
+  await page.getByTestId(`salary-settlement-staff-${payrollStaff.id}`).click();
+  await page.getByTestId('salary-settlement-next-button').click();
+  await expect(page.getByTestId(`salary-settlement-card-${payrollStaff.id}`)).toBeVisible();
+
+  const saveRequestPromise = page.waitForRequest(
+    (request) => request.url().includes('/payroll_records') && request.method() === 'POST'
+  );
+
+  await page.getByTestId('salary-settlement-finalize-button').click();
+
+  const saveRequest = await saveRequestPromise;
+  const payload = saveRequest.postDataJSON() as any[] | any;
+  const record = Array.isArray(payload) ? payload[0] : payload;
+
+  expect(record.staff_id).toBe(payrollStaff.id);
+  expect(record.extra_allowance).toBe(250000);
+  expect(record.total_taxable).toBe(3450000);
+  await expect(page.getByTestId('salary-settlement-complete-step')).toBeVisible();
+});
+
 test('regular payroll settlement applies withholding ratio and qualifying child tax credits from the monthly table', async ({ page }) => {
   await page.addInitScript(() => {
     window.confirm = () => true;
