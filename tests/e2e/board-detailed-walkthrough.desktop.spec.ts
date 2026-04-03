@@ -8,6 +8,7 @@ const CONDOLENCE_BOARD = '\uACBD\uC870\uC0AC';
 const SURGERY_BOARD = '\uC218\uC220\uC77C\uC815';
 const MRI_BOARD = 'MRI\uC77C\uC815';
 const GUIDE_BOARD = '\uC5C5\uBB34\uAC00\uC774\uB4DC';
+const GUIDE_BOARD_TITLE = '\uC5C5\uBB34\uACF5\uC720';
 
 function trackRuntimeErrors(page: Page) {
   const errors: string[] = [];
@@ -54,7 +55,8 @@ function buildSubMenuTestId(mainMenuId: string, subMenuId: string) {
 
 async function openBoardMenu(page: Page, boardName: string) {
   await page.getByTestId(buildSubMenuTestId(BOARD_MENU, boardName)).click();
-  await expect(page.getByRole('heading', { name: boardName })).toBeVisible();
+  const visibleHeading = boardName === GUIDE_BOARD ? GUIDE_BOARD_TITLE : boardName;
+  await expect(page.getByRole('heading', { name: visibleHeading })).toBeVisible();
 }
 
 function parseBoardMonthLabel(label: string) {
@@ -322,11 +324,13 @@ test('guide board uploads and displays onboarding materials for new staff', asyn
   await openBoardMenu(page, GUIDE_BOARD);
   await expect(page.getByTestId('guide-library-view')).toBeVisible();
 
-  const firstTeamButton = page.getByTestId('guide-team-menu').getByRole('button').nth(1);
-  await firstTeamButton.click();
+  await expect(page.getByTestId('guide-company-select')).toBeVisible();
+  await expect(page.getByTestId('guide-team-filter-select')).toBeVisible();
+  await page.getByTestId('guide-team-filter-select').selectOption({ index: 1 });
   await page.getByTestId('guide-open-compose').click();
   await expect(page.getByTestId('guide-form')).toBeVisible();
   await expect(page.getByTestId('guide-team-select')).not.toHaveValue('');
+  await expect(page.getByTestId('guide-kind-select')).toContainText('업무 인수인계');
   const selectedTeamLabel = await page.getByTestId('guide-team-select').inputValue();
   await page.getByTestId('guide-title-input').fill('인공관절 수술 준비 가이드');
   await page.getByTestId('guide-kind-select').selectOption('education');

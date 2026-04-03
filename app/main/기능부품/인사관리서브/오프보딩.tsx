@@ -6,6 +6,11 @@ import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import {
+  isMissingColumnError,
+  withMissingColumnFallback,
+  withMissingColumnsFallback,
+} from '@/lib/supabase-compat';
+import {
   countChecklistDone,
   getDefaultChecklist,
   getChecklistTargetDate,
@@ -48,6 +53,44 @@ function getPendingChecklist(checklistRow?: ChecklistRow | null) {
 
 function getDisplayText(value: unknown, fallback = '-') {
   return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+}
+
+async function cleanupOffboardingSideEffects(staffId: string, readAt: string) {
+  const cleanupWarnings: Array<{ target: string; error: unknown }> = [];
+
+  const pushByStaffResult = await supabase.from('push_subscriptions').delete().eq('staff_id', staffId);
+  if (pushByStaffResult.error && !isMissingColumnError(pushByStaffResult.error, 'staff_id')) {
+    cleanupWarnings.push({ target: 'push_subscriptions.staff_id', error: pushByStaffResult.error });
+  }
+
+  const pushByUserResult = await supabase.from('push_subscriptions').delete().eq('user_id', staffId);
+  if (pushByUserResult.error && !isMissingColumnError(pushByUserResult.error, 'user_id')) {
+    cleanupWarnings.push({ target: 'push_subscriptions.user_id', error: pushByUserResult.error });
+  }
+
+  const notificationsResult = await withMissingColumnFallback(
+    () =>
+      supabase
+        .from('notifications')
+        .update({ read_at: readAt })
+        .eq('user_id', staffId)
+        .is('read_at', null),
+    () =>
+      supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', staffId)
+        .eq('is_read', false),
+    'read_at',
+  );
+
+  if (notificationsResult.error) {
+    cleanupWarnings.push({ target: 'notifications', error: notificationsResult.error });
+  }
+
+  if (cleanupWarnings.length > 0) {
+    console.warn('오프보딩 후속 정리 일부 실패:', { staffId, cleanupWarnings });
+  }
 }
 
 export default function OffboardingView({
@@ -382,23 +425,31 @@ export default function OffboardingView({
     const actor = readClientAuditActor();
 
     try {
+      const finalizedAt = new Date().toISOString();
       const nextPermissions = { ...(staff.permissions || {}) };
       delete nextPermissions.offboarding_original_status;
       delete nextPermissions.offboarding_original_role;
       delete nextPermissions.offboarding_started_at;
       delete nextPermissions.offboarding_reason;
-      nextPermissions.offboarding_finalized_at = new Date().toISOString();
+      nextPermissions.offboarding_finalized_at = finalizedAt;
 
-      const { error: staffUpdateError } = await supabase
-        .from('staff_members')
-        .update({
-          status: '퇴사',
-          role: 'inactive',
-          resigned_at: staff.resigned_at || new Date().toISOString().slice(0, 10),
-          permissions: nextPermissions,
-          force_logout_at: new Date().toISOString(),
-        })
-        .eq('id', staffId);
+      const { error: staffUpdateError } = await withMissingColumnsFallback(
+        (omittedColumns) => {
+          const payload: Record<string, unknown> = {
+            status: '퇴사',
+            role: 'inactive',
+            resigned_at: staff.resigned_at || finalizedAt.slice(0, 10),
+            permissions: nextPermissions,
+          };
+
+          if (!omittedColumns.has('force_logout_at')) {
+            payload.force_logout_at = finalizedAt;
+          }
+
+          return supabase.from('staff_members').update(payload).eq('id', staffId);
+        },
+        ['force_logout_at'],
+      );
 
       if (staffUpdateError) throw staffUpdateError;
 
@@ -406,13 +457,7 @@ export default function OffboardingView({
         await persistChecklist(staffId, checklistItems);
       }
 
-      await supabase.from('push_subscriptions').delete().eq('staff_id', staffId);
-      await supabase.from('push_subscriptions').delete().eq('user_id', staffId);
-      await supabase
-        .from('notifications')
-        .update({ read_at: new Date().toISOString() })
-        .eq('user_id', staffId)
-        .is('read_at', null);
+      await cleanupOffboardingSideEffects(staffId, finalizedAt);
 
       await logAudit(
         '오프보딩완료',

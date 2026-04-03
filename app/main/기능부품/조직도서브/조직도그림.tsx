@@ -57,6 +57,22 @@ const DEPT_STYLES: Record<string, { gradient: string; color: string }> = {
 };
 const DEFAULT_DEPT_STYLE = { gradient: 'from-slate-700 to-slate-600', color: '#64748B' };
 
+function toSafeText(value: unknown, fallback = '') {
+  if (typeof value === 'string') return value.trim() || fallback;
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value).trim() || fallback;
+  }
+  return fallback;
+}
+
+function getStaffExtensionText(staff: StaffMember | null | undefined) {
+  return (
+    toSafeText(staff?.extension) ||
+    toSafeText(staff?.permissions?.extension) ||
+    ''
+  );
+}
+
 /** 간호과장 이상 직급만 조직도에서 개인 연락처(phone) 조회 가능 (기능 비활성화됨 - 내선번호만 표시) */
 // const CAN_SEE_PERSONAL_CONTACT_POSITIONS = ['병원장', '원장', '이사', '진료부장', '간호과장', '간호부장', '실장', '총무부장', '본부장', '팀장', '부장'];
 
@@ -898,18 +914,18 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                     "👤"
                   )}
                 </div>
-                <h4 className="text-xl md:text-2xl font-semibold text-[var(--foreground)] tracking-tight">{selectedMember.name}</h4>
-                <p className="text-[var(--accent)] text-sm font-bold mt-2">{selectedMember.company} · {selectedMember.position}</p>
+                <h4 className="text-xl md:text-2xl font-semibold text-[var(--foreground)] tracking-tight">{toSafeText(selectedMember.name, '직원')}</h4>
+                <p className="text-[var(--accent)] text-sm font-bold mt-2">{toSafeText(selectedMember.company, '-') } · {toSafeText(selectedMember.position, '-')}</p>
 
                 <div className="w-full mt-5 p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] md:rounded-[var(--radius-lg)] border border-[var(--border)] space-y-4">
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-semibold text-[var(--toss-gray-3)]">소속 부서</span>
-                    <span className="font-semibold text-[var(--foreground)]">{selectedMember.department || '-'}</span>
+                    <span className="font-semibold text-[var(--foreground)]">{toSafeText(selectedMember.department, '-')}</span>
                   </div>
-                  {(selectedMember.extension || selectedMember.permissions?.extension) && (
+                  {getStaffExtensionText(selectedMember) && (
                     <div className="flex justify-between items-center text-xs border-t border-[var(--border)] pt-4">
                       <span className="font-semibold text-[var(--toss-gray-3)]">내선번호</span>
-                      <span className="font-semibold text-[var(--foreground)]">{selectedMember.extension || selectedMember.permissions?.extension}</span>
+                      <span className="font-semibold text-[var(--foreground)]">{getStaffExtensionText(selectedMember)}</span>
                     </div>
                   )}
                 </div>
@@ -974,8 +990,8 @@ function StaffCardRow({ staff, onClick, isEditMode, setDraggedStaff, draggedStaf
         )}
       </div>
       <div className="flex flex-col justify-center min-w-0 text-left pointer-events-none">
-        <p className="font-semibold text-[var(--foreground)] text-sm truncate">{staff.name}</p>
-        <p className="text-xs font-bold text-[var(--toss-gray-3)] truncate">{staff.position || '-'}</p>
+        <p className="font-semibold text-[var(--foreground)] text-sm truncate">{toSafeText(staff.name, '직원')}</p>
+        <p className="text-xs font-bold text-[var(--toss-gray-3)] truncate">{toSafeText(staff.position, '-')}</p>
       </div>
       {isEditMode && (
         <div className="flex flex-col gap-1 ml-auto pointer-events-auto">

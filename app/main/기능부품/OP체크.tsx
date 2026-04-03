@@ -601,7 +601,10 @@ export default function OperationCheckView({
   viewMode?: OpCheckViewMode;
   title?: string;
 }) {
-  const activeTab: OpCheckViewMode = viewMode === 'templates' ? 'templates' : 'patients';
+  const allowEmbeddedTemplateSettings = viewMode !== 'templates';
+  const [activeTab, setActiveTab] = useState<OpCheckViewMode>(
+    viewMode === 'templates' ? 'templates' : 'patients',
+  );
   const headerTitle = title || (activeTab === 'templates' ? 'OP체크 템플릿' : 'OP체크');
   const [loading, setLoading] = useState(true);
   const [savingCheck, setSavingCheck] = useState(false);
@@ -652,6 +655,12 @@ export default function OperationCheckView({
   const wardMessageCloseButtonRef = useRef<HTMLButtonElement | null>(null);
   const wardRecipientSearchInputRef = useRef<HTMLInputElement | null>(null);
   const wardMessageReturnFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (viewMode === 'templates') {
+      setActiveTab('templates');
+    }
+  }, [viewMode]);
 
   const selectedScheduleCompanyId = useMemo(
     () => schedulePosts.find((post) => post.id === selectedScheduleId)?.company_id || null,
@@ -3121,10 +3130,57 @@ export default function OperationCheckView({
   return (
     <div data-testid="op-check-view" className="space-y-4">
       <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
+        <div
+          className={
+            allowEmbeddedTemplateSettings
+              ? 'flex flex-col gap-3 xl:grid xl:grid-cols-[minmax(0,1fr)_auto_minmax(220px,320px)] xl:items-center'
+              : 'flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between'
+          }
+        >
+          <div className="min-w-0">
             <h2 className="text-xl font-bold text-[var(--foreground)]">{headerTitle}</h2>
+            {allowEmbeddedTemplateSettings ? (
+              <p className="mt-1 text-[11px] font-medium text-[var(--toss-gray-3)]">
+                OP체크와 템플릿 설정을 같은 화면에서 바로 전환할 수 있습니다.
+              </p>
+            ) : null}
           </div>
+          {allowEmbeddedTemplateSettings ? (
+            <div
+              data-testid="op-check-mode-switcher"
+              className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)]/35 px-3 py-2 shadow-sm xl:justify-self-center"
+            >
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  data-testid="op-check-mode-patients"
+                  onClick={() => setActiveTab('patients')}
+                  className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-all ${
+                    activeTab === 'patients'
+                      ? 'bg-[var(--accent)] text-white shadow-sm'
+                      : 'text-[var(--toss-gray-4)] hover:bg-[var(--card)]'
+                  }`}
+                >
+                  환자 체크
+                </button>
+                <button
+                  type="button"
+                  data-testid="op-check-mode-templates"
+                  onClick={() => setActiveTab('templates')}
+                  className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-all ${
+                    activeTab === 'templates'
+                      ? 'bg-[var(--accent)] text-white shadow-sm'
+                      : 'text-[var(--toss-gray-4)] hover:bg-[var(--card)]'
+                  }`}
+                >
+                  템플릿 설정
+                </button>
+              </div>
+              <p className="mt-1 text-center text-[10px] font-medium text-[var(--toss-gray-3)]">
+                직원이 OP체크 템플릿을 직접 관리할 수 있어요.
+              </p>
+            </div>
+          ) : null}
           {activeTab === 'patients' ? (
             <div
               data-testid="op-check-patient-search-card"
@@ -3138,6 +3194,8 @@ export default function OperationCheckView({
                 className="w-full rounded-full border border-[var(--border)] px-4 py-2 text-sm font-medium"
               />
             </div>
+          ) : allowEmbeddedTemplateSettings ? (
+            <div aria-hidden="true" className="hidden xl:block" />
           ) : null}
         </div>
       </div>
@@ -3350,7 +3408,10 @@ export default function OperationCheckView({
 
         </div>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-[1fr,0.95fr]">
+        <div
+          data-testid="op-check-template-layout"
+          className="grid gap-4 xl:grid-cols-[1fr,0.95fr]"
+        >
           <section className="space-y-4">
             <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
               <div className="flex flex-wrap items-center gap-2">
