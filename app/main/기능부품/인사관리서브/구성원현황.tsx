@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import { getChecklistTargetDate, getDefaultChecklist } from '@/lib/hr-checklists';
+import { getMinimumWageByYear, MONTHLY_STANDARD_HOURS } from '@/lib/tax-free-limits';
 import StaffHistoryTimeline from './인사이력타임라인';
 import OnboardingChecklist from './급여명세/입퇴사온보딩';
 import CertTransferPanel from './교육자격인사이동패널';
@@ -93,7 +94,6 @@ function buildStaffMutationPayload(
   return nextPayload;
 }
 
-const MONTHLY_STANDARD_HOURS = 209;
 
 function formatWon(amount: number) {
   return `${Math.round(amount || 0).toLocaleString('ko-KR')}원`;
@@ -191,9 +191,37 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     () => getMonthlyWorkingHours(신규직원.working_hours_per_week),
     [신규직원.working_hours_per_week],
   );
-  const hourlySalaryAmount = useMemo(
+  const previewMinimumWageYear = Math.max(2025, new Date().getFullYear());
+  const previewMinimumWage = getMinimumWageByYear(previewMinimumWageYear);
+  const rawHourlySalaryAmount = useMemo(
     () => Math.round(totalSalaryAmount / monthlyWorkingHours),
     [monthlyWorkingHours, totalSalaryAmount],
+  );
+  const hasHourlyPremiumAdjustments = useMemo(
+    () =>
+      Number(신규직원.overtime_allowance || 0) > 0 ||
+      Number(신규직원.night_work_allowance || 0) > 0 ||
+      Number(신규직원.holiday_work_allowance || 0) > 0 ||
+      Number(신규직원.annual_leave_pay || 0) > 0 ||
+      taxfreeSalaryTotal > 0,
+    [
+      신규직원.annual_leave_pay,
+      신규직원.holiday_work_allowance,
+      신규직원.night_work_allowance,
+      신규직원.overtime_allowance,
+      taxfreeSalaryTotal,
+    ],
+  );
+  const hourlySalaryUsesMinimumFloor = useMemo(
+    () =>
+      monthlyWorkingHours > MONTHLY_STANDARD_HOURS &&
+      hasHourlyPremiumAdjustments &&
+      rawHourlySalaryAmount < previewMinimumWage,
+    [hasHourlyPremiumAdjustments, monthlyWorkingHours, previewMinimumWage, rawHourlySalaryAmount],
+  );
+  const hourlySalaryAmount = useMemo(
+    () => (hourlySalaryUsesMinimumFloor ? previewMinimumWage : rawHourlySalaryAmount),
+    [hourlySalaryUsesMinimumFloor, previewMinimumWage, rawHourlySalaryAmount],
   );
 
   // ESS (직원 셀프 서비스) 승인 대기함 관련
@@ -1356,6 +1384,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                               value={신규직원.working_hours_per_week}
                               onChange={e => 신규직원설정({ ...신규직원, working_hours_per_week: parseInt(e.target.value, 10) || 0 })}
                               className="w-full p-3 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none text-xs font-bold text-purple-900 focus:ring-2 focus:ring-purple-300"
+                              data-testid="new-staff-working-hours-per-week"
                               placeholder="40"
                             />
                             {신규직원.working_hours_per_week < 40 && 신규직원.working_hours_per_week > 0 && (
@@ -1371,6 +1400,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                               value={신규직원.working_days_per_week}
                               onChange={e => 신규직원설정({ ...신규직원, working_days_per_week: parseInt(e.target.value, 10) || 0 })}
                               className="w-full p-3 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none text-xs font-bold text-purple-900 focus:ring-2 focus:ring-purple-300"
+                              data-testid="new-staff-working-days-per-week"
                               placeholder="5"
                             />
                           </div>

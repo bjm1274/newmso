@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
+import { startTransition, useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
 import { canAccessExtraFeature } from '@/lib/access-control';
 import ThemeToggle from '@/app/components/ThemeToggle';
 import GlobalSearch from '@/app/components/GlobalSearch';
@@ -56,46 +56,72 @@ function FontSizeControl() {
   );
 }
 
-const DepartmentInventoryView = dynamic(() => import('./재고관리서브/부서별물품장비현황'), {
+const prefetchedExtraFeatureModules = new Set<string>();
+
+const loadDepartmentInventoryView = () => import('./재고관리서브/부서별물품장비현황');
+const loadWorkStatusView = () => import('./근무현황');
+const loadHandoverNotesView = () => import('./인계노트');
+const loadDischargeReviewView = () => import('./퇴원심사');
+const loadClosingReportView = () => import('./마감보고');
+const loadStaffEvaluationView = () => import('./직원평가시스템');
+const loadRealtimeDepositView = () => import('./입금실시간조회');
+const loadSurgeryConsultationView = () => import('./수술상담');
+const loadOperationCheckView = () => import('./OP체크');
+const loadOrgChartView = () => import('./조직도서브/OrgChart');
+
+const DepartmentInventoryView = dynamic(loadDepartmentInventoryView, {
   ssr: false,
   loading: () => <SubviewLoading label="부서별 재고" />,
 });
-const WorkStatusView = dynamic(() => import('./근무현황'), {
+const WorkStatusView = dynamic(loadWorkStatusView, {
   ssr: false,
   loading: () => <SubviewLoading label="근무현황" />,
 });
-const HandoverNotesView = dynamic(() => import('./인계노트'), {
+const HandoverNotesView = dynamic(loadHandoverNotesView, {
   ssr: false,
   loading: () => <SubviewLoading label="인계노트" />,
 });
-const DischargeReviewView = dynamic(() => import('./퇴원심사'), {
+const DischargeReviewView = dynamic(loadDischargeReviewView, {
   ssr: false,
   loading: () => <SubviewLoading label="퇴원심사" />,
 });
-const ClosingReportView = dynamic(() => import('./마감보고'), {
+const ClosingReportView = dynamic(loadClosingReportView, {
   ssr: false,
   loading: () => <SubviewLoading label="마감보고" />,
 });
-const StaffEvaluationView = dynamic(() => import('./직원평가시스템'), {
+const StaffEvaluationView = dynamic(loadStaffEvaluationView, {
   ssr: false,
   loading: () => <SubviewLoading label="직원평가" />,
 });
-const RealtimeDepositView = dynamic(() => import('./입금실시간조회'), {
+const RealtimeDepositView = dynamic(loadRealtimeDepositView, {
   ssr: false,
   loading: () => <SubviewLoading label="입금 실시간 조회" />,
 });
-const SurgeryConsultationView = dynamic(() => import('./수술상담'), {
+const SurgeryConsultationView = dynamic(loadSurgeryConsultationView, {
   ssr: false,
   loading: () => <SubviewLoading label="수술상담 AI 분석" />,
 });
-const OperationCheckView = dynamic(() => import('./OP체크'), {
+const OperationCheckView = dynamic(loadOperationCheckView, {
   ssr: false,
   loading: () => <SubviewLoading label="OP체크" />,
 });
-const OrgChart = dynamic(() => import('./조직도서브/OrgChart'), {
+const OrgChart = dynamic(loadOrgChartView, {
   ssr: false,
   loading: () => <SubviewLoading label="조직도" />,
 });
+
+const EXTRA_FEATURE_LOADERS: Record<string, () => Promise<unknown>> = {
+  조직도: loadOrgChartView,
+  부서별재고: loadDepartmentInventoryView,
+  근무현황: loadWorkStatusView,
+  인계노트: loadHandoverNotesView,
+  퇴원심사: loadDischargeReviewView,
+  마감보고: loadClosingReportView,
+  직원평가: loadStaffEvaluationView,
+  입금실시간조회: loadRealtimeDepositView,
+  수술상담: loadSurgeryConsultationView,
+  OP체크: loadOperationCheckView,
+};
 
 const EXTERNAL_LINKS = [
   { id: 'km-park', label: '주차관제', url: 'http://kmp0001103.iptime.org/login?redirectTo=undefined', icon: '🔗' },
@@ -234,7 +260,9 @@ export default function ExtraFeatures({
   useEffect(() => {
     if (!subView) return;
     if (activeSubViewCard && !canAccessExtraFeature(user, activeSubViewCard.id)) {
-      setSubView(null);
+      startTransition(() => {
+        setSubView(null);
+      });
     }
   }, [activeSubViewCard, subView, user]);
 
@@ -278,7 +306,9 @@ export default function ExtraFeatures({
     }
 
     if (targetSubView) {
-      setSubView(targetSubView);
+      startTransition(() => {
+        setSubView(targetSubView);
+      });
     }
   }, [persistRecent, user]);
 
@@ -286,6 +316,70 @@ export default function ExtraFeatures({
     () => FEATURE_CARDS.filter((card) => canAccessExtraFeature(user, card.id)),
     [user]
   );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const pendingLoaders = visibleCards
+      .map((card) => [card.subView, EXTRA_FEATURE_LOADERS[card.subView]] as const)
+      .filter((entry): entry is readonly [string, () => Promise<unknown>] => {
+        const [subview, loader] = entry;
+        return typeof loader === 'function' && !prefetchedExtraFeatureModules.has(subview);
+      });
+
+    if (pendingLoaders.length === 0) return;
+
+    const idleWindow = window as Window & typeof globalThis & {
+      requestIdleCallback?: (callback: () => void) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    let cancelled = false;
+    let timeoutId: number | null = null;
+
+    const prefetchNext = (index: number) => {
+      if (cancelled || index >= pendingLoaders.length) {
+        return;
+      }
+
+      const [subview, loader] = pendingLoaders[index];
+      prefetchedExtraFeatureModules.add(subview);
+      void loader().finally(() => {
+        if (cancelled) return;
+        timeoutId = window.setTimeout(() => prefetchNext(index + 1), 120);
+      });
+    };
+
+    if (typeof idleWindow.requestIdleCallback === 'function') {
+      const idleId = idleWindow.requestIdleCallback(() => {
+        prefetchNext(0);
+      });
+
+      return () => {
+        cancelled = true;
+        if (timeoutId !== null) {
+          window.clearTimeout(timeoutId);
+        }
+        if (typeof idleWindow.cancelIdleCallback === 'function') {
+          idleWindow.cancelIdleCallback(idleId);
+        }
+      };
+    }
+
+    timeoutId = window.setTimeout(() => prefetchNext(0), 300);
+    return () => {
+      cancelled = true;
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [visibleCards]);
+
+  const handleBack = useCallback(() => {
+    startTransition(() => {
+      setSubView(null);
+    });
+  }, []);
 
   const favoriteCards = useMemo(
     () => visibleCards.filter((card) => favorites.includes(card.id)),
@@ -326,7 +420,9 @@ export default function ExtraFeatures({
             onSelect={(type, id) => {
               if (type === 'handover') {
                 if (canAccessExtraFeature(user, '인계노트')) {
-                  setSubView('인계노트');
+                  startTransition(() => {
+                    setSubView('인계노트');
+                  });
                 }
                 return;
               }
@@ -381,7 +477,7 @@ export default function ExtraFeatures({
 
   if (resolvedSubView === '조직도') {
     return (
-      <FeatureShell onBack={() => setSubView(null)} maxWidth="max-w-7xl">
+      <FeatureShell onBack={handleBack} maxWidth="max-w-7xl">
         <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm overflow-x-auto">
           <OrgChart
             user={user || null}
@@ -397,7 +493,7 @@ export default function ExtraFeatures({
 
   if (resolvedSubView === '부서별재고') {
     return (
-      <FeatureShell onBack={() => setSubView(null)} boxed>
+      <FeatureShell onBack={handleBack} boxed>
         <DepartmentInventoryView user={user || {}} />
       </FeatureShell>
     );
@@ -405,7 +501,7 @@ export default function ExtraFeatures({
 
   if (resolvedSubView === '근무현황') {
     return (
-      <FeatureShell onBack={() => setSubView(null)} boxed>
+      <FeatureShell onBack={handleBack} boxed>
         <WorkStatusView user={user || {}} />
       </FeatureShell>
     );
@@ -413,7 +509,7 @@ export default function ExtraFeatures({
 
   if (resolvedSubView === '인계노트') {
     return (
-      <FeatureShell onBack={() => setSubView(null)}>
+      <FeatureShell onBack={handleBack}>
         <HandoverNotesView user={user || {}} />
       </FeatureShell>
     );
@@ -421,7 +517,7 @@ export default function ExtraFeatures({
 
   if (resolvedSubView === '퇴원심사') {
     return (
-      <FeatureShell onBack={() => setSubView(null)}>
+      <FeatureShell onBack={handleBack}>
         <DischargeReviewView user={user || {}} />
       </FeatureShell>
     );
@@ -429,15 +525,19 @@ export default function ExtraFeatures({
 
   if (resolvedSubView === '마감보고') {
     return (
-      <FeatureShell onBack={() => setSubView(null)}>
-        <ClosingReportView user={user || {}} />
+      <FeatureShell onBack={handleBack}>
+        <ClosingReportView
+          user={user || {}}
+          staffs={staffs}
+          selectedCompanyId={selectedCompanyId}
+        />
       </FeatureShell>
     );
   }
 
   if (resolvedSubView === '직원평가') {
     return (
-      <FeatureShell onBack={() => setSubView(null)} boxed>
+      <FeatureShell onBack={handleBack} boxed>
         <StaffEvaluationView user={user || {}} staffs={staffs} />
       </FeatureShell>
     );
@@ -445,7 +545,7 @@ export default function ExtraFeatures({
 
   if (resolvedSubView === '입금실시간조회') {
     return (
-      <FeatureShell onBack={() => setSubView(null)} maxWidth="max-w-6xl">
+      <FeatureShell onBack={handleBack} maxWidth="max-w-6xl">
         <RealtimeDepositView user={user || {}} />
       </FeatureShell>
     );
@@ -453,7 +553,7 @@ export default function ExtraFeatures({
 
   if (resolvedSubView === '수술상담') {
     return (
-      <FeatureShell onBack={() => setSubView(null)} maxWidth="max-w-4xl">
+      <FeatureShell onBack={handleBack} maxWidth="max-w-4xl">
         <SurgeryConsultationView user={user || {}} />
       </FeatureShell>
     );
@@ -461,7 +561,7 @@ export default function ExtraFeatures({
 
   if (resolvedSubView === 'OP체크') {
     return (
-      <FeatureShell onBack={() => setSubView(null)} maxWidth="max-w-7xl">
+      <FeatureShell onBack={handleBack} maxWidth="max-w-7xl">
         <OperationCheckView
           user={user || {}}
           staffs={staffs}
