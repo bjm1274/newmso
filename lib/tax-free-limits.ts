@@ -16,6 +16,10 @@ export const TAX_FREE_LEGAL_LIMITS = {
 export const MINIMUM_WAGE_2025 = 10_030; // 시급
 export const MINIMUM_WAGE_2026 = 10_320; // 시급 (2026년 확정)
 
+export function getMinimumWageByYear(year: number) {
+  return year >= 2026 ? MINIMUM_WAGE_2026 : MINIMUM_WAGE_2025;
+}
+
 /** 근로·임금 정보 기본값: 미입력(0)일 때 적용 (학습 문서 §9·§14.2) */
 export const DAILY_STANDARD_HOURS = 8;   // 일 소정근로시간
 export const WEEKLY_STANDARD_HOURS = 48;  // 주 소정근로+주휴 환산 시간(40+8)

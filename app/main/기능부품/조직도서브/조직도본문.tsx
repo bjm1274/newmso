@@ -6,43 +6,56 @@ import { normalizeMainMenuForUser } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import type { ErpUser, ERPData, StaffMember } from '@/types';
 
-const OrgChart = dynamic(() => import('./OrgChart'), {
+const prefetchedMainMenuModules = new Set<string>();
+
+const loadOrgChartView = () => import('./OrgChart');
+const loadMyPageView = () => import('../마이페이지');
+const loadNotificationInboxView = () => import('../알림인박스');
+const loadChatView = () => import('../메신저');
+const loadBoardView = () => import('../게시판');
+const loadApprovalView = () => import('../전자결재');
+const loadHRView = () => import('../인사관리');
+const loadInventoryView = () => import('../재고관리_통합완성');
+const loadAdminView = () => import('../관리자전용');
+const loadExtraFeaturesView = () => import('../추가기능');
+
+const OrgChart = dynamic(loadOrgChartView, {
   ssr: false,
   loading: () => <MenuViewLoading label="조직도" />,
 });
-const MyPage = dynamic(() => import('../마이페이지'), {
+const MyPage = dynamic(loadMyPageView, {
   ssr: false,
   loading: () => <MenuViewLoading label="내정보" />,
 });
-const NotificationInbox = dynamic(() => import('../알림인박스'), {
+const NotificationInbox = dynamic(loadNotificationInboxView, {
   ssr: false,
   loading: () => <MenuViewLoading label="알림" />,
 });
-const ChatView = dynamic(() => import('../메신저'), {
+const ChatView = dynamic(loadChatView, {
   ssr: false,
   loading: () => <MenuViewLoading label="채팅" />,
 });
-const BoardView = dynamic(() => import('../게시판'), {
+const BoardView = dynamic(loadBoardView, {
   ssr: false,
   loading: () => <MenuViewLoading label="게시판" />,
 });
-const ApprovalView = dynamic(() => import('../전자결재'), {
+const ApprovalView = dynamic(loadApprovalView, {
   ssr: false,
   loading: () => <MenuViewLoading label="전자결재" />,
 });
-const HRView = dynamic(() => import('../인사관리'), {
+const HRView = dynamic(loadHRView, {
   ssr: false,
   loading: () => <MenuViewLoading label="인사관리" />,
 });
-const InventoryView = dynamic(() => import('../재고관리_통합완성'), {
+const InventoryView = dynamic(loadInventoryView, {
   ssr: false,
   loading: () => <MenuViewLoading label="재고관리" />,
 });
-const AdminView = dynamic(() => import('../관리자전용'), {
+const AdminView = dynamic(loadAdminView, {
   ssr: false,
   loading: () => <MenuViewLoading label="관리자" />,
 });
-const ExtraFeatures = dynamic(() => import('../추가기능'), {
+const ExtraFeatures = dynamic(loadExtraFeaturesView, {
   ssr: false,
   loading: () => <MenuViewLoading label="추가기능" />,
 });
@@ -124,6 +137,86 @@ export default function MainContent({
   onConsumeShareTarget,
 }: MainContentProps) {
   const [annualLeaveNotice, setAnnualLeaveNotice] = useState<{ remaining: number; total: number } | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const loaderEntries: Array<[string, () => Promise<unknown>]> = [
+      ['내정보', loadMyPageView],
+      ['알림', loadNotificationInboxView],
+      ['조직도', loadOrgChartView],
+      ['채팅', loadChatView],
+      ['게시판', loadBoardView],
+    ];
+
+    if (normalizeMainMenuForUser(user, '전자결재') === '전자결재') {
+      loaderEntries.push(['전자결재', loadApprovalView]);
+    }
+
+    if (normalizeMainMenuForUser(user, '인사관리') === '인사관리') {
+      loaderEntries.push(['인사관리', loadHRView]);
+    }
+
+    if (normalizeMainMenuForUser(user, '재고관리') === '재고관리') {
+      loaderEntries.push(['재고관리', loadInventoryView]);
+    }
+
+    if (normalizeMainMenuForUser(user, '추가기능') === '추가기능') {
+      loaderEntries.push(['추가기능', loadExtraFeaturesView]);
+    }
+
+    if (normalizeMainMenuForUser(user, '관리자') === '관리자') {
+      loaderEntries.push(['관리자', loadAdminView]);
+    }
+
+    const pendingLoaders = loaderEntries.filter(([key]) => !prefetchedMainMenuModules.has(key));
+    if (pendingLoaders.length === 0) return;
+
+    const idleWindow = window as Window & typeof globalThis & {
+      requestIdleCallback?: (callback: () => void) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    let cancelled = false;
+    let timeoutId: number | null = null;
+
+    const prefetchNext = (index: number) => {
+      if (cancelled || index >= pendingLoaders.length) {
+        return;
+      }
+
+      const [key, loader] = pendingLoaders[index];
+      prefetchedMainMenuModules.add(key);
+      void loader().finally(() => {
+        if (cancelled) return;
+        timeoutId = window.setTimeout(() => prefetchNext(index + 1), 120);
+      });
+    };
+
+    if (typeof idleWindow.requestIdleCallback === 'function') {
+      const idleId = idleWindow.requestIdleCallback(() => {
+        prefetchNext(0);
+      });
+
+      return () => {
+        cancelled = true;
+        if (timeoutId !== null) {
+          window.clearTimeout(timeoutId);
+        }
+        if (typeof idleWindow.cancelIdleCallback === 'function') {
+          idleWindow.cancelIdleCallback(idleId);
+        }
+      };
+    }
+
+    timeoutId = window.setTimeout(() => prefetchNext(0), 300);
+    return () => {
+      cancelled = true;
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [user]);
 
   useEffect(() => {
     const checkNotifications = async () => {
@@ -285,7 +378,6 @@ export default function MainContent({
       {mainMenu === '관리자' && (
         <div className="min-h-0 flex-1 overflow-x-hidden">
           <AdminView
-            key={`admin-${subView}`}
             user={user}
             staffs={data.staffs}
             depts={data.depts}

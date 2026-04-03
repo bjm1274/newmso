@@ -1,6 +1,6 @@
 ﻿'use client';
 import { toast } from '@/lib/toast';
-import { Suspense, useState, useEffect, useCallback, useMemo } from 'react';
+import { Suspense, startTransition, useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
@@ -87,6 +87,7 @@ function MainPageContent() {
   const searchParams = useSearchParams();
   const [user, setUser] = useState<ErpUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
   const [companies, setCompanies] = useState<{ id: string; name: string; type: string }[]>([]);
   const [selectedCompanyId, setSelectedCompanyIdState] = useState<string | null>(null);
   const [menuResetVersion, setMenuResetVersion] = useState(0);
@@ -147,32 +148,39 @@ function MainPageContent() {
   const handleSelectedCompanyIdChange = useCallback(
     (id: string | null) => {
       persistSelectedCompanyId(id);
-      setSelectedCompanyIdState(id);
-      if (!isMsoUser) return;
-      if (!id) {
-        setSelectedCo('전체');
-        return;
-      }
-      const matchedCompany = companyById.get(id);
-      if (matchedCompany?.name) {
-        setSelectedCo(matchedCompany.name);
-      }
+      startTransition(() => {
+        setSelectedCompanyIdState(id);
+        if (!isMsoUser) return;
+        if (!id) {
+          setSelectedCo('전체');
+          return;
+        }
+        const matchedCompany = companyById.get(id);
+        if (matchedCompany?.name) {
+          setSelectedCo(matchedCompany.name);
+        }
+      });
     },
     [companyById, isMsoUser]
   );
 
   const handleSelectedCoChange = useCallback(
     (nextCo: string | null) => {
-      setSelectedCo(nextCo ?? '전체');
       if (!isMsoUser) return;
       if (!nextCo || nextCo === '전체') {
         persistSelectedCompanyId(null);
-        setSelectedCompanyIdState(null);
+        startTransition(() => {
+          setSelectedCo('전체');
+          setSelectedCompanyIdState(null);
+        });
         return;
       }
       const nextCompanyId = companyIdByName.get(nextCo) ?? null;
       persistSelectedCompanyId(nextCompanyId);
-      setSelectedCompanyIdState(nextCompanyId);
+      startTransition(() => {
+        setSelectedCo(nextCo);
+        setSelectedCompanyIdState(nextCompanyId);
+      });
     },
     [companyIdByName, isMsoUser]
   );
@@ -809,6 +817,7 @@ function MainPageContent() {
     } catch (error) {
       console.error("데이터 로딩 실패:", error);
     } finally {
+      setHasLoadedInitialData(true);
       setLoading(false);
     }
   }, [persistClientUser, user]);
@@ -924,28 +933,34 @@ function MainPageContent() {
     if (isSameMenu) {
       clearMenuNavigationTargets();
       resetPersistedMenuState(menu);
-      if (menu === '채팅') {
-        setChatListResetToken((prev) => prev + 1);
-      }
-      setMenuResetVersion((prev) => prev + 1);
+      startTransition(() => {
+        if (menu === '채팅') {
+          setChatListResetToken((prev) => prev + 1);
+        }
+        setMenuResetVersion((prev) => prev + 1);
 
-      if (sub !== undefined) {
-        setSubView(sub);
-        return;
-      }
+        if (sub !== undefined) {
+          setSubView(sub);
+          return;
+        }
 
-      if (selectableSubMenus.length > 0) {
-        setSubView(selectableSubMenus[0].id);
-      }
+        if (selectableSubMenus.length > 0) {
+          setSubView(selectableSubMenus[0].id);
+        }
+      });
       return;
     }
 
-    setMainMenu(menu);
-    if (sub !== undefined) setSubView(sub);
+    startTransition(() => {
+      setMainMenu(menu);
+      if (sub !== undefined) setSubView(sub);
+    });
   }, [clearMenuNavigationTargets, mainMenu, resetPersistedMenuState, selectableSubMenus]);
 
   const handleSubViewChange = useCallback((nextSubView: string) => {
-    setSubView(nextSubView);
+    startTransition(() => {
+      setSubView(nextSubView);
+    });
   }, []);
 
   const handleRefresh = useCallback(() => {
@@ -1053,7 +1068,7 @@ function MainPageContent() {
           onOpenPost={(boardId: string, postId: string) => { setMainMenu('게시판'); if (boardId) setInitialBoardView(boardId); setInitialOpenPostId(postId); }}
         />
 
-        {loading && (
+        {loading && !hasLoadedInitialData && (
           <div
             className="absolute inset-0 bg-[var(--toss-card)]/60 z-40 flex items-center justify-center"
             data-testid="main-loading-overlay"
@@ -1062,7 +1077,7 @@ function MainPageContent() {
           </div>
         )}
         <MainContent
-          key={`${mainMenu}-${menuResetVersion}`}
+          key={`main-content-${menuResetVersion}`}
           user={user}
           mainMenu={mainMenu}
           data={data}
