@@ -158,6 +158,108 @@ test("chat shows unread counters only on messages I sent", async ({ page }) => {
   await expect(page.getByTestId("chat-message-read-status-msg-peer")).toHaveCount(0);
 });
 
+test("chat clears message unread counters when a peer reads from another direct room in the same conversation", async ({ page }) => {
+  await mockSupabase(page, {
+    chatRooms: [
+      {
+        id: "00000000-0000-0000-0000-000000000000",
+        name: "Notice",
+        type: "notice",
+        members: [],
+        created_at: "2026-03-08T00:00:00.000Z",
+        last_message_at: "2026-03-08T00:00:00.000Z",
+      },
+      {
+        id: "room-direct-a",
+        name: "Direct Room A",
+        type: "direct",
+        members: [fakeUser.id, "peer-1"],
+        created_at: "2026-03-08T09:00:00.000Z",
+        last_message_at: "2026-03-08T10:00:00.000Z",
+        last_message_preview: "my own older direct",
+      },
+      {
+        id: "room-direct-b",
+        name: "Direct Room B",
+        type: "direct",
+        members: ["peer-1", fakeUser.id],
+        created_at: "2026-03-08T09:30:00.000Z",
+        last_message_at: "2026-03-08T10:10:00.000Z",
+        last_message_preview: "peer reply in sibling room",
+      },
+    ],
+    staffMembers: [
+      fakeUser,
+      {
+        ...fakeUser,
+        id: "peer-1",
+        name: "Merged Direct Peer",
+        employee_no: "E2E-CHAT-188",
+      },
+    ],
+    messages: [
+      {
+        id: "msg-own-direct",
+        room_id: "room-direct-a",
+        sender_id: fakeUser.id,
+        content: "my own older direct",
+        created_at: "2026-03-08T10:00:00.000Z",
+        is_deleted: false,
+        staff: { name: fakeUser.name, photo_url: null },
+      },
+      {
+        id: "msg-peer-direct",
+        room_id: "room-direct-b",
+        sender_id: "peer-1",
+        content: "peer reply in sibling room",
+        created_at: "2026-03-08T10:10:00.000Z",
+        is_deleted: false,
+        staff: { name: "Merged Direct Peer", photo_url: null },
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: "\uCC44\uD305",
+      erp_chat_last_room: "room-direct-b",
+    },
+  });
+
+  await page.goto(
+    `/main?${new URLSearchParams({ open_menu: "\uCC44\uD305" }).toString()}`,
+  );
+  await expect(page.getByTestId("chat-view")).toBeVisible();
+  await page.getByTestId("chat-room-room-direct-b").click();
+  await expect(page.getByTestId("chat-message-input")).toBeVisible();
+
+  await expect(page.getByTestId("chat-message-read-status-msg-own-direct")).toHaveText("1");
+
+  await page.evaluate(async () => {
+    await fetch("/rest/v1/room_read_cursors?on_conflict=user_id,room_id", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: "peer-1",
+        room_id: "room-direct-a",
+        last_read_at: "2026-03-08T10:12:00.000Z",
+      }),
+    });
+
+    const channel = new BroadcastChannel("erp-chat-sync");
+    channel.postMessage({
+      action: "message-read",
+      roomId: "room-direct-a",
+      at: Date.now(),
+    });
+    channel.close();
+  });
+
+  await expect(page.getByTestId("chat-message-read-status-msg-own-direct")).toHaveCount(0);
+});
+
 test("chat updates room preview and unread count immediately for messages from another room", async ({ page }) => {
   await mockSupabase(page, {
     chatRooms: [

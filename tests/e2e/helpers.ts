@@ -149,6 +149,7 @@ export type MockFixtures = {
   pollVotes?: any[];
   messageReactions?: any[];
   messageReads?: any[];
+  roomReadCursors?: any[];
   messageBookmarks?: any[];
   messageInsertFailures?: number;
   missingMessageColumns?: string[];
@@ -376,6 +377,7 @@ function buildFixtures(overrides: MockFixtures = {}) {
     pollVotes: overrides.pollVotes ?? [],
     messageReactions: overrides.messageReactions ?? [],
     messageReads: overrides.messageReads ?? [],
+    roomReadCursors: overrides.roomReadCursors ?? [],
     messageBookmarks: overrides.messageBookmarks ?? [],
     messageInsertFailures: overrides.messageInsertFailures ?? 0,
     approvals:
@@ -683,6 +685,7 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   let pollVotes = [...fixtures.pollVotes];
   let messageReactions = [...fixtures.messageReactions];
   let messageReads = [...fixtures.messageReads];
+  let roomReadCursors = [...fixtures.roomReadCursors];
   let messageBookmarks = [...fixtures.messageBookmarks];
   let companies = [...fixtures.companies];
   let inventoryItems = [...fixtures.inventoryItems];
@@ -1870,6 +1873,61 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       }
 
       return json(route, messageReads);
+    }
+
+    if (path.includes('/room_read_cursors')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(roomReadCursors, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const upserted = payloads.map((payload: any) => {
+          const existing = roomReadCursors.find(
+            (row: any) =>
+              String(row.room_id) === String(payload.room_id) &&
+              String(row.user_id) === String(payload.user_id)
+          );
+
+          if (existing) {
+            return { ...existing, ...payload };
+          }
+
+          return {
+            id: payload.id || `room-read-cursor-${roomReadCursors.length + 1}`,
+            created_at: payload.created_at || new Date().toISOString(),
+            ...payload,
+          };
+        });
+
+        roomReadCursors = [
+          ...roomReadCursors.filter(
+            (row: any) =>
+              !upserted.some(
+                (candidate: any) =>
+                  String(candidate.room_id) === String(row.room_id) &&
+                  String(candidate.user_id) === String(row.user_id)
+              )
+          ),
+          ...upserted,
+        ];
+
+        return json(route, wantsObject ? upserted[0] : upserted);
+      }
+
+      if (method === 'DELETE') {
+        const deleting = applyQueryFilters(roomReadCursors, url);
+        const deleteKeys = new Set(
+          deleting.map((row: any) => `${String(row.room_id)}::${String(row.user_id)}`)
+        );
+        roomReadCursors = roomReadCursors.filter(
+          (row: any) => !deleteKeys.has(`${String(row.room_id)}::${String(row.user_id)}`)
+        );
+        return json(route, wantsObject ? deleting[0] ?? null : deleting);
+      }
+
+      return json(route, roomReadCursors);
     }
 
     if (path.includes('/message_bookmarks')) {
@@ -3173,7 +3231,6 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
     if (
       path.includes('/push_subscriptions') ||
       path.includes('/education_records') ||
-      path.includes('/room_read_cursors') ||
       path.includes('/room_notification_settings') ||
       path.includes('/messenger_drive_links')
     ) {
