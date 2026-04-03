@@ -3,6 +3,8 @@ import { toast } from '@/lib/toast';
 import type { StaffMember as AppStaffMember } from '@/types';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { filterRosterShiftsForDepartment } from '@/lib/roster-shift-team-filter';
 import SmartDatePicker from '../../공통/SmartDatePicker';
 import SmartMonthPicker from '../../공통/SmartMonthPicker';
 import AutoRosterPlanner from '../../근무표자동편성';
@@ -285,10 +287,42 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
   // 근무표 편성: work_shifts 로드
   useEffect(() => {
     if (viewMode !== 'schedule') return;
-    supabase.from('work_shifts').select('id, name, start_time, end_time').eq('is_active', true).then(({ data }) => {
+    void withMissingColumnsFallback(
+      (omittedColumns) => {
+        const columns = [
+          'id',
+          'name',
+          'start_time',
+          'end_time',
+          'description',
+          'shift_type',
+          'company_name',
+          'weekly_work_days',
+          'is_weekend_work',
+        ].filter((column) => !omittedColumns.has(column));
+
+        let query = supabase
+          .from('work_shifts')
+          .select(columns.join(', '))
+          .eq('is_active', true);
+
+        if (selectedCo !== '전체') {
+          query = query.eq('company_name', selectedCo);
+        }
+
+        return query.order('start_time', { ascending: true });
+      },
+      ['description', 'shift_type', 'company_name', 'weekly_work_days', 'is_weekend_work']
+    ).then(({ data, error }) => {
+      if (error) {
+        console.error('근무형태 조회 실패:', error);
+        setWorkShifts([]);
+        return;
+      }
+
       setWorkShifts(data || []);
     });
-  }, [viewMode]);
+  }, [selectedCo, viewMode]);
 
   const loadShiftAssignments = async () => {
     if (viewMode !== 'schedule' || filtered.length === 0) {
@@ -348,6 +382,18 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
     if (rosterTeam === '전체') return filtered;
     return filtered.filter((s: StaffMember) => s.department === rosterTeam);
   }, [filtered, rosterTeam]);
+  const visibleWorkShifts = useMemo(() => {
+    const scopedDepartment = rosterTeam === '전체' ? '' : rosterTeam;
+    const scopedShifts = filterRosterShiftsForDepartment(scopedDepartment, workShifts as any[]);
+    return scopedShifts.length > 0 ? scopedShifts : workShifts;
+  }, [rosterTeam, workShifts]);
+
+  useEffect(() => {
+    if (!activeTool || activeTool === 'eraser') return;
+    if (!visibleWorkShifts.some((shift: any) => shift.id === activeTool)) {
+      setActiveTool(null);
+    }
+  }, [activeTool, visibleWorkShifts]);
 
   const handleSwapRequest = async (targetDate: string, reason: string) => {
     if (!swapData || !user) return;
@@ -511,8 +557,8 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
     setAiLoading(true);
     try {
       const monthDates = daysArray.map((day) => `${selectedMonth}-${String(day).padStart(2, '0')}`);
-      const validShiftIds = new Set(workShifts.map((shift: any) => String(shift.id)));
-      const offShift = workShifts.find((shift: any) => {
+      const validShiftIds = new Set(visibleWorkShifts.map((shift: any) => String(shift.id)));
+      const offShift = visibleWorkShifts.find((shift: any) => {
         const name = String(shift?.name || '').toLowerCase();
         return name.includes('off') || name.includes('오프') || name.includes('휴무') || name === 'o';
       });
@@ -524,7 +570,7 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           staffs: teamStaffs, 
-          workShifts: workShifts, 
+          workShifts: visibleWorkShifts, 
           selectedMonth: selectedMonth, 
           selectedDepartment: rosterTeam,
           selectedCompany: selectedCo || '본사',
@@ -1048,7 +1094,7 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
                       <button
                         type="button"
                         onClick={() => {
-                          const standardShift = workShifts.find(sh => sh.name.includes('통상') || sh.name.includes('일반') || sh.name.includes('주간') || sh.name.includes('9to6'));
+                          const standardShift = visibleWorkShifts.find(sh => sh.name.includes('통상') || sh.name.includes('일반') || sh.name.includes('주간') || sh.name.includes('9to6'));
                           if (!standardShift) {
                             toast('통상/일반/주간 이라는 이름이 포함된 근무형태가 부재합니다.');
                             return;
@@ -1136,7 +1182,7 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
               <div className="flex flex-wrap items-center gap-2 bg-[var(--card)] dark:bg-zinc-800 p-2 rounded-2xl border border-[var(--border)] dark:border-zinc-700 shadow-sm w-fit">
                 <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider mx-3">Toolbox</span>
                 <div className="w-px h-6 bg-[var(--tab-bg)] dark:bg-zinc-700 mr-2"></div>
-                {workShifts.map((sh: any) => {
+                {visibleWorkShifts.map((sh: any) => {
                   const isActive = activeTool === sh.id;
                   let colorClass = 'bg-[var(--tab-bg)] dark:bg-zinc-900 text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] border-[var(--border)] dark:border-zinc-700 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800';
                   if (sh.name.includes('Day') || sh.name.includes('데이') || sh.name === 'D') colorClass = 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/40';
@@ -1270,8 +1316,10 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
                   </div>
                   <div className="flex-1 overflow-auto custom-scrollbar relative">
                     <AutoRosterPlanner
-                      staffs={staffs as AppStaffMember[]}
+                      staffs={rosterFiltered as AppStaffMember[]}
                       selectedCo={selectedCo}
+                      initialDepartment={rosterTeam !== '전체' ? rosterTeam : undefined}
+                      initialMonth={selectedMonth}
                       user={(user as AppStaffMember) || undefined}
                       onAssignmentsSaved={() => {
                         void loadShiftAssignments();
