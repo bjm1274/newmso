@@ -621,6 +621,90 @@ test("chat opens a room and re-clicking the room list keeps the view aligned to 
     .toBe(true);
 });
 
+test("chat keeps the latest message visible when delayed notice data shrinks the list", async ({ page }) => {
+  const longMessages = Array.from({ length: 40 }, (_, index) => ({
+    id: `msg-delay-${index + 1}`,
+    room_id: "room-delay",
+    sender_id: index % 2 === 0 ? fakeUser.id : "peer-delay",
+    content: `delay message ${index + 1}`,
+    created_at: `2026-03-08T11:${String(index).padStart(2, "0")}:00.000Z`,
+    is_deleted: false,
+    staff: { name: index % 2 === 0 ? fakeUser.name : "Delayed Peer", photo_url: null },
+  }));
+
+  await mockSupabase(page, {
+    chatRooms: [
+      {
+        id: "00000000-0000-0000-0000-000000000000",
+        name: "Notice",
+        type: "notice",
+        members: [],
+        created_at: "2026-03-08T00:00:00.000Z",
+        last_message_at: "2026-03-08T00:00:00.000Z",
+      },
+      {
+        id: "room-delay",
+        name: "Delayed Notice Room",
+        type: "group",
+        members: [fakeUser.id, "peer-delay"],
+        created_at: "2026-03-08T10:00:00.000Z",
+        last_message_at: "2026-03-08T11:39:00.000Z",
+        last_message_preview: "delay message 40",
+      },
+    ],
+    staffMembers: [
+      fakeUser,
+      {
+        ...fakeUser,
+        id: "peer-delay",
+        name: "Delayed Peer",
+        employee_no: "E2E-CHAT-100",
+      },
+    ],
+    messages: longMessages,
+    pinnedMessages: [
+      {
+        room_id: "room-delay",
+        message_id: "msg-delay-40",
+      },
+    ],
+  });
+
+  await page.route("**/rest/v1/pinned_messages*", async (route) => {
+    await page.waitForTimeout(180);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([{ message_id: "msg-delay-40" }]),
+    });
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: "\uCC44\uD305",
+    },
+  });
+
+  await page.goto(
+    `/main?${new URLSearchParams({ open_menu: "\uCC44\uD305" }).toString()}`,
+  );
+  await expect(page.getByTestId("chat-view")).toBeVisible();
+
+  await page.getByTestId("chat-room-room-delay").click();
+
+  await expect(page.getByText("공지 메시지")).toBeVisible();
+  await expect(page.getByTestId("chat-message-msg-delay-40")).toBeVisible();
+  await expect(page.getByRole("button", { name: "최신 메시지" })).toBeHidden();
+  await expect
+    .poll(async () =>
+      page.getByTestId("chat-message-list").evaluate((node) => {
+        const el = node as HTMLDivElement;
+        return Math.abs(el.scrollHeight - el.clientHeight - el.scrollTop) <= 24;
+      }),
+    )
+    .toBe(true);
+});
+
 test("chat marks notifications as read when a message arrives in the already open room", async ({ page }) => {
   await mockSupabase(page, {
     chatRooms: [

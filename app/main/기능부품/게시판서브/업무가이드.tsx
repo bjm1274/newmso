@@ -28,49 +28,6 @@ const GUIDE_POST_OPTIONAL_COLUMNS = ['updated_at', 'company_id', 'attachments'] 
 
 const GUIDE_DEPARTMENT_PRESETS = ['수술실', '외래', '병동', '원무', '검사실', '행정', '재고', '회복실'] as const;
 
-const GUIDE_TEMPLATES = [
-  {
-    id: 'joint-surgery',
-    label: '인공관절 수술 준비',
-    title: '인공관절 수술 준비 가이드',
-    department: '수술실',
-    kind: 'education',
-    audience: 'new_hire',
-    description:
-      '1. 수술 전 확인\n- 환자명, 수술 부위, 수술 시간 재확인\n- 필요한 임플란트 규격과 수량 확인\n\n2. 준비물 세팅\n- 기본 기구 세트 준비\n- 임플란트와 소모품 준비\n- 수술실 장비 작동 상태 확인\n\n3. 수술 중 체크 포인트\n- 오염 구역과 멸균 구역 분리 유지\n- 집도의 요청 순서에 맞춰 기구 전달\n\n4. 수술 후 정리\n- 사용 기구 수량 확인\n- 재사용 기구 분류 및 멸균 전달\n- 사용 재고 기록 및 인계 내용 정리',
-  },
-  {
-    id: 'anesthesia',
-    label: '마취 준비',
-    title: '마취 준비 가이드',
-    department: '수술실',
-    kind: 'education',
-    audience: 'new_hire',
-    description:
-      '1. 마취 전 확인\n- 환자 신원, 금식 여부, 알레르기 확인\n- 모니터링 장비 작동 확인\n\n2. 준비물\n- 마취 약물, 기도 확보 장비, suction 준비\n- 응급 약물과 산소 공급 상태 확인\n\n3. 진행 순서\n- 마취과 요청 순서에 맞춰 준비물 전달\n- 환자 상태 변화 즉시 공유\n\n4. 종료 후 인계\n- 회복실 전달 시 약물, 특이사항, 주의사항 인계',
-  },
-  {
-    id: 'sterilization',
-    label: '기구 소독',
-    title: '기구 소독 및 멸균 가이드',
-    department: '수술실',
-    kind: 'education',
-    audience: 'all_staff',
-    description:
-      '1. 수거 직후 분류\n- 날카로운 기구와 일반 기구 분리\n- 오염 정도에 따라 1차 세척 구분\n\n2. 세척 단계\n- 세척제 농도 확인\n- 관절형 기구는 펼친 상태로 세척\n\n3. 멸균 전 점검\n- 파손 여부 확인\n- 세트별 누락 여부 확인\n\n4. 멸균 후 보관\n- 포장 상태 확인\n- 사용 기한 및 보관 위치 기록',
-  },
-  {
-    id: 'handover',
-    label: '인수인계 문서',
-    title: '신규 직원 인수인계 문서',
-    department: '수술실',
-    kind: 'handover',
-    audience: 'current_staff',
-    description:
-      '1. 반드시 설명할 업무\n- 일일 오픈/마감 루틴\n- 자주 쓰는 기구 위치\n- 긴급 상황 보고 체계\n\n2. 인계 체크리스트\n- 재고 부족 품목\n- 예약된 수술 특이사항\n- 장비 고장/주의 이슈\n\n3. 신규 직원 확인 항목\n- 직접 시연 여부\n- 질문 정리 여부\n- 추가 교육 필요 항목',
-  },
-] as const;
-
 type QueryResult<T> = {
   data: T | null;
   error: unknown;
@@ -349,10 +306,10 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
   const isCrossCompanyViewer = Boolean(user?.permissions?.mso || user?.role === 'admin' || isPrivileged);
   const currentUserId = String(user?.id || '').trim();
   const currentCompanyId = String(user?.company_id || '').trim();
-  const activeCompanyLabel = isCrossCompanyViewer
+  const activeOrganizationLabel = isCrossCompanyViewer
     ? selectedCo && selectedCo !== '전체'
       ? selectedCo
-      : '전체 법인'
+      : '전체 병원/기관'
     : String(user?.company || '').trim();
   const canManageResource = useCallback(
     (resource?: Pick<GuideResource, 'author_id'> | null) => {
@@ -425,24 +382,21 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
     return resources.filter((resource) => !resource.company_id || resource.company_id === currentCompanyId);
   }, [currentCompanyId, isCrossCompanyViewer, resources, selectedCompanyId]);
 
-  const departments = useMemo(
+  const departmentOptions = useMemo(
     () =>
       Array.from(
         new Set(
-          companyScopedResources
-            .map((resource) => String(resource.department || '').trim())
-            .filter(Boolean),
+          [...GUIDE_DEPARTMENT_PRESETS, ...companyScopedResources.map((resource) => String(resource.department || '').trim())].filter(Boolean),
         ),
       ).sort((left, right) => left.localeCompare(right, 'ko')),
     [companyScopedResources],
   );
 
-  const filteredResources = useMemo(() => {
+  const baseFilteredResources = useMemo(() => {
     const keyword = search.trim().toLowerCase();
     return companyScopedResources.filter((resource) => {
       if (kindFilter !== 'all' && resource.kind !== kindFilter) return false;
       if (audienceFilter !== 'all' && resource.audience !== audienceFilter) return false;
-      if (departmentFilter !== 'all' && resource.department !== departmentFilter) return false;
       if (!keyword) return true;
 
       return [
@@ -457,7 +411,23 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(keyword));
     });
-  }, [audienceFilter, companyScopedResources, departmentFilter, kindFilter, search]);
+  }, [audienceFilter, companyScopedResources, kindFilter, search]);
+
+  const departmentCounts = useMemo(() => {
+    return baseFilteredResources.reduce<Record<string, number>>((counts, resource) => {
+      const nextDepartment = String(resource.department || '').trim();
+      if (!nextDepartment) return counts;
+      counts[nextDepartment] = (counts[nextDepartment] || 0) + 1;
+      return counts;
+    }, {});
+  }, [baseFilteredResources]);
+
+  const filteredResources = useMemo(() => {
+    if (departmentFilter === 'all') return baseFilteredResources;
+    return baseFilteredResources.filter((resource) => resource.department === departmentFilter);
+  }, [baseFilteredResources, departmentFilter]);
+
+  const selectedDepartmentLabel = departmentFilter === 'all' ? '전체 부서' : departmentFilter;
 
   useEffect(() => {
     if (!selectedResourceId || !filteredResources.some((resource) => resource.id === selectedResourceId)) {
@@ -470,19 +440,11 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
     [filteredResources, selectedResourceId],
   );
 
-  const applyTemplate = useCallback((templateId: string) => {
-    const template = GUIDE_TEMPLATES.find((item) => item.id === templateId);
-    if (!template) return;
-    setTitle((prev) => prev || template.title);
-    setDepartment((prev) => prev || template.department);
-    setKind(template.kind);
-    setAudience(template.audience);
-    setDescription((prev) => (prev.trim() ? prev : template.description));
-    setShowComposer(true);
-  }, []);
-
-  const startCreate = useCallback(() => {
+  const startCreate = useCallback((nextDepartment?: string) => {
     resetComposer();
+    if (nextDepartment && nextDepartment !== 'all') {
+      setDepartment(nextDepartment);
+    }
     setShowComposer(true);
   }, [resetComposer]);
 
