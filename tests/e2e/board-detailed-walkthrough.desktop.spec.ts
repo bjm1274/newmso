@@ -301,10 +301,11 @@ test('guide board uploads and displays onboarding materials for new staff', asyn
   await openBoardMenu(page, GUIDE_BOARD);
   await expect(page.getByTestId('guide-library-view')).toBeVisible();
 
+  await page.getByRole('button', { name: /수술실/ }).click();
   await page.getByTestId('guide-open-compose').click();
   await expect(page.getByTestId('guide-form')).toBeVisible();
+  await expect(page.getByTestId('guide-department-input')).toHaveValue('수술실');
   await page.getByTestId('guide-title-input').fill('인공관절 수술 준비 가이드');
-  await page.getByTestId('guide-department-input').fill('수술실');
   await page.getByTestId('guide-kind-select').selectOption('education');
   await page.getByTestId('guide-audience-select').selectOption('new_hire');
   await page.getByTestId('guide-keywords-input').fill('인공관절, 멸균, 신규교육');
