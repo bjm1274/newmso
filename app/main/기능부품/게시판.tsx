@@ -609,7 +609,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     수술일정: { title: '수술일정', description: '' },
     MRI일정: { title: 'MRI일정', description: '' },
     직원제안함: { title: '직원 제안함', description: '' },
-    업무가이드: { title: '업무가이드', description: '신규 직원 교육자료와 인수인계 문서를 부서별로 정리합니다.' },
+    업무가이드: { title: '업무가이드', description: '부서별 메뉴에서 업무가이드 게시글과 첨부 자료를 함께 관리합니다.' },
   };
   const currentBoardMeta = boardMetaMap[activeBoard] || {
     title: activeBoard || '게시판',

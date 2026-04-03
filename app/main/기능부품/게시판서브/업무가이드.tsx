@@ -632,41 +632,21 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
             </div>
             <h2 className="text-xl font-bold text-[var(--foreground)]">업무가이드</h2>
             <p className="text-sm font-semibold leading-6 text-[var(--toss-gray-3)]">
-              수술실, 외래, 병동처럼 부서별로 자주 반복되는 프로세스를 문서와 파일로 정리해 두고 신규 직원이
-              바로 이해할 수 있게 공유하세요. 교육자료와 인수인계 문서를 한 곳에서 관리할 수 있습니다.
+              부서 메뉴별로 업무가이드 게시글과 자료를 정리하고, 필요한 파일을 함께 등록해 바로 공유하세요.
+              신규 직원 교육자료와 인수인계 문서를 부서 중심으로 관리할 수 있습니다.
             </p>
-            <div className="flex flex-wrap gap-2">
-              {GUIDE_TEMPLATES.map((template) => (
-                <button
-                  key={template.id}
-                  type="button"
-                  onClick={() => applyTemplate(template.id)}
-                  className="rounded-full border border-[var(--border)] bg-white px-3 py-1.5 text-xs font-bold text-[var(--foreground)] hover:bg-[var(--muted)]"
-                >
-                  {template.label}
-                </button>
-              ))}
-            </div>
           </div>
 
           <div className="flex flex-col items-start gap-2 rounded-[var(--radius-lg)] bg-[var(--muted)] p-4 text-xs font-semibold text-[var(--toss-gray-3)] xl:min-w-[240px]">
-            <span>표시 법인: {activeCompanyLabel || '기본 법인'}</span>
+            <span>표시 기관: {activeOrganizationLabel || '기본 기관'}</span>
+            <span>선택 부서: {selectedDepartmentLabel}</span>
             <span>자료 수: {filteredResources.length}건</span>
             <span>첨부 포함: {filteredResources.filter((resource) => resource.attachments.length > 0).length}건</span>
-            {canWrite ? (
-              <button
-                type="button"
-                onClick={startCreate}
-                data-testid="guide-open-compose"
-                className="mt-2 rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-bold text-white shadow-sm hover:opacity-95"
-              >
-                + 자료 등록
-              </button>
-            ) : (
+            {!canWrite ? (
               <span className="mt-2 rounded-full bg-white px-3 py-1 text-[11px] text-[var(--foreground)]">
                 읽기 전용
               </span>
-            )}
+            ) : null}
           </div>
         </div>
       </header>
@@ -676,9 +656,9 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-lg font-bold text-[var(--foreground)]">{editingResourceId ? '업무가이드 수정' : '업무가이드 등록'}</h3>
+                <h3 className="text-lg font-bold text-[var(--foreground)]">{editingResourceId ? '업무가이드 게시글 수정' : '업무가이드 게시글 등록'}</h3>
                 <p className="mt-1 text-xs font-semibold text-[var(--toss-gray-3)]">
-                  업무 순서, 체크포인트, 주의사항, 첨부 문서를 함께 남겨 주세요.
+                  게시글 내용과 함께 문서, 이미지, 참고 파일을 같이 등록할 수 있습니다.
                 </p>
               </div>
               <button
@@ -692,6 +672,12 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                 닫기
               </button>
             </div>
+
+            {!editingResourceId && departmentFilter !== 'all' && (
+              <div className="rounded-[var(--radius-lg)] bg-[var(--toss-blue-light)] px-4 py-3 text-xs font-semibold text-[var(--accent)]">
+                현재 {departmentFilter} 메뉴에서 게시글을 작성 중입니다. 적용 부서는 아래에서 바로 확인하거나 변경할 수 있습니다.
+              </div>
+            )}
 
             <div className="grid gap-4 lg:grid-cols-2">
               <label className="space-y-2">
@@ -716,10 +702,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                   className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
                 />
                 <datalist id="guide-department-options">
-                  {GUIDE_DEPARTMENT_PRESETS.map((item) => (
-                    <option key={item} value={item} />
-                  ))}
-                  {departments.map((item) => (
+                  {departmentOptions.map((item) => (
                     <option key={item} value={item} />
                   ))}
                 </datalist>
@@ -847,7 +830,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                 onClick={() => void saveResource()}
                 className="rounded-full bg-[var(--accent)] px-5 py-2 text-sm font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {saving ? '저장 중...' : editingResourceId ? '수정 저장' : '자료 등록'}
+                {saving ? '저장 중...' : editingResourceId ? '수정 저장' : '게시글 등록'}
               </button>
             </div>
           </div>
@@ -856,6 +839,59 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
 
       <section className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
         <div className="space-y-4">
+          <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm" data-testid="guide-department-menu">
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-[var(--foreground)]">부서별 메뉴</p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-[var(--toss-gray-3)]">
+                    부서를 선택하면 해당 부서의 업무가이드 게시글과 첨부 자료만 볼 수 있습니다.
+                  </p>
+                </div>
+                {canWrite ? (
+                  <button
+                    type="button"
+                    onClick={() => startCreate(departmentFilter !== 'all' ? departmentFilter : undefined)}
+                    data-testid="guide-open-compose"
+                    className="rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-bold text-white shadow-sm hover:opacity-95"
+                  >
+                    {departmentFilter === 'all' ? '+ 게시글 작성' : `+ ${departmentFilter} 게시글 작성`}
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                <button
+                  type="button"
+                  onClick={() => setDepartmentFilter('all')}
+                  className={`flex items-center justify-between rounded-[var(--radius-lg)] border px-3 py-3 text-left text-sm font-bold transition ${
+                    departmentFilter === 'all'
+                      ? 'border-[var(--accent)] bg-[var(--toss-blue-light)] text-[var(--accent)]'
+                      : 'border-[var(--border)] bg-white text-[var(--foreground)] hover:border-[var(--accent)]/40'
+                  }`}
+                >
+                  <span>전체 부서</span>
+                  <span className="text-xs">{baseFilteredResources.length}건</span>
+                </button>
+                {departmentOptions.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setDepartmentFilter(item)}
+                    className={`flex items-center justify-between rounded-[var(--radius-lg)] border px-3 py-3 text-left text-sm font-bold transition ${
+                      departmentFilter === item
+                        ? 'border-[var(--accent)] bg-[var(--toss-blue-light)] text-[var(--accent)]'
+                        : 'border-[var(--border)] bg-white text-[var(--foreground)] hover:border-[var(--accent)]/40'
+                    }`}
+                  >
+                    <span>{item}</span>
+                    <span className="text-xs">{departmentCounts[item] || 0}건</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
             <div className="space-y-3">
               <input
@@ -895,43 +931,39 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                   </button>
                 ))}
               </div>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDepartmentFilter('all')}
-                  className={`rounded-full px-3 py-1.5 text-xs font-bold ${
-                    departmentFilter === 'all' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--foreground)]'
-                  }`}
-                >
-                  전체 부서
-                </button>
-                {departments.map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => setDepartmentFilter(item)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-bold ${
-                      departmentFilter === item ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--foreground)]'
-                    }`}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
             </div>
           </div>
 
           <div className="space-y-3">
+            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-[var(--foreground)]">
+                    {departmentFilter === 'all' ? '전체 부서 게시글 / 자료' : `${departmentFilter} 게시글 / 자료`}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-[var(--toss-gray-3)]">
+                    {departmentFilter === 'all'
+                      ? '부서 메뉴를 선택하면 원하는 부서의 게시글과 첨부 자료만 빠르게 볼 수 있습니다.'
+                      : `${departmentFilter} 메뉴에 등록된 업무가이드와 자료입니다.`}
+                  </p>
+                </div>
+                <span className="rounded-full bg-[var(--muted)] px-3 py-1 text-xs font-bold text-[var(--foreground)]">
+                  {filteredResources.length}건
+                </span>
+              </div>
+            </div>
+
             {loading ? (
               <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-8 text-center text-sm font-semibold text-[var(--toss-gray-3)]">
                 업무가이드를 불러오는 중입니다.
               </div>
             ) : filteredResources.length === 0 ? (
               <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-8 text-center">
-                <p className="text-base font-bold text-[var(--foreground)]">등록된 자료가 없습니다.</p>
+                <p className="text-base font-bold text-[var(--foreground)]">등록된 게시글이 없습니다.</p>
                 <p className="mt-2 text-sm font-semibold text-[var(--toss-gray-3)]">
-                  신규 직원이 반복해서 보는 SOP, 준비물, 인수인계 포인트를 먼저 정리해 두세요.
+                  {departmentFilter === 'all'
+                    ? '먼저 부서를 선택한 뒤 SOP, 준비물, 인수인계 포인트를 게시글과 첨부 자료로 정리해 두세요.'
+                    : `${departmentFilter} 메뉴에 첫 업무가이드 게시글과 자료를 등록해 보세요.`}
                 </p>
               </div>
             ) : (
@@ -997,7 +1029,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                     <h3 className="text-2xl font-bold text-[var(--foreground)]">{selectedResource.title}</h3>
                     <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-[var(--toss-gray-3)]">
                       <span>{selectedResource.author_name || '작성자 미상'}</span>
-                      <span>{selectedResource.company || activeCompanyLabel || '기본 법인'}</span>
+                      <span>{selectedResource.company || activeOrganizationLabel || '기본 기관'}</span>
                       <span>{formatDate(selectedResource.updated_at || selectedResource.created_at)}</span>
                     </div>
                   </div>

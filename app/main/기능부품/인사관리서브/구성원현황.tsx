@@ -582,7 +582,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         const beforeStaff = 직원목록.find((staff: StaffMember) => String(staff.id) === String(선택된직원ID)) || null;
         const afterStaff = {
           ...beforeStaff,
-          /* ...commonData,
+          ...commonData,
           annual_leave_total: 신규직원.연차총개수,
           annual_leave_used: 신규직원.연차사용개수,
         };
@@ -601,10 +601,6 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
               .select(),
           [...STAFF_MUTATION_ALLOWANCE_COLUMNS],
         );
-          ...commonData,
-          annual_leave_total: 신규직원.연차총개수,
-          annual_leave_used: 신규직원.연차사용개수
-        }).eq('id', 선택된직원ID).select();
 
         if (updateErr) {
           throw updateErr;

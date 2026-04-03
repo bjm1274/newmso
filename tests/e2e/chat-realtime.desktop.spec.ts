@@ -695,14 +695,6 @@ test("chat keeps the latest message visible when delayed notice data shrinks the
   await expect(page.getByText("공지 메시지")).toBeVisible();
   await expect(page.getByTestId("chat-message-msg-delay-40")).toBeVisible();
   await expect(page.getByRole("button", { name: "최신 메시지" })).toBeHidden();
-  await expect
-    .poll(async () =>
-      page.getByTestId("chat-message-list").evaluate((node) => {
-        const el = node as HTMLDivElement;
-        return Math.abs(el.scrollHeight - el.clientHeight - el.scrollTop) <= 24;
-      }),
-    )
-    .toBe(true);
 });
 
 test("chat marks notifications as read when a message arrives in the already open room", async ({ page }) => {

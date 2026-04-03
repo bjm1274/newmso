@@ -3,6 +3,7 @@ import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { calculateAttendanceDeduction } from '@/lib/attendance-deduction';
 import { logAudit } from '@/lib/audit';
 import { formatPayrollMutationError } from '@/lib/payroll-records';
@@ -39,6 +40,15 @@ interface SettlementEntry {
   withholding_rate_percent: 80 | 100 | 120;
   advance_pay: number;
 }
+
+const PAYROLL_RECORD_OPTIONAL_COLUMNS = [
+  'meal_allowance',
+  'night_duty_allowance',
+  'vehicle_allowance',
+  'childcare_allowance',
+  'research_allowance',
+  'other_taxfree',
+] as const;
 
 export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { staffs: StaffMember[]; selectedCo: string; onRefresh?: () => void }) {
   const [step, setStep] = useState(1);
@@ -496,7 +506,19 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
         };
       });
 
-      const { error: payrollSaveError } = await supabase.from('payroll_records').upsert(records, { onConflict: 'staff_id,year_month' });
+      const { error: payrollSaveError } = await withMissingColumnsFallback(
+        (omittedColumns) => {
+          const normalizedRecords = records.map((record) => {
+            const nextRecord = { ...record } as Record<string, unknown>;
+            omittedColumns.forEach((columnName) => {
+              delete nextRecord[columnName];
+            });
+            return nextRecord;
+          });
+          return supabase.from('payroll_records').upsert(normalizedRecords, { onConflict: 'staff_id,year_month' });
+        },
+        [...PAYROLL_RECORD_OPTIONAL_COLUMNS],
+      );
       if (payrollSaveError) throw payrollSaveError;
       const u = typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem('erp_user') || '{}'); } catch { return {}; } })() : {};
       try {
