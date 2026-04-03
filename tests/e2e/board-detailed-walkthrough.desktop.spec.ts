@@ -100,6 +100,27 @@ test('board detailed walkthrough clicks through each board menu in practical ord
   await mockSupabase(page, {
     boardPosts: [],
     boardPostComments: [],
+    staffMembers: [
+      { ...fakeUser, department: '수술팀', status: '재직' },
+      {
+        id: 'guide-team-member-2',
+        name: '팀원 A',
+        company: fakeUser.company,
+        company_id: fakeUser.company_id,
+        department: '수술팀',
+        position: '간호사',
+        status: '재직',
+      },
+    ],
+    orgTeams: [
+      {
+        id: 'guide-org-team-1',
+        company_name: fakeUser.company,
+        division: '간호부',
+        team_name: '수술팀',
+        sort_order: 1,
+      },
+    ],
   });
 
   await seedSession(page, {
@@ -301,10 +322,12 @@ test('guide board uploads and displays onboarding materials for new staff', asyn
   await openBoardMenu(page, GUIDE_BOARD);
   await expect(page.getByTestId('guide-library-view')).toBeVisible();
 
-  await page.getByRole('button', { name: /수술실/ }).click();
+  const firstTeamButton = page.getByTestId('guide-team-menu').getByRole('button').nth(1);
+  await firstTeamButton.click();
   await page.getByTestId('guide-open-compose').click();
   await expect(page.getByTestId('guide-form')).toBeVisible();
-  await expect(page.getByTestId('guide-department-input')).toHaveValue('수술실');
+  await expect(page.getByTestId('guide-team-select')).not.toHaveValue('');
+  const selectedTeamLabel = await page.getByTestId('guide-team-select').inputValue();
   await page.getByTestId('guide-title-input').fill('인공관절 수술 준비 가이드');
   await page.getByTestId('guide-kind-select').selectOption('education');
   await page.getByTestId('guide-audience-select').selectOption('new_hire');
@@ -322,9 +345,21 @@ test('guide board uploads and displays onboarding materials for new staff', asyn
   await expect(page.getByTestId('guide-card-board-post-1')).toBeVisible();
   await expect(page.getByTestId('guide-detail')).toContainText('인공관절 수술 준비 가이드');
   await expect(page.getByTestId('guide-detail')).toContainText('신규직원');
-  await expect(page.getByTestId('guide-detail')).toContainText('수술실');
+  await expect(page.getByTestId('guide-detail')).toContainText(selectedTeamLabel);
   await expect(page.getByTestId('guide-detail')).toContainText('joint-guide.pdf');
   await expect(page.getByRole('link', { name: /joint-guide\.pdf/i })).toBeVisible();
+
+  await page.getByTestId('guide-task-title-input').fill('수술 장비 재확인');
+  await page.getByTestId('guide-task-due-date-input').fill('2026-04-03');
+  await page.getByTestId('guide-task-priority-select').selectOption('high');
+  await page.getByTestId('guide-task-note-input').fill('오전 수술 전 체크리스트를 다시 확인합니다.');
+  await page.getByTestId('guide-task-save').click();
+
+  await expect(page.getByTestId('guide-task-card-board-post-2')).toContainText('수술 장비 재확인');
+  await expect(page.getByTestId('guide-task-card-board-post-2')).toContainText('오전 수술 전 체크리스트를 다시 확인합니다.');
+  await page.getByTestId('guide-task-toggle-board-post-2').click();
+  await page.getByTestId('guide-team-task-board').getByRole('button', { name: '전체' }).click();
+  await expect(page.getByTestId('guide-task-card-board-post-2')).toContainText('완료');
 
   expect(runtimeErrors).toEqual([]);
 });
