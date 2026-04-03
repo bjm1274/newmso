@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, type ResponseSchema, SchemaType } from '@google/generative-ai';
+﻿import { GoogleGenerativeAI, type ResponseSchema, SchemaType } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 import { readSessionFromRequest } from '@/lib/server-session';
 
