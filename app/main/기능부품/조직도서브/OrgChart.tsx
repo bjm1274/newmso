@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { normalizeProfileUser } from '@/lib/profile-photo';
 import { supabase } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
 
@@ -35,6 +36,28 @@ type CompanyTree = {
   departments: DepartmentGroup[];
   isHospital: boolean;
   activeCount: number;
+};
+
+type AttendanceSnapshot = {
+  staff_id: string;
+  date?: string | null;
+  work_date?: string | null;
+  check_in?: string | null;
+  check_out?: string | null;
+  check_in_time?: string | null;
+  check_out_time?: string | null;
+  status?: string | null;
+};
+
+type PresenceState = 'working' | 'checked_out' | 'before_work';
+
+type PresenceMeta = {
+  state: PresenceState;
+  label: string;
+  toneClass: string;
+  dotClass: string;
+  checkInLabel: string | null;
+  checkOutLabel: string | null;
 };
 
 // company → Map<team_name, division_name>
@@ -80,7 +103,82 @@ let orgTeamsCache: OrgTeamIndex | null = null;
 let orgTeamsPromise: Promise<OrgTeamIndex> | null = null;
 
 function normalizeText(value: unknown) {
-  return String(value ?? '').trim();
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value).trim();
+  }
+  return '';
+}
+
+function toDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatClockLabel(value: unknown) {
+  const text = normalizeText(value);
+  if (!text) return null;
+  if (/^\d{2}:\d{2}(:\d{2})?$/.test(text)) return text.slice(0, 5);
+  if (text.length >= 16 && text[10] === 'T') return text.slice(11, 16);
+  const parsed = Date.parse(text);
+  if (Number.isFinite(parsed)) {
+    return new Intl.DateTimeFormat('ko-KR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(new Date(parsed));
+  }
+  return text.slice(0, 5);
+}
+
+function getAttendanceCheckIn(attendance?: AttendanceSnapshot | null) {
+  return normalizeText(attendance?.check_in) || normalizeText(attendance?.check_in_time) || null;
+}
+
+function getAttendanceCheckOut(attendance?: AttendanceSnapshot | null) {
+  return normalizeText(attendance?.check_out) || normalizeText(attendance?.check_out_time) || null;
+}
+
+function isWorkingAttendance(attendance?: AttendanceSnapshot | null) {
+  return Boolean(getAttendanceCheckIn(attendance)) && !getAttendanceCheckOut(attendance);
+}
+
+function getPresenceMeta(attendance?: AttendanceSnapshot | null): PresenceMeta {
+  const checkInLabel = formatClockLabel(getAttendanceCheckIn(attendance));
+  const checkOutLabel = formatClockLabel(getAttendanceCheckOut(attendance));
+
+  if (checkInLabel && !checkOutLabel) {
+    return {
+      state: 'working',
+      label: '근무중',
+      toneClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+      dotClass: 'bg-emerald-500',
+      checkInLabel,
+      checkOutLabel: null,
+    };
+  }
+
+  if (checkInLabel && checkOutLabel) {
+    return {
+      state: 'checked_out',
+      label: '퇴근 완료',
+      toneClass: 'border-slate-200 bg-slate-100 text-slate-600',
+      dotClass: 'bg-slate-400',
+      checkInLabel,
+      checkOutLabel,
+    };
+  }
+
+  return {
+    state: 'before_work',
+    label: '출근 전',
+    toneClass: 'border-amber-200 bg-amber-50 text-amber-700',
+    dotClass: 'bg-amber-400',
+    checkInLabel: null,
+    checkOutLabel: null,
+  };
 }
 
 function isResignedStaff(staff: StaffMember) {
@@ -199,7 +297,11 @@ async function fetchOrgChartDirectory() {
           .order('department', { ascending: true })
           .order('employee_no', { ascending: true });
         if (error) throw error;
-        const next = dedupeStaffs((data as StaffMember[]) ?? []);
+        const next = dedupeStaffs(
+          Array.isArray(data)
+            ? data.map((staff) => normalizeProfileUser(staff as StaffMember))
+            : [],
+        );
         orgChartDirectoryCache = next;
         return next;
       } finally {
@@ -319,7 +421,7 @@ function buildCompanyTree(
 
 // ─── 서브 컴포넌트 ────────────────────────────────────────────────────────────
 
-function Avatar({ staff, size = 'md' }: { staff: StaffMember; size?: 'sm' | 'md' | 'lg' }) {
+function Avatar({ staff, size = 'md', isWorking = false }: { staff: StaffMember; size?: 'sm' | 'md' | 'lg'; isWorking?: boolean }) {
   const sizeClass =
     size === 'lg' ? 'h-8 w-8 text-xs' : size === 'sm' ? 'h-6 w-6 text-[10px]' : 'h-7 w-7 text-[11px]';
   const palette = [
@@ -333,29 +435,68 @@ function Avatar({ staff, size = 'md' }: { staff: StaffMember; size?: 'sm' | 'md'
   const name = normalizeText(staff.name) || '?';
   const color = palette[(name.charCodeAt(0) || 0) % palette.length];
   return (
-    <div className={`${sizeClass} ${color} flex shrink-0 items-center justify-center rounded-full font-bold`}>
-      {name[0]}
+    <div className="relative shrink-0">
+      <div className={`${sizeClass} ${color} flex items-center justify-center rounded-full font-bold`}>
+        {name[0]}
+      </div>
+      {isWorking ? (
+        <span
+          className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500 shadow-sm"
+          aria-label="현재 근무중"
+        />
+      ) : null}
     </div>
   );
 }
 
-function StaffChip({ staff, onSelect }: { staff: StaffMember; onSelect: (s: StaffMember) => void }) {
+function PresenceBadge({ presence, compact = false, testId }: { presence: PresenceMeta; compact?: boolean; testId?: string }) {
+  return (
+    <span
+      data-testid={testId}
+      className={`inline-flex items-center gap-1 rounded-full border font-bold ${presence.toneClass} ${
+        compact ? 'px-1.5 py-0.5 text-[9px]' : 'px-2.5 py-1 text-[10px]'
+      }`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${presence.dotClass}`} />
+      {presence.label}
+    </span>
+  );
+}
+
+function StaffChip({
+  staff,
+  onSelect,
+  presence,
+}: {
+  staff: StaffMember;
+  onSelect: (s: StaffMember) => void;
+  presence: PresenceMeta;
+}) {
   return (
     <button
       type="button"
       onClick={() => onSelect(staff)}
       className="flex w-full items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 py-1.5 text-left transition hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/60 active:scale-[0.98]"
     >
-      <Avatar staff={staff} size="sm" />
-      <div className="min-w-0">
+      <Avatar staff={staff} size="sm" isWorking={presence.state === 'working'} />
+      <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-bold text-[var(--foreground)]">{normalizeText(staff.name)}</p>
         <p className="truncate text-[10px] text-[var(--toss-gray-3)]">{normalizeText(staff.position) || '직급 미지정'}</p>
       </div>
+      {presence.state === 'working' ? <PresenceBadge presence={presence} compact /> : null}
     </button>
   );
 }
 
-function DepartmentColumn({ department, onSelect }: { department: DepartmentGroup; onSelect: (s: StaffMember) => void }) {
+function DepartmentColumn({
+  department,
+  onSelect,
+  attendanceByStaffId,
+}: {
+  department: DepartmentGroup;
+  onSelect: (s: StaffMember) => void;
+  attendanceByStaffId: Map<string, AttendanceSnapshot>;
+}) {
   return (
     <section className="w-[110px] shrink-0 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
       <div className={`bg-gradient-to-r ${department.accentClass} px-2.5 py-1.5`}>
@@ -365,7 +506,12 @@ function DepartmentColumn({ department, onSelect }: { department: DepartmentGrou
       <div className="space-y-1 p-1.5">
         {department.members.length > 0 ? (
           department.members.map((staff) => (
-            <StaffChip key={staff.id} staff={staff} onSelect={onSelect} />
+            <StaffChip
+              key={staff.id}
+              staff={staff}
+              onSelect={onSelect}
+              presence={getPresenceMeta(attendanceByStaffId.get(staff.id) ?? null)}
+            />
           ))
         ) : (
           <p className="py-2 text-center text-[10px] text-[var(--toss-gray-3)]">–</p>
@@ -375,23 +521,40 @@ function DepartmentColumn({ department, onSelect }: { department: DepartmentGrou
   );
 }
 
-function LeaderCard({ leader, onSelect }: { leader: StaffMember; onSelect: (s: StaffMember) => void }) {
+function LeaderCard({
+  leader,
+  onSelect,
+  presence,
+}: {
+  leader: StaffMember;
+  onSelect: (s: StaffMember) => void;
+  presence: PresenceMeta;
+}) {
   return (
     <button
       type="button"
       onClick={() => onSelect(leader)}
       className="flex items-center gap-2 rounded-xl border border-[var(--accent)]/20 bg-[var(--card)] px-3 py-2 shadow-sm transition hover:border-[var(--accent)]/40 hover:shadow-md active:scale-[0.98]"
     >
-      <Avatar staff={leader} size="lg" />
-      <div className="text-left">
+      <Avatar staff={leader} size="lg" isWorking={presence.state === 'working'} />
+      <div className="min-w-0 text-left">
         <p className="text-sm font-black tracking-tight text-[var(--foreground)]">{normalizeText(leader.name)}</p>
         <p className="text-xs font-semibold text-[var(--toss-gray-3)]">{normalizeText(leader.position) || '대표'}</p>
       </div>
+      <PresenceBadge presence={presence} compact />
     </button>
   );
 }
 
-function ManagerRow({ managers, onSelect }: { managers: StaffMember[]; onSelect: (s: StaffMember) => void }) {
+function ManagerRow({
+  managers,
+  onSelect,
+  attendanceByStaffId,
+}: {
+  managers: StaffMember[];
+  onSelect: (s: StaffMember) => void;
+  attendanceByStaffId: Map<string, AttendanceSnapshot>;
+}) {
   if (managers.length === 0) return null;
   return (
     <div className="inline-flex flex-col items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
@@ -400,27 +563,41 @@ function ManagerRow({ managers, onSelect }: { managers: StaffMember[]; onSelect:
       </div>
       <div className="flex flex-wrap justify-center gap-1.5 px-3 py-2">
         {managers.map((staff) => (
+          (() => {
+            const presence = getPresenceMeta(attendanceByStaffId.get(staff.id) ?? null);
+            return (
           <button
             key={staff.id}
             type="button"
             onClick={() => onSelect(staff)}
             className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--page-bg)] px-2 py-1.5 transition hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/60 active:scale-[0.98]"
           >
-            <Avatar staff={staff} size="sm" />
+            <Avatar staff={staff} size="sm" isWorking={presence.state === 'working'} />
             <div className="text-left">
               <p className="text-xs font-bold text-[var(--foreground)]">{normalizeText(staff.name)}</p>
               <p className="text-[10px] text-[var(--toss-gray-3)]">
                 {normalizeText(staff.position)} · {getDepartmentName(staff)}
               </p>
             </div>
+            <PresenceBadge presence={presence} compact />
           </button>
+            );
+          })()
         ))}
       </div>
     </div>
   );
 }
 
-function DivisionSection({ division, onSelect }: { division: DivisionGroup; onSelect: (s: StaffMember) => void }) {
+function DivisionSection({
+  division,
+  onSelect,
+  attendanceByStaffId,
+}: {
+  division: DivisionGroup;
+  onSelect: (s: StaffMember) => void;
+  attendanceByStaffId: Map<string, AttendanceSnapshot>;
+}) {
   const totalMembers = division.departments.reduce((sum, d) => sum + d.members.length, 0);
   return (
     <div className="shrink-0 flex flex-col">
@@ -433,7 +610,12 @@ function DivisionSection({ division, onSelect }: { division: DivisionGroup; onSe
       {division.departments.length > 0 ? (
         <div className={`flex items-start gap-1.5 rounded-b-xl border-x border-b ${division.borderClass} ${division.bgClass} p-1.5`}>
           {division.departments.map((dept) => (
-            <DepartmentColumn key={dept.name} department={dept} onSelect={onSelect} />
+            <DepartmentColumn
+              key={dept.name}
+              department={dept}
+              onSelect={onSelect}
+              attendanceByStaffId={attendanceByStaffId}
+            />
           ))}
         </div>
       ) : (
@@ -445,14 +627,37 @@ function DivisionSection({ division, onSelect }: { division: DivisionGroup; onSe
   );
 }
 
-function CompanyPyramid({ tree, onSelect }: { tree: CompanyTree; onSelect: (s: StaffMember) => void }) {
+function countWorkingMembers(tree: CompanyTree, attendanceByStaffId: Map<string, AttendanceSnapshot>) {
+  let count = 0;
+  if (tree.leader && isWorkingAttendance(attendanceByStaffId.get(tree.leader.id) ?? null)) count += 1;
+  tree.managers.forEach((staff) => {
+    if (isWorkingAttendance(attendanceByStaffId.get(staff.id) ?? null)) count += 1;
+  });
+  tree.departments.forEach((department) => {
+    department.members.forEach((staff) => {
+      if (isWorkingAttendance(attendanceByStaffId.get(staff.id) ?? null)) count += 1;
+    });
+  });
+  return count;
+}
+
+function CompanyPyramid({
+  tree,
+  onSelect,
+  attendanceByStaffId,
+}: {
+  tree: CompanyTree;
+  onSelect: (s: StaffMember) => void;
+  attendanceByStaffId: Map<string, AttendanceSnapshot>;
+}) {
+  const workingCount = countWorkingMembers(tree, attendanceByStaffId);
   return (
     <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--page-bg)] shadow-sm">
       {/* 헤더 */}
       <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--card)] px-4 py-2.5">
         <div>
           <h3 className="text-sm font-bold text-[var(--foreground)]">{tree.company}</h3>
-          <p className="text-[10px] font-medium text-[var(--toss-gray-3)]">재직 {tree.activeCount}명</p>
+          <p className="text-[10px] font-medium text-[var(--toss-gray-3)]">재직 {tree.activeCount}명 · 근무중 {workingCount}명</p>
         </div>
         <span className="rounded-full bg-[var(--muted)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">ORG</span>
       </div>
@@ -461,14 +666,18 @@ function CompanyPyramid({ tree, onSelect }: { tree: CompanyTree; onSelect: (s: S
       <div className="flex flex-col items-center gap-2 px-4 pt-4 pb-2">
         {tree.leader && (
           <>
-            <LeaderCard leader={tree.leader} onSelect={onSelect} />
+            <LeaderCard
+              leader={tree.leader}
+              onSelect={onSelect}
+              presence={getPresenceMeta(attendanceByStaffId.get(tree.leader.id) ?? null)}
+            />
             <div className="h-3 w-px bg-[var(--border)]" />
           </>
         )}
         {tree.managers.length > 0 && (
           <>
             <div className="flex justify-center w-full">
-              <ManagerRow managers={tree.managers} onSelect={onSelect} />
+              <ManagerRow managers={tree.managers} onSelect={onSelect} attendanceByStaffId={attendanceByStaffId} />
             </div>
             <div className="h-3 w-px bg-[var(--border)]" />
           </>
@@ -480,13 +689,13 @@ function CompanyPyramid({ tree, onSelect }: { tree: CompanyTree; onSelect: (s: S
         {tree.isHospital && tree.divisions.length > 0 ? (
           <div className="flex justify-center gap-3 px-4" style={{ minWidth: 'max-content' }}>
             {tree.divisions.map((div) => (
-              <DivisionSection key={div.name} division={div} onSelect={onSelect} />
+              <DivisionSection key={div.name} division={div} onSelect={onSelect} attendanceByStaffId={attendanceByStaffId} />
             ))}
           </div>
         ) : tree.departments.length > 0 ? (
           <div className="flex justify-center gap-2 px-4" style={{ minWidth: 'max-content' }}>
             {tree.departments.map((dept) => (
-              <DepartmentColumn key={dept.name} department={dept} onSelect={onSelect} />
+              <DepartmentColumn key={dept.name} department={dept} onSelect={onSelect} attendanceByStaffId={attendanceByStaffId} />
             ))}
           </div>
         ) : (
@@ -499,9 +708,9 @@ function CompanyPyramid({ tree, onSelect }: { tree: CompanyTree; onSelect: (s: S
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({ label, value, testId }: { label: string; value: string; testId?: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-1">
+    <div data-testid={testId} className="flex items-center justify-between gap-4 py-1">
       <span className="text-sm font-semibold text-[var(--toss-gray-3)]">{label}</span>
       <span className="text-right text-sm font-bold text-[var(--foreground)]">{value}</span>
     </div>
@@ -519,11 +728,18 @@ export default function OrgChart({
 }: OrgChartProps) {
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showWorkingOnly, setShowWorkingOnly] = useState(false);
   const [allStaffs, setAllStaffs] = useState<StaffMember[]>(() =>
     dedupeStaffs([...(orgChartDirectoryCache ?? []), ...staffs]),
   );
   const [teamIndex, setTeamIndex] = useState<OrgTeamIndex>(() => orgTeamsCache ?? new Map());
   const [isLoadingDirectory, setIsLoadingDirectory] = useState(() => !orgChartDirectoryCache);
+  const [attendanceByStaffId, setAttendanceByStaffId] = useState<Map<string, AttendanceSnapshot>>(new Map());
+  const [isLoadingAttendance, setIsLoadingAttendance] = useState(false);
+  const [attendanceRefreshToken, setAttendanceRefreshToken] = useState(0);
+  const [attendanceLastSyncAt, setAttendanceLastSyncAt] = useState<Date | null>(null);
+  const attendanceRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const todayKey = useMemo(() => toDateKey(new Date()), []);
 
   useEffect(() => {
     setAllStaffs((prev) => dedupeStaffs([...prev, ...staffs]));
@@ -552,6 +768,104 @@ export default function OrgChart({
     return () => { ignore = true; };
   }, [staffs]);
 
+  useEffect(() => {
+    let ignore = false;
+
+    const loadTodayAttendance = async () => {
+      setIsLoadingAttendance(true);
+      try {
+        const [attendanceRows, legacyAttendanceRows] = await Promise.allSettled([
+          supabase
+            .from('attendance')
+            .select('staff_id, date, check_in, check_out, status')
+            .eq('date', todayKey),
+          supabase
+            .from('attendances')
+            .select('staff_id, work_date, check_in_time, check_out_time, status')
+            .eq('work_date', todayKey),
+        ]);
+
+        if (ignore) return;
+
+        const merged = new Map<string, AttendanceSnapshot>();
+        if (attendanceRows.status === 'fulfilled' && Array.isArray(attendanceRows.value.data)) {
+          (attendanceRows.value.data as AttendanceSnapshot[]).forEach((row) => {
+            if (!row?.staff_id) return;
+            merged.set(String(row.staff_id), { ...row });
+          });
+        }
+        if (legacyAttendanceRows.status === 'fulfilled' && Array.isArray(legacyAttendanceRows.value.data)) {
+          (legacyAttendanceRows.value.data as AttendanceSnapshot[]).forEach((row) => {
+            if (!row?.staff_id) return;
+            const key = String(row.staff_id);
+            const existing = merged.get(key) ?? null;
+            merged.set(key, {
+              ...existing,
+              ...row,
+              staff_id: key,
+              date: existing?.date ?? row.work_date ?? todayKey,
+            });
+          });
+        }
+
+        setAttendanceByStaffId(merged);
+        setAttendanceLastSyncAt(new Date());
+      } catch (error) {
+        if (!ignore) {
+          console.error('조직도 근무현황 로드 실패:', error);
+          setAttendanceByStaffId(new Map());
+        }
+      } finally {
+        if (!ignore) setIsLoadingAttendance(false);
+      }
+    };
+
+    void loadTodayAttendance();
+    return () => { ignore = true; };
+  }, [attendanceRefreshToken, todayKey]);
+
+  useEffect(() => {
+    const scheduleRefresh = () => {
+      if (attendanceRefreshTimerRef.current) clearTimeout(attendanceRefreshTimerRef.current);
+      attendanceRefreshTimerRef.current = setTimeout(() => {
+        setAttendanceRefreshToken((current) => current + 1);
+      }, 250);
+    };
+
+    const channel = supabase
+      .channel(`org-chart-working-status-${user?.id || 'guest'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendances' }, scheduleRefresh)
+      .subscribe();
+
+    const handleVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        scheduleRefresh();
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', scheduleRefresh);
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisible);
+    }
+
+    return () => {
+      if (attendanceRefreshTimerRef.current) {
+        clearTimeout(attendanceRefreshTimerRef.current);
+        attendanceRefreshTimerRef.current = null;
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', scheduleRefresh);
+      }
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisible);
+      }
+      void supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
   const directoryStaffs = useMemo(
     () =>
       dedupeStaffs(allStaffs)
@@ -564,6 +878,27 @@ export default function OrgChart({
           return compareStaff(a, b);
         }),
     [allStaffs],
+  );
+
+  const workingEntries = useMemo(
+    () =>
+      directoryStaffs
+        .filter((staff) => !isResignedStaff(staff))
+        .map((staff) => ({
+          staff,
+          attendance: attendanceByStaffId.get(staff.id) ?? null,
+        }))
+        .filter(
+          (entry): entry is { staff: StaffMember; attendance: AttendanceSnapshot } =>
+            isWorkingAttendance(entry.attendance),
+        )
+        .sort((left, right) => compareStaff(left.staff, right.staff)),
+    [attendanceByStaffId, directoryStaffs],
+  );
+
+  const workingStaffIds = useMemo(
+    () => new Set(workingEntries.map((entry) => entry.staff.id)),
+    [workingEntries],
   );
 
   const companyOptions = useMemo(() => {
@@ -582,11 +917,52 @@ export default function OrgChart({
   const activeCompany =
     selectedCo && normalizeText(selectedCo) ? normalizeText(selectedCo) : COMPANY_ALL;
 
+  const filteredDirectoryStaffs = useMemo(
+    () =>
+      showWorkingOnly
+        ? directoryStaffs.filter((staff) => workingStaffIds.has(staff.id))
+        : directoryStaffs,
+    [directoryStaffs, showWorkingOnly, workingStaffIds],
+  );
+
+  const visibleWorkingEntries = useMemo(
+    () =>
+      workingEntries.filter(
+        ({ staff }) => activeCompany === COMPANY_ALL || getCompanyName(staff) === activeCompany,
+      ),
+    [activeCompany, workingEntries],
+  );
+
+  const workingGroups = useMemo(() => {
+    const grouped = new Map<string, Array<{ staff: StaffMember; attendance: AttendanceSnapshot }>>();
+
+    visibleWorkingEntries.forEach((entry) => {
+      const label =
+        activeCompany === COMPANY_ALL
+          ? `${getCompanyName(entry.staff)} · ${getDepartmentName(entry.staff)}`
+          : getDepartmentName(entry.staff);
+      const bucket = grouped.get(label) ?? [];
+      bucket.push(entry);
+      grouped.set(label, bucket);
+    });
+
+    return Array.from(grouped.entries())
+      .map(([label, members]) => ({
+        label,
+        members: members.sort((left, right) => compareStaff(left.staff, right.staff)),
+      }))
+      .sort((left, right) => {
+        const sizeDiff = right.members.length - left.members.length;
+        if (sizeDiff !== 0) return sizeDiff;
+        return left.label.localeCompare(right.label, 'ko-KR');
+      });
+  }, [activeCompany, visibleWorkingEntries]);
+
   const trees = useMemo(() => {
     const filtered =
       activeCompany === COMPANY_ALL
-        ? directoryStaffs
-        : directoryStaffs.filter((s) => getCompanyName(s) === activeCompany);
+        ? filteredDirectoryStaffs
+        : filteredDirectoryStaffs.filter((s) => getCompanyName(s) === activeCompany);
 
     const grouped = new Map<string, StaffMember[]>();
     for (const staff of filtered) {
@@ -599,12 +975,12 @@ export default function OrgChart({
     return Array.from(grouped.entries())
       .map(([co, members]) => buildCompanyTree(co, members, teamIndex))
       .filter((t) => t.activeCount > 0);
-  }, [activeCompany, directoryStaffs, teamIndex]);
+  }, [activeCompany, filteredDirectoryStaffs, teamIndex]);
 
   const searchResults = useMemo(() => {
     const term = normalizeText(searchTerm);
     if (!term) return [];
-    return directoryStaffs.filter((s) => {
+    return filteredDirectoryStaffs.filter((s) => {
       const hay = [
         normalizeText(s.name),
         normalizeText(s.position),
@@ -613,11 +989,15 @@ export default function OrgChart({
       ].join(' ');
       return hay.includes(term);
     });
-  }, [directoryStaffs, searchTerm]);
+  }, [filteredDirectoryStaffs, searchTerm]);
 
   const activeCount = useMemo(
     () => directoryStaffs.filter((s) => !isResignedStaff(s)).length,
     [directoryStaffs],
+  );
+  const selectedStaffPresence = useMemo(
+    () => (selectedStaff ? getPresenceMeta(attendanceByStaffId.get(selectedStaff.id) ?? null) : null),
+    [attendanceByStaffId, selectedStaff],
   );
 
   return (
@@ -676,6 +1056,99 @@ export default function OrgChart({
 
       <div className={`px-2 py-3 md:px-4 ${compact ? 'pb-4' : 'pb-6'}`}>
         <div className="w-full space-y-4">
+          <section
+            data-testid="org-working-summary"
+            className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-emerald-100/70 p-4 shadow-sm"
+          >
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-base font-black text-[var(--foreground)]">오늘 근무중</h3>
+                  <span className="rounded-full bg-emerald-500 px-2.5 py-1 text-[11px] font-black text-white">
+                    {visibleWorkingEntries.length}명
+                  </span>
+                  <span className="rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-200">
+                    {activeCompany === COMPANY_ALL ? '전사 기준' : `${activeCompany} 기준`}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs font-medium text-emerald-900/80">
+                  출근 처리 후 아직 퇴근하지 않은 직원만 바로 모아 보여줍니다.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  data-testid="org-working-only-toggle"
+                  onClick={() => setShowWorkingOnly((current) => !current)}
+                  className={`rounded-full border px-3 py-1.5 text-[11px] font-bold transition ${
+                    showWorkingOnly
+                      ? 'border-emerald-500 bg-emerald-500 text-white'
+                      : 'border-emerald-200 bg-white text-emerald-700 hover:border-emerald-400'
+                  }`}
+                >
+                  오늘 근무중만 보기
+                </button>
+                <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-3)] ring-1 ring-emerald-100">
+                  {isLoadingAttendance ? '근무현황 갱신 중…' : '실시간 반영'}
+                </span>
+                {attendanceLastSyncAt ? (
+                  <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-3)] ring-1 ring-emerald-100">
+                    {attendanceLastSyncAt.toLocaleTimeString('ko-KR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                    })} 갱신
+                  </span>
+                ) : null}
+              </div>
+            </div>
+
+            {workingGroups.length > 0 ? (
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {workingGroups.map((group) => (
+                  <div
+                    key={group.label}
+                    className="rounded-[var(--radius-xl)] border border-white/80 bg-white/90 p-3 shadow-sm"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-bold text-[var(--foreground)]">{group.label}</p>
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">
+                        {group.members.length}명
+                      </span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {group.members.map(({ staff, attendance }) => (
+                        <button
+                          key={staff.id}
+                          type="button"
+                          data-testid={`org-working-chip-${staff.id}`}
+                          onClick={() => setSelectedStaff(staff)}
+                          className="flex min-w-0 items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-left transition hover:border-emerald-400 hover:bg-emerald-100"
+                        >
+                          <Avatar staff={staff} size="sm" isWorking />
+                          <span className="min-w-0">
+                            <span className="block truncate text-[11px] font-bold text-emerald-900">
+                              {normalizeText(staff.name)}
+                            </span>
+                            <span className="block truncate text-[10px] font-medium text-emerald-700/80">
+                              {[normalizeText(staff.position), formatClockLabel(getAttendanceCheckIn(attendance)) ? `출근 ${formatClockLabel(getAttendanceCheckIn(attendance))}` : '근무중']
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-[var(--radius-xl)] border border-dashed border-emerald-200 bg-white/70 px-4 py-6 text-center text-sm font-medium text-emerald-900/70">
+                현재 표시 조건에서 오늘 근무중인 직원이 없습니다.
+              </div>
+            )}
+          </section>
+
           {searchTerm ? (
             <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
               <div className="mb-3 flex items-center gap-2">
@@ -687,13 +1160,16 @@ export default function OrgChart({
               {searchResults.length > 0 ? (
                 <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                   {searchResults.map((staff) => (
+                    (() => {
+                      const presence = getPresenceMeta(attendanceByStaffId.get(staff.id) ?? null);
+                      return (
                     <button
                       key={staff.id}
                       type="button"
                       onClick={() => setSelectedStaff(staff)}
                       className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3.5 py-3 text-left transition hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/50 hover:shadow-sm"
                     >
-                      <Avatar staff={staff} />
+                      <Avatar staff={staff} isWorking={presence.state === 'working'} />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-bold text-[var(--foreground)]">{normalizeText(staff.name)}</p>
                         <p className="truncate text-xs text-[var(--toss-gray-3)]">
@@ -701,7 +1177,10 @@ export default function OrgChart({
                         </p>
                         <p className="truncate text-[11px] text-[var(--toss-gray-3)]/70">{normalizeText(staff.position) || '직급 미지정'}</p>
                       </div>
+                      <PresenceBadge presence={presence} compact />
                     </button>
+                      );
+                    })()
                   ))}
                 </div>
               ) : (
@@ -712,12 +1191,21 @@ export default function OrgChart({
             </section>
           ) : trees.length > 0 ? (
             trees.map((tree) => (
-              <CompanyPyramid key={tree.company} tree={tree} onSelect={setSelectedStaff} />
+              <CompanyPyramid
+                key={tree.company}
+                tree={tree}
+                onSelect={setSelectedStaff}
+                attendanceByStaffId={attendanceByStaffId}
+              />
             ))
           ) : (
             <section className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--card)] px-5 py-16 text-center shadow-sm">
-              <h3 className="font-bold text-[var(--foreground)]">조직도에 표시할 직원이 없습니다.</h3>
-              <p className="mt-1 text-sm font-medium text-[var(--toss-gray-3)]">회사나 검색 조건을 다시 확인해 주세요.</p>
+              <h3 className="font-bold text-[var(--foreground)]">
+                {showWorkingOnly ? '현재 근무중인 직원이 조직도에 없습니다.' : '조직도에 표시할 직원이 없습니다.'}
+              </h3>
+              <p className="mt-1 text-sm font-medium text-[var(--toss-gray-3)]">
+                {showWorkingOnly ? '필터를 해제하면 전체 조직도를 다시 볼 수 있습니다.' : '회사나 검색 조건을 다시 확인해 주세요.'}
+              </p>
             </section>
           )}
         </div>
@@ -733,13 +1221,30 @@ export default function OrgChart({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-4">
-              <Avatar staff={selectedStaff} size="lg" />
+              <Avatar staff={selectedStaff} size="lg" isWorking={selectedStaffPresence?.state === 'working'} />
               <div className="min-w-0">
                 <p className="truncate text-xl font-black text-[var(--foreground)]">{normalizeText(selectedStaff.name)}</p>
                 <p className="truncate text-sm font-semibold text-[var(--toss-gray-3)]">{normalizeText(selectedStaff.position) || '직급 미지정'}</p>
               </div>
+              {selectedStaffPresence ? (
+                <PresenceBadge
+                  presence={selectedStaffPresence}
+                  testId="org-staff-modal-presence"
+                />
+              ) : null}
             </div>
             <div className="mt-4 divide-y divide-[var(--border)] rounded-2xl border border-[var(--border)] bg-[var(--page-bg)] px-4">
+              {selectedStaffPresence ? (
+                <InfoRow
+                  testId="org-staff-modal-presence-row"
+                  label="근무 상태"
+                  value={[
+                    selectedStaffPresence.label,
+                    selectedStaffPresence.checkInLabel ? `출근 ${selectedStaffPresence.checkInLabel}` : null,
+                    selectedStaffPresence.checkOutLabel ? `퇴근 ${selectedStaffPresence.checkOutLabel}` : null,
+                  ].filter(Boolean).join(' · ')}
+                />
+              ) : null}
               <InfoRow label="회사" value={getCompanyName(selectedStaff)} />
               <InfoRow label="부서" value={getDepartmentName(selectedStaff)} />
               <InfoRow label="사번" value={normalizeText(selectedStaff.employee_no) || '-'} />

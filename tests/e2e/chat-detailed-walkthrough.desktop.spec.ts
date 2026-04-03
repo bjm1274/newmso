@@ -154,6 +154,11 @@ test('chat detailed walkthrough opens each internal menu in practical order', as
 
   await page.getByTestId('chat-tab-org').click();
   await expect(page.getByTestId('chat-org-list')).toBeVisible();
+  await page
+    .locator('button')
+    .filter({ hasText: peerTwo.department as string })
+    .first()
+    .click();
   await page.getByTestId(`chat-direct-${peerTwo.id}`).click();
   await expect(page.getByTestId('chat-tab-chat')).toBeVisible();
   await expect(page.getByTestId('chat-open-drawer')).toBeVisible();
@@ -379,6 +384,60 @@ test('chat shows who reacted when a reaction chip is selected', async ({
   await expect(page.getByTestId('chat-reaction-detail-modal')).not.toContainText(peerTwo.name);
   await page.getByTestId('chat-reaction-detail-modal').getByRole('button', { name: '닫기' }).click();
   await expect(page.getByTestId('chat-reaction-detail-modal')).toBeHidden();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('chat org view keeps department cards collapsed by default', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const alphaOne = {
+    ...fakeUser,
+    id: 'chat-org-alpha-1',
+    employee_no: 'E2E-CHAT-ALPHA-1',
+    name: 'Alpha One',
+    department: 'Alpha Team',
+    position: 'Coordinator',
+  };
+  const alphaTwo = {
+    ...fakeUser,
+    id: 'chat-org-alpha-2',
+    employee_no: 'E2E-CHAT-ALPHA-2',
+    name: 'Alpha Two',
+    department: 'Alpha Team',
+    position: 'Staff',
+  };
+  const betaOne = {
+    ...fakeUser,
+    id: 'chat-org-beta-1',
+    employee_no: 'E2E-CHAT-BETA-1',
+    name: 'Beta One',
+    department: 'Beta Team',
+    position: 'Staff',
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [fakeUser, alphaOne, alphaTwo, betaOne],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '채팅',
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent('채팅')}`);
+
+  await expect(page.getByTestId('chat-view')).toBeVisible();
+  await page.getByTestId('chat-tab-org').click();
+  await expect(page.getByTestId('chat-org-list')).toBeVisible();
+
+  await expect(page.getByTestId(`chat-direct-${alphaOne.id}`)).toHaveCount(0);
+  await expect(page.getByTestId(`chat-direct-${betaOne.id}`)).toHaveCount(0);
+
+  await page.getByRole('button', { name: /Alpha Team/ }).click();
+  await expect(page.getByTestId(`chat-direct-${alphaOne.id}`)).toBeVisible();
+  await expect(page.getByTestId(`chat-direct-${alphaTwo.id}`)).toBeVisible();
+  await expect(page.getByTestId(`chat-direct-${betaOne.id}`)).toHaveCount(0);
 
   expect(runtimeErrors).toEqual([]);
 });

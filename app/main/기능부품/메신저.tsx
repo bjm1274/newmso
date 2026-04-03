@@ -4674,18 +4674,6 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     return grouped;
   }, [allKnownStaffs]);
 
-  useEffect(() => {
-    if (viewMode !== 'org') return;
-    setExpandedDepts((prev) => {
-      if (prev.size > 0) return prev;
-      return new Set(
-        Object.entries(groupedStaffs).flatMap(([company, depts]) =>
-          Object.keys(depts as Record<string, StaffMember[]>).map((dept) => `${company}::${dept}`)
-        )
-      );
-    });
-  }, [groupedStaffs, viewMode]);
-
   const openDirectChat = useCallback(async ( staff: StaffMember) => {
     const otherId = String(staff?.id || '').trim();
     if (!effectiveChatUserId || !otherId) {
