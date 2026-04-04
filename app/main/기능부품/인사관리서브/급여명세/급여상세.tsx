@@ -5,6 +5,7 @@ import {
   fetchDocumentDesignStore,
   resolveDocumentDesign,
 } from '@/lib/document-designs';
+import { calculateHourlyRateFromMonthlySalary, getMonthlyWorkingHours } from '@/lib/payroll-working-hours';
 
 function InfoItem({ label, value, highlight = false }: { label: string; value?: string; highlight?: boolean }) {
   return (
@@ -105,6 +106,7 @@ interface StaffInfo {
   department?: string;
   position?: string;
   base_salary?: number;
+  position_allowance?: number;
   meal_allowance?: number;
   night_duty_allowance?: number;
   vehicle_allowance?: number;
@@ -153,7 +155,7 @@ export default function SalaryDetail({ record, staff }: { record?: SalaryRecord;
       childcare_allowance: staff?.childcare_allowance || 0,
       research_allowance: staff?.research_allowance || 0,
       other_taxfree: staff?.other_taxfree || 0,
-      extra_allowance: 0,
+      extra_allowance: staff?.position_allowance || 0,
       overtime_pay: 0,
       bonus: 0,
       year_month: new Date().toISOString().slice(0, 7),
@@ -227,8 +229,17 @@ export default function SalaryDetail({ record, staff }: { record?: SalaryRecord;
   const advancePayAmount = Number(record?.advance_pay || 0);
   const isAdvancePay = advancePayAmount > 0;
   const wphForPayslip = staff?.working_hours_per_week || 40;
-  const monthlyHoursForPayslip = Math.round((wphForPayslip * 52) / 12);
-  const hourlyRate = monthlyHoursForPayslip > 0 ? Math.floor(Number(data.base_salary || 0) / monthlyHoursForPayslip) : 0;
+  const fixedMonthlySalary =
+    Number(data.base_salary || 0) +
+    Number(data.extra_allowance || 0) +
+    Number(data.meal_allowance || 0) +
+    Number(data.night_duty_allowance || 0) +
+    Number(data.vehicle_allowance || 0) +
+    Number(data.childcare_allowance || 0) +
+    Number(data.research_allowance || 0) +
+    Number(data.other_taxfree || 0);
+  const monthlyHoursForPayslip = getMonthlyWorkingHours(wphForPayslip);
+  const hourlyRate = calculateHourlyRateFromMonthlySalary(fixedMonthlySalary, wphForPayslip, 'floor');
 
   return (
     <div

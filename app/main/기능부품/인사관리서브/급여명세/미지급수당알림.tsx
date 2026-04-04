@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { calculateHourlyRateFromMonthlySalary } from '@/lib/payroll-working-hours';
 
 interface Props {
   staffs: any[];
@@ -60,7 +61,10 @@ export default function UnpaidAllowanceAlert({ staffs, selectedCo, user }: Props
           const paidOT = staffPayrolls.reduce((s: number, p: any) => s + ((p.meta_data?.overtime_pay || p.overtime_pay || 0) > 0 ? 1 : 0), 0);
 
           const baseSalary = staff.base_salary || staff.base || 2000000;
-          const hourlyWage = baseSalary / 209;
+          const hourlyWage = calculateHourlyRateFromMonthlySalary(
+            baseSalary,
+            staff.working_hours_per_week || 40,
+          );
 
           if (totalOT > 0 && paidOT === 0) {
             const pay = Math.round(hourlyWage * 1.5 * totalOT);
