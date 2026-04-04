@@ -5,13 +5,6 @@ import { readSessionFromRequest } from '@/lib/server-session';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function buildContentDisposition(rawName: string, download: boolean): string {
-  const ascii = rawName.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
-  const encoded = encodeURIComponent(rawName);
-  const dispositionType = download ? 'attachment' : 'inline';
-  return `${dispositionType}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
-}
-
 export async function GET(request: NextRequest) {
   try {
     const session = await readSessionFromRequest(request);
@@ -38,31 +31,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'This bucket is not available' }, { status: 403 });
     }
 
-    const signedUrl = await createR2DownloadUrl(bucket, objectKey);
+    const signedUrl = await createR2DownloadUrl(bucket, objectKey, {
+      downloadFileName: download ? fileName : null,
+    });
     if (!signedUrl) {
       return NextResponse.json({ error: 'Cloudflare R2 is not configured' }, { status: 500 });
     }
 
-    const upstream = await fetch(signedUrl, {
-      signal: AbortSignal.timeout(30_000),
-    });
-
-    if (!upstream.ok || !upstream.body) {
-      return NextResponse.json({ error: '파일을 불러오지 못했습니다.' }, { status: 404 });
-    }
-
-    const headers = new Headers();
-    headers.set('Content-Type', upstream.headers.get('content-type') || 'application/octet-stream');
-    headers.set('Cache-Control', download ? 'private, max-age=3600' : 'private, max-age=600');
-    headers.set('Content-Disposition', buildContentDisposition(fileName, download));
-    const contentLength = upstream.headers.get('content-length');
-    if (contentLength) {
-      headers.set('Content-Length', contentLength);
-    }
-
-    return new NextResponse(upstream.body, {
-      status: 200,
-      headers,
+    return NextResponse.redirect(signedUrl, {
+      status: 307,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : '파일 조회 중 오류가 발생했습니다.';
