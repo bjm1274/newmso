@@ -4,6 +4,8 @@ import { dismissDialogs, fakeUser, mockSupabase, seedSession } from './helpers';
 async function installPushRegistrationRetryStubs(page: Page) {
   await page.addInitScript(() => {
     const registrationCounts = { register: 0 };
+    const permissionState = { value: 'granted' as NotificationPermission };
+    const permissionRequestCounts = { request: 0 };
     const nativeNotifications: Array<{ title?: string; options?: NotificationOptions }> = [];
     const fakeRegistration = {
       scope: '/',
@@ -24,6 +26,8 @@ async function installPushRegistrationRetryStubs(page: Page) {
       window as Window & {
         __pushRegistrationCounts?: typeof registrationCounts;
         __nativeNotifications?: typeof nativeNotifications;
+        __pushPermissionRequestCounts?: typeof permissionRequestCounts;
+        __setNotificationPermissionState?: (next: NotificationPermission) => void;
       }
     ).__pushRegistrationCounts = registrationCounts;
     (
@@ -31,6 +35,19 @@ async function installPushRegistrationRetryStubs(page: Page) {
         __nativeNotifications?: typeof nativeNotifications;
       }
     ).__nativeNotifications = nativeNotifications;
+    (
+      window as Window & {
+        __pushPermissionRequestCounts?: typeof permissionRequestCounts;
+        __setNotificationPermissionState?: (next: NotificationPermission) => void;
+      }
+    ).__pushPermissionRequestCounts = permissionRequestCounts;
+    (
+      window as Window & {
+        __setNotificationPermissionState?: (next: NotificationPermission) => void;
+      }
+    ).__setNotificationPermissionState = (next: NotificationPermission) => {
+      permissionState.value = next;
+    };
 
     function FakeNotification(this: Notification, title?: string, options?: NotificationOptions) {
       nativeNotifications.push({ title, options });
@@ -38,11 +55,15 @@ async function installPushRegistrationRetryStubs(page: Page) {
 
     Object.defineProperty(FakeNotification, 'permission', {
       configurable: true,
-      get: () => 'granted',
+      get: () => permissionState.value,
     });
     Object.defineProperty(FakeNotification, 'requestPermission', {
       configurable: true,
-      value: async () => 'granted',
+      value: async () => {
+        permissionRequestCounts.request += 1;
+        permissionState.value = 'granted';
+        return permissionState.value;
+      },
     });
 
     Object.defineProperty(window, 'Notification', {
@@ -87,6 +108,17 @@ async function getNativeNotificationCount(page: Page) {
           __nativeNotifications?: Array<{ title?: string }>;
         }
       ).__nativeNotifications?.length ?? 0
+  );
+}
+
+async function getNotificationPermissionRequestCount(page: Page) {
+  return page.evaluate(
+    () =>
+      (
+        window as Window & {
+          __pushPermissionRequestCounts?: { request?: number };
+        }
+      ).__pushPermissionRequestCounts?.request ?? 0
   );
 }
 
@@ -230,6 +262,36 @@ test('mobile notification service retries push registration when focus returns w
   });
 
   await expect.poll(async () => getPushRegistrationCount(page)).toBeGreaterThan(initialCount);
+});
+
+test('mobile notification service requests permission from the first user gesture when it is still default', async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName === 'webkit', 'iPhone browser sessions need Home Screen install before push permission can be requested.');
+  await installPushRegistrationRetryStubs(page);
+  await mockSupabase(page, {
+    notifications: [],
+  });
+
+  await seedSession(page);
+  await page.addInitScript(() => {
+    (
+      window as Window & {
+        __setNotificationPermissionState?: (next: NotificationPermission) => void;
+      }
+    ).__setNotificationPermissionState?.('default');
+  });
+  await page.goto('/main');
+  await expect(page.getByTestId('main-shell')).toBeVisible();
+
+  const initialRegisterCount = await getPushRegistrationCount(page);
+  await expect.poll(async () => getNotificationPermissionRequestCount(page)).toBe(0);
+
+  await page.getByTestId('main-shell').click({ position: { x: 20, y: 20 } });
+
+  await expect.poll(async () => getNotificationPermissionRequestCount(page)).toBeGreaterThan(0);
+  await expect.poll(async () => getPushRegistrationCount(page)).toBeGreaterThan(initialRegisterCount);
 });
 
 test('mobile chat notifications use a native popup when push is already connected', async ({ page }) => {
