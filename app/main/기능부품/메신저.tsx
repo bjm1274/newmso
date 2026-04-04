@@ -5978,8 +5978,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         (msg.staff as { name?: string } | null | undefined)?.name || null
                       ) || (msg.staff as StaffMember | null | undefined) || null
                     : null;
-                const senderName = senderProfile?.name || (msg.staff as { name?: string } | null | undefined)?.name || '이름 없음';
-                const senderPosition = senderProfile?.position || (msg.staff as { position?: string } | null | undefined)?.position || '';
+                  const senderName = senderProfile?.name || (msg.staff as { name?: string } | null | undefined)?.name || '이름 없음';
                 const senderPhotoUrl = senderProfile ? getProfilePhotoUrl(senderProfile as StaffMember) : null;
                 const wardMessageMeta = !isDeletedMessage ? extractWardMessageMeta(msg.content) : { displayContent: '', meta: null };
                 const showWardQuickReplies =
@@ -5987,6 +5986,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   !isDeletedMessage &&
                   wardMessageMeta.meta?.type === 'op_ward_request';
                 const isWardQuickReplySending = wardQuickReplySendingMessageId === String(msg.id || '');
+                const showIncomingAvatar = !isMine && !isContinuous;
                 lastSenderId = String(msg.sender_id);
 
                 return (
@@ -6009,181 +6009,195 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     ) : (
                       <div
                         ref={el => { msgRefs.current[msg.id] = el; }}
-                        className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
+                        className={`flex w-full flex-col ${isMine ? 'items-end' : 'items-start'}`}
                       >
-                        {!isMine && !isContinuous && (
-                          <div className="mb-0.5 flex items-center gap-1.5 px-1">
-                            <div data-testid={`chat-message-sender-avatar-${msg.id}`} className="shrink-0">
-                              <MessengerAvatar
-                                name={senderName}
-                                photoUrl={senderPhotoUrl}
-                                className="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full bg-[var(--tab-bg)] text-[9px] font-bold text-[var(--toss-gray-3)] dark:bg-zinc-800"
-                                decorative
-                              />
-                            </div>
-                            <span className="min-w-0 truncate text-[10px] font-semibold leading-none text-[var(--toss-gray-3)]">
-                              {senderName} {senderPosition}
-                            </span>
-                          </div>
-                        )}
-                        <div
-                          data-testid={isDeletedMessage ? `chat-message-deleted-${msg.id}` : `chat-message-${msg.id}`}
-                          onClick={(e) => {
-                            if (isDeletedMessage) return;
-                            e.stopPropagation();
-                            openMessageActions(msg);
-                          }}
-                          className={`group relative ${
-                            isDeletedMessage
-                              ? 'border border-dashed border-[var(--border)] bg-[var(--muted)] px-2 py-1 text-[var(--toss-gray-3)] italic md:px-3'
-                              : !msg.content
-                                ? 'p-0 bg-transparent shadow-none border-none'
-                                : 'border px-2 py-1 md:px-3'
-                          } rounded-[var(--radius-md)] text-[13px] md:text-sm ${isDeletedMessage ? 'cursor-default' : 'cursor-pointer'} transition-all max-w-[78%] md:max-w-[72%] ${
-                            isDeletedMessage
-                              ? isMine
-                                ? 'rounded-tr-sm'
-                                : 'rounded-tl-sm'
-                              : !msg.content
-                                ? ''
-                                : isMine
-                                  ? 'bg-[var(--accent)] text-white border-transparent rounded-tr-sm'
-                                  : 'bg-[var(--card)] dark:bg-zinc-800 border-[var(--border)] dark:border-zinc-700 rounded-tl-sm hover:border-blue-300 dark:hover:border-blue-700 text-foreground'
-                          }`}
-                          role="button"
-                          tabIndex={isDeletedMessage ? -1 : 0}
-                          onKeyDown={(e) => {
-                            if (isDeletedMessage) return;
-                            if (e.key === 'Enter') markMessageRead(msg);
-                          }}
-                          aria-label={`${msg.staff?.name || '이름 없음'} ${isDeletedMessage ? '삭제된 메시지' : '메시지'}`}
-                        >
-                          {!isDeletedMessage && msg.reply_to_id && (() => {
-                            const parent = messages.find(( m: ChatMessage) => m.id === msg.reply_to_id);
-                            return parent ? (
-                              <div
-                                className={`mb-1 p-1.5 rounded-[var(--radius-md)] text-[11px] border-l-2 cursor-pointer hover:opacity-80 transition-opacity ${isMine ? 'bg-white/10 border-white/40 text-white/90' : 'bg-[var(--muted)] border-[var(--accent)]/40 text-[var(--foreground)]'
-                                  }`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  scrollToMessage(msg.reply_to_id!);
-                                }}
-                              >
-                                <span className="font-bold opacity-80">답글 {(parent.staff as { name?: string } | null | undefined)?.name}: </span>
-                                <span className="truncate block mt-0.5">
-                                  {getMessageDisplayText(
-                                    parent.content,
-                                    parent.file_name,
-                                    parent.file_url,
-                                    '첨부 파일'
-                                  )}
-                                </span>
-                              </div>
-                            ) : null;
-                          })()}
-                          <div className={`leading-relaxed ${(msg.content && !isDeletedMessage) ? 'mb-0.5' : ''}`}>
-                            {isDeletedMessage ? getDeletedMessagePreviewText() : renderMessageContent(msg.content || '', isMine, activeMessageHighlightQuery)}
-                          </div>
-                          {!isDeletedMessage && msg.file_url && (() => {
-                            const furl = msg.file_url!;
-                            const attachmentName = getAttachmentDisplayName(msg.file_name, furl);
-                            const attachmentKind = resolveAttachmentKind(furl, msg.file_kind);
-                            return (
-                              <div className="mt-2" onClick={(e) => e.stopPropagation()}>
-                                <AttachmentListCard
-                                  url={furl}
-                                  name={attachmentName}
-                                  kind={attachmentKind}
-                                  onPreview={() => openAttachmentPreview(furl, attachmentName, attachmentKind)}
-                                  layout="bubble"
-                                  tone={isMine ? 'accent' : 'default'}
+                        <div className={`flex ${isMine ? 'max-w-[78%] flex-col items-end md:max-w-[72%]' : 'w-full items-start gap-2'}`}>
+                          {!isMine ? (
+                            showIncomingAvatar ? (
+                              <div data-testid={`chat-message-sender-avatar-${msg.id}`} className="shrink-0 self-start pt-0.5">
+                                <MessengerAvatar
+                                  name={senderName}
+                                  photoUrl={senderPhotoUrl}
+                                  className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-[var(--tab-bg)] text-[12px] font-bold text-[var(--toss-gray-3)] ring-1 ring-black/5 dark:bg-zinc-800"
+                                  decorative
                                 />
                               </div>
-                            );
-                          })()}
-
-                          {!isDeletedMessage && hasReacts && (
-                            <div className="mt-2 flex items-center gap-2 text-[11px] flex-wrap">
-                              <span className="flex gap-1 flex-wrap">
-                                {Object.entries(msgReacts).map(([emoji, cnt]) =>
-                                ((cnt as number) > 0 ? (
-                                  <button
-                                    key={emoji}
-                                    type="button"
+                            ) : (
+                              <div aria-hidden="true" className="w-10 shrink-0" />
+                            )
+                          ) : null}
+                          <div
+                            data-testid={!isMine ? `chat-message-stack-${msg.id}` : undefined}
+                            className={`${isMine ? 'flex w-full flex-col items-end' : 'flex min-w-0 max-w-[82%] flex-col items-start md:max-w-[74%]'}`}
+                          >
+                            {!isMine && showIncomingAvatar && (
+                              <span
+                                data-testid={`chat-message-sender-name-${msg.id}`}
+                                className="mb-1 px-0.5 text-[11px] font-bold leading-none text-[var(--toss-gray-4)]"
+                              >
+                                {senderName}
+                              </span>
+                            )}
+                            <div
+                              data-testid={isDeletedMessage ? `chat-message-deleted-${msg.id}` : `chat-message-${msg.id}`}
+                              onClick={(e) => {
+                                if (isDeletedMessage) return;
+                                e.stopPropagation();
+                                openMessageActions(msg);
+                              }}
+                              className={`group relative ${
+                                isDeletedMessage
+                                  ? 'border border-dashed border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-[var(--toss-gray-3)] italic'
+                                  : !msg.content
+                                    ? 'p-0 bg-transparent shadow-none border-none'
+                                    : 'border px-3 py-2'
+                              } rounded-2xl text-[13px] md:text-sm ${isDeletedMessage ? 'cursor-default' : 'cursor-pointer'} transition-all max-w-full ${
+                                isDeletedMessage
+                                  ? isMine
+                                    ? 'rounded-tr-sm'
+                                    : 'rounded-tl-sm'
+                                  : !msg.content
+                                    ? ''
+                                    : isMine
+                                      ? 'bg-[var(--accent)] text-white border-transparent rounded-tr-sm'
+                                      : 'bg-[var(--card)] dark:bg-zinc-800 border-[var(--border)] dark:border-zinc-700 rounded-tl-sm hover:border-blue-300 dark:hover:border-blue-700 text-foreground'
+                              }`}
+                              role="button"
+                              tabIndex={isDeletedMessage ? -1 : 0}
+                              onKeyDown={(e) => {
+                                if (isDeletedMessage) return;
+                                if (e.key === 'Enter') markMessageRead(msg);
+                              }}
+                              aria-label={`${msg.staff?.name || '이름 없음'} ${isDeletedMessage ? '삭제된 메시지' : '메시지'}`}
+                            >
+                              {!isDeletedMessage && msg.reply_to_id && (() => {
+                                const parent = messages.find(( m: ChatMessage) => m.id === msg.reply_to_id);
+                                return parent ? (
+                                  <div
+                                    className={`mb-1 p-1.5 rounded-[var(--radius-md)] text-[11px] border-l-2 cursor-pointer hover:opacity-80 transition-opacity ${isMine ? 'bg-white/10 border-white/40 text-white/90' : 'bg-[var(--muted)] border-[var(--accent)]/40 text-[var(--foreground)]'
+                                      }`}
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      openReactionDetail(msg, emoji);
+                                      scrollToMessage(msg.reply_to_id!);
                                     }}
-                                    className={`px-1.5 py-0.5 rounded text-[11px] transition-colors ${isMine ? 'bg-[var(--card)]/20 hover:bg-[var(--card)]/30' : 'bg-[var(--muted)] hover:bg-[var(--toss-blue-light)]'
-                                      }`}
-                                    aria-label={`${emoji} 반응 누른 사람 ${(cnt as number)}명 보기`}
                                   >
-                                    {emoji} {cnt as number}
-                                  </button>
-                                ) : null)
-                                )}
-                              </span>
-                            </div>
-                          )}
+                                    <span className="font-bold opacity-80">답글 {(parent.staff as { name?: string } | null | undefined)?.name}: </span>
+                                    <span className="truncate block mt-0.5">
+                                      {getMessageDisplayText(
+                                        parent.content,
+                                        parent.file_name,
+                                        parent.file_url,
+                                        '첨부 파일'
+                                      )}
+                                    </span>
+                                  </div>
+                                ) : null;
+                              })()}
+                              <div className={`leading-relaxed ${(msg.content && !isDeletedMessage) ? 'mb-0.5' : ''}`}>
+                                {isDeletedMessage ? getDeletedMessagePreviewText() : renderMessageContent(msg.content || '', isMine, activeMessageHighlightQuery)}
+                              </div>
+                              {!isDeletedMessage && msg.file_url && (() => {
+                                const furl = msg.file_url!;
+                                const attachmentName = getAttachmentDisplayName(msg.file_name, furl);
+                                const attachmentKind = resolveAttachmentKind(furl, msg.file_kind);
+                                return (
+                                  <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                                    <AttachmentListCard
+                                      url={furl}
+                                      name={attachmentName}
+                                      kind={attachmentKind}
+                                      onPreview={() => openAttachmentPreview(furl, attachmentName, attachmentKind)}
+                                      layout="bubble"
+                                      tone={isMine ? 'accent' : 'default'}
+                                    />
+                                  </div>
+                                );
+                              })()}
 
-                          <div
-                            className={`absolute bottom-0 z-10 ${isMine ? 'right-full mr-2 items-end' : 'left-full ml-2 items-start'
-                              } flex flex-col gap-0.5 whitespace-nowrap`}
-                          >
-                            {displayedReadStatusSummary && (
-                              canOpenReadStatus ? (
-                                <button
-                                  data-testid={`chat-message-read-status-${msg.id}`}
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    loadReadStatusForMessage(msg);
-                                  }}
-                                  className="text-[10px] font-bold text-emerald-500 hover:text-emerald-600 underline underline-offset-2"
-                                >
-                                  {displayedReadStatusSummary}
-                                </button>
-                              ) : (
-                                <span
-                                  data-testid={`chat-message-read-status-${msg.id}`}
-                                  className={`text-[10px] font-bold ${deliveryState === 'failed' ? 'text-red-500' : 'text-emerald-500'}`}
-                                >
-                                  {displayedReadStatusSummary}
+                              {!isDeletedMessage && hasReacts && (
+                                <div className="mt-2 flex items-center gap-2 text-[11px] flex-wrap">
+                                  <span className="flex gap-1 flex-wrap">
+                                    {Object.entries(msgReacts).map(([emoji, cnt]) =>
+                                    ((cnt as number) > 0 ? (
+                                      <button
+                                        key={emoji}
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          openReactionDetail(msg, emoji);
+                                        }}
+                                        className={`px-1.5 py-0.5 rounded text-[11px] transition-colors ${isMine ? 'bg-[var(--card)]/20 hover:bg-[var(--card)]/30' : 'bg-[var(--muted)] hover:bg-[var(--toss-blue-light)]'
+                                          }`}
+                                        aria-label={`${emoji} 반응 누른 사람 ${(cnt as number)}명 보기`}
+                                      >
+                                        {emoji} {cnt as number}
+                                      </button>
+                                    ) : null)
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+
+                              <div
+                                className={`absolute bottom-0 z-10 ${isMine ? 'right-full mr-2 items-end' : 'left-full ml-2 items-start'
+                                  } flex flex-col gap-0.5 whitespace-nowrap`}
+                              >
+                                {displayedReadStatusSummary && (
+                                  canOpenReadStatus ? (
+                                    <button
+                                      data-testid={`chat-message-read-status-${msg.id}`}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        loadReadStatusForMessage(msg);
+                                      }}
+                                      className="text-[10px] font-bold text-emerald-500 hover:text-emerald-600 underline underline-offset-2"
+                                    >
+                                      {displayedReadStatusSummary}
+                                    </button>
+                                  ) : (
+                                    <span
+                                      data-testid={`chat-message-read-status-${msg.id}`}
+                                      className={`text-[10px] font-bold ${deliveryState === 'failed' ? 'text-red-500' : 'text-emerald-500'}`}
+                                    >
+                                      {displayedReadStatusSummary}
+                                    </span>
+                                  )
+                                )}
+                                <span className="text-[8px] font-bold text-[var(--toss-gray-4)]">
+                                  {created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </span>
-                              )
+                              </div>
+                            </div>
+                            {showWardQuickReplies && (
+                              <div
+                                data-testid={`chat-ward-quick-replies-${msg.id}`}
+                                className="mt-2 flex w-full flex-col gap-1"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                <p className="px-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                                  빠른 응답
+                                </p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {WARD_QUICK_REPLY_OPTIONS.map((option) => (
+                                    <button
+                                      key={option.id}
+                                      type="button"
+                                      data-testid={`chat-ward-quick-reply-${msg.id}-${option.id}`}
+                                      disabled={isWardQuickReplySending}
+                                      onClick={() => {
+                                        void sendWardQuickReply(msg, option.text);
+                                      }}
+                                      className="rounded-full border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)] hover:border-[var(--accent)] hover:bg-[var(--toss-blue-light)] disabled:cursor-wait disabled:opacity-60"
+                                    >
+                                      {option.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
                             )}
-                            <span className="text-[8px] font-bold text-[var(--toss-gray-4)]">
-                              {created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
                           </div>
                         </div>
-                        {showWardQuickReplies && (
-                          <div
-                            data-testid={`chat-ward-quick-replies-${msg.id}`}
-                            className="mt-2 flex max-w-[78%] flex-col gap-1 md:max-w-[72%]"
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <p className="px-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                              빠른 응답
-                            </p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {WARD_QUICK_REPLY_OPTIONS.map((option) => (
-                                <button
-                                  key={option.id}
-                                  type="button"
-                                  data-testid={`chat-ward-quick-reply-${msg.id}-${option.id}`}
-                                  disabled={isWardQuickReplySending}
-                                  onClick={() => {
-                                    void sendWardQuickReply(msg, option.text);
-                                  }}
-                                  className="rounded-full border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)] hover:border-[var(--accent)] hover:bg-[var(--toss-blue-light)] disabled:cursor-wait disabled:opacity-60"
-                                >
-                                  {option.label}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                         {isMine && deliveryStateLabel && (
                           <div className="mt-1 flex flex-wrap items-center justify-end gap-2">
                             <span
