@@ -1,5 +1,30 @@
 importScripts('/push-notification-shared.js');
 
+try {
+  importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js');
+  importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js');
+
+  if (self.firebase?.apps?.length === 0) {
+    self.firebase.initializeApp({
+      apiKey: 'AIzaSyBGqA18_a00XlYSRvoRu2KpdKfVJHJnikA',
+      authDomain: 'mso-system.firebaseapp.com',
+      projectId: 'mso-system',
+      storageBucket: 'mso-system.firebasestorage.app',
+      messagingSenderId: '873459384687',
+      appId: '1:873459384687:web:4fd03a6b1090683a58689a',
+    });
+  }
+
+  if (self.firebase?.messaging) {
+    const messaging = self.firebase.messaging();
+    messaging.onBackgroundMessage((payload) => {
+      return self.__erpPushShared.showIncomingNotification(payload);
+    });
+  }
+} catch (error) {
+  console.warn('[SW] Firebase messaging init skipped:', error);
+}
+
 // ── Web Share Target: 다른 앱에서 파일/텍스트 공유 시 처리 ──
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
