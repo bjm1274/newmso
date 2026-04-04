@@ -1,10 +1,15 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { useDeferredValue, useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useDeferredValue, useState, useEffect, useMemo, useRef, useCallback, type MouseEvent as ReactMouseEvent } from 'react';
 import { canAccessBoard, isAdminUser, isPrivilegedUser } from '@/lib/access-control';
 import { getStaffLikeId, resolveStaffLike } from '@/lib/staff-identity';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/supabase-compat';
+import {
+  buildStorageDownloadUrl,
+  shouldUseManagedBrowserDownload,
+  triggerManagedBrowserDownload,
+} from '@/lib/object-storage-url';
 import { CHAT_FOCUS_KEY, CHAT_ROOM_KEY } from '@/app/main/navigation-state';
 import SmartDatePicker from './공통/SmartDatePicker';
 import GuideLibrary from './게시판서브/업무가이드';
@@ -556,6 +561,29 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const readMarkingRef = useRef<Set<string>>(new Set());
   const boardFetchSeqRef = useRef(0);
   const previousBoardRef = useRef(activeBoard);
+
+  const handleAttachmentDownloadClick = useCallback(async (
+    event: ReactMouseEvent<HTMLAnchorElement>,
+    url: string,
+    fileName: string,
+  ) => {
+    const href = buildStorageDownloadUrl(url, fileName);
+    if (!href) {
+      event.preventDefault();
+      toast('다운로드 주소를 만들지 못했습니다.', 'error');
+      return;
+    }
+    if (!shouldUseManagedBrowserDownload()) {
+      return;
+    }
+    event.preventDefault();
+    try {
+      await triggerManagedBrowserDownload(href, fileName);
+    } catch (error) {
+      console.error('board attachment download failed', error);
+      toast('모바일 다운로드에 실패했습니다. 다시 시도해 주세요.', 'error');
+    }
+  }, []);
 
   // 알림 등에서 딥링크 ID로 진입 시 해당 게시물 모달 즉시 열기
   useEffect(() => {
@@ -2244,9 +2272,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                                     className="flex max-w-full items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2"
                                   >
                                     <a
-                                      href={att.url}
+                                      href={buildStorageDownloadUrl(att.url, att.name ?? '')}
+                                      onClick={(event) => void handleAttachmentDownloadClick(event, att.url, att.name ?? '')}
                                       target="_blank"
                                       rel="noopener noreferrer"
+                                      download={att.name ?? 'download'}
                                       className="max-w-[240px] truncate text-xs font-bold text-[var(--accent)] hover:underline"
                                       title={att.name}
                                     >
@@ -3053,7 +3083,15 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                             <p className="text-[11px] font-bold text-[var(--toss-gray-4)] p-2 bg-[var(--page-bg)] truncate">{att.name}</p>
                           </div>
                         ) : (
-                          <a key={i} href={`/api/download?url=${encodeURIComponent(att.url)}&name=${encodeURIComponent(att.name ?? '')}`} className="inline-flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--muted)] border border-[var(--border)] text-sm font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]">
+                          <a
+                            key={i}
+                            href={buildStorageDownloadUrl(att.url, att.name ?? '')}
+                            onClick={(event) => void handleAttachmentDownloadClick(event, att.url, att.name ?? '')}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download={att.name ?? 'download'}
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--muted)] border border-[var(--border)] text-sm font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
+                          >
                             📎 {att.name}
                           </a>
                         )
