@@ -38,7 +38,7 @@ function encodeObjectKey(objectKey: string): string {
     .join('/');
 }
 
-function buildResponseContentDisposition(rawName: string): string {
+export function buildResponseContentDisposition(rawName: string): string {
   const normalizedName = String(rawName || 'download');
   const ascii = normalizedName.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
   const encoded = encodeURIComponent(normalizedName);

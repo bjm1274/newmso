@@ -612,6 +612,8 @@ function AttachmentQuickActions({
         href={buildDownloadUrl(url, name)}
         onClick={(event) => event.stopPropagation()}
         download={name}
+        target="_blank"
+        rel="noopener noreferrer"
         className={downloadClassByVariant[variant]}
       >
         다운로드
@@ -1088,6 +1090,10 @@ export default function ChatView({
   const lastTimelineTailRef = useRef('');
   const lastHandledChatListResetTokenRef = useRef(0);
   const selectedRoomIdRef = useRef<string | null>(null);
+  const mobileChatHistoryEntryActiveRef = useRef(false);
+  const suppressNextMobileChatPopstateRef = useRef(false);
+  const setRoomRef = useRef<(roomId: string | null) => void>(() => {});
+  const closeMobileChatBackLayerRef = useRef<() => boolean>(() => false);
   const initialRoomRestoreSyncedRef = useRef(false);
   const fetchDataRef = useRef<(() => Promise<void>) | null>(null);
   const globalRealtimeRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1099,6 +1105,22 @@ export default function ChatView({
 
   const [mentionQuery, setMentionQuery] = useState('');
   const [showMentionList, setShowMentionList] = useState(false);
+
+  const pushMobileChatHistoryEntry = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    if (!isMobileChatViewport()) return;
+    if (!selectedRoomIdRef.current) return;
+    if (mobileChatHistoryEntryActiveRef.current) return;
+    try {
+      window.history.pushState({
+        ...(window.history.state ?? {}),
+        __erpMobileChatRoomOpen: true,
+        __erpMobileChatRoomToken: Date.now(),
+      }, '');
+      mobileChatHistoryEntryActiveRef.current = true;
+    } catch {
+    }
+  }, []);
 
   const [unreadModalMsg, setUnreadModalMsg] = useState<ChatMessage | null>(null);
   const [unreadUsers, setUnreadUsers] = useState<StaffMember[]>([]);
@@ -1457,6 +1479,7 @@ export default function ChatView({
     } catch {
     }
   };
+  setRoomRef.current = setRoom;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1475,6 +1498,63 @@ export default function ChatView({
       }
     };
   }, [selectedRoomId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!isMobileChatViewport()) return;
+
+    if (selectedRoomId) {
+      pushMobileChatHistoryEntry();
+      return;
+    }
+
+    if (!mobileChatHistoryEntryActiveRef.current) return;
+
+    suppressNextMobileChatPopstateRef.current = true;
+    mobileChatHistoryEntryActiveRef.current = false;
+    try {
+      window.history.back();
+    } catch {
+      suppressNextMobileChatPopstateRef.current = false;
+    }
+  }, [pushMobileChatHistoryEntry, selectedRoomId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handlePopState = () => {
+      if (suppressNextMobileChatPopstateRef.current) {
+        suppressNextMobileChatPopstateRef.current = false;
+        return;
+      }
+      if (!isMobileChatViewport()) {
+        mobileChatHistoryEntryActiveRef.current = false;
+        return;
+      }
+      if (!selectedRoomIdRef.current) {
+        mobileChatHistoryEntryActiveRef.current = false;
+        return;
+      }
+
+      mobileChatHistoryEntryActiveRef.current = false;
+
+      if (closeMobileChatBackLayerRef.current()) {
+        window.requestAnimationFrame(() => {
+          if (selectedRoomIdRef.current) {
+            pushMobileChatHistoryEntry();
+          }
+        });
+        return;
+      }
+
+      setRoomRef.current(null);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [pushMobileChatHistoryEntry]);
 
   const roomPrefsUserId = effectiveChatUserId || user?.id || null;
 
@@ -2000,6 +2080,73 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const closeAttachmentPreview = useCallback(() => {
     setAttachmentPreview(null);
   }, []);
+
+  const closeMobileChatBackLayer = useCallback(() => {
+    if (attachmentPreview) {
+      closeAttachmentPreview();
+      return true;
+    }
+    if (activeActionMsg) {
+      setActiveActionMsg(null);
+      return true;
+    }
+    if (reactionDetailTarget) {
+      setReactionDetailTarget(null);
+      return true;
+    }
+    if (unreadModalMsg) {
+      setUnreadModalMsg(null);
+      return true;
+    }
+    if (showForwardModal || forwardSourceMsg) {
+      setShowForwardModal(false);
+      setForwardSourceMsg(null);
+      return true;
+    }
+    if (showAddMemberModal) {
+      setShowAddMemberModal(false);
+      setAddMemberSelectingIds([]);
+      return true;
+    }
+    if (showMediaPanel) {
+      setShowMediaPanel(false);
+      return true;
+    }
+    if (showPollModal) {
+      setShowPollModal(false);
+      return true;
+    }
+    if (showDrawer) {
+      setShowDrawer(false);
+      return true;
+    }
+    if (showGlobalSearch) {
+      setShowGlobalSearch(false);
+      setGlobalSearchQuery('');
+      setGlobalSearchResults([]);
+      return true;
+    }
+    if (showGroupModal) {
+      setShowGroupModal(false);
+      return true;
+    }
+    return false;
+  }, [
+    activeActionMsg,
+    attachmentPreview,
+    closeAttachmentPreview,
+    forwardSourceMsg,
+    reactionDetailTarget,
+    showAddMemberModal,
+    showDrawer,
+    showForwardModal,
+    showGlobalSearch,
+    showGroupModal,
+    showMediaPanel,
+    showPollModal,
+    unreadModalMsg,
+  ]);
+  closeMobileChatBackLayerRef.current = closeMobileChatBackLayer;
 
   useEffect(() => {
     attachmentZoomRef.current = attachmentZoom;
@@ -8093,6 +8240,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               href={buildDownloadUrl(activeAttachmentPreview.url, activeAttachmentPreview.name ?? '')}
               onClick={(e) => e.stopPropagation()}
               download={activeAttachmentPreview.name ?? 'download'}
+              target="_blank"
+              rel="noopener noreferrer"
               className="h-11 inline-flex items-center justify-center rounded-full bg-white/15 hover:bg-white/30 px-4 text-white text-xs font-semibold transition-colors"
               aria-label="다운로드"
             >
@@ -8194,6 +8343,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   <a
                     href={buildDownloadUrl(activeAttachmentPreview.url, activeAttachmentPreview.name ?? '')}
                     download={activeAttachmentPreview.name ?? 'download'}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="inline-flex items-center rounded-lg bg-[var(--tab-bg)] px-3 py-2 text-xs font-bold text-[var(--foreground)]"
                   >
                     다운로드
