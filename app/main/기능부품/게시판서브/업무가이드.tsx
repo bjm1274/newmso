@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canAccessBoard, isAdminUser, isPrivilegedUser } from '@/lib/access-control';
+import { buildStorageDownloadUrl } from '@/lib/object-storage-url';
 import { supabase } from '@/lib/supabase';
 import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { toast } from '@/lib/toast';
@@ -1692,7 +1693,8 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                         {selectedResource.attachments.map((attachment, index) => (
                           <a
                             key={`${attachment.url}-${index}`}
-                            href={attachment.url}
+                            href={buildStorageDownloadUrl(attachment.url, attachment.name)}
+                            download={attachment.name}
                             target="_blank"
                             rel="noreferrer"
                             className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-4 transition hover:border-[var(--accent)]"

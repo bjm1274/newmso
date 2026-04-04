@@ -23,7 +23,7 @@ import {
 } from '@/lib/approval-workflow';
 import { isMissingColumnError, withMissingColumnFallback } from '@/lib/supabase-compat';
 import { notificationMatchesApprovalId } from '@/lib/notification-metadata';
-import { buildInternalStorageDownloadUrl, isInternalStorageObjectUrl } from '@/lib/object-storage-url';
+import { buildStorageDownloadUrl } from '@/lib/object-storage-url';
 import {
   formatApprovalAttachmentSize,
   getReportApprovalSummary,
@@ -1236,14 +1236,13 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
         </div>
         <div className="space-y-2 p-4">
           {attachments.map((attachment, index) => {
-            const href = isInternalStorageObjectUrl(attachment.url)
-              ? buildInternalStorageDownloadUrl(attachment.url, attachment.name)
-              : attachment.url;
+            const href = buildStorageDownloadUrl(attachment.url, attachment.name);
 
             return (
               <a
                 key={`${attachment.url}-${attachment.name}-${index}`}
                 href={href}
+                download={attachment.name}
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/60 px-3 py-2 transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--muted)]"
