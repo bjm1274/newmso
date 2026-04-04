@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/lib/ThemeContext";
 import ErrorBoundary from "@/app/components/ErrorBoundary";
+import PwaBootstrap from "@/app/components/PwaBootstrap";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,17 +16,25 @@ const geistMono = Geist_Mono({
 });
 
 export const viewport: Viewport = {
-  width: 'device-width',
+  width: "device-width",
   initialScale: 1,
-  viewportFit: 'cover', // iPhone 노치/다이나믹 아일랜드 safe area 활성화
+  themeColor: "#2563eb",
+  viewportFit: "cover",
 };
 
 export const metadata: Metadata = {
   title: "SY INC. MSO 통합 시스템",
   description: "병원 경영 통합 관리 시스템",
   manifest: "/manifest.json",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "MSO" },
-  icons: { icon: "/sy-logo.png", apple: "/sy-logo.png" },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "MSO",
+  },
+  icons: {
+    icon: "/icon-512x512.png",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({
@@ -36,12 +45,12 @@ export default function RootLayout({
   return (
     <html lang="ko" suppressHydrationWarning>
       <head>
-        <link rel="icon" href="/sy-logo.png" type="image/png" />
+        <link rel="icon" href="/icon-512x512.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
         />
-        {/* 글씨 크기 초기화 — 렌더 전 즉시 적용 */}
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var s=localStorage.getItem('erp-font-size');if(s){document.documentElement.style.fontSize=s+'px';}}catch(e){}})();`,
@@ -52,6 +61,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} font-app antialiased bg-[var(--background)] text-[var(--foreground)]`}
       >
         <ThemeProvider>
+          <PwaBootstrap />
           <ErrorBoundary>{children}</ErrorBoundary>
         </ThemeProvider>
       </body>
