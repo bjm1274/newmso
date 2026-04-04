@@ -354,6 +354,59 @@ test('chat auto-creates a personal self chat and opens it with the self label', 
   expect(runtimeErrors).toEqual([]);
 });
 
+test('chat collapses duplicate self chat rooms into one visible entry', async ({
+  page,
+}) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    staffMembers: [fakeUser],
+    chatRooms: [
+      {
+        id: noticeRoomId,
+        name: '공지메시지',
+        type: 'notice',
+        members: [fakeUser.id],
+        created_at: '2026-03-08T00:00:00.000Z',
+        last_message_at: '2026-03-08T00:00:00.000Z',
+      },
+      {
+        id: 'self-room-old',
+        name: '나와의 채팅',
+        type: 'direct',
+        members: [fakeUser.id],
+        created_at: '2026-03-08T08:00:00.000Z',
+        last_message_at: '2026-03-08T08:10:00.000Z',
+        last_message_preview: '이전 self room',
+      },
+      {
+        id: 'self-room-new',
+        name: '나와의 채팅',
+        type: 'direct',
+        members: [fakeUser.id],
+        created_at: '2026-03-08T09:00:00.000Z',
+        last_message_at: '2026-03-08T09:20:00.000Z',
+        last_message_preview: '최신 self room',
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '\uCC44\uD305',
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent('\uCC44\uD305')}`);
+
+  await expect(page.getByTestId('chat-view')).toBeVisible();
+  await expect(page.locator('[data-testid^="chat-room-"]').filter({ hasText: '나와의 채팅' })).toHaveCount(1);
+  await expect(page.locator('[data-testid^="chat-room-"]').filter({ hasText: '최신 self room' })).toHaveCount(1);
+  await expect(page.locator('[data-testid^="chat-room-"]').filter({ hasText: '이전 self room' })).toHaveCount(0);
+
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('chat shows ward quick replies for received op ward messages and sends the selected reply', async ({
   page,
 }) => {

@@ -355,7 +355,7 @@ function haveSameMembers(left: string[], right: string[]): boolean {
 function getDirectRoomMembersKey(room: ChatRoom | null | undefined): string | null {
   if (room?.type !== 'direct') return null;
   const members = normalizeMemberIds(room?.members);
-  if (members.length !== 2) return null;
+  if (members.length === 0 || members.length > 2) return null;
   return [...members].sort().join('::');
 }
 
@@ -957,6 +957,7 @@ export default function ChatView({
   const pendingBottomAlignRoomIdRef = useRef<string | null>(null);
   const fetchDataRequestSeqRef = useRef(0);
   const timelineItemCountRef = useRef(0);
+  const selfChatCreationInFlightRef = useRef(false);
   const [omniSearch, setOmniSearch] = useState('');
   const [chatSearch, setChatSearch] = useState('');
   const deferredOmniSearch = useDeferredValue(omniSearch);
@@ -2618,13 +2619,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       const sourceRooms = Array.isArray(rooms) ? rooms : [];
       if (!currentUserId) return sourceRooms;
 
-      const existingSelfRoom = sourceRooms
+      const existingSelfRooms = sourceRooms
         .filter((room: ChatRoom) => isSelfChatRoom(room, currentUserId))
         .sort(
           (a: ChatRoom, b: ChatRoom) =>
             new Date(b.last_message_at || b.created_at || 0).getTime() -
             new Date(a.last_message_at || a.created_at || 0).getTime()
-        )[0];
+        );
+      const existingSelfRoom = existingSelfRooms[0];
 
       if (existingSelfRoom) {
         const nextMembers = [currentUserId];
@@ -2647,13 +2649,23 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           console.error('나와의 채팅 동기화 실패:', error);
         }
 
-        return sourceRooms.map((room: ChatRoom) =>
-          String(room.id) === String(existingSelfRoom.id)
-            ? { ...room, name: SELF_ROOM_NAME, type: 'direct' as const, members: nextMembers }
-            : room
-        );
+        return sourceRooms
+          .filter(
+            (room: ChatRoom) =>
+              !isSelfChatRoom(room, currentUserId) || String(room.id) === String(existingSelfRoom.id)
+          )
+          .map((room: ChatRoom) =>
+            String(room.id) === String(existingSelfRoom.id)
+              ? { ...room, name: SELF_ROOM_NAME, type: 'direct' as const, members: nextMembers }
+              : room
+          );
       }
 
+      if (selfChatCreationInFlightRef.current) {
+        return sourceRooms;
+      }
+
+      selfChatCreationInFlightRef.current = true;
       try {
         const { data: insertedRoom, error } = (await supabase
           .from('chat_rooms')
@@ -2666,6 +2678,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       } catch (error) {
         console.error('나와의 채팅 생성 실패:', error);
         return sourceRooms;
+      } finally {
+        selfChatCreationInFlightRef.current = false;
       }
     },
     [effectiveChatUserId]
