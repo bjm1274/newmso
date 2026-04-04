@@ -1,6 +1,6 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, type MouseEvent as ReactMouseEvent } from 'react';
 import { canAccessApprovalSection, hasPermission } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { syncApprovalToDocumentRepository } from '@/lib/approval-document-archive';
@@ -23,7 +23,11 @@ import {
 } from '@/lib/approval-workflow';
 import { isMissingColumnError, withMissingColumnFallback } from '@/lib/supabase-compat';
 import { notificationMatchesApprovalId } from '@/lib/notification-metadata';
-import { buildStorageDownloadUrl } from '@/lib/object-storage-url';
+import {
+  buildStorageDownloadUrl,
+  shouldUseManagedBrowserDownload,
+  triggerManagedBrowserDownload,
+} from '@/lib/object-storage-url';
 import {
   formatApprovalAttachmentSize,
   getReportApprovalSummary,
@@ -473,7 +477,7 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
       ? initialView
       : defaultApprovalView
   );
-  const [approvals, setApprovals] = useState<Record<string, unknown>[]>([]);
+const [approvals, setApprovals] = useState<Record<string, unknown>[]>([]);
   const [formType, setFormType] = useState('업무기안');
   const [formTitle, setFormTitle] = useState('');
   const [formContent, setFormContent] = useState('');
@@ -487,7 +491,29 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
   const [suppliesLoadKey, setSuppliesLoadKey] = useState(0);
   const [composeSeedApproval, setComposeSeedApproval] = useState<Record<string, unknown> | null>(null);
   const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
-  const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대기' | '승인' | '반려'>('전체');
+const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대기' | '승인' | '반려'>('전체');
+const handleAttachmentDownloadClick = useCallback(async (
+  event: ReactMouseEvent<HTMLAnchorElement>,
+  url: string,
+  fileName: string,
+) => {
+  const href = buildStorageDownloadUrl(url, fileName);
+  if (!href) {
+    event.preventDefault();
+    toast('다운로드 주소를 만들지 못했습니다.', 'error');
+    return;
+  }
+  if (!shouldUseManagedBrowserDownload()) {
+    return;
+  }
+  event.preventDefault();
+  try {
+    await triggerManagedBrowserDownload(href, fileName);
+  } catch (error) {
+    console.error('approval attachment download failed', error);
+    toast('모바일 다운로드에 실패했습니다. 다시 시도해 주세요.', 'error');
+  }
+}, []);
   const [approvalDocumentFilter, setApprovalDocumentFilter] = useState(ALL_DOCUMENT_FILTER);
   const [approvalKeyword, setApprovalKeyword] = useState('');
   const [approvalDateMode, setApprovalDateMode] = useState<'month' | 'week' | 'range'>('month');
@@ -1242,6 +1268,7 @@ export default function ApprovalView({ user, staffs, selectedCompanyId, onRefres
               <a
                 key={`${attachment.url}-${attachment.name}-${index}`}
                 href={href}
+                onClick={(event) => void handleAttachmentDownloadClick(event, attachment.url, attachment.name)}
                 download={attachment.name}
                 target="_blank"
                 rel="noreferrer"
