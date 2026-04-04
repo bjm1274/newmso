@@ -10,6 +10,27 @@ function getAdminApp(): admin.app.App {
   return admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 }
 
+function buildSafeWebpushLink() {
+  const rawOrigin =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.APP_URL ||
+    '';
+  const normalizedOrigin = String(rawOrigin).trim();
+  if (!normalizedOrigin) return undefined;
+
+  try {
+    const parsed = new URL(normalizedOrigin);
+    if (parsed.protocol !== 'https:') return undefined;
+    parsed.pathname = '/main';
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString();
+  } catch {
+    return undefined;
+  }
+}
+
 export async function sendFcmNotification(
   fcmToken: string,
   payload: { title: string; body: string; data?: Record<string, string> },
@@ -24,15 +45,32 @@ export async function sendFcmNotification(
 
     const messageId = payload.data?.message_id || '';
     const collapseKey = payload.data?.tag || (messageId ? `chat-msg-${messageId}` : undefined);
+    const webpushLink = buildSafeWebpushLink();
+    const webpushNotificationData = {
+      ...messageData,
+      ...payload.data,
+    };
 
     await admin.messaging(app).send({
       token: fcmToken,
       data: messageData,
       webpush: {
-        fcmOptions: { link: '/main' },
         headers: {
           Urgency: 'high',
         },
+        notification: {
+          title: payload.title,
+          body: payload.body,
+          tag: collapseKey,
+          data: webpushNotificationData,
+        },
+        ...(webpushLink
+          ? {
+              fcmOptions: {
+                link: webpushLink,
+              },
+            }
+          : {}),
       },
       android: {
         priority: 'high',

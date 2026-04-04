@@ -1,5 +1,9 @@
 importScripts('/push-notification-shared.js');
 
+self.addEventListener('notificationclick', (event) => {
+  event.waitUntil(self.__erpPushShared.handleNotificationClick(event));
+});
+
 try {
   importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js');
   importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js');
@@ -18,6 +22,9 @@ try {
   if (self.firebase?.messaging) {
     const messaging = self.firebase.messaging();
     messaging.onBackgroundMessage((payload) => {
+      if (self.__erpPushShared.handleFcmBackgroundMessage) {
+        return self.__erpPushShared.handleFcmBackgroundMessage(payload);
+      }
       return self.__erpPushShared.showIncomingNotification(payload);
     });
   }
@@ -93,10 +100,6 @@ self.addEventListener('push', (event) => {
 
     await self.__erpPushShared.showIncomingNotification(data);
   })());
-});
-
-self.addEventListener('notificationclick', (event) => {
-  event.waitUntil(self.__erpPushShared.handleNotificationClick(event));
 });
 
 self.addEventListener('message', (event) => {

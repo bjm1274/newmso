@@ -315,6 +315,51 @@ function erpNormalizeNotificationPayload(raw) {
   };
 }
 
+function erpBuildNotificationOptions(payload) {
+  return {
+    body: payload.body,
+    icon: ERP_PUSH_ICON_URL,
+    badge: ERP_PUSH_BADGE_URL,
+    tag: payload.tag,
+    requireInteraction: false,
+    renotify: false,
+    vibrate: [1000],
+    data: payload.data,
+    actions: [
+      { action: 'open', title: '확인하기' },
+      { action: 'close', title: '닫기' },
+    ],
+  };
+}
+
+async function erpDispatchIncomingNotification(rawPayload, options) {
+  await erpFlushRetryQueue();
+  const payload = erpNormalizeNotificationPayload(rawPayload);
+  if (!erpShouldShowNotification(payload.tag)) return;
+
+  try {
+    if (self.navigator && 'setAppBadge' in self.navigator) {
+      self.navigator.setAppBadge().catch(() => {});
+    }
+  } catch {
+    // ignore badge failures
+  }
+
+  const hasVisibleClient = await erpBroadcastPreviewToVisibleClients(payload);
+  if (hasVisibleClient) return;
+
+  const allowBrowserManagedDisplay = Boolean(options && options.allowBrowserManagedDisplay);
+  const hasNotificationPayload =
+    rawPayload &&
+    typeof rawPayload === 'object' &&
+    rawPayload.notification &&
+    typeof rawPayload.notification === 'object';
+
+  if (allowBrowserManagedDisplay && hasNotificationPayload) return;
+
+  await self.registration.showNotification(payload.title, erpBuildNotificationOptions(payload));
+}
+
 async function erpShowIncomingNotification(rawPayload) {
   await erpFlushRetryQueue();
   const payload = erpNormalizeNotificationPayload(rawPayload);
@@ -345,6 +390,14 @@ async function erpShowIncomingNotification(rawPayload) {
       { action: 'close', title: '닫기' },
     ],
   });
+}
+
+async function erpShowIncomingNotificationManaged(rawPayload) {
+  await erpDispatchIncomingNotification(rawPayload, { allowBrowserManagedDisplay: false });
+}
+
+async function erpHandleFcmBackgroundMessage(rawPayload) {
+  await erpDispatchIncomingNotification(rawPayload, { allowBrowserManagedDisplay: true });
 }
 
 function erpBuildTargetUrl(data) {
@@ -543,7 +596,8 @@ async function erpHandleNotificationClick(event) {
 }
 
 self.__erpPushShared = {
-  showIncomingNotification: erpShowIncomingNotification,
+  showIncomingNotification: erpShowIncomingNotificationManaged,
+  handleFcmBackgroundMessage: erpHandleFcmBackgroundMessage,
   handleNotificationClick: erpHandleNotificationClick,
   handlePushSubscriptionChange: erpHandlePushSubscriptionChange,
   handleClientMessage: erpHandleClientMessage,
