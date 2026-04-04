@@ -21,6 +21,27 @@ export function buildInternalStorageDownloadUrl(url: string, fileName: string): 
   return `${parsed.pathname}${parsed.search}`;
 }
 
+export function buildStorageDownloadUrl(url: string, fileName: string): string {
+  const normalizedUrl = String(url || '').trim();
+  const normalizedFileName = String(fileName || '').trim() || 'download';
+  if (!normalizedUrl) return '';
+
+  if (isInternalStorageObjectUrl(normalizedUrl)) {
+    return buildInternalStorageDownloadUrl(normalizedUrl, normalizedFileName);
+  }
+
+  return `/api/download?url=${encodeURIComponent(normalizedUrl)}&name=${encodeURIComponent(normalizedFileName)}`;
+}
+
+export function buildPublicStorageDownloadUrl(url: string, fileName: string): string {
+  const normalizedUrl = String(url || '').trim();
+  if (!normalizedUrl) return '';
+
+  const parsed = new URL(normalizedUrl);
+  parsed.searchParams.set('download', String(fileName || '').trim() || '1');
+  return parsed.toString();
+}
+
 export function extractStorageUrlExtension(url: string): string {
   const rawUrl = String(url || '').trim();
   if (!rawUrl) return '';

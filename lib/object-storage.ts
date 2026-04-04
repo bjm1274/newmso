@@ -38,6 +38,13 @@ function encodeObjectKey(objectKey: string): string {
     .join('/');
 }
 
+function buildResponseContentDisposition(rawName: string): string {
+  const normalizedName = String(rawName || 'download');
+  const ascii = normalizedName.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
+  const encoded = encodeURIComponent(normalizedName);
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+}
+
 function getR2Config(): R2Config | null {
   const accountId = String(process.env.R2_ACCOUNT_ID || '').trim();
   const accessKeyId = String(process.env.R2_ACCESS_KEY_ID || '').trim();
@@ -216,7 +223,11 @@ export async function uploadChatAttachmentToR2(
   };
 }
 
-export async function createR2DownloadUrl(bucket: string, objectKey: string): Promise<string | null> {
+export async function createR2DownloadUrl(
+  bucket: string,
+  objectKey: string,
+  options?: { downloadFileName?: string | null },
+): Promise<string | null> {
   const config = getR2Config();
   if (!config) {
     return null;
@@ -228,6 +239,11 @@ export async function createR2DownloadUrl(bucket: string, objectKey: string): Pr
     new GetObjectCommand({
       Bucket: bucket,
       Key: objectKey,
+      ...(options?.downloadFileName
+        ? {
+            ResponseContentDisposition: buildResponseContentDisposition(options.downloadFileName),
+          }
+        : {}),
     }),
     { expiresIn: DEFAULT_DOWNLOAD_EXPIRATION_SECONDS },
   );

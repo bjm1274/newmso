@@ -4,9 +4,8 @@ import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import {
-  buildInternalStorageDownloadUrl,
+  buildStorageDownloadUrl,
   extractStorageUrlExtension,
-  isInternalStorageObjectUrl,
 } from '@/lib/object-storage-url';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { bindPageRefresh } from '@/lib/realtime-maintenance';
@@ -108,10 +107,7 @@ function extractWardMessageMeta(value: unknown): {
 
 /** 원본 파일명으로 다운로드되도록 프록시 URL 생성 */
 function buildDownloadUrl(fileUrl: string, fileName: string): string {
-  if (isInternalStorageObjectUrl(fileUrl)) {
-    return buildInternalStorageDownloadUrl(fileUrl, fileName);
-  }
-  return `/api/download?url=${encodeURIComponent(fileUrl)}&name=${encodeURIComponent(fileName)}`;
+  return buildStorageDownloadUrl(fileUrl, fileName);
 }
 const CHAT_ROOM_PREFS_KEY = 'erp_chat_room_prefs';
 const CHAT_PINNED_KEY = 'erp_chat_pinned_messages';
@@ -615,6 +611,7 @@ function AttachmentQuickActions({
       <a
         href={buildDownloadUrl(url, name)}
         onClick={(event) => event.stopPropagation()}
+        download={name}
         className={downloadClassByVariant[variant]}
       >
         다운로드
@@ -8095,6 +8092,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             <a
               href={buildDownloadUrl(activeAttachmentPreview.url, activeAttachmentPreview.name ?? '')}
               onClick={(e) => e.stopPropagation()}
+              download={activeAttachmentPreview.name ?? 'download'}
               className="h-11 inline-flex items-center justify-center rounded-full bg-white/15 hover:bg-white/30 px-4 text-white text-xs font-semibold transition-colors"
               aria-label="다운로드"
             >
@@ -8195,6 +8193,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   </a>
                   <a
                     href={buildDownloadUrl(activeAttachmentPreview.url, activeAttachmentPreview.name ?? '')}
+                    download={activeAttachmentPreview.name ?? 'download'}
                     className="inline-flex items-center rounded-lg bg-[var(--tab-bg)] px-3 py-2 text-xs font-bold text-[var(--foreground)]"
                   >
                     다운로드
