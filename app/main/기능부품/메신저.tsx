@@ -5491,7 +5491,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       key={roomId}
                       data-testid={`chat-room-${roomId}`}
                       onClick={() => handleRoomListClick(room.id)}
-                      className={`group p-2.5 rounded-2xl cursor-pointer transition-all flex items-center justify-between gap-3 border relative overflow-hidden ${isSelected
+                      className={`group p-2.5 rounded-xl cursor-pointer transition-all flex items-center justify-between gap-2.5 border relative overflow-hidden ${isSelected
                         ? 'bg-zinc-800 border-zinc-700 shadow-sm'
                         : 'bg-[var(--card)] dark:bg-zinc-900 border-transparent hover:border-[var(--border)] dark:hover:border-zinc-800'
                         }`}
@@ -5503,55 +5503,51 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           {isNoticeChannel ? (
                             <div
                               data-testid={`chat-room-icon-${roomId}`}
-                              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-500/15 text-[15px] leading-none text-blue-600 ring-1 ring-blue-200/70"
+                              className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/20 text-[13px] leading-none text-blue-600"
                             >
                               📢
                             </div>
                           ) : peerName ? (
                             <div
                               data-testid={`chat-room-icon-${roomId}`}
-                              className="relative flex h-10 w-10 shrink-0 items-center justify-center"
+                              className="relative flex h-8 w-8 shrink-0 items-center justify-center"
                             >
                               <MessengerAvatar
                                 name={peerName || label}
                                 photoUrl={peerPhotoUrl}
-                                className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-[var(--tab-bg)] text-[12px] font-bold text-[var(--toss-gray-4)] ring-1 ring-black/5 dark:bg-zinc-800"
+                                className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-[var(--tab-bg)] text-[11px] font-bold text-[var(--toss-gray-4)] dark:bg-zinc-800"
                                 decorative
                               />
                               {isPeerOnline && (
-                                <span className="absolute right-0 bottom-0 h-3 w-3 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-900" />
+                                <span className="absolute -right-0.5 -bottom-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-white dark:border-zinc-900" />
                               )}
                             </div>
                           ) : (
                             <div
                               data-testid={`chat-room-icon-${roomId}`}
-                              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--tab-bg)] text-[15px] leading-none text-[var(--toss-gray-4)] ring-1 ring-black/5 dark:bg-zinc-800"
+                              className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--tab-bg)] text-[13px] leading-none text-[var(--toss-gray-4)] dark:bg-zinc-800"
                             >
                               💬
                             </div>
                           )}
                         <div data-testid={`chat-room-summary-${roomId}`} className="flex min-w-0 flex-1 flex-col gap-1 py-0.5">
                           <div className="flex items-start gap-1.5 min-w-0">
-                            <p className={`text-[12px] font-bold ${room.type === 'group' ? 'line-clamp-2 break-words whitespace-normal leading-4' : 'truncate'} ${isSelected ? 'text-white' : 'text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]'}`}>
-                              {label}
-                            </p>
                             {unread > 0 && (
-                              <span className="shrink-0 min-w-[18px] h-[18px] px-1.5 inline-flex items-center justify-center rounded-full bg-blue-600 text-white text-[9px] font-bold shadow-soft">
+                              <span className="shrink-0 min-w-[18px] h-[18px] px-1.5 inline-flex items-center justify-center rounded-[var(--radius-md)] bg-blue-600 text-white text-[9px] font-bold shadow-soft">
                                 {unread > 99 ? '99+' : unread}
                               </span>
                             )}
+                            <p className={`text-[12px] font-bold ${room.type === 'group' ? 'line-clamp-2 break-words whitespace-normal leading-4' : 'truncate'} ${isSelected ? 'text-white' : 'text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]'}`}>
+                              {label}
+                            </p>
                             {isPinned && <span className="text-[9px] font-bold text-amber-400">PIN</span>}
                             {isHidden && <span className="text-[9px] font-bold text-[var(--toss-gray-3)]">HIDE</span>}
                           </div>
                           <div
                             data-testid={`chat-room-preview-${roomId}`}
-                            className={`inline-flex max-w-[190px] items-center rounded-2xl border px-2.5 py-1 text-[10px] font-medium ${
-                              isSelected
-                                ? 'border-white/10 bg-white/10 text-white/80'
-                                : 'border-[var(--border)] bg-[var(--tab-bg)] text-[var(--toss-gray-3)] dark:border-zinc-800 dark:bg-zinc-800/80'
-                            }`}
+                            className="text-[10px] text-[var(--toss-gray-3)] font-medium truncate"
                           >
-                            <span className="truncate">{preview}</span>
+                            {preview}
                           </div>
                         </div>
                       </div>
