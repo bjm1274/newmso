@@ -267,6 +267,76 @@ test('mobile chat tab returns to the room list when tapped again', async ({ page
   await expect(page.getByTestId('chat-room-room-mobile-reset')).toBeVisible();
 });
 
+test('mobile device back closes the open chat room before leaving the page', async ({ page }) => {
+  await mockSupabase(page, {
+    chatRooms: [
+      {
+        id: '00000000-0000-0000-0000-000000000000',
+        name: 'Notice',
+        type: 'notice',
+        members: [],
+        created_at: '2026-03-08T00:00:00.000Z',
+        last_message_at: '2026-03-08T00:00:00.000Z',
+      },
+      {
+        id: 'room-mobile-hardware-back',
+        name: 'Mobile Hardware Back Room',
+        type: 'group',
+        members: [fakeUser.id, 'peer-mobile-hardware-back'],
+        created_at: '2026-03-08T09:00:00.000Z',
+        last_message_at: '2026-03-08T10:00:00.000Z',
+        last_message_preview: 'hardware back message',
+      },
+    ],
+    staffMembers: [
+      fakeUser,
+      {
+        ...fakeUser,
+        id: 'peer-mobile-hardware-back',
+        name: 'Mobile Hardware Peer',
+        employee_no: 'E2E-CHAT-MOBILE-BACK',
+      },
+    ],
+    messages: [
+      {
+        id: 'msg-mobile-hardware-back-1',
+        room_id: 'room-mobile-hardware-back',
+        sender_id: 'peer-mobile-hardware-back',
+        content: 'hardware back message',
+        created_at: '2026-03-08T10:00:00.000Z',
+        is_deleted: false,
+        staff: { name: 'Mobile Hardware Peer', photo_url: null },
+      },
+    ],
+  });
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '채팅',
+    },
+  });
+
+  await page.goto(`/main?${new URLSearchParams({ open_menu: '채팅' }).toString()}`);
+  await expect(page.getByTestId('chat-view')).toBeVisible();
+
+  const historyLengthBeforeOpen = await page.evaluate(() => window.history.length);
+  const roomItem = page.getByTestId('chat-room-room-mobile-hardware-back');
+  await expect(roomItem).toBeVisible();
+  await roomItem.click();
+
+  await expect(page.getByTestId('chat-message-input')).toBeVisible();
+  await expect(roomItem).toBeHidden();
+  await expect
+    .poll(async () => page.evaluate(() => window.history.length))
+    .toBe(historyLengthBeforeOpen + 1);
+
+  await page.evaluate(() => window.history.back());
+
+  await expect(page).toHaveURL(/\/main/);
+  await expect(page.getByTestId('chat-view')).toBeVisible();
+  await expect(page.getByTestId('chat-message-input')).toBeHidden();
+  await expect(page.getByTestId('chat-room-room-mobile-hardware-back')).toBeVisible();
+});
+
 test('mobile chat room icons keep a uniform size across room names', async ({ page }) => {
   await mockSupabase(page, {
     chatRooms: [
