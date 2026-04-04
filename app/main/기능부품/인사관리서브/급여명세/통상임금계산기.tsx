@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { MONTHLY_STANDARD_HOURS } from '@/lib/tax-free-limits';
 
 interface Props {
   staffs: any[];
@@ -21,7 +22,7 @@ export default function OrdinaryWageCalculator({ staffs, selectedCo, user }: Pro
   const [holidayHours, setHolidayHours] = useState(0);
   const [unusedLeave, setUnusedLeave] = useState(0);
 
-  const MONTHLY_HOURS = 209;
+  const MONTHLY_HOURS = MONTHLY_STANDARD_HOURS;
 
   const ordinaryWage = basePay + positionAllowance + jobAllowance + familyAllowance + mealTaxable + transportTaxable;
   const hourlyWage = ordinaryWage / MONTHLY_HOURS;

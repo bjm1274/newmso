@@ -3673,6 +3673,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         isNoticeChannel: room.id === NOTICE_ROOM_ID,
         label: roomLabelMap.get(roomId) || '',
         preview: getRoomPreviewText(room),
+        peerName: peer?.name || '',
+        peerPhotoUrl: peer ? getProfilePhotoUrl(peer) : null,
         isPeerOnline: peer ? isStaffCurrentlyOnline(peer) : false,
         isPinned: roomPrefs[room.id]?.pinned === true,
         isHidden: roomPrefs[room.id]?.hidden === true,
@@ -3804,6 +3806,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     if (!selectedRoom || selectedRoom.type !== 'direct') return null;
     return roomMembers.find((member) => String(member?.id ?? '') !== effectiveChatUserId) || null;
   }, [selectedRoom, roomMembers, effectiveChatUserId]);
+
+  const selectedPeerPhotoUrl = useMemo(
+    () => (selectedPeer ? getProfilePhotoUrl(selectedPeer as StaffMember) : null),
+    [selectedPeer]
+  );
 
   const selectedPeerIsOnline = useMemo(
     () => (selectedPeer ? isStaffCurrentlyOnline(selectedPeer as StaffMember) : false),
@@ -5377,7 +5384,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   {showHiddenRooms ? '숨김방 닫기' : '숨김방 보기'}
                 </button>
               </div>
-              {sidebarRoomItems.map(({ room, roomId, unread, isSelected, isNoticeChannel, label, preview, isPeerOnline, isPinned, isHidden, pinnedIndex, pinnedCount }) => {
+              {sidebarRoomItems.map(({ room, roomId, unread, isSelected, isNoticeChannel, label, preview, peerName, peerPhotoUrl, isPeerOnline, isPinned, isHidden, pinnedIndex, pinnedCount }) => {
                   return (
                     <div
                       key={roomId}
@@ -5392,15 +5399,36 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500/100"></div>
                       )}
                         <div className="flex items-start gap-3 min-w-0 flex-1">
-                          <div
-                            data-testid={`chat-room-icon-${roomId}`}
-                            className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[13px] leading-none ${isNoticeChannel ? 'bg-blue-500/20 text-blue-600' : 'bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)]'}`}
-                          >
-                            {isNoticeChannel ? '📢' : '💬'}
-                            {!isNoticeChannel && isPeerOnline && (
-                              <span className="absolute -right-0.5 -bottom-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-white dark:border-zinc-900" />
-                            )}
-                          </div>
+                          {isNoticeChannel ? (
+                            <div
+                              data-testid={`chat-room-icon-${roomId}`}
+                              className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/20 text-[13px] leading-none text-blue-600"
+                            >
+                              📢
+                            </div>
+                          ) : peerName ? (
+                            <div
+                              data-testid={`chat-room-icon-${roomId}`}
+                              className="relative flex h-8 w-8 shrink-0 items-center justify-center"
+                            >
+                              <MessengerAvatar
+                                name={peerName || label}
+                                photoUrl={peerPhotoUrl}
+                                className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-[var(--tab-bg)] text-[11px] font-bold text-[var(--toss-gray-4)] dark:bg-zinc-800"
+                                decorative
+                              />
+                              {isPeerOnline && (
+                                <span className="absolute -right-0.5 -bottom-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-white dark:border-zinc-900" />
+                              )}
+                            </div>
+                          ) : (
+                            <div
+                              data-testid={`chat-room-icon-${roomId}`}
+                              className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--tab-bg)] text-[13px] leading-none text-[var(--toss-gray-4)] dark:bg-zinc-800"
+                            >
+                              💬
+                            </div>
+                          )}
                         <div className="flex flex-col min-w-0 py-0.5">
                           <div className="flex items-start gap-1.5 min-w-0">
                             {unread > 0 && (
@@ -5554,8 +5582,23 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           <header className="px-4 py-2.5 flex items-center justify-between border-b border-[var(--border)]/50 dark:border-zinc-800/50 glass glass-border shrink-0 z-40">
             <div className="flex items-center gap-3 min-w-0">
               <button onClick={() => setRoom(null)} className="md:hidden text-[var(--toss-gray-3)]">뒤로</button>
-              <div className="w-9 h-9 rounded-lg bg-[var(--tab-bg)] dark:bg-zinc-800 flex items-center justify-center text-lg">
-                {selectedRoom.id === NOTICE_ROOM_ID ? '📢' : '💬'}
+              <div data-testid="chat-room-header-avatar" className="flex h-9 w-9 shrink-0 items-center justify-center">
+                {selectedRoom.id === NOTICE_ROOM_ID ? (
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/20 text-lg text-blue-600">
+                    📢
+                  </div>
+                ) : selectedPeer ? (
+                  <MessengerAvatar
+                    name={selectedPeer.name || selectedRoomLabel}
+                    photoUrl={selectedPeerPhotoUrl}
+                    className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-[var(--tab-bg)] text-[12px] font-bold text-[var(--toss-gray-4)] dark:bg-zinc-800"
+                    decorative
+                  />
+                ) : (
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--tab-bg)] text-lg text-[var(--toss-gray-4)] dark:bg-zinc-800">
+                    💬
+                  </div>
+                )}
               </div>
               <div className="min-w-0">
                 <h3 className={`text-[13px] font-bold text-foreground ${selectedRoom.type === 'group' ? 'line-clamp-2 break-words whitespace-normal leading-4' : 'truncate'}`}>
@@ -5820,6 +5863,16 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 const isSystemInvite = typeof msg.content === 'string' && msg.content.startsWith('[초대]');
                 const systemText = isSystemInvite ? (msg.content as string).replace(/^\[초대\]\s*/, '') : '';
                 const isContinuous = !showDateDivider && !isSystemInvite && String(msg.sender_id) === lastSenderId;
+                const senderProfile =
+                  !isMine
+                    ? resolveStaffProfile(
+                        String(msg.sender_id || ''),
+                        (msg.staff as { name?: string } | null | undefined)?.name || null
+                      ) || (msg.staff as StaffMember | null | undefined) || null
+                    : null;
+                const senderName = senderProfile?.name || (msg.staff as { name?: string } | null | undefined)?.name || '이름 없음';
+                const senderPosition = senderProfile?.position || (msg.staff as { position?: string } | null | undefined)?.position || '';
+                const senderPhotoUrl = senderProfile ? getProfilePhotoUrl(senderProfile as StaffMember) : null;
                 const wardMessageMeta = !isDeletedMessage ? extractWardMessageMeta(msg.content) : { displayContent: '', meta: null };
                 const showWardQuickReplies =
                   !isMine &&
@@ -5851,9 +5904,19 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
                       >
                         {!isMine && !isContinuous && (
-                          <span className="mb-0.5 px-1 text-[10px] font-semibold leading-none text-[var(--toss-gray-3)]">
-                            {msg.staff?.name} {msg.staff?.position}
-                          </span>
+                          <div className="mb-0.5 flex items-center gap-1.5 px-1">
+                            <div data-testid={`chat-message-sender-avatar-${msg.id}`} className="shrink-0">
+                              <MessengerAvatar
+                                name={senderName}
+                                photoUrl={senderPhotoUrl}
+                                className="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full bg-[var(--tab-bg)] text-[9px] font-bold text-[var(--toss-gray-3)] dark:bg-zinc-800"
+                                decorative
+                              />
+                            </div>
+                            <span className="min-w-0 truncate text-[10px] font-semibold leading-none text-[var(--toss-gray-3)]">
+                              {senderName} {senderPosition}
+                            </span>
+                          </div>
                         )}
                         <div
                           data-testid={isDeletedMessage ? `chat-message-deleted-${msg.id}` : `chat-message-${msg.id}`}

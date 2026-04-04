@@ -42,6 +42,7 @@ const peerTwo = {
   name: 'Chat Peer Two',
   department: '원무과',
   position: '주임',
+  photo_url: 'data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"64\" height=\"64\"><rect width=\"64\" height=\"64\" rx=\"20\" fill=\"%230ea5e9\"/><text x=\"32\" y=\"39\" font-size=\"24\" text-anchor=\"middle\" fill=\"white\">P</text></svg>',
 };
 
 const noticeRoomId = '00000000-0000-0000-0000-000000000000';
@@ -162,6 +163,9 @@ test('chat detailed walkthrough opens each internal menu in practical order', as
   await page.getByTestId(`chat-direct-${peerTwo.id}`).click();
   await expect(page.getByTestId('chat-tab-chat')).toBeVisible();
   await expect(page.getByTestId('chat-open-drawer')).toBeVisible();
+  await expect(page.getByTestId('chat-room-icon-room-direct').locator('img')).toBeVisible();
+  await expect(page.getByTestId('chat-room-header-avatar').locator('img')).toBeVisible();
+  await expect(page.getByTestId('chat-message-sender-avatar-msg-direct-1').locator('img')).toBeVisible();
 
   await page.getByTestId('chat-tab-chat').click();
   await page.getByTestId('chat-toggle-hidden-rooms').click();
@@ -224,6 +228,67 @@ test('chat still renders room messages when optional message columns are missing
   await expect(page.getByTestId('chat-message-msg-fallback-1')).toContainText('운영 스키마 대응 메시지');
 
   expect(runtimeErrors).toEqual([]);
+});
+
+test('chat shows staff profile photos in room list, header, and sender rows', async ({
+  page,
+}) => {
+  const peerWithPhoto = {
+    ...peerTwo,
+    id: 'chat-peer-photo',
+    name: 'Photo Peer',
+    photo_url: 'data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"64\" height=\"64\"><rect width=\"64\" height=\"64\" rx=\"20\" fill=\"%2310b981\"/><text x=\"32\" y=\"39\" font-size=\"22\" text-anchor=\"middle\" fill=\"white\">Q</text></svg>',
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [fakeUser, peerWithPhoto],
+    chatRooms: [
+      {
+        id: noticeRoomId,
+        name: '공지메시지',
+        type: 'notice',
+        members: [fakeUser.id],
+        created_at: '2026-03-08T00:00:00.000Z',
+        last_message_at: '2026-03-08T00:00:00.000Z',
+      },
+      {
+        id: 'room-photo-direct',
+        name: '',
+        type: 'direct',
+        members: [fakeUser.id, peerWithPhoto.id],
+        created_at: '2026-03-08T09:30:00.000Z',
+        last_message_at: '2026-03-08T10:30:00.000Z',
+        last_message_preview: '프로필 사진 확인 메시지',
+        created_by: fakeUser.id,
+      },
+    ],
+    messages: [
+      {
+        id: 'msg-photo-direct-1',
+        room_id: 'room-photo-direct',
+        sender_id: peerWithPhoto.id,
+        content: '프로필 사진 확인 메시지',
+        created_at: '2026-03-08T10:30:00.000Z',
+        is_deleted: false,
+        staff: { name: peerWithPhoto.name, photo_url: peerWithPhoto.photo_url, position: peerWithPhoto.position },
+        chat_rooms: { id: 'room-photo-direct', name: '', type: 'direct', members: [fakeUser.id, peerWithPhoto.id] },
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '\uCC44\uD305',
+      erp_chat_last_room: 'room-photo-direct',
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent('\uCC44\uD305')}`);
+
+  await expect(page.getByTestId('chat-view')).toBeVisible();
+  await expect(page.getByTestId('chat-room-icon-room-photo-direct').locator('img')).toBeVisible();
+  await expect(page.getByTestId('chat-room-header-avatar').locator('img')).toBeVisible();
+  await expect(page.getByTestId('chat-message-sender-avatar-msg-photo-direct-1').locator('img')).toBeVisible();
 });
 
 test('chat shows ward quick replies for received op ward messages and sends the selected reply', async ({

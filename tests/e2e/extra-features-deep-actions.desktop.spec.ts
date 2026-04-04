@@ -93,6 +93,23 @@ const floorStaffUser = {
   },
 };
 
+const syIncDirectorUser = {
+  ...fakeUser,
+  id: '12345678-9999-8888-7777-666666666666',
+  employee_no: 'E2E-006',
+  name: 'SY이사',
+  company: 'SY INC.',
+  company_id: '44444444-4444-4444-4444-444444444444',
+  department: '경영지원팀',
+  position: '이사',
+  role: 'staff',
+  permissions: {
+    ...fakeUser.permissions,
+    mso: false,
+    'extra_\uB9C8\uAC10\uBCF4\uACE0': true,
+  },
+};
+
 function getTodayKey() {
   return new Intl.DateTimeFormat('sv-SE', {
     timeZone: 'Asia/Seoul',
@@ -534,6 +551,41 @@ test('daily closure blocks non-author staff from editing an existing report', as
   await expect(page.getByTestId('daily-closure-read-restricted-note')).toBeVisible();
   await expect(page.getByTestId('daily-closure-date-status')).toContainText('작성자 본인만 수정');
   await expect(page.getByTestId('daily-closure-save')).toBeDisabled();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('daily closure list stays visible for SY INC. directors without selecting a company', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const todayKey = getTodayKey();
+
+  await prepareExtraFeature(
+    page,
+    {
+      staffMembers: [syIncDirectorUser, extraFeaturesUser],
+      dailyClosures: [
+        {
+          id: 'daily-closure-cross-company',
+          company_id: extraFeaturesUser.company_id,
+          date: todayKey,
+          total_amount: 91000,
+          petty_cash_start: 20000,
+          petty_cash_end: 8000,
+          status: 'completed',
+          memo: '지점 마감보고',
+          created_by: extraFeaturesUser.id,
+        },
+      ],
+      dailyClosureItems: [],
+      dailyChecks: [],
+    },
+    'extra-card-closing-report',
+    { user: syIncDirectorUser }
+  );
+
+  await expect(page.getByTestId('daily-closure-all-company-note')).toBeVisible();
+  await expect(page.getByTestId('daily-closure-list')).toBeVisible();
+  await expect(page.getByText(todayKey)).toBeVisible();
 
   expect(runtimeErrors).toEqual([]);
 });

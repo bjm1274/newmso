@@ -7,6 +7,7 @@ import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import { getChecklistTargetDate, getDefaultChecklist } from '@/lib/hr-checklists';
 import { getMinimumWageByYear, MONTHLY_STANDARD_HOURS } from '@/lib/tax-free-limits';
+import { getMonthlyWorkingHours } from '@/lib/payroll-working-hours';
 import StaffHistoryTimeline from './인사이력타임라인';
 import OnboardingChecklist from './급여명세/입퇴사온보딩';
 import CertTransferPanel from './교육자격인사이동패널';
@@ -97,12 +98,6 @@ function buildStaffMutationPayload(
 
 function formatWon(amount: number) {
   return `${Math.round(amount || 0).toLocaleString('ko-KR')}원`;
-}
-
-function getMonthlyWorkingHours(weeklyHours: number) {
-  const normalizedWeeklyHours = Number(weeklyHours) || 40;
-  if (normalizedWeeklyHours <= 0) return MONTHLY_STANDARD_HOURS;
-  return Math.max(1, Math.round(MONTHLY_STANDARD_HOURS * (normalizedWeeklyHours / 40) * 10) / 10);
 }
 
 function normalizeResidentNo(value: string | null | undefined) {
