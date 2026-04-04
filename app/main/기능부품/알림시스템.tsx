@@ -356,7 +356,15 @@ function isMobileClientDevice() {
 
 function requiresUserGestureForPushPermission() {
   if (typeof window === 'undefined' || typeof Notification === 'undefined') return false;
-  return isAppleMobileDevice() && Notification.permission === 'default';
+  return Notification.permission === 'default';
+}
+
+function canRequestPushPermissionFromGesture() {
+  if (!requiresUserGestureForPushPermission()) return false;
+  if (isAppleMobileDevice()) {
+    return isStandaloneWebApp();
+  }
+  return true;
 }
 
 function getPushClientPlatform() {
@@ -1579,8 +1587,7 @@ export default function NotificationSystem({
 
   useEffect(() => {
     if (typeof window === 'undefined' || !effectiveUserId) return;
-    if (!isStandaloneWebApp()) return;
-    if (!requiresUserGestureForPushPermission()) return;
+    if (!canRequestPushPermissionFromGesture()) return;
 
     let handled = false;
     const handleUserGesture = () => {
