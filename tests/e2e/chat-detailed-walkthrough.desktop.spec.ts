@@ -291,6 +291,69 @@ test('chat shows staff profile photos in room list, header, and sender rows', as
   await expect(page.getByTestId('chat-message-sender-avatar-msg-photo-direct-1').locator('img')).toBeVisible();
 });
 
+test('chat auto-creates a personal self chat and opens it with the self label', async ({
+  page,
+}) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const selfUser = {
+    ...fakeUser,
+    photo_url: 'data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"64\" height=\"64\"><rect width=\"64\" height=\"64\" rx=\"20\" fill=\"%23f97316\"/><text x=\"32\" y=\"39\" font-size=\"22\" text-anchor=\"middle\" fill=\"white\">나</text></svg>',
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [selfUser],
+    chatRooms: [
+      {
+        id: noticeRoomId,
+        name: '공지메시지',
+        type: 'notice',
+        members: [selfUser.id],
+        created_at: '2026-03-08T00:00:00.000Z',
+        last_message_at: '2026-03-08T00:00:00.000Z',
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '\uCC44\uD305',
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent('\uCC44\uD305')}`);
+
+  await expect(page.getByTestId('chat-view')).toBeVisible();
+  const selfRoom = page.locator('[data-testid^="chat-room-"]').filter({ hasText: '나와의 채팅' }).first();
+  await expect(selfRoom).toBeVisible();
+  await expect(selfRoom.getByTestId(/chat-room-icon-/).locator('img')).toBeVisible();
+
+  await selfRoom.click();
+  await expect(page.getByTestId('chat-room-header-avatar').locator('img')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '나와의 채팅' })).toBeVisible();
+
+  await page.getByTestId('chat-open-drawer').click();
+  await expect(page.getByTestId('chat-room-drawer')).toBeVisible();
+  await expect(page.getByText('방 나가기')).toHaveCount(0);
+
+  const persistedRooms = await page.evaluate(async () => {
+    const response = await fetch('/rest/v1/chat_rooms?type=eq.direct&select=*');
+    return response.json();
+  });
+
+  expect(
+    Array.isArray(persistedRooms) &&
+      persistedRooms.some(
+        (room: any) =>
+          String(room?.name || '') === '나와의 채팅' &&
+          Array.isArray(room?.members) &&
+          room.members.length === 1 &&
+          String(room.members[0] || '') === '11111111-1111-1111-1111-111111111111',
+      ),
+  ).toBeTruthy();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('chat shows ward quick replies for received op ward messages and sends the selected reply', async ({
   page,
 }) => {
