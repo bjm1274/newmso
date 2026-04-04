@@ -932,6 +932,11 @@ export default function NotificationSystem({
     const activeChatRoomId = getVisibleActiveChatRoomId();
     const suppressLiveDisplay = Boolean(isChatType && incomingRoomId && activeChatRoomId === incomingRoomId);
     const useMobileChatPreview = Boolean(isChatType && isMobileClientDevice());
+    const shouldPreferMobileNativePopup = Boolean(
+      useMobileChatPreview &&
+      typeof Notification !== 'undefined' &&
+      Notification.permission === 'granted'
+    );
 
     if (!suppressLiveDisplay && !useMobileChatPreview) {
       addToast({
@@ -955,6 +960,7 @@ export default function NotificationSystem({
             room_id: rowMetadata.room_id,
             message_id: rowMetadata.message_id || rowMetadata.id || row.id,
             data: rowMetadata,
+            suppress_mobile_banner: shouldPreferMobileNativePopup,
           },
         }));
       }
@@ -981,8 +987,16 @@ export default function NotificationSystem({
       const isBackgroundClient =
         typeof document !== 'undefined' && document.visibilityState !== 'visible';
       const shouldShowSystemNotification =
-        (!isMobileClientDevice() || isBackgroundClient) &&
-        (!isChatType || !hasPushSubscriptionActive(effectiveUserId));
+        (
+          !isMobileClientDevice() ||
+          isBackgroundClient ||
+          shouldPreferMobileNativePopup
+        ) &&
+        (
+          !isChatType ||
+          !hasPushSubscriptionActive(effectiveUserId) ||
+          shouldPreferMobileNativePopup
+        );
       if (canShowNativeNotification && shouldShowSystemNotification) {
         sendNotification(title, {
           body,
