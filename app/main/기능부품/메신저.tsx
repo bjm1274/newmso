@@ -34,6 +34,7 @@ type PollItem = {
 
 const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
 const NOTICE_ROOM_NAME = '공지메시지';
+const SELF_ROOM_NAME = '나와의 채팅';
 const CAN_WRITE_NOTICE_POSITIONS = ['대표', '부장', '팀장', '실장', '병원장', '이사', '본부장', '총무부장', '진료부장', '간호부장'];
 const MOBILE_CHAT_MEDIA_QUERY = '(max-width: 767px), (hover: none) and (pointer: coarse)';
 const WARD_MESSAGE_META_PREFIX = '[[WARD_MESSAGE_META]]';
@@ -272,6 +273,14 @@ function getPendingAttachmentDisplayName(file: File): string {
 
 function normalizeMemberIds(members: unknown): string[] {
   return Array.isArray(members) ? members.map((id: unknown) => String(id)) : [];
+}
+
+function isSelfChatRoom(room: ChatRoom | null | undefined, currentUserId: string | null | undefined): boolean {
+  if (room?.type !== 'direct') return false;
+  const normalizedCurrentUserId = String(currentUserId || '').trim();
+  if (!normalizedCurrentUserId) return false;
+  const members = normalizeMemberIds(room?.members);
+  return members.length === 1 && members[0] === normalizedCurrentUserId;
 }
 
 function isActiveChatMember(staff: StaffMember | null | undefined): boolean {
@@ -873,6 +882,7 @@ function getKoreanTodayString() {
 function getRoomDisplayName(room: ChatRoom | null | undefined, staffs: StaffMember[], currentUserId: string | null | undefined): string {
   if (!room) return '채팅방';
   if (room.id === NOTICE_ROOM_ID) return NOTICE_ROOM_NAME;
+  if (isSelfChatRoom(room, currentUserId)) return SELF_ROOM_NAME;
   // 2명 초과(그룹화된 방)면 room.name 우선 사용
   const members = normalizeMemberIds(room.members);
   if (room.type === 'direct' && members.length <= 2) {
@@ -1159,7 +1169,7 @@ export default function ChatView({
     [presenceMap]
   );
   const resolveStaffProfile = useCallback(
-    (staffId: string | null | undefined, fallbackName?: string | null) => {
+    (staffId: string | null | undefined, fallbackName?: string | null): StaffMember | null => {
       const knownStaff = findKnownStaffById(staffId);
       if (knownStaff) {
         return {
@@ -1169,8 +1179,8 @@ export default function ChatView({
       }
       if (String(staffId) === String(user?.id) && user?.name) {
         return {
-          id: user.id,
-          name: user.name,
+          id: String(user.id),
+          name: String(user.name),
           company: user.company || '',
           department: user.department || '',
           position: user.position || '',
@@ -1180,7 +1190,7 @@ export default function ChatView({
       const safeName = String(fallbackName || '').trim();
       if (!safeName) return null;
       return {
-        id: staffId,
+        id: String(staffId || ''),
         name: safeName,
         company: '',
         department: '',
@@ -2602,6 +2612,65 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     }
   }, [noticeRoomMemberIds]);
 
+  const ensureSelfChatRoom = useCallback(
+    async (rooms: ChatRoom[]) => {
+      const currentUserId = String(effectiveChatUserId || '').trim();
+      const sourceRooms = Array.isArray(rooms) ? rooms : [];
+      if (!currentUserId) return sourceRooms;
+
+      const existingSelfRoom = sourceRooms
+        .filter((room: ChatRoom) => isSelfChatRoom(room, currentUserId))
+        .sort(
+          (a: ChatRoom, b: ChatRoom) =>
+            new Date(b.last_message_at || b.created_at || 0).getTime() -
+            new Date(a.last_message_at || a.created_at || 0).getTime()
+        )[0];
+
+      if (existingSelfRoom) {
+        const nextMembers = [currentUserId];
+        const currentMembers = normalizeMemberIds(existingSelfRoom.members);
+        const needsUpdate =
+          existingSelfRoom.name !== SELF_ROOM_NAME ||
+          existingSelfRoom.type !== 'direct' ||
+          currentMembers.length !== 1 ||
+          currentMembers[0] !== currentUserId;
+
+        if (!needsUpdate) return sourceRooms;
+
+        try {
+          const { error } = await supabase
+            .from('chat_rooms')
+            .update({ name: SELF_ROOM_NAME, type: 'direct', members: nextMembers })
+            .eq('id', existingSelfRoom.id);
+          if (error) throw error;
+        } catch (error) {
+          console.error('나와의 채팅 동기화 실패:', error);
+        }
+
+        return sourceRooms.map((room: ChatRoom) =>
+          String(room.id) === String(existingSelfRoom.id)
+            ? { ...room, name: SELF_ROOM_NAME, type: 'direct' as const, members: nextMembers }
+            : room
+        );
+      }
+
+      try {
+        const { data: insertedRoom, error } = (await supabase
+          .from('chat_rooms')
+          .insert([{ name: SELF_ROOM_NAME, type: 'direct', members: [currentUserId] }])
+          .select(CHAT_ROOM_SELECT)
+          .single()) as { data: ChatRoom | null; error: unknown };
+        if (error) throw error;
+        if (!insertedRoom) return sourceRooms;
+        return [...sourceRooms, insertedRoom];
+      } catch (error) {
+        console.error('나와의 채팅 생성 실패:', error);
+        return sourceRooms;
+      }
+    },
+    [effectiveChatUserId]
+  );
+
   useEffect(() => {
     chatRoomsRef.current = chatRooms;
   }, [chatRooms]);
@@ -3093,11 +3162,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         data: ChatRoom[] | null;
         error: unknown;
       };
-      await syncChatRoomsState(rooms || []);
+      const roomsWithSelf = await ensureSelfChatRoom(rooms || []);
+      await syncChatRoomsState(roomsWithSelf);
     };
     loadRooms();
     // selectedRoomId는 의도적으로 제외 — 채팅방 목록은 마운트 시 1회만 로드
-  }, [noticeRoomMemberIds, syncChatRoomsState]);
+  }, [ensureSelfChatRoom, noticeRoomMemberIds, syncChatRoomsState]);
 
   useEffect(() => {
     if (!chatRooms.some((room: ChatRoom) => String(room.id) === NOTICE_ROOM_ID)) return;
@@ -3110,12 +3180,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         supabase.from('chat_rooms').select(CHAT_ROOM_SELECT).then(async (result) => {
           const rooms = (result as { data: ChatRoom[] | null; error: unknown }).data;
           if (!rooms) return;
-          await syncChatRoomsState(rooms);
+          const roomsWithSelf = await ensureSelfChatRoom(rooms);
+          await syncChatRoomsState(roomsWithSelf);
         });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [syncChatRoomsState]);
+  }, [ensureSelfChatRoom, syncChatRoomsState]);
 
   useEffect(() => {
     if (!(effectiveChatUserId || user?.id)) return;
@@ -3655,14 +3726,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     return sidebarRooms.map((room: ChatRoom) => {
       const roomId = String(room.id);
       const members = normalizeMemberIds(room.members);
+      const selfRoom = isSelfChatRoom(room, effectiveChatUserId);
       const peer =
         room.type === 'direct'
-          ? members
-              .map((memberId) => allKnownStaffMap.get(memberId))
-              .find(
-                (staff: StaffMember | undefined) =>
-                  Boolean(staff) && String(staff!.id) !== effectiveChatUserId
-              ) || null
+          ? selfRoom
+            ? resolveStaffProfile(effectiveChatUserId)
+            : members
+                .map((memberId) => allKnownStaffMap.get(memberId))
+                .find(
+                  (staff: StaffMember | undefined) =>
+                    Boolean(staff) && String(staff!.id) !== effectiveChatUserId
+                ) || null
           : null;
 
       return {
@@ -3687,6 +3761,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     effectivePinnedRoomOrder,
     effectiveChatUserId,
     isStaffCurrentlyOnline,
+    resolveStaffProfile,
     roomLabelMap,
     roomPrefs,
     chatRooms,
@@ -3804,8 +3879,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const selectedPeer = useMemo(() => {
     if (!selectedRoom || selectedRoom.type !== 'direct') return null;
+    if (isSelfChatRoom(selectedRoom, effectiveChatUserId)) {
+      return resolveStaffProfile(effectiveChatUserId);
+    }
     return roomMembers.find((member) => String(member?.id ?? '') !== effectiveChatUserId) || null;
-  }, [selectedRoom, roomMembers, effectiveChatUserId]);
+  }, [selectedRoom, roomMembers, effectiveChatUserId, resolveStaffProfile]);
 
   const selectedPeerPhotoUrl = useMemo(
     () => (selectedPeer ? getProfilePhotoUrl(selectedPeer as StaffMember) : null),
@@ -3904,6 +3982,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     if (!selectedRoom) return;
     if (selectedRoom.id === NOTICE_ROOM_ID) {
       toast('공지 메시지 방은 나갈 수 없습니다.', 'warning');
+      return;
+    }
+    if (isSelfChatRoom(selectedRoom, effectiveChatUserId)) {
+      toast('나와의 채팅은 나갈 수 없습니다.', 'warning');
       return;
     }
     if (!confirm('이 채팅방에서 나가시겠습니까? 나간 뒤에는 다시 초대를 받아야 입장할 수 있습니다.')) return;
@@ -4696,7 +4778,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       if (error) throw error;
 
       const repairedRooms = await repairDirectRooms(rooms || []);
-      const targetMembers = new Set([effectiveChatUserId, otherId]);
+      const isSelfTarget = otherId === effectiveChatUserId;
+      const targetMembers = new Set(isSelfTarget ? [effectiveChatUserId] : [effectiveChatUserId, otherId]);
       const foundRoom = repairedRooms
         .filter(( room: ChatRoom) => {
           const members = Array.isArray(room?.members)
@@ -4713,14 +4796,18 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         setChatRooms((prev) =>
           sortChatRoomsWithNoticeFirst([
             ...prev.filter(( room: ChatRoom) => String(room.id) !== String(foundRoom.id)),
-            foundRoom,
+            isSelfTarget ? { ...foundRoom, name: SELF_ROOM_NAME, type: 'direct' as const, members: [effectiveChatUserId] } : foundRoom,
           ])
         );
         setRoom(foundRoom.id);
       } else {
         const { data: room, error: insertError } = (await supabase
           .from('chat_rooms')
-          .insert([{ name: `${staff.name}`, type: 'direct', members: [effectiveChatUserId, otherId] }])
+          .insert([{
+            name: isSelfTarget ? SELF_ROOM_NAME : `${staff.name}`,
+            type: 'direct',
+            members: isSelfTarget ? [effectiveChatUserId] : [effectiveChatUserId, otherId],
+          }])
           .select(CHAT_ROOM_SELECT)
           .single()) as { data: ChatRoom | null; error: unknown };
         if (insertError) throw insertError;
@@ -4728,7 +4815,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           setChatRooms((prev) =>
             sortChatRoomsWithNoticeFirst([
               ...prev.filter((candidate: ChatRoom) => String(candidate.id) !== String(room.id)),
-              room,
+              isSelfTarget ? { ...room, name: SELF_ROOM_NAME, type: 'direct' as const, members: [effectiveChatUserId] } : room,
             ])
           );
           setRoom(room.id);
@@ -6641,7 +6728,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   </div>
                 ) : (
                   <div className="flex gap-2">
-                    {selectedRoom?.id !== NOTICE_ROOM_ID && (
+                    {!isSelfChatRoom(selectedRoom, effectiveChatUserId) && selectedRoom?.id !== NOTICE_ROOM_ID && (
                       <button onClick={() => { setShowDrawer(false); handleLeaveRoom(); }} className="flex-1 py-2.5 bg-red-500/10 dark:bg-red-900/20 text-red-600 rounded-xl text-[11px] font-bold hover:bg-red-500/20 transition-colors">방 나가기</button>
                     )}
                     {/* 이름 수정: 그룹방 or 멤버 3명 이상(direct→그룹 전환) */}
