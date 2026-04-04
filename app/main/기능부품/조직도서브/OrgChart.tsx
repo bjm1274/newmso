@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { normalizeProfileUser } from '@/lib/profile-photo';
+import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { supabase } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
 
@@ -434,10 +434,22 @@ function Avatar({ staff, size = 'md', isWorking = false }: { staff: StaffMember;
   ];
   const name = normalizeText(staff.name) || '?';
   const color = palette[(name.charCodeAt(0) || 0) % palette.length];
+  const photoUrl = getProfilePhotoUrl(staff);
   return (
     <div className="relative shrink-0">
-      <div className={`${sizeClass} ${color} flex items-center justify-center rounded-full font-bold`}>
-        {name[0]}
+      <div
+        className={`${sizeClass} ${photoUrl ? 'overflow-hidden bg-[var(--tab-bg)]' : color} flex items-center justify-center rounded-full font-bold`}
+      >
+        {photoUrl ? (
+          <img
+            src={photoUrl}
+            alt={`${name} 프로필 사진`}
+            className="h-full w-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          name[0]
+        )}
       </div>
       {isWorking ? (
         <span

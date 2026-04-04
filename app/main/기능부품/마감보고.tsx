@@ -46,18 +46,23 @@ export default function DailyClosurePage({
     staffs?: any[];
     selectedCompanyId?: string | null;
 }) {
+    const normalizedPosition = String(user?.position || '').trim();
+    const isSyIncDirector = useMemo(() => {
+        return String(user?.company || '').trim() === 'SY INC.' && /(이사|director)/i.test(normalizedPosition);
+    }, [normalizedPosition, user?.company]);
+
     const isDepartmentHeadOrHigher = useMemo(() => {
-        const position = String(user?.position || '');
         return (
             user?.role === 'admin' ||
             user?.role === 'manager' ||
             user?.permissions?.mso === true ||
-            DEPARTMENT_HEAD_KEYWORDS.some((keyword) => position.includes(keyword))
+            DEPARTMENT_HEAD_KEYWORDS.some((keyword) => normalizedPosition.includes(keyword))
         );
-    }, [user?.permissions?.mso, user?.position, user?.role]);
+    }, [normalizedPosition, user?.permissions?.mso, user?.role]);
 
-    const canReadClosures = isDepartmentHeadOrHigher;
-    const effectiveCompanyId = selectedCompanyId || user?.company_id || null;
+    const canReadClosures = isDepartmentHeadOrHigher || isSyIncDirector;
+    const canReadAcrossCompanies = isSyIncDirector && !selectedCompanyId;
+    const effectiveCompanyId = canReadAcrossCompanies ? null : (selectedCompanyId || user?.company_id || null);
     const [view, setView] = useState<'list' | 'form'>(canReadClosures ? 'list' : 'form');
     const [loading, setLoading] = useState(false);
     const [closures, setClosures] = useState<DailyClosure[]>([]);
@@ -103,16 +108,21 @@ export default function DailyClosurePage({
     }, [canReadClosures]);
 
     const loadClosures = useCallback(async () => {
-        if (!canReadClosures || !effectiveCompanyId) {
+        if (!canReadClosures) {
             setClosures([]);
             return;
         }
         setLoading(true);
-        const { data, error } = await supabase
+        let query = supabase
             .from('daily_closures')
             .select('*')
-            .eq('company_id', effectiveCompanyId)
             .order('date', { ascending: false });
+
+        if (effectiveCompanyId) {
+            query = query.eq('company_id', effectiveCompanyId);
+        }
+
+        const { data, error } = await query;
         if (error) { console.error('마감보고 목록 조회 오류:', error); }
         else if (data) setClosures(data);
         setLoading(false);
@@ -151,6 +161,12 @@ export default function DailyClosurePage({
     }, []);
 
     const loadSelectedDateClosure = useCallback(async () => {
+        if (canReadAcrossCompanies) {
+            setActiveClosure(null);
+            resetFormFields();
+            return;
+        }
+
         if (!effectiveCompanyId || !selectedDate) {
             setActiveClosure(null);
             resetFormFields();
@@ -185,7 +201,7 @@ export default function DailyClosurePage({
         }
 
         resetFormFields();
-    }, [effectiveCompanyId, loadClosureDetails, resetFormFields, selectedDate, user?.id]);
+    }, [canReadAcrossCompanies, effectiveCompanyId, loadClosureDetails, resetFormFields, selectedDate, user?.id]);
 
     useEffect(() => {
         void loadClosures();
@@ -306,6 +322,14 @@ export default function DailyClosurePage({
                     <p className="mt-1 text-[11px] font-medium text-[var(--toss-gray-3)]">
                         작성은 누구나 가능하며, 목록 열람은 부서장 이상만 가능합니다.
                     </p>
+                    {canReadAcrossCompanies ? (
+                        <p
+                            data-testid="daily-closure-all-company-note"
+                            className="mt-1 text-[11px] font-semibold text-[var(--accent)]"
+                        >
+                            SY INC. 이사 권한으로 전체 회사 마감보고를 열람 중입니다.
+                        </p>
+                    ) : null}
                 </div>
                 {canReadClosures ? (
                     <button

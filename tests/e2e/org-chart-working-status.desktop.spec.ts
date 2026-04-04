@@ -21,6 +21,7 @@ test("org chart highlights staff who are currently working and can filter to the
     department: "수술실",
     position: "간호사",
     employee_no: "E2E-ORG-101",
+    profile_photo_url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" rx="20" fill="%2306b6d4"/><text x="32" y="39" font-size="22" text-anchor="middle" fill="white">수</text></svg>',
   };
   const workingB = {
     ...fakeUser,
@@ -84,6 +85,7 @@ test("org chart highlights staff who are currently working and can filter to the
   await expect(page.getByTestId("org-working-summary")).toContainText("2명");
   await expect(page.getByTestId(`org-working-chip-${workingA.id}`)).toBeVisible();
   await expect(page.getByTestId(`org-working-chip-${workingB.id}`)).toBeVisible();
+  await expect(page.locator('img[alt="수술실 근무자 프로필 사진"]').first()).toBeVisible();
 
   await page.getByTestId("org-working-only-toggle").click();
 
