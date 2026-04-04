@@ -129,6 +129,8 @@ function createPushSharedHarness(options?: {
 function createUnifiedServiceWorkerHarness() {
   const importCalls: string[] = [];
   const backgroundPayloads: Array<unknown> = [];
+  const fcmBackgroundPayloads: Array<unknown> = [];
+  const eventSequence: string[] = [];
   let backgroundHandler: ((payload: unknown) => Promise<unknown> | unknown) | null = null;
   const firebaseApps: Array<Record<string, unknown>> = [];
 
@@ -136,6 +138,9 @@ function createUnifiedServiceWorkerHarness() {
     __erpPushShared: {
       showIncomingNotification: async (payload: unknown) => {
         backgroundPayloads.push(payload);
+      },
+      handleFcmBackgroundMessage: async (payload: unknown) => {
+        fcmBackgroundPayloads.push(payload);
       },
       handleNotificationClick: async () => undefined,
       handleClientMessage: async () => undefined,
@@ -156,7 +161,9 @@ function createUnifiedServiceWorkerHarness() {
         };
       },
     },
-    addEventListener: () => undefined,
+    addEventListener: (type: string) => {
+      eventSequence.push(`listener:${type}`);
+    },
     clients: {
       claim: async () => undefined,
     },
@@ -168,6 +175,9 @@ function createUnifiedServiceWorkerHarness() {
   const sandbox = {
     self: fakeSelf,
     importScripts: (...urls: string[]) => {
+      urls.forEach((url) => {
+        eventSequence.push(`import:${url}`);
+      });
       importCalls.push(...urls);
     },
     URL,
@@ -191,6 +201,8 @@ function createUnifiedServiceWorkerHarness() {
   return {
     importCalls,
     backgroundPayloads,
+    fcmBackgroundPayloads,
+    eventSequence,
     runBackgroundMessage: async (payload: unknown) => {
       if (!backgroundHandler) throw new Error('background handler was not registered');
       await backgroundHandler(payload);
@@ -401,7 +413,7 @@ test('unified service worker forwards FCM background messages to the shared noti
     },
   });
 
-  expect(harness.backgroundPayloads).toContainEqual({
+  expect(harness.fcmBackgroundPayloads).toContainEqual({
     data: {
       type: 'message',
       room_id: 'room-fcm-background',
@@ -411,6 +423,59 @@ test('unified service worker forwards FCM background messages to the shared noti
       title: 'FCM background',
       body: 'background payload',
     },
+  });
+  expect(harness.backgroundPayloads).toHaveLength(0);
+});
+
+test('unified service worker keeps the custom notification click handler ahead of firebase imports', async () => {
+  const harness = createUnifiedServiceWorkerHarness();
+  const notificationClickIndex = harness.eventSequence.indexOf('listener:notificationclick');
+  const firebaseImportIndex = harness.eventSequence.indexOf(
+    'import:https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js'
+  );
+
+  expect(notificationClickIndex).toBeGreaterThanOrEqual(0);
+  expect(firebaseImportIndex).toBeGreaterThanOrEqual(0);
+  expect(notificationClickIndex).toBeLessThan(firebaseImportIndex);
+});
+
+test('shared push lets browser-managed FCM notifications render without duplicating them', async () => {
+  const harness = createPushSharedHarness({ clients: [] });
+
+  await harness.shared?.handleFcmBackgroundMessage?.({
+    data: {
+      type: 'message',
+      room_id: 'room-fcm-managed',
+      message_id: 'message-fcm-managed-1',
+      tag: 'chat-msg-fcm-managed-1',
+    },
+    notification: {
+      title: 'FCM managed title',
+      body: 'FCM managed body',
+      tag: 'chat-msg-fcm-managed-1',
+    },
+  });
+
+  expect(harness.shownNotifications).toHaveLength(0);
+
+  await harness.shared?.handleFcmBackgroundMessage?.({
+    data: {
+      type: 'message',
+      room_id: 'room-fcm-data-only',
+      message_id: 'message-fcm-data-only-1',
+      tag: 'chat-msg-fcm-data-only-1',
+      title: 'FCM data-only title',
+      body: 'FCM data-only body',
+    },
+  });
+
+  expect(harness.shownNotifications).toHaveLength(1);
+  expect(harness.shownNotifications[0]).toMatchObject({
+    title: 'FCM data-only title',
+    options: expect.objectContaining({
+      body: 'FCM data-only body',
+      tag: 'chat-msg-fcm-data-only-1',
+    }),
   });
 });
 
