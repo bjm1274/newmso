@@ -9,6 +9,7 @@ type ChatDetail = {
   message_id?: unknown;
   type?: unknown;
   data?: unknown;
+  suppress_mobile_banner?: unknown;
 };
 
 type BannerItem = {
@@ -104,13 +105,14 @@ export default function ChatAlertBanner(props: {
         detail?.data && typeof detail.data === 'object'
           ? (detail.data as Record<string, unknown>)
           : {};
+      const suppressMobileBanner = Boolean(detail?.suppress_mobile_banner);
       const type = toBannerText(detail?.type || payload.type, 'message') === 'mention' ? 'mention' : 'message';
       const senderName = toBannerText(payload.sender_name, toBannerText(detail?.title, '새 메시지'));
       const roomName = toBannerText(payload.room_name, '');
       const title = senderName || toBannerText(detail?.title, '새 메시지');
       const body = toBannerText(detail?.body, '메시지를 확인해 주세요.');
 
-      if (!title || !roomId) return;
+      if (!title || !roomId || suppressMobileBanner) return;
 
       enqueue({
         id: messageId || `${roomId}:${title}:${body}`,

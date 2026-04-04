@@ -25,6 +25,7 @@ function createPushSharedHarness(options?: {
   const postedMessages: Array<unknown> = [];
   const fetchCalls: FetchCall[] = [];
   const subscribeCalls: Array<Record<string, unknown>> = [];
+  const shownNotifications: Array<{ title?: string; options?: NotificationOptions }> = [];
 
   const fetchImpl =
     options?.fetchImpl ||
@@ -81,7 +82,9 @@ function createPushSharedHarness(options?: {
           return fakeSubscription;
         },
       },
-      showNotification: async () => undefined,
+      showNotification: async (title?: string, options?: NotificationOptions) => {
+        shownNotifications.push({ title, options });
+      },
     },
     clients: {
       matchAll: async () => registeredClients,
@@ -119,6 +122,7 @@ function createPushSharedHarness(options?: {
     postedMessages,
     fetchCalls,
     subscribeCalls,
+    shownNotifications,
   };
 }
 
@@ -304,5 +308,72 @@ test('shared push queues failed requests offline and flushes them when the app a
     payload: {
       notificationId: 'notification-queued-1',
     },
+  });
+});
+
+test('shared push shows a system notification only when there is no visible client', async () => {
+  const backgroundHarness = createPushSharedHarness({
+    clients: [
+      {
+        visibilityState: 'hidden',
+        focused: false,
+        postMessage: () => undefined,
+      } as {
+        visibilityState: string;
+        focused: boolean;
+        postMessage: (message: unknown) => void;
+      },
+    ],
+  });
+
+  await backgroundHarness.shared?.showIncomingNotification({
+    title: '잠금화면 테스트',
+    body: '백그라운드에서는 시스템 알림이 떠야 합니다.',
+    data: {
+      type: 'message',
+      room_id: 'room-lockscreen',
+      message_id: 'message-lockscreen-1',
+    },
+  });
+
+  expect(backgroundHarness.shownNotifications).toHaveLength(1);
+  expect(backgroundHarness.shownNotifications[0]).toMatchObject({
+    title: '잠금화면 테스트',
+  });
+
+  const foregroundPostedMessages: Array<unknown> = [];
+  const foregroundHarness = createPushSharedHarness({
+    clients: [
+      {
+        visibilityState: 'visible',
+        focused: true,
+        postMessage: (message: unknown) => {
+          foregroundPostedMessages.push(message);
+        },
+      } as {
+        visibilityState: string;
+        focused: boolean;
+        postMessage: (message: unknown) => void;
+      },
+    ],
+  });
+
+  await foregroundHarness.shared?.showIncomingNotification({
+    title: '포그라운드 테스트',
+    body: '보이는 화면에는 미리보기만 보내야 합니다.',
+    data: {
+      type: 'message',
+      room_id: 'room-foreground',
+      message_id: 'message-foreground-1',
+    },
+  });
+
+  expect(foregroundHarness.shownNotifications).toHaveLength(0);
+  expect(foregroundPostedMessages).toContainEqual({
+    type: 'erp-push-preview',
+    payload: expect.objectContaining({
+      title: '포그라운드 테스트',
+      body: '보이는 화면에는 미리보기만 보내야 합니다.',
+    }),
   });
 });
