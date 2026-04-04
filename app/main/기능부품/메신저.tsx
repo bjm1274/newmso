@@ -1,11 +1,13 @@
 ﻿'use client';
 import { toast } from '@/lib/toast';
-import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
+import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback, type MouseEvent as ReactMouseEvent } from 'react';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import {
   buildStorageDownloadUrl,
   extractStorageUrlExtension,
+  shouldUseManagedBrowserDownload,
+  triggerManagedBrowserDownload,
 } from '@/lib/object-storage-url';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { bindPageRefresh } from '@/lib/realtime-maintenance';
@@ -108,6 +110,30 @@ function extractWardMessageMeta(value: unknown): {
 /** 원본 파일명으로 다운로드되도록 프록시 URL 생성 */
 function buildDownloadUrl(fileUrl: string, fileName: string): string {
   return buildStorageDownloadUrl(fileUrl, fileName);
+}
+
+async function handleStorageDownloadLinkClick(
+  event: ReactMouseEvent<HTMLAnchorElement>,
+  fileUrl: string,
+  fileName: string,
+) {
+  event.stopPropagation();
+  const downloadUrl = buildDownloadUrl(fileUrl, fileName);
+  if (!downloadUrl) {
+    event.preventDefault();
+    toast('다운로드 주소를 만들지 못했습니다.', 'error');
+    return;
+  }
+  if (!shouldUseManagedBrowserDownload()) {
+    return;
+  }
+  event.preventDefault();
+  try {
+    await triggerManagedBrowserDownload(downloadUrl, fileName);
+  } catch (error) {
+    console.error('managed download failed', error);
+    toast('모바일 다운로드에 실패했습니다. 다시 시도해 주세요.', 'error');
+  }
 }
 const CHAT_ROOM_PREFS_KEY = 'erp_chat_room_prefs';
 const CHAT_PINNED_KEY = 'erp_chat_pinned_messages';
@@ -610,7 +636,7 @@ function AttachmentQuickActions({
       </button>
       <a
         href={buildDownloadUrl(url, name)}
-        onClick={(event) => event.stopPropagation()}
+        onClick={(event) => void handleStorageDownloadLinkClick(event, url, name)}
         download={name}
         target="_blank"
         rel="noopener noreferrer"
@@ -8238,7 +8264,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             </a>
             <a
               href={buildDownloadUrl(activeAttachmentPreview.url, activeAttachmentPreview.name ?? '')}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(event) => void handleStorageDownloadLinkClick(
+                event,
+                activeAttachmentPreview.url,
+                activeAttachmentPreview.name ?? 'download',
+              )}
               download={activeAttachmentPreview.name ?? 'download'}
               target="_blank"
               rel="noopener noreferrer"
@@ -8342,6 +8372,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   </a>
                   <a
                     href={buildDownloadUrl(activeAttachmentPreview.url, activeAttachmentPreview.name ?? '')}
+                    onClick={(event) => void handleStorageDownloadLinkClick(
+                      event,
+                      activeAttachmentPreview.url,
+                      activeAttachmentPreview.name ?? 'download',
+                    )}
                     download={activeAttachmentPreview.name ?? 'download'}
                     target="_blank"
                     rel="noopener noreferrer"

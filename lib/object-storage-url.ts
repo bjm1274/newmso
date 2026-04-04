@@ -1,4 +1,5 @@
 const INTERNAL_OBJECT_PROXY_PATH = '/api/storage/object';
+const MANAGED_DOWNLOAD_MEDIA_QUERY = '(hover: none) and (pointer: coarse), (max-width: 767px)';
 
 export function isInternalStorageObjectUrl(url: string): boolean {
   const rawUrl = String(url || '').trim();
@@ -40,6 +41,55 @@ export function buildPublicStorageDownloadUrl(url: string, fileName: string): st
   const parsed = new URL(normalizedUrl);
   parsed.searchParams.set('download', String(fileName || '').trim() || '1');
   return parsed.toString();
+}
+
+export function shouldUseManagedBrowserDownload(): boolean {
+  if (typeof window === 'undefined') return false;
+  const userAgent = String(window.navigator?.userAgent || '');
+  if (/SamsungBrowser/i.test(userAgent)) return true;
+  try {
+    return window.matchMedia(MANAGED_DOWNLOAD_MEDIA_QUERY).matches;
+  } catch {
+    return false;
+  }
+}
+
+export async function triggerManagedBrowserDownload(downloadUrl: string, fileName: string): Promise<void> {
+  if (typeof window === 'undefined') {
+    throw new Error('Browser environment is required.');
+  }
+
+  const response = await fetch(downloadUrl, {
+    credentials: 'include',
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Download failed with status ${response.status}`);
+  }
+
+  const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+  if (contentType.includes('text/html') || contentType.includes('application/json')) {
+    const bodyText = await response.clone().text().catch(() => '');
+    if (/<html[\s>]|<!doctype html/i.test(bodyText) || bodyText.includes('"error"')) {
+      throw new Error('Download response was not a file.');
+    }
+  }
+
+  const blob = await response.blob();
+  const objectUrl = window.URL.createObjectURL(blob);
+  const anchor = window.document.createElement('a');
+  anchor.href = objectUrl;
+  anchor.download = String(fileName || '').trim() || 'download';
+  anchor.rel = 'noopener noreferrer';
+  anchor.style.display = 'none';
+  window.document.body.appendChild(anchor);
+  anchor.click();
+
+  window.setTimeout(() => {
+    anchor.remove();
+    window.URL.revokeObjectURL(objectUrl);
+  }, 1_000);
 }
 
 export function extractStorageUrlExtension(url: string): string {
