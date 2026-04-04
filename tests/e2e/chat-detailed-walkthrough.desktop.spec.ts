@@ -289,6 +289,8 @@ test('chat shows staff profile photos in room list, header, and sender rows', as
   await expect(page.getByTestId('chat-room-icon-room-photo-direct').locator('img')).toBeVisible();
   await expect(page.getByTestId('chat-room-preview-room-photo-direct')).toContainText('프로필 사진 확인 메시지');
   await expect(page.getByTestId('chat-room-header-avatar').locator('img')).toBeVisible();
+  await expect(page.getByTestId('chat-message-stack-msg-photo-direct-1')).toBeVisible();
+  await expect(page.getByTestId('chat-message-sender-name-msg-photo-direct-1')).toContainText(peerWithPhoto.name);
   await expect(page.getByTestId('chat-message-sender-avatar-msg-photo-direct-1').locator('img')).toBeVisible();
 });
 
