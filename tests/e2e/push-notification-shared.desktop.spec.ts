@@ -126,6 +126,78 @@ function createPushSharedHarness(options?: {
   };
 }
 
+function createUnifiedServiceWorkerHarness() {
+  const importCalls: string[] = [];
+  const backgroundPayloads: Array<unknown> = [];
+  let backgroundHandler: ((payload: unknown) => Promise<unknown> | unknown) | null = null;
+  const firebaseApps: Array<Record<string, unknown>> = [];
+
+  const fakeSelf = {
+    __erpPushShared: {
+      showIncomingNotification: async (payload: unknown) => {
+        backgroundPayloads.push(payload);
+      },
+      handleNotificationClick: async () => undefined,
+      handleClientMessage: async () => undefined,
+      handlePushSubscriptionChange: async () => undefined,
+      flushRetryQueue: async () => undefined,
+    },
+    firebase: {
+      apps: firebaseApps,
+      initializeApp(config: Record<string, unknown>) {
+        firebaseApps.push(config);
+        return config;
+      },
+      messaging() {
+        return {
+          onBackgroundMessage(callback: (payload: unknown) => Promise<unknown> | unknown) {
+            backgroundHandler = callback;
+          },
+        };
+      },
+    },
+    addEventListener: () => undefined,
+    clients: {
+      claim: async () => undefined,
+    },
+  } as Record<string, unknown>;
+
+  const scriptPath = path.join(process.cwd(), 'public', 'sw.js');
+  const scriptSource = fs.readFileSync(scriptPath, 'utf8');
+
+  const sandbox = {
+    self: fakeSelf,
+    importScripts: (...urls: string[]) => {
+      importCalls.push(...urls);
+    },
+    URL,
+    URLSearchParams,
+    caches: {
+      open: async () => ({
+        put: async () => undefined,
+      }),
+    },
+    Response,
+    File,
+    Promise,
+    Date,
+    console,
+  } as Record<string, unknown>;
+
+  vm.runInNewContext(scriptSource, sandbox, {
+    filename: 'sw.js',
+  });
+
+  return {
+    importCalls,
+    backgroundPayloads,
+    runBackgroundMessage: async (payload: unknown) => {
+      if (!backgroundHandler) throw new Error('background handler was not registered');
+      await backgroundHandler(payload);
+    },
+  };
+}
+
 test('shared push click opens the exact approval, board, and inventory targets', async () => {
   const approvalHarness = createPushSharedHarness({ clients: [] });
   await approvalHarness.shared?.handleNotificationClick({
@@ -307,6 +379,37 @@ test('shared push queues failed requests offline and flushes them when the app a
     type: 'erp-notification-read-sync',
     payload: {
       notificationId: 'notification-queued-1',
+    },
+  });
+});
+
+test('unified service worker forwards FCM background messages to the shared notification helper', async () => {
+  const harness = createUnifiedServiceWorkerHarness();
+
+  expect(harness.importCalls).toContain('https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js');
+  expect(harness.importCalls).toContain('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js');
+
+  await harness.runBackgroundMessage({
+    data: {
+      type: 'message',
+      room_id: 'room-fcm-background',
+      message_id: 'message-fcm-background-1',
+    },
+    notification: {
+      title: 'FCM background',
+      body: 'background payload',
+    },
+  });
+
+  expect(harness.backgroundPayloads).toContainEqual({
+    data: {
+      type: 'message',
+      room_id: 'room-fcm-background',
+      message_id: 'message-fcm-background-1',
+    },
+    notification: {
+      title: 'FCM background',
+      body: 'background payload',
     },
   });
 });

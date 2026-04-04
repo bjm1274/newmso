@@ -15,6 +15,7 @@ import {
   loadNotifSettings,
   NotifSettings,
   PUSH_STATUS_CHANGED_EVENT,
+  sendNotification,
   type PushConnectionStatus,
 } from './알림시스템';
 
@@ -147,6 +148,8 @@ function SettingsTab({ userId }: { userId?: string | null }) {
   const [pushStatus, setPushStatus] = useState<PushConnectionStatus | null>(null);
   const [pushStatusError, setPushStatusError] = useState<string | null>(null);
   const [pushActionPending, setPushActionPending] = useState(false);
+  const [pushTestPending, setPushTestPending] = useState(false);
+  const [pushTestResult, setPushTestResult] = useState<string | null>(null);
 
   const update = (partial: Partial<NotifSettings>) => {
     const next = { ...settings, ...partial };
@@ -217,6 +220,39 @@ function SettingsTab({ userId }: { userId?: string | null }) {
     }
   }, [refreshPushStatus, userId]);
 
+  const handlePushPopupTest = useCallback(async () => {
+    setPushTestResult(null);
+    if (!pushStatus?.supported) {
+      setPushTestResult('이 기기에서는 웹 알림 팝업을 지원하지 않습니다.');
+      return;
+    }
+    if (!pushStatus.secureContext) {
+      setPushTestResult('현재 주소가 보안 연결이 아니어서 시스템 팝업을 띄울 수 없습니다. 휴대폰에서는 HTTPS 또는 설치형 앱으로 접속해 주세요.');
+      return;
+    }
+    if (pushStatus.permission !== 'granted') {
+      setPushTestResult('알림 권한이 아직 허용되지 않았습니다. 먼저 알림 권한을 켜 주세요.');
+      return;
+    }
+
+    setPushTestPending(true);
+    try {
+      sendNotification('메시지 팝업 테스트', {
+        body: '이 알림이 보이면 현재 기기에서 시스템 팝업 경로가 정상입니다.',
+        tag: 'erp-push-popup-self-test',
+        data: {
+          type: 'notification',
+          source: 'push-popup-self-test',
+        },
+      });
+      setPushTestResult('테스트 팝업을 보냈습니다. 화면 상단이 아니라 기기 알림 영역도 함께 확인해 주세요.');
+    } catch {
+      setPushTestResult('테스트 팝업 호출에 실패했습니다.');
+    } finally {
+      setPushTestPending(false);
+    }
+  }, [pushStatus]);
+
   const pushPermissionLabel =
     pushStatus?.permission === 'granted'
       ? '허용됨'
@@ -249,6 +285,15 @@ function SettingsTab({ userId }: { userId?: string | null }) {
   const pushActionLabel =
     pushStatus?.permission === 'default' ? '알림 권한 켜기' : '푸시 다시 연결';
   const showIosGuide = Boolean(pushStatus?.appleMobile);
+  const canRunPopupTest = Boolean(
+    pushStatus?.supported &&
+    pushStatus.secureContext &&
+    pushStatus.permission === 'granted'
+  );
+  const currentOrigin =
+    typeof window !== 'undefined' && window.location?.origin
+      ? window.location.origin
+      : '';
 
   return (
     <div className="space-y-4 p-4 md:p-4">
@@ -294,7 +339,37 @@ function SettingsTab({ userId }: { userId?: string | null }) {
                 {pushStatus?.hasSubscription ? '브라우저 등록됨' : '브라우저 등록 없음'}
               </p>
             </div>
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--muted)]/40 px-3 py-2.5">
+              <p className="text-[var(--toss-gray-3)]">접속</p>
+              <p data-testid="notification-settings-push-secure-context" className="mt-1 font-bold text-[var(--foreground)]">
+                {pushStatus?.secureContext ? '보안 연결' : '비보안 연결'}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--muted)]/40 px-3 py-2.5">
+              <p className="text-[var(--toss-gray-3)]">플랫폼</p>
+              <p data-testid="notification-settings-push-platform" className="mt-1 font-bold text-[var(--foreground)]">
+                {pushStatus?.platform || 'unknown'}
+              </p>
+            </div>
           </div>
+
+          {currentOrigin && (
+            <p
+              data-testid="notification-settings-push-origin"
+              className="text-xs text-[var(--toss-gray-3)] break-all"
+            >
+              현재 주소: {currentOrigin}
+            </p>
+          )}
+
+          {!pushStatus?.secureContext && (
+            <p
+              data-testid="notification-settings-push-secure-guide"
+              className="text-xs text-amber-600 leading-relaxed"
+            >
+              휴대폰에서 `http://192.168...` 같은 사설 IP 주소로 연 개발 서버는 시스템 팝업이 동작하지 않습니다. HTTPS 주소나 홈 화면에 추가한 설치형 앱으로 접속해 주세요.
+            </p>
+          )}
 
           {showIosGuide && (
             <div
@@ -328,6 +403,11 @@ function SettingsTab({ userId }: { userId?: string | null }) {
           {pushStatusError && (
             <p className="text-xs text-red-500">{pushStatusError}</p>
           )}
+          {pushTestResult && (
+            <p data-testid="notification-settings-push-test-result" className="text-xs text-[var(--toss-gray-3)]">
+              {pushTestResult}
+            </p>
+          )}
 
           <div className="flex flex-wrap gap-2">
             {canReconnectPush && (
@@ -341,6 +421,19 @@ function SettingsTab({ userId }: { userId?: string | null }) {
                 {pushActionPending ? '연결 중...' : pushActionLabel}
               </button>
             )}
+            <button
+              type="button"
+              data-testid="notification-settings-push-test"
+              onClick={() => void handlePushPopupTest()}
+              disabled={pushTestPending}
+              className={`px-4 py-2 rounded-xl text-xs font-bold border ${
+                canRunPopupTest
+                  ? 'border-emerald-300 bg-emerald-500/10 text-emerald-700'
+                  : 'border-[var(--border)] text-[var(--toss-gray-3)]'
+              } disabled:opacity-60`}
+            >
+              {pushTestPending ? '테스트 중...' : '팝업 테스트'}
+            </button>
             <button
               type="button"
               data-testid="notification-settings-push-refresh"
@@ -558,7 +651,7 @@ export default function NotificationInbox({ user: _rawUser, onRefresh }: Record<
         {/* 상단 탭바: 목록 / 설정 */}
         <div className="flex gap-1 mb-[-1px]">
           {([{ id: 'list', label: '알림 목록' }, { id: 'settings', label: '⚙️ 설정' }] as const).map(t => (
-            <button key={t.id} type="button" onClick={() => setActiveInnerTab(t.id)}
+            <button key={t.id} type="button" data-testid={`notification-inner-tab-${t.id}`} onClick={() => setActiveInnerTab(t.id)}
               className={`px-4 py-2 text-xs font-bold rounded-t-xl border-b-2 transition-all ${activeInnerTab === t.id
                 ? 'border-[var(--accent)] text-[var(--accent)]'
                 : 'border-transparent text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}>
