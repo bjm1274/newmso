@@ -287,6 +287,7 @@ test('chat shows staff profile photos in room list, header, and sender rows', as
 
   await expect(page.getByTestId('chat-view')).toBeVisible();
   await expect(page.getByTestId('chat-room-icon-room-photo-direct').locator('img')).toBeVisible();
+  await expect(page.getByTestId('chat-room-preview-room-photo-direct')).toContainText('프로필 사진 확인 메시지');
   await expect(page.getByTestId('chat-room-header-avatar').locator('img')).toBeVisible();
   await expect(page.getByTestId('chat-message-sender-avatar-msg-photo-direct-1').locator('img')).toBeVisible();
 });
@@ -400,9 +401,9 @@ test('chat collapses duplicate self chat rooms into one visible entry', async ({
   await page.goto(`/main?open_menu=${encodeURIComponent('\uCC44\uD305')}`);
 
   await expect(page.getByTestId('chat-view')).toBeVisible();
-  await expect(page.locator('[data-testid^="chat-room-"]').filter({ hasText: '나와의 채팅' })).toHaveCount(1);
-  await expect(page.locator('[data-testid^="chat-room-"]').filter({ hasText: '최신 self room' })).toHaveCount(1);
-  await expect(page.locator('[data-testid^="chat-room-"]').filter({ hasText: '이전 self room' })).toHaveCount(0);
+  await expect(page.getByTestId('chat-room-self-room-new')).toBeVisible();
+  await expect(page.getByTestId('chat-room-preview-self-room-new')).toContainText('최신 self room');
+  await expect(page.getByTestId('chat-room-self-room-old')).toHaveCount(0);
 
   expect(runtimeErrors).toEqual([]);
 });
