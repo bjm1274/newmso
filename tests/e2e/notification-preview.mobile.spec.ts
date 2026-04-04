@@ -368,7 +368,7 @@ test('mobile chat notifications use a native popup when push is already connecte
 
 test('notification settings shows push status and lets the user retry registration', async ({
   page,
-}) => {
+}, testInfo) => {
   await installPushRegistrationRetryStubs(page);
   await mockSupabase(page, {
     notifications: [],
@@ -382,7 +382,11 @@ test('notification settings shows push status and lets the user retry registrati
   await expect(page.getByTestId('notification-settings-push-status')).toBeVisible();
   await expect(page.getByTestId('notification-settings-push-permission')).toHaveText('허용됨');
   await expect(page.getByTestId('notification-settings-push-connection')).toContainText('구독이 끊겨');
-  await expect(page.getByTestId('notification-settings-ios-guide')).toContainText('홈 화면에 추가');
+  if (testInfo.project.name.includes('iphone')) {
+    await expect(page.getByTestId('notification-settings-ios-guide')).toContainText('홈 화면에 추가');
+  } else {
+    await expect(page.getByTestId('notification-settings-ios-guide')).toHaveCount(0);
+  }
 
   await expect.poll(async () => getPushRegistrationCount(page)).toBeGreaterThan(0);
   const initialCount = await getPushRegistrationCount(page);
@@ -390,4 +394,30 @@ test('notification settings shows push status and lets the user retry registrati
   await page.getByTestId('notification-settings-push-action').click();
 
   await expect.poll(async () => getPushRegistrationCount(page)).toBe(initialCount + 1);
+});
+
+test('notification settings can trigger a popup self-test and show runtime diagnostics', async ({
+  page,
+}) => {
+  await installPushRegistrationRetryStubs(page);
+  await mockSupabase(page, {
+    notifications: [],
+  });
+
+  await seedSession(page);
+  await page.goto('/main?open_menu=알림');
+  await expect(page.getByTestId('notifications-view')).toBeVisible();
+
+  await page.getByTestId('notification-inner-tab-settings').click();
+  await expect(page.getByTestId('notification-settings-push-status')).toBeVisible();
+  await expect(page.getByTestId('notification-settings-push-secure-context')).toContainText('보안 연결');
+  await expect(page.getByTestId('notification-settings-push-platform')).toBeVisible();
+  await expect(page.getByTestId('notification-settings-push-origin')).toContainText('127.0.0.1');
+
+  await page.getByTestId('notification-settings-push-test').click();
+
+  await expect.poll(async () => getNativeNotificationCount(page)).toBeGreaterThan(0);
+  await expect(page.getByTestId('notification-settings-push-test-result')).toContainText(
+    '테스트 팝업을 보냈습니다.'
+  );
 });
