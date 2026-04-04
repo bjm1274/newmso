@@ -38,5 +38,21 @@ export default defineConfig({
         browserName: 'chromium',
       },
     },
+    {
+      name: 'mobile-android-chromium',
+      testMatch: /.*\.mobile\.spec\.ts/,
+      use: {
+        ...devices['Pixel 7'],
+        browserName: 'chromium',
+      },
+    },
+    {
+      name: 'mobile-iphone-webkit',
+      testMatch: /.*\.mobile\.spec\.ts/,
+      use: {
+        ...devices['iPhone 13'],
+        browserName: 'webkit',
+      },
+    },
   ],
 });

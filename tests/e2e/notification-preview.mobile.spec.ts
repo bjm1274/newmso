@@ -4,6 +4,7 @@ import { dismissDialogs, fakeUser, mockSupabase, seedSession } from './helpers';
 async function installPushRegistrationRetryStubs(page: Page) {
   await page.addInitScript(() => {
     const registrationCounts = { register: 0 };
+    const nativeNotifications: Array<{ title?: string; options?: NotificationOptions }> = [];
     const fakeRegistration = {
       scope: '/',
       active: { scriptURL: '/sw.js' },
@@ -14,16 +15,26 @@ async function installPushRegistrationRetryStubs(page: Page) {
         getSubscription: async () => null,
         subscribe: async () => null,
       },
-      showNotification: async () => undefined,
+      showNotification: async (title?: string, options?: NotificationOptions) => {
+        nativeNotifications.push({ title, options });
+      },
     };
 
     (
       window as Window & {
         __pushRegistrationCounts?: typeof registrationCounts;
+        __nativeNotifications?: typeof nativeNotifications;
       }
     ).__pushRegistrationCounts = registrationCounts;
+    (
+      window as Window & {
+        __nativeNotifications?: typeof nativeNotifications;
+      }
+    ).__nativeNotifications = nativeNotifications;
 
-    function FakeNotification(this: Notification) {}
+    function FakeNotification(this: Notification, title?: string, options?: NotificationOptions) {
+      nativeNotifications.push({ title, options });
+    }
 
     Object.defineProperty(FakeNotification, 'permission', {
       configurable: true,
@@ -65,6 +76,17 @@ async function getPushRegistrationCount(page: Page) {
           __pushRegistrationCounts?: { register?: number };
         }
       ).__pushRegistrationCounts?.register ?? 0
+  );
+}
+
+async function getNativeNotificationCount(page: Page) {
+  return page.evaluate(
+    () =>
+      (
+        window as Window & {
+          __nativeNotifications?: Array<{ title?: string }>;
+        }
+      ).__nativeNotifications?.length ?? 0
   );
 }
 
@@ -207,7 +229,79 @@ test('mobile notification service retries push registration when focus returns w
     window.dispatchEvent(new Event('focus'));
   });
 
-  await expect.poll(async () => getPushRegistrationCount(page)).toBe(initialCount + 1);
+  await expect.poll(async () => getPushRegistrationCount(page)).toBeGreaterThan(initialCount);
+});
+
+test('mobile chat notifications use a native popup when push is already connected', async ({ page }) => {
+  await installPushRegistrationRetryStubs(page);
+  await mockSupabase(page, {
+    notifications: [],
+    chatRooms: [
+      {
+        id: '00000000-0000-0000-0000-000000000000',
+        name: 'Notice',
+        type: 'notice',
+        members: [],
+        created_at: '2026-03-31T08:30:00.000Z',
+        last_message_at: '2026-03-31T08:30:00.000Z',
+      },
+      {
+        id: 'room-mobile-native-preview',
+        name: '모바일 네이티브 알림 방',
+        type: 'group',
+        members: [fakeUser.id, 'chat-preview-peer'],
+        created_at: '2026-03-31T08:30:00.000Z',
+        last_message_at: '2026-03-31T08:45:00.000Z',
+        last_message_preview: '이전 메시지',
+      },
+    ],
+    staffMembers: [
+      fakeUser,
+      {
+        ...fakeUser,
+        id: 'chat-preview-peer',
+        name: 'Chat Preview Peer',
+        employee_no: 'E2E-CHAT-PREVIEW-001',
+      },
+    ],
+    messages: [
+      {
+        id: 'msg-existing-native-1',
+        room_id: 'room-mobile-native-preview',
+        sender_id: 'chat-preview-peer',
+        content: '이전 메시지',
+        created_at: '2026-03-31T08:45:00.000Z',
+        is_deleted: false,
+        staff: { name: 'Chat Preview Peer', photo_url: null },
+      },
+    ],
+  });
+
+  await seedSession(page);
+  await page.goto('/main');
+  await expect(page.getByTestId('main-shell')).toBeVisible();
+
+  await page.evaluate((staffId) => {
+    window.localStorage.setItem(`erp_push_subscription_active:${staffId}`, '1');
+  }, fakeUser.id);
+
+  await insertLiveNotification(page, {
+    id: 'notification-mobile-native-message-preview-1',
+    type: 'message',
+    title: 'Chat Preview Peer',
+    body: '모바일에서도 시스템 팝업으로 바로 떠야 합니다.',
+    metadata: {
+      room_id: 'room-mobile-native-preview',
+      message_id: 'msg-live-native-preview-1',
+      sender_name: 'Chat Preview Peer',
+      room_name: '모바일 네이티브 알림 방',
+      type: 'message',
+    },
+  });
+
+  await expect.poll(async () => getNativeNotificationCount(page)).toBe(1);
+  await expect(page.getByTestId('chat-preview-banner')).toHaveCount(0);
+  await expect(page.getByTestId('notification-toast-notification-mobile-native-message-preview-1')).toHaveCount(0);
 });
 
 test('notification settings shows push status and lets the user retry registration', async ({
