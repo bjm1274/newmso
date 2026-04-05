@@ -24,21 +24,9 @@ export default function PwaBootstrap() {
       }
     };
 
-    if (document.readyState === 'complete') {
-      void registerServiceWorker();
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const handleLoad = () => {
-      void registerServiceWorker();
-    };
-
-    window.addEventListener('load', handleLoad, { once: true });
+    void registerServiceWorker();
     return () => {
       cancelled = true;
-      window.removeEventListener('load', handleLoad);
     };
   }, []);
 

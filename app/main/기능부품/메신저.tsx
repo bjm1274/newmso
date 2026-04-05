@@ -1,14 +1,8 @@
 ﻿'use client';
 import { toast } from '@/lib/toast';
-import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback, type MouseEvent as ReactMouseEvent } from 'react';
+import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
-import {
-  buildStorageDownloadUrl,
-  extractStorageUrlExtension,
-  shouldUseManagedBrowserDownload,
-  triggerManagedBrowserDownload,
-} from '@/lib/object-storage-url';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { bindPageRefresh } from '@/lib/realtime-maintenance';
 import {
@@ -20,6 +14,24 @@ import {
 } from '@/lib/chat-query-columns';
 import { CHAT_ACTIVE_ROOM_KEY, CHAT_FOCUS_KEY, CHAT_ROOM_KEY } from '@/app/main/navigation-state';
 import SmartDatePicker from './공통/SmartDatePicker';
+import {
+  AttachmentListCard,
+  AttachmentPreview,
+  AttachmentPreviewItem,
+  AttachmentPreviewKind,
+  AttachmentQuickActions,
+  buildDownloadUrl,
+  buildUploadRequestFileName,
+  extractFirstLinkUrl,
+  getAttachmentDisplayName,
+  getDeletedMessagePreviewText,
+  getMessageDisplayText,
+  getPendingAttachmentDisplayName,
+  handleStorageDownloadLinkClick,
+  resolveAttachmentKind,
+  sortAlbumMessages,
+  stripHiddenMessageMetaBlocks,
+} from './메신저첨부';
 import { buildMessengerImageAlt, MessengerAvatar, MessengerStatusUserRow } from './메신저공통';
 import type { StaffMember, ChatRoom, ChatMessage } from '@/types';
 
