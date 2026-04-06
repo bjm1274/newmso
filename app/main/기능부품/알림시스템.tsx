@@ -919,8 +919,9 @@ export default function NotificationSystem({
     const activeChatRoomId = getVisibleActiveChatRoomId();
     const suppressLiveDisplay = Boolean(isChatType && incomingRoomId && activeChatRoomId === incomingRoomId);
     const useMobileChatPreview = Boolean(isChatType && isMobileClientDevice());
+    const wasForegroundPopupAlreadyShown = rowMetadata._foreground_popup_shown === true;
     const shouldPreferMobileNativePopup = Boolean(
-      useMobileChatPreview &&
+      isMobileClientDevice() &&
       typeof Notification !== 'undefined' &&
       Notification.permission === 'granted'
     );
@@ -956,7 +957,12 @@ export default function NotificationSystem({
 
     const isDND = isInDND(settings);
     const shouldPlayLocalSound = !isMobileClientDevice();
-    if (!suppressLiveDisplay && !isDND && (settings.sound || settings.vibration)) {
+    if (
+      !suppressLiveDisplay &&
+      !isDND &&
+      !wasForegroundPopupAlreadyShown &&
+      (settings.sound || settings.vibration)
+    ) {
       playIncomingNotificationFeedback({
         type,
         allowSound: Boolean(settings.sound && shouldPlayLocalSound),
@@ -984,7 +990,11 @@ export default function NotificationSystem({
           !hasPushSubscriptionActive(effectiveUserId) ||
           shouldPreferMobileNativePopup
         );
-      if (canShowNativeNotification && shouldShowSystemNotification) {
+      if (
+        canShowNativeNotification &&
+        shouldShowSystemNotification &&
+        !wasForegroundPopupAlreadyShown
+      ) {
         sendNotification(title, {
           body,
           tag: displayKey || type,

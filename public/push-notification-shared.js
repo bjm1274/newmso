@@ -247,6 +247,17 @@ function erpIsVisibleClient(client) {
   return client?.visibilityState === 'visible' || client?.focused === true;
 }
 
+function erpIsMobileDevice() {
+  const userAgent = erpNormalizeString(self?.navigator?.userAgent);
+  return /android|iphone|ipad|ipod/i.test(userAgent);
+}
+
+function erpShouldShowForegroundPopup(payload) {
+  if (!erpIsMobileDevice()) return false;
+  const notificationType = erpNormalizeString(payload?.data?.type || payload?.type);
+  return !notificationType || Boolean(notificationType);
+}
+
 async function erpBroadcastPreviewToVisibleClients(payload) {
   const clientList = await erpGetWindowClients();
   const visibleClients = clientList.filter(erpIsVisibleClient);
@@ -332,7 +343,7 @@ function erpBuildNotificationOptions(payload) {
   };
 }
 
-async function erpDispatchIncomingNotification(rawPayload, options) {
+async function erpDisplayIncomingNotification(rawPayload) {
   await erpFlushRetryQueue();
   const payload = erpNormalizeNotificationPayload(rawPayload);
   if (!erpShouldShowNotification(payload.tag)) return;
@@ -345,59 +356,33 @@ async function erpDispatchIncomingNotification(rawPayload, options) {
     // ignore badge failures
   }
 
-  const hasVisibleClient = await erpBroadcastPreviewToVisibleClients(payload);
-  if (hasVisibleClient) return;
+  const shouldShowForegroundPopup = erpShouldShowForegroundPopup(payload);
+  const previewPayload = shouldShowForegroundPopup
+    ? {
+        ...payload,
+        data: {
+          ...(payload.data && typeof payload.data === 'object' ? payload.data : {}),
+          _foreground_popup_shown: true,
+        },
+      }
+    : payload;
 
-  const allowBrowserManagedDisplay = Boolean(options && options.allowBrowserManagedDisplay);
-  const hasNotificationPayload =
-    rawPayload &&
-    typeof rawPayload === 'object' &&
-    rawPayload.notification &&
-    typeof rawPayload.notification === 'object';
-
-  if (allowBrowserManagedDisplay && hasNotificationPayload) return;
+  const hasVisibleClient = await erpBroadcastPreviewToVisibleClients(previewPayload);
+  if (hasVisibleClient && !shouldShowForegroundPopup) return;
 
   await self.registration.showNotification(payload.title, erpBuildNotificationOptions(payload));
 }
 
 async function erpShowIncomingNotification(rawPayload) {
-  await erpFlushRetryQueue();
-  const payload = erpNormalizeNotificationPayload(rawPayload);
-  if (!erpShouldShowNotification(payload.tag)) return;
-
-  try {
-    if (self.navigator && 'setAppBadge' in self.navigator) {
-      self.navigator.setAppBadge().catch(() => {});
-    }
-  } catch {
-    // ignore badge failures
-  }
-
-  const hasVisibleClient = await erpBroadcastPreviewToVisibleClients(payload);
-  if (hasVisibleClient) return;
-
-  await self.registration.showNotification(payload.title, {
-    body: payload.body,
-    icon: ERP_PUSH_ICON_URL,
-    badge: ERP_PUSH_BADGE_URL,
-    tag: payload.tag,
-    requireInteraction: false,
-    renotify: false,
-    vibrate: [1000],
-    data: payload.data,
-    actions: [
-      { action: 'open', title: '확인하기' },
-      { action: 'close', title: '닫기' },
-    ],
-  });
+  await erpDisplayIncomingNotification(rawPayload);
 }
 
 async function erpShowIncomingNotificationManaged(rawPayload) {
-  await erpDispatchIncomingNotification(rawPayload, { allowBrowserManagedDisplay: false });
+  await erpDisplayIncomingNotification(rawPayload);
 }
 
 async function erpHandleFcmBackgroundMessage(rawPayload) {
-  await erpDispatchIncomingNotification(rawPayload, { allowBrowserManagedDisplay: true });
+  await erpDisplayIncomingNotification(rawPayload);
 }
 
 function erpBuildTargetUrl(data) {

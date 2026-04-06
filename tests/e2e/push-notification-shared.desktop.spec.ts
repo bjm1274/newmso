@@ -14,6 +14,7 @@ function createPushSharedHarness(options?: {
     status: number;
     json: () => Promise<unknown>;
   }>;
+  userAgent?: string;
   clients?: Array<{
     postMessage?: (message: unknown) => void;
     url?: string;
@@ -71,6 +72,7 @@ function createPushSharedHarness(options?: {
 
   const fakeSelf = {
     navigator: {
+      userAgent: options?.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/135.0.0.0 Safari/537.36',
       setAppBadge: async () => undefined,
       clearAppBadge: async () => undefined,
     },
@@ -439,7 +441,7 @@ test('unified service worker keeps the custom notification click handler ahead o
   expect(notificationClickIndex).toBeLessThan(firebaseImportIndex);
 });
 
-test('shared push lets browser-managed FCM notifications render without duplicating them', async () => {
+test('shared push renders FCM notifications through the service worker so lock-screen popups stay consistent', async () => {
   const harness = createPushSharedHarness({ clients: [] });
 
   await harness.shared?.handleFcmBackgroundMessage?.({
@@ -456,7 +458,14 @@ test('shared push lets browser-managed FCM notifications render without duplicat
     },
   });
 
-  expect(harness.shownNotifications).toHaveLength(0);
+  expect(harness.shownNotifications).toHaveLength(1);
+  expect(harness.shownNotifications[0]).toMatchObject({
+    title: 'FCM managed title',
+    options: expect.objectContaining({
+      body: 'FCM managed body',
+      tag: 'chat-msg-fcm-managed-1',
+    }),
+  });
 
   await harness.shared?.handleFcmBackgroundMessage?.({
     data: {
@@ -469,8 +478,8 @@ test('shared push lets browser-managed FCM notifications render without duplicat
     },
   });
 
-  expect(harness.shownNotifications).toHaveLength(1);
-  expect(harness.shownNotifications[0]).toMatchObject({
+  expect(harness.shownNotifications).toHaveLength(2);
+  expect(harness.shownNotifications[1]).toMatchObject({
     title: 'FCM data-only title',
     options: expect.objectContaining({
       body: 'FCM data-only body',
@@ -542,6 +551,53 @@ test('shared push shows a system notification only when there is no visible clie
     payload: expect.objectContaining({
       title: '포그라운드 테스트',
       body: '보이는 화면에는 미리보기만 보내야 합니다.',
+    }),
+  });
+});
+
+
+test('shared push keeps the foreground popup on mobile while also syncing the in-app preview', async () => {
+  const foregroundPostedMessages: Array<unknown> = [];
+  const harness = createPushSharedHarness({
+    userAgent:
+      'Mozilla/5.0 (Linux; Android 14; SAMSUNG SM-S918N) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/27.0 Chrome/125.0.0.0 Mobile Safari/537.36',
+    clients: [
+      {
+        visibilityState: 'visible',
+        focused: true,
+        postMessage: (message: unknown) => {
+          foregroundPostedMessages.push(message);
+        },
+      } as {
+        visibilityState: string;
+        focused: boolean;
+        postMessage: (message: unknown) => void;
+      },
+    ],
+  });
+
+  await harness.shared?.showIncomingNotification({
+    title: 'Android foreground popup',
+    body: '?? ?? ??? ??? ??? ?? ?? ???.',
+    data: {
+      type: 'message',
+      room_id: 'room-foreground-mobile',
+      message_id: 'message-foreground-mobile-1',
+    },
+  });
+
+  expect(harness.shownNotifications).toHaveLength(1);
+  expect(harness.shownNotifications[0]).toMatchObject({
+    title: 'Android foreground popup',
+  });
+  expect(foregroundPostedMessages).toContainEqual({
+    type: 'erp-push-preview',
+    payload: expect.objectContaining({
+      title: 'Android foreground popup',
+      body: '?? ?? ??? ??? ??? ?? ?? ???.',
+      data: expect.objectContaining({
+        _foreground_popup_shown: true,
+      }),
     }),
   });
 });
