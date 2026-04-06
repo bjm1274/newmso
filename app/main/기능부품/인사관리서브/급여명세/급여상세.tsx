@@ -82,7 +82,7 @@ interface SalaryRecord {
   overtime_pay?: number;
   bonus?: number;
   year_month?: string;
-  deduction_detail?: Record<string, number>;
+  deduction_detail?: Record<string, unknown>;
   total_taxable?: number;
   total_taxfree?: number;
   total_deduction?: number;
@@ -107,6 +107,10 @@ interface StaffInfo {
   position?: string;
   base_salary?: number;
   position_allowance?: number;
+  overtime_allowance?: number;
+  night_work_allowance?: number;
+  holiday_work_allowance?: number;
+  annual_leave_pay?: number;
   meal_allowance?: number;
   night_duty_allowance?: number;
   vehicle_allowance?: number;
@@ -155,7 +159,12 @@ export default function SalaryDetail({ record, staff }: { record?: SalaryRecord;
       childcare_allowance: staff?.childcare_allowance || 0,
       research_allowance: staff?.research_allowance || 0,
       other_taxfree: staff?.other_taxfree || 0,
-      extra_allowance: staff?.position_allowance || 0,
+      extra_allowance:
+        Number(staff?.position_allowance || 0) +
+        Number(staff?.overtime_allowance || 0) +
+        Number(staff?.night_work_allowance || 0) +
+        Number(staff?.holiday_work_allowance || 0) +
+        Number(staff?.annual_leave_pay || 0),
       overtime_pay: 0,
       bonus: 0,
       year_month: new Date().toISOString().slice(0, 7),
@@ -164,17 +173,20 @@ export default function SalaryDetail({ record, staff }: { record?: SalaryRecord;
 
   const calc = useMemo(() => {
     if (record) {
-      const detail = record.deduction_detail || {};
+      const detail =
+        (record.deduction_detail && typeof record.deduction_detail === 'object'
+          ? record.deduction_detail
+          : {}) as Record<string, number>;
       return {
         totalPayment: Number(record.total_taxable || 0) + Number(record.total_taxfree || 0),
         totalDeduction: Number(record.total_deduction || 0),
-        pension: detail.national_pension ?? record.national_pension ?? Math.floor(Number(record.total_taxable || 0) * 0.045),
-        health: detail.health_insurance ?? record.health_insurance ?? Math.floor(Number(record.total_taxable || 0) * 0.03545),
-        longTerm: detail.long_term_care ?? record.long_term_care ?? 0,
-        employment: detail.employment_insurance ?? record.employment_insurance ?? Math.floor(Number(record.total_taxable || 0) * 0.009),
-        incomeTax: detail.income_tax ?? record.income_tax ?? Math.floor(Number(record.total_taxable || 0) * 0.03),
-        localTax: detail.local_tax ?? record.local_tax ?? 0,
-        customDeduction: detail.custom_deduction ?? 0,
+        pension: Number(detail.national_pension ?? record.national_pension ?? Math.floor(Number(record.total_taxable || 0) * 0.045)),
+        health: Number(detail.health_insurance ?? record.health_insurance ?? Math.floor(Number(record.total_taxable || 0) * 0.03545)),
+        longTerm: Number(detail.long_term_care ?? record.long_term_care ?? 0),
+        employment: Number(detail.employment_insurance ?? record.employment_insurance ?? Math.floor(Number(record.total_taxable || 0) * 0.009)),
+        incomeTax: Number(detail.income_tax ?? record.income_tax ?? Math.floor(Number(record.total_taxable || 0) * 0.03)),
+        localTax: Number(detail.local_tax ?? record.local_tax ?? 0),
+        customDeduction: Number(detail.custom_deduction ?? 0),
         net: Number(record.net_pay || 0),
       };
     }
@@ -240,6 +252,43 @@ export default function SalaryDetail({ record, staff }: { record?: SalaryRecord;
     Number(data.other_taxfree || 0);
   const monthlyHoursForPayslip = getMonthlyWorkingHours(wphForPayslip);
   const hourlyRate = calculateHourlyRateFromMonthlySalary(fixedMonthlySalary, wphForPayslip, 'ceil');
+  const deductionDetail = useMemo(
+    () => (record?.deduction_detail && typeof record.deduction_detail === 'object'
+      ? (record.deduction_detail as Record<string, unknown>)
+      : {}),
+    [record?.deduction_detail],
+  );
+  const taxableAllowanceBreakdown = useMemo(() => {
+    const savedBreakdown =
+      deductionDetail.taxable_allowance_breakdown && typeof deductionDetail.taxable_allowance_breakdown === 'object'
+        ? (deductionDetail.taxable_allowance_breakdown as Record<string, unknown>)
+        : null;
+    const source = savedBreakdown || {
+      position_allowance: staff?.position_allowance || 0,
+      overtime_allowance: staff?.overtime_allowance || 0,
+      night_work_allowance: staff?.night_work_allowance || 0,
+      holiday_work_allowance: staff?.holiday_work_allowance || 0,
+      annual_leave_pay: staff?.annual_leave_pay || 0,
+      manual_extra_allowance: 0,
+    };
+
+    return {
+      position_allowance: Number(source.position_allowance || 0),
+      overtime_allowance: Number(source.overtime_allowance || 0),
+      night_work_allowance: Number(source.night_work_allowance || 0),
+      holiday_work_allowance: Number(source.holiday_work_allowance || 0),
+      annual_leave_pay: Number(source.annual_leave_pay || 0),
+      manual_extra_allowance: Number(source.manual_extra_allowance || 0),
+    };
+  }, [deductionDetail, staff]);
+  const fixedTaxableAllowanceTotal =
+    Number(taxableAllowanceBreakdown.position_allowance || 0) +
+    Number(taxableAllowanceBreakdown.overtime_allowance || 0) +
+    Number(taxableAllowanceBreakdown.night_work_allowance || 0) +
+    Number(taxableAllowanceBreakdown.holiday_work_allowance || 0) +
+    Number(taxableAllowanceBreakdown.annual_leave_pay || 0) +
+    Number(taxableAllowanceBreakdown.manual_extra_allowance || 0);
+  const remainingExtraAllowance = Math.max(0, Number(data.extra_allowance || 0) - fixedTaxableAllowanceTotal);
 
   return (
     <div
@@ -329,9 +378,24 @@ export default function SalaryDetail({ record, staff }: { record?: SalaryRecord;
               <div className="overflow-hidden rounded-[var(--radius-xl)] bg-[var(--card)]" style={{ border: `2px solid ${sectionBorder}` }}>
                 <div className="space-y-3 p-4 print:space-y-2 print:px-4 print:py-3">
                   <SalaryRow label="기본급" value={Number(data.base_salary || 0)} note="월 기본 급여" highlightColor={primaryColor} />
+                  {Number(taxableAllowanceBreakdown.position_allowance || 0) > 0 && (
+                    <SalaryRow label="직책수당" value={Number(taxableAllowanceBreakdown.position_allowance || 0)} note="직책 기준 과세 수당" highlightColor={primaryColor} />
+                  )}
+                  {Number(taxableAllowanceBreakdown.overtime_allowance || 0) > 0 && (
+                    <SalaryRow label="연장수당" value={Number(taxableAllowanceBreakdown.overtime_allowance || 0)} note="고정 또는 포괄 연장수당" highlightColor={primaryColor} />
+                  )}
+                  {Number(taxableAllowanceBreakdown.night_work_allowance || 0) > 0 && (
+                    <SalaryRow label="야간근로수당" value={Number(taxableAllowanceBreakdown.night_work_allowance || 0)} note="고정 야간근로 과세수당" highlightColor={primaryColor} />
+                  )}
+                  {Number(taxableAllowanceBreakdown.holiday_work_allowance || 0) > 0 && (
+                    <SalaryRow label="휴일근로수당" value={Number(taxableAllowanceBreakdown.holiday_work_allowance || 0)} note="휴일근무 과세수당" highlightColor={primaryColor} />
+                  )}
+                  {Number(taxableAllowanceBreakdown.annual_leave_pay || 0) > 0 && (
+                    <SalaryRow label="연차휴가수당" value={Number(taxableAllowanceBreakdown.annual_leave_pay || 0)} note="미사용 연차 또는 연차보전 수당" highlightColor={primaryColor} />
+                  )}
                   {Number(data.overtime_pay || 0) > 0 && (
                     <SalaryRow
-                      label="연장근로수당"
+                      label="추가 연장근로수당"
                       value={Number(data.overtime_pay || 0)}
                       note={`시급 ${hourlyRate.toLocaleString()}원 기준 연장근로 반영`}
                       highlightColor={primaryColor}
@@ -340,8 +404,13 @@ export default function SalaryDetail({ record, staff }: { record?: SalaryRecord;
                   {Number(data.bonus || 0) > 0 && (
                     <SalaryRow label="상여" value={Number(data.bonus || 0)} note="성과 또는 별도 상여" highlightColor={primaryColor} />
                   )}
-                  {Number(data.extra_allowance || 0) > 0 && (
-                    <SalaryRow label="기타 수당" value={Number(data.extra_allowance || 0)} note="직책 / 자격 / 기타 수당" highlightColor={primaryColor} />
+                  {(Number(taxableAllowanceBreakdown.manual_extra_allowance || 0) > 0 || remainingExtraAllowance > 0) && (
+                    <SalaryRow
+                      label="기타 수당"
+                      value={Number(taxableAllowanceBreakdown.manual_extra_allowance || 0) + remainingExtraAllowance}
+                      note="직접 조정된 과세수당"
+                      highlightColor={primaryColor}
+                    />
                   )}
 
                   <div className="mt-3 border-t pt-3" style={{ borderColor }}>

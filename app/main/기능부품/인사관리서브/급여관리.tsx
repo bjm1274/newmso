@@ -51,6 +51,7 @@ type PayrollRecordRow = {
   staff_id: string | number;
   year_month?: string | null;
   record_type?: string | null;
+  status?: string | null;
   base_salary?: number | null;
   meal_allowance?: number | null;
   night_duty_allowance?: number | null;
@@ -79,6 +80,7 @@ const PAYROLL_RECORD_SELECT = [
   'staff_id',
   'year_month',
   'record_type',
+  'status',
   'base_salary',
   'meal_allowance',
   'night_duty_allowance',
@@ -164,6 +166,16 @@ export default function PayrollMain({
             typeof extraFields.research_allowance === 'number' ? extraFields.research_allowance : undefined,
           other_taxfree:
             typeof extraFields.other_taxfree === 'number' ? extraFields.other_taxfree : undefined,
+          position_allowance:
+            typeof extraFields.position_allowance === 'number' ? extraFields.position_allowance : undefined,
+          overtime_allowance:
+            typeof extraFields.overtime_allowance === 'number' ? extraFields.overtime_allowance : undefined,
+          night_work_allowance:
+            typeof extraFields.night_work_allowance === 'number' ? extraFields.night_work_allowance : undefined,
+          holiday_work_allowance:
+            typeof extraFields.holiday_work_allowance === 'number' ? extraFields.holiday_work_allowance : undefined,
+          annual_leave_pay:
+            typeof extraFields.annual_leave_pay === 'number' ? extraFields.annual_leave_pay : undefined,
           working_hours_per_week:
             typeof extraFields.working_hours_per_week === 'number'
               ? extraFields.working_hours_per_week
@@ -178,6 +190,7 @@ export default function PayrollMain({
     total_deduction: row.total_deduction ?? undefined,
     net_pay: row.net_pay ?? undefined,
     advance_pay: row.advance_pay ?? undefined,
+    status: row.status ?? undefined,
   }));
   const payrollAdvancedRecords = payrollRecords.map((row) => ({
     staff_id: row.staff_id != null ? String(row.staff_id) : undefined,
@@ -210,11 +223,7 @@ export default function PayrollMain({
         year_month: currentRecord.year_month ?? undefined,
         deduction_detail:
           currentRecord.deduction_detail && typeof currentRecord.deduction_detail === 'object'
-            ? Object.fromEntries(
-                Object.entries(currentRecord.deduction_detail).filter(
-                  (entry): entry is [string, number] => typeof entry[1] === 'number',
-                ),
-              )
+            ? currentRecord.deduction_detail
             : undefined,
         total_taxable: currentRecord.total_taxable ?? undefined,
         total_taxfree: currentRecord.total_taxfree ?? undefined,

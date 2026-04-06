@@ -1,5 +1,6 @@
 'use client';
 import { toast } from '@/lib/toast';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import ContractList from './계약문서/계약서명단';
@@ -38,6 +39,18 @@ export default function ContractMain({
     break_start_time: '12:00',
     break_end_time: '13:00'
   });
+
+  const optionalEmploymentContractColumns = ['conditions_applied_at'];
+
+  const omitColumnsFromRecord = (
+    record: Record<string, unknown>,
+    omittedColumns: ReadonlySet<string>,
+  ) => {
+    if (omittedColumns.size === 0) return record;
+    return Object.fromEntries(
+      Object.entries(record).filter(([key]) => !omittedColumns.has(key))
+    );
+  };
 
   const fetchContracts = async () => {
     const { data, error } = await supabase.from('employment_contracts').select('*');
@@ -146,7 +159,21 @@ export default function ContractMain({
         .eq('contract_type', contractType)
         .in('status', ['미발송', '반려']);
 
-      const { error: upsertError } = await supabase.from('employment_contracts').upsert(requests, { onConflict: 'staff_id,contract_type' });
+      const { error: upsertError } = await withMissingColumnsFallback(
+        (omittedColumns) =>
+          supabase
+            .from('employment_contracts')
+            .upsert(
+              requests.map((request) =>
+                omitColumnsFromRecord(
+                  request as Record<string, unknown>,
+                  omittedColumns,
+                )
+              ),
+              { onConflict: 'staff_id,contract_type' }
+            ),
+        optionalEmploymentContractColumns,
+      );
       if (upsertError) {
         console.error('employment_contracts upsert failed:', upsertError);
         toast(`계약서 발송 실패: ${upsertError.message || '저장 오류'}`, 'error');

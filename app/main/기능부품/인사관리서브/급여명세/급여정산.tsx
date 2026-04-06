@@ -1,7 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
@@ -41,6 +41,38 @@ interface SettlementEntry {
   child_count_8_20: number;
   withholding_rate_percent: 80 | 100 | 120;
   advance_pay: number;
+  saved_status?: string;
+  taxable_allowance_breakdown: TaxableAllowanceBreakdown;
+}
+
+interface TaxableAllowanceBreakdown {
+  position_allowance: number;
+  overtime_allowance: number;
+  night_work_allowance: number;
+  holiday_work_allowance: number;
+  annual_leave_pay: number;
+  manual_extra_allowance: number;
+}
+
+interface SavedPayrollRecord {
+  staff_id: string;
+  year_month?: string | null;
+  base_salary?: number | null;
+  meal_allowance?: number | null;
+  night_duty_allowance?: number | null;
+  vehicle_allowance?: number | null;
+  childcare_allowance?: number | null;
+  research_allowance?: number | null;
+  other_taxfree?: number | null;
+  extra_allowance?: number | null;
+  overtime_pay?: number | null;
+  bonus?: number | null;
+  attendance_deduction?: number | null;
+  attendance_deduction_detail?: Record<string, unknown> | null;
+  deduction_detail?: Record<string, unknown> | null;
+  advance_pay?: number | null;
+  status?: string | null;
+  record_type?: string | null;
 }
 
 const PAYROLL_RECORD_OPTIONAL_COLUMNS = [
@@ -52,6 +84,62 @@ const PAYROLL_RECORD_OPTIONAL_COLUMNS = [
   'other_taxfree',
 ] as const;
 
+const PAYROLL_RECORD_LOAD_OPTIONAL_COLUMNS = [
+  ...PAYROLL_RECORD_OPTIONAL_COLUMNS,
+  'attendance_deduction',
+  'attendance_deduction_detail',
+  'deduction_detail',
+  'advance_pay',
+  'status',
+  'record_type',
+] as const;
+
+const EMPTY_TAXABLE_ALLOWANCE_BREAKDOWN: TaxableAllowanceBreakdown = {
+  position_allowance: 0,
+  overtime_allowance: 0,
+  night_work_allowance: 0,
+  holiday_work_allowance: 0,
+  annual_leave_pay: 0,
+  manual_extra_allowance: 0,
+};
+
+function getTaxableAllowanceBreakdownTotal(value?: Partial<TaxableAllowanceBreakdown> | null) {
+  if (!value) return 0;
+  return (
+    Number(value.position_allowance || 0) +
+    Number(value.overtime_allowance || 0) +
+    Number(value.night_work_allowance || 0) +
+    Number(value.holiday_work_allowance || 0) +
+    Number(value.annual_leave_pay || 0) +
+    Number(value.manual_extra_allowance || 0)
+  );
+}
+
+function getStaffTaxableAllowanceBreakdown(staff: StaffMember): TaxableAllowanceBreakdown {
+  return {
+    position_allowance: Number(staff.position_allowance || 0),
+    overtime_allowance: Number(staff.overtime_allowance || 0),
+    night_work_allowance: Number(staff.night_work_allowance || 0),
+    holiday_work_allowance: Number(staff.holiday_work_allowance || 0),
+    annual_leave_pay: Number(staff.annual_leave_pay || 0),
+    manual_extra_allowance: 0,
+  };
+}
+
+function normalizeTaxableAllowanceBreakdown(value: unknown): TaxableAllowanceBreakdown {
+  const source = value && typeof value === 'object'
+    ? (value as Record<string, unknown>)
+    : {};
+  return {
+    position_allowance: Number(source.position_allowance || 0),
+    overtime_allowance: Number(source.overtime_allowance || 0),
+    night_work_allowance: Number(source.night_work_allowance || 0),
+    holiday_work_allowance: Number(source.holiday_work_allowance || 0),
+    annual_leave_pay: Number(source.annual_leave_pay || 0),
+    manual_extra_allowance: Number(source.manual_extra_allowance || 0),
+  };
+}
+
 export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { staffs: StaffMember[]; selectedCo: string; onRefresh?: () => void }) {
   const [step, setStep] = useState(1);
   const [yearMonth, setYearMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -60,6 +148,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
   const [loading, setLoading] = useState(false);
   const [taxFreeLimits, setTaxFreeLimits] = useState<TaxFreeSettings>(DEFAULT_SETTINGS);
   const [taxInsuranceRates, setTaxInsuranceRates] = useState<TaxInsuranceRates>(DEFAULT_TAX_INSURANCE_RATES);
+  const [savedRecordsByStaff, setSavedRecordsByStaff] = useState<Record<string, SavedPayrollRecord>>({});
 
   useEffect(() => {
     let ok = true;
@@ -88,12 +177,135 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
 
   const filteredStaffs = staffs.filter((s: StaffMember) => selectedCo === '전체' || s.company === selectedCo);
 
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const staffIds = filteredStaffs.map((staff) => String(staff.id));
+      if (staffIds.length === 0) {
+        if (active) setSavedRecordsByStaff({});
+        return;
+      }
+
+      const requiredColumns = ['staff_id', 'year_month', 'base_salary', 'extra_allowance', 'overtime_pay', 'bonus'];
+      const { data, error } = await withMissingColumnsFallback(
+        (omittedColumns) => {
+          const selectColumns = [
+            ...requiredColumns,
+            ...PAYROLL_RECORD_LOAD_OPTIONAL_COLUMNS.filter((column) => !omittedColumns.has(column)),
+          ].join(', ');
+          return supabase
+            .from('payroll_records')
+            .select(selectColumns)
+            .eq('year_month', yearMonth)
+            .in('staff_id', staffIds);
+        },
+        [...PAYROLL_RECORD_LOAD_OPTIONAL_COLUMNS],
+      );
+
+      if (!active) return;
+
+      if (error) {
+        console.error('saved payroll records load failed:', error);
+        setSavedRecordsByStaff({});
+        return;
+      }
+
+      const nextMap = Object.fromEntries(
+        ((data || []) as unknown as SavedPayrollRecord[])
+          .filter((record) => !record.record_type || record.record_type === 'regular')
+          .map((record) => [String(record.staff_id), record]),
+      );
+      setSavedRecordsByStaff(nextMap);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [staffs, selectedCo, yearMonth]);
+
   const toggleStaff = (staff: StaffMember) => {
     if (selectedStaffs.find(s => s.id === staff.id)) {
       setSelectedStaffs(selectedStaffs.filter(s => s.id !== staff.id));
     } else {
       setSelectedStaffs([...selectedStaffs, staff]);
     }
+  };
+
+  const getSavedDeductionDetail = (savedRecord?: SavedPayrollRecord | null) =>
+    savedRecord?.deduction_detail && typeof savedRecord.deduction_detail === 'object'
+      ? (savedRecord.deduction_detail as Record<string, unknown>)
+      : {};
+
+  const buildSettlementEntry = (
+    staff: StaffMember,
+    attendanceDeduction: number,
+    attendanceDetail: Record<string, unknown>,
+  ): SettlementEntry => {
+    const savedRecord = savedRecordsByStaff[String(staff.id)];
+    const savedDeductionDetail = getSavedDeductionDetail(savedRecord);
+    const defaultBreakdown = getStaffTaxableAllowanceBreakdown(staff);
+    const savedBreakdown = normalizeTaxableAllowanceBreakdown(savedDeductionDetail.taxable_allowance_breakdown);
+    const nextBreakdown = getTaxableAllowanceBreakdownTotal(savedBreakdown) > 0
+      ? savedBreakdown
+      : defaultBreakdown;
+    const defaultExtraAllowance = getTaxableAllowanceBreakdownTotal(defaultBreakdown);
+    const persistedExtraAllowance = Number(savedRecord?.extra_allowance ?? defaultExtraAllowance) || 0;
+    const fixedAllowanceBase =
+      Number(nextBreakdown.position_allowance || 0) +
+      Number(nextBreakdown.overtime_allowance || 0) +
+      Number(nextBreakdown.night_work_allowance || 0) +
+      Number(nextBreakdown.holiday_work_allowance || 0) +
+      Number(nextBreakdown.annual_leave_pay || 0);
+
+    nextBreakdown.manual_extra_allowance = Math.max(0, persistedExtraAllowance - fixedAllowanceBase);
+
+    return {
+      base_salary: Number(savedRecord?.base_salary ?? staff.base_salary ?? 0) || 0,
+      meal_allowance: Number(savedRecord?.meal_allowance ?? staff.meal_allowance ?? 0) || 0,
+      night_duty_allowance: Number(savedRecord?.night_duty_allowance ?? staff.night_duty_allowance ?? 0) || 0,
+      vehicle_allowance: Number(savedRecord?.vehicle_allowance ?? staff.vehicle_allowance ?? 0) || 0,
+      childcare_allowance: Number(savedRecord?.childcare_allowance ?? staff.childcare_allowance ?? 0) || 0,
+      research_allowance: Number(savedRecord?.research_allowance ?? staff.research_allowance ?? 0) || 0,
+      other_taxfree: Number(savedRecord?.other_taxfree ?? staff.other_taxfree ?? 0) || 0,
+      extra_allowance: persistedExtraAllowance,
+      overtime_pay: Number(savedRecord?.overtime_pay ?? 0) || 0,
+      bonus: Number(savedRecord?.bonus ?? 0) || 0,
+      apply_tax: savedDeductionDetail.apply_tax !== false && (staff.permissions?.insurance as Record<string, unknown>)?.income_tax !== false,
+      apply_insurance: savedDeductionDetail.apply_insurance !== false && (staff.permissions?.insurance as Record<string, unknown>)?.national !== false,
+      attendance_deduction: Number(savedRecord?.attendance_deduction ?? attendanceDeduction) || 0,
+      attendance_deduction_detail:
+        savedRecord?.attendance_deduction_detail && typeof savedRecord.attendance_deduction_detail === 'object'
+          ? savedRecord.attendance_deduction_detail
+          : { ...attendanceDetail, original_deduction: attendanceDeduction },
+      custom_deduction: Number(savedDeductionDetail.custom_deduction || 0) || 0,
+      dependent_count:
+        Number(
+          savedDeductionDetail.dependent_count ??
+          staff.dependent_count ??
+          (staff.permissions?.payroll as Record<string, unknown>)?.dependent_count ??
+          (staff.permissions?.tax as Record<string, unknown>)?.dependent_count ??
+          staff.permissions?.dependents ??
+          0,
+        ) || 0,
+      child_count_8_20:
+        Number(
+          savedDeductionDetail.child_count_8_20 ??
+          (staff as Record<string, unknown>).child_count_8_20 ??
+          (staff.permissions?.payroll as Record<string, unknown>)?.child_count_8_20 ??
+          (staff.permissions?.tax as Record<string, unknown>)?.child_count_8_20 ??
+          0,
+        ) || 0,
+      withholding_rate_percent: normalizeWithholdingRatePercent(
+        (savedDeductionDetail.withholding_rate_percent ??
+          (staff as Record<string, unknown>).withholding_rate_percent ??
+          (staff.permissions?.payroll as Record<string, unknown>)?.withholding_rate_percent ??
+          (staff.permissions?.tax as Record<string, unknown>)?.withholding_rate_percent ??
+          100) as number | string | null | undefined,
+      ),
+      advance_pay: Number(savedRecord?.advance_pay ?? 0) || 0,
+      saved_status: String(savedRecord?.status || ''),
+      taxable_allowance_breakdown: nextBreakdown,
+    };
   };
 
   const handleNextStep = async () => {
@@ -245,50 +457,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
             : undefined,
           { scheduledWorkDays: scheduledWorkDaysByStaff[s.id] }
         );
-        initialData[s.id] = {
-          base_salary: s.base_salary || 0,
-          meal_allowance: s.meal_allowance || 0,
-          night_duty_allowance: s.night_duty_allowance || 0,
-          vehicle_allowance: s.vehicle_allowance || 0,
-          childcare_allowance: s.childcare_allowance || 0,
-          research_allowance: s.research_allowance || 0,
-          other_taxfree: s.other_taxfree || 0,
-          extra_allowance:
-            Number(s.position_allowance || 0) +
-            Number(s.overtime_allowance || 0) +
-            Number(s.night_work_allowance || 0) +
-            Number(s.holiday_work_allowance || 0) +
-            Number(s.annual_leave_pay || 0),
-          overtime_pay: 0,
-          bonus: 0,
-          apply_tax: (s.permissions?.insurance as Record<string, unknown>)?.income_tax !== false,
-          apply_insurance: (s.permissions?.insurance as Record<string, unknown>)?.national !== false,
-          attendance_deduction: total,
-          attendance_deduction_detail: { ...detail, original_deduction: total },
-          custom_deduction: 0,
-          dependent_count:
-            Number(
-              s.dependent_count ??
-              (s.permissions?.payroll as Record<string, unknown>)?.dependent_count ??
-              (s.permissions?.tax as Record<string, unknown>)?.dependent_count ??
-              s.permissions?.dependents ??
-              0
-            ) || 0,
-          child_count_8_20:
-            Number(
-              (s as Record<string, unknown>).child_count_8_20 ??
-              (s.permissions?.payroll as Record<string, unknown>)?.child_count_8_20 ??
-              (s.permissions?.tax as Record<string, unknown>)?.child_count_8_20 ??
-              0
-            ) || 0,
-          withholding_rate_percent: normalizeWithholdingRatePercent(
-            ((s as Record<string, unknown>).withholding_rate_percent ??
-              (s.permissions?.payroll as Record<string, unknown>)?.withholding_rate_percent ??
-              (s.permissions?.tax as Record<string, unknown>)?.withholding_rate_percent ??
-              100) as number | string | null | undefined
-          ),
-          advance_pay: 0,
-        };
+        initialData[s.id] = buildSettlementEntry(s, total, detail);
       });
       setSettlementData(initialData);
       setStep(2);
@@ -451,6 +620,9 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       income_tax_before_withholding_ratio: preRatioIncomeTax,
       is_duru_nuri: isDuruNuriActive,
       is_medical_benefit: isMedicalBenefit,
+      apply_tax: data.apply_tax,
+      apply_insurance: data.apply_insurance,
+      taxable_allowance_breakdown: data.taxable_allowance_breakdown,
       tax_estimated: data.apply_tax && !hasExactWithholdingTable,
       missing_monthly_withholding_table: data.apply_tax && !hasExactWithholdingTable,
     };
@@ -466,7 +638,106 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     };
   };
 
-  const handleFinalize = async () => {
+  const persistSettlement = async (targetStatus: '임시저장' | '확정') => {
+    setLoading(true);
+    try {
+      const records = selectedStaffs.map((staff) => {
+        const data = settlementData[staff.id];
+        const advancePay = Math.round(Number(data?.advance_pay || 0));
+        const isAdvanceOnly = advancePay > 0;
+        const calc = isAdvanceOnly ? null : calculateSalary(staff.id);
+        const deductionDetail = {
+          ...(isAdvanceOnly ? {} : (calc?.deductionDetail || {})),
+          dependent_count: Number(data?.dependent_count || 0),
+          child_count_8_20: Number(data?.child_count_8_20 || 0),
+          withholding_rate_percent: normalizeWithholdingRatePercent(data?.withholding_rate_percent),
+          custom_deduction: Number(data?.custom_deduction || 0),
+          apply_tax: data?.apply_tax !== false,
+          apply_insurance: data?.apply_insurance !== false,
+          taxable_allowance_breakdown: data?.taxable_allowance_breakdown || EMPTY_TAXABLE_ALLOWANCE_BREAKDOWN,
+        };
+
+        return {
+          staff_id: staff.id,
+          year_month: yearMonth,
+          base_salary: Math.round(Number(data?.base_salary) || 0),
+          meal_allowance: Math.round(Number(data?.meal_allowance) || 0),
+          night_duty_allowance: Math.round(Number(data?.night_duty_allowance) || 0),
+          vehicle_allowance: Math.round(Number(data?.vehicle_allowance) || 0),
+          childcare_allowance: Math.round(Number(data?.childcare_allowance) || 0),
+          research_allowance: Math.round(Number(data?.research_allowance) || 0),
+          other_taxfree: Math.round(Number(data?.other_taxfree) || 0),
+          extra_allowance: Math.round(Number(data?.extra_allowance) || 0),
+          overtime_pay: Math.round(Number(data?.overtime_pay) || 0),
+          bonus: Math.round(Number(data?.bonus) || 0),
+          total_taxable: isAdvanceOnly ? 0 : Math.round(Number(calc?.taxable || 0)),
+          total_taxfree: isAdvanceOnly ? 0 : Math.round(Number(calc?.taxfree || 0)),
+          total_deduction: isAdvanceOnly ? 0 : Math.round(Number(calc?.deduction || 0)),
+          deduction_detail: deductionDetail,
+          net_pay: isAdvanceOnly ? advancePay : Math.round(Number(calc?.net || 0)),
+          attendance_deduction: Math.round(Number(data?.attendance_deduction) || 0),
+          attendance_deduction_detail: data?.attendance_deduction_detail || {},
+          advance_pay: advancePay,
+          record_type: 'regular',
+          status: targetStatus,
+        };
+      });
+
+      const { error: payrollSaveError } = await withMissingColumnsFallback(
+        (omittedColumns) => {
+          const normalizedRecords = records.map((record) => {
+            const nextRecord = { ...record } as Record<string, unknown>;
+            omittedColumns.forEach((columnName) => {
+              delete nextRecord[columnName];
+            });
+            return nextRecord;
+          });
+          return supabase.from('payroll_records').upsert(normalizedRecords, { onConflict: 'staff_id,year_month' });
+        },
+        [...PAYROLL_RECORD_OPTIONAL_COLUMNS],
+      );
+      if (payrollSaveError) throw payrollSaveError;
+
+      setSavedRecordsByStaff((prev) => ({
+        ...prev,
+        ...Object.fromEntries(records.map((record) => [String(record.staff_id), record as SavedPayrollRecord])),
+      }));
+      setSettlementData((prev) =>
+        Object.fromEntries(
+          Object.entries(prev).map(([staffId, value]) => [
+            staffId,
+            selectedStaffs.some((staff) => String(staff.id) === staffId)
+              ? { ...value, saved_status: targetStatus }
+              : value,
+          ]),
+        ) as Record<string, SettlementEntry>,
+      );
+
+      if (onRefresh) onRefresh();
+      return records;
+    } catch (err) {
+      const message = formatPayrollMutationError(err);
+      console.error('payroll save failed:', {
+        message,
+        error: err,
+        yearMonth,
+        status: targetStatus,
+        staffIds: selectedStaffs.map((staff: StaffMember) => staff.id),
+      });
+      toast(`정산 저장 중 오류가 발생했습니다. ${message}`, 'error');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDraftSaveLegacy = async () => {
+    const records = await persistSettlement('임시저장');
+    if (!records) return;
+    toast(`${records.length}명의 급여정산이 임시저장되었습니다.`, 'success');
+  };
+
+  const handleFinalizeLegacy = async () => {
     if (!confirm(`${selectedStaffs.length}명의 급여 정산을 확정하고 명세서를 생성하시겠습니까?`)) return;
 
     const needsExactIncomeTax = selectedStaffs.some((staff: StaffMember) => settlementData[staff.id]?.apply_tax);
@@ -581,6 +852,74 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     }
   };
 
+  void handleDraftSaveLegacy;
+  void handleFinalizeLegacy;
+
+  const handleDraftSave = async () => {
+    const records = await persistSettlement('임시저장');
+    if (!records) return;
+    toast(`${records.length}명의 급여정산이 임시저장되었습니다.`, 'success');
+  };
+
+  const handleFinalize = async () => {
+    if (!confirm(`${selectedStaffs.length}명의 급여 정산을 확정하고 명세서를 생성하시겠습니까?`)) return;
+
+    const needsExactIncomeTax = selectedStaffs.some((staff: StaffMember) => settlementData[staff.id]?.apply_tax);
+    if (needsExactIncomeTax && !hasExactIncomeTaxBracket(taxInsuranceRates)) {
+      toast('근로소득세 간이세액표가 설정되지 않아 급여를 안전하게 확정할 수 없습니다.\n\n세율·보험요율 관리에서 income_tax_bracket을 먼저 설정한 뒤 다시 진행해 주세요.');
+      return;
+    }
+
+    if (hasBlockingVerificationIssues) {
+      toast(`검산 리포트에 오류 ${verificationReport.errorCount}건이 있어 확정할 수 없습니다.`, 'error');
+      return;
+    }
+
+    const savedRecords = await persistSettlement('확정');
+    if (!savedRecords) return;
+
+    const u = typeof window !== 'undefined'
+      ? (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USER) || '{}'); } catch { return {}; } })()
+      : {};
+
+    try {
+      await logAudit(
+        '급여확정',
+        'payroll',
+        yearMonth,
+        {
+          count: savedRecords.length,
+          total: savedRecords.reduce((sum: number, record: any) => sum + (Number(record.net_pay) || 0), 0),
+          year_month: yearMonth,
+          records: savedRecords.map((record: any) => {
+            const staff = selectedStaffs.find((candidate: any) => candidate.id === record.staff_id);
+            return {
+              staff_id: record.staff_id,
+              staff_name: staff?.name || '-',
+              employee_no: staff?.employee_no || null,
+              company: staff?.company || '',
+              department: staff?.department || '',
+              base_salary: record.base_salary,
+              total_taxable: record.total_taxable,
+              total_taxfree: record.total_taxfree,
+              total_deduction: record.total_deduction,
+              attendance_deduction: record.attendance_deduction,
+              advance_pay: record.advance_pay,
+              net_pay: record.net_pay,
+            };
+          }),
+        },
+        u.id,
+        u.name,
+      );
+    } catch (auditError) {
+      console.error('payroll audit log failed:', auditError);
+    }
+
+    toast('급여 정산과 정산 확정이 완료되었습니다.', 'success');
+    setStep(3);
+  };
+
   const verificationRows = selectedStaffs.map((staff: StaffMember) => {
     const data = settlementData[staff.id];
     const advancePay = Number(data?.advance_pay) || 0;
@@ -661,6 +1000,17 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                   <div className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--tab-bg)] flex items-center justify-center text-sm font-semibold text-[var(--accent)]">{s.name[0]}</div>
                   <div>
                     <p className="text-sm font-medium text-[var(--foreground)]">{s.name}</p>
+                    {savedRecordsByStaff[String(s.id)]?.status && (
+                      <span
+                        className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          savedRecordsByStaff[String(s.id)]?.status === '확정'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-amber-100 text-amber-700'
+                        }`}
+                      >
+                        {savedRecordsByStaff[String(s.id)]?.status}
+                      </span>
+                    )}
                     <p className="text-xs text-[var(--toss-gray-3)]">기본급 ₩{(s.base_salary || 0).toLocaleString()}</p>
                   </div>
                 </div>
@@ -682,32 +1032,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
             )}
             <div className="max-h-[500px] overflow-y-auto space-y-4 p-2 custom-scrollbar">
               {selectedStaffs.map((s: StaffMember) => {
-                const data = settlementData[s.id] || {
-                  base_salary: Number(s.base_salary || 0),
-                  meal_allowance: Number(s.meal_allowance || 0),
-                  night_duty_allowance: Number((s as any).night_duty_allowance || 0),
-                  vehicle_allowance: Number((s as any).vehicle_allowance || 0),
-                  childcare_allowance: Number((s as any).childcare_allowance || 0),
-                  research_allowance: Number((s as any).research_allowance || 0),
-                  other_taxfree: Number((s as any).other_taxfree || 0),
-                  extra_allowance:
-                    Number((s as any).position_allowance || 0) +
-                    Number((s as any).overtime_allowance || 0) +
-                    Number((s as any).night_work_allowance || 0) +
-                    Number((s as any).holiday_work_allowance || 0) +
-                    Number((s as any).annual_leave_pay || 0),
-                  overtime_pay: 0,
-                  bonus: 0,
-                  custom_deduction: 0,
-                  attendance_deduction: 0,
-                  attendance_deduction_detail: {},
-                  dependent_count: 0,
-                  child_count_8_20: 0,
-                  withholding_rate_percent: 100,
-                  advance_pay: 0,
-                  apply_tax: true,
-                  apply_insurance: true,
-                };
+                const data = settlementData[s.id] || buildSettlementEntry(s, 0, {});
                 const advancePay = Number(data?.advance_pay) || 0;
                 const isAdvanceOnly = advancePay > 0;
                 const res = isAdvanceOnly ? { net: advancePay, taxable: 0, taxfree: 0 } : calculateSalary(s.id);
@@ -718,6 +1043,17 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                         <div className="w-9 h-9 rounded-full bg-[var(--toss-blue-light)] flex items-center justify-center text-xs font-bold text-[var(--accent)]">{s.name[0]}</div>
                         <div>
                           <p className="text-sm font-bold text-[var(--foreground)] leading-none">{s.name}</p>
+                          {data.saved_status && (
+                            <span
+                              className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                data.saved_status === '확정'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : 'bg-amber-100 text-amber-700'
+                              }`}
+                            >
+                              {data.saved_status}
+                            </span>
+                          )}
                           <p className="text-[10px] text-[var(--toss-gray-3)] mt-1">{s.company} · {s.department}</p>
                         </div>
                         {isAdvanceOnly && <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded">선지급</span>}
@@ -855,6 +1191,14 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
             </div>
             <div className="flex gap-3 pt-2">
               <button data-testid="salary-settlement-back-button" onClick={() => setStep(1)} className="flex-1 py-3 bg-[var(--card)] border border-[var(--border)] text-[var(--toss-gray-4)] text-sm font-medium rounded-[var(--radius-md)] hover:bg-[var(--muted)]">이전</button>
+              <button
+                data-testid="salary-settlement-draft-save-button"
+                onClick={handleDraftSave}
+                disabled={loading}
+                className="flex-1 py-3 bg-amber-500 text-white text-sm font-semibold rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50"
+              >
+                {loading ? '처리 중...' : '임시 저장'}
+              </button>
               <button data-testid="salary-settlement-finalize-button" onClick={handleFinalize} disabled={loading || !hasExactIncomeTaxBracket(taxInsuranceRates) || hasBlockingVerificationIssues} className="flex-[2] py-3 bg-[var(--accent)] text-white text-sm font-semibold rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50">
                 {loading ? '처리 중...' : '저장하기 · 정산 확정'}
               </button>
