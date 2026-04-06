@@ -19,6 +19,7 @@ import {
   type TaxInsuranceRates,
 } from '@/lib/use-tax-insurance-rates';
 import { buildPayrollVerificationReport } from '@/lib/payroll-governance';
+import { NP_INCOME_CEILING, NP_INCOME_FLOOR } from '@/lib/tax-free-limits';
 
 interface SettlementEntry {
   base_salary: number;
@@ -386,14 +387,16 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     // 공제 상세: 4대보험은 저장된 연도별 요율을 사용합니다.
     let national_pension = 0, health_insurance = 0, long_term_care = 0, employment_insurance = 0, income_tax = 0, local_tax = 0;
     if (data.apply_insurance) {
-      // 1. 국민연금 - 두루누리 80% 지원 적용 시 20%만 부과
-      const full_national = Math.floor(total_taxable * taxInsuranceRates.national_pension_rate);
+      // 1. 국민연금 - 기준소득월액 상·하한 적용 (2025.7~2026.6: 상한 617만원, 하한 39만원)
+      //    두루누리 80% 지원 적용 시 근로자 부담분 20%만 부과
+      const npBase = Math.min(Math.max(total_taxable, NP_INCOME_FLOOR), NP_INCOME_CEILING);
+      const full_national = Math.floor(npBase * taxInsuranceRates.national_pension_rate);
       national_pension = isDuruNuriActive ? Math.floor(full_national * 0.2) : full_national;
 
       // 2. 건강보험 - 의료급여 수급자는 제외(0원)
+      //    장기요양보험 = 과세소득 × DB 저장 요율(기본 0.46% ≈ 건강보험료×12.95%)
       if (!isMedicalBenefit) {
         health_insurance = Math.floor(total_taxable * taxInsuranceRates.health_insurance_rate);
-        // 장기요양보험 = 과세소득 × DB 저장 요율 (국민건강보험법 시행령)
         long_term_care = Math.floor(total_taxable * taxInsuranceRates.long_term_care_rate);
       }
 
@@ -483,28 +486,28 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       const advancePayAmount = (id: string) => Number(settlementData[id]?.advance_pay) || 0;
       const records = selectedStaffs.map(s => {
         const data = settlementData[s.id];
-        const advancePay = advancePayAmount(s.id);
+        const advancePay = Math.round(advancePayAmount(s.id));
         const isAdvanceOnly = advancePay > 0;
         const calc = isAdvanceOnly ? null : calculateSalary(s.id);
         return {
           staff_id: s.id,
           year_month: yearMonth,
-          base_salary: data.base_salary,
-          meal_allowance: data.meal_allowance,
-          night_duty_allowance: data.night_duty_allowance ?? 0,
-          vehicle_allowance: data.vehicle_allowance,
-          childcare_allowance: data.childcare_allowance,
-          research_allowance: data.research_allowance,
-          other_taxfree: data.other_taxfree,
-          extra_allowance: data.extra_allowance,
-          overtime_pay: data.overtime_pay,
-          bonus: data.bonus,
-          total_taxable: isAdvanceOnly ? 0 : calc!.taxable,
-          total_taxfree: isAdvanceOnly ? 0 : calc!.taxfree,
-          total_deduction: isAdvanceOnly ? 0 : calc!.deduction,
+          base_salary: Math.round(Number(data.base_salary) || 0),
+          meal_allowance: Math.round(Number(data.meal_allowance) || 0),
+          night_duty_allowance: Math.round(Number(data.night_duty_allowance) || 0),
+          vehicle_allowance: Math.round(Number(data.vehicle_allowance) || 0),
+          childcare_allowance: Math.round(Number(data.childcare_allowance) || 0),
+          research_allowance: Math.round(Number(data.research_allowance) || 0),
+          other_taxfree: Math.round(Number(data.other_taxfree) || 0),
+          extra_allowance: Math.round(Number(data.extra_allowance) || 0),
+          overtime_pay: Math.round(Number(data.overtime_pay) || 0),
+          bonus: Math.round(Number(data.bonus) || 0),
+          total_taxable: isAdvanceOnly ? 0 : Math.round(calc!.taxable),
+          total_taxfree: isAdvanceOnly ? 0 : Math.round(calc!.taxfree),
+          total_deduction: isAdvanceOnly ? 0 : Math.round(calc!.deduction),
           deduction_detail: isAdvanceOnly ? {} : (calc!.deductionDetail || {}),
-          net_pay: isAdvanceOnly ? advancePay : calc!.net,
-          attendance_deduction: data.attendance_deduction || 0,
+          net_pay: isAdvanceOnly ? advancePay : Math.round(calc!.net),
+          attendance_deduction: Math.round(Number(data.attendance_deduction) || 0),
           attendance_deduction_detail: data.attendance_deduction_detail || {},
           advance_pay: advancePay,
           record_type: 'regular',

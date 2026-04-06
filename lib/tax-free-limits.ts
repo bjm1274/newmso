@@ -16,6 +16,13 @@ export const TAX_FREE_LEGAL_LIMITS = {
 export const MINIMUM_WAGE_2025 = 10_030; // 시급
 export const MINIMUM_WAGE_2026 = 10_320; // 시급 (2026년 확정)
 
+/**
+ * 국민연금 기준소득월액 상·하한 (2025.7.1 ~ 2026.6.30, 국민연금법 시행령 제5조)
+ * 상한 초과분·하한 미달분에는 부과하지 않음
+ */
+export const NP_INCOME_CEILING = 6_170_000; // 기준소득월액 상한
+export const NP_INCOME_FLOOR   =   390_000; // 기준소득월액 하한
+
 export function getMinimumWageByYear(year: number) {
   return year >= 2026 ? MINIMUM_WAGE_2026 : MINIMUM_WAGE_2025;
 }

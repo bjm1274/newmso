@@ -41,10 +41,10 @@ export const DEFAULT_INCOME_TAX_BRACKET: IncomeTaxBracketEntry[] = [
 ];
 
 export const DEFAULT_TAX_INSURANCE_RATES: TaxInsuranceRates = {
-  national_pension_rate: 0.045,
-  health_insurance_rate: 0.0355,
-  long_term_care_rate: 0.0046,
-  employment_insurance_rate: 0.009,
+  national_pension_rate: 0.045,     // 국민연금 근로자 부담 4.5% (국민연금법)
+  health_insurance_rate: 0.03545,   // 건강보험 근로자 부담 3.545% (2026년, 국민건강보험법)
+  long_term_care_rate: 0.0046,      // 장기요양 ≈ 건강보험료×12.95% → 과세소득 대비 0.46%
+  employment_insurance_rate: 0.009, // 고용보험 근로자 부담 0.9% (2023년~, 고용보험법)
   income_tax_bracket: DEFAULT_INCOME_TAX_BRACKET,
   configured: false,
 };

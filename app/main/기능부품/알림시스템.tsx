@@ -77,6 +77,72 @@ const DEFAULT_CFG = { icon: '🔔', bg: 'bg-[var(--toss-gray-4)]', progress: 'bg
 const getTypeCfg = (type: string) => TYPE_CFG[type] || DEFAULT_CFG;
 
 export const PUSH_STATUS_CHANGED_EVENT = 'erp-push-status-changed';
+export const PUSH_DEBUG_EVENT = 'erp-push-debug';
+
+type PushDebugEntry = {
+  source: 'app' | 'sw';
+  stage: string;
+  message: string;
+  at: string;
+  detail?: Record<string, unknown> | null;
+};
+
+const PUSH_DEBUG_STORAGE_KEY = 'erp_push_debug_log';
+
+function normalizePushDebugDetail(detail: Record<string, unknown> | null | undefined) {
+  if (!detail) return null;
+  return Object.entries(detail).reduce<Record<string, unknown>>((acc, [key, value]) => {
+    if (value === undefined) return acc;
+    if (value === null) {
+      acc[key] = null;
+      return acc;
+    }
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      acc[key] = value;
+      return acc;
+    }
+    acc[key] = JSON.stringify(value);
+    return acc;
+  }, {});
+}
+
+export function readPushDebugLog(): PushDebugEntry[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(PUSH_DEBUG_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed as PushDebugEntry[] : [];
+  } catch {
+    return [];
+  }
+}
+
+export function recordPushDebug(entry: Omit<PushDebugEntry, 'at'> & { at?: string }) {
+  if (typeof window === 'undefined') return;
+  const nextEntry: PushDebugEntry = {
+    source: entry.source,
+    stage: entry.stage,
+    message: entry.message,
+    at: entry.at || new Date().toISOString(),
+    detail: normalizePushDebugDetail(entry.detail),
+  };
+
+  try {
+    const nextLog = [nextEntry, ...readPushDebugLog()].slice(0, 20);
+    window.localStorage.setItem(PUSH_DEBUG_STORAGE_KEY, JSON.stringify(nextLog));
+  } catch {
+    // ignore storage failures
+  }
+
+  try {
+    window.dispatchEvent(new CustomEvent(PUSH_DEBUG_EVENT, {
+      detail: nextEntry,
+    }));
+  } catch {
+    // ignore event failures
+  }
+}
 
 
 function isMissingTodoReminderSchema(error: unknown) {
@@ -563,18 +629,47 @@ export async function initNotificationService(options?: InitNotificationServiceO
   if (typeof window === 'undefined') return;
   if (!('serviceWorker' in navigator) || !('Notification' in window)) return;
   if (!window.isSecureContext) return;
+  recordPushDebug({
+    source: 'app',
+    stage: 'init-start',
+    message: '푸시 초기화를 시작했습니다.',
+    detail: {
+      permission: Notification.permission,
+      requestPermission,
+      platform: getPushClientPlatform(),
+    },
+  });
   try {
     await cleanupLegacyMessagingServiceWorkers();
     const reg = await navigator.serviceWorker.register('/sw.js');
     if (!reg || typeof reg !== 'object' || !('pushManager' in reg) || !reg.pushManager) {
       return;
     }
+    recordPushDebug({
+      source: 'app',
+      stage: 'sw-registered',
+      message: '서비스워커 등록을 확인했습니다.',
+      detail: {
+        scope: reg.scope,
+      },
+    });
     if (Notification.permission === 'default') {
       if (requiresUserGestureForPushPermission() && !requestPermission) {
         setPushSubscriptionActiveState(staffId, false);
+        recordPushDebug({
+          source: 'app',
+          stage: 'permission-wait-gesture',
+          message: '알림 권한 요청은 첫 사용자 동작을 기다립니다.',
+        });
         return;
       }
-      await Notification.requestPermission();
+      const permission = await Notification.requestPermission();
+      recordPushDebug({
+        source: 'app',
+        stage: 'permission-result',
+        message: `알림 권한 결과: ${permission}`,
+        detail: { permission },
+      });
     }
     const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim();
     if (Notification.permission === 'granted' && vapidKey) {
@@ -634,28 +729,133 @@ export async function initNotificationService(options?: InitNotificationServiceO
             }
           } catch (fcmErr) {
             console.warn('[FCM] 토큰 발급 실패 (Web Push는 계속 사용):', fcmErr);
+            recordPushDebug({
+              source: 'app',
+              stage: 'fcm-token-failed',
+              message: 'FCM 토큰 발급에 실패해 Web Push만 사용합니다.',
+              detail: {
+                error: String((fcmErr as { message?: string } | null)?.message || fcmErr || ''),
+              },
+            });
           }
           await syncPushSubscriptionOnServer(staffId, { ...j, fcm_token: fcmToken });
           window.localStorage.setItem(getPushVapidStorageKey(staffId), vapidKey);
           setPushSubscriptionActiveState(staffId, true);
+          recordPushDebug({
+            source: 'app',
+            stage: 'subscription-active',
+            message: '푸시 구독이 활성화되었습니다.',
+            detail: {
+              endpoint: j.endpoint,
+              hasFcmToken: Boolean(fcmToken),
+            },
+          });
         }
       } else {
         setPushSubscriptionActiveState(staffId, false);
+        recordPushDebug({
+          source: 'app',
+          stage: 'subscription-missing',
+          message: '브라우저 푸시 구독을 확보하지 못했습니다.',
+        });
       }
     } else {
       setPushSubscriptionActiveState(staffId, false);
+      recordPushDebug({
+        source: 'app',
+        stage: 'permission-not-granted',
+        message: `알림 권한 상태가 ${Notification.permission} 입니다.`,
+        detail: {
+          permission: Notification.permission,
+        },
+      });
     }
   } catch (e) {
     setPushSubscriptionActiveState(staffId, false);
     console.warn('SW 등록 건너뜀:', e);
+    recordPushDebug({
+      source: 'app',
+      stage: 'init-error',
+      message: '푸시 초기화 중 오류가 발생했습니다.',
+      detail: {
+        error: String((e as { message?: string } | null)?.message || e || ''),
+      },
+    });
   }
 }
 
 export function sendNotification(title: string, options?: NotificationOptions) {
-  if (typeof window !== 'undefined' && Notification.permission === 'granted') {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.ready.then(reg => reg.showNotification(title, { icon: '/sy-logo.png', badge: '/badge-72x72.png', tag: 'erp-noti', requireInteraction: false, ...options }));
-    } else new Notification(title, options);
+  if (typeof window === 'undefined') return;
+  if (Notification.permission !== 'granted') {
+    recordPushDebug({
+      source: 'app',
+      stage: 'show-skipped',
+      message: '알림 권한이 없어 시스템 팝업을 띄우지 못했습니다.',
+      detail: {
+        permission: Notification.permission,
+        title,
+      },
+    });
+    return;
+  }
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready
+      .then((reg) =>
+        reg.showNotification(title, {
+          icon: '/sy-logo.png',
+          badge: '/badge-72x72.png',
+          tag: 'erp-noti',
+          requireInteraction: false,
+          ...options,
+        })
+      )
+      .then(() => {
+        recordPushDebug({
+          source: 'app',
+          stage: 'show-success',
+          message: '앱에서 시스템 팝업 표시를 요청했습니다.',
+          detail: {
+            title,
+            tag: String(options?.tag || 'erp-noti'),
+          },
+        });
+      })
+      .catch((error) => {
+        recordPushDebug({
+          source: 'app',
+          stage: 'show-error',
+          message: '앱에서 시스템 팝업 표시 요청이 실패했습니다.',
+          detail: {
+            title,
+            error: String((error as { message?: string } | null)?.message || error || ''),
+          },
+        });
+      });
+    return;
+  }
+
+  try {
+    new Notification(title, options);
+    recordPushDebug({
+      source: 'app',
+      stage: 'show-success',
+      message: 'Notification API로 시스템 팝업 표시를 요청했습니다.',
+      detail: {
+        title,
+        tag: String(options?.tag || 'erp-noti'),
+      },
+    });
+  } catch (error) {
+    recordPushDebug({
+      source: 'app',
+      stage: 'show-error',
+      message: 'Notification API 호출이 실패했습니다.',
+      detail: {
+        title,
+        error: String((error as { message?: string } | null)?.message || error || ''),
+      },
+    });
   }
 }
 
@@ -1544,6 +1744,9 @@ export default function NotificationSystem({
           data?: unknown;
           active?: unknown;
           notificationId?: unknown;
+          stage?: unknown;
+          message?: unknown;
+          [key: string]: unknown;
         };
       } | null;
 
@@ -1559,6 +1762,19 @@ export default function NotificationSystem({
           effectiveUserId,
           message.payload?.active !== false
         );
+        return;
+      }
+
+      if (message.type === 'erp-push-debug' && message.payload) {
+        recordPushDebug({
+          source: 'sw',
+          stage: String(message.payload.stage || 'sw-debug'),
+          message: toNotificationText(message.payload.message, '서비스워커 상태'),
+          detail:
+            message.payload && typeof message.payload === 'object'
+              ? (message.payload as Record<string, unknown>)
+              : null,
+        });
         return;
       }
 

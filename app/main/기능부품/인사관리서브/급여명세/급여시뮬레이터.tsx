@@ -1,22 +1,36 @@
 'use client';
 import { useState, useMemo } from 'react';
 
-// 2026년 기준 법정 요율
+// 2026년 기준 법정 요율 (근로자 부담분)
 const RATES = {
-  nationalPension: 0.045,
-  healthInsurance: 0.03545,
-  longTermCare: 0.03545 * 0.1282,
-  employmentInsurance: 0.008,
+  nationalPension: 0.045,    // 국민연금 4.5%
+  healthInsurance: 0.03545,  // 건강보험 3.545%
+  // 장기요양보험: 건강보험료 × 12.95% (2026 기준, 국민건강보험법 시행령 제45조)
+  longTermCare: 0.1295,
+  // 고용보험: 근로자 부담 실업급여 0.9% (2023년 이후, 고용보험법 시행령)
+  employmentInsurance: 0.009,
 };
 
+// 국민연금 기준소득월액 상·하한 (2025.7~2026.6, 국민연금법 시행령 제5조)
+const NP_CEILING = 6_170_000;
+const NP_FLOOR   =   390_000;
+
+/**
+ * 소득세 월 간이세액 근사 계산 (소득세법 제55조 8단계 누진세율)
+ * 부양가족 0인 기준. 실제 정산은 DB 간이세액표 사용.
+ */
 function calcIncomeTax(monthly: number): number {
-  // 간이세액표 근사치 (비과세 공제 후)
   const annual = monthly * 12;
-  if (annual <= 14000000) return Math.floor(annual * 0.06 / 12);
-  if (annual <= 50000000) return Math.floor((840000 + (annual - 14000000) * 0.15) / 12);
-  if (annual <= 88000000) return Math.floor((6240000 + (annual - 50000000) * 0.24) / 12);
-  if (annual <= 150000000) return Math.floor((15360000 + (annual - 88000000) * 0.35) / 12);
-  return Math.floor((37060000 + (annual - 150000000) * 0.38) / 12);
+  let annualTax: number;
+  if      (annual <= 14_000_000)    annualTax = annual * 0.06;
+  else if (annual <= 50_000_000)    annualTax = 840_000     + (annual - 14_000_000)  * 0.15;
+  else if (annual <= 88_000_000)    annualTax = 6_240_000   + (annual - 50_000_000)  * 0.24;
+  else if (annual <= 150_000_000)   annualTax = 15_360_000  + (annual - 88_000_000)  * 0.35;
+  else if (annual <= 300_000_000)   annualTax = 37_060_000  + (annual - 150_000_000) * 0.38;
+  else if (annual <= 500_000_000)   annualTax = 94_060_000  + (annual - 300_000_000) * 0.40;
+  else if (annual <= 1_000_000_000) annualTax = 174_060_000 + (annual - 500_000_000) * 0.42;
+  else                              annualTax = 384_060_000 + (annual - 1_000_000_000) * 0.45;
+  return Math.floor(annualTax / 12);
 }
 
 const ALLOWANCE_PRESETS = [
@@ -50,7 +64,9 @@ export default function SalarySimulator() {
     const gross = baseSalary + totalAllowance;
     const taxableBase = baseSalary + totalAllowance - nonTaxable;
 
-    const np = Math.floor(taxableBase * RATES.nationalPension);
+    // 국민연금: 기준소득월액 상·하한 적용 (국민연금법 시행령 제5조)
+    const npBase = Math.min(Math.max(taxableBase, NP_FLOOR), NP_CEILING);
+    const np = Math.floor(npBase * RATES.nationalPension);
     const hi = Math.floor(taxableBase * RATES.healthInsurance);
     const ltc = Math.floor(hi * RATES.longTermCare);
     const ei = Math.floor(taxableBase * RATES.employmentInsurance);
@@ -69,7 +85,9 @@ export default function SalarySimulator() {
       .reduce((s, a) => s + Math.min(allowances[a.key] || 0, a.defaultVal), 0);
     const gross = compareBase + totalAllowance;
     const taxableBase = compareBase + totalAllowance - nonTaxable;
-    const np = Math.floor(taxableBase * RATES.nationalPension);
+    // 국민연금: 기준소득월액 상·하한 적용
+    const npBase = Math.min(Math.max(taxableBase, NP_FLOOR), NP_CEILING);
+    const np = Math.floor(npBase * RATES.nationalPension);
     const hi = Math.floor(taxableBase * RATES.healthInsurance);
     const ltc = Math.floor(hi * RATES.longTermCare);
     const ei = Math.floor(taxableBase * RATES.employmentInsurance);

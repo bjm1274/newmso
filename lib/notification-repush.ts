@@ -239,8 +239,6 @@ export async function processUnreadNotificationRepushServer(
     let rowSent = 0;
     let rowFailed = 0;
     const expiredSubscriptionIds: string[] = [];
-    const successfulFcmTokens = new Set<string>();
-
     if (uniqueFcmTokens.length > 0) {
       try {
         const fcmResult = await sendFcmBatch(uniqueFcmTokens, {
@@ -248,7 +246,6 @@ export async function processUnreadNotificationRepushServer(
           body: payload.body,
           data: payloadData,
         });
-        fcmResult.success.forEach((token) => successfulFcmTokens.add(String(token)));
         rowSent += fcmResult.success.length > 0 ? 1 : 0;
         rowFailed += fcmResult.success.length === 0 ? 1 : 0;
         if (fcmResult.expired.length > 0) {
@@ -265,10 +262,7 @@ export async function processUnreadNotificationRepushServer(
       rowFailed += 1;
     }
 
-    const webTargets = Array.from(uniqueSubscriptions.values()).filter((subscription) => {
-      const fcmToken = String(subscription.fcm_token || '').trim();
-      return !fcmToken || !successfulFcmTokens.has(fcmToken);
-    });
+    const webTargets = Array.from(uniqueSubscriptions.values());
 
     if (!pushDisabled && webTargets.length > 0) {
       const webResults = await Promise.allSettled(

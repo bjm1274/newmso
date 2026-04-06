@@ -593,7 +593,6 @@ export async function dispatchChatPushForMessage(params: {
   let sent = 0;
   let failed = 0;
   const expiredIds: string[] = [];
-  const successfulFcmTokens = new Set<string>();
   const notificationTag = albumContext.notificationTag;
   const payloadData = {
     room_id: params.roomId,
@@ -620,7 +619,6 @@ export async function dispatchChatPushForMessage(params: {
         body: previewBody,
         data: payloadData,
       });
-      fcmResult.success.forEach((token) => successfulFcmTokens.add(String(token)));
       sent += fcmResult.success.length;
       if (fcmResult.expired.length > 0) {
         await supabase
@@ -641,10 +639,7 @@ export async function dispatchChatPushForMessage(params: {
     if (pushDisabled) return;
     const payload = webPushPayload;
 
-    const targets = Array.from(uniqueSubscriptions.values()).filter((subscription) => {
-      const fcmToken = String(subscription.fcm_token || '').trim();
-      return !fcmToken || !successfulFcmTokens.has(fcmToken);
-    });
+    const targets = Array.from(uniqueSubscriptions.values());
 
     if (targets.length === 0) return;
 
@@ -678,10 +673,7 @@ export async function dispatchChatPushForMessage(params: {
     await supabase.from('push_subscriptions').delete().in('id', expiredIds);
   }
 
-  const hasUndeliveredWebPushTargets = Array.from(uniqueSubscriptions.values()).some((subscription) => {
-    const fcmToken = String(subscription.fcm_token || '').trim();
-    return !fcmToken || !successfulFcmTokens.has(fcmToken);
-  });
+  const hasUndeliveredWebPushTargets = uniqueSubscriptions.size > 0;
 
   if (pushDisabled && hasUndeliveredWebPushTargets) {
     await updateChatPushJobByMessageId(supabase, params.messageId, {

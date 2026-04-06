@@ -28,7 +28,10 @@ export default function OrdinaryWageCalculator({ staffs, selectedCo, user }: Pro
   const hourlyWage = ordinaryWage / MONTHLY_HOURS;
   const overtimePay = hourlyWage * 1.5 * overtimeHours;
   const nightPay = hourlyWage * 0.5 * nightHours;
-  const holidayPay = hourlyWage * 1.5 * holidayHours;
+  // 휴일근로: 8시간 이내 ×1.5, 8시간 초과분 ×2.0 (근로기준법 제56조 2항)
+  const holidayHours8 = Math.min(holidayHours, 8);
+  const holidayHoursOver8 = Math.max(0, holidayHours - 8);
+  const holidayPay = hourlyWage * 1.5 * holidayHours8 + hourlyWage * 2.0 * holidayHoursOver8;
   const annualLeavePay = hourlyWage * 8 * unusedLeave;
 
   const fmt = (n: number) => Math.round(n).toLocaleString('ko-KR');
@@ -47,7 +50,7 @@ export default function OrdinaryWageCalculator({ staffs, selectedCo, user }: Pro
       ['시간급 통상임금', Math.round(hourlyWage)],
       ['연장수당', Math.round(overtimePay)],
       ['야간수당', Math.round(nightPay)],
-      ['휴일수당', Math.round(holidayPay)],
+      [`휴일수당(8h이내×1.5+초과×2.0)`, Math.round(holidayPay)],
       ['연차수당', Math.round(annualLeavePay)],
     ];
     const csv = rows.map(r => r.join(',')).join('\n');
@@ -164,7 +167,9 @@ export default function OrdinaryWageCalculator({ staffs, selectedCo, user }: Pro
               <td className="p-3 text-sm font-bold text-right text-[var(--foreground)]">{fmt(nightPay)} 원</td>
             </tr>
             <tr className="border-b border-[var(--border)]">
-              <td className="p-3 text-xs font-bold text-[var(--toss-gray-4)]">휴일수당 (×1.5 × {holidayHours}시간)</td>
+              <td className="p-3 text-xs font-bold text-[var(--toss-gray-4)]">
+                휴일수당 ({holidayHours}시간 — 8h이내×1.5 + 초과×2.0)
+              </td>
               <td className="p-3 text-sm font-bold text-right text-[var(--foreground)]">{fmt(holidayPay)} 원</td>
             </tr>
             <tr>

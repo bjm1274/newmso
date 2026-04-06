@@ -14,7 +14,9 @@ import {
   initNotificationService,
   loadNotifSettings,
   NotifSettings,
+  PUSH_DEBUG_EVENT,
   PUSH_STATUS_CHANGED_EVENT,
+  readPushDebugLog,
   sendNotification,
   type PushConnectionStatus,
 } from './알림시스템';
@@ -145,6 +147,7 @@ function SettingsTab({ userId }: { userId?: string | null }) {
   const [pushActionPending, setPushActionPending] = useState(false);
   const [pushTestPending, setPushTestPending] = useState(false);
   const [pushTestResult, setPushTestResult] = useState<string | null>(null);
+  const [pushDebugLog, setPushDebugLog] = useState(() => readPushDebugLog());
 
   const update = (partial: Partial<NotifSettings>) => {
     const next = { ...settings, ...partial };
@@ -193,6 +196,20 @@ function SettingsTab({ userId }: { userId?: string | null }) {
       window.removeEventListener(PUSH_STATUS_CHANGED_EVENT, handlePushStatusRefresh);
     };
   }, [refreshPushStatus]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const syncPushDebugLog = () => {
+      setPushDebugLog(readPushDebugLog());
+    };
+
+    syncPushDebugLog();
+    window.addEventListener(PUSH_DEBUG_EVENT, syncPushDebugLog as EventListener);
+    return () => {
+      window.removeEventListener(PUSH_DEBUG_EVENT, syncPushDebugLog as EventListener);
+    };
+  }, []);
 
   const handleReconnectPush = useCallback(async () => {
     if (!userId) return;
@@ -402,6 +419,32 @@ function SettingsTab({ userId }: { userId?: string | null }) {
             <p data-testid="notification-settings-push-test-result" className="text-xs text-[var(--toss-gray-3)]">
               {pushTestResult}
             </p>
+          )}
+          {pushDebugLog.length > 0 && (
+            <div
+              data-testid="notification-settings-push-debug-log"
+              className="rounded-2xl border border-[var(--border)] bg-[var(--muted)]/30 px-4 py-3"
+            >
+              <p className="text-[11px] font-black text-[var(--toss-gray-3)] uppercase tracking-wider">최근 푸시 진단</p>
+              <div className="mt-2 space-y-2">
+                {pushDebugLog.slice(0, 5).map((entry, index) => (
+                  <div key={`${entry.at}-${entry.stage}-${index}`} className="text-xs text-[var(--toss-gray-3)] leading-relaxed">
+                    <p className="font-semibold text-[var(--foreground)]">
+                      [{entry.source === 'sw' ? 'SW' : 'APP'}] {entry.message}
+                    </p>
+                    <p>{timeAgo(entry.at)}</p>
+                    {entry.detail && Object.keys(entry.detail).length > 0 && (
+                      <p className="break-all">
+                        {Object.entries(entry.detail)
+                          .filter(([key]) => key !== 'message' && key !== 'stage')
+                          .map(([key, value]) => `${key}: ${String(value)}`)
+                          .join(' / ')}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           <div className="flex flex-wrap gap-2">

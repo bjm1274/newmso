@@ -32,6 +32,14 @@ async function erpBroadcastMessage(type, payload) {
   });
 }
 
+async function erpBroadcastDebug(stage, message, detail) {
+  await erpBroadcastMessage('erp-push-debug', {
+    stage,
+    message,
+    ...(detail && typeof detail === 'object' ? detail : {}),
+  });
+}
+
 async function erpOpenRetryDb() {
   if (typeof indexedDB === 'undefined') return null;
   if (erpRetryDbPromise) return erpRetryDbPromise;
@@ -347,6 +355,10 @@ async function erpDisplayIncomingNotification(rawPayload) {
   await erpFlushRetryQueue();
   const payload = erpNormalizeNotificationPayload(rawPayload);
   if (!erpShouldShowNotification(payload.tag)) return;
+  await erpBroadcastDebug('incoming', '서비스워커가 푸시를 수신했습니다.', {
+    tag: payload.tag,
+    title: payload.title,
+  });
 
   try {
     if (self.navigator && 'setAppBadge' in self.navigator) {
@@ -368,9 +380,27 @@ async function erpDisplayIncomingNotification(rawPayload) {
     : payload;
 
   const hasVisibleClient = await erpBroadcastPreviewToVisibleClients(previewPayload);
+  await erpBroadcastDebug('preview-sync', '보이는 앱 화면과 알림 미리보기를 동기화했습니다.', {
+    tag: payload.tag,
+    hasVisibleClient,
+    shouldShowForegroundPopup,
+  });
   if (hasVisibleClient && !shouldShowForegroundPopup) return;
 
-  await self.registration.showNotification(payload.title, erpBuildNotificationOptions(payload));
+  try {
+    await self.registration.showNotification(payload.title, erpBuildNotificationOptions(payload));
+    await erpBroadcastDebug('show-success', '서비스워커에서 시스템 팝업 표시를 요청했습니다.', {
+      tag: payload.tag,
+      title: payload.title,
+    });
+  } catch (error) {
+    await erpBroadcastDebug('show-error', '서비스워커에서 시스템 팝업 표시 요청이 실패했습니다.', {
+      tag: payload.tag,
+      title: payload.title,
+      error: String(error && error.message ? error.message : error || ''),
+    });
+    throw error;
+  }
 }
 
 async function erpShowIncomingNotification(rawPayload) {
