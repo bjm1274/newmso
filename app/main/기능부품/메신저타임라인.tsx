@@ -1,6 +1,6 @@
 'use client';
 
-import { useLayoutEffect } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { MutableRefObject, ReactNode, RefObject } from 'react';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import type { ChatMessage, StaffMember } from '@/types';
@@ -39,6 +39,15 @@ type MessengerAlbumItem = ChatMessage & {
 };
 
 export type MessengerTimelineItem = PollItem | MessengerMessageItem | MessengerAlbumItem;
+
+function formatTimelineDateLabel(value: string | number | Date | null | undefined) {
+  return new Date(value || 0).toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'short',
+  });
+}
 
 type DeliveryState = {
   status: 'sending' | 'failed' | 'sent';
@@ -114,6 +123,71 @@ export function MessengerTimeline({
   onRetryFailedMessage,
   onScrollToBottom,
 }: MessengerTimelineProps) {
+  const [scrollDateLabel, setScrollDateLabel] = useState('');
+  const [showScrollDateIndicator, setShowScrollDateIndicator] = useState(false);
+  const scrollDateHideTimeoutRef = useRef<number | null>(null);
+  const pendingRoomChangeAlignRef = useRef<string | null>(null);
+  const roomOpenAutoStickUntilRef = useRef(0);
+
+  const updateScrollDateIndicator = useCallback(() => {
+    const listElement = messageListRef.current;
+    if (!listElement) return;
+
+    const dateDividers = Array.from(
+      listElement.querySelectorAll<HTMLElement>('[data-chat-date-divider="true"]')
+    );
+
+    if (dateDividers.length === 0) {
+      setScrollDateLabel('');
+      return;
+    }
+
+    const threshold = listElement.scrollTop + 24;
+    let activeLabel = dateDividers[0]?.dataset.dateLabel || '';
+
+    for (const divider of dateDividers) {
+      if (divider.offsetTop <= threshold) {
+        activeLabel = divider.dataset.dateLabel || activeLabel;
+      } else {
+        break;
+      }
+    }
+
+    setScrollDateLabel((current) => (current === activeLabel ? current : activeLabel));
+  }, [messageListRef]);
+
+  const handleMessageListScroll = useCallback(() => {
+    const listElement = messageListRef.current;
+    updateScrollDateIndicator();
+    const shouldReveal =
+      !!listElement && listElement.scrollTop + listElement.clientHeight < listElement.scrollHeight - 32;
+    setShowScrollDateIndicator(shouldReveal);
+    if (scrollDateHideTimeoutRef.current !== null) {
+      window.clearTimeout(scrollDateHideTimeoutRef.current);
+    }
+    if (shouldReveal) {
+      scrollDateHideTimeoutRef.current = window.setTimeout(() => {
+        setShowScrollDateIndicator(false);
+      }, 900);
+    }
+    onMessageListScroll();
+  }, [messageListRef, onMessageListScroll, updateScrollDateIndicator]);
+
+  const maintainBottomAfterLayoutChange = useCallback(() => {
+    const listElement = messageListRef.current;
+    if (!selectedRoomId || !listElement) return;
+
+    const distanceFromBottom = Math.abs(
+      listElement.scrollHeight - listElement.clientHeight - listElement.scrollTop
+    );
+    const withinAutoStickWindow = Date.now() <= roomOpenAutoStickUntilRef.current;
+    if (!withinAutoStickWindow && distanceFromBottom > 120) return;
+
+    window.requestAnimationFrame(() => {
+      onScrollToBottom('auto');
+    });
+  }, [messageListRef, onScrollToBottom, selectedRoomId]);
+
   useLayoutEffect(() => {
     if (!selectedRoomId) return;
 
@@ -144,6 +218,33 @@ export function MessengerTimeline({
     };
   }, [messageListRef, scrollRef, scrollToLatestRequestToken, selectedRoomId]);
 
+  useEffect(() => {
+    pendingRoomChangeAlignRef.current = selectedRoomId;
+    roomOpenAutoStickUntilRef.current = selectedRoomId ? Date.now() + 2800 : 0;
+  }, [scrollToLatestRequestToken, selectedRoomId]);
+
+  useEffect(() => {
+    updateScrollDateIndicator();
+    setShowScrollDateIndicator(false);
+    if (
+      selectedRoomId &&
+      pendingRoomChangeAlignRef.current === selectedRoomId &&
+      combinedTimeline.length > 0
+    ) {
+      roomOpenAutoStickUntilRef.current = Math.max(roomOpenAutoStickUntilRef.current, Date.now() + 2800);
+      window.requestAnimationFrame(() => onScrollToBottom('auto'));
+      pendingRoomChangeAlignRef.current = null;
+    }
+  }, [combinedTimeline, onScrollToBottom, selectedRoomId, updateScrollDateIndicator]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollDateHideTimeoutRef.current !== null) {
+        window.clearTimeout(scrollDateHideTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <>
       {selectedRoomId && noticeMessages.length > 0 && (
@@ -171,12 +272,25 @@ export function MessengerTimeline({
         </div>
       )}
 
-      <div
-        ref={messageListRef}
-        data-testid="chat-message-list"
-        onScroll={onMessageListScroll}
-        className="flex-1 min-h-0 overflow-y-auto px-2 py-0.5 pb-1 md:px-4 md:py-2 md:pb-2 space-y-0 custom-scrollbar"
-      >
+      <div className="relative flex-1 min-h-0">
+        <div
+          ref={messageListRef}
+          data-testid="chat-message-list"
+          onScroll={handleMessageListScroll}
+          className="relative h-full min-h-0 overflow-y-auto px-2 py-0.5 pb-1 md:px-4 md:py-2 md:pb-2 space-y-0 custom-scrollbar"
+        >
+          {scrollDateLabel ? (
+            <div className="pointer-events-none absolute inset-y-0 right-2 z-20 flex items-center md:right-4">
+              <div
+                data-testid="chat-scroll-date-indicator"
+                className={`rounded-full bg-[var(--toss-gray-5)]/90 px-2.5 py-1 text-[11px] font-bold text-white shadow-lg backdrop-blur-sm transition-all duration-150 ${
+                  showScrollDateIndicator ? 'translate-x-0 opacity-100' : 'translate-x-2 opacity-0'
+                }`}
+              >
+                {scrollDateLabel}
+              </div>
+            </div>
+          ) : null}
         {!selectedRoomId ? (
           <div className="h-full flex flex-col items-center justify-center text-[var(--toss-gray-3)]">
             <span className="text-4xl mb-2">💬</span>
@@ -229,7 +343,7 @@ export function MessengerTimeline({
                 const isMineAlbum = String(albumItem.sender_id) === effectiveChatUserId;
                 const senderName = (albumItem.staff as { name?: string } | null)?.name || albumItem.sender_name || '알 수 없음';
                 const created = new Date(albumItem.created_at || 0);
-                const dateLabel = created.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+                const dateLabel = formatTimelineDateLabel(albumItem.created_at);
                 const showDateDivider = dateLabel !== lastDateLabel;
                 if (showDateDivider) lastDateLabel = dateLabel;
                 lastSenderId = String(albumItem.sender_id);
@@ -248,7 +362,11 @@ export function MessengerTimeline({
                     className={showDateDivider ? 'mt-0.5 md:mt-1' : 'mt-[2px]'}
                   >
                     {showDateDivider && (
-                      <div className="my-0.5 flex items-center justify-center gap-1 md:my-1 md:gap-2">
+                      <div
+                        data-chat-date-divider="true"
+                        data-date-label={dateLabel}
+                        className="my-0.5 flex items-center justify-center gap-1 md:my-1 md:gap-2"
+                      >
                         <div className="flex-1 h-px bg-[var(--border)]" />
                         <span className="px-2.5 py-0.5 rounded-full bg-[var(--muted)] text-[10px] font-semibold text-[var(--toss-gray-3)] shrink-0">{dateLabel}</span>
                         <div className="flex-1 h-px bg-[var(--border)]" />
@@ -281,6 +399,7 @@ export function MessengerTimeline({
                                 alt={message.file_name || '사진'}
                                 className="w-full h-full object-cover"
                                 loading="lazy"
+                                onLoad={maintainBottomAfterLayoutChange}
                               />
                               {index === 4 && count > 5 && (
                                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
@@ -335,12 +454,7 @@ export function MessengerTimeline({
               const displayedReadStatusSummary = isMine ? readStatusSummary : null;
               const isAttachmentOnlyMessage = !String(msg.content || '').trim() && Boolean(msg.file_url);
               const created = new Date(msg.created_at || 0);
-              const dateLabel = created.toLocaleDateString('ko-KR', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                weekday: 'short',
-              });
+              const dateLabel = formatTimelineDateLabel(msg.created_at);
               const showDateDivider = dateLabel !== lastDateLabel;
               if (showDateDivider) lastDateLabel = dateLabel;
               const isSystemInvite = typeof msg.content === 'string' && msg.content.startsWith('[초대]');
@@ -367,7 +481,11 @@ export function MessengerTimeline({
               return (
                 <div key={msg.id} data-testid={`chat-message-row-${msg.id}`} className={isContinuous ? 'mt-[2px]' : 'mt-0.5 md:mt-1'}>
                   {showDateDivider && (
-                    <div className="my-0.5 flex items-center justify-center gap-1 md:my-1 md:gap-2">
+                    <div
+                      data-chat-date-divider="true"
+                      data-date-label={dateLabel}
+                      className="my-0.5 flex items-center justify-center gap-1 md:my-1 md:gap-2"
+                    >
                       <div className="flex-1 h-px bg-[var(--border)]" />
                       <span className="px-2.5 py-0.5 rounded-full bg-[var(--muted)] text-[10px] font-semibold text-[var(--toss-gray-3)] shrink-0">
                         {dateLabel}
@@ -489,6 +607,7 @@ export function MessengerTimeline({
                                     onPreview={() => onOpenAttachmentPreview(fileUrl, attachmentName, attachmentKind)}
                                     layout="bubble"
                                     tone={isMine ? 'accent' : 'default'}
+                                    onMediaLoad={maintainBottomAfterLayoutChange}
                                   />
                                 </div>
                               );
@@ -634,20 +753,24 @@ export function MessengerTimeline({
           })()
         )}
 
-        <div ref={scrollRef} />
-      </div>
+          <div ref={scrollRef} />
+        </div>
 
       {showScrollToLatest && selectedRoomId && (
-        <div className="absolute right-4 bottom-4 z-20">
+        <div className="pointer-events-none absolute bottom-3 right-3 z-20 md:bottom-4 md:right-4">
           <button
+            data-testid="chat-scroll-to-latest-button"
             type="button"
             onClick={() => onScrollToBottom('smooth')}
-            className="px-3 py-2 rounded-[var(--radius-md)] bg-[var(--card)] border border-[var(--border)] shadow-sm text-[11px] font-bold text-[var(--foreground)]"
+            aria-label="\ucd5c\uc2e0 \uba54\uc2dc\uc9c0\ub85c \uc774\ub3d9"
+            className="pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--card)] text-[0px] text-[var(--foreground)] shadow-lg transition hover:-translate-y-0.5 hover:border-[var(--accent)]/40 hover:bg-[var(--toss-blue-light)] active:translate-y-0"
           >
+            <span aria-hidden="true" className="text-xl leading-none">{"\u2193"}</span>
             최신 메시지
           </button>
         </div>
       )}
+      </div>
     </>
   );
 }

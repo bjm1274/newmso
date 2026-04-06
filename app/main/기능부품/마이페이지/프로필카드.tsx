@@ -1,16 +1,14 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { useState, useEffect, type ChangeEvent } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 import { isMissingColumnError } from '@/lib/supabase-compat';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import {
-  buildProfilePhotoUrlFromPath,
   getProfilePhotoUrl,
   normalizeProfileUser,
-  withProfilePhotoMetadata,
 } from '@/lib/profile-photo';
 import { calculateApprovedAnnualLeaveUsage } from '@/lib/annual-leave-ledger';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
@@ -59,7 +57,6 @@ export default function MyProfileCard({
   const _iu = normalizeStaffLike((initialUser ?? {}) as ProfileCardUser);
   const [user, setUser] = useState<ProfileCardUser>(normalizeProfileUser(_iu as ProfileCardUser));
   const [avatarUrl, setAvatarUrl] = useState<string | null>(getProfilePhotoUrl((_iu)));
-  const [uploading, setUploading] = useState(false);
   const [internalShowSecret, setInternalShowSecret] = useState(false);
   const [internalIsEditing, setInternalIsEditing] = useState(false);
   const effectiveUserId = getStaffLikeId(user);
@@ -223,133 +220,6 @@ export default function MyProfileCard({
     const verified = await verifyPassword();
     if (verified) {
       onSuccess();
-    }
-  };
-
-  const uploadAvatar = async (event: ChangeEvent<HTMLInputElement>) => {
-    try {
-      setUploading(true);
-
-      let currentUser = user;
-      if (!getStaffLikeId(currentUser) && ((_iu)?.name || (_iu)?.employee_no || (_iu)?.auth_user_id)) {
-        await recoverUserIdentity(_iu);
-        try {
-          const stored = localStorage.getItem(STORAGE_KEYS.USER);
-          if (stored) currentUser = JSON.parse(stored);
-        } catch (_) { }
-      }
-      if (!getStaffLikeId(currentUser)) {
-        toast('사진 등록은 직원 계정(이름으로 로그인)으로 이용해 주세요. MSO 관리자 계정에는 프로필 사진 기능을 사용할 수 없습니다.', 'success');
-        setUploading(false);
-        return;
-      }
-
-      if (!event.target.files || event.target.files.length === 0) {
-        setUploading(false);
-        return;
-      }
-
-      const file = event.target.files[0];
-      const filePath = `${currentUser.id}/avatar`;
-      const uploadedAt = new Date().toISOString();
-      const currentPermissions =
-        currentUser?.permissions && typeof currentUser.permissions === 'object' && !Array.isArray(currentUser.permissions)
-          ? currentUser.permissions
-          : {};
-      const nextPermissions = {
-        ...currentPermissions,
-        profile_photo_path: filePath,
-        profile_photo_updated_at: uploadedAt,
-      };
-
-      // 1. Storage 업로드
-      const { error: uploadError } = await supabase.storage
-        .from('profiles')
-        .upload(filePath, file, { upsert: true, contentType: file.type || undefined });
-
-      if (uploadError) throw uploadError;
-
-      // 2. 이미지 주소 획득
-      const { data } = supabase.storage.from('profiles').getPublicUrl(filePath);
-      const newUrl =
-        buildProfilePhotoUrlFromPath(filePath, uploadedAt) ||
-        `${data.publicUrl}?v=${encodeURIComponent(uploadedAt)}`;
-
-      // 3. DB 업데이트 (복구된/저장소 사용자 ID)
-      let persistedToLegacyColumn = false;
-      let legacyUploadError: unknown = null;
-      try {
-        const avatarUpdate = await supabase
-        .from('staff_members')
-        .update({ avatar_url: newUrl })
-        .eq('id', currentUser.id);
-
-      if (!avatarUpdate.error) {
-        persistedToLegacyColumn = true;
-      } else {
-        if (!isMissingColumnError(avatarUpdate.error, 'avatar_url')) throw avatarUpdate.error;
-
-        const photoUpdate = await supabase
-          .from('staff_members')
-          .update({ photo_url: newUrl })
-          .eq('id', currentUser.id);
-
-        if (photoUpdate.error) {
-          if (isMissingColumnError(photoUpdate.error, 'photo_url')) {
-            throw new Error('staff_members 테이블에 avatar_url 또는 photo_url 컬럼이 없습니다.');
-          }
-          throw photoUpdate.error;
-        }
-        persistedToLegacyColumn = true;
-      }
-
-      // 4. 화면 반영
-      } catch (error: unknown) {
-        legacyUploadError = error;
-      }
-      persistedToLegacyColumn = persistedToLegacyColumn || !legacyUploadError;
-
-      const permissionsUpdate = await supabase
-        .from('staff_members')
-        .update({ permissions: nextPermissions })
-        .eq('id', currentUser.id);
-
-      if (permissionsUpdate.error && !persistedToLegacyColumn) {
-        throw permissionsUpdate.error;
-      }
-      if (legacyUploadError && !permissionsUpdate.error) {
-        console.warn('Legacy profile photo columns are unavailable; persisted metadata in permissions instead.', legacyUploadError);
-      }
-
-      setAvatarUrl(newUrl);
-
-      // 5. 세션 강제 동기화 (새로고침 방어)
-      const updatedUser = withProfilePhotoMetadata(
-        {
-          ...currentUser,
-          permissions: nextPermissions,
-          avatar_url: newUrl,
-          photo_url: newUrl,
-        },
-        filePath,
-        uploadedAt
-      );
-      setUser(updatedUser);
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser));
-      broadcastProfileUpdate(updatedUser);
-
-      toast('사진이 정상적으로 등록되었습니다!', 'success');
-
-    } catch (error: unknown) {
-      console.error('프로필 사진 업로드 실패:', error);
-      const msg: string = (error as Error)?.message || '';
-      if (msg.includes('The resource was not found') || msg.includes('bucket')) {
-        toast('프로필 사진 업로드에 실패했습니다.\n\nSupabase 대시보드 → Storage에서 버킷 이름 "profiles"인 Public 버킷을 생성한 뒤, supabase_migrations 폴더의 storage_profiles_policies.sql 정책을 적용해 주세요.', 'error');
-      } else {
-        toast('프로필 사진 업로드에 실패했습니다.\n\n' + (msg || '잠시 후 다시 시도해 주세요.'), 'error');
-      }
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -625,23 +495,6 @@ export default function MyProfileCard({
                 <span className="text-5xl font-bold text-[var(--toss-gray-3)]">👤</span>
               )}
             </div>
-            {user?.id ? (
-              <>
-                <label className="absolute bottom-1 right-1 w-10 h-10 bg-[var(--accent)] text-white rounded-full flex items-center justify-center cursor-pointer hover:opacity-90 transition-all shadow-sm z-10" htmlFor="profiles-upload">
-                  {uploading ? '⏳' : '📷'}
-                </label>
-                <input
-                  style={{ display: 'none' }}
-                  type="file"
-                  id="profiles-upload"
-                  accept="image/*"
-                  onChange={uploadAvatar}
-                  disabled={uploading}
-                />
-              </>
-            ) : (
-              <span className="absolute bottom-1 right-1 text-[11px] font-bold text-[var(--toss-gray-3)] max-w-[100px] text-right">직원 계정 로그인 시 사진 등록 가능</span>
-            )}
           </div>
 
           <div className="flex-1 w-full sm:w-auto text-left">
@@ -663,14 +516,6 @@ export default function MyProfileCard({
         </div>
       ) : (
         <>
-          <input
-            style={{ display: 'none' }}
-            type="file"
-            id="profiles-upload"
-            accept="image/*"
-            onChange={uploadAvatar}
-            disabled={uploading}
-          />
           {!hideActionBar ? (
             <div className="mb-3 flex flex-wrap items-center justify-end gap-2 border-b border-[var(--border)] pb-3">
               {actionButtons}

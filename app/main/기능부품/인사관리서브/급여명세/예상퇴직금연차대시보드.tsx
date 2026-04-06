@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { calculateSeverancePay, formatWorkPeriod } from '@/lib/severance-pay';
+import { calculateSeverancePayFromMonthlyWage, formatWorkPeriod } from '@/lib/severance-pay';
 import { isActiveStaff } from '@/lib/active-staff';
 
 export default function SeveranceLeaveDashboard({ staffs = [] }: Record<string, unknown>) {
@@ -14,8 +14,8 @@ export default function SeveranceLeaveDashboard({ staffs = [] }: Record<string, 
     const now = new Date();
     const j = joined ? new Date(joined) : now;
     const workDays = Math.max(0, Math.floor((now.getTime() - j.getTime()) / (1000 * 60 * 60 * 24)));
-    const avgWage = (s.base_salary || s.base || 0) + (s.meal_allowance || s.meal || 0);
-    const severance = calculateSeverancePay(avgWage, workDays);
+    const monthlyAvgWage = (s.base_salary || s.base || 0) + (s.meal_allowance || s.meal || 0);
+    const severance = calculateSeverancePayFromMonthlyWage(monthlyAvgWage, workDays);
     const years = workDays / 365;
     let leaveTotal = 0;
     if (years >= 1) {

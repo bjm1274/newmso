@@ -495,7 +495,6 @@ function StaffChip({
         <p className="truncate text-xs font-bold text-[var(--foreground)]">{normalizeText(staff.name)}</p>
         <p className="truncate text-[10px] text-[var(--toss-gray-3)]">{normalizeText(staff.position) || '직급 미지정'}</p>
       </div>
-      {presence.state === 'working' ? <PresenceBadge presence={presence} compact /> : null}
     </button>
   );
 }

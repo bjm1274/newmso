@@ -176,12 +176,15 @@ export type MockFixtures = {
   systemConfigs?: any[];
   generatedContracts?: any[];
   employmentContracts?: any[];
+  missingEmploymentContractColumns?: string[];
   onboardingChecklists?: any[];
   insuranceRecords?: any[];
   documentRepository?: any[];
   certificateIssuances?: any[];
   attendance?: any[];
   attendances?: any[];
+  attendanceRecords?: any[];
+  earlyLeaveRecords?: any[];
   shiftAssignments?: any[];
   handoverNotes?: any[];
   dischargeTemplates?: any[];
@@ -261,11 +264,44 @@ function parseInValues(raw: string) {
     .map((item) => decodeURIComponent(item.replace(/^"|"$/g, '').trim()));
 }
 
+function safeDecodeURIComponent(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function matchesIlikeFilter(value: unknown, pattern: string) {
+  const normalizedValue = String(normalizeComparableValue(value) ?? '').toLowerCase();
+  const normalizedPattern = safeDecodeURIComponent(pattern).replace(/%/g, '').toLowerCase();
+  if (!normalizedPattern) return true;
+  return normalizedValue.includes(normalizedPattern);
+}
+
 function applyQueryFilters(rows: any[], url: URL) {
   let filtered = [...rows];
 
   for (const [key, rawValue] of url.searchParams.entries()) {
     if (['select', 'order', 'limit', 'offset', 'on_conflict', 'columns'].includes(key)) {
+      continue;
+    }
+
+    if (key === 'or') {
+      const normalized = safeDecodeURIComponent(rawValue).replace(/^\(|\)$/g, '');
+      const conditions = normalized
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      filtered = filtered.filter((row) =>
+        conditions.some((condition) => {
+          const [fieldName, operator, ...rest] = condition.split('.');
+          if (operator !== 'ilike') return false;
+          const pattern = rest.join('.');
+          return matchesIlikeFilter(resolveFilterFieldValue(row, fieldName), pattern);
+        })
+      );
       continue;
     }
 
@@ -439,12 +475,15 @@ function buildFixtures(overrides: MockFixtures = {}) {
     approvalFormTypes: overrides.approvalFormTypes ?? [],
     generatedContracts: overrides.generatedContracts ?? [],
     employmentContracts: overrides.employmentContracts ?? [],
+    missingEmploymentContractColumns: overrides.missingEmploymentContractColumns ?? [],
     onboardingChecklists: overrides.onboardingChecklists ?? [],
     insuranceRecords: overrides.insuranceRecords ?? [],
     documentRepository: overrides.documentRepository ?? [],
     certificateIssuances: overrides.certificateIssuances ?? [],
     attendance: overrides.attendance ?? [],
     attendances: overrides.attendances ?? [],
+    attendanceRecords: overrides.attendanceRecords ?? [],
+    earlyLeaveRecords: overrides.earlyLeaveRecords ?? [],
     shiftAssignments: overrides.shiftAssignments ?? [],
     handoverNotes: overrides.handoverNotes ?? [],
     dischargeTemplates: overrides.dischargeTemplates ?? [],
@@ -707,6 +746,8 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   let certificateIssuances = [...fixtures.certificateIssuances];
   let attendance = [...(fixtures.attendance ?? [])];
   let attendances = [...fixtures.attendances];
+  let attendanceRecords = [...fixtures.attendanceRecords];
+  let earlyLeaveRecords = [...fixtures.earlyLeaveRecords];
   let shiftAssignments = [...fixtures.shiftAssignments];
   let handoverNotes = [...fixtures.handoverNotes];
   let dischargeTemplates = [...fixtures.dischargeTemplates];
@@ -716,6 +757,7 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   let opPatientChecks = [...fixtures.opPatientChecks];
   const missingSurgeryTemplatesSchema = fixtures.missingSurgeryTemplatesSchema;
   const missingInventoryItemsSchema = fixtures.missingInventoryItemsSchema;
+  const missingEmploymentContractColumns = new Set(fixtures.missingEmploymentContractColumns ?? []);
   const missingMessageColumns = new Set(fixtures.missingMessageColumns ?? []);
   const missingBoardPostColumns = new Set(fixtures.missingBoardPostColumns ?? []);
   let dailyClosures = [...fixtures.dailyClosures];
@@ -1684,6 +1726,50 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
         return json(route, firstOrList(filteredRows, wantsObject));
       }
       return json(route, attendanceDeductionRules);
+    }
+
+    if (path.includes('/attendance_records')) {
+      if (method === 'GET') {
+        const filteredRows = applyQueryFilters(attendanceRecords, url);
+        return json(route, firstOrList(filteredRows, wantsObject));
+      }
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `attendance-record-${attendanceRecords.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        attendanceRecords = [...attendanceRecords, ...inserted];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+      return json(route, attendanceRecords);
+    }
+
+    if (path.includes('/early_leave_records')) {
+      if (method === 'GET') {
+        const filteredRows = applyQueryFilters(earlyLeaveRecords, url);
+        return json(route, firstOrList(filteredRows, wantsObject));
+      }
+      if (method === 'PATCH') {
+        const body = request.postDataJSON() || {};
+        const { nextRows, updatedRows } = patchRowsMatchingFilters(earlyLeaveRecords, url, body);
+        earlyLeaveRecords = nextRows;
+        return json(route, wantsObject ? updatedRows[0] ?? null : updatedRows);
+      }
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `early-leave-record-${earlyLeaveRecords.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        earlyLeaveRecords = [...earlyLeaveRecords, ...inserted];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+      return json(route, earlyLeaveRecords);
     }
 
     if (path.includes('/tax_insurance_rates')) {
@@ -3070,6 +3156,17 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       if (method === 'POST') {
         const body = request.postDataJSON();
         const payloads = Array.isArray(body) ? body : [body];
+
+        for (const missingContractColumn of missingEmploymentContractColumns) {
+          if (
+            payloads.some((payload: any) =>
+              Object.prototype.hasOwnProperty.call(payload ?? {}, missingContractColumn)
+            )
+          ) {
+            return missingColumn(route, missingContractColumn, 'employment_contracts');
+          }
+        }
+
         const inserted = payloads.map((payload: any, index: number) => ({
           id: payload.id || `employment-contract-${employmentContracts.length + index + 1}`,
           created_at: payload.created_at || new Date().toISOString(),

@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react';
+
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import SalaryDetail from '../../인사관리서브/급여명세/급여상세';
@@ -35,6 +36,8 @@ interface SalaryRecord {
   overtime_pay?: number;
   bonus?: number;
   year_month?: string;
+  record_type?: string | null;
+  status?: string | null;
   deduction_detail?: Record<string, number>;
   total_taxable?: number;
   total_taxfree?: number;
@@ -51,6 +54,25 @@ interface SalaryRecord {
 
 type SalaryHistoryItem = { year_month: string; net_pay: number };
 
+function formatYearMonthLabel(yearMonth: string) {
+  const [year, month] = String(yearMonth || '').split('-');
+  if (!year || !month) return yearMonth;
+  return `${year}년 ${Number(month)}월`;
+}
+
+function extractYearMonthFromText(value: unknown) {
+  const text = String(value || '');
+  const dashMatch = text.match(/(20\d{2})-(\d{1,2})/);
+  if (dashMatch) {
+    return `${dashMatch[1]}-${String(Number(dashMatch[2])).padStart(2, '0')}`;
+  }
+  const koreanMatch = text.match(/(20\d{2})년\s*(\d{1,2})월/);
+  if (koreanMatch) {
+    return `${koreanMatch[1]}-${String(Number(koreanMatch[2])).padStart(2, '0')}`;
+  }
+  return null;
+}
+
 function SalaryTrendChart({ history }: { history: SalaryHistoryItem[] }) {
   if (history.length < 2) return null;
   const maxPay = Math.max(...history.map((h) => h.net_pay));
@@ -59,17 +81,21 @@ function SalaryTrendChart({ history }: { history: SalaryHistoryItem[] }) {
 
   return (
     <div className="mx-4 mt-3 mb-0 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3">
-      <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">최근 급여 추이</p>
+      <p className="mb-2 text-[11px] font-bold tracking-wider text-[var(--toss-gray-3)]">최근 명세서 실지급 추이</p>
       <div className="flex h-14 items-end gap-1">
         {history.map((item) => {
           const heightPct = range > 0 ? ((item.net_pay - minPay) / range) * 70 + 30 : 60;
           const label = item.year_month.slice(5, 7) + '월';
           return (
             <div key={item.year_month} className="flex flex-1 flex-col items-center gap-0.5">
-              <span className="text-[9px] text-[var(--accent)] font-semibold">
+              <span className="text-[9px] font-semibold text-[var(--accent)]">
                 {(item.net_pay / 10000).toFixed(0)}만
               </span>
-              <div className="w-full rounded-t-sm bg-[var(--accent)]/70 transition-all" style={{ height: `${heightPct}%` }} title={`${item.year_month}: ${item.net_pay.toLocaleString()}원`} />
+              <div
+                className="w-full rounded-t-sm bg-[var(--accent)]/70 transition-all"
+                style={{ height: `${heightPct}%` }}
+                title={`${item.year_month}: ${item.net_pay.toLocaleString()}원`}
+              />
               <span className="text-[9px] text-[var(--toss-gray-3)]">{label}</span>
             </div>
           );
@@ -86,9 +112,8 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
   const [passwordInput, setPasswordInput] = useState('');
   const [verifyError, setVerifyError] = useState('');
   const [verifying, setVerifying] = useState(false);
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [salaryData, setSalaryData] = useState<Record<string, unknown> | null>(null);
-  const [salaryHistory, setSalaryHistory] = useState<SalaryHistoryItem[]>([]);
+  const [issuedRecords, setIssuedRecords] = useState<SalaryRecord[]>([]);
+  const [selectedYearMonth, setSelectedYearMonth] = useState('');
   const effectiveUserId = getStaffLikeId(resolvedUser);
 
   useEffect(() => {
@@ -166,61 +191,100 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
     setVerifying(false);
   };
 
-  const changeMonth = (offset: number) => {
-    const newDate = new Date(currentDate);
-    newDate.setMonth(newDate.getMonth() + offset);
-    setCurrentDate(newDate);
-  };
-
-  const selectedYearMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
-
-  useEffect(() => {
-    if (!effectiveUserId) return;
-
-    const fetchSalaryRecord = async () => {
-      const { data, error } = await supabase
-        .from('payroll_records')
-        .select('*')
-        .eq('staff_id', effectiveUserId)
-        .eq('year_month', selectedYearMonth)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching salary record:', error);
-        setSalaryData(null);
-      } else {
-        setSalaryData(data);
-      }
-    };
-
-    fetchSalaryRecord();
-  }, [effectiveUserId, selectedYearMonth]);
-
-  // 급여 추이: 최근 6개월 net_pay 조회 (잠금 해제 후)
   useEffect(() => {
     if (!unlocked || !effectiveUserId) return;
-    const fetchHistory = async () => {
-      const { data } = await supabase
-        .from('payroll_records')
-        .select('year_month, net_pay')
-        .eq('staff_id', effectiveUserId)
-        .order('year_month', { ascending: false })
-        .limit(6);
-      if (Array.isArray(data) && data.length > 0) {
-        setSalaryHistory(
-          [...data]
-            .reverse()
-            .map((r) => ({ year_month: String(r.year_month || ''), net_pay: Number(r.net_pay || 0) }))
-            .filter((r) => r.net_pay > 0)
-        );
+    let cancelled = false;
+
+    const fetchIssuedSalaryRecords = async () => {
+      const [recordsResult, notificationsResult] = await Promise.all([
+        supabase
+          .from('payroll_records')
+          .select('*')
+          .eq('staff_id', effectiveUserId)
+          .neq('record_type', 'interim')
+          .order('year_month', { ascending: false }),
+        supabase
+          .from('notifications')
+          .select('title, body')
+          .eq('user_id', effectiveUserId)
+          .eq('type', '급여명세')
+          .order('created_at', { ascending: false }),
+      ]);
+
+      if (cancelled) return;
+
+      if (recordsResult.error) {
+        console.error('Error fetching issued salary records:', recordsResult.error);
+        setIssuedRecords([]);
+        setSelectedYearMonth('');
+        return;
       }
+
+      const allRecords = ((recordsResult.data || []) as SalaryRecord[]).filter((record) => {
+        const recordType = String(record.record_type || 'regular');
+        return recordType !== 'interim';
+      });
+      const issuedCandidates = allRecords.filter((record) => {
+        const status = String(record.status || '').trim();
+        return status === '확정' || status === '';
+      });
+
+      const sentMonths = new Set(
+        ((notificationsResult.data || []) as { title?: string; body?: string }[])
+          .map((row) => extractYearMonthFromText(`${row.title || ''} ${row.body || ''}`))
+          .filter((value): value is string => Boolean(value)),
+      );
+
+      const visibleRecords =
+        sentMonths.size > 0
+          ? issuedCandidates.filter((record) => sentMonths.has(String(record.year_month || '')))
+          : issuedCandidates;
+
+      const sortedRecords = [...visibleRecords].sort((a, b) =>
+        String(b.year_month || '').localeCompare(String(a.year_month || '')),
+      );
+
+      setIssuedRecords(sortedRecords);
+      setSelectedYearMonth((previous) => {
+        if (sortedRecords.some((record) => String(record.year_month || '') === previous)) {
+          return previous;
+        }
+        return String(sortedRecords[0]?.year_month || '');
+      });
     };
-    void fetchHistory();
-  }, [unlocked, effectiveUserId]);
 
-  const handlePrint = () => { window.print(); };
+    void fetchIssuedSalaryRecords();
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveUserId, unlocked]);
 
-  /* 암호 미확인 시 비밀번호 입력 화면 */
+  const salaryData = useMemo(
+    () =>
+      issuedRecords.find((record) => String(record.year_month || '') === selectedYearMonth) || null,
+    [issuedRecords, selectedYearMonth],
+  );
+  const salaryHistory = useMemo(
+    () =>
+      [...issuedRecords]
+        .slice(0, 6)
+        .reverse()
+        .map((record) => ({
+          year_month: String(record.year_month || ''),
+          net_pay: Number(record.net_pay || 0),
+        }))
+        .filter((record) => record.net_pay > 0),
+    [issuedRecords],
+  );
+  const availableMonths = useMemo(
+    () => issuedRecords.map((record) => String(record.year_month || '')).filter(Boolean),
+    [issuedRecords],
+  );
+
+  const handlePrint = () => {
+    window.print();
+  };
+
   if (!unlocked) {
     return (
       <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] overflow-hidden flex flex-col items-center justify-center min-h-[320px] p-5 sm:p-5">
@@ -230,7 +294,10 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
           <input
             type="password"
             value={passwordInput}
-            onChange={(e) => { setPasswordInput(e.target.value); setVerifyError(''); }}
+            onChange={(e) => {
+              setPasswordInput(e.target.value);
+              setVerifyError('');
+            }}
             placeholder="비밀번호"
             data-testid="salary-password-input"
             className="w-full px-4 py-3.5 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)]"
@@ -255,23 +322,21 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
     return (
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-5 sm:p-5 flex flex-col items-center justify-center min-h-[300px] text-center">
         <div className="w-16 h-16 bg-[var(--tab-bg)] rounded-full flex items-center justify-center text-2xl mb-4">📅</div>
-        <h3 className="text-lg font-bold text-[var(--foreground)] mb-2">급여 내역이 없습니다</h3>
+        <h3 className="text-lg font-bold text-[var(--foreground)] mb-2">발송된 급여명세서가 없습니다</h3>
         <p className="text-sm text-[var(--toss-gray-3)] leading-relaxed">
-          {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월의 급여 정산이 아직 완료되지 않았습니다.<br />
-          정산이 완료되면 이곳에서 명세서를 확인하실 수 있습니다.
+          확정 후 발송된 급여명세서가 있으면 이곳에서 월별로 선택해 확인할 수 있습니다.
         </p>
       </div>
     );
   }
 
-
   return (
     <>
       <style>{`
         @media print {
-          @page { size: landscape; margin: 5mm; }
-          body * { 
-            visibility: hidden; 
+          @page { size: portrait; margin: 8mm; }
+          body * {
+            visibility: hidden;
             print-color-adjust: exact !important;
             -webkit-print-color-adjust: exact !important;
           }
@@ -290,24 +355,41 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
         }
       `}</style>
 
-      <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] overflow-hidden flex flex-col h-full">
-        <div className="px-5 py-4 sm:px-4 sm:py-5 bg-[var(--muted)] border-b border-[var(--border)] flex flex-wrap justify-between items-center gap-4 shrink-0">
-          <div className="flex items-center gap-4 sm:gap-4">
-            <div className="flex gap-2">
-              <button type="button" onClick={() => changeMonth(-1)} className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--card)] border border-[var(--border)] hover:bg-[var(--toss-gray-2)] flex items-center justify-center shadow-sm">◀</button>
-              <button type="button" onClick={() => changeMonth(1)} className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--card)] border border-[var(--border)] hover:bg-[var(--toss-gray-2)] flex items-center justify-center shadow-sm">▶</button>
+      <div data-testid="mypage-salary-tab" className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] overflow-hidden flex flex-col h-full">
+        <div className="px-5 py-4 sm:px-4 sm:py-5 bg-[var(--muted)] border-b border-[var(--border)] flex flex-wrap justify-between items-end gap-4 shrink-0">
+          <div className="space-y-2">
+            <p className="text-[11px] font-bold tracking-wider text-[var(--toss-gray-3)]">월별 급여명세서</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <select
+                data-testid="mypage-salary-month-select"
+                value={selectedYearMonth}
+                onChange={(event) => setSelectedYearMonth(event.target.value)}
+                className="min-w-[180px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+              >
+                {availableMonths.map((yearMonth) => (
+                  <option key={yearMonth} value={yearMonth}>
+                    {formatYearMonthLabel(yearMonth)}
+                  </option>
+                ))}
+              </select>
+              <p className="text-sm font-medium text-[var(--toss-gray-3)]">
+                확정 후 발송된 명세서만 표시됩니다.
+              </p>
             </div>
-            <h3 className="text-lg sm:text-xl font-semibold text-[var(--foreground)]">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월</h3>
           </div>
-          <button type="button" onClick={handlePrint} className="px-4 py-3 sm:px-5 sm:py-4 bg-[var(--foreground)] text-white text-sm font-semibold rounded-[var(--radius-lg)] hover:opacity-95 transition-all flex items-center gap-2 shadow-sm">
-            🖨️ A4 한 장에 맞춰 인쇄
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="px-4 py-3 sm:px-5 sm:py-4 bg-[var(--foreground)] text-white text-sm font-semibold rounded-[var(--radius-lg)] hover:opacity-95 transition-all flex items-center gap-2 shadow-sm"
+          >
+            🖨️ A4 출력
           </button>
         </div>
 
         {salaryHistory.length >= 2 && <SalaryTrendChart history={salaryHistory} />}
 
         <div className="flex-1 overflow-auto bg-[var(--muted)] p-4 sm:p-5 lg:p-5 flex justify-center custom-scrollbar">
-          <div id="print-section" className="w-full max-w-7xl print:max-w-none print:w-full mx-auto shadow-sm print:shadow-none bg-[var(--card)] print:bg-transparent overflow-visible">
+          <div id="print-section" className="w-full max-w-[880px] print:max-w-none print:w-full mx-auto shadow-sm print:shadow-none bg-[var(--card)] print:bg-transparent overflow-visible">
             <SalaryDetail
               staff={(resolvedUser || _user) as StaffInfo | undefined}
               record={salaryData as SalaryRecord | undefined}

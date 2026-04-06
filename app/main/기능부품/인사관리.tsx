@@ -26,10 +26,9 @@ import RewardDisciplineManagement from './인사관리서브/포상징계관리'
 import LicenseManager from './인사관리서브/면허자격증관리';
 import MedicalDeviceInspection from './인사관리서브/의료기기점검';
 import AnnualLeaveExpiryAlert from './인사관리서브/연차소멸알림';
-import LatenessPatternAnalysis from './인사관리서브/지각조퇴분석';
 import IncidentReport from './인사관리서브/사고보고서';
 import WorkTypeChangeHistory from './인사관리서브/근무형태변경이력';
-import EarlyLeavingDetection from './인사관리서브/조기퇴근감지';
+import AttendanceIssueAnalysisSuite from './인사관리서브/근태이상통합분석';
 import ContractAutoGenerator from './인사관리서브/계약서자동생성';
 import InsuranceEDI from './인사관리서브/급여명세/4대보험EDI';
 import AutoRosterPlanner from './근무표자동편성';
@@ -53,9 +52,8 @@ type HrMenuId =
 type AttendanceAnalysisTabId =
   | '근태관리'
   | '연차소멸알림'
-  | '지각조퇴분석'
-  | '근무형태이력'
-  | '조기퇴근감지';
+  | '근태이상분석'
+  | '근무형태이력';
 
 type PersonnelSuiteTabId = '인사발령' | '포상/징계';
 type LifecycleSuiteTabId = '교육' | '오프보딩';
@@ -110,9 +108,8 @@ const HR_TABS: HrTabDef[] = [
 const ATTENDANCE_ANALYSIS_TABS: AttendanceAnalysisTabDef[] = [
   { id: '근태관리', label: '근태 현황', perm: 'hr_근태', icon: '⏰' },
   { id: '연차소멸알림', label: '연차소멸알림', perm: 'hr_연차휴가', icon: '⏳' },
-  { id: '지각조퇴분석', label: '지각조퇴분석', perm: 'hr_근태', icon: '📊' },
+  { id: '근태이상분석', label: '지각·조퇴·조기퇴근', perm: 'hr_근태', icon: '📊' },
   { id: '근무형태이력', label: '근무형태이력', perm: 'hr_근무형태', icon: '🔁' },
-  { id: '조기퇴근감지', label: '조기퇴근감지', perm: 'hr_근태', icon: '🚶' },
 ];
 
 const PERSONNEL_SUITE_TABS = [
@@ -173,6 +170,7 @@ const REMOVED_MENU_FALLBACKS: Record<string, HrMenuId> = {
   계약서생성기: '계약',
   연차소멸알림: '근태',
   지각조퇴분석: '근태',
+  근태이상분석: '근태',
   근무형태이력: '근태',
   조기퇴근감지: '근태',
   근무표자동편성: '근태',
@@ -202,9 +200,11 @@ const CONTRACT_UTILITY_MENU_MAP: Record<string, ContractEmbeddedTabId> = {
 
 const ATTENDANCE_ANALYSIS_MENU_MAP: Record<string, AttendanceAnalysisTabId> = {
   연차소멸알림: '연차소멸알림',
-  지각조퇴분석: '지각조퇴분석',
+  지각조퇴분석: '근태이상분석',
+  근태이상분석: '근태이상분석',
+  '지각·조퇴·조기퇴근': '근태이상분석',
   근무형태이력: '근무형태이력',
-  조기퇴근감지: '조기퇴근감지',
+  조기퇴근감지: '근태이상분석',
 };
 
 const PERSONNEL_SUITE_MENU_MAP: Record<string, PersonnelSuiteTabId> = {
@@ -861,14 +861,11 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                 {activeAttendanceTab === '연차소멸알림' && (
                   <AnnualLeaveExpiryAlert staffs={인사직원목록} selectedCo={선택사업체} user={user} />
                 )}
-                {activeAttendanceTab === '지각조퇴분석' && (
-                  <LatenessPatternAnalysis staffs={인사직원목록} selectedCo={선택사업체} user={user} />
+                {activeAttendanceTab === '근태이상분석' && (
+                  <AttendanceIssueAnalysisSuite staffs={인사직원목록} selectedCo={선택사업체} user={user} />
                 )}
                 {activeAttendanceTab === '근무형태이력' && (
                   <WorkTypeChangeHistory staffs={인사직원목록} selectedCo={선택사업체} user={user} />
-                )}
-                {activeAttendanceTab === '조기퇴근감지' && (
-                  <EarlyLeavingDetection staffs={인사직원목록} selectedCo={선택사업체} user={user} />
                 )}
               </div>
             </div>

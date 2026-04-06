@@ -19,6 +19,7 @@ test('interim settlement prorates vehicle and fixed allowances and stores deduct
     department: fakeUser.department,
     position: '주임',
     status: '퇴사',
+    joined_at: '2024-01-10',
     resigned_at: '2026-01-10',
     base_salary: 3100000,
     meal_allowance: 310000,
@@ -83,7 +84,8 @@ test('interim settlement prorates vehicle and fixed allowances and stores deduct
   expect(record.meal_allowance).toBe(100000);
   expect(record.vehicle_allowance).toBe(100000);
   expect(record.extra_allowance).toBe(20000);
-  expect(record.total_taxable).toBe(1020000);
+  expect(record.severance_pay).toBe(6754294);
+  expect(record.total_taxable).toBe(7774294);
   expect(record.total_taxfree).toBe(200000);
   expect(record.total_deduction).toBeGreaterThan(0);
   expect(record.total_deduction).toBe(

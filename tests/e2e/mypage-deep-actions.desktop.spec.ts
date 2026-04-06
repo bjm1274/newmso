@@ -351,6 +351,136 @@ test('mypage commute marks check-in as late when the assigned shift start time h
   expect(runtimeErrors).toEqual([]);
 });
 
+test('mypage commute prefers the latest staff shift over a stale session shift when checking lateness', async ({
+  page,
+}) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const frozenIso = '2026-03-27T08:23:00+09:00';
+  const workDate = '2026-03-27';
+  const staleShiftUser = {
+    ...fakeUser,
+    shift_id: 'shift-day-0800',
+  };
+  const latestStaffRow = {
+    ...staleShiftUser,
+    shift_id: 'shift-day-0830',
+  };
+
+  await page.addInitScript(({ iso }) => {
+    const RealDate = Date;
+    class MockDate extends RealDate {
+      constructor(...args: any[]) {
+        if (args.length === 0) {
+          super(iso);
+          return;
+        }
+        if (args.length === 1) {
+          super(args[0]);
+          return;
+        }
+        if (args.length === 2) {
+          super(args[0], args[1]);
+          return;
+        }
+        if (args.length === 3) {
+          super(args[0], args[1], args[2]);
+          return;
+        }
+        if (args.length === 4) {
+          super(args[0], args[1], args[2], args[3]);
+          return;
+        }
+        if (args.length === 5) {
+          super(args[0], args[1], args[2], args[3], args[4]);
+          return;
+        }
+        if (args.length === 6) {
+          super(args[0], args[1], args[2], args[3], args[4], args[5]);
+          return;
+        }
+        super(args[0], args[1], args[2], args[3], args[4], args[5], args[6]);
+      }
+
+      static now() {
+        return new RealDate(iso).getTime();
+      }
+    }
+
+    MockDate.parse = RealDate.parse;
+    MockDate.UTC = RealDate.UTC;
+    // @ts-expect-error test shim
+    window.Date = MockDate;
+  }, { iso: frozenIso });
+
+  await mockSupabase(page, {
+    staffMembers: [latestStaffRow],
+    attendance: [],
+    attendances: [],
+    workShifts: [
+      {
+        id: 'shift-day-0800',
+        name: '구세션 근무유형',
+        start_time: '08:00',
+        end_time: '17:00',
+        company_name: staleShiftUser.company,
+      },
+      {
+        id: 'shift-day-0830',
+        name: '최신 근무유형',
+        start_time: '08:30',
+        end_time: '17:30',
+        company_name: staleShiftUser.company,
+      },
+    ],
+  });
+
+  await page.context().grantPermissions(['geolocation'], {
+    origin: 'http://127.0.0.1:3000',
+  });
+  await page.context().setGeolocation({
+    latitude: 34.806074,
+    longitude: 126.405525,
+  });
+
+  await seedSession(page, {
+    user: staleShiftUser,
+    localStorage: {
+      erp_last_menu: '내정보',
+      erp_mypage_tab: 'commute',
+    },
+  });
+
+  await openMyPage(page);
+  await page.getByRole('button', { name: /출퇴근/ }).click();
+  await expect(page.getByTestId('commute-check-in-button')).toBeVisible();
+  await page.getByTestId('commute-check-in-button').click();
+
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(async ({ staffId, targetDate }) => {
+          const [attendanceResponse, attendancesResponse] = await Promise.all([
+            fetch(`/rest/v1/attendance?staff_id=eq.${staffId}&select=*`),
+            fetch(`/rest/v1/attendances?staff_id=eq.${staffId}&select=*`),
+          ]);
+          const attendanceRows = await attendanceResponse.json();
+          const attendancesRows = await attendancesResponse.json();
+          return {
+            attendance: attendanceRows.find((row: any) => String(row.date) === targetDate) ?? null,
+            attendances:
+              attendancesRows.find((row: any) => String(row.work_date || row.date) === targetDate) ?? null,
+          };
+        }, { staffId: staleShiftUser.id, targetDate: workDate }),
+      { timeout: 5000 }
+    )
+    .toMatchObject({
+      attendance: { status: '정상' },
+      attendances: { status: 'present' },
+    });
+
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('mypage commute shows an early checkout as 조퇴 and keeps correction request available', async ({
   page,
 }) => {

@@ -5,9 +5,14 @@ import { canAccessMainMenu } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { ADMIN_SIDEBAR_ITEMS } from '../../admin-menu-config';
+import { CHAT_ACTIVE_ROOM_KEY } from '@/app/main/navigation-state';
 import NotificationCenter from '../NotificationCenter';
 
-import { NOTICE_ROOM_ID } from '@/app/main/기능부품/메신저유틸';
+import {
+  getConversationRoomIdSet,
+  getRoomPrefsStorageKey,
+  NOTICE_ROOM_ID,
+} from '@/app/main/기능부품/메신저유틸';
 
 const MYPAGE_TAB_KEY = 'erp_mypage_tab';
 
@@ -135,6 +140,37 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
     [effectiveUser]
   );
 
+  const readHiddenRoomIds = useCallback(() => {
+    if (typeof window === 'undefined') return new Set<string>();
+
+    try {
+      const raw = window.localStorage.getItem(getRoomPrefsStorageKey(effectiveUserId));
+      if (!raw) return new Set<string>();
+
+      const parsed = JSON.parse(raw) as Record<string, { hidden?: boolean } | null | undefined>;
+      return new Set(
+        Object.entries(parsed || {})
+          .filter(([, value]) => value?.hidden === true)
+          .map(([roomId]) => String(roomId))
+          .filter(Boolean)
+      );
+    } catch {
+      return new Set<string>();
+    }
+  }, [effectiveUserId]);
+
+  const readOpenConversationRoomIds = useCallback((rooms: any[]) => {
+    if (typeof window === 'undefined') return new Set<string>();
+
+    try {
+      const activeRoomId = window.sessionStorage.getItem(CHAT_ACTIVE_ROOM_KEY);
+      if (!activeRoomId) return new Set<string>();
+      return getConversationRoomIdSet(activeRoomId, rooms);
+    } catch {
+      return new Set<string>();
+    }
+  }, []);
+
   const fetchChatUnreadCount = useCallback(async () => {
     if (!effectiveUserId) {
       setChatUnreadCount(0);
@@ -153,12 +189,16 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
         return Array.isArray(room.members) && room.members.some((id: string) => String(id) === effectiveUserId);
       });
 
-      if (myRooms.length === 0) {
+      const hiddenRoomIds = readHiddenRoomIds();
+      const visibleRooms = myRooms.filter((room: any) => !hiddenRoomIds.has(String(room.id)));
+
+      if (visibleRooms.length === 0) {
         setChatUnreadCount(0);
         return;
       }
 
-      const roomIds = myRooms.map((room: any) => room.id);
+      const openConversationRoomIds = readOpenConversationRoomIds(visibleRooms);
+      const roomIds = visibleRooms.map((room: any) => room.id);
       const { data: cursors, error: cursorError } = await supabase
         .from('room_read_cursors')
         .select('room_id, last_read_at')
@@ -174,6 +214,10 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
 
       let totalUnread = 0;
       for (const roomId of roomIds) {
+        if (openConversationRoomIds.has(String(roomId))) {
+          continue;
+        }
+
         let query = supabase
           .from('messages')
           .select('id', { count: 'exact', head: true })
@@ -206,7 +250,7 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
       console.error('메인 메뉴 채팅 안읽음 계산 실패:', error);
       setChatUnreadCount(0);
     }
-  }, [effectiveUserId]);
+  }, [effectiveUserId, readHiddenRoomIds, readOpenConversationRoomIds]);
 
   useEffect(() => {
     void fetchChatUnreadCount();
@@ -287,7 +331,10 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
                 <span className="relative text-[17px] leading-none">
                   {menu.icon}
                   {menu.id === '채팅' && chatUnreadCount > 0 && (
-                    <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/100 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                    <span
+                      data-testid="sidebar-menu-chat-badge"
+                      className="absolute -top-1.5 -right-2.5 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/100 text-white text-[9px] font-bold flex items-center justify-center leading-none"
+                    >
                       {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
                     </span>
                   )}
@@ -321,7 +368,10 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
                   <span className="relative text-[22px] leading-none">
                     {menu.icon}
                     {menu.id === '채팅' && chatUnreadCount > 0 && (
-                      <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-[16px] px-0.5 rounded-full bg-red-500/100 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                      <span
+                        data-testid="sidebar-menu-chat-badge-mobile"
+                        className="absolute -top-1.5 -right-2.5 min-w-[16px] h-[16px] px-0.5 rounded-full bg-red-500/100 text-white text-[9px] font-bold flex items-center justify-center leading-none"
+                      >
                         {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
                       </span>
                     )}

@@ -300,7 +300,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
           (staff as Record<string, unknown>).withholding_rate_percent ??
           (staff.permissions?.payroll as Record<string, unknown>)?.withholding_rate_percent ??
           (staff.permissions?.tax as Record<string, unknown>)?.withholding_rate_percent ??
-          100) as number | string | null | undefined,
+          80) as number | string | null | undefined,
       ),
       advance_pay: Number(savedRecord?.advance_pay ?? 0) || 0,
       saved_status: String(savedRecord?.status || ''),
@@ -502,6 +502,9 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     });
   };
 
+  const getAdvanceAdjustedNet = (netAmount: number, advancePay: number) =>
+    Math.round(Number(netAmount || 0) - Math.round(Number(advancePay || 0)));
+
   const calculateSalary = (id: string) => {
     const data = settlementData[id];
     if (!data) {
@@ -642,12 +645,13 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     setLoading(true);
     try {
       const records = selectedStaffs.map((staff) => {
-        const data = settlementData[staff.id];
+        const staffId = String(staff.id);
+        const data = settlementData[staffId];
+        const calc = calculateSalary(staffId);
         const advancePay = Math.round(Number(data?.advance_pay || 0));
-        const isAdvanceOnly = advancePay > 0;
-        const calc = isAdvanceOnly ? null : calculateSalary(staff.id);
+        const netPay = getAdvanceAdjustedNet(Number(calc?.net || 0), advancePay);
         const deductionDetail = {
-          ...(isAdvanceOnly ? {} : (calc?.deductionDetail || {})),
+          ...(calc?.deductionDetail || {}),
           dependent_count: Number(data?.dependent_count || 0),
           child_count_8_20: Number(data?.child_count_8_20 || 0),
           withholding_rate_percent: normalizeWithholdingRatePercent(data?.withholding_rate_percent),
@@ -655,6 +659,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
           apply_tax: data?.apply_tax !== false,
           apply_insurance: data?.apply_insurance !== false,
           taxable_allowance_breakdown: data?.taxable_allowance_breakdown || EMPTY_TAXABLE_ALLOWANCE_BREAKDOWN,
+          advance_pay_deduction: advancePay,
+          net_pay_before_advance: Math.round(Number(calc?.net || 0)),
         };
 
         return {
@@ -670,11 +676,11 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
           extra_allowance: Math.round(Number(data?.extra_allowance) || 0),
           overtime_pay: Math.round(Number(data?.overtime_pay) || 0),
           bonus: Math.round(Number(data?.bonus) || 0),
-          total_taxable: isAdvanceOnly ? 0 : Math.round(Number(calc?.taxable || 0)),
-          total_taxfree: isAdvanceOnly ? 0 : Math.round(Number(calc?.taxfree || 0)),
-          total_deduction: isAdvanceOnly ? 0 : Math.round(Number(calc?.deduction || 0)),
+          total_taxable: Math.round(Number(calc?.taxable || 0)),
+          total_taxfree: Math.round(Number(calc?.taxfree || 0)),
+          total_deduction: Math.round(Number(calc?.deduction || 0)),
           deduction_detail: deductionDetail,
-          net_pay: isAdvanceOnly ? advancePay : Math.round(Number(calc?.net || 0)),
+          net_pay: netPay,
           attendance_deduction: Math.round(Number(data?.attendance_deduction) || 0),
           attendance_deduction_detail: data?.attendance_deduction_detail || {},
           advance_pay: advancePay,
@@ -753,34 +759,38 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     }
 
     setLoading(true);
-    try {
-      const advancePayAmount = (id: string) => Number(settlementData[id]?.advance_pay) || 0;
-      const records = selectedStaffs.map(s => {
-        const data = settlementData[s.id];
-        const advancePay = Math.round(advancePayAmount(s.id));
-        const isAdvanceOnly = advancePay > 0;
-        const calc = isAdvanceOnly ? null : calculateSalary(s.id);
-        return {
-          staff_id: s.id,
-          year_month: yearMonth,
-          base_salary: Math.round(Number(data.base_salary) || 0),
+      try {
+        const advancePayAmount = (id: string) => Number(settlementData[id]?.advance_pay) || 0;
+        const records = selectedStaffs.map(s => {
+          const staffId = String(s.id);
+          const data = settlementData[staffId];
+          const advancePay = Math.round(advancePayAmount(staffId));
+          const calc = calculateSalary(staffId);
+          return {
+            staff_id: s.id,
+            year_month: yearMonth,
+            base_salary: Math.round(Number(data.base_salary) || 0),
           meal_allowance: Math.round(Number(data.meal_allowance) || 0),
           night_duty_allowance: Math.round(Number(data.night_duty_allowance) || 0),
           vehicle_allowance: Math.round(Number(data.vehicle_allowance) || 0),
           childcare_allowance: Math.round(Number(data.childcare_allowance) || 0),
-          research_allowance: Math.round(Number(data.research_allowance) || 0),
-          other_taxfree: Math.round(Number(data.other_taxfree) || 0),
-          extra_allowance: Math.round(Number(data.extra_allowance) || 0),
-          overtime_pay: Math.round(Number(data.overtime_pay) || 0),
-          bonus: Math.round(Number(data.bonus) || 0),
-          total_taxable: isAdvanceOnly ? 0 : Math.round(calc!.taxable),
-          total_taxfree: isAdvanceOnly ? 0 : Math.round(calc!.taxfree),
-          total_deduction: isAdvanceOnly ? 0 : Math.round(calc!.deduction),
-          deduction_detail: isAdvanceOnly ? {} : (calc!.deductionDetail || {}),
-          net_pay: isAdvanceOnly ? advancePay : Math.round(calc!.net),
-          attendance_deduction: Math.round(Number(data.attendance_deduction) || 0),
-          attendance_deduction_detail: data.attendance_deduction_detail || {},
-          advance_pay: advancePay,
+            research_allowance: Math.round(Number(data.research_allowance) || 0),
+            other_taxfree: Math.round(Number(data.other_taxfree) || 0),
+            extra_allowance: Math.round(Number(data.extra_allowance) || 0),
+            overtime_pay: Math.round(Number(data.overtime_pay) || 0),
+            bonus: Math.round(Number(data.bonus) || 0),
+            total_taxable: Math.round(Number(calc?.taxable || 0)),
+            total_taxfree: Math.round(Number(calc?.taxfree || 0)),
+            total_deduction: Math.round(Number(calc?.deduction || 0)),
+            deduction_detail: {
+              ...(calc?.deductionDetail || {}),
+              advance_pay_deduction: advancePay,
+              net_pay_before_advance: Math.round(Number(calc?.net || 0)),
+            },
+            net_pay: getAdvanceAdjustedNet(Number(calc?.net || 0), advancePay),
+            attendance_deduction: Math.round(Number(data.attendance_deduction) || 0),
+            attendance_deduction_detail: data.attendance_deduction_detail || {},
+            advance_pay: advancePay,
           record_type: 'regular',
           status: '확정'
         };
@@ -921,19 +931,20 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
   };
 
   const verificationRows = selectedStaffs.map((staff: StaffMember) => {
-    const data = settlementData[staff.id];
+    const staffId = String(staff.id);
+    const data = settlementData[staffId];
     const advancePay = Number(data?.advance_pay) || 0;
-    const isAdvanceOnly = advancePay > 0;
-    const calc = isAdvanceOnly ? null : calculateSalary(staff.id);
+    const calc = calculateSalary(staffId);
+    const netAfterAdvance = getAdvanceAdjustedNet(Number(calc?.net || 0), advancePay);
     return {
       staffId: staff.id,
       staffName: staff.name,
       companyName: staff.company,
-      grossPay: isAdvanceOnly ? advancePay : Number(calc?.total || 0),
-      taxablePay: isAdvanceOnly ? 0 : Number(calc?.taxable || 0),
-      taxFreePay: isAdvanceOnly ? 0 : Number(calc?.taxfree || 0),
-      deductionTotal: isAdvanceOnly ? 0 : Number(calc?.deduction || 0),
-      netPay: isAdvanceOnly ? advancePay : Number(calc?.net || 0),
+      grossPay: Number(calc?.total || 0),
+      taxablePay: Number(calc?.taxable || 0),
+      taxFreePay: Number(calc?.taxfree || 0),
+      deductionTotal: Number(calc?.deduction || 0),
+      netPay: netAfterAdvance,
       customDeduction: Number(data?.custom_deduction || 0),
       attendanceDeduction: Number(data?.attendance_deduction || 0),
       advancePay,
@@ -1032,10 +1043,12 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
             )}
             <div className="max-h-[500px] overflow-y-auto space-y-4 p-2 custom-scrollbar">
               {selectedStaffs.map((s: StaffMember) => {
-                const data = settlementData[s.id] || buildSettlementEntry(s, 0, {});
+                const staffId = String(s.id);
+                const data = settlementData[staffId] || buildSettlementEntry(s, 0, {});
                 const advancePay = Number(data?.advance_pay) || 0;
-                const isAdvanceOnly = advancePay > 0;
-                const res = isAdvanceOnly ? { net: advancePay, taxable: 0, taxfree: 0 } : calculateSalary(s.id);
+                const hasAdvanceDeduction = advancePay > 0;
+                const res = calculateSalary(staffId);
+                const expectedNet = getAdvanceAdjustedNet(Number(res?.net || 0), advancePay);
                 return (
                   <div key={s.id} data-testid={`salary-settlement-card-${s.id}`} className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] shadow-sm space-y-4 hover:border-[var(--accent)] transition-all">
                     <div className="flex justify-between items-center border-b border-[var(--muted)] pb-3">
@@ -1056,11 +1069,11 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                           )}
                           <p className="text-[10px] text-[var(--toss-gray-3)] mt-1">{s.company} · {s.department}</p>
                         </div>
-                        {isAdvanceOnly && <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded">선지급</span>}
+                        {hasAdvanceDeduction && <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded">선지급 차감</span>}
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] text-[var(--toss-gray-3)] font-bold">합계 예상 실지급액</p>
-                        <p className="text-lg font-black text-[var(--accent)]">₩ {res.net.toLocaleString()}</p>
+                        <p data-testid={`salary-settlement-expected-net-${s.id}`} className="text-lg font-black text-[var(--accent)]">₩ {expectedNet.toLocaleString()}</p>
                       </div>
                     </div>
 
@@ -1087,7 +1100,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-amber-600 ml-1">선지급(차감)</label>
-                        <input type="text" value={Number(data.advance_pay).toLocaleString()} onChange={(e) => updateData(s.id, 'advance_pay', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-amber-200 bg-amber-50/30 rounded-lg text-xs font-bold text-amber-700 outline-none" />
+                        <input data-testid={`salary-settlement-advance-pay-${s.id}`} type="text" value={Number(data.advance_pay).toLocaleString()} onChange={(e) => updateData(s.id, 'advance_pay', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-amber-200 bg-amber-50/30 rounded-lg text-xs font-bold text-amber-700 outline-none" />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-emerald-700 ml-1">부양가족/인적공제</label>
@@ -1117,8 +1130,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                         <label className="text-[10px] font-bold text-sky-700 ml-1">원천징수 비율</label>
                         <select
                           data-testid={`salary-settlement-withholding-rate-${s.id}`}
-                          value={Number(data.withholding_rate_percent) || 100}
-                          onChange={(e) => updateData(s.id, 'withholding_rate_percent', parseInt(e.target.value, 10) || 100)}
+                          value={Number(data.withholding_rate_percent) || 80}
+                          onChange={(e) => updateData(s.id, 'withholding_rate_percent', parseInt(e.target.value, 10) || 80)}
                           className="w-full h-8 px-3 border border-sky-200 bg-sky-50/30 rounded-lg text-xs font-bold text-sky-700 outline-none"
                         >
                           <option value={80}>80%</option>

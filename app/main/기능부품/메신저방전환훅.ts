@@ -83,15 +83,13 @@ export function useChatRoomNavigation({
     if (roomId && effectiveChatUserId) {
       const readAt = new Date().toISOString();
       const targetRoomIds = conversationRoomIds.length > 0 ? conversationRoomIds : [String(roomId)];
+      // 방에 입장하면 아직 DB에 unread count가 없는 경우도 포함해 무조건 0으로 즉시 반영
       setRoomUnreadCounts((prev) => {
-        let changed = false;
         const next = { ...prev };
         targetRoomIds.forEach((targetRoomId) => {
-          if (!next[targetRoomId]) return;
           next[targetRoomId] = 0;
-          changed = true;
         });
-        return changed ? next : prev;
+        return next;
       });
 
       void (async () => {

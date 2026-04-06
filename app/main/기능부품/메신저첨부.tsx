@@ -50,6 +50,7 @@ type AttachmentListCardProps = {
   layout?: 'list' | 'bubble';
   tone?: 'default' | 'accent';
   className?: string;
+  onMediaLoad?: (() => void) | null;
 };
 
 export function stripHiddenMessageMetaBlocks(value: unknown): string {
@@ -326,6 +327,7 @@ export function AttachmentListCard({
   layout = 'list',
   tone = 'default',
   className = '',
+  onMediaLoad,
 }: AttachmentListCardProps) {
   const isClickable = typeof onActivate === 'function';
   const bubbleAlignmentClass = tone === 'accent' ? 'items-end text-right' : 'items-start text-left';
@@ -344,6 +346,7 @@ export function AttachmentListCard({
               <img
                 src={url}
                 alt={name}
+                onLoad={() => onMediaLoad?.()}
                 className="max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] object-cover cursor-zoom-in border border-[var(--border)]"
               />
             </button>
@@ -365,7 +368,11 @@ export function AttachmentListCard({
     if (kind === 'video') {
       return (
         <div className={`inline-flex max-w-full flex-col gap-1 ${bubbleAlignmentClass} ${className}`}>
-          <video controls className="max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] bg-black border border-[var(--border)]">
+          <video
+            controls
+            onLoadedMetadata={() => onMediaLoad?.()}
+            className="max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] bg-black border border-[var(--border)]"
+          >
             <source src={url} />
           </video>
           <AttachmentQuickActions

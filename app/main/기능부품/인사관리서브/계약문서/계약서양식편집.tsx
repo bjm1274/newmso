@@ -51,52 +51,100 @@ const CATEGORY_COLORS: Record<string, string> = {
   근무: 'bg-cyan-50 text-cyan-700 border-cyan-200',
 };
 
-const DEFAULT_TEMPLATE = `제1조 [목적]
-사용자 {{company_name}}(이하 "사용자"라 한다)과 근로자 {{employee_name}}(이하 "근로자"라 한다)는 아래 조건으로 근로계약을 체결한다.
+const DEFAULT_TEMPLATE = `제1조 [담당업무 및 근무장소]
+1. 근로자는 사업장 및 사용자가 지정한 장소에서 근무한다.
+2. 근무장소: {{company_name}} 내 지정 장소
+3. 담당업무: {{department}} / {{position}}
+4. 사용자는 업무의 필요성에 의하여 근로자의 근무장소 및 부서 또는 종사업무를 변경할 수 있다.
 
-제2조 [근로 기간]
-① 근로 계약 기간: {{contract_start}} ~ {{contract_end}}
-② 수습 기간: 입사일로부터 {{probation_months}}개월 (수습 기간 중 급여는 본봉의 90% 적용)
-③ 수습 기간 종료 후 근로조건 적용일: {{conditions_applied_at}}
+제2조 [근무기간]
+1. 근로기간: {{contract_start}} ~ {{contract_end}}
+2. 근로조건 적용일: {{conditions_applied_at}}
+3. 수습기간: 입사일로부터 {{probation_months}}개월간 수습기간을 두며, 수습기간 중 임금은 본봉의 90%를 적용한다.
+4. 수습기간 종료 후 업무능력 및 근무태도에 따라 정규직 전환 여부를 결정한다.
 
-제3조 [근무 장소 및 업무]
-① 근무 장소: {{company_address}}
-② 담당 업무: {{department}} {{position}}
+제3조 [수습기간]
+1. 근로자의 입사일부터 {{probation_months}}개월 동안 수습기간을 둘 수 있다.
+2. 수습기간 중 사용자는 근로자의 업무능력, 근무태도 등을 평가하며, 수습기간 만료 후 정규직 전환 여부를 결정한다.
+3. 수습기간 중 근로계약을 해지할 경우 사용자는 근로자에게 사전 통보하여야 한다.
 
-제4조 [근무 시간]
-① 소정 근로시간: 주 {{working_hours_per_week}}시간, 주 {{working_days_per_week}}일 근무
-② 근무 시간: {{shift_start}} ~ {{shift_end}}
-③ 휴게 시간: {{break_start}} ~ {{break_end}} (근무 시간 중)
-④ 휴일: 매주 토요일·일요일, 공휴일 및 회사가 지정한 날
+   사용자: ___________(인/서명)    근로자: ___________(인/서명)
 
-제5조 [임금]
-① 임금 구성은 아래와 같다.
+제4조 [근무시간 및 휴게]
+1. 소정 근로시간: 주 {{working_hours_per_week}}시간, 주 {{working_days_per_week}}일 근무
+2. 근무시간: {{shift_start}} ~ {{shift_end}}
+3. 휴게시간: {{break_start}} ~ {{break_end}} (근무시간 중 부여)
+4. 휴일: 매주 토요일·일요일, 법정공휴일 및 회사가 지정한 날
+5. 정규 업무시간 외 근무가 필요한 경우 사용자와 근로자 간 사전 합의 후 실시한다.
+
+   사용자: ___________(인/서명)    근로자: ___________(인/서명)
+
+제5조 [임금 및 구성항목]
+1. 임금 구성은 아래와 같다.
 
 [임금 구성항목 예시]
 구성항목  금액  산정기준
 기본급  {{base_salary}}원  월 고정 지급
-직책수당  {{position_allowance}}원  직책별 차등 지급
-식대  {{meal_allowance}}원  비과세 (월 200,000원 한도)
 ────
 
-② 월 급여 합계: {{total_monthly}}원
-③ 연봉 합계: {{annual_salary}}원
-④ 통상임금 시급: {{hourly_wage}}원 (통상임금 산정기준시간 기준)
-⑤ 급여 지급일: 매월 {{payment_day}}일 (휴일인 경우 전 영업일 지급)
-⑥ 급여 지급 방법: 근로자 명의 계좌 이체
+2. 월 급여 합계: {{total_monthly}}원
+3. 연봉 합계: {{annual_salary}}원
+4. 통상임금 시급: {{hourly_wage}}원 (월 {{monthly_work_hours}}시간 기준)
+5. 급여 지급일: 매월 {{payment_day}}일 이내 지급한다. (휴일인 경우 전 영업일 지급)
+6. 급여 지급 방법: 근로자 명의 통장으로 계좌이체로 지급한다.
+   가) 연장근무수당: 통상시급의 1.5배
+   나) 야간근로수당: 오후 22:00 ~ 오전 06:00 사이 근무수당은 통상시급의 0.5배 가산
+   다) 휴일근로수당: 통상시급의 1.5배 (8시간 초과분 2.0배)
+   라) 임금 조정은 매년 1회 이상 이루어지며 최저임금보다 낮아질 수 없다.
 
-제6조 [연차유급휴가]
-① 근로기준법 제60조에 따라 1년간 80% 이상 출근 시 15일의 유급휴가를 부여한다.
-② 최초 1년 미만 근무자에게는 매월 1일의 유급휴가를 부여한다.
-③ 미사용 연차는 연차수당으로 보상한다.
+제6조 [휴일 및 휴가]
+1. 주휴일: 매주 1회 이상 유급휴일을 부여하되, 취업규칙에 정한 날로 한다.
+2. 연차유급휴가: 근로기준법 제60조에 따라 1년간 80% 이상 출근 시 15일의 유급휴가를 부여한다.
+3. 최초 1년 미만 근무자에게는 1개월 개근 시 1일의 유급휴가를 부여한다.
+4. 미사용 연차는 연차수당으로 보상한다.
 
-제7조 [사회보험]
-① 사용자는 관계법령에 따라 4대 보험(국민연금, 건강보험, 고용보험, 산재보험)에 가입한다.
-② 보험료 중 근로자 부담분은 급여에서 공제한다.
+   □ 유급휴일 확인    □ 연차 확인    □ 기타 휴가 확인
 
-제8조 [취업규칙]
-① 이 계약서에 명시되지 않은 사항은 취업규칙 및 근로기준법을 따른다.
-② 근로자는 회사의 취업규칙을 준수하여야 한다.`;
+   사용자: ___________(인/서명)    근로자: ___________(인/서명)
+
+제7조 [퇴직금]
+1. 근로자는 1년 이상 근무 시 퇴직금을 청구할 수 있다. (근로자퇴직급여보장법에 의거)
+2. 사용자는 근로자퇴직급여보장법에 따라 퇴직급여제도를 설정하고 이를 성실히 이행한다.
+3. 퇴직금은 계속 근로기간 1년에 대하여 30일분의 평균임금을 기준으로 산정한다.
+4. 사용자는 근로자에게 적합한 근로환경을 제공하여야 한다.
+
+제8조 [근로계약 해지 사유]
+1. 근로자가 1개월 전 사전 서면으로 통보하여 퇴직하게 되는 경우
+2. 업무상 부상을 입은 후 완치된 경우 (발병일과 관계없음)
+3. 정당한 사유 없이 무단결근 등 취업규칙을 위반한 경우
+4. 허위 이력서 등 부정한 방법으로 채용된 사실이 확인된 경우
+5. 기타 근로기준법에서 정한 해고 사유에 해당하는 경우
+6. 위 각 호에 해당하지 않는 경우 사용자는 30일 전 서면 통보하거나 30일분의 통상임금을 해고예고수당으로 지급한다.
+
+제9조 [손해배상]
+1. 근로자가 고의·과실로 회사에 손해를 끼친 경우 사용자는 손해배상을 청구할 수 있다.
+2. 근로자가 중대한 과실로 인해 손해를 발생시킨 경우 산재보험 처리 여부를 불문하고 이에 대한 책임을 부담하여야 한다.
+3. 손해 및 과실 책임에 따른 배상 범위는 관련 법령에 따른다.
+
+제10조 [재산보호 및 보험]
+1. 사용자는 관계법령에 따라 국민연금, 건강보험, 고용보험, 산업재해보상보험에 가입한다.
+2. 보험료 중 근로자 부담분은 급여에서 공제한다.
+3. 연장근무수당, 이직수당, 기타수당은 관계법령 및 취업규칙에 따라 지급한다.
+4. 사용자와 근로자는 각자의 의무를 성실히 이행하여야 한다.
+
+제11조 [기타근무조건]
+1. 근로조건이 변경될 경우에는 사용자와 근로자 간 합의를 거쳐 계약서의 내용을 변경할 수 있다.
+2. 이 계약서에 명시되지 않은 사항은 취업규칙 및 근로기준법에 따른다.
+3. 근로자는 재직 중 및 퇴직 후 회사의 영업비밀, 고객정보 등을 제3자에게 누설하여서는 아니 된다.
+
+제12조 [분쟁의 해결]
+1. 이 근로계약에 대한 분쟁은 취업규칙, 근로기준법, 노동위원회에 의해 처리된다.
+2. 사용자와 근로자는 근로계약서를 상호 확인하고 성실히 이행할 것을 약속한다.
+
+제13조 [계약의 효력]
+1. 본 계약서는 {{today}}부터 효력을 발생하며, 사용자와 근로자 각 1부씩 보관한다.
+2. 이 계약서 이외에 해당 업무분야에 관한 약속과 근무수칙은 이 계약에 포함된다.
+3. 본 계약서에 정하지 않은 사항에 대해서는 근로기준법 및 기타 노동 관계법령이 정하는 바에 따른다.`;
 
 interface TemplateEditorProps {
   selectedCo?: string;
@@ -285,8 +333,8 @@ export default function ContractTemplateEditor({ selectedCo }: TemplateEditorPro
           <div className="flex-1 overflow-y-auto custom-scrollbar p-5">
             <div className="bg-white shadow-md border border-slate-200 rounded-sm min-h-[900px] p-[48px] max-w-[680px] mx-auto">
               {/* 제목 */}
-              <div className="text-center mb-10 pb-6 border-b-2 border-slate-800">
-                <h1 className="text-[22px] font-black tracking-[0.25em]" style={{ fontFamily: 'Georgia, serif' }}>
+              <div className="text-center mb-6 pb-4 border-b-2 border-slate-800">
+                <h1 className="text-[22px] font-black tracking-[0.25em]" style={{ fontFamily: '"Noto Serif KR", Georgia, serif' }}>
                   근 로 계 약 서
                 </h1>
                 <p className="text-[11px] text-slate-400 mt-1 font-medium">{targetCompany === '전체' ? '기본 양식' : targetCompany}</p>
@@ -299,18 +347,18 @@ export default function ContractTemplateEditor({ selectedCo }: TemplateEditorPro
               />
 
               {/* 서명란 예시 */}
-              <div className="mt-12 pt-6 border-t border-slate-200">
-                <p className="text-center text-[11px] text-slate-500 font-semibold mb-8">
-                  「상기 내용을 충분히 이해하고 이에 동의하여 본 근로계약을 체결합니다.」
+              <div className="mt-7 pt-4 border-t border-slate-200">
+                <p className="text-center text-[11px] text-slate-500 font-semibold mb-5">
+                  상기 근로계약의 내용을 충분히 이해하고 이에 동의하여 본 계약을 체결합니다.
                 </p>
                 <div className="flex justify-between items-end">
                   <div className="space-y-1">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">사 용 자</p>
+                    <p className="text-[10px] font-bold text-slate-400 tracking-widest">사 용 자</p>
                     <p className="text-[13px] font-bold text-slate-700">{targetCompany === '전체' ? '회사명' : targetCompany}</p>
                     <p className="text-[13px] font-bold text-slate-700">대표이사 ___________  (인)</p>
                   </div>
                   <div className="text-right space-y-1">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">근 로 자</p>
+                    <p className="text-[10px] font-bold text-slate-400 tracking-widest">근 로 자</p>
                     <p className="text-[13px] font-bold text-slate-700">성명 ___________  (서명)</p>
                   </div>
                 </div>

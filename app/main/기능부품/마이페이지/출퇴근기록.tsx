@@ -252,6 +252,44 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         String(log.date || '').slice(0, 10) !== currentDateKey,
     ) || null;
 
+  const fetchLatestStaffShiftContext = useCallback(async () => {
+    const userId = effectiveUserId;
+    const fallbackShiftId = String((resolvedUser as Record<string, unknown>)?.shift_id || '').trim();
+    const fallbackDepartment =
+      String((resolvedUser as Record<string, unknown>)?.department || '').trim() || undefined;
+
+    if (!userId) {
+      return {
+        shiftId: fallbackShiftId,
+        department: fallbackDepartment,
+      };
+    }
+
+    try {
+      // 근무유형은 로그인 세션보다 staff_members 최신값이 더 정확할 수 있어 항상 DB를 우선 본다.
+      const { data: staffRow } = await supabase
+        .from('staff_members')
+        .select('shift_id, department')
+        .eq('id', userId)
+        .maybeSingle();
+
+      return {
+        shiftId:
+          String((staffRow as Record<string, unknown> | null | undefined)?.shift_id || '').trim() ||
+          fallbackShiftId,
+        department:
+          String((staffRow as Record<string, unknown> | null | undefined)?.department || '').trim() ||
+          fallbackDepartment,
+      };
+    } catch (error) {
+      console.warn('최신 근무유형 조회 실패:', error);
+      return {
+        shiftId: fallbackShiftId,
+        department: fallbackDepartment,
+      };
+    }
+  }, [effectiveUserId, resolvedUser]);
+
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     // 컴포넌트 로드 시 위치 권한 요청 및 거리 계산 미리 해보기
@@ -360,25 +398,14 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       .order('date', { ascending: false });
 
     const monthlyLogs = ((data || []) as CommuteLog[]).map((log) => ({ ...log }));
-
-    const currentShiftId = String((resolvedUser as Record<string, unknown>)?.shift_id || '').trim();
-    const currentDepartment = String((resolvedUser as Record<string, unknown>)?.department || '').trim() || undefined;
-    const needsStaffLookup = !currentShiftId || !currentDepartment;
-
-    const [assignmentResult, staffResult] = await Promise.all([
+    const [{ shiftId: latestShiftId, department: latestDepartment }, assignmentResult] = await Promise.all([
+      fetchLatestStaffShiftContext(),
       supabase
         .from('shift_assignments')
         .select('work_date, shift_id')
         .eq('staff_id', userId)
         .gte('work_date', startOfMonth)
         .lte('work_date', endOfMonth),
-      needsStaffLookup
-        ? supabase
-            .from('staff_members')
-            .select('shift_id, department')
-            .eq('id', userId)
-            .maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
     ]);
 
     const assignmentByDate = new Map<string, string>(
@@ -387,16 +414,8 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         .map((item) => [String(item.work_date).slice(0, 10), String(item.shift_id)])
     );
 
-    const effectiveDepartment =
-      currentDepartment ||
-      (staffResult?.data as Record<string, unknown> | null | undefined)?.department?.toString() ||
-      undefined;
-
-    const defaultShiftId = String(
-      (staffResult?.data as Record<string, unknown> | null | undefined)?.shift_id ||
-      currentShiftId ||
-      ''
-    ).trim();
+    const effectiveDepartment = latestDepartment;
+    const defaultShiftId = latestShiftId;
 
     const shiftIds = Array.from(
       new Set(
@@ -752,34 +771,23 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     if (!userId) return buildFallbackShiftBoundary(fallbackDepartment);
 
     try {
-      const currentShiftId = String((resolvedUser as Record<string, unknown>)?.shift_id || '').trim();
-      const needsStaffLookup = !currentShiftId || !fallbackDepartment;
+      const [{ shiftId: latestShiftId, department: latestDepartment }, assignmentResult] =
+        await Promise.all([
+          fetchLatestStaffShiftContext(),
+          supabase
+            .from('shift_assignments')
+            .select('shift_id')
+            .eq('staff_id', userId)
+            .eq('work_date', workDate)
+            .maybeSingle(),
+        ]);
 
-      const [assignmentResult, staffResult] = await Promise.all([
-        supabase
-          .from('shift_assignments')
-          .select('shift_id')
-          .eq('staff_id', userId)
-          .eq('work_date', workDate)
-          .maybeSingle(),
-        needsStaffLookup
-          ? supabase
-              .from('staff_members')
-              .select('shift_id, department')
-              .eq('id', userId)
-              .maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
-      ]);
-
-      const effectiveDepartment =
-        fallbackDepartment ||
-        (staffResult?.data as Record<string, unknown> | null | undefined)?.department?.toString();
+      const effectiveDepartment = latestDepartment || fallbackDepartment;
 
       const shiftId =
         String(
           assignmentResult?.data?.shift_id ||
-            (staffResult?.data as Record<string, unknown> | null | undefined)?.shift_id ||
-            currentShiftId ||
+            latestShiftId ||
             ''
         ).trim();
 

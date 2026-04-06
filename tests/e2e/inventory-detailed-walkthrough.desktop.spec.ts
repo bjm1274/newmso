@@ -55,6 +55,78 @@ test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
 });
 
+test('inventory keeps the requested subview instead of bouncing back to the stored view', async ({
+  page,
+}) => {
+  const inventoryUser = {
+    ...fakeUser,
+    id: 'inventory-stable-view-user',
+    employee_no: 'INV-STABLE-001',
+    name: '재고 뷰 안정성 사용자',
+    company: '박철홍정형외과',
+    company_id: 'hospital-1',
+    department: '경영지원팀',
+    position: '대리',
+    role: 'manager',
+    permissions: {
+      ...fakeUser.permissions,
+      inventory: true,
+      menu_재고관리: true,
+      inventory_현황: true,
+      inventory_등록: true,
+    },
+  };
+
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    staffMembers: [inventoryUser],
+    companies: [
+      { id: 'hospital-1', name: '박철홍정형외과', type: 'HOSPITAL', is_active: true },
+    ],
+    inventoryItems: [
+      {
+        id: 'inventory-stable-1',
+        item_name: '테스트 거즈',
+        quantity: 5,
+        stock: 5,
+        min_quantity: 1,
+        category: '소모품',
+        company: '박철홍정형외과',
+        company_id: 'hospital-1',
+        department: '외래팀',
+        created_at: '2026-04-06T09:00:00.000Z',
+      },
+    ],
+    suppliers: [],
+  });
+
+  await seedSession(page, {
+    user: inventoryUser,
+    localStorage: {
+      erp_last_menu: '재고관리',
+      erp_last_subview: '현황',
+      erp_inventory_view: '현황',
+      erp_permission_prompt_shown: '1',
+    },
+  });
+
+  await page.goto(
+    `/main?${new URLSearchParams({ open_menu: '재고관리', open_subview: '등록' }).toString()}`
+  );
+
+  await expect(page.getByTestId('inventory-view')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '품목 등록', exact: true })).toBeVisible();
+  await expect(page.getByTestId('inventory-registration-view')).toBeVisible();
+
+  await page.waitForTimeout(1800);
+
+  await expect(page.getByRole('heading', { name: '품목 등록', exact: true })).toBeVisible();
+  await expect(page.getByTestId('inventory-registration-view')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '재고 현황', exact: true })).toHaveCount(0);
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('inventory walkthrough opens each submenu in order without runtime errors', async ({ page }) => {
   test.setTimeout(150_000);
 
