@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { EMPLOYEE_INSURANCE_RATES_2026 } from '@/lib/payroll-insurance-rates';
 
 export interface TaxInsuranceRates {
   national_pension_rate: number;
@@ -41,10 +42,10 @@ export const DEFAULT_INCOME_TAX_BRACKET: IncomeTaxBracketEntry[] = [
 ];
 
 export const DEFAULT_TAX_INSURANCE_RATES: TaxInsuranceRates = {
-  national_pension_rate: 0.045,     // 국민연금 근로자 부담 4.5% (국민연금법)
-  health_insurance_rate: 0.03545,   // 건강보험 근로자 부담 3.545% (2026년, 국민건강보험법)
-  long_term_care_rate: 0.0046,      // 장기요양 ≈ 건강보험료×12.95% → 과세소득 대비 0.46%
-  employment_insurance_rate: 0.009, // 고용보험 근로자 부담 0.9% (2023년~, 고용보험법)
+  national_pension_rate: EMPLOYEE_INSURANCE_RATES_2026.nationalPension,
+  health_insurance_rate: EMPLOYEE_INSURANCE_RATES_2026.healthInsurance,
+  long_term_care_rate: EMPLOYEE_INSURANCE_RATES_2026.longTermCare,
+  employment_insurance_rate: EMPLOYEE_INSURANCE_RATES_2026.employmentInsurance,
   income_tax_bracket: DEFAULT_INCOME_TAX_BRACKET,
   configured: false,
 };
@@ -60,11 +61,19 @@ function normalizeIncomeTaxBracketEntry(entry: any): IncomeTaxBracketEntry | nul
   const min = toFiniteNumber(entry.min ?? entry.from ?? entry.start ?? entry.lower_bound ?? entry.annual_min);
   const max = toFiniteNumber(entry.max ?? entry.to ?? entry.end ?? entry.upper_bound ?? entry.annual_max);
   const rate = toFiniteNumber(entry.rate ?? entry.tax_rate ?? entry.percentage);
-  const deduction = toFiniteNumber(entry.deduction ?? entry.quick_deduction ?? entry.quickDeduction ?? entry.누진공제);
-  const baseTax = toFiniteNumber(entry.base_tax ?? entry.baseTax ?? entry.tax ?? entry.산출세액);
-  const monthlyTax = toFiniteNumber(entry.monthly_tax ?? entry.monthlyTax ?? entry.month_tax ?? entry.월세액);
-  const formulaBaseIncome = toFiniteNumber(entry.formula_base_income ?? entry.formulaBaseIncome ?? entry.base_income ?? entry.threshold_income);
-  const formulaMultiplier = toFiniteNumber(entry.formula_multiplier ?? entry.formulaMultiplier ?? entry.excess_multiplier);
+  const deduction = toFiniteNumber(
+    entry.deduction ?? entry.quick_deduction ?? entry.quickDeduction ?? entry['누진공제']
+  );
+  const baseTax = toFiniteNumber(entry.base_tax ?? entry.baseTax ?? entry.tax ?? entry['산출세액']);
+  const monthlyTax = toFiniteNumber(
+    entry.monthly_tax ?? entry.monthlyTax ?? entry.month_tax ?? entry['월세액']
+  );
+  const formulaBaseIncome = toFiniteNumber(
+    entry.formula_base_income ?? entry.formulaBaseIncome ?? entry.base_income ?? entry.threshold_income
+  );
+  const formulaMultiplier = toFiniteNumber(
+    entry.formula_multiplier ?? entry.formulaMultiplier ?? entry.excess_multiplier
+  );
   const formulaRate = toFiniteNumber(entry.formula_rate ?? entry.formulaRate ?? entry.excess_rate);
   const familyMonthlyTaxSource =
     entry.family_monthly_tax ??
@@ -73,13 +82,14 @@ function normalizeIncomeTaxBracketEntry(entry: any): IncomeTaxBracketEntry | nul
     entry.monthlyTaxByFamily ??
     entry.family_taxes ??
     entry.familyTaxes;
-  const familyMonthlyTax = familyMonthlyTaxSource && typeof familyMonthlyTaxSource === 'object'
-    ? Object.fromEntries(
-        Object.entries(familyMonthlyTaxSource)
-          .map(([key, value]) => [String(key), toFiniteNumber(value)])
-          .filter(([, value]) => value !== null)
-      ) as Record<string, number>
-    : undefined;
+  const familyMonthlyTax =
+    familyMonthlyTaxSource && typeof familyMonthlyTaxSource === 'object'
+      ? (Object.fromEntries(
+          Object.entries(familyMonthlyTaxSource)
+            .map(([key, value]) => [String(key), toFiniteNumber(value)])
+            .filter(([, value]) => value !== null)
+        ) as Record<string, number>)
+      : undefined;
 
   if (
     min === null &&
@@ -109,12 +119,14 @@ function normalizeIncomeTaxBracketEntry(entry: any): IncomeTaxBracketEntry | nul
 }
 
 function isDetailedBracket(entries: IncomeTaxBracketEntry[]) {
-  return entries.length > 1 || entries.some((entry) =>
-    entry.max !== null ||
-    entry.deduction !== undefined ||
-    entry.base_tax !== undefined ||
-    entry.monthly_tax !== undefined
-  );
+  return entries.length > 1 || entries.some((entry) => {
+    return (
+      entry.max !== null ||
+      entry.deduction !== undefined ||
+      entry.base_tax !== undefined ||
+      entry.monthly_tax !== undefined
+    );
+  });
 }
 
 function hasMonthlyWithholdingAmount(entry: IncomeTaxBracketEntry | null | undefined) {
@@ -124,17 +136,19 @@ function hasMonthlyWithholdingAmount(entry: IncomeTaxBracketEntry | null | undef
 
   const familyTaxes = entry?.family_monthly_tax;
   if (!familyTaxes || typeof familyTaxes !== 'object') return false;
+
   for (let familyCount = 1; familyCount <= 11; familyCount += 1) {
     if (!Number.isFinite(Number(familyTaxes[String(familyCount)]))) {
       return false;
     }
   }
+
   return true;
 }
 
 export function validateOfficialMonthlyIncomeTaxTable(brackets: any[] | null | undefined): string[] {
   if (!Array.isArray(brackets) || brackets.length === 0) {
-    return ['월 근로소득 간이세액표가 비어 있습니다.'];
+    return ['근로소득 간이세액표가 비어 있습니다.'];
   }
 
   const normalized = brackets
@@ -143,7 +157,7 @@ export function validateOfficialMonthlyIncomeTaxTable(brackets: any[] | null | u
     .sort((left, right) => left.min - right.min);
 
   if (normalized.length === 0) {
-    return ['월 근로소득 간이세액표를 해석할 수 없습니다.'];
+    return ['근로소득 간이세액표를 해석할 수 없습니다.'];
   }
 
   const errors: string[] = [];
@@ -151,11 +165,11 @@ export function validateOfficialMonthlyIncomeTaxTable(brackets: any[] | null | u
 
   normalized.forEach((entry, index) => {
     if (entry.official !== true) {
-      errors.push(`${index + 1}번 구간이 공식 확인 상태가 아닙니다.`);
+      errors.push(`${index + 1}번 구간의 공식 확인 상태가 아닙니다.`);
     }
 
     if (!hasMonthlyWithholdingAmount(entry)) {
-      errors.push(`${index + 1}번 구간에 monthly_tax 값이 없습니다.`);
+      errors.push(`${index + 1}번 구간의 monthly_tax 값이 없습니다.`);
     }
 
     if (!Number.isFinite(entry.min) || entry.min < 0) {
@@ -219,19 +233,22 @@ export function calculateMonthlyIncomeTax(
   if (monthlyTaxable <= 0) return 0;
 
   const brackets = resolveIncomeTaxBracket(rates);
-  const hasFamilyTable = brackets.some((entry) => entry.family_monthly_tax && Object.keys(entry.family_monthly_tax).length > 0);
+  const hasFamilyTable = brackets.some((entry) => {
+    return entry.family_monthly_tax && Object.keys(entry.family_monthly_tax).length > 0;
+  });
   const normalizedDependentCount = Math.max(0, Math.floor(Number(options?.dependentCount ?? dependentCount) || 0));
   const qualifyingChildCount = Math.min(
     normalizedDependentCount,
-    Math.max(0, Math.floor(Number(options?.qualifyingChildCount) || 0)),
+    Math.max(0, Math.floor(Number(options?.qualifyingChildCount) || 0))
   );
   const withholdingRatePercent = normalizeWithholdingRatePercent(options?.withholdingRatePercent);
   const familyCountForTable = Math.max(1, normalizedDependentCount + 1);
   const childTaxCredit = calculateQualifyingChildTaxCredit(qualifyingChildCount);
 
   if (hasFamilyTable) {
-    const matched = brackets.find((entry) => monthlyTaxable >= entry.min && monthlyTaxable < (entry.max ?? Number.POSITIVE_INFINITY))
-      ?? brackets[brackets.length - 1];
+    const matched =
+      brackets.find((entry) => monthlyTaxable >= entry.min && monthlyTaxable < (entry.max ?? Number.POSITIVE_INFINITY)) ??
+      brackets[brackets.length - 1];
 
     if (!matched) return 0;
 
@@ -260,8 +277,9 @@ export function calculateMonthlyIncomeTax(
   }
 
   const annualTaxable = monthlyTaxable * 12;
-  const matched = brackets.find((entry) => annualTaxable >= entry.min && annualTaxable <= (entry.max ?? Number.POSITIVE_INFINITY))
-    ?? brackets[brackets.length - 1];
+  const matched =
+    brackets.find((entry) => annualTaxable >= entry.min && annualTaxable <= (entry.max ?? Number.POSITIVE_INFINITY)) ??
+    brackets[brackets.length - 1];
 
   if (!matched) return 0;
 
@@ -270,9 +288,10 @@ export function calculateMonthlyIncomeTax(
     return roundDownToTen(taxAfterChildCredit * (withholdingRatePercent / 100));
   }
 
-  const annualTax = matched.base_tax !== undefined
-    ? matched.base_tax + Math.max(0, annualTaxable - matched.min) * matched.rate
-    : Math.max(0, annualTaxable * matched.rate - (matched.deduction ?? 0));
+  const annualTax =
+    matched.base_tax !== undefined
+      ? matched.base_tax + Math.max(0, annualTaxable - matched.min) * matched.rate
+      : Math.max(0, annualTaxable * matched.rate - (matched.deduction ?? 0));
 
   const monthlyTax = Math.max(0, Math.floor(annualTax / 12));
   const taxAfterChildCredit = Math.max(0, monthlyTax - childTaxCredit);
@@ -287,8 +306,9 @@ export function calculateAnnualIncomeTax(
   if (annualTaxable <= 0) return 0;
 
   const brackets = resolveIncomeTaxBracket(rates);
-  const matched = brackets.find((entry) => annualTaxable >= entry.min && annualTaxable <= (entry.max ?? Number.POSITIVE_INFINITY))
-    ?? brackets[brackets.length - 1];
+  const matched =
+    brackets.find((entry) => annualTaxable >= entry.min && annualTaxable <= (entry.max ?? Number.POSITIVE_INFINITY)) ??
+    brackets[brackets.length - 1];
 
   if (!matched) return 0;
 
@@ -296,9 +316,10 @@ export function calculateAnnualIncomeTax(
     return Math.max(0, Math.floor(matched.monthly_tax * 12));
   }
 
-  const annualTax = matched.base_tax !== undefined
-    ? matched.base_tax + Math.max(0, annualTaxable - matched.min) * matched.rate
-    : Math.max(0, annualTaxable * matched.rate - (matched.deduction ?? 0));
+  const annualTax =
+    matched.base_tax !== undefined
+      ? matched.base_tax + Math.max(0, annualTaxable - matched.min) * matched.rate
+      : Math.max(0, annualTaxable * matched.rate - (matched.deduction ?? 0));
 
   return Math.max(0, Math.floor(annualTax));
 }
@@ -311,11 +332,37 @@ function normalizeRates(row: any | null | undefined, configured: boolean): TaxIn
       configured,
     };
   }
+
+  const normalizedNationalPensionRate = Number(
+    source.national_pension_rate ?? EMPLOYEE_INSURANCE_RATES_2026.nationalPension
+  );
+  const normalizedHealthInsuranceRate = Number(
+    source.health_insurance_rate ?? EMPLOYEE_INSURANCE_RATES_2026.healthInsurance
+  );
+  const normalizedLongTermCareRate = Number(
+    source.long_term_care_rate ?? EMPLOYEE_INSURANCE_RATES_2026.longTermCare
+  );
+  const normalizedEmploymentInsuranceRate = Number(
+    source.employment_insurance_rate ?? EMPLOYEE_INSURANCE_RATES_2026.employmentInsurance
+  );
+
   return {
-    national_pension_rate: Number(source.national_pension_rate ?? DEFAULT_TAX_INSURANCE_RATES.national_pension_rate),
-    health_insurance_rate: Number(source.health_insurance_rate ?? DEFAULT_TAX_INSURANCE_RATES.health_insurance_rate),
-    long_term_care_rate: Number(source.long_term_care_rate ?? DEFAULT_TAX_INSURANCE_RATES.long_term_care_rate),
-    employment_insurance_rate: Number(source.employment_insurance_rate ?? DEFAULT_TAX_INSURANCE_RATES.employment_insurance_rate),
+    national_pension_rate:
+      source.effective_year >= 2026
+        ? Math.max(normalizedNationalPensionRate, EMPLOYEE_INSURANCE_RATES_2026.nationalPension)
+        : normalizedNationalPensionRate,
+    health_insurance_rate:
+      source.effective_year >= 2026
+        ? Math.max(normalizedHealthInsuranceRate, EMPLOYEE_INSURANCE_RATES_2026.healthInsurance)
+        : normalizedHealthInsuranceRate,
+    long_term_care_rate:
+      source.effective_year >= 2026
+        ? Math.max(normalizedLongTermCareRate, EMPLOYEE_INSURANCE_RATES_2026.longTermCare)
+        : normalizedLongTermCareRate,
+    employment_insurance_rate:
+      source.effective_year >= 2026
+        ? Math.max(normalizedEmploymentInsuranceRate, EMPLOYEE_INSURANCE_RATES_2026.employmentInsurance)
+        : normalizedEmploymentInsuranceRate,
     income_tax_bracket: resolveIncomeTaxBracket(source),
     configured,
   };
@@ -346,6 +393,7 @@ export async function fetchTaxInsuranceRates(
     if (hasOfficialMonthlyIncomeTaxTable(companyRates.income_tax_bracket)) {
       return companyRates;
     }
+
     if (fallbackRes.data) {
       const fallbackRates = normalizeRates(fallbackRes.data, true);
       if (hasOfficialMonthlyIncomeTaxTable(fallbackRates.income_tax_bracket)) {
@@ -356,6 +404,7 @@ export async function fetchTaxInsuranceRates(
         };
       }
     }
+
     return companyRates;
   }
 
@@ -366,5 +415,6 @@ export function hasExactIncomeTaxBracket(rates: TaxInsuranceRates): boolean {
   if (rates.configured !== true || !Array.isArray(rates.income_tax_bracket) || rates.income_tax_bracket.length === 0) {
     return false;
   }
+
   return hasOfficialMonthlyIncomeTaxTable(rates.income_tax_bracket);
 }

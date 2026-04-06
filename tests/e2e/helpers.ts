@@ -154,8 +154,10 @@ export type MockFixtures = {
   messageInsertFailures?: number;
   missingMessageColumns?: string[];
   missingBoardPostColumns?: string[];
+  missingPayrollRecordColumns?: string[];
   approvals?: any[];
   payrollRecords?: any[];
+  payrollLocks?: any[];
   boardPosts?: any[];
   boardPostComments?: any[];
   boardPostReads?: any[];
@@ -169,6 +171,7 @@ export type MockFixtures = {
   purchaseOrders?: any[];
   asRepairRecords?: any[];
   returnRecords?: any[];
+  incidentReports?: any[];
   workSchedules?: any[];
   workShifts?: any[];
   orgTeams?: any[];
@@ -194,6 +197,7 @@ export type MockFixtures = {
   opPatientChecks?: any[];
   missingSurgeryTemplatesSchema?: boolean;
   missingInventoryItemsSchema?: boolean;
+  missingDailyClosureColumns?: string[];
   dailyClosures?: any[];
   dailyClosureItems?: any[];
   dailyChecks?: any[];
@@ -448,6 +452,7 @@ function buildFixtures(overrides: MockFixtures = {}) {
           created_at: '2026-03-08T09:00:00.000Z',
         },
       ],
+    payrollLocks: overrides.payrollLocks ?? [],
     boardPosts: overrides.boardPosts ?? [],
     boardPostComments: overrides.boardPostComments ?? [],
     boardPostReads: overrides.boardPostReads ?? [],
@@ -469,6 +474,7 @@ function buildFixtures(overrides: MockFixtures = {}) {
     purchaseOrders: overrides.purchaseOrders ?? [],
     asRepairRecords: overrides.asRepairRecords ?? [],
     returnRecords: overrides.returnRecords ?? [],
+    incidentReports: overrides.incidentReports ?? [],
     workSchedules: overrides.workSchedules ?? [],
     workShifts: overrides.workShifts ?? [],
     orgTeams: overrides.orgTeams ?? [],
@@ -493,8 +499,10 @@ function buildFixtures(overrides: MockFixtures = {}) {
     opPatientChecks: overrides.opPatientChecks ?? [],
     missingSurgeryTemplatesSchema: overrides.missingSurgeryTemplatesSchema ?? false,
     missingInventoryItemsSchema: overrides.missingInventoryItemsSchema ?? false,
+    missingDailyClosureColumns: overrides.missingDailyClosureColumns ?? [],
     missingMessageColumns: overrides.missingMessageColumns ?? [],
     missingBoardPostColumns: overrides.missingBoardPostColumns ?? [],
+    missingPayrollRecordColumns: overrides.missingPayrollRecordColumns ?? [],
     dailyClosures: overrides.dailyClosures ?? [],
     dailyClosureItems: overrides.dailyClosureItems ?? [],
     dailyChecks: overrides.dailyChecks ?? [],
@@ -521,9 +529,9 @@ function buildFixtures(overrides: MockFixtures = {}) {
           id: 'tax-rate-default-1',
           effective_year: Number(defaultYearMonth.slice(0, 4)),
           company_name: fakeUser.company,
-          national_pension_rate: 0.045,
-          health_insurance_rate: 0.0355,
-          long_term_care_rate: 0.0046,
+          national_pension_rate: 0.0475,
+          health_insurance_rate: 0.03595,
+          long_term_care_rate: 0.004724,
           employment_insurance_rate: 0.009,
           configured: true,
           income_tax_bracket: buildMockMonthlyWithholdingTable(),
@@ -532,9 +540,9 @@ function buildFixtures(overrides: MockFixtures = {}) {
           id: 'tax-rate-default-all',
           effective_year: Number(defaultYearMonth.slice(0, 4)),
           company_name: '전체',
-          national_pension_rate: 0.045,
-          health_insurance_rate: 0.0355,
-          long_term_care_rate: 0.0046,
+          national_pension_rate: 0.0475,
+          health_insurance_rate: 0.03595,
+          long_term_care_rate: 0.004724,
           employment_insurance_rate: 0.009,
           configured: true,
           income_tax_bracket: buildMockMonthlyWithholdingTable(),
@@ -735,6 +743,7 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   let purchaseOrders = [...fixtures.purchaseOrders];
   let asRepairRecords = [...fixtures.asRepairRecords];
   let returnRecords = [...fixtures.returnRecords];
+  let incidentReports = [...fixtures.incidentReports];
   let workSchedules = [...fixtures.workSchedules];
   let workShifts = [...fixtures.workShifts];
   let orgTeams = [...fixtures.orgTeams];
@@ -760,6 +769,7 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   const missingEmploymentContractColumns = new Set(fixtures.missingEmploymentContractColumns ?? []);
   const missingMessageColumns = new Set(fixtures.missingMessageColumns ?? []);
   const missingBoardPostColumns = new Set(fixtures.missingBoardPostColumns ?? []);
+  const missingPayrollRecordColumns = new Set(fixtures.missingPayrollRecordColumns ?? []);
   let dailyClosures = [...fixtures.dailyClosures];
   let dailyClosureItems = [...fixtures.dailyClosureItems];
   let dailyChecks = [...fixtures.dailyChecks];
@@ -772,6 +782,7 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   const legacyInventoryDepartmentSchema = fixtures.legacyInventoryDepartmentSchema;
   let messageInsertFailures = fixtures.messageInsertFailures;
   let payrollRecords = [...fixtures.payrollRecords];
+  let payrollLocks = [...fixtures.payrollLocks];
   let boardPosts = [...fixtures.boardPosts];
   let boardPostComments = [...fixtures.boardPostComments];
   let boardPostReads = [...fixtures.boardPostReads];
@@ -2523,6 +2534,11 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       if (method === 'POST') {
         const body = request.postDataJSON();
         const payloads = Array.isArray(body) ? body : [body];
+        for (const columnName of fixtures.missingDailyClosureColumns || []) {
+          if (payloads.some((payload: any) => Object.prototype.hasOwnProperty.call(payload || {}, columnName))) {
+            return missingColumn(route, columnName, 'daily_closures');
+          }
+        }
         const upserted = payloads.map((payload: any, index: number) => {
           const existingIndex = dailyClosures.findIndex(
             (row: any) =>
@@ -2548,6 +2564,17 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
         return json(route, wantsObject ? upserted[0] : upserted);
       }
 
+      if (method === 'DELETE') {
+        const deleting = applyQueryFilters(dailyClosures, url);
+        const deletingIds = new Set(deleting.map((row: any) => String(row.id)));
+        dailyClosures = dailyClosures.filter((row: any) => !deletingIds.has(String(row.id)));
+        dailyClosureItems = dailyClosureItems.filter(
+          (row: any) => !deletingIds.has(String(row.closure_id))
+        );
+        dailyChecks = dailyChecks.filter((row: any) => !deletingIds.has(String(row.closure_id)));
+        return json(route, wantsObject ? deleting[0] ?? null : deleting);
+      }
+
       return json(route, dailyClosures);
     }
 
@@ -2559,6 +2586,17 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       if (method === 'POST') {
         const body = request.postDataJSON();
         const payloads = Array.isArray(body) ? body : [body];
+        const duplicateItemId = payloads.find((payload: any) =>
+          payload?.id && dailyClosureItems.some((row: any) => String(row.id) === String(payload.id))
+        )?.id;
+        if (duplicateItemId) {
+          return json(route, {
+            code: '23505',
+            details: null,
+            hint: null,
+            message: "duplicate key value violates unique constraint 'daily_closure_items_pkey'",
+          }, 409);
+        }
         const inserted = payloads.map((payload: any, index: number) => ({
           id: payload.id || `daily-closure-item-${dailyClosureItems.length + index + 1}`,
           created_at: payload.created_at || new Date().toISOString(),
@@ -2585,6 +2623,17 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       if (method === 'POST') {
         const body = request.postDataJSON();
         const payloads = Array.isArray(body) ? body : [body];
+        const duplicateCheckId = payloads.find((payload: any) =>
+          payload?.id && dailyChecks.some((row: any) => String(row.id) === String(payload.id))
+        )?.id;
+        if (duplicateCheckId) {
+          return json(route, {
+            code: '23505',
+            details: null,
+            hint: null,
+            message: "duplicate key value violates unique constraint 'daily_checks_pkey'",
+          }, 409);
+        }
         const inserted = payloads.map((payload: any, index: number) => ({
           id: payload.id || `daily-check-${dailyChecks.length + index + 1}`,
           created_at: payload.created_at || new Date().toISOString(),
@@ -2792,6 +2841,12 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       }
 
       if (method === 'GET') {
+        const select = String(url.searchParams.get('select') || '');
+        for (const columnName of missingPayrollRecordColumns) {
+          if (select.includes(columnName)) {
+            return missingColumn(route, columnName, 'payroll_records');
+          }
+        }
         return json(route, firstOrList(applyQueryFilters(payrollRecords, url), wantsObject));
       }
 
@@ -2820,6 +2875,39 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       }
 
       return json(route, payrollRecords);
+    }
+
+    if (path.includes('/payroll_locks')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(payrollLocks, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `payroll-lock-${payrollLocks.length + index + 1}`,
+          locked_at: payload.locked_at || new Date().toISOString(),
+          ...payload,
+        }));
+        payrollLocks = [...payrollLocks, ...inserted];
+        return json(route, wantsObject ? inserted[0] ?? null : inserted);
+      }
+
+      if (method === 'PATCH') {
+        const body = request.postDataJSON() || {};
+        const { nextRows, updatedRows } = patchRowsMatchingFilters(payrollLocks, url, body);
+        payrollLocks = nextRows;
+        return json(route, wantsObject ? updatedRows[0] ?? null : updatedRows);
+      }
+
+      if (method === 'DELETE') {
+        const deleting = applyQueryFilters(payrollLocks, url);
+        payrollLocks = payrollLocks.filter((row: any) => !matchFilters(row, url));
+        return json(route, wantsObject ? deleting[0] ?? null : deleting);
+      }
+
+      return json(route, payrollLocks);
     }
 
     if (path.includes('/tax_reports')) {
@@ -3058,6 +3146,39 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       }
 
       return json(route, returnRecords);
+    }
+
+    if (path.includes('/incident_reports')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(incidentReports, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `incident-report-${incidentReports.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        incidentReports = [...inserted, ...incidentReports];
+        return json(route, wantsObject ? inserted[0] ?? null : inserted);
+      }
+
+      if (method === 'PATCH') {
+        const body = request.postDataJSON() || {};
+        const { nextRows, updatedRows } = patchRowsMatchingFilters(incidentReports, url, body);
+        incidentReports = nextRows;
+        return json(route, wantsObject ? updatedRows[0] ?? null : updatedRows);
+      }
+
+      if (method === 'DELETE') {
+        const deleting = applyQueryFilters(incidentReports, url);
+        incidentReports = incidentReports.filter((row: any) => !matchFilters(row, url));
+        return json(route, wantsObject ? deleting[0] ?? null : deleting);
+      }
+
+      return json(route, incidentReports);
     }
 
     if (path.includes('/inventory')) {

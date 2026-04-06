@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
+import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
 
 export default function PayrollExport({ checkedIds = [], selectedCo, yearMonth: initialYm }: Record<string, unknown>) {
@@ -26,8 +27,7 @@ export default function PayrollExport({ checkedIds = [], selectedCo, yearMonth: 
       const { data: prData, error } = await supabase
         .from('payroll_records')
         .select('*')
-        .eq('year_month', yearMonth)
-        .neq('record_type', 'interim');
+        .eq('year_month', yearMonth);
 
       if (!active) return;
 
@@ -39,7 +39,7 @@ export default function PayrollExport({ checkedIds = [], selectedCo, yearMonth: 
         return;
       }
 
-      let list = prData || [];
+      let list = filterNonInterimPayrollRecords((prData || []) as any[]);
       // staff_members 별도 조회 후 병합
       if (list.length > 0) {
         const staffIds = [...new Set(list.map((r: any) => r.staff_id))];

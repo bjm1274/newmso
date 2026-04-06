@@ -8,6 +8,7 @@ import LeaveDashboard from './연차종합대시보드';
 import LaborCostTrend from './인건비추이분석';
 import DeptSalaryDistribution from './부서별급여분포';
 import TurnoverDashboard from './이직률근속률대시보드';
+import TotalLaborCostForecast from './총인건비예측';
 
 export default function HRDashboardIntegrated({ staffs = [], selectedCo, checkedIds, yearMonth }: Record<string, unknown>) {
   const [ym, setYm] = useState((yearMonth as string) || new Date().toISOString().slice(0, 7));
@@ -26,6 +27,7 @@ export default function HRDashboardIntegrated({ staffs = [], selectedCo, checked
         <SeveranceLeaveDashboard staffs={staffs} />
         <LeaveDashboard staffs={staffs} selectedCo={selectedCo} currentUser={typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USER) || '{}'); } catch { return null; } })() : null} />
         <DeptSalaryDistribution staffs={staffs} selectedCo={selectedCo} />
+        <TotalLaborCostForecast staffs={(staffs as any[]) || []} selectedCo={String(selectedCo || '')} user={null} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

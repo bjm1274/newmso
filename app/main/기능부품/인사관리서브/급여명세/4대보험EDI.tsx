@@ -1,152 +1,383 @@
 'use client';
-import { useState, useEffect } from 'react';
+
+import { useEffect, useMemo, useState } from 'react';
+import { filterNonInterimPayrollRecords, getPayrollGrossPay } from '@/lib/payroll-records';
+import {
+  calculateEmployeeInsuranceDeductions,
+  calculateIndustrialAccidentInsurance,
+  EMPLOYEE_INSURANCE_RATES_2026,
+  getIndustrialAccidentInsuranceInfo,
+} from '@/lib/payroll-insurance-rates';
 import { supabase } from '@/lib/supabase';
 
-const EDI_TYPES = [
-  { id: 'NPS', label: '국민연금', rate: 0.045, desc: '기준소득월액의 4.5% (근로자)' },
-  { id: 'HI', label: '건강보험', rate: 0.03545, desc: '보수월액의 3.545% (근로자)' },
-  { id: 'LCI', label: '장기요양보험', rate: 0.009182, desc: '건강보험료의 12.95% (2024)' },
-  { id: 'EI', label: '고용보험', rate: 0.009, desc: '보수총액의 0.9% (근로자)' },
-];
+type Row = {
+  id: string;
+  name: string;
+  position: string;
+  base: number;
+  nps: number;
+  hi: number;
+  lci: number;
+  ei: number;
+  wc: number;
+  employeeTotal: number;
+  employerOnlyTotal: number;
+};
 
-type Row = { id: string; name: string; position: string; base: number; nps: number; hi: number; lci: number; ei: number; total: number };
+type PayrollRecordRow = {
+  staff_id: string | number;
+  year_month?: string | null;
+  record_type?: string | null;
+  status?: string | null;
+  gross_pay?: number | null;
+  total_taxable?: number | null;
+  total_taxfree?: number | null;
+  base_salary?: number | null;
+};
 
-function calcInsurance(base: number) {
-  const nps = Math.round(base * 0.045 / 10) * 10;
-  const hi = Math.round(base * 0.03545 / 10) * 10;
-  const lci = Math.round(hi * 0.1295 / 10) * 10;
-  const ei = Math.round(base * 0.009 / 10) * 10;
-  return { nps, hi, lci, ei, total: nps + hi + lci + ei };
+function isFinalizedPayrollRecord(record: PayrollRecordRow | null | undefined) {
+  const status = String(record?.status ?? '').trim().toLowerCase();
+  return status === '확정' || status === 'finalized' || status === 'confirmed';
 }
 
-export default function InsuranceEDI({ staffs = [], selectedCo, user }: { staffs: any[]; selectedCo: string; user: any }) {
+function formatPercent(value: number) {
+  return `${(value * 100).toFixed(4).replace(/0+$/, '').replace(/\.$/, '')}%`;
+}
+
+export default function InsuranceEDI({
+  staffs = [],
+  selectedCo,
+  user,
+}: {
+  staffs: any[];
+  selectedCo: string;
+  user: any;
+}) {
   const [yearMonth, setYearMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [rows, setRows] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [filterType, setFilterType] = useState('전체');
 
-  const filtered = staffs.filter(s => selectedCo === '전체' || s.company === selectedCo);
+  const selectedCompanyLabel = selectedCo || user?.company || '전체';
+  const filteredStaffs = useMemo(
+    () => (!selectedCo || selectedCo === '전체' ? staffs : staffs.filter((staff) => staff.company === selectedCo)),
+    [selectedCo, staffs]
+  );
+
+  const industrialAccidentInfo = useMemo(
+    () => getIndustrialAccidentInsuranceInfo(selectedCompanyLabel),
+    [selectedCompanyLabel]
+  );
 
   useEffect(() => {
-    const computed: Row[] = filtered.map(s => {
-      const base = s.base_salary || s.base || 3000000;
-      const ins = calcInsurance(base);
-      return { id: s.id, name: s.name, position: s.position || '', base, ...ins };
-    });
-    setRows(computed);
-  }, [staffs, selectedCo]);
+    let cancelled = false;
 
-  const totalRow = rows.reduce((acc, r) => ({
-    nps: acc.nps + r.nps, hi: acc.hi + r.hi, lci: acc.lci + r.lci, ei: acc.ei + r.ei, total: acc.total + r.total,
-  }), { nps: 0, hi: 0, lci: 0, ei: 0, total: 0 });
+    const loadFinalizedPayrollRows = async () => {
+      if (filteredStaffs.length === 0) {
+        setRows([]);
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        const { data, error } = await supabase
+          .from('payroll_records')
+          .select('staff_id, year_month, record_type, status, gross_pay, total_taxable, total_taxfree, base_salary')
+          .eq('year_month', yearMonth);
+
+        if (error) throw error;
+
+        const filteredStaffIdSet = new Set(filteredStaffs.map((staff) => String(staff.id)));
+        const finalizedRecordByStaffId = new Map<string, PayrollRecordRow>();
+
+        for (const record of filterNonInterimPayrollRecords(((data || []) as unknown) as PayrollRecordRow[])) {
+          const staffId = String(record.staff_id ?? '');
+          if (!filteredStaffIdSet.has(staffId)) continue;
+          if (!isFinalizedPayrollRecord(record)) continue;
+          finalizedRecordByStaffId.set(staffId, record);
+        }
+
+        const computedRows: Row[] = filteredStaffs.flatMap((staff) => {
+          const record = finalizedRecordByStaffId.get(String(staff.id));
+          if (!record) return [];
+
+          const payrollBase = getPayrollGrossPay(record);
+          const base = Math.max(
+            payrollBase,
+            Number(record.base_salary ?? 0),
+            Number(staff.base_salary ?? staff.base ?? 0)
+          );
+          const employeeInsurance = calculateEmployeeInsuranceDeductions(base);
+          const industrialAccident = calculateIndustrialAccidentInsurance(base, selectedCompanyLabel);
+
+          return [
+            {
+              id: String(staff.id),
+              name: String(staff.name || ''),
+              position: String(staff.position || ''),
+              base,
+              nps: employeeInsurance.nationalPension,
+              hi: employeeInsurance.healthInsurance,
+              lci: employeeInsurance.longTermCare,
+              ei: employeeInsurance.employmentInsurance,
+              wc: industrialAccident.employerAmount,
+              employeeTotal: employeeInsurance.total,
+              employerOnlyTotal: industrialAccident.employerAmount,
+            },
+          ];
+        });
+
+        if (!cancelled) setRows(computedRows);
+      } catch (error) {
+        console.warn('payroll_records finalized insurance EDI load failed:', error);
+        if (!cancelled) setRows([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void loadFinalizedPayrollRows();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filteredStaffs, selectedCompanyLabel, yearMonth]);
+
+  const totalRow = rows.reduce(
+    (accumulator, row) => ({
+      nps: accumulator.nps + row.nps,
+      hi: accumulator.hi + row.hi,
+      lci: accumulator.lci + row.lci,
+      ei: accumulator.ei + row.ei,
+      wc: accumulator.wc + row.wc,
+      employeeTotal: accumulator.employeeTotal + row.employeeTotal,
+      employerOnlyTotal: accumulator.employerOnlyTotal + row.employerOnlyTotal,
+    }),
+    { nps: 0, hi: 0, lci: 0, ei: 0, wc: 0, employeeTotal: 0, employerOnlyTotal: 0 }
+  );
 
   const generateEDI = () => {
     setGenerating(true);
+
     const lines: string[] = [];
     lines.push(`[4대보험 EDI 파일 - ${yearMonth}]`);
     lines.push(`생성일시: ${new Date().toLocaleString('ko-KR')}`);
-    lines.push(`사업장: ${selectedCo}`);
-    lines.push(`총 인원: ${rows.length}명`);
+    lines.push(`사업체: ${selectedCompanyLabel}`);
+    lines.push(`산재보험 업종: ${industrialAccidentInfo.industryLabel}`);
+    lines.push(`급여확정 대상: ${rows.length}명`);
     lines.push('');
-    lines.push('번호,성명,직위,기준소득,국민연금,건강보험,장기요양,고용보험,합계');
-    rows.forEach((r, i) => {
-      lines.push(`${i + 1},${r.name},${r.position},${r.base.toLocaleString()},${r.nps.toLocaleString()},${r.hi.toLocaleString()},${r.lci.toLocaleString()},${r.ei.toLocaleString()},${r.total.toLocaleString()}`);
+    lines.push('번호,성명,직위,보험기준금액,국민연금,건강보험,장기요양보험,고용보험,산재보험(사업주),근로자부담합계,사업주부담합계');
+
+    rows.forEach((row, index) => {
+      lines.push(
+        [
+          index + 1,
+          row.name,
+          row.position,
+          row.base,
+          row.nps,
+          row.hi,
+          row.lci,
+          row.ei,
+          row.wc,
+          row.employeeTotal,
+          row.employerOnlyTotal,
+        ].join(',')
+      );
     });
+
     lines.push('');
-    lines.push(`합계,,,,${totalRow.nps.toLocaleString()},${totalRow.hi.toLocaleString()},${totalRow.lci.toLocaleString()},${totalRow.ei.toLocaleString()},${totalRow.total.toLocaleString()}`);
+    lines.push(
+      ['합계', '', '', '', totalRow.nps, totalRow.hi, totalRow.lci, totalRow.ei, totalRow.wc, totalRow.employeeTotal, totalRow.employerOnlyTotal].join(',')
+    );
 
     const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `4대보험EDI_${yearMonth}_${selectedCo}.csv`;
-    a.click();
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `4대보험EDI_${yearMonth}_${selectedCompanyLabel}.csv`;
+    anchor.click();
     URL.revokeObjectURL(url);
     setGenerating(false);
   };
 
-  const fmt = (n: number) => n.toLocaleString() + '원';
+  const rateCards = [
+    {
+      id: 'NPS',
+      label: '국민연금',
+      rate: EMPLOYEE_INSURANCE_RATES_2026.nationalPension,
+      desc: '근로자 부담 4.75%',
+    },
+    {
+      id: 'HI',
+      label: '건강보험',
+      rate: EMPLOYEE_INSURANCE_RATES_2026.healthInsurance,
+      desc: '근로자 부담 3.595%',
+    },
+    {
+      id: 'LCI',
+      label: '장기요양보험',
+      rate: EMPLOYEE_INSURANCE_RATES_2026.longTermCare,
+      desc: '근로자 부담 0.4724%',
+    },
+    {
+      id: 'EI',
+      label: '고용보험',
+      rate: EMPLOYEE_INSURANCE_RATES_2026.employmentInsurance,
+      desc: '근로자 부담 0.9%',
+    },
+    {
+      id: 'WCI',
+      label: '산재보험',
+      rate: industrialAccidentInfo.employerRate,
+      desc: `${industrialAccidentInfo.industryLabel} · 사업주 부담`,
+    },
+  ] as const;
 
   return (
-    <div className="p-4 md:p-4 space-y-5">
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+    <div className="space-y-5 p-4 md:p-4" data-testid="insurance-edi-view">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <h2 className="text-base font-bold text-[var(--foreground)]">4대보험 EDI 파일 자동 생성</h2>
+          <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
+            해당 월 급여가 확정된 직원만 포함합니다. 산재보험은 회사 업종 기준 사업주 부담으로 표시합니다.
+          </p>
         </div>
-        <div className="flex gap-2 items-center">
-          <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm font-bold bg-[var(--card)] outline-none" />
-          <button onClick={generateEDI} disabled={generating || rows.length === 0} className="px-4 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-sm font-bold shadow-sm hover:opacity-90 disabled:opacity-50">
+        <div className="flex items-center gap-2">
+          <input
+            type="month"
+            value={yearMonth}
+            onChange={(event) => setYearMonth(event.target.value)}
+            className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-bold outline-none"
+          />
+          <button
+            onClick={generateEDI}
+            disabled={generating || rows.length === 0}
+            className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
+          >
             CSV 다운로드
           </button>
         </div>
       </div>
 
-      {/* 보험료율 안내 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {EDI_TYPES.map(t => (
-          <div key={t.id} className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)]">
-            <p className="text-xs font-bold text-[var(--foreground)]">{t.label}</p>
-            <p className="text-lg font-bold text-[var(--accent)] mt-0.5">{(t.rate * 100).toFixed(3)}%</p>
-            <p className="text-[9px] text-[var(--toss-gray-3)] mt-0.5">{t.desc}</p>
+      <div className="flex items-center justify-between rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3">
+        <div className="text-xs font-medium text-[var(--toss-gray-4)]">
+          기준 회사: <span className="font-bold text-[var(--foreground)]">{selectedCompanyLabel}</span>
+        </div>
+        <div
+          className="rounded-full bg-[var(--accent)]/10 px-3 py-1 text-sm font-bold text-[var(--accent)]"
+          data-testid="insurance-edi-count"
+        >
+          {rows.length}명
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        {rateCards.map((type) => (
+          <div
+            key={type.id}
+            className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3"
+          >
+            <p className="text-xs font-bold text-[var(--foreground)]">{type.label}</p>
+            <p className="mt-0.5 text-lg font-bold text-[var(--accent)]">{formatPercent(type.rate)}</p>
+            <p className="mt-0.5 text-[9px] text-[var(--toss-gray-3)]">{type.desc}</p>
           </div>
         ))}
       </div>
 
-      {/* 합계 카드 */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
         {[
           { label: '국민연금 합계', value: totalRow.nps, color: 'text-blue-600' },
           { label: '건강보험 합계', value: totalRow.hi, color: 'text-green-600' },
           { label: '장기요양 합계', value: totalRow.lci, color: 'text-teal-600' },
           { label: '고용보험 합계', value: totalRow.ei, color: 'text-orange-600' },
-          { label: '근로자 부담 합계', value: totalRow.total, color: 'text-[var(--accent)]' },
-        ].map(c => (
-          <div key={c.label} className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] text-center">
-            <p className={`text-base font-bold ${c.color}`}>{c.value.toLocaleString()}</p>
-            <p className="text-[9px] text-[var(--toss-gray-3)] mt-0.5">{c.label}</p>
+          { label: '산재보험 합계', value: totalRow.wc, color: 'text-rose-600' },
+          { label: '근로자 부담 합계', value: totalRow.employeeTotal, color: 'text-[var(--accent)]' },
+        ].map((card) => (
+          <div
+            key={card.label}
+            className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 text-center"
+          >
+            <p className={`text-base font-bold ${card.color}`}>{card.value.toLocaleString()}</p>
+            <p className="mt-0.5 text-[9px] text-[var(--toss-gray-3)]">{card.label}</p>
           </div>
         ))}
       </div>
 
-      {/* 테이블 */}
-      <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] overflow-hidden shadow-sm">
+      <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left" style={{ minWidth: '700px' }}>
-            <thead className="bg-[var(--muted)]/60 border-b border-[var(--border)]">
+          <table className="w-full text-left" style={{ minWidth: '980px' }}>
+            <thead className="border-b border-[var(--border)] bg-[var(--muted)]/60">
               <tr>
-                {['성명', '직위', '기준소득', '국민연금', '건강보험', '장기요양', '고용보험', '합계'].map(h => (
-                  <th key={h} className="px-3 py-3 text-[10px] font-semibold text-[var(--toss-gray-3)] whitespace-nowrap">{h}</th>
+                {[
+                  '성명',
+                  '직위',
+                  '보험기준금액',
+                  '국민연금',
+                  '건강보험',
+                  '장기요양',
+                  '고용보험',
+                  '산재보험(사업주)',
+                  '근로자 부담',
+                  '사업주 부담',
+                ].map((header) => (
+                  <th
+                    key={header}
+                    className="whitespace-nowrap px-3 py-3 text-[10px] font-semibold text-[var(--toss-gray-3)]"
+                  >
+                    {header}
+                  </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--border)]">
-              {rows.map(r => (
-                <tr key={r.id} className="hover:bg-[var(--muted)]/30">
-                  <td className="px-3 py-2.5 text-xs font-bold text-[var(--foreground)]">{r.name}</td>
-                  <td className="px-3 py-2.5 text-xs text-[var(--toss-gray-3)]">{r.position}</td>
-                  <td className="px-3 py-2.5 text-xs text-right">{r.base.toLocaleString()}</td>
-                  <td className="px-3 py-2.5 text-xs text-right text-blue-600">{r.nps.toLocaleString()}</td>
-                  <td className="px-3 py-2.5 text-xs text-right text-green-600">{r.hi.toLocaleString()}</td>
-                  <td className="px-3 py-2.5 text-xs text-right text-teal-600">{r.lci.toLocaleString()}</td>
-                  <td className="px-3 py-2.5 text-xs text-right text-orange-600">{r.ei.toLocaleString()}</td>
-                  <td className="px-3 py-2.5 text-xs text-right font-bold text-[var(--accent)]">{r.total.toLocaleString()}</td>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={10} className="px-3 py-8 text-center text-sm text-[var(--toss-gray-3)]">
+                    불러오는 중입니다...
+                  </td>
                 </tr>
-              ))}
-              <tr className="bg-[var(--muted)]/50 border-t-2 border-[var(--border)] font-bold">
-                <td className="px-3 py-2.5 text-xs font-bold" colSpan={2}>합계 ({rows.length}명)</td>
-                <td className="px-3 py-2.5 text-xs text-right">-</td>
-                <td className="px-3 py-2.5 text-xs text-right text-blue-600">{totalRow.nps.toLocaleString()}</td>
-                <td className="px-3 py-2.5 text-xs text-right text-green-600">{totalRow.hi.toLocaleString()}</td>
-                <td className="px-3 py-2.5 text-xs text-right text-teal-600">{totalRow.lci.toLocaleString()}</td>
-                <td className="px-3 py-2.5 text-xs text-right text-orange-600">{totalRow.ei.toLocaleString()}</td>
-                <td className="px-3 py-2.5 text-xs text-right font-bold text-[var(--accent)]">{totalRow.total.toLocaleString()}</td>
-              </tr>
+              ) : rows.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="px-3 py-8 text-center text-sm text-[var(--toss-gray-3)]">
+                    확정된 급여 데이터가 없습니다.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((row) => (
+                  <tr
+                    key={row.id}
+                    data-testid={`insurance-edi-row-${row.id}`}
+                    className="border-b border-[var(--border-subtle)] last:border-0"
+                  >
+                    <td className="whitespace-nowrap px-3 py-3 text-sm font-semibold text-[var(--foreground)]">
+                      {row.name}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 text-xs text-[var(--toss-gray-3)]">
+                      {row.position || '-'}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 text-sm font-medium text-[var(--foreground)]">
+                      {row.base.toLocaleString()}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 text-sm">{row.nps.toLocaleString()}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-sm">{row.hi.toLocaleString()}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-sm">{row.lci.toLocaleString()}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-sm">{row.ei.toLocaleString()}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-sm text-rose-600">{row.wc.toLocaleString()}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-sm font-bold text-[var(--accent)]">
+                      {row.employeeTotal.toLocaleString()}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 text-sm font-bold text-rose-600">
+                      {row.employerOnlyTotal.toLocaleString()}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
-
-      <p className="text-[10px] text-[var(--toss-gray-3)]">* 본 계산은 참고용이며, 실제 신고 시 건강보험공단·고용노동부 기준을 확인하세요. 사업주 부담분(근로자와 동일 비율)은 별도 계산됩니다.</p>
     </div>
   );
 }

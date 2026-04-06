@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
 
 export default function LaborCostTrend({ selectedCo }: Record<string, unknown>) {
@@ -12,17 +13,17 @@ export default function LaborCostTrend({ selectedCo }: Record<string, unknown>) 
       for (let i = 0; i < 12; i++) {
         const d = new Date(base.getFullYear(), base.getMonth() - i, 1);
         const ym = d.toISOString().slice(0, 7);
-        const { data } = await supabase.from('payroll_records').select('net_pay').eq('year_month', ym).not('record_type', 'eq', 'interim');
-        let rows = data || [];
+        const { data } = await supabase
+          .from('payroll_records')
+          .select('staff_id, net_pay, record_type')
+          .eq('year_month', ym);
+        let rows = filterNonInterimPayrollRecords((data || []) as any[]);
         if (selectedCo && selectedCo !== '전체') {
-          // FK join 대신 staff_members 별도 조회 (PostgREST 관계 캐시 오류 방지)
-          const { data: r2 } = await supabase.from('payroll_records').select('*').eq('year_month', ym).not('record_type', 'eq', 'interim');
-          const allRows = r2 || [];
-          if (allRows.length > 0) {
-            const staffIds = [...new Set(allRows.map((r: any) => r.staff_id))];
+          if (rows.length > 0) {
+            const staffIds = [...new Set(rows.map((r: any) => r.staff_id))];
             const { data: staffData } = await supabase.from('staff_members').select('id, company').in('id', staffIds);
             const staffCompanyMap = Object.fromEntries((staffData || []).map((s: any) => [String(s.id), s.company]));
-            rows = allRows.filter((r: any) => staffCompanyMap[String(r.staff_id)] === selectedCo);
+            rows = rows.filter((r: any) => staffCompanyMap[String(r.staff_id)] === selectedCo);
           } else {
             rows = [];
           }

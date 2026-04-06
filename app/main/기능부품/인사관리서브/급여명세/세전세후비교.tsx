@@ -1,6 +1,8 @@
 'use client';
-import { useState, useEffect } from 'react';
+
+import { useEffect, useMemo, useState } from 'react';
 import { getPayrollGrossPay } from '@/lib/payroll-records';
+import { calculateEmployeeInsuranceDeductions } from '@/lib/payroll-insurance-rates';
 import { supabase } from '@/lib/supabase';
 
 interface Props {
@@ -9,24 +11,52 @@ interface Props {
   user: any;
 }
 
-export default function GrossNetComparison({ staffs, selectedCo, user }: Props) {
+type ComparisonRow = {
+  staff: any;
+  gross: number;
+  deduction: number;
+  net: number;
+  deductionRate: string;
+  breakdown: {
+    pension: number;
+    health: number;
+    ltcare: number;
+    employment: number;
+    incomeTax: number;
+    localTax: number;
+  };
+};
+
+function formatNumber(value: number) {
+  return Math.round(value).toLocaleString('ko-KR');
+}
+
+export default function GrossNetComparison({ staffs, selectedCo }: Props) {
   const [yearMonth, setYearMonth] = useState(new Date().toISOString().slice(0, 7));
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const filtered = selectedCo === '전체' ? staffs : staffs.filter((s: any) => s.company === selectedCo);
+  const filteredStaffs = useMemo(
+    () => (selectedCo === '전체' ? staffs : staffs.filter((staff: any) => staff.company === selectedCo)),
+    [selectedCo, staffs]
+  );
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const staffIds = filtered.map((s: any) => s.id);
-        if (staffIds.length === 0) { setRecords([]); setLoading(false); return; }
+        const staffIds = filteredStaffs.map((staff: any) => staff.id);
+        if (!staffIds.length) {
+          setRecords([]);
+          return;
+        }
+
         const { data, error } = await supabase
           .from('payroll_records')
           .select('*')
           .eq('year_month', yearMonth)
           .in('staff_id', staffIds);
+
         if (error) throw error;
         setRecords(data || []);
       } catch {
@@ -35,75 +65,110 @@ export default function GrossNetComparison({ staffs, selectedCo, user }: Props) 
         setLoading(false);
       }
     };
-    fetchData();
-  }, [yearMonth, selectedCo]);
 
-  const fmt = (n: number) => Math.round(n).toLocaleString('ko-KR');
+    void fetchData();
+  }, [filteredStaffs, yearMonth]);
 
-  const rows = filtered.map((staff: any) => {
-    const rec = records.find((r: any) => String(r.staff_id) === String(staff.id));
-    const gross = getPayrollGrossPay(rec);
-    const deduction = rec?.total_deduction || 0;
-    const net = rec?.net_pay || gross - deduction;
-    const deductionRate = gross > 0 ? ((deduction / gross) * 100).toFixed(1) : '0.0';
-    const meta = rec?.meta_data || {};
-    const breakdown = {
-      pension: meta.pension || meta.국민연금 || Math.round(gross * 0.045),
-      health: meta.health_insurance || meta.건강보험 || Math.round(gross * 0.03545),
-      ltcare: meta.long_term_care || meta.장기요양 || Math.round(gross * 0.00453),
-      employment: meta.employment_insurance || meta.고용보험 || Math.round(gross * 0.009),
-      incomeTax: meta.income_tax || meta.소득세 || 0,
-      localTax: meta.local_income_tax || meta.지방소득세 || 0,
-    };
-    return { staff, gross, deduction, net, deductionRate, breakdown };
-  });
+  const rows = useMemo<ComparisonRow[]>(() => {
+    return filteredStaffs.map((staff: any) => {
+      const record = records.find((row: any) => String(row.staff_id) === String(staff.id));
+      const gross = getPayrollGrossPay(record);
+      const deduction = Number(record?.total_deduction || 0);
+      const net = Number(record?.net_pay || Math.max(0, gross - deduction));
+      const deductionRate = gross > 0 ? ((deduction / gross) * 100).toFixed(1) : '0.0';
+      const meta = record?.meta_data || {};
+      const insuranceFallback = calculateEmployeeInsuranceDeductions(gross);
 
-  const totalGross = rows.reduce((s, r) => s + r.gross, 0);
-  const totalDeduction = rows.reduce((s, r) => s + r.deduction, 0);
-  const totalNet = rows.reduce((s, r) => s + r.net, 0);
-  const totalRate = totalGross > 0 ? ((totalDeduction / totalGross) * 100).toFixed(1) : '0.0';
+      return {
+        staff,
+        gross,
+        deduction,
+        net,
+        deductionRate,
+        breakdown: {
+          pension: Number(meta.pension ?? meta.national_pension ?? meta.국민연금 ?? insuranceFallback.nationalPension),
+          health: Number(
+            meta.health_insurance ?? meta.healthInsurance ?? meta.건강보험 ?? insuranceFallback.healthInsurance
+          ),
+          ltcare: Number(
+            meta.long_term_care ?? meta.longTermCare ?? meta.장기요양 ?? insuranceFallback.longTermCare
+          ),
+          employment: Number(
+            meta.employment_insurance ??
+              meta.employmentInsurance ??
+              meta.고용보험 ??
+              insuranceFallback.employmentInsurance
+          ),
+          incomeTax: Number(meta.income_tax ?? meta.incomeTax ?? meta.소득세 ?? 0),
+          localTax: Number(meta.local_income_tax ?? meta.localTax ?? meta.지방소득세 ?? 0),
+        },
+      };
+    });
+  }, [filteredStaffs, records]);
 
-  // 실수령액 구간 분포
-  const buckets: Record<string, number> = {};
-  rows.forEach(r => {
-    if (r.net === 0) return;
-    const bucket = `${Math.floor(r.net / 1000000)}백만`;
-    buckets[bucket] = (buckets[bucket] || 0) + 1;
-  });
+  const totals = useMemo(() => {
+    const totalGross = rows.reduce((sum, row) => sum + row.gross, 0);
+    const totalDeduction = rows.reduce((sum, row) => sum + row.deduction, 0);
+    const totalNet = rows.reduce((sum, row) => sum + row.net, 0);
+    const totalRate = totalGross > 0 ? ((totalDeduction / totalGross) * 100).toFixed(1) : '0.0';
+    return { totalGross, totalDeduction, totalNet, totalRate };
+  }, [rows]);
+
+  const buckets = useMemo(() => {
+    const nextBuckets: Record<string, number> = {};
+    rows.forEach((row) => {
+      if (row.net <= 0) return;
+      const bucket = `${Math.floor(row.net / 1_000_000)}백만`;
+      nextBuckets[bucket] = (nextBuckets[bucket] || 0) + 1;
+    });
+    return nextBuckets;
+  }, [rows]);
+
   const maxBucket = Math.max(...Object.values(buckets), 1);
 
   const handleCsvDownload = () => {
-    const header = ['직원명', '총지급액', '총공제액', '실수령액', '공제율'];
-    const body = rows.map(r => [r.staff.name, r.gross, r.deduction, r.net, `${r.deductionRate}%`]);
-    const csv = [header, ...body].map(row => row.join(',')).join('\n');
+    const header = ['직원명', '총급여', '총공제', '실수령액', '공제율'];
+    const body = rows.map((row) => [
+      row.staff.name,
+      row.gross,
+      row.deduction,
+      row.net,
+      `${row.deductionRate}%`,
+    ]);
+    const csv = [header, ...body].map((row) => row.join(',')).join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `세전세후비교_${yearMonth}.csv`;
-    a.click();
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `세전세후비교_${yearMonth}.csv`;
+    link.click();
     URL.revokeObjectURL(url);
   };
 
   return (
-    <div className="p-4 md:p-4 space-y-5 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="mx-auto max-w-5xl space-y-5 p-4 md:p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-[var(--foreground)]">세전/세후 비교 분석</h2>
+          <h2 className="text-lg font-bold text-[var(--foreground)]">세전·세후 비교 분석</h2>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex items-center gap-2">
           <input
             type="month"
             value={yearMonth}
-            onChange={e => setYearMonth(e.target.value)}
-            className="p-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-bold"
+            onChange={(e) => setYearMonth(e.target.value)}
+            className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-2 text-sm font-bold"
           />
-          <button onClick={handleCsvDownload} className="px-4 py-2 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)] hover:opacity-90">CSV</button>
+          <button
+            onClick={handleCsvDownload}
+            className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-xs font-bold text-white hover:opacity-90"
+          >
+            CSV
+          </button>
         </div>
       </div>
 
       {loading ? (
-        <div className="text-center py-10 text-sm text-[var(--toss-gray-3)]">로딩 중...</div>
+        <div className="py-10 text-center text-sm text-[var(--toss-gray-3)]">불러오는 중입니다...</div>
       ) : (
         <>
           <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
@@ -111,66 +176,78 @@ export default function GrossNetComparison({ staffs, selectedCo, user }: Props) 
               <thead>
                 <tr className="bg-[var(--muted)]">
                   <th className="p-2 text-left font-bold text-[var(--toss-gray-4)]">직원명</th>
-                  <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">총지급액</th>
+                  <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">총급여</th>
                   <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">국민연금</th>
                   <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">건강보험</th>
-                  <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">장기요양</th>
+                  <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">장기요양보험</th>
                   <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">고용보험</th>
                   <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">소득세</th>
-                  <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">총공제액</th>
+                  <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">총공제</th>
                   <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">실수령액</th>
                   <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">공제율</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 ? (
-                  <tr><td colSpan={10} className="p-4 text-center text-[var(--toss-gray-3)]">데이터가 없습니다.</td></tr>
-                ) : rows.map(r => (
-                  <tr key={r.staff.id} className="border-t border-[var(--border)] hover:bg-[var(--muted)]/50">
-                    <td className="p-2 font-bold">{r.staff.name}</td>
-                    <td className="p-2 text-right">{fmt(r.gross)}</td>
-                    <td className="p-2 text-right text-[var(--toss-gray-4)]">{fmt(r.breakdown.pension)}</td>
-                    <td className="p-2 text-right text-[var(--toss-gray-4)]">{fmt(r.breakdown.health)}</td>
-                    <td className="p-2 text-right text-[var(--toss-gray-4)]">{fmt(r.breakdown.ltcare)}</td>
-                    <td className="p-2 text-right text-[var(--toss-gray-4)]">{fmt(r.breakdown.employment)}</td>
-                    <td className="p-2 text-right text-[var(--toss-gray-4)]">{fmt(r.breakdown.incomeTax)}</td>
-                    <td className="p-2 text-right text-red-600 font-bold">{fmt(r.deduction)}</td>
-                    <td className="p-2 text-right text-[var(--accent)] font-bold">{fmt(r.net)}</td>
-                    <td className="p-2 text-right">{r.deductionRate}%</td>
+                  <tr>
+                    <td colSpan={10} className="p-4 text-center text-[var(--toss-gray-3)]">
+                      데이터가 없습니다.
+                    </td>
                   </tr>
-                ))}
+                ) : (
+                  rows.map((row) => (
+                    <tr
+                      key={row.staff.id}
+                      className="border-t border-[var(--border)] hover:bg-[var(--muted)]/50"
+                    >
+                      <td className="p-2 font-bold">{row.staff.name}</td>
+                      <td className="p-2 text-right">{formatNumber(row.gross)}</td>
+                      <td className="p-2 text-right text-[var(--toss-gray-4)]">{formatNumber(row.breakdown.pension)}</td>
+                      <td className="p-2 text-right text-[var(--toss-gray-4)]">{formatNumber(row.breakdown.health)}</td>
+                      <td className="p-2 text-right text-[var(--toss-gray-4)]">{formatNumber(row.breakdown.ltcare)}</td>
+                      <td className="p-2 text-right text-[var(--toss-gray-4)]">
+                        {formatNumber(row.breakdown.employment)}
+                      </td>
+                      <td className="p-2 text-right text-[var(--toss-gray-4)]">{formatNumber(row.breakdown.incomeTax)}</td>
+                      <td className="p-2 text-right font-bold text-red-600">{formatNumber(row.deduction)}</td>
+                      <td className="p-2 text-right font-bold text-[var(--accent)]">{formatNumber(row.net)}</td>
+                      <td className="p-2 text-right">{row.deductionRate}%</td>
+                    </tr>
+                  ))
+                )}
                 {rows.length > 0 && (
                   <tr className="border-t-2 border-[var(--accent)] bg-[var(--accent)]/5 font-bold">
-                    <td className="p-2 font-bold text-[var(--accent)]">전체 합계</td>
-                    <td className="p-2 text-right">{fmt(totalGross)}</td>
+                    <td className="p-2 text-[var(--accent)]">전체 합계</td>
+                    <td className="p-2 text-right">{formatNumber(totals.totalGross)}</td>
                     <td className="p-2" colSpan={4} />
                     <td className="p-2" />
-                    <td className="p-2 text-right text-red-600">{fmt(totalDeduction)}</td>
-                    <td className="p-2 text-right text-[var(--accent)]">{fmt(totalNet)}</td>
-                    <td className="p-2 text-right">{totalRate}%</td>
+                    <td className="p-2 text-right text-red-600">{formatNumber(totals.totalDeduction)}</td>
+                    <td className="p-2 text-right text-[var(--accent)]">{formatNumber(totals.totalNet)}</td>
+                    <td className="p-2 text-right">{totals.totalRate}%</td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
 
-          {/* 실수령액 구간 분포 차트 */}
           {Object.keys(buckets).length > 0 && (
-            <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] p-4">
-              <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">실수령액 구간별 직원 수</h3>
+            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-4">
+              <h3 className="mb-3 text-sm font-bold text-[var(--foreground)]">실수령액 구간별 직원 수</h3>
               <div className="space-y-2">
-                {Object.entries(buckets).sort().map(([label, count]) => (
-                  <div key={label} className="flex items-center gap-3">
-                    <span className="text-xs font-bold text-[var(--toss-gray-4)] w-16 shrink-0">{label}원대</span>
-                    <div className="flex-1 bg-[var(--muted)] rounded-full h-4 overflow-hidden">
-                      <div
-                        className="h-full bg-[var(--accent)] rounded-full transition-all"
-                        style={{ width: `${(count / maxBucket) * 100}%` }}
-                      />
+                {Object.entries(buckets)
+                  .sort()
+                  .map(([label, count]) => (
+                    <div key={label} className="flex items-center gap-3">
+                      <span className="w-16 shrink-0 text-xs font-bold text-[var(--toss-gray-4)]">{label}</span>
+                      <div className="h-4 flex-1 overflow-hidden rounded-full bg-[var(--muted)]">
+                        <div
+                          className="h-full rounded-full bg-[var(--accent)] transition-all"
+                          style={{ width: `${(count / maxBucket) * 100}%` }}
+                        />
+                      </div>
+                      <span className="w-8 text-right text-xs font-bold text-[var(--toss-gray-4)]">{count}명</span>
                     </div>
-                    <span className="text-xs font-bold text-[var(--toss-gray-4)] w-8 text-right">{count}명</span>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
           )}

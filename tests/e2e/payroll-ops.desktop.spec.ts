@@ -386,6 +386,103 @@ test('regular payroll settlement defaults withholding rate to 80 percent when no
   expect(record.deduction_detail.withholding_rate_percent).toBe(80);
 });
 
+test('insurance EDI lists only finalized payroll staff for the selected month', async ({ page }) => {
+  const yearMonth = new Date().toISOString().slice(0, 7);
+
+  const confirmedStaff = {
+    ...fakeUser,
+    id: 'edi-confirmed-1',
+    employee_no: 'EDI-001',
+    name: '확정직원',
+    company: fakeUser.company,
+    company_id: fakeUser.company_id,
+    department: fakeUser.department,
+    position: '주임',
+    base_salary: 3200000,
+  };
+
+  const draftStaff = {
+    ...fakeUser,
+    id: 'edi-draft-1',
+    employee_no: 'EDI-002',
+    name: '임시직원',
+    company: fakeUser.company,
+    company_id: fakeUser.company_id,
+    department: fakeUser.department,
+    position: '사원',
+    base_salary: 3100000,
+  };
+
+  const missingStaff = {
+    ...fakeUser,
+    id: 'edi-missing-1',
+    employee_no: 'EDI-003',
+    name: '미정산직원',
+    company: fakeUser.company,
+    company_id: fakeUser.company_id,
+    department: fakeUser.department,
+    position: '사원',
+    base_salary: 3000000,
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [confirmedStaff, draftStaff, missingStaff],
+    payrollRecords: [
+      {
+        id: 'payroll-confirmed-edi',
+        staff_id: confirmedStaff.id,
+        year_month: yearMonth,
+        status: '확정',
+        gross_pay: 3450000,
+        base_salary: confirmedStaff.base_salary,
+      },
+      {
+        id: 'payroll-draft-edi',
+        staff_id: draftStaff.id,
+        year_month: yearMonth,
+        status: '임시저장',
+        gross_pay: 3300000,
+        base_salary: draftStaff.base_salary,
+      },
+      {
+        id: 'payroll-other-month-edi',
+        staff_id: missingStaff.id,
+        year_month: '2026-01',
+        status: '확정',
+        gross_pay: 3100000,
+        base_salary: missingStaff.base_salary,
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    user: {
+      ...fakeUser,
+      company: confirmedStaff.company,
+      department: confirmedStaff.department,
+    },
+    localStorage: {
+      erp_last_menu: '인사관리',
+      erp_last_subview: '급여',
+      erp_hr_tab: '급여',
+      erp_hr_workspace: '근태 · 급여',
+    },
+  });
+
+  await page.goto(`/main?${new URLSearchParams({ open_menu: '인사관리' }).toString()}`);
+
+  await expect(page.getByTestId('payroll-view')).toBeVisible();
+  await page.getByTestId('hr-company-select').selectOption(fakeUser.company);
+  await page.getByTestId('payroll-tab-4대보험EDI').click();
+
+  await expect(page.getByTestId('insurance-edi-view')).toBeVisible();
+  await expect(page.getByTestId(`insurance-edi-row-${confirmedStaff.id}`)).toBeVisible();
+  await expect(page.getByTestId(`insurance-edi-row-${confirmedStaff.id}`)).toContainText('3,450,000');
+  await expect(page.getByTestId(`insurance-edi-row-${draftStaff.id}`)).toHaveCount(0);
+  await expect(page.getByTestId(`insurance-edi-row-${missingStaff.id}`)).toHaveCount(0);
+  await expect(page.getByTestId('insurance-edi-count')).toContainText('1명');
+});
+
 test('regular payroll settlement includes saved position allowance in taxable pay', async ({
   page,
 }) => {
@@ -708,6 +805,224 @@ test('payroll ledger shows a pending placeholder instead of a finalized slip whe
     '급여는 아직 정산중입니다',
   );
   await expect(page.getByTestId('salary-detail-card')).toHaveCount(0);
+});
+
+test('payroll ledger still shows finalized records when payroll_records misses optional columns', async ({
+  page,
+}) => {
+  const yearMonth = new Date().toISOString().slice(0, 7);
+  const payrollStaff = {
+    id: 'payroll-missing-columns-1',
+    employee_no: 'PAY-MISSING-001',
+    name: '옵션컬럼직원',
+    company: fakeUser.company,
+    company_id: fakeUser.company_id,
+    department: fakeUser.department,
+    position: '주임',
+    base_salary: 3000000,
+    meal_allowance: 200000,
+    night_duty_allowance: 0,
+    vehicle_allowance: 0,
+    childcare_allowance: 0,
+    research_allowance: 0,
+    other_taxfree: 0,
+    permissions: {},
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [payrollStaff],
+    payrollRecords: [
+      {
+        id: 'payroll-missing-columns-record-1',
+        staff_id: payrollStaff.id,
+        year_month: yearMonth,
+        status: '확정',
+        base_salary: 3000000,
+        meal_allowance: 200000,
+        extra_allowance: 0,
+        overtime_pay: 0,
+        bonus: 0,
+        total_taxable: 3000000,
+        total_taxfree: 200000,
+        total_deduction: 120000,
+        net_pay: 3080000,
+        deduction_detail: {
+          national_pension: 0,
+          health_insurance: 0,
+          long_term_care: 0,
+          employment_insurance: 0,
+          income_tax: 0,
+          local_tax: 0,
+        },
+      },
+    ],
+    missingPayrollRecordColumns: ['advance_pay'],
+    attendances: [],
+  });
+
+  await seedSession(page, {
+    user: {
+      ...fakeUser,
+      company: payrollStaff.company,
+      department: payrollStaff.department,
+    },
+    localStorage: {
+      erp_last_menu: '인사관리',
+      erp_last_subview: '급여',
+      erp_hr_tab: '급여',
+      erp_hr_workspace: '근태 · 급여',
+    },
+  });
+
+  await page.goto(`/main?${new URLSearchParams({ open_menu: '인사관리' }).toString()}`);
+
+  await expect(page.getByTestId('payroll-view')).toBeVisible();
+  await page.getByTestId('hr-company-select').selectOption(fakeUser.company);
+  await page.getByTestId('payroll-tab-급여대장').click();
+
+  const payrollRow = page.locator('tr').filter({
+    has: page.getByText(payrollStaff.name, { exact: true }),
+  });
+  await expect(payrollRow).toContainText('확정');
+  await expect(page.getByTestId('payroll-ledger-pending-placeholder')).toHaveCount(0);
+  await expect(page.getByTestId('salary-detail-card')).toBeVisible();
+});
+
+test('payroll ledger shows a finalized slip for legacy confirmed records without record_type', async ({
+  page,
+}) => {
+  const yearMonth = new Date().toISOString().slice(0, 7);
+  const [year, month] = yearMonth.split('-');
+  const payrollStaff = {
+    id: 'payroll-legacy-1',
+    employee_no: 'PAY-LEGACY-001',
+    name: '기존확정직원',
+    company: fakeUser.company,
+    company_id: fakeUser.company_id,
+    department: fakeUser.department,
+    position: '주임',
+    base_salary: 3100000,
+    meal_allowance: 200000,
+    night_duty_allowance: 0,
+    vehicle_allowance: 0,
+    childcare_allowance: 0,
+    research_allowance: 0,
+    other_taxfree: 0,
+    permissions: {},
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [payrollStaff],
+    payrollRecords: [
+      {
+        id: 'payroll-legacy-record-1',
+        staff_id: payrollStaff.id,
+        year_month: yearMonth,
+        record_type: null,
+        status: '확정',
+        base_salary: 3100000,
+        meal_allowance: 200000,
+        night_duty_allowance: 0,
+        vehicle_allowance: 0,
+        childcare_allowance: 0,
+        research_allowance: 0,
+        other_taxfree: 0,
+        extra_allowance: 0,
+        overtime_pay: 0,
+        bonus: 0,
+        total_taxable: 3100000,
+        total_taxfree: 200000,
+        total_deduction: 120000,
+        net_pay: 3180000,
+        deduction_detail: {
+          national_pension: 0,
+          health_insurance: 0,
+          long_term_care: 0,
+          employment_insurance: 0,
+          income_tax: 0,
+          local_tax: 0,
+        },
+      },
+    ],
+    attendances: [],
+  });
+
+  await seedSession(page, {
+    user: {
+      ...fakeUser,
+      company: payrollStaff.company,
+      department: payrollStaff.department,
+    },
+    localStorage: {
+      erp_last_menu: '인사관리',
+      erp_last_subview: '급여',
+      erp_hr_tab: '급여',
+      erp_hr_workspace: '근태 및 급여',
+    },
+  });
+
+  await page.goto(`/main?${new URLSearchParams({ open_menu: '인사관리' }).toString()}`);
+
+  await expect(page.getByTestId('payroll-view')).toBeVisible();
+  await page.getByTestId('hr-company-select').selectOption(fakeUser.company);
+  await page.getByTestId('payroll-tab-급여대장').click();
+
+  const payrollRow = page.locator('tr').filter({
+    has: page.getByText(payrollStaff.name, { exact: true }),
+  });
+  await expect(payrollRow).toContainText('확정');
+  await expect(page.getByTestId('payroll-ledger-pending-placeholder')).toHaveCount(0);
+  await expect(page.getByTestId('salary-detail-card')).toBeVisible();
+  await expect(page.getByText(`${year}년 ${Number(month)}월 급여명세서`, { exact: true })).toBeVisible();
+});
+
+test('payroll settlement wizard shows the payroll lock card and opens the lock panel', async ({
+  page,
+}) => {
+  const payrollStaff = {
+    id: 'payroll-lock-1',
+    employee_no: 'PAY-LOCK-001',
+    name: '잠금테스트직원',
+    company: fakeUser.company,
+    company_id: fakeUser.company_id,
+    department: fakeUser.department,
+    position: '사원',
+    base_salary: 3000000,
+    permissions: {},
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [payrollStaff],
+    payrollRecords: [],
+    payrollLocks: [],
+    attendances: [],
+  });
+
+  await seedSession(page, {
+    user: {
+      ...fakeUser,
+      company: payrollStaff.company,
+      department: payrollStaff.department,
+    },
+    localStorage: {
+      erp_last_menu: '인사관리',
+      erp_last_subview: '급여',
+      erp_hr_tab: '급여',
+      erp_hr_workspace: '근태 및 급여',
+    },
+  });
+
+  await page.goto(`/main?${new URLSearchParams({ open_menu: '인사관리' }).toString()}`);
+
+  await expect(page.getByTestId('payroll-view')).toBeVisible();
+  await page.getByTestId('hr-company-select').selectOption(fakeUser.company);
+  await page.getByTestId('payroll-tab-급여정산').click();
+
+  await expect(page.getByTestId('run-payroll-lock-button')).toBeVisible();
+  await page.getByTestId('run-payroll-lock-button').click();
+
+  await expect(page.getByText('급여 월 마감 잠금', { exact: true })).toBeVisible();
+  await expect(page.getByText('마감 잠금', { exact: true })).toBeVisible();
 });
 
 test.skip('interim settlement prorates vehicle and fixed allowances and stores deductions', async ({ page }) => {

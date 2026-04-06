@@ -1689,7 +1689,11 @@ test("payroll tax file utility triggers a browser download", async ({
     `/main?${new URLSearchParams({ open_menu: "인사관리" }).toString()}`,
   );
 
-  await page.getByTestId("payroll-utility-1").click();
+  await expect(page.getByTestId("payroll-view")).toBeVisible();
+  const taxFileTab = page.getByTestId("payroll-tab-원천징수파일");
+  if (await taxFileTab.count()) {
+    await taxFileTab.click();
+  }
   await expect(page.getByTestId("payroll-utility-tax-file")).toBeVisible();
   const downloadPromise = page.waitForEvent("download");
   await page.getByTestId("payroll-tax-download-button").click();
@@ -2061,9 +2065,9 @@ test("employee and admin can complete a realistic monthly operations lifecycle",
         id: "tax-rate-hospital-1",
         effective_year: 2026,
         company_name: hospital.name,
-        national_pension_rate: 0.045,
-        health_insurance_rate: 0.0355,
-        long_term_care_rate: 0.0046,
+        national_pension_rate: 0.0475,
+        health_insurance_rate: 0.03595,
+        long_term_care_rate: 0.004724,
         employment_insurance_rate: 0.009,
         income_tax_bracket: [{ min: 0, rate: 0.03, monthly_tax: 120000, official: true }],
       },
@@ -2071,9 +2075,9 @@ test("employee and admin can complete a realistic monthly operations lifecycle",
         id: "tax-rate-all-1",
         effective_year: 2026,
         company_name: "전체",
-        national_pension_rate: 0.045,
-        health_insurance_rate: 0.0355,
-        long_term_care_rate: 0.0046,
+        national_pension_rate: 0.0475,
+        health_insurance_rate: 0.03595,
+        long_term_care_rate: 0.004724,
         employment_insurance_rate: 0.009,
         income_tax_bracket: [{ min: 0, rate: 0.03, monthly_tax: 120000, official: true }],
       },

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import SalaryDetail from '../../인사관리서브/급여명세/급여상세';
@@ -201,7 +202,6 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
           .from('payroll_records')
           .select('*')
           .eq('staff_id', effectiveUserId)
-          .neq('record_type', 'interim')
           .order('year_month', { ascending: false }),
         supabase
           .from('notifications')
@@ -220,10 +220,9 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
         return;
       }
 
-      const allRecords = ((recordsResult.data || []) as SalaryRecord[]).filter((record) => {
-        const recordType = String(record.record_type || 'regular');
-        return recordType !== 'interim';
-      });
+      const allRecords = filterNonInterimPayrollRecords(
+        (recordsResult.data || []) as SalaryRecord[],
+      );
       const issuedCandidates = allRecords.filter((record) => {
         const status = String(record.status || '').trim();
         return status === '확정' || status === '';

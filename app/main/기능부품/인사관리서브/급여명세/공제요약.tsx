@@ -1,15 +1,32 @@
 'use client';
+
+import { calculateEmployeeInsuranceDeductions } from '@/lib/payroll-insurance-rates';
+
 export default function DeductionSummary({ base }: { base: number }) {
-  const pension = Math.floor(base * 0.045);
-  const health = Math.floor(base * 0.03545);
+  const deductions = calculateEmployeeInsuranceDeductions(base);
+
   return (
-    <div className="border border-[var(--border)] p-4 bg-[var(--card)] rounded-[var(--radius-md)] shadow-sm">
-      <div className="pb-2 border-b border-[var(--border)] mb-3">
-        <h3 className="text-sm font-semibold text-[var(--foreground)]">법정 공제</h3>
+    <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+      <div className="mb-3 border-b border-[var(--border)] pb-2">
+        <h3 className="text-sm font-semibold text-[var(--foreground)]">4대보험 요약</h3>
       </div>
-      <div className="space-y-2">
-        <div className="flex justify-between text-xs font-medium text-[var(--toss-gray-4)]"><span>국민연금</span><span className="text-red-500">-{pension.toLocaleString()}원</span></div>
-        <div className="flex justify-between text-xs font-medium text-[var(--toss-gray-4)]"><span>건강보험</span><span className="text-red-500">-{health.toLocaleString()}원</span></div>
+      <div className="space-y-2 text-xs font-medium text-[var(--toss-gray-4)]">
+        <div className="flex justify-between">
+          <span>국민연금</span>
+          <span className="text-red-500">-{deductions.nationalPension.toLocaleString()}원</span>
+        </div>
+        <div className="flex justify-between">
+          <span>건강보험</span>
+          <span className="text-red-500">-{deductions.healthInsurance.toLocaleString()}원</span>
+        </div>
+        <div className="flex justify-between">
+          <span>장기요양보험</span>
+          <span className="text-red-500">-{deductions.longTermCare.toLocaleString()}원</span>
+        </div>
+        <div className="flex justify-between">
+          <span>고용보험</span>
+          <span className="text-red-500">-{deductions.employmentInsurance.toLocaleString()}원</span>
+        </div>
       </div>
     </div>
   );

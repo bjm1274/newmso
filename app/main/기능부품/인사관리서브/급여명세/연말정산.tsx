@@ -10,6 +10,7 @@ import {
   fetchTaxInsuranceRates,
   type TaxInsuranceRates,
 } from '@/lib/use-tax-insurance-rates';
+import { calculateEmployeeInsuranceDeductions } from '@/lib/payroll-insurance-rates';
 
 interface YearEndSettlementProps {
   staffs?: unknown[];
@@ -182,6 +183,7 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: YearEndSe
     const calculatedTax = Number(staff.calculated_tax || 0);
     const taxPaid = Number(staff.tax_paid || 0);
     const refundOrAdditional = Number(staff.refund_or_additional || 0);
+    const insurance = calculateEmployeeInsuranceDeductions(totalSalary);
     return `
 근로소득 원천징수영수증
 발급일: ${new Date().toLocaleDateString('ko-KR')}
@@ -203,9 +205,10 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: YearEndSe
 환급/추가납부: ₩${Math.abs(refundOrAdditional).toLocaleString()}
 
 [보험료 정보]
-건강보험료: ₩${Math.round(totalSalary * 0.03395).toLocaleString()}
-국민연금료: ₩${Math.round(totalSalary * 0.045).toLocaleString()}
-고용보험료: ₩${Math.round(totalSalary * 0.008).toLocaleString()}
+건강보험료: ₩${insurance.healthInsurance.toLocaleString()}
+국민연금료: ₩${insurance.nationalPension.toLocaleString()}
+장기요양보험료: ₩${insurance.longTermCare.toLocaleString()}
+고용보험료: ₩${insurance.employmentInsurance.toLocaleString()}
 
 [발급 기관]
 박철홍정형외과

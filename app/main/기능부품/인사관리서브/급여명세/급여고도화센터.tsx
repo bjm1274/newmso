@@ -3,7 +3,7 @@ import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import TaxInsuranceRatesPanel from './세율보험요율관리';
 import PayrollLockPanel from './급여월마감잠금';
@@ -366,12 +366,14 @@ export default function PayrollAdvancedCenter({
   selectedCo,
   yearMonth,
   payrollRecords = [],
+  showWorkflowCards = false,
   onRefresh,
 }: {
   staffs?: StaffMember[];
   selectedCo?: string;
   yearMonth: string;
   payrollRecords?: PayrollRecordSummaryRow[];
+  showWorkflowCards?: boolean;
   onRefresh?: () => void;
 }) {
   const [viewer, setViewer] = useState<StaffMember | null>(null);
@@ -395,6 +397,9 @@ export default function PayrollAdvancedCenter({
   const [previousMonthRecords, setPreviousMonthRecords] = useState<PayrollRecordSummaryRow[]>([]);
   const [policyVersions, setPolicyVersions] = useState<PayrollPolicyVersionRow[]>([]);
   const [policyVersionNote, setPolicyVersionNote] = useState('');
+  const [workflowFocus, setWorkflowFocus] = useState<'lock' | 'interim' | null>(null);
+  const payrollLockSectionRef = useRef<HTMLDivElement | null>(null);
+  const interimSettlementSectionRef = useRef<HTMLDivElement | null>(null);
 
   const companyScope = selectedCo && selectedCo.trim() ? selectedCo : '전체';
   const filteredStaffs = useMemo(
@@ -521,6 +526,7 @@ export default function PayrollAdvancedCenter({
 
   const currentApproval = approvalState;
   const viewerName = viewer?.name || '관리자';
+  const needsOfficialTaxReview = !hasExactIncomeTaxBracket(taxInsuranceRates);
   const monthBonusItems = useMemo(() => bonusItems.filter((item) => item.yearMonth === yearMonth && filteredStaffs.some((staff) => String(staff.id) === item.staffId)), [bonusItems, filteredStaffs, yearMonth]);
   const monthRetroItems = useMemo(() => retroItems.filter((item) => filteredStaffs.some((staff) => String(staff.id) === item.staffId)), [filteredStaffs, retroItems]);
   const activeDeductions = useMemo(() => deductionItems.filter((item) => item.active && filteredStaffs.some((staff) => String(staff.id) === item.staffId)), [deductionItems, filteredStaffs]);
@@ -580,6 +586,25 @@ export default function PayrollAdvancedCenter({
 
   const monthCount = getMonthDiff(retroForm.startMonth, retroForm.endMonth);
   const retroPreviewTotal = Math.max(0, (retroForm.afterBase - retroForm.beforeBase) * monthCount);
+
+  const focusWorkflowSection = useCallback((section: 'lock' | 'interim') => {
+    setWorkflowFocus(section);
+    const target =
+      section === 'lock' ? payrollLockSectionRef.current : interimSettlementSectionRef.current;
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+
+  const getWorkflowCardClassName = (section: 'lock' | 'interim') =>
+    `group flex h-full flex-col items-start rounded-[var(--radius-xl)] border bg-[var(--card)] p-4 text-left transition-all ${
+      workflowFocus === section
+        ? 'border-[var(--accent)] shadow-sm ring-2 ring-[var(--accent)]/15'
+        : 'border-[var(--border)] hover:border-[var(--accent)] hover:shadow-sm'
+    }`;
+
+  const getWorkflowSectionClassName = (section: 'lock' | 'interim') =>
+    workflowFocus === section
+      ? 'rounded-[calc(var(--radius-xl)+4px)] ring-2 ring-[var(--accent)]/15'
+      : '';
 
   const savePolicyVersion = async () => {
     setSavingKey('policy-version');
@@ -808,8 +833,54 @@ export default function PayrollAdvancedCenter({
           급여 고도화 데이터를 불러오는 중입니다.
         </div>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-          <div className="space-y-4">
+        <div className="space-y-4">
+          {showWorkflowCards ? (
+            <>
+              {needsOfficialTaxReview && (
+                <div className="rounded-[var(--radius-lg)] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  <p className="font-semibold">급여 점검 필요</p>
+                  <p className="mt-1">
+                    해당 연도 소득세 세율표가 공식 확인 상태가 아니라 급여 확정이 제한됩니다.
+                  </p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <button
+                  type="button"
+                  data-testid="admin-payroll-lock-card"
+                  onClick={() => focusWorkflowSection('lock')}
+                  className={getWorkflowCardClassName('lock')}
+                >
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-[var(--radius-xl)] bg-emerald-50 text-2xl text-emerald-600 shadow-inner transition-transform group-hover:scale-110">
+                    🔒
+                  </div>
+                  <h3 className="text-lg font-bold text-[var(--foreground)]">급여 마감 및 잠금</h3>
+                  <p className="mt-2 text-xs leading-relaxed text-[var(--toss-gray-3)]">
+                    {yearMonth} 급여의 마감 잠금, 재오픈 요청, 검토 상태를 한 번에 관리합니다.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  data-testid="admin-payroll-interim-card"
+                  onClick={() => focusWorkflowSection('interim')}
+                  className={getWorkflowCardClassName('interim')}
+                >
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-[var(--radius-xl)] bg-amber-50 text-2xl text-amber-500 shadow-inner transition-transform group-hover:scale-110">
+                    👋
+                  </div>
+                  <h3 className="text-lg font-bold text-[var(--foreground)]">중도 퇴사자 정산</h3>
+                  <p className="mt-2 text-xs leading-relaxed text-[var(--toss-gray-3)]">
+                    월중 퇴사자 급여를 일할 계산하고 퇴직 정산까지 이어서 처리합니다.
+                  </p>
+                </button>
+              </div>
+            </>
+          ) : null}
+
+          <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+            <div className="space-y-4">
             <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
               <h3 className="text-base font-bold text-[var(--foreground)]">상여·인센티브 엔진</h3>
               <div className="mt-4 grid gap-3 md:grid-cols-4">
@@ -1125,9 +1196,36 @@ export default function PayrollAdvancedCenter({
               </div>
             </div>
 
-            <TaxInsuranceRatesPanel companyName={selectedCo} />
-            <PayrollLockPanel yearMonth={yearMonth} companyName={selectedCo} onLockChange={onRefresh} />
-            <InterimSettlement staffs={staffs} selectedCo={selectedCo} onRefresh={onRefresh} />
+              <TaxInsuranceRatesPanel companyName={selectedCo} />
+
+              {showWorkflowCards ? (
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <div
+                    ref={payrollLockSectionRef}
+                    data-testid="admin-payroll-lock-section"
+                    className={getWorkflowSectionClassName('lock')}
+                  >
+                    <PayrollLockPanel
+                      yearMonth={yearMonth}
+                      companyName={selectedCo}
+                      onLockChange={onRefresh}
+                    />
+                  </div>
+                  <div
+                    ref={interimSettlementSectionRef}
+                    data-testid="admin-payroll-interim-section"
+                    className={getWorkflowSectionClassName('interim')}
+                  >
+                    <InterimSettlement staffs={staffs} selectedCo={selectedCo} onRefresh={onRefresh} />
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <PayrollLockPanel yearMonth={yearMonth} companyName={selectedCo} onLockChange={onRefresh} />
+                  <InterimSettlement staffs={staffs} selectedCo={selectedCo} onRefresh={onRefresh} />
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
+import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
 
 type SendSummary = {
@@ -45,8 +46,7 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<st
         .select('staff_id')
         .eq('year_month', yearMonth)
         .in('staff_id', staffIds)
-        .eq('status', '확정')
-        .neq('record_type', 'interim');
+        .eq('status', '확정');
 
       if (!active) return;
 
@@ -58,7 +58,8 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<st
       }
 
       setLoadError('');
-      setEligibleCount(new Set((data || []).map((row: any) => String(row.staff_id))).size);
+      const eligibleRecords = filterNonInterimPayrollRecords((data || []) as any[]);
+      setEligibleCount(new Set(eligibleRecords.map((row: any) => String(row.staff_id))).size);
     })();
 
     return () => {
@@ -78,8 +79,7 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<st
       .select('staff_id, year_month, net_pay, status, record_type')
       .eq('year_month', yearMonth)
       .in('staff_id', staffIds)
-      .eq('status', '확정')
-      .neq('record_type', 'interim');
+      .eq('status', '확정');
 
     if (error) {
       console.error('payroll email sender fetch failed:', error);
@@ -87,7 +87,7 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<st
       return;
     }
 
-    const targetRecords = records || [];
+    const targetRecords = filterNonInterimPayrollRecords((records || []) as any[]);
     if (targetRecords.length === 0) {
       toast('해당 월에 정산이 확정된 급여명세서가 없습니다.');
       return;
