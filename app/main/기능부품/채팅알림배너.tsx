@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { toNotificationText, getInitials } from '@/lib/notification-utils';
 
 type ChatDetail = {
   title?: unknown;
@@ -25,24 +26,7 @@ type BannerItem = {
 
 const DISPLAY_MS = 6000;
 
-function toBannerText(value: unknown, fallback = '') {
-  if (typeof value === 'string') return value.trim();
-  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
-    return String(value);
-  }
-  return fallback;
-}
-
-function getInitials(name: string) {
-  const trimmed = name.trim();
-  if (!trimmed) return 'MSG';
-  if (/[\uAC00-\uD7A3]/.test(trimmed[0])) return trimmed[0];
-  const parts = trimmed.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  }
-  return trimmed.slice(0, 2).toUpperCase();
-}
+const toBannerText = (value: unknown, fallback = '') => toNotificationText(value, fallback, true);
 
 export default function ChatAlertBanner(props: {
   onOpenChat: (roomId: string) => void;
@@ -137,7 +121,7 @@ export default function ChatAlertBanner(props: {
   if (!current) return null;
 
   const pendingCount = queueRef.current.length;
-  const initials = getInitials(current.senderName || current.title);
+  const initials = getInitials(current.senderName || current.title, 'MSG');
   const eyebrow = current.type === 'mention' ? '멘션 도착' : '메시지 미리보기';
   const roomLabel =
     current.roomName && current.roomName !== current.senderName ? current.roomName : current.type === 'mention' ? '채팅방에서 불렀어요' : '채팅방에서 도착';

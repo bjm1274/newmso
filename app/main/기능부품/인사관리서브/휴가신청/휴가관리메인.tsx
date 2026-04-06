@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
 import { logAudit, readClientAuditActor } from '@/lib/audit';
+import { STORAGE_KEYS } from '@/lib/storage-keys';
 import AnnualLeavePromotion from './연차촉진시스템';
 import AnnualLeaveLedger from './연차원장';
 import AttendanceDeductionSimulator from './근태차감시뮬레이터';
@@ -134,7 +135,7 @@ export default function LeaveManagement({
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      const raw = localStorage.getItem('erp_user');
+      const raw = localStorage.getItem(STORAGE_KEYS.USER);
       if (!raw) return;
       const u = JSON.parse(raw || '{}');
       if (!u?.id) return;

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { formatWon } from '@/lib/date-formatter';
 
 export const DEFAULT_THRESHOLD = 20;
 
@@ -75,9 +76,7 @@ function getMonthLabel(value: string) {
   return `${yearText}년 ${month}월`;
 }
 
-function formatCurrency(value: number) {
-  return `${Math.round(value).toLocaleString()}원`;
-}
+const formatCurrency = (value: number) => formatWon(Math.round(value));
 
 function formatPercent(value: number) {
   if (!Number.isFinite(value)) {

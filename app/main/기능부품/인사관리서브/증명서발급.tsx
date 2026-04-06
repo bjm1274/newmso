@@ -4,6 +4,7 @@ import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { CERTIFICATE_TYPES } from '@/lib/certificate-types';
+import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import {
   alphaColor,
@@ -191,7 +192,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
     setSerialNo(nextSerial);
 
     try {
-      const rawUser = typeof window !== 'undefined' ? window.localStorage.getItem('erp_user') : null;
+      const rawUser = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEYS.USER) : null;
       const currentUser = rawUser ? JSON.parse(rawUser) : {};
 
       await supabase.from('certificate_issuances').insert({

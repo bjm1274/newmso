@@ -3,15 +3,19 @@ import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { StaffMember } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { isActiveStaff } from '@/lib/active-staff';
 import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import { getChecklistTargetDate, getDefaultChecklist } from '@/lib/hr-checklists';
 import { getMinimumWageByYear, MONTHLY_STANDARD_HOURS } from '@/lib/tax-free-limits';
-import { getMonthlyWorkingHours } from '@/lib/payroll-working-hours';
+import { calculateHourlyRateFromMonthlySalary, getMonthlyWorkingHours } from '@/lib/payroll-working-hours';
 import StaffHistoryTimeline from './인사이력타임라인';
 import OnboardingChecklist from './급여명세/입퇴사온보딩';
 import CertTransferPanel from './교육자격인사이동패널';
 import SmartDatePicker from '../공통/SmartDatePicker';
+import { formatWon as libFormatWon } from '@/lib/date-formatter';
+
+const formatWon = (amount: number) => libFormatWon(Math.round(amount || 0));
 
 function createEmptyStaffForm(selectedCompany?: string) {
   const company = selectedCompany && selectedCompany !== '전체' ? selectedCompany : '';
@@ -95,10 +99,6 @@ function buildStaffMutationPayload(
   return nextPayload;
 }
 
-
-function formatWon(amount: number) {
-  return `${Math.round(amount || 0).toLocaleString('ko-KR')}원`;
-}
 
 function normalizeResidentNo(value: string | null | undefined) {
   return String(value || '').replace(/[^0-9]/g, '');
@@ -189,8 +189,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const previewMinimumWageYear = Math.max(2025, new Date().getFullYear());
   const previewMinimumWage = getMinimumWageByYear(previewMinimumWageYear);
   const rawHourlySalaryAmount = useMemo(
-    () => Math.round(totalSalaryAmount / monthlyWorkingHours),
-    [monthlyWorkingHours, totalSalaryAmount],
+    () => calculateHourlyRateFromMonthlySalary(totalSalaryAmount, 신규직원.working_hours_per_week, 'ceil'),
+    [신규직원.working_hours_per_week, totalSalaryAmount],
   );
   const hasHourlyPremiumAdjustments = useMemo(
     () =>
@@ -844,11 +844,11 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           : String(s.name || '').toLocaleLowerCase('ko-KR').includes(normalizedKeyword);
 
         if (보기상태 === '퇴사') {
-          return companyMatch && status === '퇴사' && nameMatch;
+          return companyMatch && !isActiveStaff(s) && nameMatch;
         }
 
         // 기본은 재직자 위주
-        return companyMatch && status !== '퇴사' && nameMatch;
+        return companyMatch && isActiveStaff(s) && nameMatch;
       })
       .sort((a: StaffMember, b: StaffMember) => {
         const aEmployeeNo = normalizeEmployeeNoForSort(a.employee_no);
@@ -1377,10 +1377,13 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                             <input
                               type="number"
                               value={신규직원.working_hours_per_week}
-                              onChange={e => 신규직원설정({ ...신규직원, working_hours_per_week: parseInt(e.target.value, 10) || 0 })}
+                              onChange={e => 신규직원설정({ ...신규직원, working_hours_per_week: Number.parseFloat(e.target.value) || 0 })}
                               className="w-full p-3 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none text-xs font-bold text-purple-900 focus:ring-2 focus:ring-purple-300"
                               data-testid="new-staff-working-hours-per-week"
-                              placeholder="40"
+                              inputMode="decimal"
+                              min="0"
+                              step="0.1"
+                              placeholder="40.0"
                             />
                             {신규직원.working_hours_per_week < 40 && 신규직원.working_hours_per_week > 0 && (
                               <p className="text-[9px] font-bold text-purple-600 mt-1 ml-1">

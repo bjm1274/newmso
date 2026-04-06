@@ -7,7 +7,7 @@ import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staf
 import { ADMIN_SIDEBAR_ITEMS } from '../../admin-menu-config';
 import NotificationCenter from '../NotificationCenter';
 
-const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
+import { NOTICE_ROOM_ID } from '@/app/main/기능부품/메신저유틸';
 
 const MYPAGE_TAB_KEY = 'erp_mypage_tab';
 

@@ -1,3 +1,6 @@
+import { asRecord, cleanString } from './data-normalizer';
+import { formatDateLabel, formatMonthLabel, buildDateRangeLabel } from './date-formatter';
+
 export type ApprovalAttachmentMeta = {
   name: string;
   url: string;
@@ -17,41 +20,6 @@ export const REPORT_TYPE_OPTIONS = [
   { value: 'weekly', label: '주간보고서' },
   { value: 'other', label: '기타보고서' },
 ] as const;
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' ? ({ ...(value as Record<string, unknown>) }) : {};
-}
-
-function cleanString(value: unknown) {
-  return String(value ?? '').trim();
-}
-
-function formatDateLabel(value: unknown) {
-  const raw = cleanString(value);
-  if (!raw) return '';
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return raw;
-  return parsed.toLocaleDateString('ko-KR');
-}
-
-function formatMonthLabel(value: unknown) {
-  const raw = cleanString(value);
-  if (!raw) return '';
-  const [year, month] = raw.split('-');
-  if (!year || !month) return raw;
-  const numericMonth = Number(month);
-  if (!Number.isFinite(numericMonth)) return raw;
-  return `${year}년 ${numericMonth}월`;
-}
-
-function buildDateRangeLabel(startValue: unknown, endValue: unknown) {
-  const startLabel = formatDateLabel(startValue);
-  const endLabel = formatDateLabel(endValue);
-  if (startLabel && endLabel) {
-    return startLabel === endLabel ? startLabel : `${startLabel} ~ ${endLabel}`;
-  }
-  return startLabel || endLabel;
-}
 
 export function getReportTypeLabel(value: unknown) {
   const raw = cleanString(value);

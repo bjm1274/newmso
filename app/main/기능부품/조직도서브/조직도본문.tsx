@@ -304,7 +304,6 @@ export default function MainContent({
             onConsumePostId={onConsumeOpenPostId}
             surgeries={data.surgeries}
             mris={data.mris}
-            onRefresh={onRefresh}
             setMainMenu={setMainMenu}
           />
         </div>

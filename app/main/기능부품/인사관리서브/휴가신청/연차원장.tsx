@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { calculateLeaveDays, isAnnualLeaveType, isApprovedLeaveStatus } from '@/lib/annual-leave-ledger';
+import { isActiveStaff } from '@/lib/active-staff';
 
 type StaffLite = {
   id: string;
@@ -55,7 +56,7 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
     () =>
       staffs.filter((staff) => {
         if (selectedCo !== '전체' && staff.company !== selectedCo) return false;
-        return staff.status !== '퇴사';
+        return isActiveStaff(staff);
       }),
     [selectedCo, staffs]
   );

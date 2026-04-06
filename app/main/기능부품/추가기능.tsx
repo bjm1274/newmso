@@ -1,166 +1,21 @@
 'use client';
 
-import dynamic from 'next/dynamic';
-import { startTransition, useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
-import { canAccessExtraFeature } from '@/lib/access-control';
+import { startTransition, useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
+
 import ThemeToggle from '@/app/components/ThemeToggle';
 import GlobalSearch from '@/app/components/GlobalSearch';
+import { canAccessExtraFeature } from '@/lib/access-control';
 
-// ─── 글씨 크기 조절 ────────────────────────────────────────────────────────────
-const FONT_SIZES = [
-  { label: '기본', value: 15 },
-  { label: '하', value: 17 },
-  { label: '중', value: 19 },
-  { label: '대', value: 21 },
-];
-const FONT_SIZE_KEY = 'erp-font-size';
-
-function applyFontSize(px: number) {
-  document.documentElement.style.fontSize = `${px}px`;
-}
-
-function FontSizeControl() {
-  const [current, setCurrent] = useState<number>(() => {
-    if (typeof window === 'undefined') return 15;
-    return Number(localStorage.getItem(FONT_SIZE_KEY) || 15);
-  });
-
-  useEffect(() => {
-    applyFontSize(current);
-  }, [current]);
-
-  const change = (px: number) => {
-    setCurrent(px);
-    localStorage.setItem(FONT_SIZE_KEY, String(px));
-    applyFontSize(px);
-  };
-
-  return (
-    <div className="inline-flex h-8 items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 shadow-sm">
-      <span className="text-[10px] font-semibold text-[var(--toss-gray-3)] mr-0.5">글씨</span>
-      {FONT_SIZES.map((s) => (
-        <button
-          key={s.value}
-          type="button"
-          onClick={() => change(s.value)}
-          className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all ${
-            current === s.value
-              ? 'bg-[var(--accent)] text-white'
-              : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
-          }`}
-        >
-          {s.label}
-        </button>
-      ))}
-    </div>
-  );
-}
+import {
+  EXTERNAL_LINKS,
+  EXTRA_FEATURE_LOADERS,
+  ExtraFeatureSubview,
+  FEATURE_CARDS,
+  FontSizeControl,
+  type FeatureCard,
+} from './추가기능공통';
 
 const prefetchedExtraFeatureModules = new Set<string>();
-
-const loadDepartmentInventoryView = () => import('./재고관리서브/부서별물품장비현황');
-const loadWorkStatusView = () => import('./근무현황');
-const loadHandoverNotesView = () => import('./인계노트');
-const loadDischargeReviewView = () => import('./퇴원심사');
-const loadClosingReportView = () => import('./마감보고');
-const loadStaffEvaluationView = () => import('./직원평가시스템');
-const loadRealtimeDepositView = () => import('./입금실시간조회');
-const loadSurgeryConsultationView = () => import('./수술상담');
-const loadOperationCheckView = () => import('./OP체크');
-const loadOrgChartView = () => import('./조직도서브/OrgChart');
-
-const DepartmentInventoryView = dynamic(loadDepartmentInventoryView, {
-  ssr: false,
-  loading: () => <SubviewLoading label="부서별 재고" />,
-});
-const WorkStatusView = dynamic(loadWorkStatusView, {
-  ssr: false,
-  loading: () => <SubviewLoading label="근무현황" />,
-});
-const HandoverNotesView = dynamic(loadHandoverNotesView, {
-  ssr: false,
-  loading: () => <SubviewLoading label="인계노트" />,
-});
-const DischargeReviewView = dynamic(loadDischargeReviewView, {
-  ssr: false,
-  loading: () => <SubviewLoading label="퇴원심사" />,
-});
-const ClosingReportView = dynamic(loadClosingReportView, {
-  ssr: false,
-  loading: () => <SubviewLoading label="마감보고" />,
-});
-const StaffEvaluationView = dynamic(loadStaffEvaluationView, {
-  ssr: false,
-  loading: () => <SubviewLoading label="직원평가" />,
-});
-const RealtimeDepositView = dynamic(loadRealtimeDepositView, {
-  ssr: false,
-  loading: () => <SubviewLoading label="입금 실시간 조회" />,
-});
-const SurgeryConsultationView = dynamic(loadSurgeryConsultationView, {
-  ssr: false,
-  loading: () => <SubviewLoading label="수술상담 AI 분석" />,
-});
-const OperationCheckView = dynamic(loadOperationCheckView, {
-  ssr: false,
-  loading: () => <SubviewLoading label="OP체크" />,
-});
-const OrgChart = dynamic(loadOrgChartView, {
-  ssr: false,
-  loading: () => <SubviewLoading label="조직도" />,
-});
-
-const EXTRA_FEATURE_LOADERS: Record<string, () => Promise<unknown>> = {
-  조직도: loadOrgChartView,
-  부서별재고: loadDepartmentInventoryView,
-  근무현황: loadWorkStatusView,
-  인계노트: loadHandoverNotesView,
-  퇴원심사: loadDischargeReviewView,
-  마감보고: loadClosingReportView,
-  직원평가: loadStaffEvaluationView,
-  입금실시간조회: loadRealtimeDepositView,
-  수술상담: loadSurgeryConsultationView,
-  OP체크: loadOperationCheckView,
-};
-
-const EXTERNAL_LINKS = [
-  { id: 'km-park', label: '주차관제', url: 'http://kmp0001103.iptime.org/login?redirectTo=undefined', icon: '🔗' },
-  { id: 'webfax', label: '웹팩스', url: 'https://webfax.uplus.co.kr/m', icon: '📠' },
-];
-
-type FeatureCard = {
-  id: string;
-  label: string;
-  icon: string;
-  subView: string;
-};
-
-const FEATURE_CARDS: FeatureCard[] = [
-  { id: '조직도', label: '조직도', icon: '🏢', subView: '조직도' },
-  { id: '부서별재고', label: '부서별 재고', icon: '📦', subView: '부서별재고' },
-  { id: '근무현황', label: '근무현황', icon: '📅', subView: '근무현황' },
-  { id: '인계노트', label: '인계노트', icon: '📝', subView: '인계노트' },
-  { id: '퇴원심사', label: '퇴원심사', icon: '🏥', subView: '퇴원심사' },
-  { id: '마감보고', label: '마감보고', icon: '💰', subView: '마감보고' },
-  { id: '직원평가', label: '직원평가', icon: '✍️', subView: '직원평가' },
-  { id: '입금실시간조회', label: '입금 실시간 조회', icon: '🏦', subView: '입금실시간조회' },
-  { id: '수술상담', label: '수술상담 AI 분석', icon: '🎙️', subView: '수술상담' },
-  { id: 'OP체크', label: 'OP체크', icon: '🩺', subView: 'OP체크' },
-];
-
-const FEATURE_CARD_TEST_IDS = [
-  'org-chart',
-  'department-inventory',
-  'work-status',
-  'handover-note',
-  'discharge-review',
-  'closing-report',
-  'staff-evaluation',
-  'realtime-deposit',
-  'surgery-consultation',
-  'op-check',
-] as const;
-
 const MAX_RECENT = 5;
 const LS_FAVORITES = 'erp_favorites';
 const LS_RECENT = 'erp_recent_features';
@@ -172,58 +27,7 @@ type ExtraFeaturesProps = {
   selectedCo?: string | null;
   selectedCompanyId?: string | null;
   onSearchSelect?: (type: string, id: string) => void;
-  onOpenOrgChart?: () => void;
 };
-
-function SubviewLoading({ label }: { label: string }) {
-  return (
-    <div className="flex min-h-[260px] items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)]">
-      <div className="flex flex-col items-center gap-3 text-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--toss-blue-light)] border-t-[var(--accent)]" />
-        <div className="space-y-1">
-          <p className="text-sm font-bold text-[var(--foreground)]">{label} 불러오는 중</p>
-          <p className="text-xs font-medium text-[var(--toss-gray-3)]">필요한 기능만 로드해서 반응성을 높이고 있습니다.</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FeatureShell({
-  children,
-  onBack,
-  maxWidth = 'max-w-5xl',
-  boxed = false,
-}: {
-  children: ReactNode;
-  onBack: () => void;
-  maxWidth?: string;
-  boxed?: boolean;
-}) {
-  const content = boxed ? (
-    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-      {children}
-    </div>
-  ) : (
-    children
-  );
-
-  return (
-    <div data-testid="extra-subview" className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
-      <div className={`mx-auto flex w-full flex-col gap-3 ${maxWidth}`}>
-        <button
-          data-testid="extra-back-button"
-          type="button"
-          onClick={onBack}
-          className="self-start text-[11px] font-bold text-[var(--accent)] hover:underline"
-        >
-          ← 목록으로
-        </button>
-        {content}
-      </div>
-    </div>
-  );
-}
 
 export default function ExtraFeatures({
   user,
@@ -323,8 +127,8 @@ export default function ExtraFeatures({
     const pendingLoaders = visibleCards
       .map((card) => [card.subView, EXTRA_FEATURE_LOADERS[card.subView]] as const)
       .filter((entry): entry is readonly [string, () => Promise<unknown>] => {
-        const [subview, loader] = entry;
-        return typeof loader === 'function' && !prefetchedExtraFeatureModules.has(subview);
+        const [nextSubView, loader] = entry;
+        return typeof loader === 'function' && !prefetchedExtraFeatureModules.has(nextSubView);
       });
 
     if (pendingLoaders.length === 0) return;
@@ -342,8 +146,8 @@ export default function ExtraFeatures({
         return;
       }
 
-      const [subview, loader] = pendingLoaders[index];
-      prefetchedExtraFeatureModules.add(subview);
+      const [nextSubView, loader] = pendingLoaders[index];
+      prefetchedExtraFeatureModules.add(nextSubView);
       void loader().finally(() => {
         if (cancelled) return;
         timeoutId = window.setTimeout(() => prefetchNext(index + 1), 120);
@@ -399,11 +203,6 @@ export default function ExtraFeatures({
     [recentFeatures, user]
   );
 
-  const getFeatureCardTestId = useCallback((card: FeatureCard) => {
-    const cardIndex = FEATURE_CARDS.findIndex((item) => item.id === card.id);
-    return FEATURE_CARD_TEST_IDS[cardIndex] || `feature-${cardIndex}`;
-  }, []);
-
   const compactToolbar = (
     <div className="flex items-center gap-2">
       <FontSizeControl />
@@ -436,26 +235,19 @@ export default function ExtraFeatures({
     </div>
   );
 
-  const getCardStyle = useCallback((id: string) => {
-    if (id === '인계노트') return 'bg-red-500/10 text-red-500 group-hover:bg-red-500/20';
-    if (id === '퇴원심사') return 'bg-purple-500/10 text-purple-500 group-hover:bg-purple-500/20';
-    if (id === '조직도') return 'bg-sky-50 text-sky-600 group-hover:bg-sky-100';
-    return 'bg-[var(--muted)] group-hover:bg-[var(--toss-blue-light)]';
-  }, []);
-
   const renderCard = useCallback((card: FeatureCard) => (
     <div
       key={card.id}
-      data-testid={`extra-card-shell-${getFeatureCardTestId(card)}`}
-      className="relative flex items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/50 group"
+      data-testid={`extra-card-shell-${card.testId}`}
+      className="group relative flex items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/50"
     >
       <button
         type="button"
-        data-testid={`extra-card-${getFeatureCardTestId(card)}`}
+        data-testid={`extra-card-${card.testId}`}
         onClick={() => handleFeatureClick(card.id, card.subView)}
         className="flex min-w-0 flex-1 items-center gap-3 text-left"
       >
-        <div className={`flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] text-xl transition-colors ${getCardStyle(card.id)}`}>
+        <div className={`flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] text-xl transition-colors ${card.accentClass}`}>
           {card.icon}
         </div>
         <div className="min-w-0 flex-1">
@@ -465,7 +257,7 @@ export default function ExtraFeatures({
       </button>
       <button
         type="button"
-        data-testid={`extra-favorite-${getFeatureCardTestId(card)}`}
+        data-testid={`extra-favorite-${card.testId}`}
         onClick={(event) => toggleFavorite(card.id, event)}
         className="shrink-0 text-lg leading-none transition-transform hover:scale-110"
         title={favorites.includes(card.id) ? '즐겨찾기 해제' : '즐겨찾기 추가'}
@@ -473,102 +265,20 @@ export default function ExtraFeatures({
         {favorites.includes(card.id) ? '★' : '☆'}
       </button>
     </div>
-  ), [favorites, getCardStyle, getFeatureCardTestId, handleFeatureClick, toggleFavorite]);
+  ), [favorites, handleFeatureClick, toggleFavorite]);
 
-  if (resolvedSubView === '조직도') {
+  if (resolvedSubView) {
     return (
-      <FeatureShell onBack={handleBack} maxWidth="max-w-7xl">
-        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm overflow-x-auto">
-          <OrgChart
-            user={user || null}
-            staffs={staffs}
-            selectedCo={orgChartCompany}
-            setSelectedCo={setOrgChartCompany}
-            compact
-          />
-        </div>
-      </FeatureShell>
-    );
-  }
-
-  if (resolvedSubView === '부서별재고') {
-    return (
-      <FeatureShell onBack={handleBack} boxed>
-        <DepartmentInventoryView user={user || {}} />
-      </FeatureShell>
-    );
-  }
-
-  if (resolvedSubView === '근무현황') {
-    return (
-      <FeatureShell onBack={handleBack} boxed>
-        <WorkStatusView user={user || {}} />
-      </FeatureShell>
-    );
-  }
-
-  if (resolvedSubView === '인계노트') {
-    return (
-      <FeatureShell onBack={handleBack}>
-        <HandoverNotesView user={user || {}} />
-      </FeatureShell>
-    );
-  }
-
-  if (resolvedSubView === '퇴원심사') {
-    return (
-      <FeatureShell onBack={handleBack}>
-        <DischargeReviewView user={user || {}} />
-      </FeatureShell>
-    );
-  }
-
-  if (resolvedSubView === '마감보고') {
-    return (
-      <FeatureShell onBack={handleBack}>
-        <ClosingReportView
-          user={user || {}}
-          staffs={staffs}
-          selectedCompanyId={selectedCompanyId}
-        />
-      </FeatureShell>
-    );
-  }
-
-  if (resolvedSubView === '직원평가') {
-    return (
-      <FeatureShell onBack={handleBack} boxed>
-        <StaffEvaluationView user={user || {}} staffs={staffs} />
-      </FeatureShell>
-    );
-  }
-
-  if (resolvedSubView === '입금실시간조회') {
-    return (
-      <FeatureShell onBack={handleBack} maxWidth="max-w-6xl">
-        <RealtimeDepositView user={user || {}} />
-      </FeatureShell>
-    );
-  }
-
-  if (resolvedSubView === '수술상담') {
-    return (
-      <FeatureShell onBack={handleBack} maxWidth="max-w-4xl">
-        <SurgeryConsultationView user={user || {}} />
-      </FeatureShell>
-    );
-  }
-
-  if (resolvedSubView === 'OP체크') {
-    return (
-      <FeatureShell onBack={handleBack} maxWidth="max-w-7xl">
-        <OperationCheckView
-          user={user || {}}
-          staffs={staffs}
-          selectedCo={selectedCo}
-          selectedCompanyId={selectedCompanyId}
-        />
-      </FeatureShell>
+      <ExtraFeatureSubview
+        subView={resolvedSubView}
+        onBack={handleBack}
+        user={user || null}
+        staffs={staffs}
+        selectedCo={selectedCo}
+        selectedCompanyId={selectedCompanyId}
+        orgChartCompany={orgChartCompany}
+        setOrgChartCompany={setOrgChartCompany}
+      />
     );
   }
 
@@ -585,7 +295,7 @@ export default function ExtraFeatures({
   }
 
   return (
-    <div data-testid="extra-features-list" className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
+    <div data-testid="extra-features-list" className="custom-scrollbar flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4">
       <div className="mx-auto w-full max-w-5xl">
         <h2 className="mb-1 text-lg font-bold text-[var(--foreground)]">추가 기능</h2>
 
@@ -630,7 +340,7 @@ export default function ExtraFeatures({
                 href={item.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/50 group"
+                className="group flex items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/50"
               >
                 <div className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--muted)] text-xl transition-colors group-hover:bg-[var(--toss-blue-light)]">
                   {item.icon}
@@ -638,7 +348,7 @@ export default function ExtraFeatures({
                 <div className="min-w-0 flex-1">
                   <h3 className="text-sm font-semibold text-[var(--foreground)]">{item.label}</h3>
                 </div>
-                <span className="text-[var(--toss-gray-3)] group-hover:text-[var(--accent)]">↗</span>
+                <span className="text-[var(--toss-gray-3)] group-hover:text-[var(--accent)]">→</span>
               </a>
             ))}
           </div>

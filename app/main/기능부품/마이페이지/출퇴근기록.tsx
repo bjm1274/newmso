@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { WORKPLACE_LOCATION, ALLOWED_DISTANCE_M } from '@/lib/location';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
+import { formatLocalDateKey } from '@/lib/use-local-date-key';
 
 const HOSPITAL_LOCATION = WORKPLACE_LOCATION;
 const ALLOWED_RADIUS_METER = ALLOWED_DISTANCE_M;
@@ -49,7 +50,21 @@ type CommuteLog = {
   status?: string | null;
   displayStatus?: string;
   displayEarlyLeaveMinutes?: number | null;
+  isVirtual?: boolean;
 } & Record<string, unknown>;
+
+const COMMUTE_STATUS_LABELS: Record<string, string> = {
+  present: '정상',
+  late: '지각',
+  early_leave: '조퇴',
+  annual_leave: '연차',
+  half_day: '반차',
+  half_leave: '반차',
+  sick_leave: '병가',
+  absent: '결근',
+};
+
+const NON_ABSENT_DISPLAY_STATUSES = new Set(['연차', '반차', '병가', '공가', '휴무']);
 
 function buildFallbackShiftBoundary(department?: string): ShiftBoundary {
   const isMedicalStaff = department === '의료진';
@@ -123,11 +138,73 @@ function getDisplayStatus(log: CommuteLog | null | undefined) {
   return String(log?.displayStatus || log?.status || '').trim();
 }
 
-function formatLocalDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+function normalizeCommuteStatusLabel(status: unknown) {
+  const rawStatus = String(status || '').trim();
+  return COMMUTE_STATUS_LABELS[rawStatus] || rawStatus;
+}
+
+function resolveEmploymentStartDate(user: Record<string, unknown> | null | undefined) {
+  const candidateKeys = ['hire_date', 'joined_at', 'join_date', 'start_date'];
+  for (const key of candidateKeys) {
+    const value = String(user?.[key] || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function buildVisibleHistoryDateKeys(
+  monthDate: Date,
+  currentDateKey: string,
+  user: Record<string, unknown> | null | undefined,
+) {
+  const viewingMonthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
+  const currentMonthKey = currentDateKey.slice(0, 7);
+  if (viewingMonthKey > currentMonthKey) {
+    return [] as string[];
+  }
+
+  const employmentStartDate = resolveEmploymentStartDate(user);
+  const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const rangeStart = employmentStartDate
+    ? new Date(
+        Math.max(
+          monthStart.getTime(),
+          buildDateWithTime(employmentStartDate, 0, 0).getTime(),
+        ),
+      )
+    : monthStart;
+
+  const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+  const rangeEnd =
+    viewingMonthKey === currentMonthKey
+      ? new Date(buildDateWithTime(currentDateKey, 0, 0).getTime() - 24 * 60 * 60 * 1000)
+      : monthEnd;
+
+  if (rangeEnd.getTime() < rangeStart.getTime()) {
+    return [] as string[];
+  }
+
+  const dateKeys: string[] = [];
+  for (const cursor = new Date(rangeStart); cursor.getTime() <= rangeEnd.getTime(); cursor.setDate(cursor.getDate() + 1)) {
+    dateKeys.push(formatLocalDateKey(cursor));
+  }
+  return dateKeys;
+}
+
+function shouldTreatAsAbsent(log: CommuteLog, currentDateKey: string) {
+  const workDate = String(log.date || '').slice(0, 10);
+  if (!workDate || workDate >= currentDateKey) {
+    return false;
+  }
+
+  const normalizedStatus = normalizeCommuteStatusLabel(log.status);
+  if (NON_ABSENT_DISPLAY_STATUSES.has(normalizedStatus)) {
+    return false;
+  }
+
+  return !log.check_in || !log.check_out;
 }
 
 export default function CommuteRecord({ user, onRequestCorrection }: CommuteRecordProps) {
@@ -168,7 +245,10 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   const staleOpenLog =
     logs.find(
       (log) =>
+        !log.isVirtual &&
+        !!log.check_in &&
         !log.check_out &&
+        getDisplayStatus(log) !== '결근' &&
         String(log.date || '').slice(0, 10) !== currentDateKey,
     ) || null;
 
@@ -240,7 +320,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     if (effectiveUserId) {
       void initCommuteData();
     }
-  }, [effectiveUserId, currentMonth]);
+  }, [effectiveUserId, currentMonth, currentDateKey]);
 
   useEffect(() => {
     if (!effectiveUserId) return;
@@ -280,10 +360,6 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       .order('date', { ascending: false });
 
     const monthlyLogs = ((data || []) as CommuteLog[]).map((log) => ({ ...log }));
-    if (monthlyLogs.length === 0) {
-      setLogs([]);
-      return;
-    }
 
     const currentShiftId = String((resolvedUser as Record<string, unknown>)?.shift_id || '').trim();
     const currentDepartment = String((resolvedUser as Record<string, unknown>)?.department || '').trim() || undefined;
@@ -367,15 +443,48 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         (log.check_out as string | null | undefined) || null,
         boundary
       );
+      const normalizedStatus = normalizeCommuteStatusLabel(log.status);
+      const displayStatus = shouldTreatAsAbsent({ ...log, status: normalizedStatus }, currentDateKey)
+        ? '결근'
+        : earlyLeaveMinutes > 0
+          ? '조퇴'
+          : normalizedStatus || (log.check_in && log.check_out ? '정상' : '');
 
       return {
         ...log,
-        displayStatus: earlyLeaveMinutes > 0 ? '조퇴' : String(log.status || ''),
-        displayEarlyLeaveMinutes: earlyLeaveMinutes > 0 ? earlyLeaveMinutes : null,
+        status: normalizedStatus || String(log.status || ''),
+        displayStatus,
+        displayEarlyLeaveMinutes: displayStatus === '조퇴' ? earlyLeaveMinutes : null,
       };
     });
 
-    setLogs(decoratedLogs);
+    const logsByDate = new Map<string, CommuteLog>();
+    decoratedLogs.forEach((log) => {
+      const workDate = String(log.date || '').slice(0, 10);
+      if (workDate && !logsByDate.has(workDate)) {
+        logsByDate.set(workDate, log);
+      }
+    });
+
+    for (const workDate of buildVisibleHistoryDateKeys(currentMonth, currentDateKey, resolvedUser)) {
+      if (logsByDate.has(workDate)) continue;
+      logsByDate.set(workDate, {
+        id: `virtual-absent-${workDate}`,
+        date: workDate,
+        check_in: null,
+        check_out: null,
+        status: '결근',
+        displayStatus: '결근',
+        displayEarlyLeaveMinutes: null,
+        isVirtual: true,
+      });
+    }
+
+    const finalLogs = Array.from(logsByDate.values()).sort((a, b) =>
+      String(b.date || '').localeCompare(String(a.date || ''))
+    );
+
+    setLogs(finalLogs);
 
     const logsNeedingSync = decoratedLogs.filter((log) => {
       const originalStatus = String(log.status || '').trim();
@@ -597,7 +706,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     options?: { earlyLeaveMinutes?: number | null }
   ) => {
     try {
-      const statusMap: Record<string, string> = { '정상': 'present', '지각': 'late', '조퇴': 'early_leave' };
+      const statusMap: Record<string, string> = { '정상': 'present', '지각': 'late', '조퇴': 'early_leave', '결근': 'absent' };
       const attStatus = statusMap[status] || 'present';
       const mins = checkIn && checkOut
         ? Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 60000)
@@ -838,6 +947,10 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     return `${hours}시간 ${minutes}분`;
   };
 
+  const workedDaysCount = logs.filter((log) => !!log.check_in && !!log.check_out && getDisplayStatus(log) !== '결근').length;
+  const lateCount = logs.filter((log) => getDisplayStatus(log) === '지각').length;
+  const normalCount = logs.filter((log) => getDisplayStatus(log) === '정상').length;
+
 
   return (
     <div data-testid="commute-record-view" className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-2xl px-4 py-5 sm:p-5 h-full flex flex-col space-y-7">
@@ -920,9 +1033,9 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
       {/* 통계 */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <StatItem label="이번 달 근무" value={`${logs.length}일`} />
-        <StatItem label="지각" value={`${logs.filter((log) => getDisplayStatus(log) === '지각').length}회`} isWarning />
-        <StatItem label="정상 출근" value={`${logs.filter((log) => getDisplayStatus(log) === '정상').length}회`} isSuccess />
+        <StatItem label="이번 달 근무" value={`${workedDaysCount}일`} />
+        <StatItem label="지각" value={`${lateCount}회`} isWarning />
+        <StatItem label="정상 출근" value={`${normalCount}회`} isSuccess />
       </div>
 
       {/* 근무시간 차트 */}
@@ -962,12 +1075,15 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
             return (
               <div
                 key={log.id}
+                data-testid={`commute-history-row-${String(log.date || '').slice(0, 10)}`}
                 className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 sm:gap-4 p-3 sm:p-5 bg-[var(--muted)] rounded-[var(--radius-md)] border border-transparent hover:border-[var(--border)] transition-all"
               >
                 <div className="flex items-center gap-4">
                   <div
                     className={`w-14 h-14 rounded-[var(--radius-md)] flex flex-col items-center justify-center font-semibold ${
-                      displayStatus === '지각'
+                      displayStatus === '결근'
+                        ? 'bg-red-500/15 text-red-600'
+                        : displayStatus === '지각'
                         ? 'bg-red-500/20 text-red-600'
                         : displayStatus === '조퇴'
                         ? 'bg-amber-100 text-amber-700'
@@ -981,7 +1097,12 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
                     <p className="text-xs font-bold text-[var(--toss-gray-3)]">
                       {workDate.toLocaleDateString('ko-KR', { weekday: 'long' })}
                     </p>
-                    <p className="font-semibold text-[var(--foreground)]">{displayStatus || '-'}</p>
+                    <p
+                      data-testid={`commute-history-status-${String(log.date || '').slice(0, 10)}`}
+                      className="font-semibold text-[var(--foreground)]"
+                    >
+                      {displayStatus || '-'}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 md:gap-5 justify-between md:justify-end w-full">
@@ -1039,9 +1160,9 @@ function AttendanceCalendar({ logs, currentMonth }: { logs: CommuteLog[]; curren
   const getDayCellStyle = (day: number): string => {
     const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const log = logByDate.get(dateKey);
-    const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
     if (log) {
       const status = getDisplayStatus(log);
+      if (status === '결근') return 'bg-red-500/100/15 text-red-500 font-semibold';
       if (status === '지각') return 'bg-orange-500/100/15 text-orange-600 font-semibold';
       if (status === '연차' || status === '반차') return 'bg-purple-500/100/15 text-purple-600 font-semibold';
       if (status === '병가') return 'bg-blue-500/100/15 text-blue-600 font-semibold';
@@ -1076,7 +1197,7 @@ function AttendanceCalendar({ logs, currentMonth }: { logs: CommuteLog[]; curren
         <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-green-500/100/30" />정상</span>
         <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-orange-500/100/30" />지각</span>
         <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-purple-500/100/30" />연차/반차</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-red-500/100/20" />미출근</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-red-500/100/20" />결근</span>
       </div>
     </div>
   );
@@ -1117,7 +1238,9 @@ function WorkHoursChart({ logs }: { logs: CommuteLog[] }) {
           const heightPercent = maxHours > 0 ? (hours / maxHours) * 100 : 0;
           const barColor =
             hours === 0
-              ? 'bg-[var(--border)]'
+              ? status === '결근'
+                ? 'bg-red-300'
+                : 'bg-[var(--border)]'
               : status === '지각'
                 ? 'bg-orange-400'
                 : 'bg-[var(--accent)]';
@@ -1131,7 +1254,7 @@ function WorkHoursChart({ logs }: { logs: CommuteLog[] }) {
                 <div
                   className={`w-full rounded-t-sm ${barColor} transition-all`}
                   style={{ height: `${Math.max(hours > 0 ? 15 : 4, heightPercent)}%` }}
-                  title={`${day}일: ${hours > 0 ? hours.toFixed(1) + 'h' : '미출근'}`}
+                  title={`${day}일: ${hours > 0 ? hours.toFixed(1) + 'h' : status || '결근'}`}
                 />
               </div>
               <span className="text-[8px] text-[var(--toss-gray-3)]">{day}</span>
@@ -1150,7 +1273,11 @@ function WorkHoursChart({ logs }: { logs: CommuteLog[] }) {
         </span>
         <span className="flex items-center gap-1">
           <span className="inline-block h-2 w-2 rounded-sm bg-[var(--border)]" />
-          미출근
+          미기록
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-2 w-2 rounded-sm bg-red-300" />
+          결근
         </span>
       </div>
     </div>

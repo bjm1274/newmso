@@ -18,6 +18,8 @@ import {
   sendNotification,
   type PushConnectionStatus,
 } from './알림시스템';
+import { STORAGE_KEYS } from '@/lib/storage-keys';
+import { timeAgo } from '@/lib/notification-utils';
 
 // ─── 타입 설정 ───
 const TABS = [
@@ -57,13 +59,6 @@ function getDateGroup(dateStr: string): string {
   return '이전';
 }
 
-function timeAgo(dateStr: string) {
-  const d = (Date.now() - new Date(dateStr).getTime()) / 1000;
-  if (d < 60) return '방금';
-  if (d < 3600) return `${Math.floor(d / 60)}분 전`;
-  if (d < 86400) return `${Math.floor(d / 3600)}시간 전`;
-  return new Date(dateStr).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' });
-}
 
 function buildApprovalNotificationHref(metadata: Record<string, unknown>) {
   const params = new URLSearchParams({
@@ -154,13 +149,13 @@ function SettingsTab({ userId }: { userId?: string | null }) {
   const update = (partial: Partial<NotifSettings>) => {
     const next = { ...settings, ...partial };
     setSettings(next);
-    if (typeof window !== 'undefined') localStorage.setItem('erp_notif_settings', JSON.stringify(next));
+    if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEYS.NOTIF_SETTINGS, JSON.stringify(next));
   };
 
   const updateType = (id: string, val: boolean) => {
     const next = { ...settings, types: { ...settings.types, [id]: val } };
     setSettings(next);
-    if (typeof window !== 'undefined') localStorage.setItem('erp_notif_settings', JSON.stringify(next));
+    if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEYS.NOTIF_SETTINGS, JSON.stringify(next));
   };
 
   const refreshPushStatus = useCallback(async () => {

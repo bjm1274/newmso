@@ -1,4 +1,5 @@
 import { isMissingColumnError } from '@/lib/supabase-compat';
+export { getScopedActiveStaffs } from '@/lib/active-staff';
 
 export type EducationCategory = 'hospital' | 'company' | 'common';
 
@@ -89,14 +90,6 @@ export function getApplicableEducationItems(companyName?: string) {
   return EDUCATION_ITEMS.filter((item) => {
     if (item.category === 'common') return true;
     return medicalCompany ? item.category === 'hospital' : item.category === 'company';
-  });
-}
-
-export function getScopedActiveStaffs(staffs: any[] = [], selectedCo = '전체') {
-  return staffs.filter((staff) => {
-    const companyMatched = selectedCo === '전체' || staff?.company === selectedCo;
-    const status = staff?.status ?? staff?.상태;
-    return companyMatched && status !== '퇴사';
   });
 }
 

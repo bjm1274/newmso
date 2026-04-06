@@ -3,6 +3,7 @@ import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
+import { getScopedActiveStaffs } from '@/lib/active-staff';
 
 const EVENT_TYPES = ['생일', '결혼', '출산', '사망(본인가족)', '회갑/칠순', '입학/졸업', '기타'] as const;
 const AMOUNT_GUIDE: Record<string, string> = { '생일': '30,000~50,000', '결혼': '50,000~100,000', '출산': '50,000', '사망(본인가족)': '100,000~200,000', '회갑/칠순': '50,000', '입학/졸업': '30,000', '기타': '별도 결정' };
@@ -20,7 +21,7 @@ export default function CongratulationsCondolences({ staffs = [], selectedCo }: 
         if (data) setRecords(data);
     };
 
-    const filtered = _staffs.filter((s: any) => (selectedCo === '전체' || s.company === selectedCo) && s.status !== '퇴사');
+    const filtered = getScopedActiveStaffs(_staffs, String(selectedCo ?? '전체'));
     const filteredRecords = records.filter((r: any) => {
         if (selectedCo !== '전체' && r.company !== selectedCo) return false;
         if (filter !== '전체' && r.event_type !== filter) return false;

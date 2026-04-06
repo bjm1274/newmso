@@ -3,6 +3,7 @@ import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
+import { isActiveStaff } from '@/lib/active-staff';
 
 type InsuranceRecord = {
     id: string;
@@ -95,7 +96,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: Record<
 
     const filteredStaffs = _staffs.filter((s: any) => {
         if (selectedCo !== '전체' && s.company !== selectedCo) return false;
-        return s.status !== '퇴사';
+        return isActiveStaff(s);
     });
 
     const filteredRecords = records.filter(r => {
@@ -112,7 +113,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: Record<
     const pendingCount = records.filter(r => r.status === '미신고' && (selectedCo === '전체' || r.company === selectedCo)).length;
 
     // 4대보험 현황 요약 (간이)
-    const activeStaffs = _staffs.filter((s: any) => s.status !== '퇴사' && (selectedCo === '전체' || s.company === selectedCo));
+    const activeStaffs = _staffs.filter((s: any) => isActiveStaff(s) && (selectedCo === '전체' || s.company === selectedCo));
     const summaryCards = INSURANCE_TYPES.map(ins => ({
         name: ins,
         enrolled: activeStaffs.length,
@@ -284,7 +285,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: Record<
                             const joinDate = s.joined_at ? new Date(s.joined_at) : null;
                             if (!joinDate) return false;
                             const diff = (Date.now() - joinDate.getTime()) / (1000 * 60 * 60 * 24);
-                            return diff <= 14 && s.status !== '퇴사';
+                            return diff <= 14 && isActiveStaff(s);
                         }).map((s: any) => (
                             <div key={s.id} className="flex items-center justify-between p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
                                 <div className="flex items-center gap-3">
@@ -307,7 +308,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: Record<
                         ))}
                         {_staffs.filter((s: any) => {
                             if (selectedCo !== '전체' && s.company !== selectedCo) return false;
-                            return s.status === '퇴사' && s.resigned_at;
+                            return !isActiveStaff(s) && s.resigned_at;
                         }).slice(0, 5).map((s: any) => (
                             <div key={s.id} className="flex items-center justify-between p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
                                 <div className="flex items-center gap-3">
@@ -333,8 +334,8 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: Record<
                             const joinDate = s.joined_at ? new Date(s.joined_at) : null;
                             if (!joinDate) return false;
                             const diff = (Date.now() - joinDate.getTime()) / (1000 * 60 * 60 * 24);
-                            return diff <= 14 && s.status !== '퇴사';
-                        }).length === 0 && _staffs.filter((s: any) => s.status === '퇴사' && s.resigned_at && (selectedCo === '전체' || s.company === selectedCo)).length === 0 && (
+                            return diff <= 14 && isActiveStaff(s);
+                        }).length === 0 && _staffs.filter((s: any) => !isActiveStaff(s) && s.resigned_at && (selectedCo === '전체' || s.company === selectedCo)).length === 0 && (
                                 <div className="text-center py-5 text-[var(--toss-gray-3)]">
                                     <p className="text-3xl mb-2 opacity-30">✅</p>
                                     <p className="text-[11px] font-bold">현재 미처리 건이 없습니다</p>

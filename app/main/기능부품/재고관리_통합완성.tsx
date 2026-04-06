@@ -1,8 +1,9 @@
-'use client';
+﻿'use client';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { StaffMember, InventoryItem, Supplier } from '@/types';
 import { canAccessInventorySection } from '@/lib/access-control';
+import { formatWon } from '@/lib/date-formatter';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import UDIManagement from './재고관리서브/UDI관리';
@@ -129,9 +130,7 @@ function isExpirySoon(item: InventoryItem, threshold: number) {
   return Boolean(item?.expiry_date) && new Date(item.expiry_date as string).getTime() < threshold;
 }
 
-function formatCurrency(value: number) {
-  return `${Number(value || 0).toLocaleString('ko-KR')}원`;
-}
+const formatCurrency = (value: number) => formatWon(Number(value || 0));
 
 function normalizeInventoryQueryError(error: unknown) {
   if (error instanceof Error) {

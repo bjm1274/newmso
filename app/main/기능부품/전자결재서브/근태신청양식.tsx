@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
 import SmartDatePicker from '../공통/SmartDatePicker';
+import { isActiveStaff } from '@/lib/active-staff';
 
 const DEFAULT_LEAVE_TYPE = '연차 (1.0)';
 
@@ -42,7 +43,7 @@ export default function AttendanceForms({
       .filter((staff) => {
         const staffId = String(staff?.id || '').trim();
         if (!staffId || staffId === currentUserId) return false;
-        if (String(staff?.status || '').trim() === '퇴사') return false;
+        if (!isActiveStaff(staff)) return false;
         return true;
       })
       .sort((left, right) => {

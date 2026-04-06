@@ -1,9 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-
-const BUDGET_SETTINGS_KEY = 'erp_budget_settings';
-const BUDGET_EXECUTIONS_KEY = 'erp_budget_executions';
+import { STORAGE_KEYS } from '@/lib/storage-keys';
+import { readLocalStorage, writeLocalStorage } from '@/lib/storage-utils';
 
 const BUDGET_ITEMS = ['인건비', '운영비', '장비', '기타'] as const;
 type BudgetItem = typeof BUDGET_ITEMS[number];
@@ -28,20 +27,6 @@ interface BudgetExecution {
   createdAt: string;
 }
 
-function loadFromStorage<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function saveToStorage(key: string, value: any) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch { /* ignore */ }
-}
 
 export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
   const [activeTab, setActiveTab] = useState<'설정' | '집행현황'>('설정');
@@ -76,8 +61,8 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
   ]));
 
   useEffect(() => {
-    setSettings(loadFromStorage<BudgetSetting[]>(BUDGET_SETTINGS_KEY, []));
-    setExecutions(loadFromStorage<BudgetExecution[]>(BUDGET_EXECUTIONS_KEY, []));
+    setSettings(readLocalStorage<BudgetSetting[]>(STORAGE_KEYS.BUDGET_SETTINGS, []));
+    setExecutions(readLocalStorage<BudgetExecution[]>(STORAGE_KEYS.BUDGET_EXECUTIONS, []));
   }, []);
 
   const handleAddSetting = () => {
@@ -93,14 +78,14 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
     };
     const updated = [...settings, newItem];
     setSettings(updated);
-    saveToStorage(BUDGET_SETTINGS_KEY, updated);
+    writeLocalStorage(STORAGE_KEYS.BUDGET_SETTINGS, updated);
     setSettingForm(f => ({ ...f, amount: '', dept: '' }));
   };
 
   const handleDeleteSetting = (id: string) => {
     const updated = settings.filter(s => s.id !== id);
     setSettings(updated);
-    saveToStorage(BUDGET_SETTINGS_KEY, updated);
+    writeLocalStorage(STORAGE_KEYS.BUDGET_SETTINGS, updated);
   };
 
   const handleAddExecution = () => {
@@ -116,7 +101,7 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
     };
     const updated = [...executions, newExec];
     setExecutions(updated);
-    saveToStorage(BUDGET_EXECUTIONS_KEY, updated);
+    writeLocalStorage(STORAGE_KEYS.BUDGET_EXECUTIONS, updated);
     setExecForm(f => ({ ...f, amount: '', memo: '' }));
     setShowExecForm(false);
   };
@@ -124,7 +109,7 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
   const handleDeleteExecution = (id: string) => {
     const updated = executions.filter(e => e.id !== id);
     setExecutions(updated);
-    saveToStorage(BUDGET_EXECUTIONS_KEY, updated);
+    writeLocalStorage(STORAGE_KEYS.BUDGET_EXECUTIONS, updated);
   };
 
   // 집행 현황 차트 데이터 생성

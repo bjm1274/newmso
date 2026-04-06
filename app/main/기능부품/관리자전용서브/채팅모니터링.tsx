@@ -32,38 +32,7 @@ type Message = {
   created_at: string;
 };
 
-const BANNED_WORDS_KEY = 'erp-banned-words';
-const DEFAULT_BANNED = ['씨발', '개새끼', '병신', '지랄', '미친놈', '꺼져', '죽어', '쓰레기', '찐따', '바보', '멍청이', 'ㅅㅂ', 'ㅂㅅ', 'ㅈㄹ'];
-
-function loadBannedWords(): string[] {
-  if (typeof window === 'undefined') return DEFAULT_BANNED;
-  try {
-    const raw = localStorage.getItem(BANNED_WORDS_KEY);
-    return raw ? JSON.parse(raw) : DEFAULT_BANNED;
-  } catch { return DEFAULT_BANNED; }
-}
-
-function saveBannedWords(words: string[]) {
-  localStorage.setItem(BANNED_WORDS_KEY, JSON.stringify(words));
-}
-
-function containsBanned(content: string, banned: string[]): boolean {
-  const lower = content.toLowerCase();
-  return banned.some((w) => lower.includes(w.toLowerCase()));
-}
-
-function highlightBanned(content: string, banned: string[]): React.ReactNode[] {
-  if (!banned.length) return [content];
-  const pattern = banned.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-  const regex = new RegExp(`(${pattern})`, 'gi');
-  const parts = content.split(regex);
-  return parts.map((part, i) => {
-    if (banned.some((w) => part.toLowerCase() === w.toLowerCase())) {
-      return <mark key={i} className="bg-red-400 text-white rounded px-0.5">{part}</mark>;
-    }
-    return part;
-  });
-}
+import { DEFAULT_BANNED, loadBannedWords, saveBannedWords, containsBanned, highlightBanned } from '@/lib/banned-words';
 
 function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' }) {
   const palette = ['bg-sky-100 text-sky-700','bg-emerald-100 text-emerald-700','bg-violet-100 text-violet-700','bg-amber-100 text-amber-700','bg-rose-100 text-rose-700'];

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
+import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { useActionDialog } from '@/app/components/useActionDialog';
 
 type TodoPriority = 'low' | 'medium' | 'high' | 'urgent';
@@ -224,7 +225,21 @@ function sortTasks(rows: TodoRow[]) {
 
 export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatNavigate }: Record<string, unknown>) {
   const onChatNavigate = _onChatNavigate as ((roomId: string, messageId: string) => void) | undefined;
-  const normalizedInitialUser = normalizeStaffLike((initialUser ?? {}) as Record<string, unknown>);
+  const initialUserRecord = (initialUser ?? {}) as Record<string, unknown>;
+  const normalizedInitialUser = useMemo(
+    () => normalizeStaffLike(initialUserRecord),
+    [
+      initialUserRecord?.id,
+      initialUserRecord?.name,
+      initialUserRecord?.employee_no,
+      initialUserRecord?.auth_user_id,
+      initialUserRecord?.company,
+      initialUserRecord?.company_id,
+      initialUserRecord?.department,
+      initialUserRecord?.position,
+      initialUserRecord?.role,
+    ],
+  );
   const [user, setUser] = useState<Record<string, unknown>>(normalizedInitialUser);
   const [tasks, setTasks] = useState<TodoRow[]>([]);
   const [newTask, setNewTask] = useState('');
@@ -256,7 +271,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
           const resolvedUser = await resolveStaffLike(normalizedInitialUser);
           if (getStaffLikeId(resolvedUser)) {
             setUser(resolvedUser);
-            localStorage.setItem('erp_user', JSON.stringify(resolvedUser));
+            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(resolvedUser));
           }
         } catch {
           // ignore recovery failure
@@ -268,7 +283,12 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
     };
 
     void recoverUser();
-  }, [normalizedInitialUser]);
+  }, [
+    normalizedInitialUser?.id,
+    normalizedInitialUser?.name,
+    normalizedInitialUser?.employee_no,
+    normalizedInitialUser?.auth_user_id,
+  ]);
 
   const fetchTasks = async (userId: string) => {
     if (!userId) return;

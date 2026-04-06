@@ -453,6 +453,54 @@ test('chat can start replies from photo, file, and link cards', async ({ page })
   expect(runtimeErrors).toEqual([]);
 });
 
+test('chat keeps attachment-only reply previews readable for outgoing image replies', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    staffMembers: [fakeUser, peerUser],
+    chatRooms: [buildNoticeRoom(), buildClipboardRoom()],
+    messages: [
+      {
+        id: 'msg-image-parent',
+        room_id: CLIPBOARD_ROOM_ID,
+        sender_id: peerUser.id,
+        content: '원본 이미지입니다.',
+        file_url: 'http://127.0.0.1:3000/storage/v1/object/public/pchos-files/chat/reply-parent-image.png',
+        file_name: 'reply-parent-image.png',
+        file_kind: 'image',
+        created_at: '2026-03-08T10:00:00.000Z',
+        is_deleted: false,
+        staff: { name: peerUser.name, photo_url: null, position: peerUser.position },
+      },
+      {
+        id: 'msg-image-reply',
+        room_id: CLIPBOARD_ROOM_ID,
+        sender_id: fakeUser.id,
+        content: '',
+        reply_to_id: 'msg-image-parent',
+        file_url: 'http://127.0.0.1:3000/storage/v1/object/public/pchos-files/chat/reply-child-image.png',
+        file_name: 'reply-child-image.png',
+        file_kind: 'image',
+        created_at: '2026-03-08T10:05:00.000Z',
+        is_deleted: false,
+        staff: { name: fakeUser.name, photo_url: null, position: fakeUser.position },
+      },
+    ],
+  });
+
+  await openClipboardChat(page);
+
+  const replyPreview = page.getByTestId('chat-reply-preview-msg-image-reply');
+  await expect(replyPreview).toBeVisible();
+
+  const replyPreviewClass = await replyPreview.getAttribute('class');
+  expect(replyPreviewClass).toContain('bg-[var(--toss-blue-light)]');
+  expect(replyPreviewClass).toContain('text-[var(--foreground)]');
+
+  await expect(page.getByAltText('reply-child-image.png')).toBeVisible();
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('chat falls back to app-server upload when direct storage upload fails', async ({ page }) => {
   const runtimeErrors = trackRuntimeErrors(page);
   let uploadPlanCalls = 0;

@@ -11,26 +11,8 @@ import { SYSTEM_MASTER_ACCOUNT_ID, hasSystemMasterPermission } from '@/lib/syste
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
-
-// ── 금지어 관리 ────────────────────────────────────────────────────────
-const BANNED_WORDS_KEY = 'erp-banned-words';
-const DEFAULT_BANNED = ['씨발', '개새끼', '병신', '지랄', '미친놈', '꺼져', '죽어', '쓰레기', '찐따', 'ㅅㅂ', 'ㅂㅅ', 'ㅈㄹ'];
-
-function loadBannedWords(): string[] {
-  if (typeof window === 'undefined') return DEFAULT_BANNED;
-  try { const r = localStorage.getItem(BANNED_WORDS_KEY); return r ? JSON.parse(r) : DEFAULT_BANNED; } catch { return DEFAULT_BANNED; }
-}
-function saveBannedWords(words: string[]) { localStorage.setItem(BANNED_WORDS_KEY, JSON.stringify(words)); }
-function highlightBanned(content: string, banned: string[]): React.ReactNode[] {
-  if (!banned.length) return [content];
-  const pattern = banned.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-  const regex = new RegExp(`(${pattern})`, 'gi');
-  return content.split(regex).map((part, i) =>
-    banned.some((w) => part.toLowerCase() === w.toLowerCase())
-      ? <mark key={i} className="bg-red-400 text-white rounded px-0.5">{part}</mark>
-      : part
-  );
-}
+import { formatWon } from '@/lib/date-formatter';
+import { DEFAULT_BANNED, loadBannedWords, saveBannedWords, highlightBanned } from '@/lib/banned-words';
 
 function BannedWordModal({ onClose }: { onClose: () => void }) {
   const [words, setWords] = useState<string[]>(loadBannedWords);
@@ -309,10 +291,7 @@ type SystemMasterActionId =
 
 const CHAT_FETCH_LIMIT = '500';
 
-function formatCurrency(value: unknown) {
-  const amount = Number(value || 0);
-  return `${amount.toLocaleString('ko-KR')}원`;
-}
+const formatCurrency = (value: unknown) => formatWon(Number(value || 0));
 
 function maskResidentNo(value: string, reveal: boolean) {
   if (!value) return '-';

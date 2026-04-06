@@ -4,6 +4,7 @@ import type { StaffMember } from '@/types';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { calculateAttendanceDeduction } from '@/lib/attendance-deduction';
 import { logAudit } from '@/lib/audit';
 import { formatPayrollMutationError } from '@/lib/payroll-records';
@@ -525,7 +526,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
         [...PAYROLL_RECORD_OPTIONAL_COLUMNS],
       );
       if (payrollSaveError) throw payrollSaveError;
-      const u = typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem('erp_user') || '{}'); } catch { return {}; } })() : {};
+      const u = typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USER) || '{}'); } catch { return {}; } })() : {};
       try {
         await logAudit(
           '급여수정',

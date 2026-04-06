@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { ZERO_UUID } from '@/lib/constants';
 
 export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
   const [password, setPassword] = useState('');
@@ -30,20 +31,20 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
     try {
       if (type === 'chat') {
         // 채팅 메시지, 읽음 확인, 알림 설정, 채팅방 전체 삭제
-        await supabase.from('messages').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('message_reads').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('room_notification_settings').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('chat_rooms').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('messages').delete().neq('id', ZERO_UUID);
+        await supabase.from('message_reads').delete().neq('id', ZERO_UUID);
+        await supabase.from('room_notification_settings').delete().neq('id', ZERO_UUID);
+        await supabase.from('chat_rooms').delete().neq('id', ZERO_UUID);
       }
       else if (type === 'inventory') {
         // 재고 및 로그 삭제
-        await supabase.from('inventory_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('inventory').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('inventory_logs').delete().neq('id', ZERO_UUID);
+        await supabase.from('inventory').delete().neq('id', ZERO_UUID);
       }
       else if (type === 'board') {
         // 게시판(공지사항, 경조사 등) 게시물 및 댓글 삭제 (수술일정/MRI 제외)
-        await supabase.from('posts').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('board_post_comments').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('posts').delete().neq('id', ZERO_UUID);
+        await supabase.from('board_post_comments').delete().neq('id', ZERO_UUID);
         await supabase.from('board_posts').delete().neq('board_type', '수술일정').neq('board_type', 'MRI일정표').neq('board_type', 'mri');
       }
       else if (type === 'schedule') {
@@ -65,7 +66,7 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
       }
       else if (type === 'system_logs') {
         // 시스템 감사 로그 삭제
-        await supabase.from('audit_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('audit_logs').delete().neq('id', ZERO_UUID);
       }
       else if (type === 'expired_contracts') {
         // 미체결 계약서 초안 삭제 (30일 경과)

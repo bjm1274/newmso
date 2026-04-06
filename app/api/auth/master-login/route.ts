@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isActiveStaff } from '@/lib/active-staff';
 
 // 아이디별 로그인 실패 횟수 추적 (IP가 아닌 loginId 단위 — 다른 사람에게 영향 없음)
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
@@ -75,10 +76,7 @@ function failureResponse(error?: string, status = 200) {
   return clearSessionCookie(response);
 }
 
-function isActiveStaffForLogin(row: any) {
-  const status = String(row?.status ?? '').trim();
-  return status !== '퇴사';
-}
+const isActiveStaffForLogin = (row: any) => isActiveStaff(row);
 
 export async function POST(request: NextRequest) {
   let loginId = '';

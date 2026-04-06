@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
+import { STORAGE_KEYS } from '@/lib/storage-keys';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -24,8 +25,8 @@ export default function LoginPage() {
         });
 
         if (!response.ok) {
-          localStorage.removeItem('erp_user');
-          localStorage.removeItem('erp_login_at');
+          localStorage.removeItem(STORAGE_KEYS.USER);
+          localStorage.removeItem(STORAGE_KEYS.LOGIN_AT);
           persistSupabaseAccessToken(null);
           if (!ignore) setCheckingAuth(false);
           return;
@@ -33,20 +34,20 @@ export default function LoginPage() {
 
         const payload = await response.json();
         if (!payload?.authenticated || !payload.user) {
-          localStorage.removeItem('erp_user');
-          localStorage.removeItem('erp_login_at');
+          localStorage.removeItem(STORAGE_KEYS.USER);
+          localStorage.removeItem(STORAGE_KEYS.LOGIN_AT);
           persistSupabaseAccessToken(null);
           if (!ignore) setCheckingAuth(false);
           return;
         }
 
-        localStorage.setItem('erp_user', JSON.stringify(payload.user));
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(payload.user));
         persistSupabaseAccessToken(payload.supabaseAccessToken ?? null);
         void supabase.realtime.setAuth(payload.supabaseAccessToken ?? null);
         router.replace('/main');
       } catch {
-        localStorage.removeItem('erp_user');
-        localStorage.removeItem('erp_login_at');
+        localStorage.removeItem(STORAGE_KEYS.USER);
+        localStorage.removeItem(STORAGE_KEYS.LOGIN_AT);
         persistSupabaseAccessToken(null);
         if (!ignore) setCheckingAuth(false);
       }
@@ -80,8 +81,8 @@ export default function LoginPage() {
         return;
       }
 
-      localStorage.setItem('erp_user', JSON.stringify(payload.user));
-      localStorage.setItem('erp_login_at', new Date().toISOString());
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(payload.user));
+      localStorage.setItem(STORAGE_KEYS.LOGIN_AT, new Date().toISOString());
       persistSupabaseAccessToken(payload.supabaseAccessToken ?? null);
       void supabase.realtime.setAuth(payload.supabaseAccessToken ?? null);
       setLoading(false);

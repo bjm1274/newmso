@@ -13,6 +13,7 @@ import {
   type AttendanceAnomalyStaff,
 } from '@/lib/attendance-anomalies';
 import { loadLeavePolicySettings, type LeavePolicySettings } from '@/lib/leave-policy-settings';
+import { isActiveStaff } from '@/lib/active-staff';
 
 type StaffLite = AttendanceAnomalyStaff & {
   status?: string;
@@ -84,7 +85,7 @@ export default function AttendanceAnomalyPanel({ staffs, selectedCo }: Attendanc
     () =>
       staffs.filter((staff) => {
         if (selectedCo !== '전체' && staff.company !== selectedCo) return false;
-        return staff.status !== '퇴사';
+        return isActiveStaff(staff);
       }),
     [selectedCo, staffs]
   );

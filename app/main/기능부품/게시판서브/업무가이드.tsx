@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { toast } from '@/lib/toast';
 import type { AttachmentItem, BoardPost, StaffMember } from '@/types';
+import { isActiveStaff } from '@/lib/active-staff';
 
 const GUIDE_BOARD_TYPE = '업무가이드';
 const GUIDE_DISPLAY_NAME = '업무공유';
@@ -425,9 +426,7 @@ async function runGuideMutation<T>(
   return { ...result, payload: nextPayload };
 }
 
-function isVisibleStaff(status: unknown) {
-  return normalizeText(status) !== '퇴사';
-}
+const isVisibleStaff = (status: unknown) => isActiveStaff({ status: status as string | null | undefined });
 
 function buildCompanyScopes(
   orgTeams: OrgTeamRow[],

@@ -9,11 +9,10 @@ import { processPendingChatPushJobs } from '@/lib/chat-push-dispatch';
 import { selectSystemMasterStaffRows } from '@/lib/system-master-staff-query';
 import { processDueTodoRemindersServer } from '@/lib/todo-reminder-cron';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
+import { NOTICE_ROOM_ID } from '@/lib/constants';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
 const OPERATION_CRONS = [
   { path: '/api/cron/backup', schedule: '매일 00:00', label: '정기 전체 백업' },
   { path: '/api/cron/chat-retention', schedule: '매일 02:00', label: '채팅 보관정책 정리' },

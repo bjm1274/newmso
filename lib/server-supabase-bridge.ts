@@ -1,7 +1,7 @@
 import type { SessionUser } from './server-session';
+import { ZERO_UUID } from './constants';
 
 const encoder = new TextEncoder();
-const ZERO_UUID = '00000000-0000-0000-0000-000000000000';
 
 function getCryptoApi() {
   if (!globalThis.crypto?.subtle) {

@@ -4,8 +4,7 @@ import { toast } from '@/lib/toast';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { StaffMember } from '@/types';
 import { supabase } from '@/lib/supabase';
-
-const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
+import { isActiveChatMember, NOTICE_ROOM_ID } from './메신저유틸';
 const DEFAULT_DRIVE_LINKS = [
   { name: 'OneDrive 공유문서', url: '', sort_order: 0 },
   { name: '병원 NAS', url: '', sort_order: 1 },
@@ -76,7 +75,7 @@ export default function MessengerOperationsCenter({
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const activeStaffs = useMemo(
-    () => (staffs as unknown as StaffMember[]).filter((staff) => staff?.status !== '퇴사'),
+    () => (staffs as unknown as StaffMember[]).filter((staff) => isActiveChatMember(staff)),
     [staffs]
   );
   const _user = (user ?? {}) as Record<string, unknown>;

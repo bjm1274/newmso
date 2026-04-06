@@ -10,6 +10,7 @@ import {
   toNotificationMetadataRecord,
 } from '@/lib/notification-metadata';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
+import { toNotificationText, timeAgo } from '@/lib/notification-utils';
 
 const TYPE_CFG: Record<string, { icon: string; color: string; label: string }> = {
   message: { icon: '💬', color: 'text-blue-500', label: '채팅' },
@@ -27,25 +28,6 @@ const TYPE_CFG: Record<string, { icon: string; color: string; label: string }> =
 
 const getTypeCfg = (type: string) => TYPE_CFG[type] || TYPE_CFG.default;
 
-function toNotificationText(value: unknown, fallback = '') {
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
-    return String(value);
-  }
-  return fallback;
-}
-
-function timeAgo(dateStr: string) {
-  const elapsedSeconds = (Date.now() - new Date(dateStr).getTime()) / 1000;
-  if (elapsedSeconds < 60) return '방금 전';
-  if (elapsedSeconds < 3600) return `${Math.floor(elapsedSeconds / 60)}분 전`;
-  if (elapsedSeconds < 86400) return `${Math.floor(elapsedSeconds / 3600)}시간 전`;
-  if (elapsedSeconds < 604800) return `${Math.floor(elapsedSeconds / 86400)}일 전`;
-  return new Date(dateStr).toLocaleDateString('ko-KR', {
-    month: 'short',
-    day: 'numeric',
-  });
-}
 
 function buildInventoryNotificationHref(metadata: Record<string, unknown>) {
   const params = new URLSearchParams({

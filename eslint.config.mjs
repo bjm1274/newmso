@@ -44,6 +44,8 @@ const eslintConfig = defineConfig([
     ".claude/**",
     // Local deployment inspection scratch files should not affect app linting.
     "tmp_vercel_inspect/**",
+    // APK 추출 임시 디렉터리 — 서드파티 minified JS 파일 포함
+    "tmp_apk_extract/**",
   ]),
 ]);
 

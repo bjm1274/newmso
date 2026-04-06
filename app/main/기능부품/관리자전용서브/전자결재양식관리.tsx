@@ -3,6 +3,8 @@ import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { STORAGE_KEYS } from '@/lib/storage-keys';
+import { readLocalStorage, writeLocalStorage } from '@/lib/storage-utils';
 
 type TemplateDesign = {
   title?: string;
@@ -43,8 +45,8 @@ type TemplateOption = {
 };
 
 const DEFAULT_LOGO_URL = '/logo.png';
-const LOCAL_APPROVAL_FORM_TYPES_KEY = 'erp_approval_form_types_custom';
-const LOCAL_FORM_TEMPLATE_DESIGNS_KEY = 'erp_form_template_designs';
+const LOCAL_APPROVAL_FORM_TYPES_KEY = STORAGE_KEYS.APPROVAL_FORM_TYPES_CUSTOM;
+const LOCAL_FORM_TEMPLATE_DESIGNS_KEY = STORAGE_KEYS.FORM_TEMPLATE_DESIGNS;
 
 const builtinTemplates: TemplateOption[] = [
   { slug: 'leave', name: '연차/휴가', summary: '휴가 일정과 인수인계 내용을 정리하는 기본양식' },
@@ -100,24 +102,6 @@ function isMissingTableError(error: any, tableName = 'system_settings') {
   return code === 'PGRST205' || message.includes(tableName.toLowerCase());
 }
 
-function readLocal<T>(key: string, fallback: T): T {
-  if (typeof window === 'undefined') return fallback;
-  try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeLocal<T>(key: string, value: T) {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // ignore
-  }
-}
 
 function slugFromName(name: string) {
   return name.replace(/\s+/g, '').replace(/[^\w가-힣a-zA-Z0-9-]/g, '') || 'custom';
@@ -148,7 +132,7 @@ function readRuntimeCompanyLabel(user?: any) {
 
   if (typeof window !== 'undefined') {
     try {
-      const raw = window.localStorage.getItem('erp_user');
+      const raw = window.localStorage.getItem(STORAGE_KEYS.USER);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed?.company) return String(parsed.company);
@@ -603,7 +587,7 @@ function resolveCurrentDesign(
 }
 
 async function persistDesigns(designs: Record<string, TemplateDesign>) {
-  writeLocal(LOCAL_FORM_TEMPLATE_DESIGNS_KEY, designs);
+  writeLocalStorage(LOCAL_FORM_TEMPLATE_DESIGNS_KEY, designs);
   const result = await supabase
     .from('system_settings')
     .upsert(
@@ -724,13 +708,13 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
   );
 
   const syncListState = (next: FormTypeRow[]) => {
-    writeLocal(LOCAL_APPROVAL_FORM_TYPES_KEY, next);
+    writeLocalStorage(LOCAL_APPROVAL_FORM_TYPES_KEY, next);
     setList(next);
   };
 
   useEffect(() => {
     const loadList = async () => {
-      const localRows = readLocal<FormTypeRow[]>(LOCAL_APPROVAL_FORM_TYPES_KEY, []);
+      const localRows = readLocalStorage<FormTypeRow[]>(LOCAL_APPROVAL_FORM_TYPES_KEY, []);
 
       try {
         const { data, error } = await supabase
@@ -765,7 +749,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
 
     const loadSavedDesigns = async () => {
       try {
-        const localDesigns = readLocal<Record<string, TemplateDesign>>(LOCAL_FORM_TEMPLATE_DESIGNS_KEY, {});
+        const localDesigns = readLocalStorage<Record<string, TemplateDesign>>(LOCAL_FORM_TEMPLATE_DESIGNS_KEY, {});
         const { data, error } = await supabase
           .from('system_settings')
           .select('value')
@@ -775,7 +759,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
         let parsed = localDesigns;
         if (!error && data?.value) {
           parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
-          writeLocal(LOCAL_FORM_TEMPLATE_DESIGNS_KEY, parsed);
+          writeLocalStorage(LOCAL_FORM_TEMPLATE_DESIGNS_KEY, parsed);
         } else if (error && !isMissingTableError(error, 'system_settings')) {
           throw error;
         }
