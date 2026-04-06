@@ -1,26 +1,38 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
 import TaxFreeSettingsPanel from './급여명세/비과세항목설정';
 import LegalStandardsPanel from './급여명세/법정기준패널';
 import TaxInsuranceRatesPanel from './급여명세/세율보험요율관리';
 import PayrollLockPanel from './급여명세/급여월마감잠금';
 import ShiftPatternManager from './급여명세/교대제스케줄관리';
 
-export default function IntegratedHRSettings({ companyName }: { companyName: string }) {
+export default function IntegratedHRSettings({
+    companyName,
+    showLockMenu = true,
+}: {
+    companyName: string;
+    showLockMenu?: boolean;
+}) {
     const [activeMenu, setActiveMenu] = useState('policy');
+    const menus = [
+        { id: 'policy', icon: '📝', label: '인사 정책 및 룰 (Rules)' },
+        { id: 'tax', icon: '💳', label: '세법 및 비과세 기준' },
+        { id: 'shift', icon: '⏰', label: '스케줄 및 근무제형' },
+        ...(showLockMenu ? [{ id: 'lock', icon: '🔒', label: '급여 마감 및 잠금' }] : []),
+    ];
+
+    useEffect(() => {
+        if (!showLockMenu && activeMenu === 'lock') {
+            setActiveMenu('policy');
+        }
+    }, [activeMenu, showLockMenu]);
 
     return (
         <div className="flex flex-col md:flex-row h-full rounded-[var(--radius-xl)] overflow-hidden bg-[var(--page-bg)] border border-[var(--border)] shadow-sm">
             {/* Left Sidebar */}
             <aside className="w-full md:w-64 bg-[var(--muted)] border-r border-[var(--border)] p-4 shrink-0 flex flex-col gap-2">
                 <h3 className="px-3 pb-3 pt-2 text-xs font-bold text-[var(--toss-gray-4)] uppercase tracking-widest border-b border-[var(--border)] mb-2">인사/급여 앱 설정</h3>
-                {[
-                    { id: 'policy', icon: '📝', label: '인사 정책 및 룰 (Rules)' },
-                    { id: 'tax', icon: '💳', label: '세법 및 비과세 기준' },
-                    { id: 'shift', icon: '⏰', label: '스케줄 및 근무제형' },
-                    { id: 'lock', icon: '🔒', label: '급여 마감 및 잠금' },
-                ].map(menu => (
+                {menus.map(menu => (
                     <button
                         key={menu.id}
                         onClick={() => setActiveMenu(menu.id)}
@@ -66,7 +78,7 @@ export default function IntegratedHRSettings({ companyName }: { companyName: str
                         </div>
                     </div>
                 )}
-                {activeMenu === 'lock' && (
+                {showLockMenu && activeMenu === 'lock' && (
                     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-2xl">
                         <div className="flex flex-col gap-1 mb-3">
                             <h2 className="text-base font-bold text-[var(--foreground)] tracking-tight">급여 마감 및 잠금</h2>

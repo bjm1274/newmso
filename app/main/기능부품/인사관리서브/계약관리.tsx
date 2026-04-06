@@ -40,7 +40,7 @@ export default function ContractMain({
     break_end_time: '13:00'
   });
 
-  const optionalEmploymentContractColumns = ['conditions_applied_at'];
+  const optionalEmploymentContractColumns = ['conditions_applied_at', 'contract_start_date'];
 
   const omitColumnsFromRecord = (
     record: Record<string, unknown>,
@@ -179,11 +179,16 @@ export default function ContractMain({
         optionalEmploymentContractColumns,
       );
 
-      // Some older schema-cache responses still bubble through once; retry explicitly without the optional column.
-      if (upsertError && isMissingColumnError(upsertError, 'conditions_applied_at')) {
+      // Some older schema-cache responses still bubble through once; retry explicitly without optional columns.
+      if (
+        upsertError &&
+        optionalEmploymentContractColumns.some((columnName) =>
+          isMissingColumnError(upsertError, columnName)
+        )
+      ) {
         const fallbackResult = await upsertEmploymentContracts(
           requests as Record<string, unknown>[],
-          new Set(['conditions_applied_at']),
+          new Set(optionalEmploymentContractColumns),
         );
         upsertError = fallbackResult.error;
       }

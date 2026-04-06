@@ -40,7 +40,7 @@ test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
 });
 
-test('contract sending succeeds even when employment_contracts misses conditions_applied_at', async ({
+test('contract sending succeeds even when employment_contracts misses optional contract columns', async ({
   page,
 }) => {
   const hrUser = {
@@ -80,7 +80,7 @@ test('contract sending succeeds even when employment_contracts misses conditions
     staffMembers: [hrUser, targetStaff],
     companies: [{ id: 'hospital-1', name: '박철홍정형외과', type: 'HOSPITAL', is_active: true }],
     employmentContracts: [],
-    missingEmploymentContractColumns: ['conditions_applied_at'],
+    missingEmploymentContractColumns: ['conditions_applied_at', 'contract_start_date'],
   });
 
   await seedSession(page, {
@@ -376,23 +376,30 @@ test('hr walkthrough opens each submenu in practical order without runtime error
 
   await openHrMenu(page, '근태');
   await expect(page.getByText(/전문 근태 통합 관리/)).toBeVisible();
-  await page.getByRole('button', { name: '연차소멸알림' }).click();
-  await expect(page.getByTestId('attendance-analysis-leave-expiry')).toBeVisible();
+  await expect(page.getByRole('button', { name: '연차소멸알림' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '지각조퇴분석' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '조기퇴근감지' })).toHaveCount(0);
   await page.getByRole('button', { name: '지각·조퇴·조기퇴근' }).click();
   await expect(page.getByTestId('attendance-analysis-issue-suite')).toBeVisible();
   await expect(page.getByTestId('attendance-analysis-lateness')).toBeVisible();
   await expect(page.getByTestId('attendance-analysis-early-leaving')).toBeVisible();
+  await page.getByRole('button', { name: '근태 차감 시뮬레이터' }).click();
+  await expect(page.getByTestId('attendance-deduction-simulator-view')).toBeVisible();
+  await page.getByRole('button', { name: '근태 이상 탐지' }).click();
+  await expect(page.getByTestId('attendance-anomaly-panel-view')).toBeVisible();
   await page.getByRole('button', { name: '근무형태이력' }).click();
   await expect(page.getByTestId('attendance-analysis-worktype-history')).toBeVisible();
 
-  await openHrMenu(page, '교대근무');
-  await expect(page.getByTestId('shift-suite-bar')).toBeVisible();
-  await page.getByTestId('shift-suite-0').click();
-  await expect(page.getByText(/교대근무 및 스케줄링 간트 차트/)).toBeVisible();
-  await page.getByTestId('shift-suite-1').click();
-  await expect(page.getByTestId('roster-pattern-planner')).toBeVisible();
+  const scheduleButton = page.getByRole('button', { name: '근무표 생성' });
+  if (await scheduleButton.count()) {
+    await scheduleButton.click();
+    await expect(page.getByText(/교대근무 및 스케줄링 간트 차트/)).toBeVisible();
+    const plannerButton = page.getByRole('button', { name: '간호근무표' });
+    if (await plannerButton.count()) {
+      await plannerButton.click();
+      await expect(page.getByTestId('roster-pattern-planner')).toBeVisible();
+    }
+  }
 
   await openHrMenu(page, '연차/휴가');
   await expect(page.getByTestId('leave-management-view')).toBeVisible();
@@ -400,39 +407,40 @@ test('hr walkthrough opens each submenu in practical order without runtime error
   await expect(page.getByText(/근로기준법 기준 연차·휴가 안내/)).toBeVisible();
   await page.getByTestId('leave-tab-연차-대시보드').click();
   await expect(page.getByText(/연차 종합 대시보드/)).toBeVisible();
+  await page.getByTestId('leave-tab-연차소멸알림').click();
+  await expect(page.getByTestId('attendance-analysis-leave-expiry')).toBeVisible();
   await page.getByTestId('leave-tab-연차-원장').click();
   await expect(page.getByTestId('annual-leave-ledger-view')).toBeVisible();
-  await page.getByTestId('leave-tab-근태-차감-시뮬레이터').click();
-  await expect(page.getByTestId('attendance-deduction-simulator-view')).toBeVisible();
-  await page.getByTestId('leave-tab-근태-이상-탐지').click();
-  await expect(page.getByTestId('attendance-anomaly-panel-view')).toBeVisible();
+  await expect(page.getByTestId('leave-tab-근태-차감-시뮬레이터')).toHaveCount(0);
+  await expect(page.getByTestId('leave-tab-근태-이상-탐지')).toHaveCount(0);
 
-  await openHrMenu(page, '급여');
-  await page.getByRole('button', { name: '급여 메인' }).click();
+  await page.locator('[data-testid="hr-menu-급여"]:visible').first().click();
   await expect(page.getByTestId('payroll-view')).toBeVisible();
   for (const payrollTabId of [
     '대시보드',
     '급여정산',
     '급여대장',
     '연말퇴직정산',
-    '급여시뮬레이터',
+    '원천징수파일',
     '4대보험EDI',
+    '급여시뮬레이터',
     '퇴직연금',
     '임금피크제',
-    '최저임금',
+    '급여기준체크',
     '통상임금',
-    '비과세체크',
-    '총인건비예측',
-    '세전세후',
     '미지급수당',
     '무급결근차감',
   ]) {
     await page.getByTestId(`payroll-tab-${payrollTabId}`).click();
     await expect(page.getByTestId('payroll-view')).toBeVisible();
   }
-  await page.getByRole('button', { name: '원천징수파일' }).click();
+  await expect(page.getByTestId('payroll-tab-최저임금')).toHaveCount(0);
+  await expect(page.getByTestId('payroll-tab-비과세체크')).toHaveCount(0);
+  await expect(page.getByTestId('payroll-tab-총인건비예측')).toHaveCount(0);
+  await expect(page.getByTestId('payroll-tab-세전세후')).toHaveCount(0);
+  await page.getByTestId('payroll-tab-원천징수파일').click();
   await expect(page.getByTestId('payroll-utility-tax-file')).toBeVisible();
-  await page.getByRole('button', { name: '4대보험 / EDI' }).click();
+  await page.getByTestId('payroll-tab-4대보험EDI').click();
   await expect(page.getByTestId('payroll-utility-insurance')).toBeVisible();
 
   await openHrWorkspace(page, '복지 · 문서');

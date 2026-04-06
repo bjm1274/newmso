@@ -11,6 +11,10 @@ import {
   calculateHourlyRateFromMonthlySalary,
   getMonthlyWorkingHours,
 } from '@/lib/payroll-working-hours';
+import {
+  calculateEmployeeInsuranceDeductions,
+  getIndustrialAccidentInsuranceInfo,
+} from '@/lib/payroll-insurance-rates';
 
 function toNumber(value: unknown) {
   const numeric = Number(value);
@@ -22,13 +26,6 @@ function formatDateLabel(value?: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString('ko-KR');
-}
-
-function getStatusLabel(status?: string | null) {
-  const normalized = String(status || '').trim();
-  if (normalized === '확정') return '확정';
-  if (normalized === '임시저장') return '임시저장';
-  return '정산중';
 }
 
 function InfoItem({
@@ -234,21 +231,22 @@ export default function SalaryDetail({
       const totalTaxfree = toNumber(record.total_taxfree);
       const detail = deductionDetail;
       const incomeTax = toNumber(detail.income_tax ?? record.income_tax);
+      const insuranceFallback = calculateEmployeeInsuranceDeductions(totalTaxable);
 
       return {
         totalPayment: totalTaxable + totalTaxfree,
         totalDeduction: toNumber(record.total_deduction),
         pension: toNumber(
-          detail.national_pension ?? record.national_pension ?? Math.floor(totalTaxable * 0.045),
+          detail.national_pension ?? record.national_pension ?? insuranceFallback.nationalPension,
         ),
         health: toNumber(
-          detail.health_insurance ?? record.health_insurance ?? Math.floor(totalTaxable * 0.03545),
+          detail.health_insurance ?? record.health_insurance ?? insuranceFallback.healthInsurance,
         ),
-        longTerm: toNumber(detail.long_term_care ?? record.long_term_care),
+        longTerm: toNumber(detail.long_term_care ?? record.long_term_care ?? insuranceFallback.longTermCare),
         employment: toNumber(
           detail.employment_insurance ??
             record.employment_insurance ??
-            Math.floor(totalTaxable * 0.009),
+            insuranceFallback.employmentInsurance,
         ),
         incomeTax,
         localTax: toNumber(detail.local_tax ?? record.local_tax),
@@ -269,11 +267,11 @@ export default function SalaryDetail({
       toNumber(data.childcare_allowance) +
       toNumber(data.research_allowance) +
       toNumber(data.other_taxfree);
-
-    const pension = Math.floor(taxable * 0.045);
-    const health = Math.floor(taxable * 0.03545);
-    const longTerm = Math.floor(health * 0.1295);
-    const employment = Math.floor(taxable * 0.009);
+    const insuranceFallback = calculateEmployeeInsuranceDeductions(taxable);
+    const pension = insuranceFallback.nationalPension;
+    const health = insuranceFallback.healthInsurance;
+    const longTerm = insuranceFallback.longTermCare;
+    const employment = insuranceFallback.employmentInsurance;
     const incomeTax = Math.floor(taxable * 0.03);
     const localTax = Math.floor(incomeTax * 0.1);
     const totalDeduction = pension + health + longTerm + employment + incomeTax + localTax;
@@ -293,13 +291,13 @@ export default function SalaryDetail({
   }, [data, deductionDetail, record]);
 
   const companyName = staff?.company || design.companyLabel || 'SY INC.';
+  const industrialAccidentInfo = getIndustrialAccidentInsuranceInfo(companyName);
   const companyLabel = design.companyLabel || companyName;
   const primaryColor = design.primaryColor || '#163b70';
   const borderColor = design.borderColor || '#d8e1ee';
   const yearMonth = String(data.year_month || new Date().toISOString().slice(0, 7));
   const [year, month] = yearMonth.split('-');
   const monthLabel = `${year}년 ${Number(month || '1')}월`;
-  const statusLabel = getStatusLabel(record?.status ?? data.status);
   const advancePayAmount = toNumber(record?.advance_pay);
   const isAdvancePay = advancePayAmount > 0;
   const weeklyHours = toNumber(staff?.working_hours_per_week || 40);
@@ -455,60 +453,20 @@ export default function SalaryDetail({
       `}</style>
 
       <div
-        className="border-b px-5 py-5 print:px-4 print:py-4"
+        className="border-b px-4 py-3 print:px-3 print:py-2.5"
         style={{ borderColor, background: `linear-gradient(135deg, ${alphaColor(primaryColor, 0.12)}, ${alphaColor(primaryColor, 0.03)})` }}
       >
-        <p className="text-sm font-black tracking-wide text-[var(--foreground)]">{companyLabel}</p>
-        <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h2 className="text-2xl font-black tracking-tight text-[var(--foreground)]">
-              {monthLabel} 급여명세서
-            </h2>
-            <p className="mt-2 text-sm font-medium text-[var(--toss-gray-3)]">
-              {staff?.name || '직원'} · {staff?.department || '부서 미지정'}
-            </p>
-          </div>
-
-          <div className="flex flex-col items-start gap-2 md:items-end">
-            <span
-              className="rounded-full px-3 py-1 text-xs font-bold"
-              style={{
-                backgroundColor:
-                  statusLabel === '확정'
-                    ? alphaColor('#059669', 0.12)
-                    : statusLabel === '임시저장'
-                      ? alphaColor('#d97706', 0.12)
-                      : alphaColor('#6b7280', 0.12),
-                color:
-                  statusLabel === '확정'
-                    ? '#059669'
-                    : statusLabel === '임시저장'
-                      ? '#d97706'
-                      : '#6b7280',
-              }}
-            >
-              {statusLabel}
-            </span>
-            <div
-              className="rounded-[var(--radius-lg)] border px-4 py-3 text-right"
-              style={{
-                borderColor: alphaColor(primaryColor, 0.16),
-                backgroundColor: alphaColor(primaryColor, 0.06),
-              }}
-            >
-              <p className="text-[11px] font-bold tracking-wide text-[var(--toss-gray-3)]">
-                {isAdvancePay ? '가불 지급액' : '실지급액'}
-              </p>
-              <p className="mt-1 text-2xl font-black tracking-tight text-[var(--foreground)]">
-                {settlementAmount.toLocaleString()}원
-              </p>
-            </div>
-          </div>
-        </div>
+        <h2 className="text-2xl font-black tracking-tight text-[var(--foreground)]">
+          {monthLabel} 급여명세서
+        </h2>
       </div>
 
-      <div className="space-y-4 px-5 py-5 print:space-y-3 print:px-4 print:py-4">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="space-y-4 px-4 py-4 print:space-y-3 print:px-3 print:py-3">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+          <InfoItem
+            label="산재보험(회사부담)"
+            value={`${(industrialAccidentInfo.employerRate * 100).toFixed(2)}% · ${industrialAccidentInfo.industryLabel}`}
+          />
           <InfoItem label="성명" value={staff?.name} />
           <InfoItem label="사번" value={staff?.employee_no || staff?.id} />
           <InfoItem label="입사일" value={formatDateLabel(staff?.join_date || staff?.joined_at)} />

@@ -7,6 +7,21 @@ export function getPayrollGrossPay(record: Record<string, any> | null | undefine
   return taxable + taxfree;
 }
 
+type PayrollRecordLike = {
+  record_type?: unknown;
+} | null | undefined;
+
+export function isInterimPayrollRecord(record: PayrollRecordLike): boolean {
+  const recordType = String(record?.record_type ?? '').trim().toLowerCase();
+  return recordType === 'interim';
+}
+
+export function filterNonInterimPayrollRecords<T extends { record_type?: unknown }>(
+  records: T[] | null | undefined,
+): T[] {
+  return (records ?? []).filter((record) => !isInterimPayrollRecord(record));
+}
+
 export function formatPayrollMutationError(error: unknown): string {
   if (!error) return '알 수 없는 오류';
 

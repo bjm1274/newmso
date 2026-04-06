@@ -17,20 +17,18 @@ import EducationMain from './인사관리서브/교육관리';
 import ShiftCalendar from './인사관리서브/시프트캘린더';
 import DocumentScanner from './인사관리서브/스마트서류제출';
 import OffboardingView from './인사관리서브/오프보딩';
-import TaxFileGenerator from './인사관리서브/원천징수파일생성';
-import InsuranceManagement from './인사관리서브/4대보험관리';
 import HealthCheckupManagement from './인사관리서브/건강검진관리';
 import CongratulationsCondolences from './인사관리서브/경조사관리';
 import PersonnelAppointment from './인사관리서브/인사발령관리';
 import RewardDisciplineManagement from './인사관리서브/포상징계관리';
 import LicenseManager from './인사관리서브/면허자격증관리';
 import MedicalDeviceInspection from './인사관리서브/의료기기점검';
-import AnnualLeaveExpiryAlert from './인사관리서브/연차소멸알림';
 import IncidentReport from './인사관리서브/사고보고서';
 import WorkTypeChangeHistory from './인사관리서브/근무형태변경이력';
 import AttendanceIssueAnalysisSuite from './인사관리서브/근태이상통합분석';
+import AttendanceDeductionSimulator from './인사관리서브/휴가신청/근태차감시뮬레이터';
+import AttendanceAnomalyPanel from './인사관리서브/휴가신청/근태이상탐지';
 import ContractAutoGenerator from './인사관리서브/계약서자동생성';
-import InsuranceEDI from './인사관리서브/급여명세/4대보험EDI';
 import AutoRosterPlanner from './근무표자동편성';
 
 
@@ -51,17 +49,17 @@ type HrMenuId =
 
 type AttendanceAnalysisTabId =
   | '근태관리'
-  | '연차소멸알림'
   | '근태이상분석'
+  | '근태차감시뮬레이터'
+  | '근태이상탐지'
   | '근무형태이력';
 
 type PersonnelSuiteTabId = '인사발령' | '포상/징계';
 type LifecycleSuiteTabId = '교육' | '오프보딩';
 type ComplianceSuiteTabId = '건강검진' | '면허/자격증' | '의료기기점검' | '사고보고서';
 type DocumentCenterTabId = '문서보관함' | '증명서' | '서류제출';
-type PayrollEmbeddedTabId = '기본' | '원천징수파일' | '4대보험';
 type ContractEmbeddedTabId = '기본' | '계약서생성기';
-type LeaveSuiteTabId = '연차/휴가 신청내역' | '공휴일 달력';
+type LeaveSuiteTabId = '연차/휴가 신청내역' | '연차소멸알림' | '공휴일 달력';
 
 type HrTabDef = {
   id: HrMenuId;
@@ -107,8 +105,9 @@ const HR_TABS: HrTabDef[] = [
 
 const ATTENDANCE_ANALYSIS_TABS: AttendanceAnalysisTabDef[] = [
   { id: '근태관리', label: '근태 현황', perm: 'hr_근태', icon: '⏰' },
-  { id: '연차소멸알림', label: '연차소멸알림', perm: 'hr_연차휴가', icon: '⏳' },
   { id: '근태이상분석', label: '지각·조퇴·조기퇴근', perm: 'hr_근태', icon: '📊' },
+  { id: '근태차감시뮬레이터', label: '근태 차감 시뮬레이터', perm: 'hr_근태', icon: '🧮' },
+  { id: '근태이상탐지', label: '근태 이상 탐지', perm: 'hr_근태', icon: '🚨' },
   { id: '근무형태이력', label: '근무형태이력', perm: 'hr_근무형태', icon: '🔁' },
 ];
 
@@ -135,12 +134,6 @@ const DOCUMENT_CENTER_TABS = [
   { id: '서류제출', label: '서류 제출', perm: 'hr_서류제출', icon: '📤' },
 ] as const;
 
-const PAYROLL_UTILITY_TABS = [
-  { id: '기본', label: '급여 메인', icon: '💰' },
-  { id: '원천징수파일', label: '원천징수파일', icon: '📊' },
-  { id: '4대보험', label: '4대보험 / EDI', icon: '🏛️' },
-] as const;
-
 const CONTRACT_UTILITY_TABS = [
   { id: '기본', label: '계약 현황', icon: '📝' },
   { id: '계약서생성기', label: '계약서 자동생성', icon: '🧾' },
@@ -149,6 +142,7 @@ const CONTRACT_UTILITY_TABS = [
 
 const LEAVE_SUITE_MENU_MAP: Record<string, LeaveSuiteTabId> = {
   '연차/휴가': '연차/휴가 신청내역',
+  연차소멸알림: '연차소멸알림',
   공휴일달력: '공휴일 달력',
 };
 
@@ -168,9 +162,13 @@ const REMOVED_MENU_FALLBACKS: Record<string, HrMenuId> = {
   원천징수파일: '급여',
   '4대보험': '급여',
   계약서생성기: '계약',
-  연차소멸알림: '근태',
+  연차소멸알림: '연차/휴가',
   지각조퇴분석: '근태',
   근태이상분석: '근태',
+  '근태 차감 시뮬레이터': '근태',
+  '근태 이상 탐지': '근태',
+  근태차감시뮬레이터: '근태',
+  근태이상탐지: '근태',
   근무형태이력: '근태',
   조기퇴근감지: '근태',
   근무표자동편성: '근태',
@@ -188,21 +186,19 @@ const REMOVED_MENU_FALLBACKS: Record<string, HrMenuId> = {
   비품대여: '구성원',
 };
 
-const PAYROLL_UTILITY_MENU_MAP: Record<string, PayrollEmbeddedTabId> = {
-  원천징수파일: '원천징수파일',
-  '4대보험': '4대보험',
-};
-
 const CONTRACT_UTILITY_MENU_MAP: Record<string, ContractEmbeddedTabId> = {
   계약서생성기: '계약서생성기',
 };
 
 
 const ATTENDANCE_ANALYSIS_MENU_MAP: Record<string, AttendanceAnalysisTabId> = {
-  연차소멸알림: '연차소멸알림',
   지각조퇴분석: '근태이상분석',
   근태이상분석: '근태이상분석',
   '지각·조퇴·조기퇴근': '근태이상분석',
+  '근태 차감 시뮬레이터': '근태차감시뮬레이터',
+  근태차감시뮬레이터: '근태차감시뮬레이터',
+  '근태 이상 탐지': '근태이상탐지',
+  근태이상탐지: '근태이상탐지',
   근무형태이력: '근무형태이력',
   조기퇴근감지: '근태이상분석',
 };
@@ -260,8 +256,11 @@ function getWorkspaceForHrMenu(menuId: HrMenuId): HrWorkspaceId {
   return '복지 · 문서';
 }
 
-function getPayrollInitialTab(menuId?: string | null): PayrollEmbeddedTabId {
-  return PAYROLL_UTILITY_MENU_MAP[menuId || ''] || '기본';
+function getPayrollMainInitialTab(menuId?: string | null): string {
+  if (menuId === '원천징수파일') return '원천징수파일';
+  if (menuId === '4대보험') return '4대보험EDI';
+  if (menuId === '최저임금' || menuId === '비과세체크') return '급여기준체크';
+  return '대시보드';
 }
 
 function getContractInitialTab(menuId?: string | null): ContractEmbeddedTabId {
@@ -456,7 +455,6 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
   const [입퇴사교육탭, 입퇴사교육탭설정] = useState<LifecycleSuiteTabId>(getLifecycleSuiteInitialTab(initialMenu));
   const [자격안전탭, 자격안전탭설정] = useState<ComplianceSuiteTabId>(getComplianceSuiteInitialTab(initialMenu));
   const [문서센터탭, 문서센터탭설정] = useState<DocumentCenterTabId>(getDocumentCenterInitialTab(initialMenu));
-  const [급여내부탭, 급여내부탭설정] = useState<PayrollEmbeddedTabId>(getPayrollInitialTab(initialMenu));
   const [계약내부탭, 계약내부탭설정] = useState<ContractEmbeddedTabId>(getContractInitialTab(initialMenu));
   const [휴가내부탭, 휴가내부탭설정] = useState<LeaveSuiteTabId>(getLeaveSuiteInitialTab(initialMenu));
   const [전체직원목록, 전체직원목록설정] = useState<any[]>([]);
@@ -556,7 +554,6 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
     입퇴사교육탭설정(normalizeLifecycleTabForUser(user, getLifecycleSuiteInitialTab(requestedMenu)));
     자격안전탭설정(normalizeComplianceTabForUser(user, getComplianceSuiteInitialTab(requestedMenu)));
     문서센터탭설정(normalizeDocumentCenterTabForUser(user, getDocumentCenterInitialTab(requestedMenu)));
-    급여내부탭설정(getPayrollInitialTab(requestedMenu));
     계약내부탭설정(getContractInitialTab(requestedMenu));
     휴가내부탭설정(getLeaveSuiteInitialTab(requestedMenu));
   };
@@ -858,11 +855,14 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
               />
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {activeAttendanceTab === '근태관리' && <AttendanceMain staffs={인사직원목록} selectedCo={선택사업체} user={user} />}
-                {activeAttendanceTab === '연차소멸알림' && (
-                  <AnnualLeaveExpiryAlert staffs={인사직원목록} selectedCo={선택사업체} user={user} />
-                )}
                 {activeAttendanceTab === '근태이상분석' && (
                   <AttendanceIssueAnalysisSuite staffs={인사직원목록} selectedCo={선택사업체} user={user} />
+                )}
+                {activeAttendanceTab === '근태차감시뮬레이터' && (
+                  <AttendanceDeductionSimulator staffs={인사직원목록} selectedCo={선택사업체} />
+                )}
+                {activeAttendanceTab === '근태이상탐지' && (
+                  <AttendanceAnomalyPanel staffs={인사직원목록} selectedCo={선택사업체} />
                 )}
                 {activeAttendanceTab === '근무형태이력' && (
                   <WorkTypeChangeHistory staffs={인사직원목록} selectedCo={선택사업체} user={user} />
@@ -888,29 +888,15 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
           )}
           {activeMenu === '급여' && (
             <div className="flex h-full flex-col">
-              <SectionTabBar
-                tabs={[...PAYROLL_UTILITY_TABS]}
-                activeTab={급여내부탭}
-                onChange={(tabId) => 급여내부탭설정(tabId as PayrollEmbeddedTabId)}
-                testIdPrefix="payroll-utility"
-              />
               <div className="min-h-0 flex-1 overflow-y-auto">
-                {급여내부탭 === '기본' && <PayrollMain staffs={인사직원목록} selectedCo={선택사업체} onRefresh={onRefresh} showAdminPolicyTabs={false} />}
-                {급여내부탭 === '원천징수파일' && (
-                    <div className="p-3 md:p-4">
-                    <TaxFileGenerator staffs={인사직원목록} selectedCo={선택사업체} />
-                  </div>
-                )}
-                {급여내부탭 === '4대보험' && (
-                  <div className="grid gap-4 p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:p-4">
-                    <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-                      <InsuranceManagement staffs={인사직원목록} selectedCo={선택사업체} />
-                    </div>
-                    <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-                      <InsuranceEDI staffs={인사직원목록} selectedCo={선택사업체} user={user} />
-                    </div>
-                  </div>
-                )}
+                <PayrollMain
+                  staffs={인사직원목록}
+                  selectedCo={선택사업체}
+                  onRefresh={onRefresh}
+                  showAdminPolicyTabs={false}
+                  user={user}
+                  initialTab={getPayrollMainInitialTab(initialMenu)}
+                />
               </div>
             </div>
           )}

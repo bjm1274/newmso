@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { canAccessExtraFeature, isAdminUser } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from './공통/SmartDatePicker';
 
@@ -35,8 +36,6 @@ interface DailyClosure {
     created_at?: string | null;
 }
 
-const DEPARTMENT_HEAD_KEYWORDS = ['부서장', '팀장', '과장', '실장', '부장', '이사', '원장', '병원장'];
-
 export default function DailyClosurePage({
     user,
     staffs = [],
@@ -47,26 +46,26 @@ export default function DailyClosurePage({
     selectedCompanyId?: string | null;
 }) {
     const normalizedPosition = String(user?.position || '').trim();
+    const isAdmin = useMemo(() => isAdminUser(user), [user]);
     const isSyIncDirector = useMemo(() => {
         return String(user?.company || '').trim() === 'SY INC.' && /(이사|director)/i.test(normalizedPosition);
     }, [normalizedPosition, user?.company]);
 
-    const isDepartmentHeadOrHigher = useMemo(() => {
-        return (
-            user?.role === 'admin' ||
-            user?.role === 'manager' ||
-            user?.permissions?.mso === true ||
-            DEPARTMENT_HEAD_KEYWORDS.some((keyword) => normalizedPosition.includes(keyword))
-        );
-    }, [normalizedPosition, user?.permissions?.mso, user?.role]);
+    const hasClosureAccess = useMemo(() => {
+        return isAdmin || canAccessExtraFeature(user, '마감보고');
+    }, [isAdmin, user]);
 
-    const canReadClosures = isDepartmentHeadOrHigher || isSyIncDirector;
-    const canReadAcrossCompanies = isSyIncDirector && !selectedCompanyId;
-    const effectiveCompanyId = canReadAcrossCompanies ? null : (selectedCompanyId || user?.company_id || null);
+    const canReadClosures = hasClosureAccess;
+    const canEditClosures = hasClosureAccess;
+    const canReadAcrossCompanies = (isSyIncDirector || isAdmin) && !selectedCompanyId;
+    const baseCompanyId = selectedCompanyId || user?.company_id || null;
+    const listCompanyId = canReadAcrossCompanies ? null : baseCompanyId;
     const [view, setView] = useState<'list' | 'form'>(canReadClosures ? 'list' : 'form');
     const [loading, setLoading] = useState(false);
     const [closures, setClosures] = useState<DailyClosure[]>([]);
     const [activeClosure, setActiveClosure] = useState<DailyClosure | null>(null);
+    const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
+    const detailCompanyId = editingCompanyId || baseCompanyId;
 
     // Form State
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -84,7 +83,7 @@ export default function DailyClosurePage({
         [staffs]
     );
     const isOwnActiveClosure = Boolean(activeClosure?.created_by && String(activeClosure.created_by) === String(user?.id || ''));
-    const canEditSelectedDateClosure = !activeClosure || isOwnActiveClosure;
+    const canEditSelectedDateClosure = !activeClosure || canEditClosures;
 
     const getAuthorName = useCallback((closure: DailyClosure | null | undefined) => {
         if (!closure) return '작성자 미상';
@@ -118,15 +117,15 @@ export default function DailyClosurePage({
             .select('*')
             .order('date', { ascending: false });
 
-        if (effectiveCompanyId) {
-            query = query.eq('company_id', effectiveCompanyId);
+        if (listCompanyId) {
+            query = query.eq('company_id', listCompanyId);
         }
 
         const { data, error } = await query;
         if (error) { console.error('마감보고 목록 조회 오류:', error); }
         else if (data) setClosures(data);
         setLoading(false);
-    }, [canReadClosures, effectiveCompanyId]);
+    }, [canReadClosures, listCompanyId]);
 
     const loadClosureDetails = useCallback(async (closure: DailyClosure) => {
         const [{ data: detailItems, error: itemError }, { data: detailChecks, error: checkError }] = await Promise.all([
@@ -161,13 +160,13 @@ export default function DailyClosurePage({
     }, []);
 
     const loadSelectedDateClosure = useCallback(async () => {
-        if (canReadAcrossCompanies) {
+        if (canReadAcrossCompanies && !detailCompanyId) {
             setActiveClosure(null);
             resetFormFields();
             return;
         }
 
-        if (!effectiveCompanyId || !selectedDate) {
+        if (!detailCompanyId || !selectedDate) {
             setActiveClosure(null);
             resetFormFields();
             return;
@@ -176,7 +175,7 @@ export default function DailyClosurePage({
         const { data, error } = await supabase
             .from('daily_closures')
             .select('*')
-            .eq('company_id', effectiveCompanyId)
+            .eq('company_id', detailCompanyId)
             .eq('date', selectedDate)
             .maybeSingle();
 
@@ -195,13 +194,13 @@ export default function DailyClosurePage({
 
         setActiveClosure(data);
 
-        if (String(data.created_by || '') === String(user?.id || '')) {
+        if (canReadClosures || String(data.created_by || '') === String(user?.id || '')) {
             await loadClosureDetails(data);
             return;
         }
 
         resetFormFields();
-    }, [canReadAcrossCompanies, effectiveCompanyId, loadClosureDetails, resetFormFields, selectedDate, user?.id]);
+    }, [canReadAcrossCompanies, canReadClosures, detailCompanyId, loadClosureDetails, resetFormFields, selectedDate, user?.id]);
 
     useEffect(() => {
         void loadClosures();
@@ -211,13 +210,19 @@ export default function DailyClosurePage({
         void loadSelectedDateClosure();
     }, [loadSelectedDateClosure]);
 
-    const openClosureForEdit = useCallback((closure: DailyClosure) => {
-        if (String(closure.created_by || '') !== String(user?.id || '')) {
+    const openClosureForEdit = useCallback(async (closure: DailyClosure) => {
+        if (!canEditClosures && String(closure.created_by || '') !== String(user?.id || '')) {
             return;
         }
+        setActiveClosure(closure);
+        setEditingCompanyId(String(closure.company_id || '').trim() || null);
         setSelectedDate(closure.date);
+        setPettyCashStart(Number(closure.petty_cash_start) || 0);
+        setPettyCashEnd(Number(closure.petty_cash_end) || 0);
+        setMemo(String(closure.memo || ''));
         setView('form');
-    }, [user?.id]);
+        await loadClosureDetails(closure);
+    }, [canEditClosures, loadClosureDetails, user?.id]);
 
     const addItem = () => {
         setItems([...items, { patient_name: '', amount: 0, payment_method: '카드', receipt_type: '진료비', memo: '' }]);
@@ -242,8 +247,13 @@ export default function DailyClosurePage({
     };
 
     const saveClosure = async () => {
-        if (!effectiveCompanyId) {
+        if (!detailCompanyId) {
             toast('회사 정보가 없어 마감보고를 저장할 수 없습니다.', 'warning');
+            return;
+        }
+
+        if (!canEditClosures) {
+            toast('마감보고 수정 권한이 없습니다.', 'warning');
             return;
         }
 
@@ -259,22 +269,32 @@ export default function DailyClosurePage({
 
         setLoading(true);
         try {
+            const preservedAuthorName = activeClosure ? getAuthorName(activeClosure) : String(user?.name || '').trim();
             const closureData = {
-                company_id: effectiveCompanyId,
+                company_id: detailCompanyId,
                 date: selectedDate,
                 total_amount: totalCalculated,
                 petty_cash_start: pettyCashStart,
                 petty_cash_end: pettyCashEnd,
                 status: 'completed',
-                created_by: user.id,
+                created_by: activeClosure?.created_by || user.id,
+                created_by_name: preservedAuthorName || null,
                 memo: memo
             };
 
-            const { data: closure, error: cError } = await supabase
-                .from('daily_closures')
-                .upsert(closureData, { onConflict: 'company_id, date' })
-                .select()
-                .single();
+            const upsertClosure = async (payload: Record<string, unknown>) =>
+                await supabase
+                    .from('daily_closures')
+                    .upsert(payload, { onConflict: 'company_id, date' })
+                    .select()
+                    .single();
+
+            let { data: closure, error: cError } = await upsertClosure(closureData);
+
+            if (cError && String(cError.message || '').includes("created_by_name")) {
+                const { created_by_name: _ignored, ...fallbackClosureData } = closureData;
+                ({ data: closure, error: cError } = await upsertClosure(fallbackClosureData));
+            }
 
             if (cError) throw cError;
 
@@ -287,14 +307,14 @@ export default function DailyClosurePage({
             // Insert new items
             if (items.length > 0) {
                 const { error: insErr1 } = await supabase.from('daily_closure_items').insert(
-                    items.map(item => ({ ...item, closure_id: closure.id }))
+                    items.map(({ id: _itemId, ...item }) => ({ ...item, closure_id: closure.id }))
                 );
                 if (insErr1) throw insErr1;
             }
 
             if (checks.length > 0) {
                 const { error: insErr2 } = await supabase.from('daily_checks').insert(
-                    checks.map(check => ({ ...check, closure_id: closure.id }))
+                    checks.map(({ id: _checkId, ...check }) => ({ ...check, closure_id: closure.id }))
                 );
                 if (insErr2) throw insErr2;
             }
@@ -312,6 +332,58 @@ export default function DailyClosurePage({
         }
     };
 
+    const deleteClosure = async (closure: DailyClosure) => {
+        if (!canEditClosures) {
+            toast('마감보고 삭제 권한이 없습니다.', 'warning');
+            return;
+        }
+
+        const authorName = getAuthorName(closure);
+        const confirmed = window.confirm(
+            `${closure.date} 마감보고를 삭제할까요?\n작성자: ${authorName}\n삭제 후에는 복구할 수 없습니다.`
+        );
+        if (!confirmed) return;
+
+        setLoading(true);
+        try {
+            const { error: deleteItemsError } = await supabase
+                .from('daily_closure_items')
+                .delete()
+                .eq('closure_id', closure.id);
+            if (deleteItemsError) throw deleteItemsError;
+
+            const { error: deleteChecksError } = await supabase
+                .from('daily_checks')
+                .delete()
+                .eq('closure_id', closure.id);
+            if (deleteChecksError) throw deleteChecksError;
+
+            const { error: deleteClosureError } = await supabase
+                .from('daily_closures')
+                .delete()
+                .eq('id', closure.id);
+            if (deleteClosureError) throw deleteClosureError;
+
+            setClosures((prev) => prev.filter((item) => item.id !== closure.id));
+
+            if (activeClosure?.id === closure.id) {
+                setActiveClosure(null);
+                setEditingCompanyId(null);
+                resetFormFields();
+                if (canReadClosures) {
+                    setView('list');
+                }
+            }
+
+            toast('마감보고를 삭제했습니다.', 'success');
+            await loadClosures();
+        } catch (err: unknown) {
+            toast('삭제 중 오류가 발생했습니다: ' + ((err as Error)?.message ?? String(err)), 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="space-y-4" data-testid="daily-closure-view">
             <div className="flex justify-between items-center">
@@ -320,7 +392,7 @@ export default function DailyClosurePage({
                         <span>💰</span> 마감보고
                     </h2>
                     <p className="mt-1 text-[11px] font-medium text-[var(--toss-gray-3)]">
-                        작성은 누구나 가능하며, 목록 열람은 부서장 이상만 가능합니다.
+                        마감보고 권한이 있는 사용자와 관리자는 등록된 보고를 열람하고 수정할 수 있습니다.
                     </p>
                     {canReadAcrossCompanies ? (
                         <p
@@ -334,7 +406,14 @@ export default function DailyClosurePage({
                 {canReadClosures ? (
                     <button
                         data-testid="daily-closure-toggle-view"
-                        onClick={() => setView(view === 'list' ? 'form' : 'list')}
+                        onClick={() => {
+                            if (view === 'list') {
+                                setEditingCompanyId(null);
+                                setActiveClosure(null);
+                                resetFormFields();
+                            }
+                            setView(view === 'list' ? 'form' : 'list');
+                        }}
                         className="px-4 py-2 text-xs font-bold rounded-xl bg-gray-900 text-white shadow-sm hover:bg-black transition-all"
                     >
                         {view === 'list' ? '➕ 새 마감 작성' : '📋 마감 목록 보기'}
@@ -344,7 +423,7 @@ export default function DailyClosurePage({
                         data-testid="daily-closure-read-restricted-note"
                         className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[11px] font-semibold text-[var(--toss-gray-3)]"
                     >
-                        목록 열람은 부서장 이상
+                        마감보고 권한 또는 관리자 권한이 필요합니다.
                     </div>
                 )}
             </div>
@@ -373,15 +452,30 @@ export default function DailyClosurePage({
                                     <p data-testid={`daily-closure-author-${c.id}`} className="text-[10px] text-[var(--toss-gray-3)] mt-2">
                                         작성자: {getAuthorName(c)}
                                     </p>
-                                    {String(c.created_by || '') === String(user?.id || '') ? (
-                                        <button
-                                            type="button"
-                                            data-testid={`daily-closure-edit-${c.id}`}
-                                            onClick={() => openClosureForEdit(c)}
-                                            className="mt-2 text-[11px] font-bold text-[var(--accent)] hover:underline"
-                                        >
-                                            수정
-                                        </button>
+                                    {canEditClosures ? (
+                                        <div className="mt-2 flex items-center justify-end gap-3">
+                                            <button
+                                                type="button"
+                                                data-testid={`daily-closure-edit-${c.id}`}
+                                                onClick={() => {
+                                                    void openClosureForEdit(c);
+                                                }}
+                                                className="text-[11px] font-bold text-[var(--accent)] hover:underline"
+                                            >
+                                                수정
+                                            </button>
+                                            <button
+                                                type="button"
+                                                data-testid={`daily-closure-delete-${c.id}`}
+                                                onClick={() => {
+                                                    void deleteClosure(c);
+                                                }}
+                                                className="text-[11px] font-bold text-red-500 hover:underline disabled:opacity-50"
+                                                disabled={loading}
+                                            >
+                                                삭제
+                                            </button>
+                                        </div>
                                     ) : null}
                                 </div>
                             </div>
@@ -401,8 +495,8 @@ export default function DailyClosurePage({
                         >
                             {isOwnActiveClosure
                                 ? `${selectedDate} 작성분을 수정 중입니다.`
-                                : canReadClosures
-                                    ? `${selectedDate} 마감보고는 ${getAuthorName(activeClosure)} 작성본이 이미 등록되어 있어 열람만 가능합니다.`
+                                : canEditClosures
+                                    ? `${selectedDate} 마감보고는 ${getAuthorName(activeClosure)} 작성본이 이미 등록되어 있으며, 현재 권한으로 수정할 수 있습니다.`
                                     : `${selectedDate} 마감보고가 이미 등록되어 있어 작성자 본인만 수정할 수 있습니다.`}
                         </div>
                     ) : null}
@@ -416,6 +510,7 @@ export default function DailyClosurePage({
                         <div className="space-y-1.5">
                             <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase">기초 시재 (전일 이월) *</label>
                             <input
+                                data-testid="daily-closure-petty-cash-start"
                                 type="number"
                                 value={pettyCashStart}
                                 onChange={e => setPettyCashStart(Number(e.target.value))}
@@ -425,6 +520,7 @@ export default function DailyClosurePage({
                         <div className="space-y-1.5">
                             <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase">기말 시재 (마감 시재) *</label>
                             <input
+                                data-testid="daily-closure-petty-cash-end"
                                 type="number"
                                 value={pettyCashEnd}
                                 onChange={e => setPettyCashEnd(Number(e.target.value))}
@@ -558,8 +654,22 @@ export default function DailyClosurePage({
                             disabled={loading || !canEditSelectedDateClosure}
                             className="w-full py-4 bg-[var(--card)] text-[var(--foreground)] text-sm font-black rounded-2xl hover:bg-[var(--tab-bg)] transition-all active:scale-[0.98] disabled:opacity-50"
                         >
-                            {loading ? '저장 중...' : isOwnActiveClosure ? '작성한 마감보고 수정 저장' : '오늘 업무 마감 및 보고 저장'}
+                            {loading ? '저장 중...' : activeClosure ? '마감보고 수정 저장' : '오늘 업무 마감 및 보고 저장'}
                         </button>
+
+                        {activeClosure && canEditClosures ? (
+                            <button
+                                type="button"
+                                data-testid="daily-closure-delete-active"
+                                onClick={() => {
+                                    void deleteClosure(activeClosure);
+                                }}
+                                disabled={loading}
+                                className="w-full py-3 border border-red-200 bg-red-50 text-sm font-bold text-red-600 rounded-2xl hover:bg-red-100 transition-all disabled:opacity-50"
+                            >
+                                {loading ? '처리 중...' : '현재 마감보고 삭제'}
+                            </button>
+                        ) : null}
                     </div>
                 </div>
             )}

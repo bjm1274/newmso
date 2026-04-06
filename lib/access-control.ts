@@ -501,6 +501,10 @@ export function canAccessExtraFeature(
   if (!canAccessMainMenu(user, '추가기능')) return false;
   const permissionKey = resolvePermissionKey(featureIdOrPermissionKey, EXTRA_FEATURE_PERMISSION_KEYS);
 
+  if (permissionKey === 'extra_마감보고' && isAdminUser(user)) {
+    return true;
+  }
+
   if (STRICT_EXTRA_FEATURE_PERMISSION_KEYS.has(permissionKey)) {
     const explicitPermission = getExplicitPermissionState(user, permissionKey);
     if (explicitPermission !== null) {

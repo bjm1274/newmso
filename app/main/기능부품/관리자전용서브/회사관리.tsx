@@ -554,11 +554,12 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
             onYearMonthChange={setPolicyYearMonth}
           />
           <div className="grid gap-4 xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
-            <IntegratedHRSettings companyName={policyCompany} />
+            <IntegratedHRSettings companyName={policyCompany} showLockMenu={false} />
             <PayrollAdvancedCenter
               staffs={staffs}
               selectedCo={policyCompany}
               yearMonth={policyYearMonth}
+              showWorkflowCards
               onRefresh={onRefresh}
             />
           </div>

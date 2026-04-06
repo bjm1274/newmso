@@ -22,6 +22,9 @@ type PayrollLockRow = {
   reopen_review_comment?: string | null;
 };
 
+const BASIC_LOCK_SELECT = 'id, year_month, company_name, locked_at, locked_by, memo';
+const EXTENDED_LOCK_SELECT = `${BASIC_LOCK_SELECT}, reopen_requested_at, reopen_requested_by, reopen_request_comment, reopen_request_status, reopen_reviewed_at, reopen_reviewed_by, reopen_review_comment`;
+
 function readStoredUser() {
   if (typeof window === 'undefined') return null;
   try {
@@ -38,10 +41,21 @@ function getCompanyScope(companyName?: unknown) {
 
 function formatLockError(error: unknown) {
   const message = (error as { message?: string; code?: string })?.message || '';
-  if (/reopen_request_status|reopen_requested_at|reopen_reviewed_at/i.test(message)) {
+  if (
+    /reopen_request_status|reopen_requested_at|reopen_requested_by|reopen_request_comment|reopen_reviewed_at|reopen_reviewed_by|reopen_review_comment/i.test(
+      message,
+    )
+  ) {
     return '급여 마감 잠금 확장 컬럼이 아직 적용되지 않았습니다. 마이그레이션을 먼저 적용해 주세요.';
   }
   return message || '급여 마감 잠금 처리 중 오류가 발생했습니다.';
+}
+
+function isMissingReopenColumnError(error: unknown) {
+  const message = String((error as { message?: string })?.message || '');
+  return /reopen_request_status|reopen_requested_at|reopen_requested_by|reopen_request_comment|reopen_reviewed_at|reopen_reviewed_by|reopen_review_comment/i.test(
+    message,
+  );
 }
 
 export default function PayrollLockPanel({
@@ -58,6 +72,7 @@ export default function PayrollLockPanel({
   const [loading, setLoading] = useState(false);
   const [requestComment, setRequestComment] = useState('');
   const [reviewComment, setReviewComment] = useState('');
+  const [supportsReopenWorkflow, setSupportsReopenWorkflow] = useState(true);
 
   const companyScope = getCompanyScope(companyName);
 
@@ -66,14 +81,33 @@ export default function PayrollLockPanel({
   }, []);
 
   const loadLock = async () => {
-    const { data, error } = await supabase
+    const extendedResult = await supabase
       .from('payroll_locks')
-      .select('id, year_month, company_name, locked_at, locked_by, memo, reopen_requested_at, reopen_requested_by, reopen_request_comment, reopen_request_status, reopen_reviewed_at, reopen_reviewed_by, reopen_review_comment')
+      .select(EXTENDED_LOCK_SELECT)
       .eq('year_month', yearMonth)
       .eq('company_name', companyScope)
       .maybeSingle();
-    if (error) throw error;
-    setLockRow((data as PayrollLockRow | null) ?? null);
+
+    if (!extendedResult.error) {
+      setSupportsReopenWorkflow(true);
+      setLockRow((extendedResult.data as PayrollLockRow | null) ?? null);
+      return;
+    }
+
+    if (!isMissingReopenColumnError(extendedResult.error)) {
+      throw extendedResult.error;
+    }
+
+    const fallbackResult = await supabase
+      .from('payroll_locks')
+      .select(BASIC_LOCK_SELECT)
+      .eq('year_month', yearMonth)
+      .eq('company_name', companyScope)
+      .maybeSingle();
+    if (fallbackResult.error) throw fallbackResult.error;
+
+    setSupportsReopenWorkflow(false);
+    setLockRow((fallbackResult.data as PayrollLockRow | null) ?? null);
   };
 
   useEffect(() => {
@@ -85,12 +119,12 @@ export default function PayrollLockPanel({
   }, [yearMonth, companyScope]);
 
   const canApproveReopen = useMemo(() => isAdminUser(viewer) || isPrivilegedUser(viewer), [viewer]);
-  const hasPendingRequest = lockRow?.reopen_request_status === 'pending';
+  const hasPendingRequest = supportsReopenWorkflow && lockRow?.reopen_request_status === 'pending';
 
   const createLock = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('payroll_locks')
         .insert({
           year_month: yearMonth,
@@ -98,11 +132,12 @@ export default function PayrollLockPanel({
           locked_by: viewer?.id || null,
           memo: '급여 마감 잠금',
         })
-        .select('id, year_month, company_name, locked_at, locked_by, memo, reopen_requested_at, reopen_requested_by, reopen_request_comment, reopen_request_status, reopen_reviewed_at, reopen_reviewed_by, reopen_review_comment')
+        .select(BASIC_LOCK_SELECT)
         .single();
       if (error) throw error;
-      setLockRow(data as PayrollLockRow);
-      toast('급여 마감 잠금이 설정되었습니다.', 'success');
+
+      await loadLock();
+      toast('급여 마감 잠금을 설정했습니다.', 'success');
       onLockChange?.();
     } catch (error) {
       console.error('payroll lock create failed:', error);
@@ -114,6 +149,11 @@ export default function PayrollLockPanel({
 
   const requestReopen = async () => {
     if (!lockRow) return;
+    if (!supportsReopenWorkflow) {
+      toast('재오픈 요청 기능은 확장 컬럼 적용 후 사용할 수 있습니다.', 'warning');
+      return;
+    }
+
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -128,9 +168,10 @@ export default function PayrollLockPanel({
           reopen_review_comment: null,
         })
         .eq('id', lockRow.id)
-        .select('id, year_month, company_name, locked_at, locked_by, memo, reopen_requested_at, reopen_requested_by, reopen_request_comment, reopen_request_status, reopen_reviewed_at, reopen_reviewed_by, reopen_review_comment')
+        .select(EXTENDED_LOCK_SELECT)
         .single();
       if (error) throw error;
+
       setLockRow(data as PayrollLockRow);
       setRequestComment('');
       toast('재오픈 요청을 등록했습니다.', 'success');
@@ -145,11 +186,17 @@ export default function PayrollLockPanel({
 
   const reviewReopen = async (approved: boolean) => {
     if (!lockRow) return;
+    if (!supportsReopenWorkflow) {
+      toast('재오픈 승인 기능은 확장 컬럼 적용 후 사용할 수 있습니다.', 'warning');
+      return;
+    }
+
     setLoading(true);
     try {
       if (approved) {
         const { error } = await supabase.from('payroll_locks').delete().eq('id', lockRow.id);
         if (error) throw error;
+
         setLockRow(null);
         setReviewComment('');
         toast('급여 마감 재오픈을 승인했습니다.', 'success');
@@ -163,9 +210,10 @@ export default function PayrollLockPanel({
             reopen_review_comment: reviewComment.trim() || null,
           })
           .eq('id', lockRow.id)
-          .select('id, year_month, company_name, locked_at, locked_by, memo, reopen_requested_at, reopen_requested_by, reopen_request_comment, reopen_request_status, reopen_reviewed_at, reopen_reviewed_by, reopen_review_comment')
+          .select(EXTENDED_LOCK_SELECT)
           .single();
         if (error) throw error;
+
         setLockRow(data as PayrollLockRow);
         setReviewComment('');
         toast('재오픈 요청을 반려했습니다.', 'success');
@@ -207,17 +255,25 @@ export default function PayrollLockPanel({
       {lockRow && (
         <div className="mt-4 space-y-4">
           <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3 text-sm text-[var(--foreground)]">
-            <p>잠금일: {lockRow.locked_at ? new Date(lockRow.locked_at).toLocaleString('ko-KR') : '-'}</p>
-            <p>재오픈 상태: {lockRow.reopen_request_status || '요청 없음'}</p>
-            {lockRow.reopen_request_comment ? (
-              <p className="mt-1 text-xs text-[var(--toss-gray-3)]">요청 사유: {lockRow.reopen_request_comment}</p>
-            ) : null}
-            {lockRow.reopen_review_comment ? (
-              <p className="mt-1 text-xs text-[var(--toss-gray-3)]">검토 메모: {lockRow.reopen_review_comment}</p>
-            ) : null}
+            <p>잠금 시각: {lockRow.locked_at ? new Date(lockRow.locked_at).toLocaleString('ko-KR') : '-'}</p>
+            {supportsReopenWorkflow ? (
+              <>
+                <p>재오픈 상태: {lockRow.reopen_request_status || '요청 없음'}</p>
+                {lockRow.reopen_request_comment ? (
+                  <p className="mt-1 text-xs text-[var(--toss-gray-3)]">요청 사유: {lockRow.reopen_request_comment}</p>
+                ) : null}
+                {lockRow.reopen_review_comment ? (
+                  <p className="mt-1 text-xs text-[var(--toss-gray-3)]">검토 메모: {lockRow.reopen_review_comment}</p>
+                ) : null}
+              </>
+            ) : (
+              <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
+                현재 환경은 기본 잠금만 지원합니다. 재오픈 요청 기능은 확장 컬럼 적용 후 사용할 수 있습니다.
+              </p>
+            )}
           </div>
 
-          {!hasPendingRequest && (
+          {supportsReopenWorkflow && !hasPendingRequest && (
             <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
               <label className="mb-2 block text-xs font-semibold text-[var(--toss-gray-4)]">재오픈 요청 메모</label>
               <textarea
@@ -225,7 +281,7 @@ export default function PayrollLockPanel({
                 onChange={(event) => setRequestComment(event.target.value)}
                 rows={3}
                 className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm outline-none"
-                placeholder="재오픈이 필요한 이유를 남겨 주세요."
+                placeholder="재오픈이 필요한 사유를 적어 주세요."
               />
               <div className="mt-3 flex justify-end">
                 <button
@@ -240,7 +296,7 @@ export default function PayrollLockPanel({
             </div>
           )}
 
-          {hasPendingRequest && canApproveReopen && (
+          {supportsReopenWorkflow && hasPendingRequest && canApproveReopen && (
             <div className="rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 px-4 py-3">
               <label className="mb-2 block text-xs font-semibold text-amber-800">재오픈 검토 메모</label>
               <textarea
@@ -248,7 +304,7 @@ export default function PayrollLockPanel({
                 onChange={(event) => setReviewComment(event.target.value)}
                 rows={3}
                 className="w-full rounded-[var(--radius-md)] border border-amber-200 bg-white px-3 py-2 text-sm outline-none"
-                placeholder="승인 또는 반려 메모를 남겨 주세요."
+                placeholder="승인 또는 반려 메모를 적어 주세요."
               />
               <div className="mt-3 flex flex-wrap justify-end gap-2">
                 <button

@@ -1,41 +1,32 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
+import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { supabase } from '@/lib/supabase';
 import { hasOfficialMonthlyIncomeTaxTable } from '@/lib/use-tax-insurance-rates';
+import { calculateEmployeeInsuranceDeductions } from '@/lib/payroll-insurance-rates';
 import type { StaffMember } from '@/types';
 import SalaryDetail from './급여명세/급여상세';
 import PayrollTable from './급여명세/급여대장표';
-import PayrollMonthlySummary from './급여명세/급여대장월별요약';
-import LaborCostSimulation from './인력예측/인건비예측';
 import InterimSettlement from './급여명세/중간정산';
+import PayrollLockPanel from './급여명세/급여월마감잠금';
 import YearEndSettlement from './급여명세/연말정산';
 import SalarySettlement from './급여명세/급여정산';
 import SeveranceCalculator from './급여명세/퇴직금계산기';
 import PayrollEmailSender from './급여명세/급여명세서발송';
-import TaxFreeSettingsPanel from './급여명세/비과세항목설정';
-import LegalStandardsPanel from './급여명세/법정기준패널';
-import WeeklyHoursMonitor from './급여명세/주52시간모니터링';
 import HRDashboardIntegrated from './급여명세/인사대시보드통합';
 import SeveranceLeaveDashboard from './급여명세/예상퇴직금연차대시보드';
-import LeaveDashboard from './급여명세/연차종합대시보드';
 import SalaryChangeHistory from './급여명세/급여변경이력';
-import OnboardingChecklist from './급여명세/입퇴사온보딩';
-import AuditLogDetail from './급여명세/감사로그상세';
-import PayrollLockPanel from './급여명세/급여월마감잠금';
-import ShiftPatternManager from './급여명세/교대제스케줄관리';
-import NotificationTemplatesPanel from './급여명세/알림템플릿관리';
-import TaxInsuranceRatesPanel from './급여명세/세율보험요율관리';
 import IntegratedHRSettings from './인사통합설정';
+import TaxFileGenerator from './원천징수파일생성';
+import InsuranceManagement from './4대보험관리';
 import SalarySimulator from './급여명세/급여시뮬레이터';
 import InsuranceEDI from './급여명세/4대보험EDI';
 import RetirementPensionManager from './급여명세/퇴직연금관리';
 import WagePeakCalculator from './급여명세/임금피크제';
-import MinWageChecker from './급여명세/최저임금체크';
+import PayrollComplianceCheck from './급여명세/급여기준점검';
 import OrdinaryWageCalculator from './급여명세/통상임금계산기';
-import TaxFreeLimitChecker from './급여명세/비과세한도체크';
-import TotalLaborCostForecast from './급여명세/총인건비예측';
-import GrossNetComparison from './급여명세/세전세후비교';
 import UnpaidAllowanceAlert from './급여명세/미지급수당알림';
 import PayrollAdvancedCenter from './급여명세/급여고도화센터';
 import UnpaidAbsenceDeduction from './급여명세/무급결근차감';
@@ -76,11 +67,15 @@ type PayrollRecordRow = {
   advance_pay?: number | null;
 };
 
-const PAYROLL_RECORD_SELECT = [
+const PAYROLL_RECORD_REQUIRED_COLUMNS = [
   'staff_id',
   'year_month',
-  'record_type',
   'status',
+];
+
+const PAYROLL_RECORD_OPTIONAL_COLUMNS = [
+  'record_type',
+  'staff_id',
   'base_salary',
   'meal_allowance',
   'night_duty_allowance',
@@ -103,13 +98,15 @@ const PAYROLL_RECORD_SELECT = [
   'local_tax',
   'net_pay',
   'advance_pay',
-].join(', ');
+] as const;
 
 type PayrollMainProps = {
   staffs?: Staff[];
   selectedCo?: string;
   onRefresh?: () => void;
   showAdminPolicyTabs?: boolean;
+  user?: any;
+  initialTab?: string;
 };
 
 export default function PayrollMain({
@@ -117,8 +114,10 @@ export default function PayrollMain({
   selectedCo,
   onRefresh,
   showAdminPolicyTabs = true,
+  user = null,
+  initialTab = '대시보드',
 }: PayrollMainProps) {
-  const [activeTab, setActiveTab] = useState('대시보드');
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [selectedStaffId, setSelectedStaffId] = useState<string | number | null>(null);
   const [checkedIds, setCheckedIds] = useState<(string | number)[]>([]);
   const [yearMonth, setYearMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
@@ -257,16 +256,30 @@ export default function PayrollMain({
         return;
       }
       try {
-        const { data, error } = await supabase
-          .from('payroll_records')
-          .select(PAYROLL_RECORD_SELECT)
-          .eq('year_month', yearMonth)
-          .not('record_type', 'eq', 'interim');
+        const { data, error } = await withMissingColumnsFallback(
+          (omittedColumns) =>
+            supabase
+              .from('payroll_records')
+              .select(
+                [
+                  ...PAYROLL_RECORD_REQUIRED_COLUMNS,
+                  ...PAYROLL_RECORD_OPTIONAL_COLUMNS.filter(
+                    (column) =>
+                      !omittedColumns.has(column) &&
+                      !PAYROLL_RECORD_REQUIRED_COLUMNS.includes(column as (typeof PAYROLL_RECORD_REQUIRED_COLUMNS)[number]),
+                  ),
+                ].join(', ')
+              )
+              .eq('year_month', yearMonth),
+          [...PAYROLL_RECORD_OPTIONAL_COLUMNS],
+        );
         if (error) {
           console.warn('payroll_records 조회 실패:', error.message);
           setPayrollRecords([]);
         } else {
-          setPayrollRecords(((data || []) as unknown) as PayrollRecordRow[]);
+          setPayrollRecords(
+            filterNonInterimPayrollRecords(((data || []) as unknown) as PayrollRecordRow[]),
+          );
         }
       } catch (e) {
         console.warn('payroll_records 조회 중 예외:', e);
@@ -305,15 +318,13 @@ export default function PayrollMain({
     { id: '급여대장', label: '급여대장', icon: '📋' },
     { id: '연말퇴직정산', label: '연말퇴직정산', icon: '🗓️' },
     { id: '통합설정', label: '통합설정', icon: '⚙️' },
+    { id: '원천징수파일', label: '원천징수파일', icon: '📊' },
+    { id: '4대보험EDI', label: '4대보험 / EDI', icon: '🏛️' },
     { id: '급여시뮬레이터', label: '급여 시뮬레이터', icon: '🧮' },
-    { id: '4대보험EDI', label: '4대보험 EDI', icon: '🏛️' },
     { id: '퇴직연금', label: '퇴직연금', icon: '💼' },
     { id: '임금피크제', label: '임금피크제', icon: '📉' },
-    { id: '최저임금', label: '최저임금 체크', icon: '⚠️' },
+    { id: '급여기준체크', label: '최저임금·비과세 점검', icon: '⚠️' },
     { id: '통상임금', label: '통상임금 계산기', icon: '🧮' },
-    { id: '비과세체크', label: '비과세 한도 체크', icon: '⚠️' },
-    { id: '총인건비예측', label: '총인건비 예측', icon: '📈' },
-    { id: '세전세후', label: '세전/세후 비교', icon: '💹' },
     { id: '미지급수당', label: '미지급 수당 알림', icon: '🔔' },
     { id: '급여고도화', label: '급여 고도화', icon: '🧩' },
     { id: '무급결근차감', label: '무급 결근 차감', icon: '📉' },
@@ -323,7 +334,7 @@ export default function PayrollMain({
     '?듯빀?ㅼ젙',
     '湲됱뿬怨좊룄??',
   ]);
-  const hiddenAdminPayrollTabIds = new Set<string>([tabs[4].id, tabs[15].id]);
+  const hiddenAdminPayrollTabIds = new Set<string>(['통합설정', '급여고도화']);
   adminOnlyPayrollTabIds.forEach((tabId) => hiddenAdminPayrollTabIds.add(tabId));
   const visibleTabs = showAdminPolicyTabs
     ? tabs
@@ -334,6 +345,12 @@ export default function PayrollMain({
       setActiveTab(visibleTabs[0]?.id || tabs[0]?.id);
     }
   }, [activeTab, tabs, visibleTabs]);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   return (
     <div
@@ -374,12 +391,6 @@ export default function PayrollMain({
           </nav>
         </div>
 
-        <div className="hidden lg:flex items-center gap-3">
-          <div className="px-4 py-2 bg-[var(--toss-blue-light)]/50 rounded-[var(--radius-md)] border border-[var(--accent)]/10">
-            <p className="text-[11px] font-bold text-[var(--accent)]/60 text-center leading-tight">선택된 사업체</p>
-            <p className="text-sm font-bold text-[var(--accent)] leading-tight">{selectedCo as string}</p>
-          </div>
-        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-4">
@@ -399,7 +410,12 @@ export default function PayrollMain({
             {activeTab === '대시보드' && <HRDashboardIntegrated staffs={filtered} selectedCo={selectedCo} checkedIds={checkedIds} yearMonth={yearMonth} />}
 
             {activeTab === '급여정산' && (
-              <RunPayrollWizard staffs={staffs} selectedCo={selectedCo} onRefresh={refreshPayrollWorkspace} />
+              <RunPayrollWizard
+                staffs={staffs}
+                selectedCo={selectedCo}
+                yearMonth={yearMonth}
+                onRefresh={refreshPayrollWorkspace}
+              />
             )}
 
             {activeTab === '급여대장' && (
@@ -472,6 +488,21 @@ export default function PayrollMain({
             {activeTab === '통합설정' && (
               <IntegratedHRSettings companyName={selectedCo ?? ''} />
             )}
+            {activeTab === '원천징수파일' && (
+              <div className="p-4">
+                <TaxFileGenerator staffs={filtered} selectedCo={selectedCo ?? ''} />
+              </div>
+            )}
+            {activeTab === '4대보험EDI' && (
+              <div className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+                  <InsuranceManagement staffs={filtered} selectedCo={selectedCo ?? ''} />
+                </div>
+                <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+                  <InsuranceEDI staffs={filtered} selectedCo={selectedCo ?? ''} user={user} />
+                </div>
+              </div>
+            )}
             {activeTab === '급여시뮬레이터' && (
               <div className="p-4">
                 <div className="mb-4">
@@ -480,14 +511,10 @@ export default function PayrollMain({
                 <SalarySimulator />
               </div>
             )}
-            {activeTab === '4대보험EDI' && <InsuranceEDI staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
             {activeTab === '퇴직연금' && <RetirementPensionManager staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
             {activeTab === '임금피크제' && <WagePeakCalculator staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
-            {activeTab === '최저임금' && <MinWageChecker staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
+            {activeTab === '급여기준체크' && <PayrollComplianceCheck staffs={filtered} selectedCo={selectedCo ?? ''} user={user} />}
             {activeTab === '통상임금' && <OrdinaryWageCalculator staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
-            {activeTab === '비과세체크' && <TaxFreeLimitChecker staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
-            {activeTab === '총인건비예측' && <TotalLaborCostForecast staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
-            {activeTab === '세전세후' && <GrossNetComparison staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
             {activeTab === '미지급수당' && <UnpaidAllowanceAlert staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
             {activeTab === '급여고도화' && (
                 <PayrollAdvancedCenter
@@ -516,8 +543,18 @@ export default function PayrollMain({
   );
 }
 
-function RunPayrollWizard({ staffs = [], selectedCo, onRefresh }: { staffs?: Staff[]; selectedCo?: string; onRefresh?: () => void }) {
-  const [mode, setMode] = useState<'select' | 'regular' | 'interim'>('select');
+function RunPayrollWizard({
+  staffs = [],
+  selectedCo,
+  yearMonth,
+  onRefresh,
+}: {
+  staffs?: Staff[];
+  selectedCo?: string;
+  yearMonth: string;
+  onRefresh?: () => void;
+}) {
+  const [mode, setMode] = useState<'select' | 'regular' | 'interim' | 'lock'>('select');
 
   if (mode === 'regular') {
     return (
@@ -541,10 +578,26 @@ function RunPayrollWizard({ staffs = [], selectedCo, onRefresh }: { staffs?: Sta
     );
   }
 
+  if (mode === 'lock') {
+    return (
+      <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <button
+          onClick={() => setMode('select')}
+          className="px-4 py-2 bg-[var(--muted)] text-[var(--foreground)] text-xs font-bold rounded-[var(--radius-md)] hover:bg-[var(--toss-gray-2)] transition-colors"
+        >
+          ← 마법사 홈으로 돌아가기
+        </button>
+        <div className="max-w-3xl">
+          <PayrollLockPanel yearMonth={yearMonth} companyName={selectedCo} onLockChange={onRefresh} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col items-center justify-center py-20 px-4 min-h-[60vh] animate-in zoom-in-95 duration-500" data-testid="run-payroll-wizard">
       <div className="bg-[var(--card)] backdrop-blur-3xl p-4 rounded-2xl border border-[var(--border)] shadow-sm text-center max-w-3xl w-full">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           <button
             data-testid="run-payroll-regular-button"
             onClick={() => setMode('regular')}
@@ -564,6 +617,16 @@ function RunPayrollWizard({ staffs = [], selectedCo, onRefresh }: { staffs?: Sta
             <h3 className="text-lg font-bold text-[var(--foreground)] mb-2">중도 퇴사자 정산</h3>
             <p className="text-xs text-[var(--toss-gray-3)] leading-relaxed">월중 퇴사한 직원의 급여를 근무일수에 비례하여 일할 계산(Prorated) 처리합니다.</p>
           </button>
+
+          <button
+            data-testid="run-payroll-lock-button"
+            onClick={() => setMode('lock')}
+            className="group flex flex-col items-start p-4 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] hover:border-emerald-500 hover:shadow-sm transition-all text-left"
+          >
+            <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-[var(--radius-xl)] flex items-center justify-center text-2xl mb-4 shadow-inner group-hover:scale-110 transition-transform">🔒</div>
+            <h3 className="text-lg font-bold text-[var(--foreground)] mb-2">급여 마감 및 잠금</h3>
+            <p className="text-xs text-[var(--toss-gray-3)] leading-relaxed">선택한 월 급여의 마감 잠금과 재오픈 요청 상태를 확인하고 관리합니다.</p>
+          </button>
         </div>
       </div>
     </div>
@@ -575,16 +638,15 @@ function RunPayrollWizard({ staffs = [], selectedCo, onRefresh }: { staffs?: Sta
 function BenefitSummary({ staff }: { staff: Staff }) {
   const base = staff.base ?? 3_000_000;
   const welfare = Math.round(base * 0.05);
-  const pension = Math.round(base * 0.045);
-  const health = Math.round(base * 0.03545);
+  const insurance = calculateEmployeeInsuranceDeductions(base);
 
   return (
     <div className="app-card p-4 shadow-sm">
       <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3">복리후생 · 4대보험 (DEMO)</h3>
       <div className="space-y-1.5 text-xs font-medium text-[var(--toss-gray-4)]">
         <div className="flex justify-between"><span>복리후생 예산</span><span className="text-[var(--accent)]">{welfare.toLocaleString()}원/월</span></div>
-        <div className="flex justify-between"><span>국민연금 회사부담</span><span className="text-red-600">-{pension.toLocaleString()}원</span></div>
-        <div className="flex justify-between"><span>건강보험 회사부담</span><span className="text-red-600">-{health.toLocaleString()}원</span></div>
+        <div className="flex justify-between"><span>국민연금 회사부담</span><span className="text-red-600">-{insurance.nationalPension.toLocaleString()}원</span></div>
+        <div className="flex justify-between"><span>건강보험 회사부담</span><span className="text-red-600">-{insurance.healthInsurance.toLocaleString()}원</span></div>
       </div>
       <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">* Supabase 연동 후 자동 반영 예정</p>
     </div>

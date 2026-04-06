@@ -7,11 +7,10 @@ import { logAudit, readClientAuditActor } from '@/lib/audit';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import AnnualLeavePromotion from './연차촉진시스템';
 import AnnualLeaveLedger from './연차원장';
-import AttendanceDeductionSimulator from './근태차감시뮬레이터';
-import AttendanceAnomalyPanel from './근태이상탐지';
 import HolidayWorkPolicySettings from './휴일근무규칙설정';
 import LeaveDashboard from '../급여명세/연차종합대시보드';
 import HolidayCalendar from '../공휴일달력';
+import AnnualLeaveExpiryAlert from '../연차소멸알림';
 
 type Leave = {
   id: string;
@@ -27,34 +26,32 @@ type Leave = {
 type LeaveManagementTabId =
   | '연차/휴가 신청내역'
   | '연차 대시보드'
+  | '연차소멸알림'
   | '연차사용촉진 자동화'
   | '연차 자동부여 설정'
   | '공휴일 달력'
   | '연차 원장'
-  | '근태 차감 시뮬레이터'
-  | '근태 이상 탐지'
   | '휴일/대체휴무 규칙';
 
 const LEAVE_TAB_DEFS: { id: LeaveManagementTabId; label: string }[] = [
   { id: '연차/휴가 신청내역', label: '연차/휴가 신청내역' },
   { id: '연차 대시보드', label: '연차 대시보드' },
+  { id: '연차소멸알림', label: '연차소멸알림' },
   { id: '연차사용촉진 자동화', label: '연차사용촉진 자동화' },
   { id: '연차 자동부여 설정', label: '연차 자동부여 설정' },
   { id: '공휴일 달력', label: '공휴일 달력' },
   { id: '연차 원장', label: '연차 원장' },
-  { id: '근태 차감 시뮬레이터', label: '근태 차감 시뮬레이터' },
-  { id: '근태 이상 탐지', label: '근태 이상 탐지' },
   { id: '휴일/대체휴무 규칙', label: '휴일/대체휴무 규칙' },
 ];
 
 const LEGACY_ADMIN_REDIRECT_TABS = new Set<LeaveManagementTabId>([
-  LEAVE_TAB_DEFS[2].id,
+  '연차사용촉진 자동화',
 ]);
 
 const ADMIN_ONLY_LEAVE_TABS = new Set<LeaveManagementTabId>([
-  LEAVE_TAB_DEFS[3].id,
-  LEAVE_TAB_DEFS[4].id,
-  LEAVE_TAB_DEFS[8].id,
+  '연차 자동부여 설정',
+  '공휴일 달력',
+  '휴일/대체휴무 규칙',
 ]);
 
 export default function LeaveManagement({
@@ -80,7 +77,7 @@ export default function LeaveManagement({
         if (LEGACY_ADMIN_REDIRECT_TABS.has(tab.id)) return tabMode === 'all' && allowLeaveTabs;
         if (tabMode === 'admin') {
           if (!ADMIN_ONLY_LEAVE_TABS.has(tab.id)) return false;
-          if (tab.id === LEAVE_TAB_DEFS[4].id) return allowHolidayTab;
+          if (tab.id === '공휴일 달력') return allowHolidayTab;
           return true;
         }
         if (ADMIN_ONLY_LEAVE_TABS.has(tab.id)) return false;
@@ -378,6 +375,9 @@ export default function LeaveManagement({
         {activeTab === '연차 대시보드' && (
           <LeaveDashboard staffs={staffList} selectedCo={selectedCo as string} currentUser={currentUser} />
         )}
+        {activeTab === '연차소멸알림' && (
+          <AnnualLeaveExpiryAlert staffs={staffList} selectedCo={selectedCo as string} user={user} />
+        )}
         {activeTab === '연차사용촉진 자동화' && <AnnualLeavePromotion staffs={staffList} selectedCo={selectedCo as string} />}
 
         {activeTab === '연차 자동부여 설정' && (
@@ -434,12 +434,6 @@ export default function LeaveManagement({
         )}
         {activeTab === '연차 원장' && (
           <AnnualLeaveLedger staffs={staffList as any[]} selectedCo={selectedCo as string} />
-        )}
-        {activeTab === '근태 차감 시뮬레이터' && (
-          <AttendanceDeductionSimulator staffs={staffList as any[]} selectedCo={selectedCo as string} />
-        )}
-        {activeTab === '근태 이상 탐지' && (
-          <AttendanceAnomalyPanel staffs={staffList as any[]} selectedCo={selectedCo as string} />
         )}
         {activeTab === '휴일/대체휴무 규칙' && (
           <HolidayWorkPolicySettings selectedCo={selectedCo as string} />

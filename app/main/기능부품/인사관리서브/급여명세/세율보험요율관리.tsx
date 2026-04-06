@@ -8,8 +8,22 @@ import {
   hasOfficialMonthlyIncomeTaxTable,
   validateOfficialMonthlyIncomeTaxTable,
 } from '@/lib/use-tax-insurance-rates';
+import {
+  EMPLOYEE_INSURANCE_RATES_2026,
+  getIndustrialAccidentInsuranceInfo,
+} from '@/lib/payroll-insurance-rates';
 
 const COMPANY_FILTER = '전체';
+
+type TaxInsuranceRateForm = {
+  effective_year: number;
+  national_pension_rate: number;
+  health_insurance_rate: number;
+  long_term_care_rate: number;
+  employment_insurance_rate: number;
+  income_tax_bracket_text: string;
+  official_confirmed: boolean;
+};
 
 function formatPercent(value: number) {
   return `${(value * 100).toFixed(3).replace(/0+$/, '').replace(/\.$/, '')}%`;
@@ -25,17 +39,18 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Record<string, unknown> | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<TaxInsuranceRateForm>({
     effective_year: new Date().getFullYear(),
-    national_pension_rate: 0.0475,
-    health_insurance_rate: 0.03545,
-    long_term_care_rate: 0.00459,
-    employment_insurance_rate: 0.009,
+    national_pension_rate: EMPLOYEE_INSURANCE_RATES_2026.nationalPension,
+    health_insurance_rate: EMPLOYEE_INSURANCE_RATES_2026.healthInsurance,
+    long_term_care_rate: EMPLOYEE_INSURANCE_RATES_2026.longTermCare,
+    employment_insurance_rate: EMPLOYEE_INSURANCE_RATES_2026.employmentInsurance,
     income_tax_bracket_text: '',
     official_confirmed: false,
   });
 
   const scopedCompany = companyName || COMPANY_FILTER;
+  const industrialAccidentInfo = useMemo(() => getIndustrialAccidentInsuranceInfo(scopedCompany), [scopedCompany]);
 
   const loadList = async () => {
     setLoading(true);
@@ -57,10 +72,10 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
     setEditing(null);
     setForm({
       effective_year: new Date().getFullYear(),
-      national_pension_rate: 0.0475,
-      health_insurance_rate: 0.03545,
-      long_term_care_rate: 0.00459,
-      employment_insurance_rate: 0.009,
+      national_pension_rate: EMPLOYEE_INSURANCE_RATES_2026.nationalPension,
+      health_insurance_rate: EMPLOYEE_INSURANCE_RATES_2026.healthInsurance,
+      long_term_care_rate: EMPLOYEE_INSURANCE_RATES_2026.longTermCare,
+      employment_insurance_rate: EMPLOYEE_INSURANCE_RATES_2026.employmentInsurance,
       income_tax_bracket_text: '',
       official_confirmed: false,
     });
@@ -70,10 +85,11 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
     setEditing(row);
     setForm({
       effective_year: Number(row.effective_year) || new Date().getFullYear(),
-      national_pension_rate: Number(row.national_pension_rate) || 0.0475,
-      health_insurance_rate: Number(row.health_insurance_rate) || 0.03545,
-      long_term_care_rate: Number(row.long_term_care_rate) || 0.00459,
-      employment_insurance_rate: Number(row.employment_insurance_rate) || 0.009,
+      national_pension_rate: Number(row.national_pension_rate) || EMPLOYEE_INSURANCE_RATES_2026.nationalPension,
+      health_insurance_rate: Number(row.health_insurance_rate) || EMPLOYEE_INSURANCE_RATES_2026.healthInsurance,
+      long_term_care_rate: Number(row.long_term_care_rate) || EMPLOYEE_INSURANCE_RATES_2026.longTermCare,
+      employment_insurance_rate:
+        Number(row.employment_insurance_rate) || EMPLOYEE_INSURANCE_RATES_2026.employmentInsurance,
       income_tax_bracket_text: stringifyBracket(row.income_tax_bracket),
       official_confirmed: Array.isArray(row.income_tax_bracket) && row.income_tax_bracket.length > 0 && row.income_tax_bracket.every((entry: any) => entry?.official === true),
     });
@@ -180,6 +196,10 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
           <h3 className="text-sm font-semibold text-[var(--foreground)]">세율·보험요율 관리</h3>
           <p className="mt-1 text-xs text-[var(--toss-gray-4)]">
             급여 확정 전 해당 연도의 보험요율과 소득세 세율표를 먼저 설정하세요.
+          </p>
+          <p className="mt-1 text-[11px] font-medium text-[var(--toss-gray-4)]">
+            산재보험은 회사 업종 기준 사업주 부담입니다. 현재 회사 기준 {industrialAccidentInfo.industryLabel}{' '}
+            {(industrialAccidentInfo.employerRate * 100).toFixed(2)}%
           </p>
         </div>
         <button

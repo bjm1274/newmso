@@ -110,6 +110,23 @@ const syIncDirectorUser = {
   },
 };
 
+const adminClosingReportUser = {
+  ...fakeUser,
+  id: '22222222-9999-8888-7777-666666666666',
+  employee_no: 'E2E-007',
+  name: 'Admin Closing',
+  department: '운영',
+  position: '관리자',
+  role: 'admin',
+  company: extraFeaturesUser.company,
+  company_id: extraFeaturesUser.company_id,
+  permissions: {
+    ...fakeUser.permissions,
+    admin: true,
+    'extra_\uB9C8\uAC10\uBCF4\uACE0': false,
+  },
+};
+
 function getTodayKey() {
   return new Intl.DateTimeFormat('sv-SE', {
     timeZone: 'Asia/Seoul',
@@ -120,7 +137,13 @@ async function prepareExtraFeature(
   page: Page,
   fixtures: Parameters<typeof mockSupabase>[1],
   cardTestId: string,
-  options?: { user?: typeof extraFeaturesUser | typeof floorStaffUser }
+  options?: {
+    user?:
+      | typeof extraFeaturesUser
+      | typeof floorStaffUser
+      | typeof syIncDirectorUser
+      | typeof adminClosingReportUser;
+  }
 ) {
   await page.addInitScript(() => {
     window.alert = () => {};
@@ -515,7 +538,7 @@ test('daily closure can save settlement items and return to the list', async ({ 
   expect(runtimeErrors).toEqual([]);
 });
 
-test('daily closure form stays writable for non-manager staff', async ({ page }) => {
+test('daily closure list stays visible for staff with closing-report permission', async ({ page }) => {
   const runtimeErrors = trackRuntimeErrors(page);
   const todayKey = getTodayKey();
 
@@ -531,23 +554,26 @@ test('daily closure form stays writable for non-manager staff', async ({ page })
     { user: floorStaffUser }
   );
 
-  await expect(page.getByTestId('daily-closure-read-restricted-note')).toBeVisible();
-  await expect(page.getByTestId('daily-closure-toggle-view')).toHaveCount(0);
-  await expect(page.getByTestId('daily-closure-list')).toHaveCount(0);
+  await expect(page.getByTestId('daily-closure-read-restricted-note')).toHaveCount(0);
+  await expect(page.getByTestId('daily-closure-toggle-view')).toBeVisible();
+  await expect(page.getByTestId('daily-closure-list')).toBeVisible();
 
+  await page.getByTestId('daily-closure-toggle-view').click();
   await page.getByTestId('daily-closure-date').fill(todayKey);
   await page.getByTestId('daily-closure-add-item').click();
-  await page.getByTestId('daily-closure-item-patient-0').fill('일반직원 환자');
+  await page.getByTestId('daily-closure-item-patient-0').fill('Floor Staff Patient');
   await page.getByTestId('daily-closure-item-amount-0').fill('18000');
   await expect(page.getByTestId('daily-closure-save')).toBeEnabled();
 
   await page.getByTestId('daily-closure-save').click();
-  await expect(page.getByTestId('daily-closure-date-status')).toContainText('수정 중');
+  await expect(page.getByTestId('daily-closure-list')).toBeVisible();
+  await expect(page.getByText('18,000')).toBeVisible();
+  await expect(page.getByTestId(/daily-closure-author-/).first()).toContainText(floorStaffUser.name);
 
   expect(runtimeErrors).toEqual([]);
 });
 
-test('daily closure blocks non-author staff from editing an existing report', async ({ page }) => {
+test('daily closure allows permissioned staff to edit an existing report', async ({ page }) => {
   const runtimeErrors = trackRuntimeErrors(page);
   const todayKey = getTodayKey();
 
@@ -568,16 +594,128 @@ test('daily closure blocks non-author staff from editing an existing report', as
           created_by: extraFeaturesUser.id,
         },
       ],
-      dailyClosureItems: [],
+      dailyClosureItems: [
+        {
+          id: 'daily-closure-item-existing',
+          closure_id: 'daily-closure-existing',
+          patient_name: 'Existing Patient',
+          amount: 77000,
+          payment_method: '카드',
+          receipt_type: '진료비',
+          memo: '',
+        },
+      ],
       dailyChecks: [],
     },
     'extra-card-closing-report',
     { user: floorStaffUser }
   );
 
-  await expect(page.getByTestId('daily-closure-read-restricted-note')).toBeVisible();
-  await expect(page.getByTestId('daily-closure-date-status')).toContainText('작성자 본인만 수정');
-  await expect(page.getByTestId('daily-closure-save')).toBeDisabled();
+  await expect(page.getByTestId('daily-closure-read-restricted-note')).toHaveCount(0);
+  await expect(page.getByTestId('daily-closure-list')).toBeVisible();
+
+  await page.getByTestId('daily-closure-edit-daily-closure-existing').click();
+  await expect(page.getByTestId('daily-closure-item-patient-0')).toHaveValue('Existing Patient');
+  await expect(page.getByTestId('daily-closure-petty-cash-start')).toHaveValue('10000');
+  await expect(page.getByTestId('daily-closure-petty-cash-end')).toHaveValue('5000');
+  await expect(page.getByTestId('daily-closure-memo')).toHaveValue('기존 마감보고');
+  await expect(page.getByTestId('daily-closure-save')).toBeEnabled();
+
+  await page.getByTestId('daily-closure-item-amount-0').fill('78000');
+  await page.getByTestId('daily-closure-save').click();
+  await expect(page.getByTestId('daily-closure-list')).toBeVisible();
+  await expect(page.getByText('78,000')).toBeVisible();
+  await expect(page.getByTestId(/daily-closure-author-/).first()).toContainText(extraFeaturesUser.name);
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('daily closure allows permissioned staff to delete an existing report', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const todayKey = getTodayKey();
+
+  await prepareExtraFeature(
+    page,
+    {
+      staffMembers: [extraFeaturesUser, floorStaffUser],
+      dailyClosures: [
+        {
+          id: 'daily-closure-delete-target',
+          company_id: floorStaffUser.company_id,
+          date: todayKey,
+          total_amount: 62000,
+          petty_cash_start: 12000,
+          petty_cash_end: 4000,
+          status: 'completed',
+          memo: '삭제 대상 마감보고',
+          created_by: extraFeaturesUser.id,
+        },
+      ],
+      dailyClosureItems: [
+        {
+          id: 'daily-closure-item-delete-target',
+          closure_id: 'daily-closure-delete-target',
+          patient_name: 'Delete Patient',
+          amount: 62000,
+          payment_method: '카드',
+          receipt_type: '진료비',
+          memo: '',
+        },
+      ],
+      dailyChecks: [
+        {
+          id: 'daily-check-delete-target',
+          closure_id: 'daily-closure-delete-target',
+          check_number: '12345678',
+          amount: 10000,
+          bank_name: '테스트은행',
+        },
+      ],
+    },
+    'extra-card-closing-report',
+    { user: floorStaffUser }
+  );
+
+  await expect(page.getByTestId('daily-closure-list')).toBeVisible();
+  await expect(page.getByTestId('daily-closure-card-daily-closure-delete-target')).toBeVisible();
+
+  await page.getByTestId('daily-closure-delete-daily-closure-delete-target').click();
+
+  await expect(page.getByTestId('daily-closure-card-daily-closure-delete-target')).toHaveCount(0);
+  await expect(page.getByText('등록된 마감 보고가 없습니다.')).toBeVisible();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('daily closure save falls back when created_by_name column is missing', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const todayKey = getTodayKey();
+
+  await prepareExtraFeature(
+    page,
+    {
+      staffMembers: [extraFeaturesUser],
+      dailyClosures: [],
+      dailyClosureItems: [],
+      dailyChecks: [],
+      missingDailyClosureColumns: ['created_by_name'],
+    },
+    'extra-card-closing-report'
+  );
+
+  await expect(page.getByTestId('daily-closure-view')).toBeVisible();
+  await page.getByTestId('daily-closure-toggle-view').click();
+  await page.getByTestId('daily-closure-date').fill(todayKey);
+  await page.getByTestId('daily-closure-add-item').click();
+  await page.getByTestId('daily-closure-item-patient-0').fill('Schema Fallback Patient');
+  await page.getByTestId('daily-closure-item-amount-0').fill('45000');
+  await page.getByTestId('daily-closure-memo').fill('created_by_name 없이 저장');
+  await page.getByTestId('daily-closure-save').click();
+
+  await expect(page.getByTestId('daily-closure-list')).toBeVisible();
+  await expect(page.getByText(todayKey)).toBeVisible();
+  await expect(page.getByText('45,000')).toBeVisible();
+  await expect(page.getByTestId(/daily-closure-author-/).first()).toContainText(extraFeaturesUser.name);
 
   expect(runtimeErrors).toEqual([]);
 });
@@ -613,6 +751,54 @@ test('daily closure list stays visible for SY INC. directors without selecting a
   await expect(page.getByTestId('daily-closure-all-company-note')).toBeVisible();
   await expect(page.getByTestId('daily-closure-list')).toBeVisible();
   await expect(page.getByText(todayKey)).toBeVisible();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('daily closure stays accessible for admins without explicit closing-report permission', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const todayKey = getTodayKey();
+
+  await prepareExtraFeature(
+    page,
+    {
+      staffMembers: [adminClosingReportUser, extraFeaturesUser],
+      dailyClosures: [
+        {
+          id: 'daily-closure-admin-access',
+          company_id: extraFeaturesUser.company_id,
+          date: todayKey,
+          total_amount: 45000,
+          petty_cash_start: 10000,
+          petty_cash_end: 6000,
+          status: 'completed',
+          memo: '관리자 확인용 마감보고',
+          created_by: extraFeaturesUser.id,
+        },
+      ],
+      dailyClosureItems: [
+        {
+          id: 'daily-closure-item-admin-access',
+          closure_id: 'daily-closure-admin-access',
+          patient_name: 'Admin Access Patient',
+          amount: 45000,
+          payment_method: '카드',
+          receipt_type: '진료비',
+          memo: '',
+        },
+      ],
+      dailyChecks: [],
+    },
+    'extra-card-closing-report',
+    { user: adminClosingReportUser }
+  );
+
+  await expect(page.getByTestId('daily-closure-list')).toBeVisible();
+  await expect(page.getByText(todayKey)).toBeVisible();
+
+  await page.getByTestId('daily-closure-edit-daily-closure-admin-access').click();
+  await expect(page.getByTestId('daily-closure-item-patient-0')).toHaveValue('Admin Access Patient');
+  await expect(page.getByTestId('daily-closure-save')).toBeEnabled();
 
   expect(runtimeErrors).toEqual([]);
 });
