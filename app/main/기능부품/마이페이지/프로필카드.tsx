@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useState, useEffect, type ChangeEvent } from 'react';
 import { supabase } from '@/lib/supabase';
+import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 import { isMissingColumnError } from '@/lib/supabase-compat';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
@@ -60,7 +61,6 @@ export default function MyProfileCard({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(getProfilePhotoUrl((_iu)));
   const [uploading, setUploading] = useState(false);
   const [internalShowSecret, setInternalShowSecret] = useState(false);
-  const [debugMsg, setDebugMsg] = useState(''); // 디버깅용 메시지
   const [internalIsEditing, setInternalIsEditing] = useState(false);
   const effectiveUserId = getStaffLikeId(user);
   const [editForm, setEditForm] = useState<{ email: string; phone: string; extension: string; address: string; bank_name: string; bank_account: string }>({
@@ -112,13 +112,10 @@ export default function MyProfileCard({
   // [핵심] 페이지 로드 시 ID가 없으면 '이름'으로 ID를 찾아내는 복구 로직
   useEffect(() => {
     if (getStaffLikeId(_iu)) {
-      setDebugMsg('');
       return;
     }
     if ((_iu)?.name || (_iu)?.employee_no || (_iu)?.auth_user_id) {
       void recoverUserIdentity(_iu);
-    } else {
-      setDebugMsg("초기 사용자 이름조차 없습니다. 재로그인 필요.");
     }
   }, [_iu?.id, _iu?.name, _iu?.employee_no, _iu?.auth_user_id]);
 
@@ -150,10 +147,8 @@ export default function MyProfileCard({
       setAvatarUrl(getProfilePhotoUrl(normalizedUser));
 
       // 3. 브라우저 저장소 동기화 (다른 탭·할일 등에서 동일 사용자 인식)
-      localStorage.setItem('erp_user', JSON.stringify(normalizedUser));
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(normalizedUser));
       broadcastProfileUpdate(normalizedUser);
-      // setDebugMsg(`ID 복구 완료: ${data.id}`);
-
     } catch (err) {
       console.error(err);
     }
@@ -176,8 +171,8 @@ export default function MyProfileCard({
     }
 
     try {
-      localStorage.removeItem('erp_user');
-      localStorage.removeItem('erp_login_at');
+      localStorage.removeItem(STORAGE_KEYS.USER);
+      localStorage.removeItem(STORAGE_KEYS.LOGIN_AT);
       persistSupabaseAccessToken(null);
       void supabase.realtime.setAuth(null);
     } catch {
@@ -239,7 +234,7 @@ export default function MyProfileCard({
       if (!getStaffLikeId(currentUser) && ((_iu)?.name || (_iu)?.employee_no || (_iu)?.auth_user_id)) {
         await recoverUserIdentity(_iu);
         try {
-          const stored = localStorage.getItem('erp_user');
+          const stored = localStorage.getItem(STORAGE_KEYS.USER);
           if (stored) currentUser = JSON.parse(stored);
         } catch (_) { }
       }
@@ -340,7 +335,7 @@ export default function MyProfileCard({
         uploadedAt
       );
       setUser(updatedUser);
-      localStorage.setItem('erp_user', JSON.stringify(updatedUser));
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser));
       broadcastProfileUpdate(updatedUser);
 
       toast('사진이 정상적으로 등록되었습니다!', 'success');
@@ -425,7 +420,7 @@ export default function MyProfileCard({
       bank_name: toSafeText(updatedUser.bank_name) || toSafeText(updatedUser.permissions?.bank_name) || '',
       bank_account: toSafeText(updatedUser.bank_account) || toSafeText(updatedUser.permissions?.bank_account) || '',
     });
-    localStorage.setItem('erp_user', JSON.stringify(updatedUser));
+    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser));
     broadcastProfileUpdate(updatedUser);
 
     await logAudit(
@@ -574,7 +569,7 @@ export default function MyProfileCard({
       if (!getStaffLikeId(currentUser) && ((_iu)?.name || (_iu)?.employee_no || (_iu)?.auth_user_id)) {
         await recoverUserIdentity(_iu);
         try {
-          const stored = localStorage.getItem('erp_user');
+          const stored = localStorage.getItem(STORAGE_KEYS.USER);
           if (stored) currentUser = JSON.parse(stored);
         } catch (_) { }
       }
@@ -664,7 +659,6 @@ export default function MyProfileCard({
                 {actionButtons}
               </div>
             </div>
-            {/* <p className="text-[11px] text-[var(--toss-gray-3)] mt-2">시스템 상태: {debugMsg || '정상'}</p> */}
           </div>
         </div>
       ) : (

@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { STORAGE_KEYS } from './storage-keys';
 
 export type AuditAction = string;
 
@@ -113,7 +114,7 @@ export function readClientAuditActor() {
   }
 
   try {
-    const raw = window.localStorage.getItem('erp_user');
+    const raw = window.localStorage.getItem(STORAGE_KEYS.USER);
     const parsed = raw ? JSON.parse(raw) : null;
     return {
       userId: parsed?.id,

@@ -64,10 +64,11 @@ import ReportApprovalForm from './전자결재서브/ReportApprovalForm';
 
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { APPROVAL_VIEW_KEY } from '@/app/main/navigation-state';
+import { STORAGE_KEYS } from '@/lib/storage-keys';
 
-const DRAFT_STORAGE_KEY = 'erp_draft_approval';
-const LOCAL_APPROVAL_FORM_TYPES_KEY = 'erp_approval_form_types_custom';
-const LOCAL_FORM_TEMPLATE_DESIGNS_KEY = 'erp_form_template_designs';
+const DRAFT_STORAGE_KEY = STORAGE_KEYS.DRAFT_APPROVAL;
+const LOCAL_APPROVAL_FORM_TYPES_KEY = STORAGE_KEYS.APPROVAL_FORM_TYPES_CUSTOM;
+const LOCAL_FORM_TEMPLATE_DESIGNS_KEY = STORAGE_KEYS.FORM_TEMPLATE_DESIGNS;
 const APPROVAL_OPTIONAL_INSERT_COLUMNS = ['company_id', 'approver_line', 'doc_number'];
 const APPROVAL_REFERENCE_DEFAULTS_KEY = 'approval_reference_defaults';
 const APPROVAL_REFERENCE_ALL_KEY = 'all';
@@ -715,7 +716,7 @@ const handleAttachmentDownloadClick = useCallback(async (
     (nextTemplates: ApproverTemplate[]) => {
       if (typeof window === 'undefined' || !user?.id) return;
       window.localStorage.setItem(
-        `erp_approveline_templates_${user.id}`,
+        STORAGE_KEYS.approvelineTemplates(user.id),
         JSON.stringify(nextTemplates)
       );
     },
@@ -2157,9 +2158,9 @@ window.onload = () => window.print();
   useEffect(() => {
     if (typeof window !== 'undefined' && user?.id) {
       try {
-        const saved = window.localStorage.getItem(`erp_fav_approveline_${user.id}`);
+        const saved = window.localStorage.getItem(STORAGE_KEYS.approvelineFav(user.id));
         if (saved) setSavedApproverLine(JSON.parse(saved));
-        const savedTpls = window.localStorage.getItem(`erp_approveline_templates_${user.id}`);
+        const savedTpls = window.localStorage.getItem(STORAGE_KEYS.approvelineTemplates(user.id));
         if (savedTpls) {
           setApproverTemplates(normalizeApproverTemplates(JSON.parse(savedTpls), approvalDirectoryStaffs));
         }

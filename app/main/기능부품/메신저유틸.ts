@@ -1,0 +1,395 @@
+import { stripHiddenMessageMetaBlocks } from './메신저첨부';
+import type { ChatRoom, StaffMember } from '@/types';
+import { STORAGE_KEYS } from '@/lib/storage-keys';
+import { NOTICE_ROOM_ID } from '@/lib/constants';
+export { NOTICE_ROOM_ID };
+export const NOTICE_ROOM_NAME = '공지메시지';
+export const SELF_ROOM_NAME = '나와의 채팅';
+export const CAN_WRITE_NOTICE_POSITIONS = ['대표', '부장', '팀장', '실장', '병원장', '이사', '본부장', '총무부장', '진료부장', '간호부장'];
+export const MOBILE_CHAT_MEDIA_QUERY = '(max-width: 767px), (hover: none) and (pointer: coarse)';
+export const WARD_QUICK_REPLY_OPTIONS = [
+  { id: 'confirm', label: '확인 후 올리겠습니다', text: '확인했습니다. 환자 확인 후 올리겠습니다.' },
+  { id: 'delay', label: '준비중으로 지연', text: '현재 환자 준비 중으로 조금 지연되고 있습니다.' },
+  { id: 'moving', label: '이동 시작했습니다', text: '환자 이동 시작했습니다. 곧 올리겠습니다.' },
+  { id: 'after-care', label: '처치 후 올리겠습니다', text: '처치 마무리 후 바로 올리겠습니다.' },
+] as const;
+const WARD_MESSAGE_META_PREFIX = '[[WARD_MESSAGE_META]]';
+const WARD_MESSAGE_META_SUFFIX = '[[/WARD_MESSAGE_META]]';
+export const MESSAGE_READ_WRITES_ENABLED = false;
+
+export type WardMessageMeta = {
+  type?: string;
+  patient_name?: string;
+  chart_no?: string;
+  surgery_name?: string;
+  schedule_room?: string;
+  schedule_time?: string;
+};
+
+export type RoomPreference = {
+  pinned?: boolean;
+  hidden?: boolean;
+};
+
+export type MessageRetryPayload = {
+  roomId: string;
+  content: string;
+  fileUrl: string | null;
+  fileName: string | null;
+  fileSizeBytes: number | null;
+  fileKind: 'image' | 'video' | 'file' | null;
+  replyToId: string | null;
+  albumId?: string | null;
+  albumIndex?: number | null;
+  albumTotal?: number | null;
+};
+
+export type ChatMessageInsertPayload = {
+  room_id: string;
+  sender_id: string | null;
+  content: string;
+  file_url: string | null;
+  file_name: string | null;
+  file_size_bytes: number | null;
+  file_kind: 'image' | 'video' | 'file' | null;
+  reply_to_id: string | null;
+  album_id: string | null;
+  album_index: number | null;
+  album_total: number | null;
+};
+
+export function isMobileChatViewport() {
+  return typeof window !== 'undefined' && window.matchMedia(MOBILE_CHAT_MEDIA_QUERY).matches;
+}
+
+export function compareStaffMembers(a: StaffMember, b: StaffMember) {
+  return (a.department || '').localeCompare(b.department || '') || (a.name || '').localeCompare(b.name || '');
+}
+
+export function extractWardMessageMeta(value: unknown): {
+  displayContent: string;
+  meta: WardMessageMeta | null;
+} {
+  const raw = String(value || '');
+  const start = raw.indexOf(WARD_MESSAGE_META_PREFIX);
+  const end = raw.indexOf(WARD_MESSAGE_META_SUFFIX);
+
+  if (start < 0 || end < 0 || end <= start) {
+    return {
+      displayContent: stripHiddenMessageMetaBlocks(raw),
+      meta: null,
+    };
+  }
+
+  const displayContent = stripHiddenMessageMetaBlocks(
+    `${raw.slice(0, start)}${raw.slice(end + WARD_MESSAGE_META_SUFFIX.length)}`,
+  );
+  const metaText = raw.slice(start + WARD_MESSAGE_META_PREFIX.length, end).trim();
+
+  try {
+    return {
+      displayContent,
+      meta: JSON.parse(metaText) as WardMessageMeta,
+    };
+  } catch {
+    return {
+      displayContent,
+      meta: null,
+    };
+  }
+}
+
+export function sortChatRoomsWithNoticeFirst(rooms: ChatRoom[]): ChatRoom[] {
+  const notice = rooms.find((room: ChatRoom) => room.id === NOTICE_ROOM_ID);
+  const others = rooms.filter((room: ChatRoom) => room.id !== NOTICE_ROOM_ID).sort((a: ChatRoom, b: ChatRoom) => {
+    const at = new Date(a.last_message_at || a.created_at || 0).getTime();
+    const bt = new Date(b.last_message_at || b.created_at || 0).getTime();
+    return bt - at;
+  });
+  return notice ? [notice, ...others] : others;
+}
+
+export function normalizeMemberIds(members: unknown): string[] {
+  return Array.isArray(members) ? members.map((id: unknown) => String(id)) : [];
+}
+
+export function isSelfChatRoom(room: ChatRoom | null | undefined, currentUserId: string | null | undefined): boolean {
+  if (room?.type !== 'direct') return false;
+  const normalizedCurrentUserId = String(currentUserId || '').trim();
+  if (!normalizedCurrentUserId) return false;
+  const members = normalizeMemberIds(room?.members);
+  return members.length === 1 && members[0] === normalizedCurrentUserId;
+}
+
+export function isActiveChatMember(staff: StaffMember | null | undefined): boolean {
+  if (!staff?.id) return false;
+
+  const status = String(staff.status || '').trim();
+  const dynamicStaff = staff as Record<string, unknown>;
+  const resignedAt = typeof dynamicStaff.resigned_at === 'string' ? dynamicStaff.resigned_at.trim() : '';
+  const resignDate = typeof dynamicStaff.resign_date === 'string' ? dynamicStaff.resign_date.trim() : '';
+  const isActiveFlag = dynamicStaff.is_active;
+
+  if (isActiveFlag === false) return false;
+  if (status === '퇴사' || status === '퇴직') return false;
+  if (resignedAt) return false;
+  if (resignDate) return false;
+  return true;
+}
+
+export function isMessageReadByCursor(messageCreatedAt: string | null | undefined, lastReadAt: string | null | undefined): boolean {
+  if (!messageCreatedAt || !lastReadAt) return false;
+  const messageTime = new Date(messageCreatedAt).getTime();
+  const cursorTime = new Date(lastReadAt).getTime();
+  if (!Number.isFinite(messageTime) || !Number.isFinite(cursorTime)) return false;
+  return cursorTime >= messageTime;
+}
+
+export function getLatestReadCursor(
+  currentValue: string | null | undefined,
+  nextValue: string | null | undefined
+): string | null {
+  if (!nextValue) return currentValue || null;
+  if (!currentValue) return nextValue;
+
+  const currentTime = new Date(currentValue).getTime();
+  const nextTime = new Date(nextValue).getTime();
+  if (!Number.isFinite(currentTime)) return Number.isFinite(nextTime) ? nextValue : currentValue;
+  if (!Number.isFinite(nextTime)) return currentValue;
+  return nextTime >= currentTime ? nextValue : currentValue;
+}
+
+export function isActiveNoticeMember(staff: StaffMember | null | undefined): boolean {
+  if (!staff?.id) return false;
+
+  const status = String(staff.status || '').trim();
+  const dynamicStaff = staff as Record<string, unknown>;
+  const resignedAt = typeof dynamicStaff.resigned_at === 'string' ? dynamicStaff.resigned_at.trim() : '';
+  const resignDate = typeof dynamicStaff.resign_date === 'string' ? dynamicStaff.resign_date.trim() : '';
+  const isActiveFlag = dynamicStaff.is_active;
+
+  if (isActiveFlag === false) return false;
+  if (status === '퇴사') return false;
+  if (resignedAt) return false;
+  if (resignDate) return false;
+  return true;
+}
+
+export function isRecentPresenceTimestamp(value: string | null | undefined, freshnessMs = 5 * 60 * 1000): boolean {
+  if (!value) return false;
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return false;
+  return Date.now() - timestamp <= freshnessMs;
+}
+
+export function haveSameMembers(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+
+  const sortedLeft = [...left].sort();
+  const sortedRight = [...right].sort();
+  return sortedLeft.every((value, index) => value === sortedRight[index]);
+}
+
+export function getDirectRoomMembersKey(room: ChatRoom | null | undefined): string | null {
+  if (room?.type !== 'direct') return null;
+  const members = normalizeMemberIds(room?.members);
+  if (members.length === 0 || members.length > 2) return null;
+  return [...members].sort().join('::');
+}
+
+export function getConversationRoomIdsByRoomId(
+  roomId: string | null | undefined,
+  rooms: ChatRoom[]
+): string[] {
+  const targetRoomId = String(roomId || '').trim();
+  if (!targetRoomId) return [];
+
+  const targetRoom = rooms.find((room: ChatRoom) => String(room.id) === targetRoomId) || null;
+  const directRoomKey = getDirectRoomMembersKey(targetRoom);
+  if (!directRoomKey) return [targetRoomId];
+
+  const relatedRoomIds = rooms
+    .filter((room: ChatRoom) => getDirectRoomMembersKey(room) === directRoomKey)
+    .map((room: ChatRoom) => String(room.id))
+    .filter(Boolean);
+
+  return relatedRoomIds.length > 0 ? Array.from(new Set(relatedRoomIds)) : [targetRoomId];
+}
+
+export function getConversationUnreadCountForRoom(
+  room: ChatRoom | null | undefined,
+  unreadCounts: Record<string, number>,
+  rooms: ChatRoom[]
+): number {
+  const roomId = String(room?.id || '').trim();
+  if (!roomId) return 0;
+
+  const directRoomKey = getDirectRoomMembersKey(room);
+  if (!directRoomKey) {
+    return unreadCounts[roomId] || 0;
+  }
+
+  return rooms
+    .filter((candidate: ChatRoom) => getDirectRoomMembersKey(candidate) === directRoomKey)
+    .reduce((sum, candidate: ChatRoom) => sum + (unreadCounts[String(candidate.id)] || 0), 0);
+}
+
+export function getConversationRoomIdSet(
+  roomId: string | null | undefined,
+  rooms: ChatRoom[]
+): Set<string> {
+  return new Set(getConversationRoomIdsByRoomId(roomId, rooms));
+}
+
+export function buildChatMessageInsertPayload(
+  senderId: string | null | undefined,
+  payload: MessageRetryPayload,
+): ChatMessageInsertPayload {
+  return {
+    room_id: payload.roomId,
+    sender_id: senderId ? String(senderId) : null,
+    content: payload.content,
+    file_url: payload.fileUrl,
+    file_name: payload.fileName,
+    file_size_bytes: payload.fileSizeBytes,
+    file_kind: payload.fileKind,
+    reply_to_id: payload.replyToId,
+    album_id: payload.albumId ?? null,
+    album_index: payload.albumIndex ?? null,
+    album_total: payload.albumTotal ?? null,
+  };
+}
+
+export function shouldTriggerImmediateChatPush(payload: {
+  albumId?: string | null;
+  albumIndex?: number | null;
+  albumTotal?: number | null;
+}) {
+  const albumId = String(payload.albumId || '').trim();
+  const albumTotal = Number(payload.albumTotal ?? 0);
+  const albumIndex = Number(payload.albumIndex ?? Number.NaN);
+
+  if (!albumId || !Number.isFinite(albumTotal) || albumTotal <= 1) {
+    return true;
+  }
+
+  if (!Number.isFinite(albumIndex)) {
+    return true;
+  }
+
+  return albumIndex >= albumTotal - 1;
+}
+
+export function getRoomPrefsStorageKey(userId: string | null | undefined): string {
+  return STORAGE_KEYS.chatRoomPrefs(userId || 'guest');
+}
+
+export function isUuidLike(value: string | null | undefined): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+}
+
+export function getPinnedStorageKey(roomId: string | null | undefined): string {
+  return STORAGE_KEYS.chatPinned(roomId || 'none');
+}
+
+export function getBookmarkStorageKey(userId: string | null | undefined): string {
+  return STORAGE_KEYS.chatBookmarks(userId || 'guest');
+}
+
+export function getPinnedRoomOrderStorageKey(userId: string | null | undefined): string {
+  return STORAGE_KEYS.chatPinnedRoomOrder(userId || 'guest');
+}
+
+export function readStoredStringArray(storageKey: string): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map((value) => String(value)) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function writeStoredStringArray(storageKey: string, values: string[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(values));
+  } catch {
+    // ignore storage failures
+  }
+}
+
+export function writeStoredPinnedIds(roomId: string | null | undefined, messageIds: string[]) {
+  writeStoredStringArray(getPinnedStorageKey(roomId), messageIds.slice(0, 1));
+}
+
+export function readStoredBookmarks(userId: string | null | undefined): string[] {
+  return readStoredStringArray(getBookmarkStorageKey(userId));
+}
+
+export function writeStoredBookmarks(userId: string | null | undefined, messageIds: string[]) {
+  writeStoredStringArray(getBookmarkStorageKey(userId), messageIds);
+}
+
+export function arraysMatch(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}
+
+export function getKoreanTodayString() {
+  const now = new Date();
+  const koreaNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return koreaNow.toISOString().split('T')[0];
+}
+
+export function getRoomDisplayName(room: ChatRoom | null | undefined, staffs: StaffMember[], currentUserId: string | null | undefined): string {
+  if (!room) return '채팅방';
+  if (room.id === NOTICE_ROOM_ID) return NOTICE_ROOM_NAME;
+  if (isSelfChatRoom(room, currentUserId)) return SELF_ROOM_NAME;
+
+  const members = normalizeMemberIds(room.members);
+  if (room.type === 'direct' && members.length <= 2) {
+    const otherStaff = staffs.find(
+      (staff: StaffMember) =>
+        members.includes(String(staff.id)) &&
+        String(staff.id) !== String(currentUserId)
+    );
+    if (otherStaff?.name) return otherStaff.name;
+  }
+  return room.name || '채팅방';
+}
+
+export function getRoomPreviewText(room: ChatRoom): string {
+  return (room?.last_message_preview as string | null | undefined) || (room?.last_message as string | null | undefined) || '대화가 없습니다.';
+}
+
+export function sortRoomsForSidebar(
+  rooms: ChatRoom[],
+  prefs: Record<string, RoomPreference>,
+  pinnedRoomOrder: string[]
+): ChatRoom[] {
+  const notice = rooms.find((room: ChatRoom) => room.id === NOTICE_ROOM_ID);
+  const rest = rooms
+    .filter((room: ChatRoom) => room.id !== NOTICE_ROOM_ID)
+    .sort((a: ChatRoom, b: ChatRoom) => {
+      const at = new Date(a.last_message_at || a.created_at || 0).getTime();
+      const bt = new Date(b.last_message_at || b.created_at || 0).getTime();
+      return bt - at;
+    });
+  const pinnedOrderIndex = new Map(
+    pinnedRoomOrder.map((roomId, index) => [String(roomId), index])
+  );
+  const pinned = rest
+    .filter((room: ChatRoom) => prefs[room.id]?.pinned)
+    .sort((a: ChatRoom, b: ChatRoom) => {
+      const aIndex = pinnedOrderIndex.get(String(a.id)) ?? Number.MAX_SAFE_INTEGER;
+      const bIndex = pinnedOrderIndex.get(String(b.id)) ?? Number.MAX_SAFE_INTEGER;
+      if (aIndex !== bIndex) return aIndex - bIndex;
+      const at = new Date(a.last_message_at || a.created_at || 0).getTime();
+      const bt = new Date(b.last_message_at || b.created_at || 0).getTime();
+      return bt - at;
+    });
+  const regular = rest.filter((room: ChatRoom) => !prefs[room.id]?.pinned);
+  return notice ? [notice, ...pinned, ...regular] : [...pinned, ...regular];
+}

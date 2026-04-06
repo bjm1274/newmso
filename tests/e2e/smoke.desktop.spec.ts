@@ -485,7 +485,7 @@ test("chat retries a failed message send from the bubble", async ({ page }) => {
       },
       {
         id: "room-1",
-        name: "테스트 채팅방",
+        name: "retry room",
         type: "group",
         members: [fakeUser.id],
         created_at: "2026-03-08T09:00:00.000Z",
@@ -496,18 +496,20 @@ test("chat retries a failed message send from the bubble", async ({ page }) => {
     messages: [],
   });
   await seedSession(page, { localStorage: { erp_chat_last_room: "room-1" } });
-  await page.goto("/main?open_menu=채팅");
-  await page.getByTestId("chat-message-input").fill("재전송 메시지");
+  await page.goto("/main");
+  await page.getByTestId("sidebar-menu-chat").click();
+  await expect(page.getByTestId("chat-message-input")).toBeVisible();
+  await page.getByTestId("chat-message-input").fill("retry smoke message");
   await page.getByTestId("chat-send-button").click();
-  await expect(page.getByText("전송 실패")).toBeVisible();
+  await expect(page.getByRole("button", { name: "재전송" })).toBeVisible();
   await page.getByRole("button", { name: "재전송" }).click();
   await expect(
     page
       .locator("span.break-words.whitespace-pre-wrap")
-      .filter({ hasText: "재전송 메시지" }),
+      .filter({ hasText: "retry smoke message" }),
   ).toBeVisible();
   await expect(page.getByText("전송 실패")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "재전송" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "재전송" })).toBeHidden();
 });
 test("board view opens from the main menu routing state", async ({ page }) => {
   await mockSupabase(page, {
@@ -1626,10 +1628,10 @@ test("approval inbox can approve a pending document and refresh its status", asy
       {
         id: "approval-pending-1",
         type: "일반기안",
-        title: "승인 대기 문서",
-        content: "승인 테스트용 문서입니다.",
+        title: "approval smoke document",
+        content: "approval smoke body",
         sender_id: "sender-user-id",
-        sender_name: "기안자",
+        sender_name: "drafter",
         sender_company: fakeUser.company,
         company_id: fakeUser.company_id,
         current_approver_id: fakeUser.id,
@@ -1649,10 +1651,11 @@ test("approval inbox can approve a pending document and refresh its status", asy
   await page.goto("/main");
   await page.getByTestId("sidebar-menu-approval").click();
   await expect(page.getByTestId("approval-view")).toBeVisible();
-  await page.getByRole("button", { name: "결재함" }).click();
+  await page.locator('aside').nth(1).getByRole('button').nth(1).click();
 
   const approvalCard = page.getByTestId("approval-card-approval-pending-1");
   await expect(approvalCard).toBeVisible();
+  await expect(approvalCard.locator("button")).toHaveCount(2);
 
   const approveRequest = page.waitForRequest(
     (request) =>
@@ -1660,13 +1663,13 @@ test("approval inbox can approve a pending document and refresh its status", asy
       request.method() === "POST",
   );
 
-  await approvalCard.locator("button").nth(1).click();
+  await approvalCard.locator("button").first().click();
   const confirmDialog = page.getByRole("dialog");
   await expect(confirmDialog).toBeVisible();
   await confirmDialog.locator("button").last().click();
 
   await approveRequest;
-  await expect(approvalCard.locator("button")).toHaveCount(1);
+  await expect(approvalCard.locator("button")).toHaveCount(0);
 });
 
 test("payroll tax file utility triggers a browser download", async ({

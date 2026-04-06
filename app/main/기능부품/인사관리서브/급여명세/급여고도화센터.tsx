@@ -1,6 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
+import { STORAGE_KEYS } from '@/lib/storage-keys';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -249,7 +250,7 @@ function downloadCsv(fileName: string, rows: Array<Record<string, string | numbe
 function readStoredUser(): StaffMember | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = window.localStorage.getItem('erp_user');
+    const raw = window.localStorage.getItem(STORAGE_KEYS.USER);
     return raw ? (JSON.parse(raw) as StaffMember) : null;
   } catch {
     return null;

@@ -24,7 +24,7 @@ export function getMonthlyWorkingHours(weeklyHours: NumericInput) {
 export function calculateHourlyRateFromMonthlySalary(
   monthlySalary: NumericInput,
   weeklyHours: NumericInput,
-  rounding: HourlyRateRounding = 'round',
+  rounding: HourlyRateRounding = 'ceil',
 ) {
   const monthlyWorkingHours = getMonthlyWorkingHours(weeklyHours);
   const normalizedMonthlySalary = Math.max(0, toNumber(monthlySalary));

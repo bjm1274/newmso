@@ -1,4 +1,6 @@
 import { supabase } from './supabase';
+import { asTrimmedString, asNumber } from './data-normalizer';
+import { normalizeDateString, formatWon } from './date-formatter';
 
 export type HrLedgerEventType =
   | 'appointment'
@@ -36,27 +38,12 @@ async function safeQuery<T>(
   }
 }
 
-function normalizeDate(value: string | null | undefined) {
-  return typeof value === 'string' ? value : '';
-}
+const normalizeDate = normalizeDateString;
 
 function sortDescByDate<T extends { occurredAt: string }>(items: T[]) {
   return [...items].sort(
     (a, b) => new Date(b.occurredAt || 0).getTime() - new Date(a.occurredAt || 0).getTime(),
   );
-}
-
-function asTrimmedString(value: unknown) {
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function asNumber(value: unknown) {
-  const normalized = typeof value === 'string' ? Number(value.replace(/,/g, '')) : Number(value);
-  return Number.isFinite(normalized) ? normalized : null;
-}
-
-function formatWon(value: number) {
-  return `${value.toLocaleString()}원`;
 }
 
 function formatAppointmentDescription(record: Record<string, unknown>) {

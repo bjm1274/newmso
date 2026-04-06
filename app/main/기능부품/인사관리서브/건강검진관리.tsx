@@ -3,6 +3,7 @@ import { toast } from '@/lib/toast';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
+import { getScopedActiveStaffs } from '@/lib/active-staff';
 
 const CHECKUP_TYPES = ['일반검진', '특수검진', '채용검진', '배치전검진'] as const;
 
@@ -18,7 +19,7 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
         if (data) setRecords(data);
     };
 
-    const filtered = _staffs.filter((s: any) => (selectedCo === '전체' || s.company === selectedCo) && s.status !== '퇴사');
+    const filtered = getScopedActiveStaffs(_staffs, String(selectedCo ?? '전체'));
     const filteredRecords = records.filter((r: any) => selectedCo === '전체' || r.company === selectedCo);
 
     const checkupDue = useMemo(() => filtered.filter((s: any) => {

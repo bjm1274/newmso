@@ -1,12 +1,13 @@
 'use client';
 import { useState } from 'react';
 import { calculateSeverancePay, formatWorkPeriod } from '@/lib/severance-pay';
+import { isActiveStaff } from '@/lib/active-staff';
 
 export default function SeveranceLeaveDashboard({ staffs = [] }: Record<string, unknown>) {
   const staffsArr = staffs as any[];
   const [filterCo, setFilterCo] = useState('전체');
   const filtered = filterCo === '전체' ? staffsArr : staffsArr.filter((s: any) => s.company === filterCo);
-  const active = filtered.filter((s: any) => (s.status || '재직') !== '퇴사');
+  const active = filtered.filter((s: any) => isActiveStaff(s));
 
   const items = active.map((s: any) => {
     const joined = s.joined_at || s.join_date;

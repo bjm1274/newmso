@@ -3,6 +3,7 @@ import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
 import type { StaffMember } from '@/types';
+import { isActiveStaff } from '@/lib/active-staff';
 import {
   buildDefaultPatternProfile,
   findPatternStaffGroup,
@@ -2534,7 +2535,7 @@ export default function AutoRosterPlanner({
   const canManageRosterPolicies = adminMode;
   const canManageRosterAssignments = adminMode || canAccess;
   const ownDepartment = getDepartmentName(user);
-  const activeStaffs = useMemo(() => staffs.filter((staff) => staff?.status !== '퇴사'), [staffs]);
+  const activeStaffs = useMemo(() => staffs.filter((staff) => isActiveStaff(staff)), [staffs]);
   const companyOptions = useMemo(
     () => Array.from(new Set(activeStaffs.map((staff) => staff.company).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ko')),
     [activeStaffs]

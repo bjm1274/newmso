@@ -1,4 +1,4 @@
-export const LEAVE_NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
+export { NOTICE_ROOM_ID as LEAVE_NOTICE_ROOM_ID } from './constants';
 export const LEAVE_NOTICE_TIMEZONE = 'Asia/Seoul';
 
 const KOREAN_WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const;

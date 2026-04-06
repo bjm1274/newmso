@@ -14,51 +14,18 @@ import { CHAT_FOCUS_KEY, CHAT_ROOM_KEY } from '@/app/main/navigation-state';
 import SmartDatePicker from './공통/SmartDatePicker';
 import GuideLibrary from './게시판서브/업무가이드';
 import type { StaffMember, BoardPost, ScheduleItem, AttachmentItem } from '@/types';
-const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
-// 공지사항·경조사 게시글 등록 시 공지 채팅방 자동 전송 대상 게시판
-const BOARD_AUTO_CHAT_TYPES = new Set(['공지사항', '경조사']);
-
-const BOARD_IDS = ['공지사항', '자유게시판', '익명소리함', '경조사', '수술일정', 'MRI일정', '직원제안함', '업무가이드'];
-const BOARD_POST_OPTIONAL_COLUMNS = [
-  // 초기 스키마에 없거나 나중에 추가된 컬럼 (없어도 쿼리 정상 동작)
-  'board_id',         // 일부 환경에 없을 수 있음 (사용하지 않는 레거시 컬럼)
-  'updated_at',       // 일부 환경에 없을 수 있음
-  'company_id',
-  'tags',
-  'attachments',
-  'likes_count',
-  'is_pinned',
-  'status',
-  'scheduled_publish_at',
-  'schedule_date',
-  'schedule_time',
-  'schedule_room',
-  'patient_name',
-  'surgery_fasting',
-  'surgery_inpatient',
-  'surgery_guardian',
-  'surgery_caregiver',
-  'surgery_transfusion',
-  'mri_contrast_required',
-];
-const BOARD_POST_REQUIRED_SELECT_COLUMNS = [
-  'id',
-  'board_type',
-  'title',
-  'content',
-  'author_id',
-  'author_name',
-  'company',
-  'created_at',
-  'views',
-  'is_anonymous',
-  'poll',
-  'poll_votes',
-] as const;
-const BOARD_TEMPLATE_REQUIRED_SELECT_COLUMNS = ['id', 'name'] as const;
-const BOARD_TEMPLATE_OPTIONAL_COLUMNS = ['sort_order', 'body_part'] as const;
-const BOARD_COMMENT_SELECT = 'id, post_id, author_id, author_name, content, parent_comment_id, created_at';
-const BOARD_CHAT_ROOM_SELECT = 'id';
+import { BOARD_MENU_ITEMS, BOARD_META_MAP } from './게시판메뉴';
+import {
+  NOTICE_ROOM_ID,
+  BOARD_AUTO_CHAT_TYPES,
+  BOARD_IDS,
+  BOARD_POST_OPTIONAL_COLUMNS,
+  BOARD_POST_REQUIRED_SELECT_COLUMNS,
+  BOARD_TEMPLATE_REQUIRED_SELECT_COLUMNS,
+  BOARD_TEMPLATE_OPTIONAL_COLUMNS,
+  BOARD_COMMENT_SELECT,
+  BOARD_CHAT_ROOM_SELECT,
+} from './게시판공통';
 const SCHEDULE_META_PREFIX = '[[SCHEDULE_META]]';
 const SCHEDULE_META_SUFFIX = '[[/SCHEDULE_META]]';
 const ATTACHMENTS_META_PREFIX = '[[ATTACHMENTS_META]]';
@@ -457,7 +424,6 @@ interface BoardViewProps {
   onConsumePostId?: () => void;
   surgeries?: ScheduleItem[];
   mris?: ScheduleItem[];
-  onRefresh?: () => void;
   setMainMenu?: (menu: string) => void;
 }
 type BoardCommentRow = {
@@ -468,7 +434,7 @@ type BoardCommentRow = {
   parent_comment_id?: string | null;
   [key: string]: unknown;
 };
-export default function BoardView({ user, subView, setSubView, selectedCo, selectedCompanyId, initialBoard, initialPostId, onConsumePostId, surgeries, mris, onRefresh, setMainMenu }: BoardViewProps) {
+export default function BoardView({ user, subView, setSubView, selectedCo, selectedCompanyId, initialBoard, initialPostId, onConsumePostId, surgeries, mris, setMainMenu }: BoardViewProps) {
   const defaultBoard =
     BOARD_IDS.find((boardId) => canAccessBoard(user, boardId, 'read')) || '공지사항';
   const [activeBoard, setActiveBoard] = useState(
@@ -614,32 +580,12 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
   // 근무형태별 오늘 근무 현황 및 교대근무 부분 삭제 처리됨
 
-  const boards = [
-    { id: '공지사항', label: '📢 공지사항', icon: '📢' },
-    { id: '자유게시판', label: '💬 자유게시판', icon: '💬' },
-    { id: '익명소리함', label: '💌 익명 소리함', icon: '💌' },
-    { id: '경조사', label: '🎉 경조사', icon: '🎉' },
-    { id: '수술일정', label: '🏥 수술일정표', icon: '🏥' },
-    { id: 'MRI일정', label: '🔬 MRI일정표', icon: '🔬' },
-    { id: '직원제안함', label: '💡 직원 제안함', icon: '💡' },
-    { id: '업무가이드', label: '📚 업무공유', icon: '📚' }
-  ];
   const visibleBoards = useMemo(
-    () => boards.filter((board) => canAccessBoard(user, board.id, 'read')),
+    () => BOARD_MENU_ITEMS.filter((board) => canAccessBoard(user, board.id, 'read')),
     [user]
   );
 
-  const boardMetaMap: Record<string, { title: string; description: string }> = {
-    공지사항: { title: '공지사항', description: '' },
-    자유게시판: { title: '자유게시판', description: '' },
-    익명소리함: { title: '익명 소리함', description: '' },
-    경조사: { title: '경조사', description: '' },
-    수술일정: { title: '수술일정', description: '' },
-    MRI일정: { title: 'MRI일정', description: '' },
-    직원제안함: { title: '직원 제안함', description: '' },
-    업무가이드: { title: '업무공유', description: '회사별 / 팀별 메뉴에서 업무자료, 인수인계, 팀 할일을 함께 관리합니다.' },
-  };
-  const currentBoardMeta = boardMetaMap[activeBoard] || {
+  const currentBoardMeta = BOARD_META_MAP[activeBoard] || {
     title: activeBoard || '게시판',
     description: '',
   };

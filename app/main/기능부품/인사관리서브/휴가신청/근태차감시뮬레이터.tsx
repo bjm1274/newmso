@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import SmartMonthPicker from '../../공통/SmartMonthPicker';
 import { calculateAttendanceDeduction, type AttendanceRecord, type DeductionRule } from '@/lib/attendance-deduction';
+import { isActiveStaff } from '@/lib/active-staff';
 
 type StaffLite = {
   id: string;
@@ -83,7 +84,7 @@ export default function AttendanceDeductionSimulator({
     () =>
       staffs.filter((staff) => {
         if (selectedCo !== '전체' && staff.company !== selectedCo) return false;
-        return staff.status !== '퇴사';
+        return isActiveStaff(staff);
       }),
     [selectedCo, staffs]
   );

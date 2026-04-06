@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { isActiveStaff } from '@/lib/active-staff';
 
 type WorkShift = {
   id: string;
@@ -419,7 +420,7 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: Sta
   const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>([]);
 
   const scopedStaffs = (staffs || []).filter((staff: StaffMember) => {
-    if (staff?.status === '퇴사') return false;
+    if (!isActiveStaff(staff ?? {})) return false;
     return selectedCo === '전체' || staff?.company === selectedCo;
   });
   const depts = Array.from(new Set(scopedStaffs.map((staff: StaffMember) => getStaffDepartment(staff)).filter(Boolean))).sort(sortByKorean);

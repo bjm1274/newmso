@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { STORAGE_KEYS } from '@/lib/storage-keys';
 import PayrollExport from './급여대장내보내기';
 import WeeklyHoursMonitor from './주52시간모니터링';
 import SeveranceLeaveDashboard from './예상퇴직금연차대시보드';
@@ -23,7 +24,7 @@ export default function HRDashboardIntegrated({ staffs = [], selectedCo, checked
         <WeeklyHoursMonitor selectedCo={selectedCo} yearMonth={ym} />
         <TurnoverDashboard staffs={staffs} />
         <SeveranceLeaveDashboard staffs={staffs} />
-        <LeaveDashboard staffs={staffs} selectedCo={selectedCo} currentUser={typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem('erp_user') || '{}'); } catch { return null; } })() : null} />
+        <LeaveDashboard staffs={staffs} selectedCo={selectedCo} currentUser={typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USER) || '{}'); } catch { return null; } })() : null} />
         <DeptSalaryDistribution staffs={staffs} selectedCo={selectedCo} />
       </div>
 

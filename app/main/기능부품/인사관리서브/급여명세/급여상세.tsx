@@ -239,7 +239,7 @@ export default function SalaryDetail({ record, staff }: { record?: SalaryRecord;
     Number(data.research_allowance || 0) +
     Number(data.other_taxfree || 0);
   const monthlyHoursForPayslip = getMonthlyWorkingHours(wphForPayslip);
-  const hourlyRate = calculateHourlyRateFromMonthlySalary(fixedMonthlySalary, wphForPayslip, 'floor');
+  const hourlyRate = calculateHourlyRateFromMonthlySalary(fixedMonthlySalary, wphForPayslip, 'ceil');
 
   return (
     <div

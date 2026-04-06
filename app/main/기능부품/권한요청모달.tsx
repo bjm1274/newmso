@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useEffect, useState } from 'react';
 import { initNotificationService } from './알림시스템';
+import { STORAGE_KEYS } from '@/lib/storage-keys';
 
 const STORAGE_KEY = 'erp_permission_prompt_shown';
 
@@ -38,7 +39,7 @@ export default function PermissionPromptModal() {
       const permission = await Notification.requestPermission();
       if (permission === 'granted') {
         try {
-          const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('erp_user') : null;
+          const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.USER) : null;
           const u = raw ? JSON.parse(raw) : null;
           await initNotificationService(u?.id);
         } catch (_) { }

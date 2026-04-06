@@ -1,3 +1,5 @@
+import { asRecord, asNullableString } from './data-normalizer';
+
 type JsonRecord = Record<string, unknown>;
 
 export type ApprovalDelayConfig = {
@@ -62,14 +64,7 @@ const APPROVAL_TYPE_CODES: Record<string, string> = {
   인사명령: 'ORD',
 };
 
-function asMetaData(value: unknown): JsonRecord {
-  return value && typeof value === 'object' ? ({ ...(value as JsonRecord) }) : {};
-}
-
-function asNullableString(value: unknown) {
-  const normalized = String(value ?? '').trim();
-  return normalized ? normalized : null;
-}
+const asMetaData = asRecord;
 
 function normalizeDateStamp(value?: string | Date | null) {
   const date = value instanceof Date ? value : value ? new Date(value) : new Date();

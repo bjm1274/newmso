@@ -8,6 +8,9 @@ import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staf
 import { bindChannelHealthcheck, bindPageRefresh } from '@/lib/realtime-maintenance';
 import { detectPayrollAnomalies } from './관리자전용서브/급여이상치감지';
 import { CHAT_ACTIVE_ROOM_KEY as ACTIVE_CHAT_ROOM_SESSION_KEY } from '@/app/main/navigation-state';
+import { STORAGE_KEYS } from '@/lib/storage-keys';
+import { toNotificationText, getInitials, timeAgo } from '@/lib/notification-utils';
+import { NOTICE_ROOM_ID } from '@/lib/constants';
 
 /**
  * [실시간 알림 엔진 + KakaoTalk 스타일 Toast UI]
@@ -39,7 +42,7 @@ const DEFAULT_SETTINGS: NotifSettings = {
 export function loadNotifSettings(): NotifSettings {
   if (typeof window === 'undefined') return DEFAULT_SETTINGS;
   try {
-    const raw = localStorage.getItem('erp_notif_settings');
+    const raw = localStorage.getItem(STORAGE_KEYS.NOTIF_SETTINGS);
     if (!raw) return DEFAULT_SETTINGS;
     const p = JSON.parse(raw);
     return { ...DEFAULT_SETTINGS, ...p, types: { ...DEFAULT_SETTINGS.types, ...(p.types || {}) } };
@@ -75,30 +78,6 @@ const getTypeCfg = (type: string) => TYPE_CFG[type] || DEFAULT_CFG;
 
 export const PUSH_STATUS_CHANGED_EVENT = 'erp-push-status-changed';
 
-function toNotificationText(value: unknown, fallback = '') {
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
-    return String(value);
-  }
-  return fallback;
-}
-
-function getInitials(name: string) {
-  if (!name) return '?';
-  const t = name.trim();
-  if (/[\uAC00-\uD7A3]/.test(t[0])) return t[0];
-  const parts = t.split(' ');
-  return parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : t.slice(0, 2).toUpperCase();
-}
-
-function timeAgo(ts: number) {
-  const d = (Date.now() - ts) / 1000;
-  if (d < 10) return '방금';
-  if (d < 60) return `${Math.floor(d)}초 전`;
-  if (d < 3600) return `${Math.floor(d / 60)}분 전`;
-  if (d < 86400) return `${Math.floor(d / 3600)}시간 전`;
-  return `${Math.floor(d / 86400)}일 전`;
-}
 
 function isMissingTodoReminderSchema(error: unknown) {
   const code = String((error as { code?: string } | null)?.code || '').trim();
@@ -933,7 +912,7 @@ export default function NotificationSystem({
     if (settings.types[type] === false) return;
 
     const rowMetadata = (row.metadata && typeof row.metadata === 'object') ? row.metadata as Record<string, unknown> : {};
-    const title = toNotificationText(row.title, '?뚮┝');
+    const title = toNotificationText(row.title, '알림');
     const body = toNotificationText(row.body, '');
     const isChatType = type === 'message' || type === 'mention';
     const incomingRoomId = String(rowMetadata.room_id || '').trim();
@@ -1404,7 +1383,7 @@ export default function NotificationSystem({
         ]);
         if (roomRes.error || !roomRes.data) return;
         const members: string[] = Array.isArray(roomRes.data?.members) ? roomRes.data.members.map((id: string) => String(id)) : [];
-        const isNoticeRoom = String(msg.room_id) === '00000000-0000-0000-0000-000000000000' || roomRes.data?.type === 'notice';
+        const isNoticeRoom = String(msg.room_id) === NOTICE_ROOM_ID || roomRes.data?.type === 'notice';
         const canReceive = isNoticeRoom || members.includes(uid);
         if (!canReceive) return;
         const senderName = (senderRes.data as any)?.name || '알 수 없음';
@@ -1448,7 +1427,7 @@ export default function NotificationSystem({
             const content: string = String(p.new?.content || '');
             if (!content) return;
             try {
-              const raw = localStorage.getItem('erp-banned-words');
+              const raw = localStorage.getItem(STORAGE_KEYS.BANNED_WORDS);
               const banned: string[] = raw ? JSON.parse(raw) : [];
               if (!banned.length) return;
               const matched = banned.filter((w) => content.toLowerCase().includes(w.toLowerCase()));

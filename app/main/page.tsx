@@ -27,6 +27,7 @@ import {
 } from './navigation-state';
 
 import Sidebar, { SUB_MENUS } from './기능부품/조직도서브/조직도측면창';
+import { STORAGE_KEYS } from '@/lib/storage-keys';
 import MainContent from './기능부품/조직도서브/조직도본문';
 import NotificationSystem from './기능부품/알림시스템';
 import ChatAlertBanner from './기능부품/채팅알림배너';
@@ -297,8 +298,8 @@ function MainPageContent() {
       // ignore
     }
     try {
-      localStorage.removeItem('erp_user');
-      localStorage.removeItem('erp_login_at');
+      localStorage.removeItem(STORAGE_KEYS.USER);
+      localStorage.removeItem(STORAGE_KEYS.LOGIN_AT);
       persistSupabaseAccessToken(null);
       void supabase.realtime.setAuth(null);
     } catch {
@@ -317,7 +318,7 @@ function MainPageContent() {
     setUser(normalizedUser);
 
     try {
-      localStorage.setItem('erp_user', JSON.stringify(normalizedUser));
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(normalizedUser));
     } catch {
       // ignore
     }
@@ -396,7 +397,7 @@ function MainPageContent() {
         }
 
         try {
-          localStorage.setItem('erp_user', JSON.stringify(sessionUser));
+          localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(sessionUser));
           persistSupabaseAccessToken(payload?.supabaseAccessToken ?? null);
           void supabase.realtime.setAuth(payload?.supabaseAccessToken ?? null);
         } catch {
@@ -548,7 +549,7 @@ function MainPageContent() {
 
         if (config?.value) {
           const minAuthTime = new Date(config.value).getTime();
-          const loginAtStr = localStorage.getItem('erp_login_at');
+          const loginAtStr = localStorage.getItem(STORAGE_KEYS.LOGIN_AT);
           const loginAtMs = loginAtStr ? new Date(loginAtStr).getTime() : 0;
 
           if (loginAtMs < minAuthTime) {

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
 import { isAdminUser, isPrivilegedUser } from '@/lib/access-control';
+import { STORAGE_KEYS } from '@/lib/storage-keys';
 
 type PayrollLockRow = {
   id: string;
@@ -24,7 +25,7 @@ type PayrollLockRow = {
 function readStoredUser() {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = window.localStorage.getItem('erp_user');
+    const raw = window.localStorage.getItem(STORAGE_KEYS.USER);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;

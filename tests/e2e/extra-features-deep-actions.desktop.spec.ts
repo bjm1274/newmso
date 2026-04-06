@@ -190,6 +190,33 @@ test('work status supports real month/day navigation flow', async ({ page }) => 
   expect(runtimeErrors).toEqual([]);
 });
 
+test('work status renders UTC attendance check-in in local Korea time', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const todayKey = getTodayKey();
+  const utcCheckIn = new Date(`${todayKey}T08:17:00+09:00`).toISOString();
+
+  await prepareExtraFeature(
+    page,
+    {
+      staffMembers: [extraFeaturesUser],
+      workShifts: [
+        { id: 'shift-day', name: 'Day', start_time: '07:00:00', end_time: '15:00:00', is_active: true },
+      ],
+      shiftAssignments: [
+        { id: 'assign-utc-1', staff_id: extraFeaturesUser.id, shift_id: 'shift-day', work_date: todayKey },
+      ],
+      attendance: [
+        { id: 'attendance-utc-1', staff_id: extraFeaturesUser.id, date: todayKey, check_in: utcCheckIn },
+      ],
+    },
+    'extra-card-work-status'
+  );
+
+  await expect(page.getByTestId('work-status-view')).toBeVisible();
+  await expect(page.getByText(/출근 08:17/)).toBeVisible();
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('handover template version history is visible and selectable', async ({ page }) => {
   const runtimeErrors = trackRuntimeErrors(page);
 

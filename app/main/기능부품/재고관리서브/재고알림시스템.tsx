@@ -1,116 +1,146 @@
 'use client';
+
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { sendAdminNotifications } from '@/lib/notification-utils';
 
-/**
- * 재고 알림 시스템 (고도화 버전)
- * - 최소 재고 수준 이하로 떨어진 품목 감지
- * - 유효기간 임박 품목 감지 (30일 이내)
- * - 행정팀에 통합 알림 전송
- */
+type InventoryAlertItem = {
+  id?: string | number | null;
+  item_id?: string | number | null;
+  item_name?: string | null;
+  name?: string | null;
+  barcode?: string | null;
+  quantity?: number | null;
+  stock?: number | null;
+  min_quantity?: number | null;
+  min_stock?: number | null;
+  expiry_date?: string | null;
+};
 
-export function useInventoryAlertSystem(inventory: any[], user: any) {
-  const [lowStockItems, setLowStockItems] = useState<any[]>([]);
-  const [expiryImminentItems, setExpiryImminentItems] = useState<any[]>([]);
+function buildInventoryAlertKey(prefix: string, items: InventoryAlertItem[]) {
+  const dateKey = new Date().toISOString().split('T')[0];
+  const itemKeys = items
+    .map((item) =>
+      String(
+        item?.id ??
+          item?.item_id ??
+          item?.item_name ??
+          item?.name ??
+          item?.barcode ??
+          '',
+      ).trim(),
+    )
+    .filter(Boolean)
+    .sort();
+
+  return itemKeys.length > 0 ? `${prefix}:${dateKey}:${itemKeys.join('|')}` : '';
+}
+
+function buildLowStockAlertId(item: InventoryAlertItem) {
+  return `${String(item?.id ?? item?.item_id ?? item?.item_name ?? item?.name ?? '')}_stock`;
+}
+
+function buildExpiryAlertId(item: InventoryAlertItem) {
+  return `${String(item?.id ?? item?.item_id ?? item?.item_name ?? item?.name ?? '')}_exp`;
+}
+
+export function useInventoryAlertSystem(inventory: InventoryAlertItem[], user: unknown) {
+  const [lowStockItems, setLowStockItems] = useState<InventoryAlertItem[]>([]);
+  const [expiryImminentItems, setExpiryImminentItems] = useState<InventoryAlertItem[]>([]);
   const [alertsSent, setAlertsSent] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    checkInventoryAndAlert();
-  }, [inventory]);
+    if (!Array.isArray(inventory) || inventory.length === 0 || !user) {
+      setLowStockItems([]);
+      setExpiryImminentItems([]);
+      return;
+    }
 
-  const checkInventoryAndAlert = async () => {
-    if (!inventory || inventory.length === 0) return;
-
-    // 1. 최소 재고 미달 품목 찾기
-    const lowStock = inventory.filter((item: any) => (item.quantity ?? item.stock ?? 0) <= (item.min_quantity ?? item.min_stock ?? 0));
+    const lowStock = inventory.filter((item) => {
+      const quantity = Number(item?.quantity ?? item?.stock ?? 0);
+      const minQuantity = Number(item?.min_quantity ?? item?.min_stock ?? 0);
+      return quantity <= minQuantity;
+    });
     setLowStockItems(lowStock);
 
-    // 2. 유효기간 임박 품목 찾기 (30일 이내)
     const today = new Date();
     const thirtyDaysLater = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const expiryImminent = inventory.filter((item: any) => {
-      if (!item.expiry_date) return false;
+    const expiryImminent = inventory.filter((item) => {
+      if (!item?.expiry_date) return false;
       const expiry = new Date(item.expiry_date);
-      return expiry > today && expiry <= thirtyDaysLater;
+      return !Number.isNaN(expiry.getTime()) && expiry > today && expiry <= thirtyDaysLater;
     });
     setExpiryImminentItems(expiryImminent);
 
-    // 3. 새로운 알림 대상 품목 필터링
-    const combinedItems = [...lowStock, ...expiryImminent];
-    const newAlertItems = combinedItems.filter((item: any) => !alertsSent.has(item.id + (item.expiry_date ? '_exp' : '_stock')));
+    const lowStockNewItems = lowStock.filter((item) => !alertsSent.has(buildLowStockAlertId(item)));
+    const expiryNewItems = expiryImminent.filter((item) => !alertsSent.has(buildExpiryAlertId(item)));
 
-    if (newAlertItems.length > 0) {
-      await sendInventoryAlerts(lowStock, expiryImminent);
-
-      // 알림 보낸 품목 기록
-      const newAlertsSent = new Set(alertsSent);
-      lowStock.forEach((item: any) => newAlertsSent.add(item.id + '_stock'));
-      expiryImminent.forEach((item: any) => newAlertsSent.add(item.id + '_exp'));
-      setAlertsSent(newAlertsSent);
+    if (lowStockNewItems.length === 0 && expiryNewItems.length === 0) {
+      return;
     }
-  };
 
-  const sendInventoryAlerts = async (lowStock: any[], expiryImminent: any[]) => {
-    try {
-      // 행정팀 사용자 조회 (staff_members 테이블 사용)
-      const { data: adminUsers } = await supabase
-        .from('staff_members')
-        .select('id')
-        .or('department.eq.행정팀,department.eq.총무팀,department.eq.원무팀,department.eq.행정부');
+    const dispatchAlerts = async () => {
+      const alerts = [];
 
-      if (!adminUsers || adminUsers.length === 0) return;
-
-      const notifications: any[] = [];
-
-      // 재고 부족 알림 생성
-      if (lowStock.length > 0) {
-        adminUsers.forEach((adminUser: any) => {
-          notifications.push({
-            user_id: adminUser.id,
-            type: 'inventory_alert',
-            title: '⚠️ 안전재고 미달 알림',
-            body: `${lowStock.length}개 품목의 재고가 부족합니다. 발주 검토가 필요합니다.`,
-            metadata: { items: lowStock.map(i => i.item_name) },
-            read_at: null,
-            created_at: new Date().toISOString()
-          });
+      if (lowStockNewItems.length > 0) {
+        alerts.push({
+          type: 'inventory_alert',
+          title: '재고 부족 알림',
+          body: `${lowStockNewItems.length}개 항목의 재고가 안전수량 이하입니다.`,
+          metadata: {
+            items: lowStockNewItems.map((item) => item.item_name || item.name),
+          },
+          dedupeKey: buildInventoryAlertKey('inventory-low-stock', lowStockNewItems),
+          dedupeWindowHours: 24,
         });
       }
 
-      // 유효기간 임박 알림 생성
-      if (expiryImminent.length > 0) {
-        adminUsers.forEach((adminUser: any) => {
-          notifications.push({
-            user_id: adminUser.id,
-            type: 'expiry_alert',
-            title: '⏰ 유효기간 임박 알림',
-            body: `${expiryImminent.length}개 품목의 유효기간이 30일 이내로 남았습니다.`,
-            metadata: { items: expiryImminent.map(i => i.item_name) },
-            read_at: null,
-            created_at: new Date().toISOString()
-          });
+      if (expiryNewItems.length > 0) {
+        alerts.push({
+          type: 'expiry_alert',
+          title: '유효기간 임박 알림',
+          body: `${expiryNewItems.length}개 항목의 유효기간이 30일 이내입니다.`,
+          metadata: {
+            items: expiryNewItems.map((item) => item.item_name || item.name),
+          },
+          dedupeKey: buildInventoryAlertKey('inventory-expiry', expiryNewItems),
+          dedupeWindowHours: 24,
         });
       }
 
-      if (notifications.length > 0) {
-        await supabase.from('notifications').insert(notifications);
+      try {
+        await sendAdminNotifications(alerts);
+      } catch (error) {
+        console.error('inventory alert dispatch failed', error);
       }
-    } catch (err) {
-      console.error('재고 알림 전송 실패:', err);
-    }
-  };
+
+      setAlertsSent((prev) => {
+        const next = new Set(prev);
+        lowStockNewItems.forEach((item) => next.add(buildLowStockAlertId(item)));
+        expiryNewItems.forEach((item) => next.add(buildExpiryAlertId(item)));
+        return next;
+      });
+    };
+
+    void dispatchAlerts();
+  }, [alertsSent, inventory, user]);
 
   return { lowStockItems, expiryImminentItems, alertsSent };
 }
 
-export function InventoryAlertBadge({ lowCount, expiryCount }: { lowCount: number, expiryCount: number }) {
+export function InventoryAlertBadge({
+  lowCount,
+  expiryCount,
+}: {
+  lowCount: number;
+  expiryCount: number;
+}) {
   if (lowCount === 0 && expiryCount === 0) return null;
 
   return (
-    <div className="fixed top-20 right-8 z-50 space-y-2">
+    <div className="fixed right-8 top-20 z-50 space-y-2">
       {lowCount > 0 && (
-        <div className="bg-red-600 text-white px-4 py-3 rounded-[var(--radius-lg)] shadow-sm flex items-center gap-3 animate-pulse">
-          <div className="w-2 h-2 bg-[var(--card)] rounded-full animate-ping"></div>
+        <div className="flex items-center gap-3 rounded-[var(--radius-lg)] bg-red-600 px-4 py-3 text-white shadow-sm animate-pulse">
+          <div className="h-2 w-2 rounded-full bg-[var(--card)] animate-ping" />
           <div>
             <p className="text-[11px] font-semibold">재고 부족</p>
             <p className="text-[11px] font-bold">{lowCount}건 발생</p>
@@ -118,8 +148,8 @@ export function InventoryAlertBadge({ lowCount, expiryCount }: { lowCount: numbe
         </div>
       )}
       {expiryCount > 0 && (
-        <div className="bg-orange-500/100 text-white px-4 py-3 rounded-[var(--radius-lg)] shadow-sm flex items-center gap-3 animate-pulse">
-          <div className="w-2 h-2 bg-[var(--card)] rounded-full animate-ping"></div>
+        <div className="flex items-center gap-3 rounded-[var(--radius-lg)] bg-orange-500 px-4 py-3 text-white shadow-sm animate-pulse">
+          <div className="h-2 w-2 rounded-full bg-[var(--card)] animate-ping" />
           <div>
             <p className="text-[11px] font-semibold">유효기간 임박</p>
             <p className="text-[11px] font-bold">{expiryCount}건 발생</p>

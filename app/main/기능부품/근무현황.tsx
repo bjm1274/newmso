@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { isActiveStaff } from '@/lib/active-staff';
 
 type WorkShiftRow = {
   id: string;
@@ -104,9 +105,18 @@ function formatMonthLabel(date: Date) {
 
 function formatClockLabel(value?: string | null) {
   if (!value) return null;
-  const raw = String(value);
-  const isoMatch = raw.match(/T(\d{2}:\d{2})/);
-  if (isoMatch) return isoMatch[1];
+  const raw = String(value).trim();
+  const normalizedRaw = raw.includes(' ') && !raw.includes('T') ? raw.replace(' ', 'T') : raw;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(normalizedRaw)) {
+    const parsed = new Date(normalizedRaw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleTimeString('ko-KR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      });
+    }
+  }
   const timeMatch = raw.match(/(\d{2}:\d{2})/);
   if (timeMatch) return timeMatch[1];
   return raw.slice(0, 5);
@@ -345,7 +355,7 @@ export default function WorkStatus({ user }: { user?: any }) {
   const activeStaffsOnly = useMemo(
     () =>
       staffs
-        .filter((staff) => staff.status !== '퇴사')
+        .filter((staff) => isActiveStaff(staff))
         .sort((left, right) =>
           String(left.name || '').localeCompare(String(right.name || ''), 'ko'),
         ),

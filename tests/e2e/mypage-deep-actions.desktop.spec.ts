@@ -450,6 +450,50 @@ test('mypage commute shows an early checkout as 조퇴 and keeps correction requ
   expect(runtimeErrors).toEqual([]);
 });
 
+test('mypage commute fills missing past dates and marks incomplete records as 결근', async ({
+  page,
+}) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await installMutableDateMock(page, '2026-04-06T11:48:26+09:00');
+
+  await mockSupabase(page, {
+    attendance: [
+      {
+        id: 'attendance-incomplete-2026-04-01',
+        staff_id: fakeUser.id,
+        date: '2026-04-01',
+        check_in: null,
+        check_out: '2026-04-01T03:25:00.000Z',
+        status: '정상',
+      },
+    ],
+    attendances: [],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '내정보',
+      erp_mypage_tab: 'commute',
+    },
+  });
+
+  await openMyPage(page);
+  await page.getByRole('button', { name: /출퇴근/ }).click();
+
+  await expect(page.getByTestId('commute-record-view')).toBeVisible();
+  await expect(page.locator('[data-testid^="commute-history-row-"]')).toHaveCount(5);
+  await expect(page.getByTestId('commute-history-row-2026-04-01')).toBeVisible();
+  await expect(page.getByTestId('commute-history-row-2026-04-02')).toBeVisible();
+  await expect(page.getByTestId('commute-history-row-2026-04-03')).toBeVisible();
+  await expect(page.getByTestId('commute-history-row-2026-04-04')).toBeVisible();
+  await expect(page.getByTestId('commute-history-row-2026-04-05')).toBeVisible();
+  await expect(page.getByTestId('commute-history-status-2026-04-01')).toHaveText('결근');
+  await expect(page.getByTestId('commute-history-status-2026-04-02')).toHaveText('결근');
+  await expect(page.getByTestId('commute-history-status-2026-04-05')).toHaveText('결근');
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('mypage documents can upload a file and save it to the repository', async ({ page }) => {
   const runtimeErrors = trackRuntimeErrors(page);
 

@@ -3,6 +3,7 @@ import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { formatPayrollMutationError } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
+import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { calculateSeverancePay, formatWorkPeriod } from '@/lib/severance-pay';
 import { logAudit } from '@/lib/audit';
 import { fetchTaxFreeSettings, DEFAULT_SETTINGS, type TaxFreeSettings } from '@/lib/use-tax-free-settings';
@@ -306,7 +307,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
       const { error: payrollSaveError } = await supabase.from('payroll_records').upsert(record, { onConflict: 'staff_id,year_month' });
       if (payrollSaveError) throw payrollSaveError;
 
-      const u = typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem('erp_user') || '{}'); } catch { return {}; } })() : {};
+      const u = typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USER) || '{}'); } catch { return {}; } })() : {};
       try {
         await logAudit('중간정산확정', 'payroll', yearMonth, { staff: selectedStaff.name, total: calc.total, severance: calc.severance }, u.id, u.name);
       } catch (auditError) {

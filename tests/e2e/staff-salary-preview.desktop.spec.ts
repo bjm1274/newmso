@@ -61,7 +61,25 @@ test("new staff payroll tab shows live total salary and hourly wage", async ({
     "3,300,000원",
   );
   await expect(page.getByTestId("new-staff-hourly-wage")).toHaveText(
-    "15,789원",
+    "15,790원",
+  );
+});
+
+test("new staff affiliation tab accepts decimal weekly hours and reflects them in hourly wage", async ({
+  page,
+}) => {
+  await openNewStaffPayroll(page);
+
+  await page.getByTestId("new-staff-tab-affiliation").click();
+  await page.getByTestId("new-staff-working-hours-per-week").fill("40.5");
+  await expect(page.getByTestId("new-staff-working-hours-per-week")).toHaveValue("40.5");
+
+  await page.getByTestId("new-staff-tab-payroll").click();
+  await page.getByTestId("new-staff-salary-base_salary").fill("3300000");
+
+  await expect(page.getByText("월 소정근로시간 211.6시간 기준")).toBeVisible();
+  await expect(page.getByTestId("new-staff-hourly-wage")).toHaveText(
+    "15,596원",
   );
 });
 

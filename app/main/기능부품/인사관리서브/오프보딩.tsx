@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
+import { isActiveStaff } from '@/lib/active-staff';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import {
   isMissingColumnError,
@@ -118,7 +119,7 @@ export default function OffboardingView({
     const today = new Date().toISOString().slice(0, 10);
     return filteredStaffs.filter((staff) => {
       if (staff.status === '퇴사예정') return true;
-      if (staff.status !== '퇴사') return false;
+      if (isActiveStaff(staff)) return false;
       if (typeof staff.resigned_at !== 'string' || !staff.resigned_at) return false;
       return staff.resigned_at >= today;
     });
@@ -127,7 +128,7 @@ export default function OffboardingView({
   const pastList = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     return filteredStaffs.filter((staff) => {
-      if (staff.status !== '퇴사') return false;
+      if (isActiveStaff(staff)) return false;
       if (!staff.resigned_at) return true;
       return staff.resigned_at < today;
     });

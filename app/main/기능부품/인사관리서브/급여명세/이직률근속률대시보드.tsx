@@ -1,10 +1,11 @@
 'use client';
 import { useState } from 'react';
+import { isActiveStaff } from '@/lib/active-staff';
 
 export default function TurnoverDashboard({ staffs = [] }: Record<string, unknown>) {
   const _staffs = (staffs as Record<string, unknown>[]) ?? [];
   const total = _staffs.length;
-  const resigned = _staffs.filter((s: any) => (s.status || '').toLowerCase() === '퇴사').length;
+  const resigned = _staffs.filter((s: any) => !isActiveStaff(s)).length;
   const active = total - resigned;
   const turnover = total ? ((resigned / total) * 100).toFixed(1) : '0';
 
@@ -13,7 +14,7 @@ export default function TurnoverDashboard({ staffs = [] }: Record<string, unknow
   const [now] = useState(() => Date.now());
 
   const workDaysList = _staffs
-    .filter((s: any) => (s.status || '재직') !== '퇴사')
+    .filter((s: any) => isActiveStaff(s))
     .map((s: any) => {
       const j = s.joined_at || s.join_date;
       if (!j) return 0;

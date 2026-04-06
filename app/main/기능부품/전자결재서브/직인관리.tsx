@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { STORAGE_KEYS } from '@/lib/storage-keys';
 
 interface Props {
   user: any;
@@ -19,7 +20,7 @@ interface Seal {
 
 const SEAL_TYPES = ['법인인감', '대표인', '부서인'];
 
-const LOCAL_SEALS_KEY = 'erp_company_seals_local';
+const LOCAL_SEALS_KEY = STORAGE_KEYS.COMPANY_SEALS;
 const SEAL_BUCKET_CANDIDATES = ['seals', 'company-seals'];
 
 function isMissingTableError(error: any, tableName = 'company_seals') {

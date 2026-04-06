@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { ZERO_UUID } from '@/lib/constants';
 
 type OrgNode = {
   id: string;
@@ -156,7 +157,7 @@ export default function OrgChartEditor({
     if (!confirm(`직원 ${sourceStaffs.length}명으로 조직도를 자동 구성하시겠습니까?\n기존 조직도가 초기화됩니다.`)) return;
     setSaving(true);
     try {
-      await supabase.from('org_chart_nodes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('org_chart_nodes').delete().neq('id', ZERO_UUID);
       const depts = Array.from(new Set(sourceStaffs.map(s => s.department).filter(Boolean)));
       const colorMap: Record<string, string> = {};
       depts.forEach((d, i) => colorMap[d] = NODE_COLORS[i % NODE_COLORS.length]);
