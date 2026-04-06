@@ -17,6 +17,7 @@ interface PayrollRecord {
   total_deduction?: number;
   net_pay?: number;
   advance_pay?: number;
+  status?: string;
 }
 
 interface PayrollTableProps {
@@ -49,6 +50,15 @@ export default function PayrollTable({ staffs = [], payrollRecords = [], yearMon
 
   const getRecord = (staffId: string | number) =>
     payrollRecords.find((r) => String(r.staff_id) === String(staffId));
+
+  const getSlipLabel = (record?: PayrollRecord) => {
+    if (!record) return '정산중';
+    const status = String(record.status || '').trim();
+    if (status === '임시저장') return '임시저장';
+    if ((record.advance_pay ?? 0) > 0) return '선지급';
+    if (status === '확정') return '확정';
+    return '저장됨';
+  };
 
   const sumTaxfree = staffs.reduce((s, st) => s + (getRecord(st.id)?.total_taxfree ?? 0), 0);
   const sumTaxable = staffs.reduce((s, st) => s + (getRecord(st.id)?.total_taxable ?? 0), 0);
@@ -104,7 +114,7 @@ export default function PayrollTable({ staffs = [], payrollRecords = [], yearMon
                 const rec = getRecord(s.id);
                 const net = rec?.net_pay ?? 0;
                 const isAdvance = (rec?.advance_pay ?? 0) > 0;
-                const slipLabel = !rec ? '정산중' : isAdvance ? '선지급' : '확정';
+                const slipLabel = getSlipLabel(rec);
                 return (
                   <tr
                     key={s.id}
@@ -127,7 +137,7 @@ export default function PayrollTable({ staffs = [], payrollRecords = [], yearMon
                     </td>
                     <td className="px-3 py-3 text-right">
                       <p className="text-[13px] font-bold text-[var(--accent)]">{(net || 0).toLocaleString()}</p>
-                      <span className={`inline-block px-1.5 py-0.5 text-[9px] font-bold rounded ${!rec ? 'bg-amber-50 text-amber-600' : isAdvance ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                      <span className={`inline-block px-1.5 py-0.5 text-[9px] font-bold rounded ${!rec || slipLabel === '임시저장' || isAdvance ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
                         {slipLabel}
                       </span>
                     </td>
@@ -151,7 +161,7 @@ export default function PayrollTable({ staffs = [], payrollRecords = [], yearMon
           const rec = getRecord(s.id);
           const net = rec?.net_pay ?? 0;
           const isAdvance = (rec?.advance_pay ?? 0) > 0;
-          const slipLabel = !rec ? '정산중' : isAdvance ? '선지급' : '확정';
+          const slipLabel = getSlipLabel(rec);
           const isChecked = checkedIds.includes(s.id);
           return (
             <div
@@ -178,7 +188,7 @@ export default function PayrollTable({ staffs = [], payrollRecords = [], yearMon
                 <div><p className="text-[11px] text-[var(--toss-gray-3)] mb-0.5">차인지급액</p><p className="font-semibold text-[var(--accent)]">{net.toLocaleString()}</p></div>
               </div>
               <div className="mt-3 flex justify-between items-center">
-                <span className={`px-2 py-0.5 text-xs font-medium rounded ${!rec ? 'bg-amber-100 text-amber-800' : isAdvance ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'}`}>{slipLabel}</span>
+                <span className={`px-2 py-0.5 text-xs font-medium rounded ${!rec || slipLabel === '임시저장' || isAdvance ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'}`}>{slipLabel}</span>
                 <span className="text-xs text-[var(--toss-gray-3)]">상세 →</span>
               </div>
             </div>

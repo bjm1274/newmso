@@ -100,6 +100,7 @@ test('regular payroll settlement stores dependent deductions in the finalized re
   const record = Array.isArray(payload) ? payload[0] : payload;
 
   expect(record.staff_id).toBe(payrollStaff.id);
+  expect(record.status).toBe('확정');
   expect(record.attendance_deduction).toBeGreaterThan(0);
   expect(record.deduction_detail.dependent_count).toBe(2);
   expect(record.deduction_detail.dependent_tax_credit).toBe(31170);
@@ -114,6 +115,104 @@ test('regular payroll settlement stores dependent deductions in the finalized re
       Number(record.deduction_detail.custom_deduction || 0)
   );
   await expect(page.getByTestId('salary-settlement-complete-step')).toBeVisible();
+});
+
+test('regular payroll settlement restores draft values and saved status when reopened', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.confirm = () => true;
+  });
+
+  const yearMonth = new Date().toISOString().slice(0, 7);
+  const payrollStaff = {
+    id: 'payroll-draft-1',
+    employee_no: 'PAY-DR-001',
+    name: '임시저장 직원',
+    company: fakeUser.company,
+    company_id: fakeUser.company_id,
+    department: fakeUser.department,
+    position: '사원',
+    base_salary: 3300000,
+    position_allowance: 150000,
+    meal_allowance: 200000,
+    night_duty_allowance: 0,
+    vehicle_allowance: 0,
+    childcare_allowance: 0,
+    research_allowance: 0,
+    other_taxfree: 0,
+    overtime_allowance: 0,
+    night_work_allowance: 0,
+    holiday_work_allowance: 0,
+    annual_leave_pay: 0,
+    permissions: {},
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [payrollStaff],
+    payrollRecords: [],
+    attendances: [],
+  });
+
+  await seedSession(page, {
+    user: {
+      ...fakeUser,
+      company: payrollStaff.company,
+      department: payrollStaff.department,
+    },
+    localStorage: {
+      erp_last_menu: '인사관리',
+      erp_last_subview: '급여',
+      erp_hr_tab: '급여',
+      erp_hr_workspace: '근태 및 급여',
+    },
+  });
+
+  await page.goto(`/main?${new URLSearchParams({ open_menu: '인사관리' }).toString()}`);
+
+  await expect(page.getByTestId('payroll-view')).toBeVisible();
+  await page.getByTestId('hr-company-select').selectOption(fakeUser.company);
+  await page.getByTestId('payroll-tab-급여정산').click();
+  await page.getByTestId('run-payroll-regular-button').click();
+  await expect(page.getByTestId('salary-settlement-view')).toBeVisible();
+  await page.getByTestId(`salary-settlement-staff-${payrollStaff.id}`).click();
+  await page.getByTestId('salary-settlement-next-button').click();
+  await expect(page.getByTestId(`salary-settlement-card-${payrollStaff.id}`)).toBeVisible();
+
+  await page.getByTestId(`salary-settlement-dependent-count-${payrollStaff.id}`).fill('3');
+  await page.getByTestId(`salary-settlement-child-count-${payrollStaff.id}`).fill('1');
+  await page.getByTestId(`salary-settlement-withholding-rate-${payrollStaff.id}`).selectOption('80');
+  await page.getByTestId(`salary-settlement-custom-deduction-${payrollStaff.id}`).fill('15000');
+
+  const saveRequestPromise = page.waitForRequest(
+    (request) => request.url().includes('/payroll_records') && request.method() === 'POST'
+  );
+
+  await page.getByTestId('salary-settlement-draft-save-button').click();
+
+  const saveRequest = await saveRequestPromise;
+  const payload = saveRequest.postDataJSON() as any[] | any;
+  const record = Array.isArray(payload) ? payload[0] : payload;
+
+  expect(record.status).toBe('임시저장');
+  expect(record.deduction_detail.dependent_count).toBe(3);
+  expect(record.deduction_detail.child_count_8_20).toBe(1);
+  expect(record.deduction_detail.withholding_rate_percent).toBe(80);
+  expect(record.deduction_detail.custom_deduction).toBe(15000);
+
+  await page.reload();
+
+  await expect(page.getByTestId('payroll-view')).toBeVisible();
+  await page.getByTestId('hr-company-select').selectOption(fakeUser.company);
+  await page.getByTestId('payroll-tab-급여정산').click();
+  await page.getByTestId('run-payroll-regular-button').click();
+  await expect(page.getByTestId(`salary-settlement-staff-${payrollStaff.id}`)).toContainText('임시저장');
+
+  await page.getByTestId(`salary-settlement-staff-${payrollStaff.id}`).click();
+  await page.getByTestId('salary-settlement-next-button').click();
+  await expect(page.getByTestId(`salary-settlement-card-${payrollStaff.id}`)).toContainText('임시저장');
+  await expect(page.getByTestId(`salary-settlement-dependent-count-${payrollStaff.id}`)).toHaveValue('3');
+  await expect(page.getByTestId(`salary-settlement-child-count-${payrollStaff.id}`)).toHaveValue('1');
+  await expect(page.getByTestId(`salary-settlement-withholding-rate-${payrollStaff.id}`)).toHaveValue('80');
+  await expect(page.getByTestId(`salary-settlement-custom-deduction-${payrollStaff.id}`)).toHaveValue('15,000');
 });
 
 test('regular payroll settlement includes saved position allowance in taxable pay', async ({
@@ -189,6 +288,7 @@ test('regular payroll settlement includes saved position allowance in taxable pa
   const record = Array.isArray(payload) ? payload[0] : payload;
 
   expect(record.staff_id).toBe(payrollStaff.id);
+  expect(record.status).toBe('확정');
   expect(record.extra_allowance).toBe(250000);
   expect(record.total_taxable).toBe(3450000);
   await expect(page.getByTestId('salary-settlement-complete-step')).toBeVisible();
@@ -267,6 +367,7 @@ test('regular payroll settlement applies withholding ratio and qualifying child 
   const payload = saveRequest.postDataJSON() as any[] | any;
   const record = Array.isArray(payload) ? payload[0] : payload;
 
+  expect(record.status).toBe('확정');
   expect(record.deduction_detail.dependent_count).toBe(3);
   expect(record.deduction_detail.child_count_8_20).toBe(2);
   expect(record.deduction_detail.withholding_rate_percent).toBe(80);
@@ -275,6 +376,100 @@ test('regular payroll settlement applies withholding ratio and qualifying child 
   expect(record.deduction_detail.income_tax).toBe(113560);
   expect(record.deduction_detail.local_tax).toBe(11350);
   await expect(page.getByTestId('salary-settlement-complete-step')).toBeVisible();
+});
+
+test('payroll detail shows taxable allowance rows from the saved breakdown', async ({ page }) => {
+  const yearMonth = new Date().toISOString().slice(0, 7);
+  const payrollStaff = {
+    id: 'payroll-slip-1',
+    employee_no: 'PAY-SLIP-001',
+    name: '명세서 과세수당',
+    company: fakeUser.company,
+    company_id: fakeUser.company_id,
+    department: fakeUser.department,
+    position: '주임',
+    base_salary: 3000000,
+    position_allowance: 120000,
+    overtime_allowance: 80000,
+    night_work_allowance: 60000,
+    holiday_work_allowance: 0,
+    annual_leave_pay: 140000,
+    meal_allowance: 0,
+    night_duty_allowance: 0,
+    vehicle_allowance: 0,
+    childcare_allowance: 0,
+    research_allowance: 0,
+    other_taxfree: 0,
+    permissions: {},
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [payrollStaff],
+    payrollRecords: [
+      {
+        id: 'payroll-slip-record-1',
+        staff_id: payrollStaff.id,
+        year_month: yearMonth,
+        status: '확정',
+        base_salary: 3000000,
+        extra_allowance: 400000,
+        meal_allowance: 0,
+        night_duty_allowance: 0,
+        vehicle_allowance: 0,
+        childcare_allowance: 0,
+        research_allowance: 0,
+        other_taxfree: 0,
+        overtime_pay: 0,
+        bonus: 0,
+        total_taxable: 3400000,
+        total_taxfree: 0,
+        total_deduction: 0,
+        net_pay: 3400000,
+        deduction_detail: {
+          national_pension: 0,
+          health_insurance: 0,
+          long_term_care: 0,
+          employment_insurance: 0,
+          income_tax: 0,
+          local_tax: 0,
+          taxable_allowance_breakdown: {
+            position_allowance: 120000,
+            overtime_allowance: 80000,
+            night_work_allowance: 60000,
+            holiday_work_allowance: 0,
+            annual_leave_pay: 140000,
+            manual_extra_allowance: 0,
+          },
+        },
+      },
+    ],
+    attendances: [],
+  });
+
+  await seedSession(page, {
+    user: {
+      ...fakeUser,
+      company: payrollStaff.company,
+      department: payrollStaff.department,
+    },
+    localStorage: {
+      erp_last_menu: '인사관리',
+      erp_last_subview: '급여',
+      erp_hr_tab: '급여',
+      erp_hr_workspace: '근태 및 급여',
+    },
+  });
+
+  await page.goto(`/main?${new URLSearchParams({ open_menu: '인사관리' }).toString()}`);
+
+  await expect(page.getByTestId('payroll-view')).toBeVisible();
+  await page.getByTestId('hr-company-select').selectOption(fakeUser.company);
+  await page.getByTestId('payroll-tab-급여대장').click();
+
+  await expect(page.getByText('직책수당', { exact: true })).toBeVisible();
+  await expect(page.getByText('연장수당', { exact: true })).toBeVisible();
+  await expect(page.getByText('야간근로수당', { exact: true })).toBeVisible();
+  await expect(page.getByText('연차휴가수당', { exact: true })).toBeVisible();
 });
 
 test.skip('interim settlement prorates vehicle and fixed allowances and stores deductions', async ({ page }) => {
