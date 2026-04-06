@@ -107,7 +107,46 @@ function resolveAttendanceStatus(attendance: any, isWeekend = false) {
 }
 
 function isWorkedAttendanceStatus(status: string) {
-  return status === 'present';
+  return status === 'present' || status === 'late' || status === 'early_leave';
+}
+
+const ATTENDANCE_STATUS_META = {
+  present: { label: '정상 출근', color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/30', ring: 'ring-emerald-200 dark:ring-emerald-800/50', dot: 'bg-emerald-500' },
+  late: { label: '지각', color: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-500/10 dark:bg-orange-900/30', ring: 'ring-orange-200 dark:ring-orange-800/50', dot: 'bg-orange-500' },
+  early_leave: { label: '조퇴', color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/30', ring: 'ring-amber-200 dark:ring-amber-800/50', dot: 'bg-amber-500' },
+  absent: { label: '결근', color: 'text-rose-700 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-900/30', ring: 'ring-rose-200 dark:ring-rose-800/50', dot: 'bg-rose-500' },
+  annual_leave: { label: '연차', color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-500/10 dark:bg-blue-900/30', ring: 'ring-blue-200 dark:ring-blue-800/50', dot: 'bg-blue-500' },
+  sick_leave: { label: '병가', color: 'text-purple-700 dark:text-purple-400', bg: 'bg-purple-500/10 dark:bg-purple-900/30', ring: 'ring-purple-200 dark:ring-purple-800/50', dot: 'bg-purple-500' },
+  half_leave: { label: '반차', color: 'text-cyan-700 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-900/30', ring: 'ring-cyan-200 dark:ring-cyan-800/50', dot: 'bg-cyan-500' },
+  holiday: { label: '휴일', color: 'text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]', bg: 'bg-[var(--tab-bg)] dark:bg-zinc-800', ring: 'ring-zinc-200 dark:ring-zinc-700', dot: 'bg-zinc-400' },
+  missing: { label: '기록 없음', color: 'text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]', bg: 'bg-[var(--page-bg)] dark:bg-zinc-800/80', ring: 'ring-zinc-200 dark:ring-zinc-700', dot: 'bg-zinc-400' },
+} as const;
+
+function getAttendanceStatusMeta(status: string) {
+  return ATTENDANCE_STATUS_META[(status || 'missing') as keyof typeof ATTENDANCE_STATUS_META] || ATTENDANCE_STATUS_META.missing;
+}
+
+function isWeekendDate(dateStr: string) {
+  const dayOfWeek = new Date(dateStr).getDay();
+  return dayOfWeek === 0 || dayOfWeek === 6;
+}
+
+function buildWeekDates(anchorDate: string) {
+  const baseDate = anchorDate ? new Date(anchorDate) : new Date();
+  const start = new Date(baseDate);
+  start.setDate(baseDate.getDate() - baseDate.getDay());
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const current = new Date(start);
+    current.setDate(start.getDate() + index);
+    return current.toISOString().slice(0, 10);
+  });
+}
+
+function formatAttendanceMinutes(minutes: unknown) {
+  const resolvedMinutes = Number(minutes) || 0;
+  if (!resolvedMinutes) return '-';
+  return `${Math.floor(resolvedMinutes / 60)}h ${resolvedMinutes % 60}m`;
 }
 
 function buildMonthCalendarCells(selectedMonth: string) {
@@ -156,7 +195,9 @@ function buildMonthCalendarCells(selectedMonth: string) {
 }
 
 export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceMainProps) {
-  const [viewMode, setViewMode] = useState<'daily' | 'monthly' | 'calendar' | 'dashboard' | 'schedule'>('monthly');
+  const [viewMode, setViewMode] = useState<'calendar' | 'dashboard' | 'schedule'>('calendar');
+  const [calendarDetailView, setCalendarDetailView] = useState<'day' | 'week' | 'month'>('month');
+  const [isCalendarDetailOpen, setIsCalendarDetailOpen] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
@@ -217,7 +258,16 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
   const calendarCells = useMemo(() => buildMonthCalendarCells(selectedMonth), [selectedMonth]);
 
   const calendarAttendanceSummary = useMemo(() => {
-    const summary = new Map<string, { worked: number; lateOrEarly: number; absentOrLeave: number; totalRecords: number }>();
+    const summary = new Map<string, {
+      worked: number;
+      late: number;
+      earlyLeave: number;
+      absent: number;
+      annualLeave: number;
+      sickLeave: number;
+      halfLeave: number;
+      totalRecords: number;
+    }>();
 
     attendanceData.forEach((attendance) => {
       const workDate = String(attendance?.work_date || '').trim();
@@ -226,15 +276,30 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
       const dayOfWeek = new Date(workDate).getDay();
       const status = resolveAttendanceStatus(attendance, dayOfWeek === 0 || dayOfWeek === 6);
       if (!summary.has(workDate)) {
-        summary.set(workDate, { worked: 0, lateOrEarly: 0, absentOrLeave: 0, totalRecords: 0 });
+        summary.set(workDate, {
+          worked: 0,
+          late: 0,
+          earlyLeave: 0,
+          absent: 0,
+          annualLeave: 0,
+          sickLeave: 0,
+          halfLeave: 0,
+          totalRecords: 0,
+        });
       }
 
       const current = summary.get(workDate)!;
       current.totalRecords += 1;
 
-      if (status === 'late' || status === 'early_leave') {
+      if (status === 'late') {
         current.worked += 1;
-        current.lateOrEarly += 1;
+        current.late += 1;
+        return;
+      }
+
+      if (status === 'early_leave') {
+        current.worked += 1;
+        current.earlyLeave += 1;
         return;
       }
 
@@ -243,8 +308,23 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
         return;
       }
 
-      if (status === 'absent' || status === 'annual_leave' || status === 'sick_leave' || status === 'half_leave') {
-        current.absentOrLeave += 1;
+      if (status === 'absent') {
+        current.absent += 1;
+        return;
+      }
+
+      if (status === 'annual_leave') {
+        current.annualLeave += 1;
+        return;
+      }
+
+      if (status === 'sick_leave') {
+        current.sickLeave += 1;
+        return;
+      }
+
+      if (status === 'half_leave') {
+        current.halfLeave += 1;
       }
     });
 
@@ -259,9 +339,13 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
         setAttendanceData([]);
         return;
       }
-      const [startDate, endDate] = viewMode === 'daily'
-        ? [selectedDate, selectedDate]
-        : [`${selectedMonth}-01`, `${selectedMonth}-${String(daysInMonth).padStart(2, '0')}`];
+      const weekDates = buildWeekDates(selectedDate);
+      const [startDate, endDate] =
+        viewMode === 'calendar' && calendarDetailView === 'day'
+          ? [selectedDate, selectedDate]
+          : viewMode === 'calendar' && calendarDetailView === 'week'
+            ? [weekDates[0], weekDates[weekDates.length - 1]]
+            : [`${selectedMonth}-01`, `${selectedMonth}-${String(daysInMonth).padStart(2, '0')}`];
 
       const { data, error } = await supabase
         .from('attendances')
@@ -282,7 +366,7 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
 
   useEffect(() => {
     fetchAttendance();
-  }, [selectedMonth, selectedDate, selectedCo, viewMode, filtered]);
+  }, [selectedMonth, selectedDate, selectedCo, viewMode, calendarDetailView, filtered]);
 
   // 근무표 편성: work_shifts 로드
   useEffect(() => {
@@ -865,6 +949,46 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
 
   const daysInMonth = getDaysInMonth(selectedMonth);
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const weekDates = useMemo(() => buildWeekDates(selectedDate), [selectedDate]);
+
+  const syncSelectedDate = (dateStr: string) => {
+    setSelectedDate(dateStr);
+    if (dateStr?.slice(0, 7)) setSelectedMonth(dateStr.slice(0, 7));
+  };
+
+  const mainViewButtonKey = viewMode === 'dashboard' || viewMode === 'schedule' ? viewMode : 'calendar';
+
+  const handleAttendanceViewChange = (nextView: 'dashboard' | 'daily' | 'monthly' | 'calendar' | 'schedule') => {
+    if (nextView === 'calendar' || nextView === 'daily' || nextView === 'monthly') {
+      setViewMode('calendar');
+      setCalendarDetailView(nextView === 'daily' ? 'day' : nextView === 'monthly' ? 'month' : 'week');
+      return;
+    }
+    setViewMode(nextView);
+  };
+
+  const calendarDetailColumns = useMemo(() => {
+    if (calendarDetailView === 'week') {
+      return weekDates.map((dateStr) => ({
+        key: dateStr,
+        dateStr,
+        day: Number(dateStr.slice(-2)),
+        weekday: new Date(dateStr).getDay(),
+        isWeekend: isWeekendDate(dateStr),
+      }));
+    }
+
+    return daysArray.map((day) => {
+      const dateStr = `${selectedMonth}-${String(day).padStart(2, '0')}`;
+      return {
+        key: dateStr,
+        dateStr,
+        day,
+        weekday: new Date(dateStr).getDay(),
+        isWeekend: isWeekendDate(dateStr),
+      };
+    });
+  }, [calendarDetailView, daysArray, selectedMonth, weekDates]);
 
   const stats = useMemo(() => {
     const resolvedStatuses = attendanceData.map((attendance: any) =>
@@ -892,6 +1016,122 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
     return { total, present, late, earlyLeave, absent, rate, atRiskStaff };
   }, [attendanceData, filtered]);
 
+  const renderIntegratedDayPanel = () => (
+    <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm" data-testid="attendance-calendar-day-panel">
+      <div className="p-4 border-b border-[var(--border)] dark:border-zinc-800 bg-[var(--tab-bg)]/40">
+        <h3 className="text-lg font-bold text-foreground">일별 출퇴근 현황 <span className="text-[var(--toss-gray-4)] text-sm font-medium ml-2">{selectedDate}</span></h3>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead className="bg-[var(--tab-bg)] dark:bg-zinc-900/50 border-b border-[var(--border)] dark:border-zinc-800">
+            <tr>
+              <th className="px-4 py-4 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">직원 정보</th>
+              <th className="px-4 py-4 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">상태</th>
+              <th className="px-4 py-4 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">출퇴근 시간</th>
+              <th className="px-4 py-4 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">근무 시간</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            {filtered.map((s: StaffMember) => {
+              const att = attendanceMap.get(buildAttendanceKey(s.id, selectedDate));
+              const status = resolveAttendanceStatus(att, isWeekendDate(selectedDate));
+              const meta = getAttendanceStatusMeta(status || 'missing');
+              const checkIn = att?.check_in_time ? new Date(att.check_in_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-';
+              const checkOut = att?.check_out_time ? new Date(att.check_out_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-';
+              return (
+                <tr key={`calendar-day-${s.id}`} className="hover:bg-[var(--tab-bg)]/50 dark:hover:bg-zinc-800/30 transition-colors">
+                  <td className="px-4 py-4">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-sm text-foreground">{s.name}</span>
+                      <span className="text-[11px] text-[var(--toss-gray-4)] font-medium mt-0.5">{s.department} · {s.position}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-4">
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold ring-1 ring-inset ${meta.color} ${meta.bg} ${meta.ring}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${meta.dot}`}></span>
+                      {meta.label}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4 font-mono text-sm font-bold text-foreground">{checkIn} / {checkOut}</td>
+                  <td className="px-4 py-4 font-mono text-sm font-bold text-blue-600 dark:text-blue-500">{formatAttendanceMinutes(att?.work_hours_minutes)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  const renderIntegratedRangePanel = (mode: 'week' | 'month') => (
+    <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm" data-testid={`attendance-calendar-${mode}-panel`}>
+      <div className="p-4 border-b border-[var(--border)] dark:border-zinc-800 bg-[var(--tab-bg)]/40">
+        <h3 className="text-lg font-bold text-foreground">
+          {mode === 'week' ? '주별 근태 현황' : '월별 근태 대장'}
+          <span className="text-[var(--toss-gray-4)] text-sm font-medium ml-2">{mode === 'week' ? `${weekDates[0]} ~ ${weekDates[6]}` : selectedMonth}</span>
+        </h3>
+      </div>
+      <div className="overflow-x-auto custom-scrollbar">
+        <table className={`w-full text-left border-collapse ${mode === 'week' ? 'min-w-[980px]' : 'min-w-[1800px]'}`}>
+          <thead className="bg-[var(--tab-bg)] dark:bg-zinc-900/80 border-b border-[var(--border)] dark:border-zinc-800 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">
+            <tr>
+              <th className="px-4 py-4 sticky left-0 bg-[var(--tab-bg)] dark:bg-zinc-900/90 z-10 border-r border-[var(--border)] dark:border-zinc-800">직원명</th>
+              {calendarDetailColumns.map((column) => (
+                <th key={`${mode}-${column.key}`} className={`px-2 py-4 text-center border-r border-[var(--border)] dark:border-zinc-800 min-w-[78px] ${column.isWeekend ? 'text-red-400 dark:text-red-500' : ''}`}>
+                  <div className="flex flex-col items-center">
+                    <span>{column.day}</span>
+                    <span className="text-[9px] font-medium opacity-60 mt-0.5">{['일', '월', '화', '수', '목', '금', '토'][column.weekday]}</span>
+                  </div>
+                </th>
+              ))}
+              <th className="px-4 py-4 text-center text-blue-600 dark:text-blue-400 bg-blue-500/10/50 dark:bg-blue-900/10">출근일</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            {filtered.map((s: StaffMember) => {
+              let workDays = 0;
+              return (
+                <tr key={`${mode}-${s.id}`} className="hover:bg-[var(--tab-bg)]/50 dark:hover:bg-zinc-800/30 transition-colors">
+                  <td className="px-4 py-3 sticky left-0 bg-[var(--card)] dark:bg-zinc-900 z-10 border-r border-[var(--border)] dark:border-zinc-800">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-sm text-foreground whitespace-nowrap">{s.name}</span>
+                      <span className="text-[10px] text-[var(--toss-gray-4)] font-medium">{s.department}</span>
+                    </div>
+                  </td>
+                  {calendarDetailColumns.map((column) => {
+                    const att = attendanceMap.get(buildAttendanceKey(s.id, column.dateStr));
+                    const status = resolveAttendanceStatus(att, column.isWeekend);
+                    const meta = getAttendanceStatusMeta(status || 'missing');
+                    if (isWorkedAttendanceStatus(status)) workDays += 1;
+                    return (
+                      <td key={`${mode}-${s.id}-${column.key}`} className="p-1.5 border-r border-[var(--border)] dark:border-zinc-800 text-center align-middle">
+                        {status ? (
+                          <div className={`min-h-[38px] px-2 py-2 mx-auto flex items-center justify-center rounded-xl text-[10px] leading-tight font-bold ring-1 ring-inset ${meta.color} ${meta.bg} ${meta.ring}`}>
+                            {meta.label}
+                          </div>
+                        ) : (
+                          <div className="min-h-[38px] px-2 py-2 mx-auto flex items-center justify-center rounded-xl text-[10px] font-bold text-[var(--toss-gray-3)] bg-[var(--page-bg)] dark:bg-zinc-800/60 ring-1 ring-inset ring-zinc-200 dark:ring-zinc-700">-</div>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className="px-4 py-3 text-center bg-blue-500/10/30 dark:bg-blue-900/10 font-bold text-blue-600 dark:text-blue-400 text-sm">{workDays}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  const calendarDetailLabel =
+    calendarDetailView === 'day'
+      ? selectedDate
+      : calendarDetailView === 'week'
+        ? `${weekDates[0]} ~ ${weekDates[weekDates.length - 1]}`
+        : selectedMonth;
+
   return (
     <div className="flex flex-col h-full bg-[var(--page-bg)] animate-in fade-in duration-500">
       <header className="px-4 pt-4 pb-3 border-b border-[var(--border)] bg-[var(--card)] shrink-0 shadow-sm z-10 sticky top-0">
@@ -911,15 +1151,13 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
             <div className="flex items-center gap-1 bg-[var(--tab-bg)]/80 dark:bg-zinc-800/80 p-1 rounded-[var(--radius-lg)] w-fit border border-[var(--border)]/50 dark:border-zinc-700/50 overflow-x-auto custom-scrollbar">
               {[
                 { id: 'dashboard', label: '대시보드', icon: '📊' },
-                { id: 'daily', label: '일별 현황', icon: '📋' },
-                { id: 'monthly', label: '월별 대장', icon: '📅' },
                 ...((canCreateRoster || canApproveRoster) ? [{ id: 'schedule', label: '근무표 생성', icon: '📝' }] : []),
                 { id: 'calendar', label: '근태 달력', icon: '🗓️' }
               ].map(mode => (
                 <button
                   key={mode.id}
-                  onClick={() => setViewMode(mode.id as any)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-[var(--radius-md)] text-[12px] font-bold transition-all whitespace-nowrap ${viewMode === mode.id
+                  onClick={() => handleAttendanceViewChange(mode.id as 'dashboard' | 'daily' | 'monthly' | 'calendar' | 'schedule')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-[var(--radius-md)] text-[12px] font-bold transition-all whitespace-nowrap ${mainViewButtonKey === mode.id
                     ? 'bg-[var(--card)] dark:bg-zinc-700 text-foreground shadow-sm ring-1 ring-zinc-900/5 dark:ring-white/10'
                     : 'text-[var(--toss-gray-4)] hover:text-foreground hover:bg-[var(--card)]/50 dark:hover:bg-zinc-700/50'
                     }`}
@@ -941,116 +1179,18 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
             </button>
 
             <div className="flex items-center bg-[var(--card)] dark:bg-zinc-800 border border-[var(--border)] dark:border-zinc-700 rounded-[var(--radius-md)] p-1 shadow-sm shrink-0 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">
-              {viewMode === 'daily' ? (
-                <>
-                  <div className="px-3 bg-[var(--tab-bg)] dark:bg-zinc-900/50 rounded-lg py-1.5 border border-[var(--border-subtle)] dark:border-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)]">DATE</div>
-                  <SmartDatePicker
-                    value={selectedDate}
-                    onChange={(val) => setSelectedDate(val)}
-                    className="bg-transparent px-3 py-1.5 text-xs font-bold text-foreground outline-none w-full sm:w-32 cursor-pointer"
-                  />
-                </>
-              ) : (
-                <>
-                  <div className="px-3 bg-[var(--tab-bg)] dark:bg-zinc-900/50 rounded-lg py-1.5 border border-[var(--border-subtle)] dark:border-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)]">MONTH</div>
-                  <SmartMonthPicker
-                    value={selectedMonth}
-                    onChange={(val) => setSelectedMonth(val)}
-                    className="bg-transparent px-3 py-1.5 text-xs font-bold text-foreground outline-none w-full sm:w-32 cursor-pointer"
-                  />
-                </>
-              )}
+              <div className="px-3 bg-[var(--tab-bg)] dark:bg-zinc-900/50 rounded-lg py-1.5 border border-[var(--border-subtle)] dark:border-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)]">MONTH</div>
+              <SmartMonthPicker
+                value={selectedMonth}
+                onChange={(val) => setSelectedMonth(val)}
+                className="bg-transparent px-3 py-1.5 text-xs font-bold text-foreground outline-none w-full sm:w-32 cursor-pointer"
+              />
             </div>
           </div>
         </div>
       </header>
 
       <main className="flex-1 p-4 overflow-auto custom-scrollbar bg-[var(--muted)]/20">
-        {viewMode === 'daily' && (
-          <div className="max-w-6xl mx-auto space-y-4">
-            <h3 className="text-lg font-bold text-foreground mb-4">일별 출퇴근 현황 <span className="text-[var(--toss-gray-4)] text-sm font-medium ml-2">{selectedDate}</span></h3>
-            <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-[var(--tab-bg)] dark:bg-zinc-900/50 border-b border-[var(--border)] dark:border-zinc-800">
-                    <tr>
-                      <th className="px-4 py-4 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">직원 정보</th>
-                      <th className="px-4 py-4 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">상태</th>
-                      <th className="px-4 py-4 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">출퇴근 시간</th>
-                      <th className="px-4 py-4 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">근무 시간</th>
-                      <th className="px-4 py-4 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">비고</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                    {filtered.map((s: StaffMember) => {
-                      const att = attendanceMap.get(buildAttendanceKey(s.id, selectedDate));
-                      const checkIn = att?.check_in_time ? new Date(att.check_in_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-';
-                      const checkOut = att?.check_out_time ? new Date(att.check_out_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-';
-                      const mins = att?.work_hours_minutes ?? 0;
-                      const workHrs = mins ? `${Math.floor(mins / 60)}h ${mins % 60}m` : '-';
-                      const selectedDayOfWeek = new Date(selectedDate).getDay();
-                      const resolvedStatus = resolveAttendanceStatus(att, selectedDayOfWeek === 0 || selectedDayOfWeek === 6);
-
-                      const statusMap: Record<string, { label: string, color: string, bg: string }> = {
-                        present: { label: '정상 출근', color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/30 ring-emerald-200' },
-                        absent: { label: '결근', color: 'text-rose-700 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-900/30 ring-rose-200' },
-                        late: { label: '지각', color: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-500/10 dark:bg-orange-900/30 ring-orange-200' },
-                        early_leave: { label: '조퇴', color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/30 ring-amber-200' },
-                        sick_leave: { label: '병가', color: 'text-purple-700 dark:text-purple-400', bg: 'bg-purple-500/10 dark:bg-purple-900/30 ring-purple-200' },
-                        annual_leave: { label: '연차', color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-500/10 dark:bg-blue-900/30 ring-blue-200' },
-                        holiday: { label: '휴일', color: 'text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]', bg: 'bg-[var(--tab-bg)] dark:bg-zinc-800 ring-zinc-200' },
-                        half_leave: { label: '반차', color: 'text-cyan-700 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-900/30 ring-cyan-200' },
-                        missing: { label: '기록 없음', color: 'text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]', bg: 'bg-[var(--page-bg)] dark:bg-zinc-800/80 ring-zinc-200' },
-                      };
-
-                      const statusObj = statusMap[resolvedStatus || 'missing'] || statusMap.missing;
-
-                      return (
-                        <tr key={s.id} className="hover:bg-[var(--tab-bg)]/50 dark:hover:bg-zinc-800/30 transition-colors group cursor-default">
-                          <td className="px-4 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-[var(--tab-bg)] dark:bg-zinc-800 flex items-center justify-center text-[var(--toss-gray-4)] font-bold text-xs ring-1 ring-zinc-200 dark:ring-zinc-700">
-                                {s.name[0]}
-                              </div>
-                              <div className="flex flex-col">
-                                <span className="font-bold text-sm text-foreground">{s.name}</span>
-                                <span className="text-[11px] text-[var(--toss-gray-4)] font-medium mt-0.5">{s.department} · {s.position}</span>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-4">
-                            <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold ring-1 ring-inset ${statusObj.color} ${statusObj.bg}`}>
-                              <span className={`w-1 h-1 rounded-full mr-1.5 ${statusObj.bg.replace('ring-', 'bg-').split(' ')[0]}`} style={{ filter: 'brightness(0.8)' }}></span>
-                              {statusObj.label}
-                            </span>
-                          </td>
-                          <td className="px-4 py-4">
-                            <div className="flex flex-col gap-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-[var(--toss-gray-3)] uppercase w-4">IN</span>
-                                <span className="font-mono font-bold text-sm text-foreground">{checkIn}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-[var(--toss-gray-3)] uppercase w-4">OUT</span>
-                                <span className="font-mono font-bold text-sm text-[var(--toss-gray-4)]">{checkOut}</span>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-4 font-mono font-bold text-blue-600 dark:text-blue-500 text-sm">
-                            {workHrs}
-                          </td>
-                          <td className="px-4 py-4 text-xs font-medium text-[var(--toss-gray-4)]">
-                            {att?.notes || <span className="opacity-30">-</span>}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
 
         {viewMode === 'schedule' && (
           <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm flex flex-col min-h-[calc(100dvh-200px)]">
@@ -1432,97 +1572,6 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
           </div>
         )}
 
-        {viewMode === 'monthly' && (
-          <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
-            <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left border-collapse min-w-[800px]">
-                <thead className="bg-[var(--tab-bg)] dark:bg-zinc-900/80 border-b border-[var(--border)] dark:border-zinc-800 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">
-                  <tr>
-                    <th className="px-4 py-4 sticky left-0 bg-[var(--tab-bg)] dark:bg-zinc-900/90 z-10 border-r border-[var(--border)] dark:border-zinc-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">직원명</th>
-                    {daysArray.map((d) => {
-                      const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
-                      const dayOfWeek = new Date(dStr).getDay();
-                      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                      return (
-                        <th
-                          key={d}
-                          className={`px-2 py-4 text-center border-r border-[var(--border)] dark:border-zinc-800 min-w-[44px] ${isWeekend ? 'text-red-400 dark:text-red-500' : ''}`}
-                        >
-                          <div className="flex flex-col items-center">
-                            <span>{d}</span>
-                            <span className="text-[9px] font-medium opacity-60 mt-0.5">{['일', '월', '화', '수', '목', '금', '토'][dayOfWeek]}</span>
-                          </div>
-                        </th>
-                      );
-                    })}
-                    <th className="px-4 py-4 text-center text-blue-600 dark:text-blue-400 bg-blue-500/10/50 dark:bg-blue-900/10">출근</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {filtered.map((s: StaffMember) => {
-                    let workDays = 0;
-                    return (
-                      <tr key={s.id} className="hover:bg-[var(--tab-bg)]/50 dark:hover:bg-zinc-800/30 transition-colors group">
-                        <td className="px-4 py-3 sticky left-0 bg-[var(--card)] dark:bg-zinc-900 group-hover:bg-[var(--tab-bg)] dark:group-hover:bg-zinc-800/80 z-10 border-r border-[var(--border)] dark:border-zinc-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] transition-colors">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-sm text-foreground whitespace-nowrap">{s.name}</span>
-                            <span className="text-[10px] text-[var(--toss-gray-4)] font-medium">{s.department}</span>
-                          </div>
-                        </td>
-                        {daysArray.map((d) => {
-                          const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
-                          const att = attendanceMap.get(buildAttendanceKey(s.id, dStr));
-                          const dayOfWeek = new Date(dStr).getDay();
-                          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                          const status = resolveAttendanceStatus(att, isWeekend);
-
-                          let label = '';
-                          let cellClass = 'text-[var(--toss-gray-3)] dark:text-[var(--toss-gray-4)]';
-
-                          if (status === 'annual_leave' || status === 'sick_leave') {
-                            label = status === 'annual_leave' ? '연' : '병';
-                            cellClass = 'text-blue-600 bg-blue-500/10 dark:bg-blue-900/20';
-                          } else if (status === 'holiday' || isWeekend) {
-                            label = '휴';
-                            cellClass = 'text-red-400 bg-red-500/10/50 dark:bg-red-900/10';
-                          } else if (isWorkedAttendanceStatus(status)) {
-                            label = '출';
-                            cellClass = 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20';
-                            workDays++;
-                          } else if (status === 'late' || status === 'early_leave') {
-                            label = status === 'late' ? '지' : '조';
-                            cellClass = 'text-orange-600 bg-orange-500/10 dark:bg-orange-900/20';
-                            workDays++;
-                          } else if (status === 'absent') {
-                            label = '결';
-                            cellClass = 'text-rose-600 bg-rose-50 dark:bg-rose-900/20';
-                          } else {
-                            label = '-';
-                          }
-
-                          return (
-                            <td
-                              key={d}
-                              className="p-1 border-r border-[var(--border)] dark:border-zinc-800 text-center align-middle"
-                            >
-                              <div className={`w-8 h-8 mx-auto flex items-center justify-center rounded-lg text-[11px] font-bold ${cellClass}`}>
-                                {label}
-                              </div>
-                            </td>
-                          );
-                        })}
-                        <td className="px-4 py-3 text-center bg-blue-500/10/30 dark:bg-blue-900/10 font-bold text-blue-600 dark:text-blue-400 text-sm">
-                          {workDays}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
         {viewMode === 'dashboard' && (
           <div className="space-y-4 max-w-6xl mx-auto">
             {/* AI Attendance Alert Widget */}
@@ -1784,7 +1833,38 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
         )}
 
         {viewMode === 'calendar' && (
+          <div className="space-y-4">
           <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl p-4 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-base font-bold text-foreground">근태 달력</h3>
+                <p className="text-[11px] font-medium text-[var(--toss-gray-4)] mt-1">날짜를 누르면 팝업으로 일별 · 주별 · 월별 근태를 확인합니다.</p>
+              </div>
+              <div className="flex items-center gap-2 bg-[var(--tab-bg)] dark:bg-zinc-800/80 p-1 rounded-[var(--radius-lg)] border border-[var(--border)] dark:border-zinc-700 w-fit">
+                {[
+                  { id: 'day', label: '일별' },
+                  { id: 'week', label: '주별' },
+                  { id: 'month', label: '월별' },
+                ].map((mode) => (
+                  <button
+                    key={`calendar-open-${mode.id}`}
+                    type="button"
+                    data-testid={`attendance-calendar-open-${mode.id}`}
+                    onClick={() => {
+                      setCalendarDetailView(mode.id as 'day' | 'week' | 'month');
+                      setIsCalendarDetailOpen(true);
+                    }}
+                    className={`px-3 py-2 rounded-[var(--radius-md)] text-[12px] font-bold transition-all ${
+                      calendarDetailView === mode.id
+                        ? 'bg-[var(--card)] dark:bg-zinc-700 text-foreground shadow-sm ring-1 ring-zinc-900/5 dark:ring-white/10'
+                        : 'text-[var(--toss-gray-4)] hover:text-foreground hover:bg-[var(--card)]/60 dark:hover:bg-zinc-700/60'
+                    }`}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="overflow-x-auto custom-scrollbar -mx-1 px-1">
             <div className="grid min-w-[560px] grid-cols-7 gap-2 md:gap-4">
               {['일', '월', '화', '수', '목', '금', '토'].map((day, idx) => (
@@ -1794,16 +1874,24 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
                 const summary = cell.dateStr ? calendarAttendanceSummary.get(cell.dateStr) : null;
                 const isSelected = cell.dateStr === selectedDate;
                 const workedCount = summary?.worked || 0;
-                const issueCount = (summary?.absentOrLeave || 0) + (summary?.lateOrEarly || 0);
+                const issueCount =
+                  (summary?.late || 0) +
+                  (summary?.earlyLeave || 0) +
+                  (summary?.absent || 0) +
+                  (summary?.annualLeave || 0) +
+                  (summary?.sickLeave || 0) +
+                  (summary?.halfLeave || 0);
 
                 return (
                   <button
                     key={cell.key}
                     type="button"
+                    data-testid={cell.dateStr ? `attendance-calendar-cell-${cell.dateStr}` : undefined}
                     onClick={() => {
                       if (!cell.dateStr) return;
-                      setSelectedDate(cell.dateStr);
-                      setViewMode('daily');
+                      syncSelectedDate(cell.dateStr);
+                      setCalendarDetailView('day');
+                      setIsCalendarDetailOpen(true);
                     }}
                     className={`min-h-[130px] p-3 border rounded-2xl transition-all text-left ${
                       cell.isCurrentMonth
@@ -1847,6 +1935,67 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
               })}
             </div>
             </div>
+          </div>
+
+          {isCalendarDetailOpen && (
+            <div
+              className="fixed inset-0 z-[120] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+              data-testid="attendance-calendar-detail-modal"
+              onClick={() => setIsCalendarDetailOpen(false)}
+            >
+              <div
+                className="w-full max-w-6xl max-h-[88vh] overflow-hidden rounded-3xl bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 shadow-2xl flex flex-col"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 px-5 py-4 border-b border-[var(--border)] dark:border-zinc-800 bg-[var(--tab-bg)]/50 dark:bg-zinc-900/60">
+                  <div>
+                    <h3 className="text-lg font-bold text-foreground">근태 상세 보기</h3>
+                    <p className="text-[12px] font-medium text-[var(--toss-gray-4)] mt-1">{calendarDetailLabel}</p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 bg-[var(--card)] dark:bg-zinc-800/80 p-1 rounded-[var(--radius-lg)] border border-[var(--border)] dark:border-zinc-700">
+                      {[
+                        { id: 'day', label: '일별' },
+                        { id: 'week', label: '주별' },
+                        { id: 'month', label: '월별' },
+                      ].map((mode) => (
+                        <button
+                          key={mode.id}
+                          type="button"
+                          data-testid={`attendance-calendar-detail-${mode.id}`}
+                          onClick={() => setCalendarDetailView(mode.id as 'day' | 'week' | 'month')}
+                          className={`px-3 py-2 rounded-[var(--radius-md)] text-[12px] font-bold transition-all ${
+                            calendarDetailView === mode.id
+                              ? 'bg-[var(--card)] dark:bg-zinc-700 text-foreground shadow-sm ring-1 ring-zinc-900/5 dark:ring-white/10'
+                              : 'text-[var(--toss-gray-4)] hover:text-foreground hover:bg-[var(--card)]/60 dark:hover:bg-zinc-700/60'
+                          }`}
+                        >
+                          {mode.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      data-testid="attendance-calendar-detail-close"
+                      onClick={() => setIsCalendarDetailOpen(false)}
+                      className="w-10 h-10 rounded-full border border-[var(--border)] dark:border-zinc-700 bg-[var(--card)] dark:bg-zinc-800 text-[var(--toss-gray-4)] hover:text-foreground hover:border-blue-400 transition-colors flex items-center justify-center text-lg font-bold"
+                      aria-label="근태 상세 닫기"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-5 overflow-auto custom-scrollbar bg-[var(--muted)]/20 space-y-4">
+                  {calendarDetailView === 'day' && renderIntegratedDayPanel()}
+                  {calendarDetailView === 'week' && renderIntegratedRangePanel('week')}
+                  {calendarDetailView === 'month' && renderIntegratedRangePanel('month')}
+                </div>
+              </div>
+            </div>
+          )}
           </div>
         )}
       </main>

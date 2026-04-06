@@ -153,7 +153,19 @@ export function useChatRoomDataSync({
         openConversationRoomIds.forEach((roomId) => {
           counts[roomId] = 0;
         });
-        setRoomUnreadCounts(counts);
+        // 방 입장 직후 레이스컨디션 방지:
+        // DB 쿼리 결과가 돌아왔을 때 이미 0으로 처리된 방은 덮어쓰지 않음
+        setRoomUnreadCounts((prev) => {
+          const next = { ...counts };
+          Object.keys(prev).forEach((roomId) => {
+            if (prev[roomId] === 0 && next[roomId] !== undefined && next[roomId] !== 0) {
+              if (openConversationRoomIds.has(roomId) || roomId === activeRoomId) {
+                next[roomId] = 0;
+              }
+            }
+          });
+          return next;
+        });
       } catch (error) {
         console.error('채팅방 안읽음 수 동기화 실패:', error);
       }

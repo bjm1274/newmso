@@ -51,15 +51,6 @@ export function ProfileHeaderSummary({
               <span className="text-3xl text-[var(--toss-gray-3)]">👤</span>
             )}
           </div>
-          {user.id ? (
-            <label
-              htmlFor="profiles-upload"
-              className="absolute -bottom-1 -right-1 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-[var(--accent)] text-[13px] text-white shadow-sm transition-all hover:opacity-90"
-              title="프로필 사진 등록"
-            >
-              📷
-            </label>
-          ) : null}
         </div>
         <div className="min-w-0 flex-1">
           <p className="break-keep text-[28px] font-bold leading-tight tracking-tight text-[var(--foreground)]">

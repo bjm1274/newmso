@@ -248,6 +248,7 @@ export function GlobalSearchModal({
             ] as const).map(([tab, label, count]) => (
               <button
                 key={tab}
+                data-testid={`chat-global-search-tab-${tab}`}
                 type="button"
                 onClick={() => onTabChange(tab)}
                 className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-colors ${

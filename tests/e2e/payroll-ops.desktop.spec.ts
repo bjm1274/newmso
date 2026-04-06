@@ -5,6 +5,10 @@ test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
 });
 
+function parseWon(text: string | null | undefined) {
+  return Number(String(text || '').replace(/[^\d-]/g, '')) || 0;
+}
+
 test('regular payroll settlement stores dependent deductions in the finalized record', async ({ page }) => {
   await page.addInitScript(() => {
     window.confirm = () => true;
@@ -117,6 +121,101 @@ test('regular payroll settlement stores dependent deductions in the finalized re
   await expect(page.getByTestId('salary-settlement-complete-step')).toBeVisible();
 });
 
+test('regular payroll settlement subtracts advance pay from net pay and refreshes the payroll ledger status', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.confirm = () => true;
+  });
+
+  const yearMonth = new Date().toISOString().slice(0, 7);
+  const payrollStaff = {
+    id: 'payroll-advance-1',
+    employee_no: 'PAY-ADV-001',
+    name: '선지급차감직원',
+    company: fakeUser.company,
+    company_id: fakeUser.company_id,
+    department: fakeUser.department,
+    position: '사원',
+    base_salary: 3200000,
+    meal_allowance: 200000,
+    night_duty_allowance: 0,
+    vehicle_allowance: 0,
+    childcare_allowance: 0,
+    research_allowance: 0,
+    other_taxfree: 0,
+    overtime_allowance: 0,
+    night_work_allowance: 0,
+    holiday_work_allowance: 0,
+    annual_leave_pay: 0,
+    permissions: {},
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [payrollStaff],
+    payrollRecords: [],
+    attendances: [],
+  });
+
+  await seedSession(page, {
+    user: {
+      ...fakeUser,
+      company: payrollStaff.company,
+      department: payrollStaff.department,
+    },
+    localStorage: {
+      erp_last_menu: '인사관리',
+      erp_last_subview: '급여',
+      erp_hr_tab: '급여',
+      erp_hr_workspace: '근태 및 급여',
+    },
+  });
+
+  await page.goto(`/main?${new URLSearchParams({ open_menu: '인사관리' }).toString()}`);
+
+  await expect(page.getByTestId('payroll-view')).toBeVisible();
+  await page.getByTestId('hr-company-select').selectOption(fakeUser.company);
+  await page.getByTestId('payroll-tab-급여정산').click();
+  await page.getByTestId('run-payroll-regular-button').click();
+  await expect(page.getByTestId('salary-settlement-view')).toBeVisible();
+  await page.getByTestId(`salary-settlement-staff-${payrollStaff.id}`).click();
+  await page.getByTestId('salary-settlement-next-button').click();
+
+  const expectedNet = page.getByTestId(`salary-settlement-expected-net-${payrollStaff.id}`);
+  const expectedNetBeforeAdvance = parseWon(await expectedNet.textContent());
+
+  await page.getByTestId(`salary-settlement-advance-pay-${payrollStaff.id}`).fill('100000');
+  await expect(expectedNet).not.toHaveText(`₩ ${expectedNetBeforeAdvance.toLocaleString()}`);
+
+  const expectedNetAfterAdvance = parseWon(await expectedNet.textContent());
+  expect(expectedNetAfterAdvance).toBe(expectedNetBeforeAdvance - 100000);
+
+  const saveRequestPromise = page.waitForRequest(
+    (request) => request.url().includes('/payroll_records') && request.method() === 'POST'
+  );
+
+  await page.getByTestId('salary-settlement-finalize-button').click();
+
+  const saveRequest = await saveRequestPromise;
+  const payload = saveRequest.postDataJSON() as any[] | any;
+  const record = Array.isArray(payload) ? payload[0] : payload;
+
+  expect(record.status).toBe('확정');
+  expect(record.advance_pay).toBe(100000);
+  expect(record.net_pay).toBe(
+    Number(record.total_taxable || 0) +
+      Number(record.total_taxfree || 0) -
+      Number(record.total_deduction || 0) -
+      100000
+  );
+
+  await expect(page.getByTestId('salary-settlement-complete-step')).toBeVisible();
+  await page.getByTestId('payroll-tab-급여대장').click();
+
+  const payrollRow = page.locator('tr').filter({
+    has: page.getByText(payrollStaff.name, { exact: true }),
+  });
+  await expect(payrollRow).toContainText('확정');
+});
+
 test('regular payroll settlement restores draft values and saved status when reopened', async ({ page }) => {
   await page.addInitScript(() => {
     window.confirm = () => true;
@@ -213,6 +312,78 @@ test('regular payroll settlement restores draft values and saved status when reo
   await expect(page.getByTestId(`salary-settlement-child-count-${payrollStaff.id}`)).toHaveValue('1');
   await expect(page.getByTestId(`salary-settlement-withholding-rate-${payrollStaff.id}`)).toHaveValue('80');
   await expect(page.getByTestId(`salary-settlement-custom-deduction-${payrollStaff.id}`)).toHaveValue('15,000');
+});
+
+test('regular payroll settlement defaults withholding rate to 80 percent when no staff override exists', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.confirm = () => true;
+  });
+
+  const yearMonth = new Date().toISOString().slice(0, 7);
+  const payrollStaff = {
+    id: 'payroll-default-withholding-1',
+    employee_no: 'PAY-WH-001',
+    name: '기본원천징수직원',
+    company: fakeUser.company,
+    company_id: fakeUser.company_id,
+    department: fakeUser.department,
+    position: '사원',
+    base_salary: 3100000,
+    meal_allowance: 200000,
+    night_duty_allowance: 0,
+    vehicle_allowance: 0,
+    childcare_allowance: 0,
+    research_allowance: 0,
+    other_taxfree: 0,
+    overtime_allowance: 0,
+    night_work_allowance: 0,
+    holiday_work_allowance: 0,
+    annual_leave_pay: 0,
+    permissions: {},
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [payrollStaff],
+    payrollRecords: [],
+    attendances: [],
+  });
+
+  await seedSession(page, {
+    user: {
+      ...fakeUser,
+      company: payrollStaff.company,
+      department: payrollStaff.department,
+    },
+    localStorage: {
+      erp_last_menu: '인사관리',
+      erp_last_subview: '급여',
+      erp_hr_tab: '급여',
+      erp_hr_workspace: '근태 및 급여',
+    },
+  });
+
+  await page.goto(`/main?${new URLSearchParams({ open_menu: '인사관리' }).toString()}`);
+
+  await expect(page.getByTestId('payroll-view')).toBeVisible();
+  await page.getByTestId('hr-company-select').selectOption(fakeUser.company);
+  await page.getByTestId('payroll-tab-급여정산').click();
+  await page.getByTestId('run-payroll-regular-button').click();
+  await page.getByTestId(`salary-settlement-staff-${payrollStaff.id}`).click();
+  await page.getByTestId('salary-settlement-next-button').click();
+
+  await expect(page.getByTestId(`salary-settlement-withholding-rate-${payrollStaff.id}`)).toHaveValue('80');
+
+  const saveRequestPromise = page.waitForRequest(
+    (request) => request.url().includes('/payroll_records') && request.method() === 'POST'
+  );
+
+  await page.getByTestId('salary-settlement-finalize-button').click();
+
+  const saveRequest = await saveRequestPromise;
+  const payload = saveRequest.postDataJSON() as any[] | any;
+  const record = Array.isArray(payload) ? payload[0] : payload;
+
+  expect(record.deduction_detail.withholding_rate_percent).toBe(80);
 });
 
 test('regular payroll settlement includes saved position allowance in taxable pay', async ({
@@ -380,6 +551,7 @@ test('regular payroll settlement applies withholding ratio and qualifying child 
 
 test('payroll detail shows taxable allowance rows from the saved breakdown', async ({ page }) => {
   const yearMonth = new Date().toISOString().slice(0, 7);
+  const [year, month] = yearMonth.split('-');
   const payrollStaff = {
     id: 'payroll-slip-1',
     employee_no: 'PAY-SLIP-001',
@@ -470,6 +642,72 @@ test('payroll detail shows taxable allowance rows from the saved breakdown', asy
   await expect(page.getByText('연장수당', { exact: true })).toBeVisible();
   await expect(page.getByText('야간근로수당', { exact: true })).toBeVisible();
   await expect(page.getByText('연차휴가수당', { exact: true })).toBeVisible();
+  await expect(page.getByText(`${year}년 ${Number(month)}월 급여명세서`, { exact: true })).toBeVisible();
+  await expect(page.getByText('귀하의 노고에 감사드립니다.', { exact: true })).toBeVisible();
+  await expect(page.getByText('총 정산금액', { exact: true })).toBeVisible();
+  await expect(page.getByText('Premium Payroll')).toHaveCount(0);
+  await expect(page.getByText('Payment Summary')).toHaveCount(0);
+  await expect(page.getByText('Verified By')).toHaveCount(0);
+});
+
+test('payroll ledger shows a pending placeholder instead of a finalized slip when no payroll record exists', async ({
+  page,
+}) => {
+  const payrollStaff = {
+    id: 'payroll-pending-1',
+    employee_no: 'PAY-PENDING-001',
+    name: '정산대기직원',
+    company: fakeUser.company,
+    company_id: fakeUser.company_id,
+    department: fakeUser.department,
+    position: '사원',
+    base_salary: 2900000,
+    meal_allowance: 200000,
+    night_duty_allowance: 0,
+    vehicle_allowance: 0,
+    childcare_allowance: 0,
+    research_allowance: 0,
+    other_taxfree: 0,
+    permissions: {},
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [payrollStaff],
+    payrollRecords: [],
+    attendances: [],
+  });
+
+  await seedSession(page, {
+    user: {
+      ...fakeUser,
+      company: payrollStaff.company,
+      department: payrollStaff.department,
+    },
+    localStorage: {
+      erp_last_menu: '인사관리',
+      erp_last_subview: '급여',
+      erp_hr_tab: '급여',
+      erp_hr_workspace: '근태 및 급여',
+    },
+  });
+
+  await page.goto(`/main?${new URLSearchParams({ open_menu: '인사관리' }).toString()}`);
+
+  await expect(page.getByTestId('payroll-view')).toBeVisible();
+  await page.getByTestId('hr-company-select').selectOption(fakeUser.company);
+  await page.getByTestId('payroll-tab-급여대장').click();
+
+  const pendingRow = page.locator('tr').filter({
+    has: page.getByText(payrollStaff.name, { exact: true }),
+  });
+  await expect(pendingRow.getByText('정산중', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('payroll-ledger-pending-placeholder')).toContainText(
+    `${payrollStaff.name}님의`,
+  );
+  await expect(page.getByTestId('payroll-ledger-pending-placeholder')).toContainText(
+    '급여는 아직 정산중입니다',
+  );
+  await expect(page.getByTestId('salary-detail-card')).toHaveCount(0);
 });
 
 test.skip('interim settlement prorates vehicle and fixed allowances and stores deductions', async ({ page }) => {

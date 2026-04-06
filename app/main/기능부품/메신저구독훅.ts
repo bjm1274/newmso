@@ -229,10 +229,14 @@ export function useChatRealtimeSubscriptions({
           (payload.old as Record<string, unknown> | null) ||
           null;
         const updatedRoomId = String(updatedRow?.room_id || '').trim();
-        if (!updatedRoomId || !isRoomInSelectedConversationRef.current(updatedRoomId, chatRoomsRef.current)) return;
-        const updatedUserId = updatedRow?.user_id;
-        if (updatedUserId && String(updatedUserId) === String(effectiveChatUserId || '')) return;
-        void fetchDataLatestRef.current();
+        if (!updatedRoomId) return;
+        // 현재 열린 대화방의 커서 변경(타인)은 fetchData로 읽음수 즉시 갱신
+        if (isRoomInSelectedConversationRef.current(updatedRoomId, chatRoomsRef.current)) {
+          const updatedUserId = updatedRow?.user_id;
+          // 내 자신의 커서 변경은 무시 (이미 setRoomUnreadCounts로 처리됨)
+          if (updatedUserId && String(updatedUserId) === String(effectiveChatUserId || '')) return;
+          void fetchDataLatestRef.current();
+        }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reads' }, () => fetchDataLatestRef.current())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, () => fetchDataLatestRef.current())

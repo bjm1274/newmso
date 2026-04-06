@@ -157,7 +157,7 @@ export function buildPayrollVerificationReport(
       issues.push({
         code: 'advance-pay-applied',
         level: 'info',
-        message: `${row.staffName}는 선지급 정산으로 처리됩니다.`,
+        message: `${row.staffName}는 선지급 차감이 적용됩니다.`,
         staffId: row.staffId,
         staffName: row.staffName,
       });

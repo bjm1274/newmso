@@ -193,8 +193,8 @@ export function resolveIncomeTaxBracket(rates?: Partial<TaxInsuranceRates> | nul
 
 export function normalizeWithholdingRatePercent(value: number | string | null | undefined): 80 | 100 | 120 {
   const parsed = Number(value);
-  if (parsed === 80 || parsed === 120) return parsed;
-  return 100;
+  if (parsed === 80 || parsed === 100 || parsed === 120) return parsed;
+  return 80;
 }
 
 export function calculateQualifyingChildTaxCredit(value: number | string | null | undefined): number {

@@ -124,9 +124,13 @@ export default function PayrollMain({
   const [yearMonth, setYearMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
   const [payrollRecords, setPayrollRecords] = useState<PayrollRecordRow[]>([]);
   const [payrollAudit, setPayrollAudit] = useState<{ orphanCount: number; officialBracketConfigured: boolean } | null>(null);
+  const [payrollReloadNonce, setPayrollReloadNonce] = useState(0);
 
   const filtered: Staff[] = selectedCo === '전체' ? staffs : staffs.filter((s: Staff) => s.company === selectedCo);
-  const current = filtered.find((s) => s.id === selectedStaffId) || filtered[0];
+  const current =
+    filtered.find((s) => s.id === selectedStaffId) ||
+    filtered.find((staff) => payrollRecords.some((row) => String(row.staff_id) === String(staff.id))) ||
+    filtered[0];
   const currentRecord = current
     ? payrollRecords.find((row) => String(row.staff_id) === String(current.id))
     : null;
@@ -236,8 +240,14 @@ export default function PayrollMain({
         local_tax: currentRecord.local_tax ?? undefined,
         net_pay: currentRecord.net_pay ?? undefined,
         advance_pay: currentRecord.advance_pay ?? undefined,
+        status: currentRecord.status ?? undefined,
       }
     : undefined;
+
+  const refreshPayrollWorkspace = () => {
+    setPayrollReloadNonce((prev) => prev + 1);
+    onRefresh?.();
+  };
 
   // 선택된 월·회사에 대한 급여 정산 결과 불러오기
   useEffect(() => {
@@ -263,7 +273,7 @@ export default function PayrollMain({
         setPayrollRecords([]);
       }
     })();
-  }, [yearMonth, filtered.map(s => s.id).join(',')]);
+  }, [yearMonth, filtered.map(s => s.id).join(','), payrollReloadNonce]);
 
   useEffect(() => {
     (async () => {
@@ -389,7 +399,7 @@ export default function PayrollMain({
             {activeTab === '대시보드' && <HRDashboardIntegrated staffs={filtered} selectedCo={selectedCo} checkedIds={checkedIds} yearMonth={yearMonth} />}
 
             {activeTab === '급여정산' && (
-              <RunPayrollWizard staffs={staffs} selectedCo={selectedCo} onRefresh={onRefresh} />
+              <RunPayrollWizard staffs={staffs} selectedCo={selectedCo} onRefresh={refreshPayrollWorkspace} />
             )}
 
             {activeTab === '급여대장' && (
@@ -412,9 +422,24 @@ export default function PayrollMain({
                   />
                 </div>
                 <div className="xl:col-span-3 space-y-4">
-                  {currentSalaryDetailStaff && (
+                  {currentSalaryDetailStaff && currentSalaryDetailRecord ? (
                     <SalaryDetail staff={currentSalaryDetailStaff} record={currentSalaryDetailRecord} />
-                  )}
+                  ) : current ? (
+                    <div
+                      data-testid="payroll-ledger-pending-placeholder"
+                      className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] px-6 py-10 text-center shadow-sm"
+                    >
+                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--muted)] text-2xl">🧾</div>
+                      <h3 className="mt-4 text-xl font-bold text-[var(--foreground)]">
+                        {current.name}님의 {periodLabel} 급여는 아직 정산중입니다
+                      </h3>
+                      <p className="mt-2 text-sm leading-relaxed text-[var(--toss-gray-3)]">
+                        좌측 목록에 아직 정산중으로 표시된 직원은 저장된 급여 레코드가 없어 명세서를 보여주지 않습니다.
+                        <br />
+                        급여정산에서 저장 또는 확정한 뒤 다시 확인해 주세요.
+                      </p>
+                    </div>
+                  ) : null}
                   <aside className="grid grid-cols-1 gap-4">
                     {current && <SalaryChangeHistory staffId={String(current.id)} staffName={current.name} />}
                   </aside>
@@ -465,14 +490,14 @@ export default function PayrollMain({
             {activeTab === '세전세후' && <GrossNetComparison staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
             {activeTab === '미지급수당' && <UnpaidAllowanceAlert staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
             {activeTab === '급여고도화' && (
-              <PayrollAdvancedCenter
-                staffs={staffs}
-                selectedCo={selectedCo}
-                yearMonth={yearMonth}
-                payrollRecords={payrollAdvancedRecords}
-                onRefresh={onRefresh}
-              />
-            )}
+                <PayrollAdvancedCenter
+                  staffs={staffs}
+                  selectedCo={selectedCo}
+                  yearMonth={yearMonth}
+                  payrollRecords={payrollAdvancedRecords}
+                  onRefresh={refreshPayrollWorkspace}
+                />
+              )}
             {activeTab === '무급결근차감' && <UnpaidAbsenceDeduction staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
           </>
         ) : (

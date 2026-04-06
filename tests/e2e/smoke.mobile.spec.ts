@@ -137,6 +137,113 @@ test('mobile chat room list opens the selected room at the latest message', asyn
     .toBe(true);
 });
 
+test('mobile chat keeps the latest message visible after delayed attachments finish loading', async ({ page }) => {
+  const delayedImagePath = 'https://cdn.example.com/e2e-chat-delayed-image.png';
+  const delayedImagePngBase64 =
+    'iVBORw0KGgoAAAANSUhEUgAAAMgAAADICAIAAAAiOjnJAAAD5ElEQVR4nO3SQQ0AIBDAsAP/nuGNAvZoFSzZnpl5B3g7A+DNDAyDNzMwDN7MwDB4MwPD4M0MDIM3MzAM3szAMHgzA8PgzQwMgzczMAzezMAweDMDw+DNDAyDNzMwDN7MwDB4MwPD4M0MDIM3MzAM3szAMHgzA8PgzQwMgzczMAzezMAweDMDw+DNDAyDNzMwDN7MwDB4MwPD4M0MDIM3MzAM3szAMHgzA8PgzQwMgzczMAzezMAweDMDw+DNDAyDNzMwDN7MwDB4MwPD4M0MDIM3MzAM3szAMHgzA8PgzQwMgzczMAzezMAweDMDw+DNDAyDNzMwDN7MwDB4MwPD4M0MDIM3MzAM3szAMHgzA8PgzQwMgzczMAzezMAweDMDw+DNDAyDNzMwDN7MwDB4MwPD4M0MDIM3MzAM3szAMHgzA8PgzQwMgzczMAzezMAweDMDw+DNDAyDNzMwDN7MwDB4MwPD4M0MDIM3MzAM3szAMHgzA8PgzQwMgzczMAzezMAweDMDw+DNDAyDNzMwDN7MwDB4MwPD4M0MDIM3MzAM3szAMHgzA8PgzQwMgzczMAzezMAweDMDw+DNDAyDNzMwDN7MwDB4MwPD4M0MDIM3MzAM3szAMHgzA8PgzQwMgzczMAzezMAweDMDw+DNDAyDNzMwDN7MwDB4MwPD4M0MDIM3MzAM3szAMHgzA8PgzQwMgzczMAzezMAweDMDw+DNDAyDNzMwDN7MwDB4MwPD4M0MDIM3MzAM3szAMHgzA8PgzQwMgzczMAzezMAweDMDw+DNDAyDNzMwDN7MwDB4MwPD4M0MDIM3MzAM3szAMHgzA8PgzQwMgzczMAzezMAweDMDw+DNDAyDNzMwDN7MwDB4MwPD4M0MDIM3MzAM3szAMHgzA8PgzQwMgzczMAzezMAweDMDw+DNDAyDNzMwDN7MwDB4MwPD4M0MDIM3MzAM3szAMHgzA8PgzQwMg7c3KxgEy2veVwAAAABJRU5ErkJggg==';
+  const longMessages = Array.from({ length: 28 }, (_, index) => ({
+    id: `msg-mobile-attach-${index + 1}`,
+    room_id: 'room-mobile-attachments',
+    sender_id: index % 2 === 0 ? fakeUser.id : 'peer-mobile-attachment',
+    content: `mobile attachment message ${index + 1}`,
+    created_at: `2026-03-08T10:${String(index).padStart(2, '0')}:00.000Z`,
+    is_deleted: false,
+    staff: { name: index % 2 === 0 ? fakeUser.name : 'Attachment Peer', photo_url: null },
+  }));
+
+  await page.route('**/e2e-chat-delayed-image.png', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    await route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      body: Buffer.from(delayedImagePngBase64, 'base64'),
+    });
+  });
+
+  await mockSupabase(page, {
+    chatRooms: [
+      {
+        id: '00000000-0000-0000-0000-000000000000',
+        name: 'Notice',
+        type: 'notice',
+        members: [],
+        created_at: '2026-03-08T00:00:00.000Z',
+        last_message_at: '2026-03-08T10:29:00.000Z',
+      },
+      {
+        id: 'room-mobile-attachments',
+        name: 'Mobile Attachment Room',
+        type: 'group',
+        members: [fakeUser.id, 'peer-mobile-attachment'],
+        created_at: '2026-03-08T09:00:00.000Z',
+        last_message_at: '2026-03-08T10:29:00.000Z',
+        last_message_preview: 'latest text after attachment',
+      },
+    ],
+    staffMembers: [
+      fakeUser,
+      {
+        ...fakeUser,
+        id: 'peer-mobile-attachment',
+        name: 'Attachment Peer',
+        employee_no: 'E2E-CHAT-MOBILE-ATTACH',
+      },
+    ],
+    messages: [
+      ...longMessages,
+      {
+        id: 'msg-mobile-attachment-image',
+        room_id: 'room-mobile-attachments',
+        sender_id: 'peer-mobile-attachment',
+        content: '',
+        file_url: delayedImagePath,
+        file_name: 'delayed-image.png',
+        file_kind: 'image',
+        created_at: '2026-03-08T10:28:00.000Z',
+        is_deleted: false,
+        staff: { name: 'Attachment Peer', photo_url: null },
+      },
+      {
+        id: 'msg-mobile-attachment-latest',
+        room_id: 'room-mobile-attachments',
+        sender_id: 'peer-mobile-attachment',
+        content: 'latest text after attachment',
+        created_at: '2026-03-08T10:29:00.000Z',
+        is_deleted: false,
+        staff: { name: 'Attachment Peer', photo_url: null },
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '채팅',
+    },
+  });
+
+  await page.goto(`/main?${new URLSearchParams({ open_menu: '채팅' }).toString()}`);
+  await expect(page.getByTestId('chat-view')).toBeVisible();
+  const backToRoomListButton = page.getByRole('button', { name: '뒤로' });
+  if (await backToRoomListButton.isVisible().catch(() => false)) {
+    await backToRoomListButton.click();
+  }
+
+  await page.getByTestId('chat-room-room-mobile-attachments').click();
+  await expect(page.getByTestId('chat-message-msg-mobile-attachment-latest')).toBeVisible();
+
+  await page.waitForTimeout(1300);
+
+  await expect(page.getByTestId('chat-message-msg-mobile-attachment-latest')).toBeVisible();
+  await expect
+    .poll(async () =>
+      page.getByTestId('chat-message-list').evaluate((node) => {
+        const el = node as HTMLDivElement;
+        return Math.abs(el.scrollHeight - el.clientHeight - el.scrollTop) <= 24;
+      }),
+    )
+    .toBe(true);
+});
+
 test('mobile chat menu opens the room list as the chat main screen', async ({ page }) => {
   await mockSupabase(page, {
     chatRooms: [

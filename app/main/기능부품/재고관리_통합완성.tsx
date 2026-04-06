@@ -193,6 +193,10 @@ export default function IntegratedInventoryManagement({
   const [activeView, setActiveView] = useState(
     canAccessInventorySection(user, initialResolvedView.view) ? initialResolvedView.view : defaultInventoryView
   );
+  const hasRestoredViewRef = useRef(false);
+  const lastRequestedInitialViewRef = useRef<string | null>(
+    initialView && (VALID_VIEWS as readonly string[]).includes(initialView) ? initialView : null
+  );
   const [viewCompany, setViewCompany] = useState<string>('전체'); // 현황 탭용 회사 선택
   const [selectedDept, setSelectedDept] = useState('전체');
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -569,22 +573,42 @@ export default function IntegratedInventoryManagement({
   // 로컬스토리지 복구 또는 initialView 반영
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const requestedView =
-      initialView && (VALID_VIEWS as readonly string[]).includes(initialView)
-        ? initialView
-        : window.localStorage.getItem(INV_VIEW_KEY);
+    const normalizedInitialView =
+      initialView && (VALID_VIEWS as readonly string[]).includes(initialView) ? initialView : null;
+    const shouldBootstrapFromStorage = !hasRestoredViewRef.current;
+    const shouldApplyExternalView = normalizedInitialView !== lastRequestedInitialViewRef.current;
+    const requestedView = normalizedInitialView || (shouldBootstrapFromStorage ? window.localStorage.getItem(INV_VIEW_KEY) : null);
 
-    if (!requestedView || !(VALID_VIEWS as readonly string[]).includes(requestedView)) return;
-    if (!canAccessInventorySection(user, requestedView) && !fallbackInventoryView) return;
+    if (!requestedView || !(VALID_VIEWS as readonly string[]).includes(requestedView)) {
+      hasRestoredViewRef.current = true;
+      lastRequestedInitialViewRef.current = normalizedInitialView;
+      return;
+    }
+    if (!canAccessInventorySection(user, requestedView) && !fallbackInventoryView) {
+      hasRestoredViewRef.current = true;
+      lastRequestedInitialViewRef.current = normalizedInitialView;
+      return;
+    }
 
     const nextView = canAccessInventorySection(user, requestedView) ? requestedView : fallbackInventoryView;
-    if (!nextView) return;
+    if (!nextView) {
+      hasRestoredViewRef.current = true;
+      lastRequestedInitialViewRef.current = normalizedInitialView;
+      return;
+    }
 
-    const resolved = resolveInventoryView(nextView);
-    applyResolvedView(nextView);
-    try {
-      window.localStorage.setItem(INV_VIEW_KEY, resolved.view);
-    } catch { /* ignore */ }
+    if (shouldBootstrapFromStorage || shouldApplyExternalView) {
+      const resolved = resolveInventoryView(nextView);
+      applyResolvedView(nextView);
+      try {
+        window.localStorage.setItem(INV_VIEW_KEY, resolved.view);
+      } catch {
+        // ignore localStorage failures
+      }
+    }
+
+    hasRestoredViewRef.current = true;
+    lastRequestedInitialViewRef.current = normalizedInitialView;
   }, [applyResolvedView, fallbackInventoryView, initialView, user]);
 
   useEffect(() => {

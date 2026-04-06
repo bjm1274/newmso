@@ -335,19 +335,30 @@ function erpNormalizeNotificationPayload(raw) {
 }
 
 function erpBuildNotificationOptions(payload) {
+  const isChatNotification = Boolean(
+    payload.data && (payload.data.room_id || payload.data.type === 'message' || payload.data.type === 'mention')
+  );
+  // 채팅 알림은 답장 버튼 포함 (Web Notification Actions API)
+  const actions = isChatNotification
+    ? [
+        { action: 'reply', title: '답장', type: 'text', placeholder: '메시지 입력...' },
+        { action: 'open', title: '열기' },
+      ]
+    : [
+        { action: 'open', title: '확인하기' },
+        { action: 'close', title: '닫기' },
+      ];
+
   return {
     body: payload.body,
     icon: ERP_PUSH_ICON_URL,
     badge: ERP_PUSH_BADGE_URL,
     tag: payload.tag,
     requireInteraction: false,
-    renotify: false,
-    vibrate: [1000],
+    renotify: true,
+    vibrate: [200, 100, 200],
     data: payload.data,
-    actions: [
-      { action: 'open', title: '확인하기' },
-      { action: 'close', title: '닫기' },
-    ],
+    actions,
   };
 }
 
@@ -368,24 +379,12 @@ async function erpDisplayIncomingNotification(rawPayload) {
     // ignore badge failures
   }
 
-  const shouldShowForegroundPopup = erpShouldShowForegroundPopup(payload);
-  const previewPayload = shouldShowForegroundPopup
-    ? {
-        ...payload,
-        data: {
-          ...(payload.data && typeof payload.data === 'object' ? payload.data : {}),
-          _foreground_popup_shown: true,
-        },
-      }
-    : payload;
-
-  const hasVisibleClient = await erpBroadcastPreviewToVisibleClients(previewPayload);
-  await erpBroadcastDebug('preview-sync', '보이는 앱 화면과 알림 미리보기를 동기화했습니다.', {
+  // 앱이 포그라운드(화면 표시 중)여도 항상 시스템 알림 표시 (카카오톡 방식)
+  // 동시에 앱 내부에 preview broadcast해서 인앱 토스트도 표시
+  await erpBroadcastPreviewToVisibleClients(payload);
+  await erpBroadcastDebug('preview-sync', '앱 화면에 알림 미리보기를 전송했습니다.', {
     tag: payload.tag,
-    hasVisibleClient,
-    shouldShowForegroundPopup,
   });
-  if (hasVisibleClient && !shouldShowForegroundPopup) return;
 
   try {
     await self.registration.showNotification(payload.title, erpBuildNotificationOptions(payload));
@@ -587,6 +586,35 @@ async function erpHandleNotificationClick(event) {
   if (event.action === 'close') return;
 
   const data = event.notification.data || {};
+
+  // 알림에서 답장 버튼 처리 (Notification Actions API reply)
+  if (event.action === 'reply' && event.reply) {
+    const replyText = erpNormalizeString(event.reply);
+    const roomId = erpNormalizeString(data.room_id);
+    if (roomId && replyText) {
+      try {
+        await fetch('/api/chat/quick-reply', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ room_id: roomId, content: replyText }),
+        });
+        await erpMarkNotificationAsRead(data);
+        // 새 알림을 업데이트해서 답장 완료 표시
+        await self.registration.showNotification('답장을 보냈습니다', {
+          body: replyText,
+          icon: ERP_PUSH_ICON_URL,
+          badge: ERP_PUSH_BADGE_URL,
+          tag: `${erpNormalizeString(data.tag || data.room_id)}-reply-sent`,
+          data: { room_id: roomId },
+        });
+      } catch {
+        // 실패 시 앱 열기로 폴백 (아래 로직 계속 실행)
+      }
+      return;
+    }
+  }
+
   await erpMarkNotificationAsRead(data);
   await erpFlushRetryQueue();
   const targetUrl = erpBuildTargetUrl(data);

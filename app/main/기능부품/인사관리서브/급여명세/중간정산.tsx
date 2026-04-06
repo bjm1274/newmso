@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { formatPayrollMutationError } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
-import { calculateSeverancePay, formatWorkPeriod } from '@/lib/severance-pay';
+import { calculateSeverancePayFromMonthlyWage, formatWorkPeriod } from '@/lib/severance-pay';
 import { logAudit } from '@/lib/audit';
 import { fetchTaxFreeSettings, DEFAULT_SETTINGS, type TaxFreeSettings } from '@/lib/use-tax-free-settings';
 import {
@@ -102,8 +102,8 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
         const j = new Date(joined);
         const r = new Date(resigned);
         workDays = Math.max(0, Math.floor((r.getTime() - j.getTime()) / (1000 * 60 * 60 * 24)));
-        const avgWage = base + (mealAllowance || 0);
-        severance = calculateSeverancePay(avgWage, workDays);
+        const monthlyAvgWage = base + (mealAllowance || 0);
+        severance = calculateSeverancePayFromMonthlyWage(monthlyAvgWage, workDays);
       }
     }
 
@@ -159,7 +159,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
       (staff.withholding_rate_percent ??
         (staff.permissions?.payroll as Record<string, unknown> | undefined)?.withholding_rate_percent ??
         (staff.permissions?.tax as Record<string, unknown> | undefined)?.withholding_rate_percent ??
-        100) as number | string | null | undefined
+        80) as number | string | null | undefined
     );
     const insuranceSettings = (staff.permissions?.insurance as Record<string, unknown> | undefined) || {};
     const applyInsurance = insuranceSettings.national !== false;

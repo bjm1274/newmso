@@ -1,6 +1,6 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import type { StaffMember } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { isActiveStaff } from '@/lib/active-staff';
@@ -9,6 +9,7 @@ import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import { getChecklistTargetDate, getDefaultChecklist } from '@/lib/hr-checklists';
 import { getMinimumWageByYear, MONTHLY_STANDARD_HOURS } from '@/lib/tax-free-limits';
 import { calculateHourlyRateFromMonthlySalary, getMonthlyWorkingHours } from '@/lib/payroll-working-hours';
+import { buildProfilePhotoUrlFromPath, getProfilePhotoUrl } from '@/lib/profile-photo';
 import StaffHistoryTimeline from './인사이력타임라인';
 import OnboardingChecklist from './급여명세/입퇴사온보딩';
 import CertTransferPanel from './교육자격인사이동패널';
@@ -137,6 +138,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const [새근무형태, 새근무형태설정] = useState({ name: '', start_time: '09:00', end_time: '18:00', break_start_time: '12:00', break_end_time: '13:00' });
   const [activeTab, setActiveTab] = useState('기본'); // '기본', '소속', '급여'
   const [신규직원, 신규직원설정] = useState(() => createEmptyStaffForm(선택사업체 ?? undefined));
+  const [프로필사진파일, 프로필사진파일설정] = useState<File | null>(null);
+  const [프로필사진미리보기, 프로필사진미리보기설정] = useState<string | null>(null);
   const previousModalOpenRef = useRef(false);
   const [companySelectOptions, setCompanySelectOptions] = useState<string[]>([]);
   // 직원목록에서 회사 목록 동적 생성
@@ -472,6 +475,89 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     return ['진료부', '간호부', '총무부', '진료팀', '병동팀', '수술팀', '외래팀', '외래간호팀', '검사팀', '원무팀', '총무팀', '행정팀', '관리팀', '영양팀'];
   };
 
+  const 프로필사진선택 = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    event.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast('프로필 사진은 이미지 파일만 등록할 수 있습니다.', 'warning');
+      return;
+    }
+
+    프로필사진파일설정(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      프로필사진미리보기설정(typeof reader.result === 'string' ? reader.result : null);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const 프로필사진업로드 = async (
+    staffId: string | number,
+    file: File,
+    currentStaff?: Record<string, unknown> | null,
+  ) => {
+    const filePath = `${staffId}/avatar`;
+    const uploadedAt = new Date().toISOString();
+    const { error: uploadError } = await supabase.storage
+      .from('profiles')
+      .upload(filePath, file, { upsert: true, contentType: file.type || undefined });
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data } = supabase.storage.from('profiles').getPublicUrl(filePath);
+    const photoUrl =
+      buildProfilePhotoUrlFromPath(filePath, uploadedAt) ||
+      `${data.publicUrl}?v=${encodeURIComponent(uploadedAt)}`;
+    const currentPermissions =
+      currentStaff?.permissions && typeof currentStaff.permissions === 'object' && !Array.isArray(currentStaff.permissions)
+        ? (currentStaff.permissions as Record<string, unknown>)
+        : {};
+    const nextPermissions = {
+      ...currentPermissions,
+      profile_photo_path: filePath,
+      profile_photo_updated_at: uploadedAt,
+      profile_photo_url: photoUrl,
+    };
+
+    const avatarUpdate = await supabase
+      .from('staff_members')
+      .update({ avatar_url: photoUrl, permissions: nextPermissions })
+      .eq('id', String(staffId));
+
+    if (avatarUpdate.error) {
+      if (!isMissingColumnError(avatarUpdate.error, 'avatar_url')) {
+        throw avatarUpdate.error;
+      }
+
+      const photoUpdate = await supabase
+        .from('staff_members')
+        .update({ photo_url: photoUrl, permissions: nextPermissions })
+        .eq('id', String(staffId));
+
+      if (photoUpdate.error) {
+        if (!isMissingColumnError(photoUpdate.error, 'photo_url')) {
+          throw photoUpdate.error;
+        }
+
+        const permissionsUpdate = await supabase
+          .from('staff_members')
+          .update({ permissions: nextPermissions })
+          .eq('id', String(staffId));
+
+        if (permissionsUpdate.error) {
+          throw permissionsUpdate.error;
+        }
+      }
+    }
+
+    프로필사진파일설정(null);
+    프로필사진미리보기설정(photoUrl);
+    return { photoUrl, filePath, uploadedAt };
+  };
+
   const 직원고용형태 = (직원: StaffMember): string => (직원?.permissions?.employment_type as string) || '정규직';
   const 직원면허요약 = (직원: StaffMember) => {
     const parts = [직원?.license, 직원?.permissions?.license_no, 직원?.permissions?.license_note]
@@ -498,6 +584,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
     const defaultCompany = 선택사업체 && 선택사업체 !== '전체' ? 선택사업체 : '';
     const defaultTeam = 팀목록가져오기(defaultCompany)[0] ?? '원무팀';
+    프로필사진파일설정(null);
+    프로필사진미리보기설정(null);
 
     신규직원설정({
       ...createEmptyStaffForm(defaultCompany),
@@ -531,6 +619,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     if (!신규직원.성명 || !신규직원.입사일 || 신규직원.입사일 === '0000-00-00' || 신규직원.입사일 === '') return toast('성함과 실제 입사일은 필수 입력 사항입니다.', 'warning');
     try {
       const actor = readClientAuditActor();
+      let 프로필사진업로드경고: string | null = null;
       const dateOrNull = (val: string) => (val === '0000-00-00' || val === '0000-00' || !val || val === '') ? null : val;
       const duplicateStaff = await findDuplicateStaffMember(
         신규직원.성명,
@@ -641,7 +730,17 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           actor.userId,
           actor.userName
         );
-        toast('직원 정보가 수정되었습니다.', 'success');
+
+        if (프로필사진파일 && afterStaff.id) {
+          try {
+            await 프로필사진업로드(afterStaff.id, 프로필사진파일, afterStaff as Record<string, unknown>);
+          } catch (photoError) {
+            console.error('직원 프로필 사진 업로드 실패:', photoError);
+            프로필사진업로드경고 = '직원 정보는 수정되었지만 프로필 사진 업로드는 실패했습니다.';
+          }
+        }
+
+        toast(프로필사진업로드경고 || '직원 정보가 수정되었습니다.', 프로필사진업로드경고 ? 'warning' : 'success');
       } else {
         // 사번 부여 로직: 박철홍이면 1, 아니면 기존 숫자 사번의 최대값 다음 번호 사용
         let newEmployeeNo = '';
@@ -724,12 +823,25 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           actor.userId,
           actor.userName
         );
+
+        if (프로필사진파일 && insertedStaff?.id) {
+          try {
+            await 프로필사진업로드(insertedStaff.id, 프로필사진파일, insertedStaff as Record<string, unknown>);
+          } catch (photoError) {
+            console.error('신규 직원 프로필 사진 업로드 실패:', photoError);
+            프로필사진업로드경고 = '직원은 등록되었지만 프로필 사진 업로드는 실패했습니다.';
+          }
+        }
+
         toast(
           onboardingChecklistInitFailed
             ? `직원 등록 완료!\n로그인 아이디: 사번 ${newEmployeeNo} 또는 이름 ${신규직원.성명}\n(온보딩 패키지 자동 생성은 실패해 직원 상세에서 다시 생성됩니다.)`
             : `직원 등록 완료!\n로그인 아이디: 사번 ${newEmployeeNo} 또는 이름 ${신규직원.성명}\n(동명이인이 있으면 사번으로 로그인하세요)`,
           onboardingChecklistInitFailed ? 'warning' : 'success',
         );
+        if (프로필사진업로드경고) {
+          toast(프로필사진업로드경고, 'warning');
+        }
       }
       닫기함수(); 새로고침?.();
     } catch (error: unknown) {
@@ -743,6 +855,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
   const 수정시작 = (직원: StaffMember) => {
     선택된직원ID설정(직원.id);
+    프로필사진파일설정(null);
+    프로필사진미리보기설정(getProfilePhotoUrl(직원));
     const extensionValue = 직원.extension || 직원.permissions?.extension || '';
     const ins = (직원.permissions?.insurance as Record<string, unknown>) || { national: true, health: true, employment: true, injury: true };
     신규직원설정({
@@ -784,6 +898,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
   const 닫기함수 = () => {
     편집모드설정(false); 선택된직원ID설정(null);
+    프로필사진파일설정(null);
+    프로필사진미리보기설정(null);
     const defaultCompany = 선택사업체 && 선택사업체 !== '전체' ? 선택사업체 : '';
     신규직원설정({
       ...createEmptyStaffForm(defaultCompany),
@@ -1173,6 +1289,48 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
               <div className="min-h-[450px]">
                 {activeTab === '기본' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="md:col-span-2 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--page-bg)] p-4">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                        <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] bg-[var(--muted)] shadow-sm">
+                          {프로필사진미리보기 ? (
+                            <img
+                              src={프로필사진미리보기}
+                              alt={신규직원.성명 ? `${신규직원.성명} 프로필 사진` : '직원 프로필 사진'}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-4xl text-[var(--toss-gray-3)]">👤</span>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-bold text-[var(--foreground)]">프로필 사진</p>
+                          <p className="mt-1 text-[11px] font-medium text-[var(--toss-gray-3)]">
+                            신규 직원 등록 또는 구성원 정보 수정 저장 시 함께 반영됩니다.
+                          </p>
+                          {프로필사진파일 ? (
+                            <p className="mt-2 text-[11px] font-bold text-[var(--accent)]">
+                              선택한 파일: {프로필사진파일.name}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="shrink-0">
+                          <label
+                            htmlFor="new-staff-profile-photo-input"
+                            className="inline-flex cursor-pointer items-center justify-center rounded-[var(--radius-md)] border border-[var(--toss-blue-light)] bg-[var(--toss-blue-light)] px-4 py-2 text-xs font-bold text-[var(--accent)] transition-all hover:opacity-90"
+                          >
+                            {프로필사진미리보기 ? '사진 변경' : '사진 등록'}
+                          </label>
+                          <input
+                            id="new-staff-profile-photo-input"
+                            data-testid="new-staff-profile-photo-input"
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={프로필사진선택}
+                          />
+                        </div>
+                      </div>
+                    </div>
                     <div className="space-y-4">
                       <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
                         <span className="w-1.5 h-4 bg-[var(--accent)] rounded-full" />

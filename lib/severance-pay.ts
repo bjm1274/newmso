@@ -19,6 +19,10 @@ export function estimateDailyAvgWageFromMonthly(monthlyAvgWage: number, threeMon
   return (monthlyAvgWage * 3) / threeMonthDays;
 }
 
+export function calculateSeverancePayFromMonthlyWage(monthlyAvgWage: number, workDays: number, threeMonthDays = 91): number {
+  return calculateSeverancePay(estimateDailyAvgWageFromMonthly(monthlyAvgWage, threeMonthDays), workDays);
+}
+
 export function formatWorkPeriod(workDays: number): string {
   const y = Math.floor(workDays / 365);
   const m = Math.floor((workDays % 365) / 30);

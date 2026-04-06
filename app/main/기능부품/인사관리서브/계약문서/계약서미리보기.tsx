@@ -310,10 +310,9 @@ export default function ContractPreview({ staff, contract }: Props) {
 
   /** 섹션 본문을 줄 단위로 렌더링 */
   function renderSectionBody(body: string) {
-    // [임금 구성항목 예시] 서브섹션이 있으면 해당 부분을 실제 데이터 기반 표로 대체
     const hasSalarySection = body.includes('임금 구성항목');
 
-    const lines = body.split('\n').filter(l => l.trim());
+    const lines = body.split('\n');
     const result: React.ReactNode[] = [];
     let skipSalaryLines = false;
 
@@ -321,33 +320,82 @@ export default function ContractPreview({ staff, contract }: Props) {
       const trimmed = lines[i].trim();
       if (!trimmed) continue;
 
-      // [임금 구성항목 예시] 서브헤더를 만나면 실제 데이터 테이블로 대체
+      // [임금 구성항목] 서브헤더 → 실제 데이터 테이블로 대체
       if (hasSalarySection && trimmed.includes('임금 구성항목')) {
         result.push(<React.Fragment key={`salary-${i}`}>{renderSalaryTable()}</React.Fragment>);
         skipSalaryLines = true;
         continue;
       }
 
-      // 급여 데이터 파싱 행들 스킵 (실제 테이블로 이미 대체했으므로)
+      // 급여 raw 데이터 행 스킵
       if (skipSalaryLines) {
-        if (/^(구\s*성\s*항\s*목|기본급|식대|직책수당|기타수당|────)/.test(trimmed) || /금\s*액.*산\s*정/.test(trimmed)) {
+        if (/^(구\s*성\s*항\s*목|기본급|식대|직책수당|기타수당|────|자가운전|보육|연구)/.test(trimmed) || /금\s*액.*산\s*정/.test(trimmed)) {
           continue;
         }
-        // 다음 항(①) 또는 빈 줄에서 스킵 종료
-        if (/^[①②③④⑤⑥⑦⑧⑨⑩]/.test(trimmed) || trimmed.startsWith('제') || !trimmed) {
+        if (/^[1-9]\./.test(trimmed) || /^[①-⑩가-하]/.test(trimmed) || trimmed.startsWith('제')) {
           skipSalaryLines = false;
         } else {
           continue;
         }
       }
 
-      // [기타 서브헤더]
+      // 서명란: "사용자: ___(인/서명)" 패턴
+      if (/사용자\s*[:：]/.test(trimmed) && /인.서명/.test(trimmed)) {
+        result.push(
+          <div key={i} className="mt-4 mb-2 flex items-center gap-6 py-2 px-3 bg-slate-50 border border-slate-200 rounded-lg">
+            {trimmed.split(/\s{2,}|근로자\s*[:：]/).map((part, pi) => {
+              const label = pi === 0 ? '사용자' : '근로자';
+              const isFirst = pi === 0;
+              return (
+                <div key={pi} className="flex items-center gap-2 flex-1">
+                  <span className={`text-[10.5px] font-black shrink-0 ${isFirst ? 'text-slate-600' : 'text-blue-700'}`}>{label}</span>
+                  <div className={`flex-1 border-b-2 ${isFirst ? 'border-slate-400' : 'border-blue-400'} min-w-[80px]`} />
+                  <span className="text-[10px] text-slate-400 shrink-0">(인/서명)</span>
+                </div>
+              );
+            })}
+          </div>
+        );
+        continue;
+      }
+
+      // 체크박스 항목: □ 로 시작하는 줄
+      if (trimmed.startsWith('□')) {
+        const parts = trimmed.split(/□/).filter(Boolean);
+        result.push(
+          <div key={i} className="flex items-center gap-3 mt-2 pl-1">
+            {parts.map((part, pi) => (
+              <label key={pi} className="flex items-center gap-1.5 cursor-pointer select-none">
+                <span className="w-3.5 h-3.5 border-2 border-slate-400 rounded-sm inline-block shrink-0" />
+                <span className="text-[11.5px] text-slate-600">{part.trim()}</span>
+              </label>
+            ))}
+          </div>
+        );
+        continue;
+      }
+
+      // [서브헤더] — 임금 제외
       if (trimmed.startsWith('[') && trimmed.endsWith(']') && !trimmed.includes('임금')) {
         result.push(
-          <div key={i} className="mt-5 mb-2">
-            <span className="text-[11px] font-black text-blue-700 bg-blue-500/10 px-2.5 py-1 rounded-md">
+          <div key={i} className="mt-4 mb-1.5">
+            <span className="text-[11px] font-black text-blue-700 bg-blue-500/10 px-2.5 py-0.5 rounded-md">
               {trimmed.replace(/[\[\]]/g, '')}
             </span>
+          </div>
+        );
+        continue;
+      }
+
+      // 숫자 항목: "1." "2." 등
+      if (/^[0-9]+\./.test(trimmed)) {
+        const dotIdx = trimmed.indexOf('.');
+        const num = trimmed.slice(0, dotIdx + 1);
+        const rest = trimmed.slice(dotIdx + 1).trim();
+        result.push(
+          <div key={i} className="flex gap-2 mt-1.5">
+            <span className="text-slate-500 font-bold text-[12px] shrink-0 min-w-[18px]">{num}</span>
+            <span className="text-[12.5px] text-slate-700 leading-[1.85]">{rest}</span>
           </div>
         );
         continue;
@@ -358,9 +406,31 @@ export default function ContractPreview({ staff, contract }: Props) {
         const num = trimmed[0];
         const rest = trimmed.slice(1).trim();
         result.push(
-          <div key={i} className="flex gap-2 mt-2">
+          <div key={i} className="flex gap-2 mt-1.5">
             <span className="text-blue-600 font-black text-[12px] shrink-0 mt-[1px]">{num}</span>
-            <span className="text-[12.5px] text-[var(--toss-gray-5)] leading-[1.85]">{rest}</span>
+            <span className="text-[12.5px] text-slate-700 leading-[1.85]">{rest}</span>
+          </div>
+        );
+        continue;
+      }
+
+      // 가) 나) 다) 등 소항목
+      if (/^[가나다라마바사아자차카타파하]\)/.test(trimmed)) {
+        result.push(
+          <div key={i} className="flex gap-2 pl-5 mt-1">
+            <span className="text-slate-500 font-bold text-[11.5px] shrink-0">{trimmed.slice(0, 2)}</span>
+            <span className="text-[11.5px] text-slate-600 leading-[1.85]">{trimmed.slice(2).trim()}</span>
+          </div>
+        );
+        continue;
+      }
+
+      // 1) 2) 3) 등 세부항목
+      if (/^[0-9]+\)/.test(trimmed)) {
+        result.push(
+          <div key={i} className="flex gap-2 pl-8 mt-0.5">
+            <span className="text-slate-400 text-[11px] shrink-0">{trimmed.slice(0, trimmed.indexOf(')') + 1)}</span>
+            <span className="text-[11px] text-slate-500 leading-[1.8]">{trimmed.slice(trimmed.indexOf(')') + 1).trim()}</span>
           </div>
         );
         continue;
@@ -371,17 +441,16 @@ export default function ContractPreview({ staff, contract }: Props) {
         const content = trimmed.replace(/^[-·•]\s*/, '');
         result.push(
           <div key={i} className="flex gap-2 pl-5 mt-1">
-            <span className="text-[var(--toss-gray-3)] shrink-0 mt-[2px]">•</span>
-            <span className="text-[12px] text-[var(--toss-gray-4)] leading-[1.85]">{content}</span>
+            <span className="text-slate-400 shrink-0 mt-[2px]">•</span>
+            <span className="text-[12px] text-slate-600 leading-[1.85]">{content}</span>
           </div>
         );
         continue;
       }
 
       // 일반 텍스트
-      const indent = lines[i].match(/^\s*/)?.[0]?.length || 0;
       result.push(
-        <p key={i} className="text-[12.5px] text-[var(--toss-gray-5)] leading-[1.85]" style={indent > 2 ? { paddingLeft: '1.25rem' } : {}}>
+        <p key={i} className="text-[12.5px] text-slate-700 leading-[1.85] mt-1">
           {trimmed}
         </p>
       );
@@ -400,9 +469,9 @@ export default function ContractPreview({ staff, contract }: Props) {
   return (
     <div className="flex flex-col h-[900px] overflow-y-auto rounded-2xl border border-[var(--border)] relative custom-scrollbar bg-slate-100 print:bg-white print:border-none print:h-auto print:overflow-visible">
       {/* 상단 툴바 */}
-      <div className="sticky top-0 z-20 flex items-center justify-between px-5 py-3 bg-white/80 backdrop-blur-md border-b border-slate-200 print:hidden">
-        <div className="flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full bg-blue-500/100" />
+      <div className="sticky top-0 z-20 flex items-center justify-between px-4 py-2.5 bg-white/90 backdrop-blur-md border-b border-slate-200 print:hidden">
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
           <span className="text-[13px] font-bold text-slate-800">{staff.name}</span>
           <span className="text-[11px] text-slate-400">근로계약서</span>
         </div>
@@ -434,25 +503,22 @@ export default function ContractPreview({ staff, contract }: Props) {
               <p className="text-xs font-bold">계약서 구성 중...</p>
             </div>
           ) : (
-            <div className="flex flex-col flex-1 px-[52px] py-[48px]">
+            <div className="flex flex-col flex-1 px-[44px] py-[36px]">
 
               {/* ── 계약서 제목 ── */}
-              <div className="text-center mb-10">
-                <div className="inline-flex flex-col items-center gap-2">
-                  <p className="text-[11px] font-semibold text-slate-400 tracking-[0.3em] uppercase">Employment Agreement</p>
-                  <h1 className="text-[28px] font-black tracking-[0.35em] text-slate-900" style={{ fontFamily: 'Georgia, "Noto Serif KR", serif' }}>
-                    근 로 계 약 서
-                  </h1>
-                  <div className="flex items-center gap-2 mt-1">
-                    <div className="w-16 h-px bg-slate-800" />
-                    <div className="w-2 h-2 rotate-45 bg-slate-800" />
-                    <div className="w-16 h-px bg-slate-800" />
-                  </div>
+              <div className="text-center mb-6">
+                <h1 className="text-[26px] font-black tracking-[0.35em] text-slate-900" style={{ fontFamily: '"Noto Serif KR", Georgia, serif' }}>
+                  근 로 계 약 서
+                </h1>
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <div className="w-12 h-px bg-slate-400" />
+                  <div className="w-1.5 h-1.5 rotate-45 bg-slate-400" />
+                  <div className="w-12 h-px bg-slate-400" />
                 </div>
               </div>
 
               {/* ── 당사자 정보 표 ── */}
-              <div className="grid grid-cols-2 gap-4 mb-8">
+              <div className="grid grid-cols-2 gap-3 mb-5">
                 {/* 사용자 */}
                 <div className="rounded-xl overflow-hidden border border-slate-200">
                   <div className="px-3 py-2 bg-slate-800 text-white">
@@ -497,23 +563,23 @@ export default function ContractPreview({ staff, contract }: Props) {
               </div>
 
               {/* 구분선 */}
-              <div className="flex items-center gap-3 mb-7">
+              <div className="flex items-center gap-3 mb-5">
                 <div className="flex-1 h-px bg-slate-200" />
-                <div className="text-[10px] font-black text-slate-400 tracking-widest uppercase">Terms &amp; Conditions</div>
+                <div className="text-[10px] font-bold text-slate-400 tracking-widest">계 약 조 항</div>
                 <div className="flex-1 h-px bg-slate-200" />
               </div>
 
               {/* ── 계약 조항 ── */}
-              <div className="space-y-5">
+              <div className="space-y-4">
                 {sections.length > 0 ? sections.map((section, idx) => (
                   <div key={idx} className="group">
                     {/* 조 제목 */}
-                    <div className="flex items-center gap-2.5 mb-2.5">
+                    <div className="flex items-center gap-2 mb-2">
                       <span className="shrink-0 w-5 h-5 rounded-full bg-slate-800 text-white text-[9px] font-black flex items-center justify-center">{idx + 1}</span>
                       <h4 className="text-[12.5px] font-black text-slate-800">{section.title}</h4>
                     </div>
                     {/* 조 내용 */}
-                    <div className="ml-[30px] space-y-0.5">
+                    <div className="ml-[28px] space-y-0.5">
                       {renderSectionBody(section.body)}
                     </div>
                   </div>
@@ -526,36 +592,50 @@ export default function ContractPreview({ staff, contract }: Props) {
               </div>
 
               {/* ── 동의 문구 ── */}
-              <div className="mt-12 mb-8">
-                <div className="border border-slate-200 rounded-xl px-6 py-4 bg-[var(--muted)] text-center">
-                  <p className="text-[11.5px] font-bold text-slate-600 leading-relaxed">
-                    상기 근로계약의 내용을 충분히 이해하고 이에 동의하여 본 계약을 체결합니다.
+              <div className="mt-7 mb-4">
+                <div className="border border-slate-200 rounded-lg px-5 py-3 bg-slate-50 text-center">
+                  <p className="text-[12px] font-bold text-slate-700 leading-relaxed">
+                    하기 위의 부분을 합의합니다.
                   </p>
+                  <div className="flex items-center justify-center gap-3 mt-2">
+                    <span className="text-[11.5px] text-slate-600">근로자</span>
+                    <div className="border-b-2 border-slate-400 w-32" />
+                    <span className="text-[11px] text-slate-500">(서명)</span>
+                  </div>
                 </div>
               </div>
 
               {/* ── 날짜 ── */}
-              <div className="text-center mb-8">
-                <p className="text-[13px] font-bold tracking-[0.25em] text-slate-700">
+              <div className="text-center mb-5">
+                <p className="text-[13px] font-bold tracking-[0.35em] text-slate-700">
                   {contract?.requested_at
                     ? `${new Date(contract.requested_at as string).getFullYear()}년 ${String(new Date(contract.requested_at as string).getMonth() + 1).padStart(2, '0')}월 ${String(new Date(contract.requested_at as string).getDate()).padStart(2, '0')}일`
-                    : `${new Date().getFullYear()}년 ${String(new Date().getMonth() + 1).padStart(2, '0')}월 ${String(new Date().getDate()).padStart(2, '0')}일`
+                    : `${new Date().getFullYear()}년        월        일`
                   }
                 </p>
               </div>
 
-              {/* ── 서명란 ── */}
-              <div className="grid grid-cols-2 gap-6 mt-2">
+              {/* ── 최종 서명란 ── */}
+              <div className="grid grid-cols-2 gap-5 mt-2">
                 {/* 사용자 서명 */}
                 <div className="rounded-xl border border-slate-200 overflow-hidden">
                   <div className="px-4 py-2 bg-slate-800 text-white text-center">
                     <span className="text-[10px] font-black tracking-[0.2em]">사 용 자</span>
                   </div>
-                  <div className="p-4 space-y-1.5 relative min-h-[96px]">
-                    <p className="text-[11px] font-bold text-slate-700">{companyName}</p>
-                    <p className="text-[11px] text-slate-600">{ceoTitle} &nbsp;
-                      <span className="font-bold">{(company?.ceo_name as string) || '　　　　'}</span>
-                    </p>
+                  <div className="p-4 space-y-2 relative min-h-[100px]">
+                    <div className="flex items-center gap-2 text-[11px] text-slate-600">
+                      <span className="font-bold w-14 shrink-0">상호</span>
+                      <span className="font-semibold text-slate-800">{companyName}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] text-slate-600">
+                      <span className="font-bold w-14 shrink-0">{ceoTitle}</span>
+                      <span className="font-semibold text-slate-800">{(company?.ceo_name as string) || '　　　　'}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-1">
+                      <span className="font-bold w-14 shrink-0">서명</span>
+                      <div className="flex-1 border-b border-slate-300" />
+                      <span className="text-[10px] shrink-0">(인/서명)</span>
+                    </div>
                     {company?.seal_url ? (
                       <img
                         src={company.seal_url as string}
@@ -564,34 +644,47 @@ export default function ContractPreview({ staff, contract }: Props) {
                         alt="직인"
                       />
                     ) : (
-                      <div className="absolute bottom-2 right-3 w-12 h-12 border-2 border-red-400/50 rounded-full flex items-center justify-center rotate-[-8deg] opacity-40">
-                        <span className="text-[11px] text-red-500 font-black">인</span>
+                      <div className="absolute bottom-2 right-3 w-11 h-11 border-2 border-red-400/50 rounded-full flex items-center justify-center rotate-[-8deg] opacity-40">
+                        <span className="text-[10px] text-red-500 font-black">인</span>
                       </div>
                     )}
                   </div>
                 </div>
 
                 {/* 근로자 서명 */}
-                <div className="rounded-xl border border-blue-500/20 overflow-hidden">
+                <div className="rounded-xl border border-blue-200 overflow-hidden">
                   <div className="px-4 py-2 bg-blue-600 text-white text-center">
                     <span className="text-[10px] font-black tracking-[0.2em]">근 로 자</span>
                   </div>
-                  <div className="p-4 space-y-1.5 relative min-h-[96px]">
-                    <p className="text-[11px] font-bold text-slate-700">{staff.name}</p>
-                    <p className="text-[11px] text-slate-500">서명 &nbsp;
+                  <div className="p-4 space-y-2 relative min-h-[100px]">
+                    <div className="flex items-center gap-2 text-[11px] text-slate-600">
+                      <span className="font-bold w-14 shrink-0">성명</span>
+                      <span className="font-semibold text-slate-800">{staff.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] text-slate-600">
+                      <span className="font-bold w-14 shrink-0">부서/직위</span>
+                      <span className="text-slate-700">{[staff.department, staff.position].filter(Boolean).join(' / ') || '-'}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-1">
+                      <span className="font-bold w-14 shrink-0">서명</span>
                       {sig ? (
                         sig.startsWith('data:image') ? (
-                          <img src={sig} alt="서명" className="inline-block h-8 w-auto object-contain mix-blend-multiply" />
+                          <img src={sig} alt="서명" className="h-7 w-auto object-contain mix-blend-multiply" />
                         ) : (
-                          <span className="font-bold border-b border-slate-400 pb-px">{sig}</span>
+                          <span className="font-bold border-b border-slate-400 pb-px flex-1">{sig}</span>
                         )
                       ) : (
-                        <span className="text-blue-400 font-bold">서명 대기중</span>
+                        <div className="flex items-center flex-1 gap-2">
+                          <div className="flex-1 border-b border-blue-300" />
+                          <span className="text-[10px] text-slate-400 shrink-0">(인/서명)</span>
+                        </div>
                       )}
-                    </p>
+                    </div>
                     {!sig && (
-                      <div className="absolute bottom-2 right-3 w-14 h-7 border border-dashed border-blue-300 rounded flex items-center justify-center">
-                        <span className="text-[9px] text-blue-300 font-bold">SIGN</span>
+                      <div className="absolute bottom-2 right-3 opacity-30">
+                        <div className="w-11 h-11 border-2 border-dashed border-blue-400 rounded-full flex items-center justify-center">
+                          <span className="text-[9px] text-blue-500 font-black">인</span>
+                        </div>
                       </div>
                     )}
                   </div>

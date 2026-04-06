@@ -40,6 +40,77 @@ test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
 });
 
+test('contract sending succeeds even when employment_contracts misses conditions_applied_at', async ({
+  page,
+}) => {
+  const hrUser = {
+    ...fakeUser,
+    id: 'hr-contract-1',
+    employee_no: 'HR-C-001',
+    name: '계약담당자',
+    company: '박철홍정형외과',
+    company_id: 'hospital-1',
+    department: '경영지원팀',
+    team: '관리팀',
+    position: '실장',
+    role: 'manager',
+    permissions: {
+      ...fakeUser.permissions,
+      hr: true,
+      menu_인사관리: true,
+      hr_계약: true,
+    },
+  };
+
+  const targetStaff = {
+    ...fakeUser,
+    id: 'contract-target-1',
+    employee_no: 'CT-001',
+    name: '계약대상자',
+    company: '박철홍정형외과',
+    company_id: 'hospital-1',
+    department: '외래팀',
+    team: '외래팀',
+    position: '사원',
+    role: 'staff',
+    joined_at: '2026-03-01',
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [hrUser, targetStaff],
+    companies: [{ id: 'hospital-1', name: '박철홍정형외과', type: 'HOSPITAL', is_active: true }],
+    employmentContracts: [],
+    missingEmploymentContractColumns: ['conditions_applied_at'],
+  });
+
+  await seedSession(page, {
+    user: hrUser,
+    localStorage: {
+      erp_last_menu: '인사관리',
+      erp_last_subview: '계약',
+      erp_hr_tab: '계약',
+      erp_hr_workspace: '복지 · 문서',
+      erp_hr_company: '박철홍정형외과',
+      erp_hr_status: '재직',
+      erp_permission_prompt_shown: '1',
+    },
+  });
+
+  await page.goto('/main?open_menu=인사관리');
+  await expect(page.getByTestId('hr-view')).toBeVisible();
+
+  await openHrWorkspace(page, '복지 · 문서');
+  await openHrMenu(page, '계약');
+  await expect(page.getByRole('heading', { name: /전자 계약 및 법적 비과세 관리/ })).toBeVisible();
+
+  await page.locator('tbody input[type="checkbox"]').first().check();
+  await page.getByRole('button', { name: /근로계약서 발송/ }).click();
+
+  await expect(page.getByText(/계약서가 발송되었습니다/)).toBeVisible();
+  await expect(page.getByText(/계약서 발송 실패/)).toHaveCount(0);
+  await expect(page.getByText('서명대기', { exact: true })).toBeVisible();
+});
+
 test('hr walkthrough opens each submenu in practical order without runtime errors', async ({ page }) => {
   test.setTimeout(150_000);
 
@@ -307,12 +378,14 @@ test('hr walkthrough opens each submenu in practical order without runtime error
   await expect(page.getByText(/전문 근태 통합 관리/)).toBeVisible();
   await page.getByRole('button', { name: '연차소멸알림' }).click();
   await expect(page.getByTestId('attendance-analysis-leave-expiry')).toBeVisible();
-  await page.getByRole('button', { name: '지각조퇴분석' }).click();
+  await expect(page.getByRole('button', { name: '지각조퇴분석' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '조기퇴근감지' })).toHaveCount(0);
+  await page.getByRole('button', { name: '지각·조퇴·조기퇴근' }).click();
+  await expect(page.getByTestId('attendance-analysis-issue-suite')).toBeVisible();
   await expect(page.getByTestId('attendance-analysis-lateness')).toBeVisible();
+  await expect(page.getByTestId('attendance-analysis-early-leaving')).toBeVisible();
   await page.getByRole('button', { name: '근무형태이력' }).click();
   await expect(page.getByTestId('attendance-analysis-worktype-history')).toBeVisible();
-  await page.getByRole('button', { name: '조기퇴근감지' }).click();
-  await expect(page.getByTestId('attendance-analysis-early-leaving')).toBeVisible();
 
   await openHrMenu(page, '교대근무');
   await expect(page.getByTestId('shift-suite-bar')).toBeVisible();

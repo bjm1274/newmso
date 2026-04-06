@@ -156,6 +156,9 @@ export function useChatGlobalSearch({
       const { data, error } = await withMissingColumnsFallback<ChatMessage[]>(
         (omittedColumns) => {
           const searchableColumns = ['content'];
+          if (!omittedColumns.has('file_name')) {
+            searchableColumns.push('file_name');
+          }
           if (!omittedColumns.has('file_url')) {
             searchableColumns.push('file_url');
           }

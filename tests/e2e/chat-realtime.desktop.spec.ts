@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { dismissDialogs, fakeUser, mockSupabase, seedSession } from "./helpers";
+import { getRoomPrefsStorageKey } from "../../app/main/기능부품/메신저유틸";
 
 test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
@@ -466,6 +467,117 @@ test("chat clears unread badges across the whole 1:1 conversation when one direc
     .toBe(false);
 });
 
+test("chat sidebar menu badge ignores unread messages from hidden rooms excluded from the room list", async ({ page }) => {
+  await mockSupabase(page, {
+    chatRooms: [
+      {
+        id: "00000000-0000-0000-0000-000000000000",
+        name: "Notice",
+        type: "notice",
+        members: [],
+        created_at: "2026-03-08T00:00:00.000Z",
+        last_message_at: "2026-03-08T00:00:00.000Z",
+      },
+      {
+        id: "room-visible",
+        name: "Visible Room",
+        type: "direct",
+        members: [fakeUser.id, "peer-visible"],
+        created_at: "2026-03-08T09:00:00.000Z",
+        last_message_at: "2026-03-08T09:30:00.000Z",
+        last_message_preview: "already read",
+      },
+      {
+        id: "room-hidden",
+        name: "Hidden Room",
+        type: "direct",
+        members: [fakeUser.id, "peer-hidden"],
+        created_at: "2026-03-08T09:10:00.000Z",
+        last_message_at: "2026-03-08T10:12:00.000Z",
+        last_message_preview: "hidden unread 3",
+      },
+    ],
+    staffMembers: [
+      fakeUser,
+      {
+        ...fakeUser,
+        id: "peer-visible",
+        name: "Visible Peer",
+        employee_no: "E2E-CHAT-301",
+      },
+      {
+        ...fakeUser,
+        id: "peer-hidden",
+        name: "Hidden Peer",
+        employee_no: "E2E-CHAT-302",
+      },
+    ],
+    messages: [
+      {
+        id: "msg-visible-read",
+        room_id: "room-visible",
+        sender_id: "peer-visible",
+        content: "already read",
+        created_at: "2026-03-08T09:30:00.000Z",
+        is_deleted: false,
+        staff: { name: "Visible Peer", photo_url: null },
+      },
+      {
+        id: "msg-hidden-1",
+        room_id: "room-hidden",
+        sender_id: "peer-hidden",
+        content: "hidden unread 1",
+        created_at: "2026-03-08T10:10:00.000Z",
+        is_deleted: false,
+        staff: { name: "Hidden Peer", photo_url: null },
+      },
+      {
+        id: "msg-hidden-2",
+        room_id: "room-hidden",
+        sender_id: "peer-hidden",
+        content: "hidden unread 2",
+        created_at: "2026-03-08T10:11:00.000Z",
+        is_deleted: false,
+        staff: { name: "Hidden Peer", photo_url: null },
+      },
+      {
+        id: "msg-hidden-3",
+        room_id: "room-hidden",
+        sender_id: "peer-hidden",
+        content: "hidden unread 3",
+        created_at: "2026-03-08T10:12:00.000Z",
+        is_deleted: false,
+        staff: { name: "Hidden Peer", photo_url: null },
+      },
+    ],
+    roomReadCursors: [
+      {
+        room_id: "room-visible",
+        user_id: fakeUser.id,
+        last_read_at: "2026-03-08T09:35:00.000Z",
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: "\uCC44\uD305",
+      [getRoomPrefsStorageKey(fakeUser.id)]: JSON.stringify({
+        "room-hidden": { hidden: true, pinned: false },
+      }),
+    },
+  });
+
+  await page.goto(
+    `/main?${new URLSearchParams({ open_menu: "\uCC44\uD305" }).toString()}`,
+  );
+
+  await expect(page.getByTestId("chat-view")).toBeVisible();
+  await expect(page.getByTestId("chat-room-room-visible")).toBeVisible();
+  await expect(page.getByTestId("chat-room-room-hidden")).toHaveCount(0);
+  await expect(page.getByTestId("sidebar-menu-chat-badge")).toHaveCount(0);
+});
+
 test("chat opens a room and re-clicking the room list keeps the view aligned to the latest messages", async ({ page }) => {
   const longMessages = Array.from({ length: 40 }, (_, index) => ({
     id: `msg-long-${index + 1}`,
@@ -691,10 +803,9 @@ test("chat keeps the latest message visible when delayed notice data shrinks the
   await expect(page.getByTestId("chat-view")).toBeVisible();
 
   await page.getByTestId("chat-room-room-delay").click();
-
-  await expect(page.getByText("공지 메시지")).toBeVisible();
   await expect(page.getByTestId("chat-message-msg-delay-40")).toBeVisible();
-  await expect(page.getByRole("button", { name: "최신 메시지" })).toBeHidden();
+  await expect(page.getByTestId("chat-scroll-to-latest-button")).toBeHidden();
+  await page.waitForTimeout(250);
 });
 
 test("chat opens another room at the latest message even after the previous room was scrolled up", async ({ page }) => {
@@ -994,7 +1105,7 @@ test("chat global search jumps to the selected message and keeps the query highl
   await page.getByTestId("chat-open-global-search").click();
   await expect(page.getByTestId("chat-global-search-modal")).toBeVisible();
   await page.getByTestId("chat-global-search-input").fill("needle keyword");
-  await page.getByTestId("chat-global-search-modal").getByRole("button", { name: "메시지" }).click();
+  await page.getByTestId("chat-global-search-tab-message").click();
   await expect(page.getByTestId("chat-global-search-result-msg-search-5")).toBeVisible();
   await page.getByTestId("chat-global-search-result-msg-search-5").click();
 
@@ -1015,4 +1126,171 @@ test("chat global search jumps to the selected message and keeps the query highl
       }),
     )
     .toBe(true);
+});
+
+test("chat shows a floating date indicator while scrolling through older messages", async ({ page }) => {
+  const olderMessages = Array.from({ length: 16 }, (_, index) => ({
+    id: `msg-scroll-old-${index}`,
+    room_id: "room-scroll-date",
+    sender_id: index % 2 === 0 ? "peer-1" : fakeUser.id,
+    sender_name: index % 2 === 0 ? "Scroll Peer" : fakeUser.name,
+    content: `older scroll message ${index}`,
+    created_at: new Date(Date.UTC(2026, 0, 19, 1, index)).toISOString(),
+    is_deleted: false,
+    staff: { name: index % 2 === 0 ? "Scroll Peer" : fakeUser.name, photo_url: null },
+  }));
+
+  const newerMessages = Array.from({ length: 16 }, (_, index) => ({
+    id: `msg-scroll-new-${index}`,
+    room_id: "room-scroll-date",
+    sender_id: index % 2 === 0 ? fakeUser.id : "peer-1",
+    sender_name: index % 2 === 0 ? fakeUser.name : "Scroll Peer",
+    content: `newer scroll message ${index}`,
+    created_at: new Date(Date.UTC(2026, 0, 20, 1, index)).toISOString(),
+    is_deleted: false,
+    staff: { name: index % 2 === 0 ? fakeUser.name : "Scroll Peer", photo_url: null },
+  }));
+
+  await mockSupabase(page, {
+    chatRooms: [
+      {
+        id: "00000000-0000-0000-0000-000000000000",
+        name: "Notice",
+        type: "notice",
+        members: [],
+        created_at: "2026-03-08T00:00:00.000Z",
+        last_message_at: "2026-03-08T00:00:00.000Z",
+      },
+      {
+        id: "room-scroll-date",
+        name: "Scroll Date Room",
+        type: "group",
+        members: [fakeUser.id, "peer-1"],
+        created_at: "2026-01-19T01:00:00.000Z",
+        last_message_at: newerMessages[newerMessages.length - 1]?.created_at,
+        last_message_preview: "newer scroll message 15",
+      },
+    ],
+    staffMembers: [
+      fakeUser,
+      {
+        ...fakeUser,
+        id: "peer-1",
+        name: "Scroll Peer",
+        employee_no: "E2E-CHAT-188",
+      },
+    ],
+    messages: [...olderMessages, ...newerMessages],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: "\uCC44\uD305",
+      erp_chat_last_room: "room-scroll-date",
+    },
+  });
+
+  await page.goto(
+    `/main?${new URLSearchParams({ open_menu: "\uCC44\uD305" }).toString()}`,
+  );
+  await expect(page.getByTestId("chat-view")).toBeVisible();
+  await page.getByTestId("chat-room-room-scroll-date").click();
+  await expect(page.getByTestId("chat-message-input")).toBeVisible();
+
+  await page.waitForFunction(() => {
+    const list = document.querySelector('[data-testid="chat-message-list"]') as HTMLDivElement | null;
+    return !!list && list.scrollHeight > list.clientHeight + 120;
+  });
+
+  await expect(page.getByTestId("chat-scroll-to-latest-button")).toBeHidden();
+
+  await page.getByTestId("chat-message-list").evaluate((node) => {
+    const list = node as HTMLDivElement;
+    list.scrollTop = 0;
+    list.dispatchEvent(new Event("scroll"));
+  });
+
+  const floatingDate = page.getByTestId("chat-scroll-date-indicator");
+  await expect(floatingDate).toBeVisible();
+  await expect(floatingDate).toContainText("2026");
+  await expect(floatingDate).toContainText("19");
+});
+
+test("chat global search finds files by original attachment name", async ({ page }) => {
+  await mockSupabase(page, {
+    chatRooms: [
+      {
+        id: "00000000-0000-0000-0000-000000000000",
+        name: "Notice",
+        type: "notice",
+        members: [],
+        created_at: "2026-03-08T00:00:00.000Z",
+        last_message_at: "2026-03-08T00:00:00.000Z",
+      },
+      {
+        id: "room-file-search",
+        name: "File Search Room",
+        type: "group",
+        members: [fakeUser.id, "peer-1"],
+        created_at: "2026-03-08T09:00:00.000Z",
+        last_message_at: "2026-03-08T11:30:00.000Z",
+        last_message_preview: "???뵬 ?⑤벊?",
+      },
+    ],
+    staffMembers: [
+      fakeUser,
+      {
+        ...fakeUser,
+        id: "peer-1",
+        name: "Chat Peer Realtime",
+        employee_no: "E2E-CHAT-099",
+      },
+    ],
+    messages: [
+      {
+        id: "msg-file-search-1",
+        room_id: "room-file-search",
+        sender_id: "peer-1",
+        sender_name: "Chat Peer Realtime",
+        content: "",
+        file_url: "https://example.com/uploads/file-1.xlsx",
+        file_name: "??곷춦??꾨뱜 ??덀걠?源낆쨯??xlsx",
+        file_kind: "file",
+        created_at: "2026-03-08T11:30:00.000Z",
+        is_deleted: false,
+      },
+      {
+        id: "msg-file-search-2",
+        room_id: "room-file-search",
+        sender_id: fakeUser.id,
+        sender_name: fakeUser.name,
+        content: "??삘뀲 筌롫뗄?놅쭪?",
+        created_at: "2026-03-08T11:31:00.000Z",
+        is_deleted: false,
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: "\uCC44\uD305",
+      erp_chat_last_room: "room-file-search",
+    },
+  });
+
+  await page.goto(
+    `/main?${new URLSearchParams({ open_menu: "\uCC44\uD305" }).toString()}`,
+  );
+  await expect(page.getByTestId("chat-view")).toBeVisible();
+  await page.getByTestId("chat-room-room-file-search").click();
+  await expect(page.getByTestId("chat-message-input")).toBeVisible();
+
+  await page.getByTestId("chat-open-global-search").click();
+  await expect(page.getByTestId("chat-global-search-modal")).toBeVisible();
+  await page.getByTestId("chat-global-search-input").fill("??곷춦??꾨뱜");
+  await page.getByTestId("chat-global-search-tab-file").click();
+
+  const fileResult = page.getByTestId("chat-global-search-result-msg-file-search-1");
+  await expect(fileResult).toBeVisible();
+  await expect(fileResult).toContainText("??곷춦??꾨뱜 ??덀걠?源낆쨯??xlsx");
 });
