@@ -697,6 +697,115 @@ test("chat keeps the latest message visible when delayed notice data shrinks the
   await expect(page.getByRole("button", { name: "최신 메시지" })).toBeHidden();
 });
 
+test("chat opens another room at the latest message even after the previous room was scrolled up", async ({ page }) => {
+  const sourceRoomMessages = Array.from({ length: 36 }, (_, index) => ({
+    id: `msg-source-${index + 1}`,
+    room_id: "room-source",
+    sender_id: index % 2 === 0 ? fakeUser.id : "peer-source",
+    content: `source message ${index + 1}`,
+    created_at: `2026-03-08T12:${String(index).padStart(2, "0")}:00.000Z`,
+    is_deleted: false,
+    staff: { name: index % 2 === 0 ? fakeUser.name : "Source Peer", photo_url: null },
+  }));
+
+  const targetRoomMessages = Array.from({ length: 42 }, (_, index) => ({
+    id: `msg-target-${index + 1}`,
+    room_id: "room-target",
+    sender_id: index % 2 === 0 ? "peer-target" : fakeUser.id,
+    content: `target message ${index + 1}`,
+    created_at: `2026-03-08T13:${String(index).padStart(2, "0")}:00.000Z`,
+    is_deleted: false,
+    staff: { name: index % 2 === 0 ? "Unread Peer" : fakeUser.name, photo_url: null },
+  }));
+
+  await mockSupabase(page, {
+    chatRooms: [
+      {
+        id: "00000000-0000-0000-0000-000000000000",
+        name: "Notice",
+        type: "notice",
+        members: [],
+        created_at: "2026-03-08T00:00:00.000Z",
+        last_message_at: "2026-03-08T00:00:00.000Z",
+      },
+      {
+        id: "room-source",
+        name: "Source Room",
+        type: "group",
+        members: [fakeUser.id, "peer-source"],
+        created_at: "2026-03-08T11:00:00.000Z",
+        last_message_at: "2026-03-08T12:35:00.000Z",
+        last_message_preview: "source message 36",
+      },
+      {
+        id: "room-target",
+        name: "Unread Target Room",
+        type: "group",
+        members: [fakeUser.id, "peer-target"],
+        created_at: "2026-03-08T12:00:00.000Z",
+        last_message_at: "2026-03-08T13:41:00.000Z",
+        last_message_preview: "target message 42",
+      },
+    ],
+    staffMembers: [
+      fakeUser,
+      {
+        ...fakeUser,
+        id: "peer-source",
+        name: "Source Peer",
+        employee_no: "E2E-CHAT-201",
+      },
+      {
+        ...fakeUser,
+        id: "peer-target",
+        name: "Unread Peer",
+        employee_no: "E2E-CHAT-202",
+      },
+    ],
+    messages: [...sourceRoomMessages, ...targetRoomMessages],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: "\uCC44\uD305",
+    },
+  });
+
+  await page.goto(
+    `/main?${new URLSearchParams({ open_menu: "\uCC44\uD305" }).toString()}`,
+  );
+  await expect(page.getByTestId("chat-view")).toBeVisible();
+
+  await page.getByTestId("chat-room-room-source").click();
+  await expect(page.getByTestId("chat-message-msg-source-36")).toBeVisible();
+
+  await page.getByTestId("chat-message-list").evaluate((node) => {
+    const el = node as HTMLDivElement;
+    el.scrollTop = 0;
+  });
+
+  await expect
+    .poll(async () =>
+      page.getByTestId("chat-message-list").evaluate((node) => {
+        const el = node as HTMLDivElement;
+        return el.scrollTop <= 4;
+      }),
+    )
+    .toBe(true);
+
+  await page.getByTestId("chat-room-room-target").click();
+
+  await expect(page.getByTestId("chat-message-msg-target-42")).toBeVisible();
+  await expect
+    .poll(async () =>
+      page.getByTestId("chat-message-list").evaluate((node) => {
+        const el = node as HTMLDivElement;
+        return Math.abs(el.scrollHeight - el.clientHeight - el.scrollTop) <= 24;
+      }),
+    )
+    .toBe(true);
+});
+
 test("chat marks notifications as read when a message arrives in the already open room", async ({ page }) => {
   await mockSupabase(page, {
     chatRooms: [

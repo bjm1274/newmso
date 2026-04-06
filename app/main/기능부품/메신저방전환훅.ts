@@ -69,6 +69,7 @@ export function useChatRoomNavigation({
 
     if (previousSelectedRoomId !== roomId) {
       lastTimelineTailRef.current = '';
+      timelineItemCountRef.current = 0;
       onRoomChangeCleanup();
     }
 

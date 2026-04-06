@@ -46,23 +46,12 @@ export async function sendFcmNotification(
     const messageId = payload.data?.message_id || '';
     const collapseKey = payload.data?.tag || (messageId ? `chat-msg-${messageId}` : undefined);
     const webpushLink = buildSafeWebpushLink();
-    const webpushNotificationData = {
-      ...messageData,
-      ...payload.data,
-    };
-
     await admin.messaging(app).send({
       token: fcmToken,
       data: messageData,
       webpush: {
         headers: {
           Urgency: 'high',
-        },
-        notification: {
-          title: payload.title,
-          body: payload.body,
-          tag: collapseKey,
-          data: webpushNotificationData,
         },
         ...(webpushLink
           ? {

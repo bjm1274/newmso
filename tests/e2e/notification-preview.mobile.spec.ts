@@ -366,6 +366,31 @@ test('mobile chat notifications use a native popup when push is already connecte
   await expect(page.getByTestId('notification-toast-notification-mobile-native-message-preview-1')).toHaveCount(0);
 });
 
+test('mobile alerts also use a native popup while the app is visible', async ({ page }) => {
+  await installPushRegistrationRetryStubs(page);
+  await mockSupabase(page, {
+    notifications: [],
+  });
+
+  await seedSession(page);
+  await page.goto('/main');
+  await expect(page.getByTestId('main-shell')).toBeVisible();
+
+  await insertLiveNotification(page, {
+    id: 'notification-mobile-native-alert-1',
+    type: 'approval',
+    title: '전자결재',
+    body: '결재 요청이 도착했습니다.',
+    metadata: {
+      type: 'approval',
+      approval_id: 'approval-mobile-alert-1',
+      approval_view: '결재함',
+    },
+  });
+
+  await expect.poll(async () => getNativeNotificationCount(page)).toBe(1);
+});
+
 test('notification settings shows push status and lets the user retry registration', async ({
   page,
 }, testInfo) => {
