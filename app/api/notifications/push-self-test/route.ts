@@ -1,0 +1,145 @@
+/**
+ * 서버→기기 푸시 자가진단 API
+ * 현재 로그인한 사용자의 모든 구독에 실제로 테스트 push를 보냅니다.
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { readSessionFromRequest } from '@/lib/server-session';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+function getAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  return createClient(url, key);
+}
+
+export async function POST(request: NextRequest) {
+  const session = await readSessionFromRequest(request);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const staffId = String(session.user.id);
+  const diagnostics: Record<string, unknown> = {};
+
+  // ── 1. 환경변수 확인 ──
+  const vapidPublic = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim() || '';
+  const vapidPrivate = process.env.VAPID_PRIVATE_KEY?.trim() || '';
+  const vapidSubject = process.env.VAPID_SUBJECT?.trim() || '';
+  const firebaseSA = process.env.FIREBASE_SERVICE_ACCOUNT?.trim() || '';
+
+  diagnostics.env = {
+    vapidPublicKey: vapidPublic ? `${vapidPublic.slice(0, 10)}...` : '❌ 없음',
+    vapidPrivateKey: vapidPrivate ? '✅ 설정됨' : '❌ 없음 (Vercel에 추가 필요)',
+    vapidSubject: vapidSubject || '❌ 없음 (Vercel에 추가 필요)',
+    firebaseServiceAccount: firebaseSA ? '✅ 설정됨' : '❌ 없음 (Vercel에 추가 필요)',
+  };
+
+  // ── 2. DB 구독 정보 확인 ──
+  const supabase = getAdminClient();
+  const { data: subs } = await supabase
+    .from('push_subscriptions')
+    .select('id, endpoint, p256dh, auth, fcm_token')
+    .eq('staff_id', staffId);
+
+  diagnostics.subscriptions = (subs || []).map((s: any) => ({
+    endpoint: String(s.endpoint || '').slice(0, 60) + '...',
+    hasP256dh: Boolean(s.p256dh),
+    hasAuth: Boolean(s.auth),
+    hasFcmToken: Boolean(s.fcm_token),
+  }));
+
+  if (!subs || subs.length === 0) {
+    return NextResponse.json({
+      ok: false,
+      reason: '구독 정보 없음. 클라이언트에서 "푸시 다시 연결" 버튼을 눌러주세요.',
+      diagnostics,
+    });
+  }
+
+  const results: any[] = [];
+
+  // ── 3. Web Push (VAPID) 테스트 ──
+  if (vapidPrivate && vapidPublic) {
+    try {
+      const { default: webpush } = await import('web-push');
+      webpush.setVapidDetails(
+        vapidSubject || 'mailto:admin@example.com',
+        vapidPublic,
+        vapidPrivate,
+      );
+
+      const testPayload = JSON.stringify({
+        title: '🔔 푸시 연결 테스트',
+        body: '[Web Push] 서버→기기 연결이 정상입니다!',
+        tag: `self-test-webpush-${Date.now()}`,
+        data: { type: 'notification', source: 'self-test' },
+      });
+
+      for (const sub of subs as any[]) {
+        if (!sub.p256dh || !sub.auth || !/^https?:\/\//i.test(String(sub.endpoint))) continue;
+        try {
+          await webpush.sendNotification(
+            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+            testPayload,
+          );
+          results.push({ method: 'webpush', endpoint: String(sub.endpoint).slice(0, 40), ok: true });
+        } catch (err: any) {
+          results.push({ method: 'webpush', endpoint: String(sub.endpoint).slice(0, 40), ok: false, error: String(err?.message || err) });
+        }
+      }
+    } catch (err: any) {
+      diagnostics.webPushError = String(err?.message || err);
+    }
+  } else {
+    diagnostics.webPushSkipped = 'VAPID_PRIVATE_KEY 또는 NEXT_PUBLIC_VAPID_PUBLIC_KEY 미설정';
+  }
+
+  // ── 4. FCM 테스트 ──
+  if (firebaseSA) {
+    try {
+      const admin = await import('firebase-admin');
+      if (admin.default.apps.length === 0) {
+        admin.default.initializeApp({
+          credential: admin.default.credential.cert(JSON.parse(firebaseSA)),
+        });
+      }
+      const messaging = admin.default.messaging();
+
+      for (const sub of subs as any[]) {
+        if (!sub.fcm_token) continue;
+        try {
+          await messaging.send({
+            token: sub.fcm_token,
+            data: {
+              title: '🔔 FCM 테스트',
+              body: '[FCM] 서버→기기 FCM 연결이 정상입니다!',
+              type: 'notification',
+              tag: `self-test-fcm-${Date.now()}`,
+            },
+            android: { priority: 'high' },
+          });
+          results.push({ method: 'fcm', token: String(sub.fcm_token).slice(0, 20), ok: true });
+        } catch (err: any) {
+          results.push({ method: 'fcm', token: String(sub.fcm_token).slice(0, 20), ok: false, error: String(err?.message || err) });
+        }
+      }
+    } catch (err: any) {
+      diagnostics.fcmError = String(err?.message || err);
+    }
+  } else {
+    diagnostics.fcmSkipped = 'FIREBASE_SERVICE_ACCOUNT 미설정';
+  }
+
+  const anyOk = results.some((r) => r.ok);
+  return NextResponse.json({
+    ok: anyOk,
+    results,
+    diagnostics,
+    summary: anyOk
+      ? '✅ 최소 1개 경로로 푸시 발송 성공. 기기 알림창을 확인하세요.'
+      : '❌ 모든 경로 실패. diagnostics를 확인하세요.',
+  });
+}

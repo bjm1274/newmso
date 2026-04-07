@@ -551,10 +551,19 @@ export async function dispatchChatPushForMessage(params: {
     pushDisabled = true;
   }
 
+  // FCM 토큰이 있는 staff_id 집합 — 이 기기에는 FCM만 발송, Web Push 제외 (이중 발송 방지)
+  const staffIdsWithFcmToken = new Set<string>(
+    ((subscriptionRes.data || []) as PushSubscriptionRow[])
+      .filter((row) => row.fcm_token && row.staff_id && row.staff_id !== senderId)
+      .map((row) => String(row.staff_id))
+  );
+
   const uniqueSubscriptions = new Map<string, PushSubscriptionRow>();
   for (const row of (subscriptionRes.data || []) as PushSubscriptionRow[]) {
     if (!row.endpoint || !row.staff_id || row.staff_id === senderId) continue;
     if (!row.p256dh || !row.auth || !/^https?:\/\//i.test(String(row.endpoint))) continue;
+    // FCM 토큰이 있는 사용자는 Web Push 제외 (FCM으로만 발송)
+    if (staffIdsWithFcmToken.has(row.staff_id)) continue;
     if (!uniqueSubscriptions.has(row.endpoint)) {
       uniqueSubscriptions.set(row.endpoint, row);
     }

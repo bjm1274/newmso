@@ -363,9 +363,12 @@ function erpBuildNotificationOptions(payload) {
 }
 
 async function erpDisplayIncomingNotification(rawPayload) {
-  await erpFlushRetryQueue();
+  // 중복 체크를 await 이전에 동기적으로 실행 — 레이스 컨디션 방지
+  // (FCM onBackgroundMessage + raw push event가 동시에 발화하면 두 번째는 즉시 차단)
   const payload = erpNormalizeNotificationPayload(rawPayload);
   if (!erpShouldShowNotification(payload.tag)) return;
+
+  await erpFlushRetryQueue();
   await erpBroadcastDebug('incoming', '서비스워커가 푸시를 수신했습니다.', {
     tag: payload.tag,
     title: payload.title,

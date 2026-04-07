@@ -1,4 +1,5 @@
 'use client';
+import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -490,7 +491,12 @@ export default function MyProfileCard({
           <div className="relative group shrink-0">
             <div className="w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full bg-[var(--muted)] flex items-center justify-center overflow-hidden border-2 sm:border-4 border-[var(--card)] shadow-sm">
               {avatarUrl ? (
-                <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+                <ProfilePhotoThumbnail
+                  src={avatarUrl}
+                  name={toSafeText(user.name)}
+                  alt="Profile"
+                  className="w-full h-full"
+                />
               ) : (
                 <span className="text-5xl font-bold text-[var(--toss-gray-3)]">👤</span>
               )}
