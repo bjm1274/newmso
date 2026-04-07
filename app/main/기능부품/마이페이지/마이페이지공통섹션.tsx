@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 
 import SalarySlipContainer from './급여명세서';
 import MyCertificates from './증명서관리';
+import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { supabase } from '@/lib/supabase';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 
@@ -45,11 +46,14 @@ export function ProfileHeaderSummary({
       <div className="flex h-full items-center justify-between gap-3">
         <div className="relative shrink-0">
           <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] bg-[var(--muted)] shadow-sm">
-            {user.avatarUrl ? (
-              <img src={user.avatarUrl} alt="프로필 사진" className="h-full w-full object-cover" />
-            ) : (
-              <span className="text-3xl text-[var(--toss-gray-3)]">👤</span>
-            )}
+            <ProfilePhotoThumbnail
+              src={user.avatarUrl}
+              name={user.name}
+              alt="프로필 사진"
+              className="h-full w-full"
+              fallback={<span className="text-3xl text-[var(--toss-gray-3)]">👤</span>}
+              previewTitle={user.name ? `${user.name} 사진` : '프로필 사진'}
+            />
           </div>
         </div>
         <div className="min-w-0 flex-1">

@@ -148,6 +148,8 @@ function SettingsTab({ userId }: { userId?: string | null }) {
   const [pushTestPending, setPushTestPending] = useState(false);
   const [pushTestResult, setPushTestResult] = useState<string | null>(null);
   const [pushDebugLog, setPushDebugLog] = useState(() => readPushDebugLog());
+  const [serverTestPending, setServerTestPending] = useState(false);
+  const [serverTestResult, setServerTestResult] = useState<string | null>(null);
 
   const update = (partial: Partial<NotifSettings>) => {
     const next = { ...settings, ...partial };
@@ -231,6 +233,29 @@ function SettingsTab({ userId }: { userId?: string | null }) {
       setPushActionPending(false);
     }
   }, [refreshPushStatus, userId]);
+
+  const handleServerPushTest = useCallback(async () => {
+    setServerTestResult(null);
+    setServerTestPending(true);
+    try {
+      const res = await fetch('/api/notifications/push-self-test', { method: 'POST' });
+      const data = await res.json();
+      if (data.diagnostics?.env) {
+        const env = data.diagnostics.env as Record<string, string>;
+        const missing = Object.entries(env).filter(([, v]) => String(v).startsWith('❌')).map(([k]) => k);
+        if (missing.length > 0) {
+          setServerTestResult(`❌ Vercel 환경변수 없음: ${missing.join(', ')}\n→ Vercel 대시보드 Settings > Environment Variables에 추가 필요`);
+          return;
+        }
+      }
+      setServerTestResult(data.summary || (data.ok ? '✅ 서버 발송 성공! 기기 알림창 확인' : `❌ 실패: ${JSON.stringify(data.results)}`));
+    } catch (e) {
+      setServerTestResult('❌ 테스트 API 호출 실패');
+    } finally {
+      setServerTestPending(false);
+      setTimeout(() => setPushDebugLog(readPushDebugLog()), 2000);
+    }
+  }, []);
 
   const handlePushPopupTest = useCallback(async () => {
     setPushTestResult(null);
@@ -420,6 +445,12 @@ function SettingsTab({ userId }: { userId?: string | null }) {
               {pushTestResult}
             </p>
           )}
+          {serverTestResult && (
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)]/40 px-3 py-2.5 text-xs leading-relaxed whitespace-pre-wrap">
+              <p className="font-bold text-[var(--foreground)] mb-1">🖥️ 서버 발송 테스트 결과</p>
+              <p className="text-[var(--toss-gray-3)]">{serverTestResult}</p>
+            </div>
+          )}
           {pushDebugLog.length > 0 && (
             <div
               data-testid="notification-settings-push-debug-log"
@@ -471,6 +502,14 @@ function SettingsTab({ userId }: { userId?: string | null }) {
               } disabled:opacity-60`}
             >
               {pushTestPending ? '테스트 중...' : '팝업 테스트'}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleServerPushTest()}
+              disabled={serverTestPending}
+              className="px-4 py-2 rounded-xl border border-orange-300 bg-orange-500/10 text-orange-700 text-xs font-bold disabled:opacity-60"
+            >
+              {serverTestPending ? '테스트 중...' : '서버 발송 테스트'}
             </button>
             <button
               type="button"

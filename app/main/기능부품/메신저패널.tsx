@@ -2,6 +2,7 @@
 
 import { AttachmentListCard, getAttachmentDisplayName, resolveAttachmentKind } from './메신저첨부';
 import { MessengerAvatar } from './메신저공통';
+import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 
 export type MessengerMediaFilter = 'all' | 'media' | 'image' | 'video' | 'file';
@@ -302,7 +303,7 @@ export function GlobalSearchModal({
                           <div className="flex items-center gap-3">
                             <MessengerAvatar
                               name={staff.name}
-                              photoUrl={staff.photo_url}
+                              photoUrl={getProfilePhotoUrl(staff)}
                               className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--tab-bg)] text-[12px] font-bold text-[var(--toss-gray-3)] dark:bg-zinc-800"
                               decorative
                             />

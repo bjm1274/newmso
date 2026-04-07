@@ -1,6 +1,7 @@
 'use client';
 
 import { MessengerAvatar } from './메신저공통';
+import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import type { ChatRoom, StaffMember } from '@/types';
 
 export type MessengerViewMode = 'chat' | 'org';
@@ -374,7 +375,7 @@ export function MessengerSidebar({
                               >
                                 <MessengerAvatar
                                   name={staff.name}
-                                  photoUrl={staff.photo_url}
+                                  photoUrl={getProfilePhotoUrl(staff)}
                                   className="h-7 w-7 shrink-0 overflow-hidden rounded-lg bg-[var(--tab-bg)] text-[11px] font-bold text-[var(--toss-gray-3)] dark:bg-zinc-800"
                                   decorative
                                 />

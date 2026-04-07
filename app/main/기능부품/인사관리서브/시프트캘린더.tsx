@@ -1,5 +1,8 @@
 'use client';
 
+import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
+import { getProfilePhotoUrl } from '@/lib/profile-photo';
+
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
@@ -248,11 +251,13 @@ export default function ShiftCalendar({ staffs = [], selectedCo = '전체' }: Sh
                   <td className="p-4 border-r border-[var(--border-subtle)] sticky left-0 bg-[var(--card)] group-hover:bg-[var(--tab-bg)]/50 z-10 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-[var(--tab-bg)] overflow-hidden flex items-center justify-center shrink-0">
-                        {staff.avatar_url ? (
-                          <img src={staff.avatar_url} alt={staff.name ? `${staff.name} 프로필 사진` : '프로필 사진'} className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-xl">👤</span>
-                        )}
+                        <ProfilePhotoThumbnail
+                          src={getProfilePhotoUrl(staff)}
+                          name={staff.name}
+                          className="w-full h-full"
+                          fallback={<span className="text-xl">👤</span>}
+                          previewTitle={staff.name ? `${staff.name} 사진` : '프로필 사진'}
+                        />
                       </div>
                       <div>
                         <p className="text-[12px] font-black text-[var(--foreground)] tracking-tight">

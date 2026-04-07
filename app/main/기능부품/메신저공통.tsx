@@ -1,5 +1,7 @@
 'use client';
 
+import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
+import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import type { StaffMember } from '@/types';
 
 type MessengerAvatarProps = {
@@ -28,18 +30,16 @@ export function MessengerAvatar({
   const fallback = String(fallbackText || resolvedName || '?').trim().slice(0, 1) || '?';
 
   return (
-    <div className={className}>
-      {photoUrl ? (
-        <img
-          src={photoUrl}
-          alt={resolvedAlt}
-          className={`h-full w-full object-cover ${imageClassName}`.trim()}
-          loading="lazy"
-        />
-      ) : (
-        fallback
-      )}
-    </div>
+    <ProfilePhotoThumbnail
+      src={photoUrl}
+      name={resolvedName}
+      alt={resolvedAlt}
+      className={className}
+      imageClassName={imageClassName}
+      fallback={fallback}
+      previewDisabled={decorative}
+      previewTitle={resolvedName ? `${resolvedName} 사진` : '프로필 사진'}
+    />
   );
 }
 
@@ -70,7 +70,7 @@ export function MessengerStatusUserRow({
     <div className={containerClass}>
       <MessengerAvatar
         name={staff.name}
-        photoUrl={staff.photo_url}
+        photoUrl={getProfilePhotoUrl(staff)}
         className={avatarClass}
         decorative
       />
