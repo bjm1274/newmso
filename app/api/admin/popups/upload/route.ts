@@ -4,7 +4,7 @@ import { isAdminSession, readSessionFromRequest } from '@/lib/server-session';
 
 export const runtime = 'nodejs';
 
-const MAX_FILE_BYTES = 25 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg', 'video/mp4']);
 
 type SignedUploadPayload = {
@@ -47,6 +47,24 @@ function isAllowedType(contentType: string) {
   return ALLOWED_TYPES.has(contentType);
 }
 
+function isVideoType(contentType: string) {
+  return contentType === 'video/mp4';
+}
+
+function getMaxFileBytes(contentType: string) {
+  return isVideoType(contentType) ? MAX_VIDEO_BYTES : null;
+}
+
+function validateFileSize(contentType: string, fileSize: number) {
+  if (!isVideoType(contentType)) {
+    return;
+  }
+
+  if (fileSize > MAX_VIDEO_BYTES) {
+    throw new Error('동영상 크기는 200MB 이하여야 합니다.');
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const session = await readSessionFromRequest(request);
@@ -69,7 +87,7 @@ export async function POST(request: Request) {
       if (!isAllowedType(contentType)) {
         return NextResponse.json(
           { error: 'JPG, PNG, MP4 파일만 업로드할 수 있습니다.' },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -81,7 +99,7 @@ export async function POST(request: Request) {
       if (signedUploadError || !signedUpload) {
         return NextResponse.json(
           { error: signedUploadError?.message || '업로드 서명을 생성하지 못했습니다.' },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
@@ -90,7 +108,7 @@ export async function POST(request: Request) {
         path: filePath,
         token: signedUpload.token,
         url: getPublicUrl(supabase, filePath),
-        maxFileBytes: MAX_FILE_BYTES,
+        maxFileBytes: getMaxFileBytes(contentType),
       });
     }
 
@@ -104,13 +122,11 @@ export async function POST(request: Request) {
     if (!isAllowedType(file.type)) {
       return NextResponse.json(
         { error: 'JPG, PNG, MP4 파일만 업로드할 수 있습니다.' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    if (file.size > MAX_FILE_BYTES) {
-      return NextResponse.json({ error: '파일 크기는 25MB 이하여야 합니다.' }, { status: 400 });
-    }
+    validateFileSize(file.type, file.size);
 
     const filePath = buildFilePath(file.name, file.type);
     const arrayBuffer = await file.arrayBuffer();

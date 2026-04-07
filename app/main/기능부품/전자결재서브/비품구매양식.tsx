@@ -5,8 +5,6 @@ import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
 import {
   buildSupplyRequestMonthlySuggestions,
-  INVENTORY_SUPPORT_COMPANY,
-  INVENTORY_SUPPORT_DEPARTMENT,
   normalizeInventoryUnit,
   normalizeSupplyRequestCategory,
   normalizeSupplyRequestItems,
@@ -80,11 +78,16 @@ function getInventorySpec(row: any) {
   return String(row?.spec || '').trim();
 }
 
-function isTargetInventory(row: any) {
-  return (
-    String(row?.company || '').trim() === INVENTORY_SUPPORT_COMPANY &&
-    String(row?.department || '').trim() === INVENTORY_SUPPORT_DEPARTMENT
-  );
+function normalizeInventoryKey(value: unknown) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function getInventoryCompany(row: any) {
+  return String(row?.company || row?.company_name || '').trim();
+}
+
+function getInventoryDepartment(row: any) {
+  return String(row?.department || row?.team || row?.dept || '').trim();
 }
 
 function buildRowFromUnknown(input: unknown): SupplyRow {
@@ -123,41 +126,70 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
       .map((item) => item.dept)
       .find(Boolean) || '';
   }, [initialItems, user?.department, user?.team]);
+  const requesterCompany = useMemo(() => String(user?.company || '').trim(), [user?.company]);
+  const requesterInventoryLabel = useMemo(() => {
+    const labelParts = [requesterCompany, requesterDepartment].filter(Boolean);
+    return labelParts.length > 0 ? `${labelParts.join(' ')} 재고 기준` : '소속 부서 재고 기준';
+  }, [requesterCompany, requesterDepartment]);
 
   const inventoryCatalog = useMemo(() => {
     const merged = new Map<string, InventoryCatalogItem>();
 
-    inventory
-      .filter(isTargetInventory)
-      .forEach((row) => {
-        const name = getInventoryItemName(row);
-        if (!name) return;
+    inventory.forEach((row) => {
+      const name = getInventoryItemName(row);
+      if (!name) return;
 
-        const key = name.toLowerCase();
-        const rowUnit = getInventoryUnit(row);
-        const rowSpec = getInventorySpec(row);
-        const current = merged.get(key) || {
-          name,
-          stock: 0,
-          min_stock: 0,
-          unit: rowUnit,
-          spec: rowSpec,
-        };
+      const key = normalizeInventoryKey(name);
+      const rowUnit = getInventoryUnit(row);
+      const rowSpec = getInventorySpec(row);
+      const current = merged.get(key) || {
+        name,
+        stock: 0,
+        min_stock: 0,
+        unit: rowUnit,
+        spec: rowSpec,
+      };
 
-        current.stock += getInventoryStock(row);
-        current.min_stock = Math.max(current.min_stock, getInventoryMinStock(row));
-        if (!current.spec && rowSpec) {
-          current.spec = rowSpec;
-        }
-        if (current.unit !== 'BOX' && rowUnit === 'BOX') {
-          current.unit = rowUnit;
-        }
+      current.stock += getInventoryStock(row);
+      current.min_stock = Math.max(current.min_stock, getInventoryMinStock(row));
+      if (!current.spec && rowSpec) {
+        current.spec = rowSpec;
+      }
+      if (current.unit !== 'BOX' && rowUnit === 'BOX') {
+        current.unit = rowUnit;
+      }
 
-        merged.set(key, current);
-      });
+      merged.set(key, current);
+    });
 
     return Array.from(merged.values()).sort((left, right) => left.name.localeCompare(right.name, 'ko'));
   }, [inventory]);
+
+  const departmentStockByName = useMemo(() => {
+    const merged = new Map<string, number>();
+    if (!requesterDepartment) {
+      return merged;
+    }
+
+    inventory.forEach((row) => {
+      const name = getInventoryItemName(row);
+      if (!name) return;
+      if (normalizeInventoryKey(getInventoryDepartment(row)) !== normalizeInventoryKey(requesterDepartment)) {
+        return;
+      }
+      if (
+        requesterCompany &&
+        normalizeInventoryKey(getInventoryCompany(row)) !== normalizeInventoryKey(requesterCompany)
+      ) {
+        return;
+      }
+
+      const key = normalizeInventoryKey(name);
+      merged.set(key, (merged.get(key) || 0) + getInventoryStock(row));
+    });
+
+    return merged;
+  }, [inventory, requesterCompany, requesterDepartment]);
 
   useEffect(() => {
     const fetchInventory = async () => {
@@ -212,15 +244,17 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
     setItems((prev) =>
       prev.map((item) => {
         if (!item.name.trim()) return item;
-        const matched = inventoryCatalog.find((entry) => entry.name.toLowerCase() === item.name.trim().toLowerCase());
+        const itemKey = normalizeInventoryKey(item.name);
+        const matched = inventoryCatalog.find((entry) => normalizeInventoryKey(entry.name) === itemKey);
+        const departmentStock = departmentStockByName.get(itemKey);
         return {
           ...item,
-          currentStock: matched ? matched.stock : null,
+          currentStock: matched || departmentStockByName.has(itemKey) ? departmentStock ?? 0 : null,
           unit: matched ? matched.unit : item.unit,
         };
       }),
     );
-  }, [inventoryCatalog]);
+  }, [departmentStockByName, inventoryCatalog]);
 
   useEffect(() => {
     const normalizedItems = normalizeSupplyRequestItems(
@@ -233,10 +267,10 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
     setExtraData({
       items: normalizedItems,
       requester_department: requesterDepartment || null,
-      inventory_source_company: INVENTORY_SUPPORT_COMPANY,
-      inventory_source_department: INVENTORY_SUPPORT_DEPARTMENT,
+      inventory_source_company: requesterCompany || null,
+      inventory_source_department: requesterDepartment || null,
     });
-  }, [items, requesterDepartment, setExtraData]);
+  }, [items, requesterCompany, requesterDepartment, setExtraData]);
 
   const visibleMonthlySuggestions = useMemo(
     () => monthlySuggestions.slice(0, MONTHLY_STATS_VISIBLE_LIMIT),
@@ -254,26 +288,31 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
   }, [statsLoading, visibleMonthlySuggestions.length]);
 
   const handleSearch = (index: number, value: string) => {
-    const keyword = value.trim().toLowerCase();
+    const keyword = normalizeInventoryKey(value);
     setItems((prev) =>
       prev.map((item, itemIndex) => {
         if (itemIndex !== index) return item;
 
         const exactMatch = keyword
-          ? inventoryCatalog.find((entry) => entry.name.toLowerCase() === keyword)
+          ? inventoryCatalog.find((entry) => normalizeInventoryKey(entry.name) === keyword)
           : null;
+        const departmentStock = keyword ? departmentStockByName.get(keyword) : null;
 
         return {
           ...item,
           name: value,
-          currentStock: exactMatch ? exactMatch.stock : null,
+          currentStock: exactMatch || departmentStockByName.has(keyword) ? departmentStock ?? 0 : null,
           unit: exactMatch ? exactMatch.unit : item.unit,
           suggestions: keyword
             ? inventoryCatalog
                 .filter((entry) => {
-                  const name = entry.name.toLowerCase();
+                  const name = normalizeInventoryKey(entry.name);
                   return name.startsWith(keyword) || name.includes(keyword);
                 })
+                .map((entry) => ({
+                  ...entry,
+                  stock: departmentStockByName.get(normalizeInventoryKey(entry.name)) ?? entry.stock,
+                }))
                 .slice(0, 8)
             : [],
         };
@@ -282,13 +321,14 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
   };
 
   const selectItem = (index: number, selected: InventoryCatalogItem) => {
+    const itemKey = normalizeInventoryKey(selected.name);
     setItems((prev) =>
       prev.map((item, itemIndex) =>
         itemIndex === index
           ? {
               ...item,
               name: selected.name,
-              currentStock: selected.stock,
+              currentStock: departmentStockByName.get(itemKey) ?? 0,
               unit: selected.unit,
               suggestions: [],
             }
@@ -335,20 +375,25 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
 
       visibleMonthlySuggestions.forEach((suggestion) => {
         const matchedInventory = inventoryCatalog.find(
-          (entry) => entry.name.toLowerCase() === suggestion.name.toLowerCase(),
+          (entry) => normalizeInventoryKey(entry.name) === normalizeInventoryKey(suggestion.name),
         );
         const existingIndex = nextRows.findIndex(
           (row) =>
-            row.name.trim().toLowerCase() === suggestion.name.toLowerCase() &&
+            normalizeInventoryKey(row.name) === normalizeInventoryKey(suggestion.name) &&
             row.category.trim() === suggestion.category &&
             row.purpose.trim() === suggestion.purpose,
         );
+        const departmentStock =
+          departmentStockByName.get(normalizeInventoryKey(suggestion.name)) ?? 0;
 
         if (existingIndex >= 0) {
           nextRows[existingIndex] = {
             ...nextRows[existingIndex],
             qty: Math.max(nextRows[existingIndex].qty, suggestion.average_qty),
-            currentStock: matchedInventory ? matchedInventory.stock : nextRows[existingIndex].currentStock,
+            currentStock:
+              matchedInventory || departmentStockByName.has(normalizeInventoryKey(suggestion.name))
+                ? departmentStock
+                : nextRows[existingIndex].currentStock,
             unit: matchedInventory ? matchedInventory.unit : nextRows[existingIndex].unit,
           };
           return;
@@ -361,7 +406,10 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
             unit: matchedInventory ? matchedInventory.unit : 'EA',
             category: normalizeSupplyRequestCategory(suggestion.category),
             purpose: suggestion.purpose,
-            currentStock: matchedInventory ? matchedInventory.stock : null,
+            currentStock:
+              matchedInventory || departmentStockByName.has(normalizeInventoryKey(suggestion.name))
+                ? departmentStock
+                : null,
           }),
         );
       });
@@ -378,7 +426,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:flex md:flex-wrap md:items-center">
           <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-[var(--accent)]">
             <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]" />
-            SY INC 경영지원팀 재고 기준
+            {requesterInventoryLabel}
           </p>
           <button
             type="button"
@@ -492,20 +540,11 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
         <div className="space-y-3 md:hidden">
           {items.map((item, index) => (
             <div
-              key={index}
+              key={`mobile-reordered-${index}`}
               className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm"
             >
               <div className="mb-3 flex items-center justify-between gap-3">
                 <span className="text-[12px] font-black text-[var(--foreground)]">항목 {index + 1}</span>
-                {item.currentStock !== null ? (
-                  <span
-                    className={`shrink-0 rounded-[var(--radius-md)] px-2 py-1 text-[10px] font-bold ${
-                      item.currentStock <= 5 ? 'bg-red-500/10 text-red-600' : 'bg-blue-500/10 text-blue-600'
-                    }`}
-                  >
-                    SY INC 재고 {item.currentStock} {item.unit}
-                  </span>
-                ) : null}
               </div>
 
               <div className="space-y-3">
@@ -555,26 +594,6 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
 
                 <div className="grid grid-cols-2 gap-3">
                   <label className="block space-y-1.5">
-                    <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">수량 ({item.unit})</span>
-                    <div className="flex items-center gap-2">
-                      <input
-                        data-testid={`supplies-item-qty-mobile-${index}`}
-                        type="number"
-                        min="1"
-                        value={item.qty}
-                        onChange={(event) => updateItemField(index, 'qty', event.target.value)}
-                        className="h-12 w-full rounded-[var(--radius-md)] border-none bg-[var(--toss-blue-light)]/50 px-3 text-center text-2xl font-black tabular-nums text-[var(--accent)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
-                      />
-                      <span
-                        data-testid={`supplies-item-unit-mobile-${index}`}
-                        className="shrink-0 rounded-full bg-[var(--muted)] px-3 py-2 text-[11px] font-black text-[var(--accent)]"
-                      >
-                        {item.unit}
-                      </span>
-                    </div>
-                  </label>
-
-                  <label className="block space-y-1.5">
                     <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">품목구분</span>
                     <select
                       data-testid={`supplies-item-category-mobile-${index}`}
@@ -590,7 +609,43 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
                       ))}
                     </select>
                   </label>
+
+                  <label className="block space-y-1.5">
+                    <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">현재 재고</span>
+                    <div
+                      data-testid={`supplies-item-current-stock-mobile-${index}`}
+                      className={`flex h-12 items-center justify-center rounded-[var(--radius-md)] px-3 text-sm font-black ${
+                        item.currentStock === null
+                          ? 'bg-[var(--muted)] text-[var(--toss-gray-3)]'
+                          : item.currentStock <= 5
+                            ? 'bg-red-500/10 text-red-600'
+                            : 'bg-blue-500/10 text-blue-600'
+                      }`}
+                    >
+                      {item.currentStock === null ? '-' : `${item.currentStock} ${item.unit}`}
+                    </div>
+                  </label>
                 </div>
+
+                <label className="block space-y-1.5">
+                  <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">신청 수량 ({item.unit})</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      data-testid={`supplies-item-qty-mobile-${index}`}
+                      type="number"
+                      min="1"
+                      value={item.qty}
+                      onChange={(event) => updateItemField(index, 'qty', event.target.value)}
+                      className="h-12 w-full rounded-[var(--radius-md)] border-none bg-[var(--toss-blue-light)]/50 px-3 text-center text-2xl font-black tabular-nums text-[var(--accent)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                    />
+                    <span
+                      data-testid={`supplies-item-unit-mobile-${index}`}
+                      className="shrink-0 rounded-full bg-[var(--muted)] px-3 py-2 text-[11px] font-black text-[var(--accent)]"
+                    >
+                      {item.unit}
+                    </span>
+                  </div>
+                </label>
 
                 <label className="block space-y-1.5">
                   <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">용도</span>
@@ -610,22 +665,39 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
         <div className="hidden overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-sm md:block">
           <table className="w-full max-w-full table-fixed border-collapse">
             <colgroup>
-              <col className="w-[40%]" />
               <col className="w-[14%]" />
               <col className="w-[32%]" />
-              <col className="w-[14%]" />
+              <col className="w-[16%]" />
+              <col className="w-[16%]" />
+              <col className="w-[22%]" />
             </colgroup>
             <thead className="bg-[var(--muted)]">
               <tr className="border-b border-[var(--border)]">
-                <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">물품명</th>
-                <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">수량</th>
-                <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">용도</th>
                 <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">품목구분</th>
+                <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">물품명</th>
+                <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">현재 재고</th>
+                <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">신청 수량</th>
+                <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">용도</th>
               </tr>
             </thead>
             <tbody>
               {items.map((item, index) => (
-                <tr key={index} className="border-b border-[var(--border)] last:border-b-0">
+                <tr key={`desktop-reordered-${index}`} className="border-b border-[var(--border)] last:border-b-0">
+                  <td className="px-1.5 py-1.5 align-middle">
+                    <select
+                      data-testid={`supplies-item-category-${index}`}
+                      value={item.category}
+                      onChange={(event) => updateItemField(index, 'category', event.target.value)}
+                      className="h-10 w-full rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-2 text-[10px] font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+                    >
+                      <option value="">구분 선택</option>
+                      {SUPPLY_REQUEST_CATEGORY_OPTIONS.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
                   <td className="px-2 py-1.5 align-middle">
                     <div className="relative">
                       <input
@@ -633,20 +705,9 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
                         value={item.name}
                         onChange={(event) => handleSearch(index, event.target.value)}
                         onFocus={(event) => handleSearch(index, event.target.value)}
-                        className={`h-10 w-full rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-2.5 text-xs font-bold text-[var(--foreground)] outline-none transition-all focus:bg-[var(--card)] focus:ring-2 focus:ring-[var(--accent)]/20 ${
-                          item.currentStock !== null ? 'pr-28' : 'pr-20'
-                        }`}
+                        className="h-10 w-full rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-2.5 text-xs font-bold text-[var(--foreground)] outline-none transition-all focus:bg-[var(--card)] focus:ring-2 focus:ring-[var(--accent)]/20"
                         placeholder="물품명을 입력하세요"
                       />
-                      {item.currentStock !== null ? (
-                        <span
-                          className={`pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 rounded-[var(--radius-md)] px-1.5 py-0.5 text-[10px] font-bold ${
-                            item.currentStock <= 5 ? 'bg-red-500/10 text-red-600' : 'bg-blue-500/10 text-blue-600'
-                          }`}
-                        >
-                          재고 {item.currentStock} {item.unit}
-                        </span>
-                      ) : null}
                       {item.suggestions.length > 0 ? (
                         <div className="absolute left-0 top-full z-[100] mt-1 w-full overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
                           {item.suggestions.map((suggestion, suggestionIndex) => (
@@ -680,6 +741,20 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
                     </div>
                   </td>
                   <td className="px-2 py-1.5 align-middle">
+                    <div
+                      data-testid={`supplies-item-current-stock-${index}`}
+                      className={`inline-flex min-h-[40px] min-w-[88px] items-center justify-center rounded-[var(--radius-md)] px-2.5 text-[11px] font-black ${
+                        item.currentStock === null
+                          ? 'bg-[var(--muted)] text-[var(--toss-gray-3)]'
+                          : item.currentStock <= 5
+                            ? 'bg-red-500/10 text-red-600'
+                            : 'bg-blue-500/10 text-blue-600'
+                      }`}
+                    >
+                      {item.currentStock === null ? '-' : `${item.currentStock} ${item.unit}`}
+                    </div>
+                  </td>
+                  <td className="px-2 py-1.5 align-middle">
                     <div className="flex items-center gap-2">
                       <input
                         data-testid={`supplies-item-qty-${index}`}
@@ -706,26 +781,12 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
                       placeholder="사용 용도를 입력하세요"
                     />
                   </td>
-                  <td className="px-1.5 py-1.5 align-middle">
-                    <select
-                      data-testid={`supplies-item-category-${index}`}
-                      value={item.category}
-                      onChange={(event) => updateItemField(index, 'category', event.target.value)}
-                      className="h-10 w-full max-w-[88px] rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-1.5 text-[10px] font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-                    >
-                      <option value="">구분 선택</option>
-                      {SUPPLY_REQUEST_CATEGORY_OPTIONS.map((category) => (
-                        <option key={category} value={category}>
-                          {category}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
       </div>
     </div>
   );

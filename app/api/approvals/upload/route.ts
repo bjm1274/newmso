@@ -83,6 +83,10 @@ function validateUploadTarget(fileName: string, mimeType: string, fileSize: numb
     throw new Error('업로드할 파일 이름이 없습니다.');
   }
 
+  if (mimeType.startsWith('image/')) {
+    return;
+  }
+
   if (mimeType.startsWith('video/')) {
     if (fileSize > MAX_VIDEO_SIZE_BYTES) {
       throw new Error('동영상 크기는 200MB 이하여야 합니다.');

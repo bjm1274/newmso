@@ -29,7 +29,9 @@ type PollComposerModalProps = {
   open: boolean;
   question: string;
   options: string[];
+  deadlineAt: string;
   onQuestionChange: (value: string) => void;
+  onDeadlineAtChange: (value: string) => void;
   onOptionChange: (index: number, value: string) => void;
   onRemoveOption: (index: number) => void;
   onAddOption: () => void;
@@ -105,7 +107,9 @@ export function PollComposerModal({
   open,
   question,
   options,
+  deadlineAt,
   onQuestionChange,
+  onDeadlineAtChange,
   onOptionChange,
   onRemoveOption,
   onAddOption,
@@ -130,6 +134,16 @@ export function PollComposerModal({
               onChange={(event) => onQuestionChange(event.target.value)}
               className="w-full mt-1 p-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-[var(--radius-lg)] text-xs font-bold outline-none focus:border-[var(--accent)]"
               placeholder="예: 이번 주 회의 시간은 언제가 좋을까요?"
+            />
+          </div>
+          <div>
+            <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">마감시간</label>
+            <input
+              data-testid="chat-poll-deadline"
+              type="datetime-local"
+              value={deadlineAt}
+              onChange={(event) => onDeadlineAtChange(event.target.value)}
+              className="w-full mt-1 p-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-[var(--radius-lg)] text-xs font-bold outline-none focus:border-[var(--accent)]"
             />
           </div>
           <div>

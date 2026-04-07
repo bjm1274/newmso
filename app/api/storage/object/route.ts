@@ -8,13 +8,6 @@ import { readSessionFromRequest } from '@/lib/server-session';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function buildInlineContentDisposition(rawName: string): string {
-  const normalizedName = String(rawName || 'download');
-  const ascii = normalizedName.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
-  const encoded = encodeURIComponent(normalizedName);
-  return `inline; filename="${ascii}"; filename*=UTF-8''${encoded}`;
-}
-
 export async function GET(request: NextRequest) {
   try {
     const session = await readSessionFromRequest(request);
@@ -49,12 +42,7 @@ export async function GET(request: NextRequest) {
     if (!signedUrl) {
       return NextResponse.json({ error: 'Cloudflare R2 is not configured' }, { status: 500 });
     }
-    const redirectUrl = new URL(signedUrl);
-    if (!download && !redirectUrl.searchParams.has('response-content-disposition')) {
-      redirectUrl.searchParams.set('response-content-disposition', buildInlineContentDisposition(fileName));
-    }
-
-    const response = NextResponse.redirect(redirectUrl.toString(), 307);
+    const response = NextResponse.redirect(signedUrl, 307);
     response.headers.set('Cache-Control', 'private, no-store');
     response.headers.set('X-Content-Type-Options', 'nosniff');
     return response;

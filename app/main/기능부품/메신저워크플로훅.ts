@@ -4,6 +4,7 @@ import { useCallback, useState, type Dispatch, type SetStateAction } from 'react
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
+import { buildPollQuestionContent } from './메신저유틸';
 
 const DEFAULT_POLL_OPTIONS = ['찬성', '반대'];
 
@@ -43,6 +44,8 @@ type UseChatWorkflowDraftsResult = {
   pollQuestion: string;
   setPollQuestion: Dispatch<SetStateAction<string>>;
   pollOptions: string[];
+  pollDeadlineAt: string;
+  setPollDeadlineAt: Dispatch<SetStateAction<string>>;
   openPollModal: () => void;
   closePollModal: () => void;
   handleCreatePoll: () => Promise<void>;
@@ -74,6 +77,7 @@ export function useChatWorkflowDrafts({
   const [showPollModal, setShowPollModal] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState<string[]>(DEFAULT_POLL_OPTIONS);
+  const [pollDeadlineAt, setPollDeadlineAt] = useState('');
   const [slashCommand, setSlashCommand] = useState<SlashCommandType>(null);
   const [showSlashModal, setShowSlashModal] = useState(false);
   const [slashForm, setSlashForm] = useState<SlashCommandForm>({
@@ -90,6 +94,7 @@ export function useChatWorkflowDrafts({
 
   const closePollModal = useCallback(() => {
     setShowPollModal(false);
+    setPollDeadlineAt('');
   }, []);
 
   const handleCreatePoll = useCallback(async () => {
@@ -105,16 +110,16 @@ export function useChatWorkflowDrafts({
     }
 
     try {
+      const pollPayload = {
+        room_id: selectedRoomId,
+        creator_id: effectiveChatUserId || user?.id,
+        question: buildPollQuestionContent(pollQuestion, { deadlineAt: pollDeadlineAt }),
+        options,
+      };
+
       const { data: poll, error } = await supabase
         .from('polls')
-        .insert([
-          {
-            room_id: selectedRoomId,
-            creator_id: effectiveChatUserId || user?.id,
-            question: pollQuestion,
-            options,
-          },
-        ])
+        .insert([pollPayload])
         .select()
         .single();
 
@@ -127,16 +132,17 @@ export function useChatWorkflowDrafts({
       const optimisticPoll: PollItem = {
         id: Date.now().toString(),
         room_id: selectedRoomId,
-        question: pollQuestion,
+        question: buildPollQuestionContent(pollQuestion, { deadlineAt: pollDeadlineAt }),
         options,
       };
       setPolls((prev) => [...prev, optimisticPoll]);
     } finally {
       setPollQuestion('');
       setPollOptions(DEFAULT_POLL_OPTIONS);
+      setPollDeadlineAt('');
       setShowPollModal(false);
     }
-  }, [effectiveChatUserId, pollOptions, pollQuestion, selectedRoomId, user?.id]);
+  }, [effectiveChatUserId, pollDeadlineAt, pollOptions, pollQuestion, selectedRoomId, user?.id]);
 
   const handlePollOptionChange = useCallback((index: number, value: string) => {
     setPollOptions((prev) => prev.map((option, optionIndex) => (optionIndex === index ? value : option)));
@@ -336,6 +342,8 @@ export function useChatWorkflowDrafts({
     pollQuestion,
     setPollQuestion,
     pollOptions,
+    pollDeadlineAt,
+    setPollDeadlineAt,
     openPollModal,
     closePollModal,
     handleCreatePoll,

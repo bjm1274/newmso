@@ -15,6 +15,8 @@ export const WARD_QUICK_REPLY_OPTIONS = [
 ] as const;
 const WARD_MESSAGE_META_PREFIX = '[[WARD_MESSAGE_META]]';
 const WARD_MESSAGE_META_SUFFIX = '[[/WARD_MESSAGE_META]]';
+const POLL_META_PREFIX = '[[POLL_META]]';
+const POLL_META_SUFFIX = '[[/POLL_META]]';
 export const MESSAGE_READ_WRITES_ENABLED = false;
 
 export type WardMessageMeta = {
@@ -358,6 +360,45 @@ export function getRoomDisplayName(room: ChatRoom | null | undefined, staffs: St
     if (otherStaff?.name) return otherStaff.name;
   }
   return room.name || '채팅방';
+}
+
+export function buildPollQuestionContent(
+  question: string,
+  meta?: { deadlineAt?: string | null },
+): string {
+  const normalizedQuestion = String(question || '').trim();
+  const deadlineAt = String(meta?.deadlineAt || '').trim();
+  if (!deadlineAt) return normalizedQuestion;
+  return `${normalizedQuestion}${normalizedQuestion ? '\n' : ''}${POLL_META_PREFIX}${JSON.stringify({ deadlineAt })}${POLL_META_SUFFIX}`;
+}
+
+export function extractPollMetaFromQuestion(value: unknown): {
+  displayQuestion: string;
+  deadlineAt: string;
+} {
+  const raw = String(value || '');
+  const start = raw.indexOf(POLL_META_PREFIX);
+  const end = raw.indexOf(POLL_META_SUFFIX);
+
+  if (start === -1 || end === -1 || end <= start) {
+    return { displayQuestion: raw.trim(), deadlineAt: '' };
+  }
+
+  const displayQuestion = raw.slice(0, start).trim();
+  const metaText = raw.slice(start + POLL_META_PREFIX.length, end).trim();
+
+  try {
+    const parsed = JSON.parse(metaText) as { deadlineAt?: string | null };
+    return {
+      displayQuestion,
+      deadlineAt: String(parsed?.deadlineAt || '').trim(),
+    };
+  } catch {
+    return {
+      displayQuestion: raw.trim(),
+      deadlineAt: '',
+    };
+  }
 }
 
 export function getRoomPreviewText(room: ChatRoom): string {

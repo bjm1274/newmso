@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { isActiveStaff } from '@/lib/active-staff';
+import { withMissingColumnFallback } from '@/lib/supabase-compat';
+import { buildShiftLookup, resolveAssignedShift } from '@/lib/shift-resolution';
 
 type WorkShiftRow = {
-  id: string;
+  id?: string | null;
   name?: string | null;
   start_time?: string | null;
   end_time?: string | null;
@@ -23,6 +25,7 @@ type StaffRow = {
 type ShiftAssignmentRow = {
   staff_id: string;
   shift_id?: string | null;
+  shift_name?: string | null;
   work_date: string;
 };
 
@@ -234,11 +237,21 @@ export default function WorkStatus({ user }: { user?: any }) {
         const [shiftRes, staffRes, assignmentRes, attendanceRes, attendancesRes] = await Promise.allSettled([
           supabase.from('work_shifts').select('id, name, start_time, end_time').eq('is_active', true),
           supabase.from('staff_members').select('id, name, shift_id, department, position, status'),
-          supabase
-            .from('shift_assignments')
-            .select('staff_id, shift_id, work_date')
-            .gte('work_date', queryRange.startKey)
-            .lte('work_date', queryRange.endKey),
+          withMissingColumnFallback(
+            () =>
+              supabase
+                .from('shift_assignments')
+                .select('staff_id, shift_id, shift_name, work_date')
+                .gte('work_date', queryRange.startKey)
+                .lte('work_date', queryRange.endKey),
+            () =>
+              supabase
+                .from('shift_assignments')
+                .select('staff_id, shift_id, work_date')
+                .gte('work_date', queryRange.startKey)
+                .lte('work_date', queryRange.endKey),
+            'shift_name',
+          ),
           supabase
             .from('attendance')
             .select('staff_id, date, check_in, check_out, status')
@@ -389,14 +402,38 @@ export default function WorkStatus({ user }: { user?: any }) {
     }
   }, [departmentFilter, departmentOptions]);
 
-  const shiftMap = useMemo(() => new Map(workShifts.map((shift) => [shift.id, shift])), [workShifts]);
+  const shiftLookup = useMemo(() => buildShiftLookup(workShifts), [workShifts]);
   const staffMap = useMemo(() => new Map(filteredStaffs.map((staff) => [staff.id, staff])), [filteredStaffs]);
+
+  const resolveAssignmentDisplay = (
+    assignment: ShiftAssignmentRow | undefined,
+    fallbackShiftId?: string | null,
+  ) => {
+    const shift = resolveAssignedShift(assignment, shiftLookup, { fallbackShiftId });
+    const assignedShiftName = String(assignment?.shift_name || '').trim();
+    const shiftId =
+      String(
+        shift?.id ||
+          assignment?.shift_id ||
+          (assignedShiftName ? `name:${assignedShiftName}` : fallbackShiftId || 'none'),
+      ).trim() || 'none';
+
+    return {
+      shiftId,
+      shiftName:
+        shift?.name ||
+        assignedShiftName ||
+        (shiftId === 'none' ? '근무형태 미지정' : '기타 근무'),
+      timeRange: formatShiftRange(shift),
+      band: inferShiftBand(shift),
+    };
+  };
 
   const activeStaffs = useMemo(() => {
     const assignmentMap = new Map(
       assignments
         .filter((assignment) => assignment.work_date === todayKey)
-        .map((assignment) => [assignment.staff_id, assignment.shift_id || 'none']),
+        .map((assignment) => [assignment.staff_id, assignment]),
     );
     const grouped = new Map<string, Array<{ staff: StaffRow; attendance: AttendanceRow }>>();
 
@@ -408,19 +445,24 @@ export default function WorkStatus({ user }: { user?: any }) {
       const staff = staffMap.get(record.staff_id);
       if (!staff) return;
 
-      const shiftId = assignmentMap.get(record.staff_id) || staff.shift_id || 'none';
-      if (!grouped.has(shiftId)) grouped.set(shiftId, []);
-      grouped.get(shiftId)?.push({ staff, attendance: record });
+      const assignment = assignmentMap.get(record.staff_id);
+      const display = resolveAssignmentDisplay(assignment, staff.shift_id);
+      if (!grouped.has(display.shiftId)) grouped.set(display.shiftId, []);
+      grouped.get(display.shiftId)?.push({ staff, attendance: record });
     });
 
     return Array.from(grouped.entries())
       .map(([shiftId, items]) => {
-        const shift = shiftMap.get(shiftId);
+        const display = resolveAssignmentDisplay(
+          assignmentMap.get(items[0]?.staff.id),
+          items[0]?.staff.shift_id,
+        );
+        const shift = { name: display.shiftName };
         return {
           shiftId,
           shiftName: shift?.name || (shiftId === 'none' ? '근무형태 미지정' : '기타 근무'),
-          timeRange: formatShiftRange(shift),
-          band: inferShiftBand(shift),
+          timeRange: display.timeRange,
+          band: display.band,
           items: items.sort((left, right) =>
             String(left.staff.name || '').localeCompare(String(right.staff.name || ''), 'ko'),
           ),
@@ -432,10 +474,11 @@ export default function WorkStatus({ user }: { user?: any }) {
         }
         return right.items.length - left.items.length;
       });
-  }, [assignments, shiftMap, staffMap, todayAttendance, todayKey]);
+  }, [assignments, shiftLookup, staffMap, todayAttendance, todayKey]);
 
   const assignmentCountsByDate = useMemo(() => {
     const counts = new Map<string, DayShiftCounts>();
+    const staffShiftById = new Map(filteredStaffs.map((staff) => [staff.id, staff.shift_id]));
 
     assignments.forEach((assignment) => {
       const key = assignment.work_date;
@@ -444,13 +487,13 @@ export default function WorkStatus({ user }: { user?: any }) {
       const current = counts.get(key)!;
       current.total += 1;
 
-      const band = inferShiftBand(shiftMap.get(assignment.shift_id || ''));
+      const band = resolveAssignmentDisplay(assignment, staffShiftById.get(assignment.staff_id)).band;
       if (band === 'D' || band === 'E' || band === 'N') current[band] += 1;
       else current.OTHER += 1;
     });
 
     return counts;
-  }, [assignments, shiftMap]);
+  }, [assignments, filteredStaffs, shiftLookup]);
 
   const staffNamesByDate = useMemo(() => {
     const grouped = new Map<string, string[]>();
@@ -479,26 +522,31 @@ export default function WorkStatus({ user }: { user?: any }) {
 
     const selectedAssignments = assignments.filter((assignment) => assignment.work_date === selectedDateKey);
     const hasExplicitAssignments = selectedAssignments.length > 0;
-    const grouped = new Map<string, StaffRow[]>();
+    const grouped = new Map<
+      string,
+      { staffs: StaffRow[]; display: ReturnType<typeof resolveAssignmentDisplay> }
+    >();
 
     if (hasExplicitAssignments) {
       selectedAssignments.forEach((assignment) => {
         const staff = staffMap.get(assignment.staff_id);
         if (!staff) return;
-        const key = assignment.shift_id || 'none';
-        if (!grouped.has(key)) grouped.set(key, []);
-        grouped.get(key)?.push(staff);
+        const display = resolveAssignmentDisplay(assignment, staff.shift_id);
+        if (!grouped.has(display.shiftId)) {
+          grouped.set(display.shiftId, { staffs: [], display });
+        }
+        grouped.get(display.shiftId)?.staffs.push(staff);
       });
     }
 
-    const baseRows: ShiftCardRow[] = Array.from(grouped.entries()).map(([shiftId, groupedStaffs]) => {
-      const shift = shiftMap.get(shiftId);
+    const baseRows: ShiftCardRow[] = Array.from(grouped.entries()).map(([shiftId, group]) => {
+      const shift = { name: group.display.shiftName };
       return {
         shiftId,
         shiftName: shift?.name || (shiftId === 'none' ? '근무형태 미지정' : '기타 근무'),
-        timeRange: formatShiftRange(shift),
-        band: inferShiftBand(shift),
-        staffs: groupedStaffs.sort((left, right) =>
+        timeRange: group.display.timeRange,
+        band: group.display.band,
+        staffs: group.staffs.sort((left, right) =>
           String(left.name || '').localeCompare(String(right.name || ''), 'ko'),
         ),
         activeStaffIds,
@@ -549,7 +597,7 @@ export default function WorkStatus({ user }: { user?: any }) {
       counts: visibleCounts,
       activeStaffCount: activeStaffIds.size,
     };
-  }, [assignmentCountsByDate, assignments, selectedDateKey, shiftMap, showActiveOnly, staffMap, todayAttendance, todayKey]);
+  }, [assignmentCountsByDate, assignments, selectedDateKey, shiftLookup, showActiveOnly, staffMap, todayAttendance, todayKey]);
 
   return (
     <div className="space-y-5" data-testid="work-status-view">

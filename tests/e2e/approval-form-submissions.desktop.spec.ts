@@ -486,6 +486,20 @@ test('shared approval forms submit with real field input', async ({ page }) => {
         category: '소모품',
         created_at: '2026-03-16T09:10:00.000Z',
       },
+      {
+        id: 'inventory-item-3',
+        item_name: '멸균 거즈',
+        quantity: 4,
+        stock: 4,
+        min_quantity: 1,
+        unit: 'BOX',
+        spec: '4x4 / 30매',
+        company: composeUser.company,
+        company_id: composeUser.company_id,
+        department: composeUser.department,
+        category: '치료용품',
+        created_at: '2026-03-16T09:20:00.000Z',
+      },
     ],
     attendance: [
       {
@@ -594,6 +608,7 @@ test('shared approval forms submit with real field input', async ({ page }) => {
     await page.getByTestId('approval-content-input').fill('병동 비품 신청 사유입니다.');
     await page.getByTestId('supplies-item-name-0').fill('멸균 거즈');
     await expect(page.getByTestId('supplies-item-unit-0')).toHaveText('BOX');
+    await expect(page.getByTestId('supplies-item-current-stock-0')).toContainText('4 BOX');
     await page.getByTestId('supplies-item-qty-0').fill('3');
     await page.getByTestId('supplies-item-purpose-0').fill('병동 처치용');
     await page.getByTestId('supplies-item-category-0').selectOption('의료용품');

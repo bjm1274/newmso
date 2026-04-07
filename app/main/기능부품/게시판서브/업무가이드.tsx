@@ -63,6 +63,9 @@ type GuideTaskMetaPayload = {
   dueDate?: string;
   priority?: GuideTaskPriority;
   isDone?: boolean;
+  completedAt?: string;
+  completedById?: string;
+  completedByName?: string;
 };
 
 type GuideRow = BoardPost & {
@@ -91,6 +94,9 @@ type GuideTask = GuideRow & {
   dueDate: string;
   priority: GuideTaskPriority;
   isDone: boolean;
+  completedAt: string;
+  completedById: string;
+  completedByName: string;
 };
 
 type OrgTeamRow = {
@@ -267,6 +273,9 @@ function buildGuideTaskContent(note: string, meta: GuideTaskMetaPayload) {
     dueDate: normalizeText(meta.dueDate) || undefined,
     priority: meta.priority || 'medium',
     isDone: Boolean(meta.isDone),
+    completedAt: normalizeText(meta.completedAt) || undefined,
+    completedById: normalizeText(meta.completedById) || undefined,
+    completedByName: normalizeText(meta.completedByName) || undefined,
   };
 
   return `${normalizedNote}${normalizedNote ? '\n' : ''}${GUIDE_TASK_META_PREFIX}${JSON.stringify(normalizedMeta)}${GUIDE_TASK_META_SUFFIX}`;
@@ -325,6 +334,9 @@ function normalizeGuideTask(post: GuideRow): GuideTask {
     dueDate: normalizeText(meta?.dueDate),
     priority: normalizeGuideTaskPriority(meta?.priority),
     isDone: Boolean(meta?.isDone),
+    completedAt: normalizeText(meta?.completedAt),
+    completedById: normalizeText(meta?.completedById),
+    completedByName: normalizeText(meta?.completedByName),
   };
 }
 
@@ -572,7 +584,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState<'all' | GuideKind>('all');
   const [audienceFilter, setAudienceFilter] = useState<'all' | GuideAudience>('all');
-  const [taskFilter, setTaskFilter] = useState<'all' | 'open' | 'done'>('open');
+  const [taskFilter, setTaskFilter] = useState<'all' | 'open' | 'done'>('all');
 
   const [title, setTitle] = useState('');
   const [teamName, setTeamName] = useState('');
@@ -1122,6 +1134,9 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
         dueDate: taskDueDate.trim() || undefined,
         priority: taskPriority,
         isDone: false,
+        completedAt: undefined,
+        completedById: undefined,
+        completedByName: undefined,
       }),
       author_id: currentUserId || null,
       author_name: user?.name || '익명',
@@ -1140,6 +1155,18 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
           toast('본인이 작성한 팀 할일만 수정할 수 있습니다.', 'warning');
           return;
         }
+
+        payload.content = buildGuideTaskContent(taskNote, {
+          companyName: activeTeam.companyName,
+          divisionName: activeTeam.divisionName,
+          teamName: activeTeam.teamName,
+          dueDate: taskDueDate.trim() || undefined,
+          priority: taskPriority,
+          isDone: Boolean(original?.isDone),
+          completedAt: original?.completedAt || undefined,
+          completedById: original?.completedById || undefined,
+          completedByName: original?.completedByName || undefined,
+        });
 
         const { data, error, payload: persistedPayload } = await runGuideMutation<GuideRow>(
           (nextPayload) => supabase.from('board_posts').update(nextPayload).eq('id', editingTaskId).select().single(),
@@ -1204,6 +1231,9 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
     const nextTask = {
       ...task,
       isDone: !task.isDone,
+      completedAt: task.isDone ? '' : new Date().toISOString(),
+      completedById: task.isDone ? '' : currentUserId || '',
+      completedByName: task.isDone ? '' : (user?.name || ''),
       updated_at: new Date().toISOString(),
       content: buildGuideTaskContent(task.note, {
         companyName: task.companyName || task.company || activeCompanyLabel,
@@ -1212,6 +1242,9 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
         dueDate: task.dueDate || undefined,
         priority: task.priority,
         isDone: !task.isDone,
+        completedAt: task.isDone ? undefined : new Date().toISOString(),
+        completedById: task.isDone ? undefined : currentUserId || undefined,
+        completedByName: task.isDone ? undefined : user?.name || undefined,
       }),
     };
 
@@ -1227,7 +1260,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
       console.error('guide task toggle failed', error);
       void loadGuideWorkspace();
     }
-  }, [activeCompanyLabel, canWrite, loadGuideWorkspace]);
+  }, [activeCompanyLabel, canWrite, currentUserId, loadGuideWorkspace, user?.name]);
 
   const deleteTask = useCallback(async (task: GuideTask) => {
     if (!canManagePost(task)) {
@@ -1899,6 +1932,11 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                             <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold text-[var(--toss-gray-3)]">
                               <span>{task.author_name || '작성자 미상'}</span>
                               <span>{formatDate(task.updated_at || task.created_at)}</span>
+                              {task.isDone ? (
+                                <span>
+                                  {`완료자 ${task.completedByName || '확인 불가'}${task.completedAt ? ` · ${formatDate(task.completedAt)}` : ''}`}
+                                </span>
+                              ) : null}
                             </div>
                           </div>
 

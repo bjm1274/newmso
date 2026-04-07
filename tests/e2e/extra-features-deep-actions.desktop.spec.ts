@@ -240,6 +240,44 @@ test('work status renders UTC attendance check-in in local Korea time', async ({
   expect(runtimeErrors).toEqual([]);
 });
 
+test('work status resolves legacy shift_name assignments to the configured schedule time', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const todayKey = getTodayKey();
+
+  await prepareExtraFeature(
+    page,
+    {
+      staffMembers: [extraFeaturesUser],
+      workShifts: [
+        {
+          id: 'shift-outpatient-0830',
+          name: '외래/검사 월-금',
+          start_time: '08:30:00',
+          end_time: '17:30:00',
+          is_active: true,
+        },
+      ],
+      shiftAssignments: [
+        {
+          id: 'assign-legacy-name-1',
+          staff_id: extraFeaturesUser.id,
+          work_date: todayKey,
+          shift_name: '외래/검사 월-금',
+        },
+      ],
+      attendance: [
+        { id: 'attendance-legacy-name-1', staff_id: extraFeaturesUser.id, date: todayKey, check_in: `${todayKey}T08:05:00` },
+      ],
+    },
+    'extra-card-work-status'
+  );
+
+  await expect(page.getByTestId('work-status-view')).toBeVisible();
+  await expect(page.getByText('외래/검사 월-금')).toBeVisible();
+  await expect(page.getByText('08:30 - 17:30')).toBeVisible();
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('handover template version history is visible and selectable', async ({ page }) => {
   const runtimeErrors = trackRuntimeErrors(page);
 

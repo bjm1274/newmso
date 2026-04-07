@@ -6,6 +6,12 @@ import { WORKPLACE_LOCATION, ALLOWED_DISTANCE_M } from '@/lib/location';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import { formatLocalDateKey } from '@/lib/use-local-date-key';
+import {
+  buildShiftLookup,
+  resolveAssignedShift,
+  type ShiftAssignmentReference,
+  type ShiftLookupRecord,
+} from '@/lib/shift-resolution';
 
 const HOSPITAL_LOCATION = WORKPLACE_LOCATION;
 const ALLOWED_RADIUS_METER = ALLOWED_DISTANCE_M;
@@ -52,6 +58,12 @@ type CommuteLog = {
   displayEarlyLeaveMinutes?: number | null;
   isVirtual?: boolean;
 } & Record<string, unknown>;
+
+type MonthlyShiftAssignmentRow = {
+  work_date?: string | null;
+  shift_id?: string | null;
+  shift_name?: string | null;
+};
 
 const COMMUTE_STATUS_LABELS: Record<string, string> = {
   present: '정상',
@@ -400,18 +412,39 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     const monthlyLogs = ((data || []) as CommuteLog[]).map((log) => ({ ...log }));
     const [{ shiftId: latestShiftId, department: latestDepartment }, assignmentResult] = await Promise.all([
       fetchLatestStaffShiftContext(),
-      supabase
-        .from('shift_assignments')
-        .select('work_date, shift_id')
-        .eq('staff_id', userId)
-        .gte('work_date', startOfMonth)
-        .lte('work_date', endOfMonth),
+      withMissingColumnFallback(
+        () =>
+          supabase
+            .from('shift_assignments')
+            .select('work_date, shift_id, shift_name')
+            .eq('staff_id', userId)
+            .gte('work_date', startOfMonth)
+            .lte('work_date', endOfMonth),
+        () =>
+          supabase
+            .from('shift_assignments')
+            .select('work_date, shift_id')
+            .eq('staff_id', userId)
+            .gte('work_date', startOfMonth)
+            .lte('work_date', endOfMonth),
+        'shift_name'
+      ),
     ]);
 
-    const assignmentByDate = new Map<string, string>(
-      ((assignmentResult.data || []) as Array<{ work_date: string; shift_id: string | null }>)
-        .filter((item) => item.shift_id)
-        .map((item) => [String(item.work_date).slice(0, 10), String(item.shift_id)])
+    if (assignmentResult.error) {
+      throw assignmentResult.error;
+    }
+
+    const assignmentByDate = new Map<string, ShiftAssignmentReference>(
+      ((assignmentResult.data || []) as MonthlyShiftAssignmentRow[])
+        .filter((item) => item.work_date)
+        .map((item) => [
+          String(item.work_date).slice(0, 10),
+          {
+            shift_id: item.shift_id,
+            shift_name: item.shift_name,
+          },
+        ])
     );
 
     const effectiveDepartment = latestDepartment;
@@ -419,29 +452,51 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
     const shiftIds = Array.from(
       new Set(
-        [...assignmentByDate.values(), defaultShiftId].filter(Boolean)
+        [
+          ...Array.from(assignmentByDate.values()).map((assignment) => String(assignment.shift_id || '').trim()),
+          defaultShiftId,
+        ].filter(Boolean)
+      )
+    );
+    const shiftNames = Array.from(
+      new Set(
+        Array.from(assignmentByDate.values())
+          .map((assignment) => String(assignment.shift_name || '').trim())
+          .filter(Boolean)
       )
     );
 
-    const shiftsMap = new Map<string, { start_time?: string | null; end_time?: string | null }>();
-    if (shiftIds.length > 0) {
-      const { data: shiftRows } = await supabase
-        .from('work_shifts')
-        .select('id, start_time, end_time')
-        .in('id', shiftIds);
+    const shiftRows: ShiftLookupRecord[] = [];
+    if (shiftIds.length > 0 || shiftNames.length > 0) {
+      const [shiftIdsResult, shiftNamesResult] = await Promise.all([
+        shiftIds.length > 0
+          ? supabase.from('work_shifts').select('id, name, start_time, end_time').in('id', shiftIds)
+          : Promise.resolve({ data: [], error: null }),
+        shiftNames.length > 0
+          ? supabase.from('work_shifts').select('id, name, start_time, end_time').in('name', shiftNames)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
 
-      ((shiftRows || []) as Array<{ id: string; start_time?: string | null; end_time?: string | null }>).forEach((row) => {
-        shiftsMap.set(String(row.id), row);
-      });
+      if (shiftIdsResult.error) {
+        throw shiftIdsResult.error;
+      }
+      if (shiftNamesResult.error) {
+        throw shiftNamesResult.error;
+      }
+
+      shiftRows.push(...((shiftIdsResult.data || []) as ShiftLookupRecord[]));
+      shiftRows.push(...((shiftNamesResult.data || []) as ShiftLookupRecord[]));
     }
+    const shiftLookup = buildShiftLookup(shiftRows);
 
     const boundaryByDate = new Map<string, ShiftBoundary>();
     const resolveBoundaryForDate = (dateStr: string) => {
       const cached = boundaryByDate.get(dateStr);
       if (cached) return cached;
 
-      const shiftId = assignmentByDate.get(dateStr) || defaultShiftId;
-      const shiftRow = shiftId ? shiftsMap.get(shiftId) : null;
+      const shiftRow = resolveAssignedShift(assignmentByDate.get(dateStr), shiftLookup, {
+        fallbackShiftId: defaultShiftId,
+      });
       const boundary = shiftRow
         ? buildShiftBoundary(
             String(shiftRow.start_time || ''),
@@ -774,32 +829,67 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       const [{ shiftId: latestShiftId, department: latestDepartment }, assignmentResult] =
         await Promise.all([
           fetchLatestStaffShiftContext(),
-          supabase
-            .from('shift_assignments')
-            .select('shift_id')
-            .eq('staff_id', userId)
-            .eq('work_date', workDate)
-            .maybeSingle(),
+          withMissingColumnFallback(
+            () =>
+              supabase
+                .from('shift_assignments')
+                .select('shift_id, shift_name')
+                .eq('staff_id', userId)
+                .eq('work_date', workDate)
+                .maybeSingle(),
+            () =>
+              supabase
+                .from('shift_assignments')
+                .select('shift_id')
+                .eq('staff_id', userId)
+                .eq('work_date', workDate)
+                .maybeSingle(),
+            'shift_name'
+          ),
         ]);
+
+      if (assignmentResult.error) {
+        throw assignmentResult.error;
+      }
 
       const effectiveDepartment = latestDepartment || fallbackDepartment;
 
-      const shiftId =
-        String(
-          assignmentResult?.data?.shift_id ||
-            latestShiftId ||
-            ''
-        ).trim();
+      const assignment = (assignmentResult.data || null) as ShiftAssignmentReference | null;
+      const shiftIds = Array.from(
+        new Set(
+          [String(assignment?.shift_id || '').trim(), String(latestShiftId || '').trim()].filter(Boolean)
+        )
+      );
+      const shiftNames = Array.from(new Set([String(assignment?.shift_name || '').trim()].filter(Boolean)));
 
-      if (!shiftId) {
+      if (shiftIds.length === 0 && shiftNames.length === 0) {
         return buildFallbackShiftBoundary(effectiveDepartment);
       }
 
-      const { data: shiftRow } = await supabase
-        .from('work_shifts')
-        .select('start_time, end_time')
-        .eq('id', shiftId)
-        .maybeSingle();
+      const [shiftIdsResult, shiftNamesResult] = await Promise.all([
+        shiftIds.length > 0
+          ? supabase.from('work_shifts').select('id, name, start_time, end_time').in('id', shiftIds)
+          : Promise.resolve({ data: [], error: null }),
+        shiftNames.length > 0
+          ? supabase.from('work_shifts').select('id, name, start_time, end_time').in('name', shiftNames)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+
+      if (shiftIdsResult.error) {
+        throw shiftIdsResult.error;
+      }
+      if (shiftNamesResult.error) {
+        throw shiftNamesResult.error;
+      }
+
+      const shiftLookup = buildShiftLookup([
+        ...((shiftIdsResult.data || []) as ShiftLookupRecord[]),
+        ...((shiftNamesResult.data || []) as ShiftLookupRecord[]),
+      ]);
+      const shiftRow = resolveAssignedShift(assignment, shiftLookup, { fallbackShiftId: latestShiftId });
+      if (!shiftRow) {
+        return buildFallbackShiftBoundary(effectiveDepartment);
+      }
 
       const startTime = String((shiftRow as Record<string, unknown> | null | undefined)?.start_time || '').trim();
       const endTime = String((shiftRow as Record<string, unknown> | null | undefined)?.end_time || '').trim();

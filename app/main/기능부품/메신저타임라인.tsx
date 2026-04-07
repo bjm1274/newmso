@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { MutableRefObject, ReactNode, RefObject } from 'react';
@@ -13,7 +13,7 @@ import {
   type AttachmentPreviewKind,
 } from './메신저첨부';
 import { MessengerAvatar } from './메신저공통';
-import { extractWardMessageMeta, WARD_QUICK_REPLY_OPTIONS } from './메신저유틸';
+import { extractPollMetaFromQuestion, extractWardMessageMeta, WARD_QUICK_REPLY_OPTIONS } from './메신저유틸';
 
 type PollItem = {
   id: string;
@@ -125,6 +125,7 @@ export function MessengerTimeline({
 }: MessengerTimelineProps) {
   const [scrollDateLabel, setScrollDateLabel] = useState('');
   const [showScrollDateIndicator, setShowScrollDateIndicator] = useState(false);
+  const [noticeBannerCollapsed, setNoticeBannerCollapsed] = useState(false);
   const scrollDateHideTimeoutRef = useRef<number | null>(null);
   const pendingRoomChangeAlignRef = useRef<string | null>(null);
   const roomOpenAutoStickUntilRef = useRef(0);
@@ -245,29 +246,74 @@ export function MessengerTimeline({
     };
   }, []);
 
+  useEffect(() => {
+    setNoticeBannerCollapsed(false);
+  }, [selectedRoomId, noticeMessages.length]);
+
   return (
     <>
       {selectedRoomId && noticeMessages.length > 0 && (
-        <div className="shrink-0 border-b border-orange-100 bg-orange-500/10/80 px-4 py-3 md:px-4">
-          <div className="flex flex-wrap gap-2">
-            {noticeMessages.map((pinnedMessage) => (
-              <button
-                key={`pin-${pinnedMessage.id}`}
-                type="button"
-                onClick={() => onScrollToMessage(pinnedMessage.id)}
-                className="min-w-0 max-w-full rounded-[var(--radius-lg)] border border-orange-500/20 bg-[var(--card)] px-3 py-2 text-left shadow-sm transition-colors hover:bg-orange-500/20"
-              >
-                <p className="text-[10px] font-bold text-orange-500">공지 메시지</p>
-                <p className="mt-1 max-w-[280px] truncate text-xs font-semibold text-[var(--foreground)]">
-                  {getMessageDisplayText(
-                    pinnedMessage.content,
-                    pinnedMessage.file_name,
-                    pinnedMessage.file_url,
-                    '첨부 파일 메시지'
-                  )}
-                </p>
-              </button>
-            ))}
+        <div
+          data-testid="chat-notice-banner"
+          className="shrink-0 border-b border-orange-100 bg-orange-500/10 px-3 py-2 md:px-4"
+        >
+          <div className="flex items-center gap-2">
+            <div className="shrink-0 rounded-full bg-orange-500 px-2.5 py-1 text-[10px] font-bold text-white">
+              {`공지 ${noticeMessages.length}`}
+            </div>
+            <div className="min-w-0 flex-1">
+              {noticeBannerCollapsed ? (
+                <button
+                  type="button"
+                  data-testid="chat-notice-collapsed-preview"
+                  onClick={() => {
+                    if (noticeMessages[0]?.id) onScrollToMessage(noticeMessages[0].id);
+                  }}
+                  className="w-full min-w-0 rounded-full border border-orange-500/20 bg-[var(--card)] px-3 py-1.5 text-left text-xs font-semibold text-[var(--foreground)] shadow-sm transition-colors hover:bg-orange-500/10"
+                >
+                  <span className="block truncate">
+                    {getMessageDisplayText(
+                      noticeMessages[0]?.content,
+                      noticeMessages[0]?.file_name,
+                      noticeMessages[0]?.file_url,
+                      '공지 메시지'
+                    )}
+                  </span>
+                </button>
+              ) : (
+                <div
+                  data-testid="chat-notice-items"
+                  className="flex gap-2 overflow-x-auto pb-0.5 custom-scrollbar"
+                >
+                  {noticeMessages.map((pinnedMessage) => (
+                    <button
+                      key={`pin-${pinnedMessage.id}`}
+                      data-testid={`chat-notice-item-${pinnedMessage.id}`}
+                      type="button"
+                      onClick={() => onScrollToMessage(pinnedMessage.id)}
+                      className="min-w-0 max-w-[420px] shrink-0 rounded-full border border-orange-500/20 bg-[var(--card)] px-3 py-1.5 text-left text-xs font-semibold text-[var(--foreground)] shadow-sm transition-colors hover:bg-orange-500/10 md:max-w-[560px]"
+                    >
+                      <span className="block truncate">
+                        {getMessageDisplayText(
+                          pinnedMessage.content,
+                          pinnedMessage.file_name,
+                          pinnedMessage.file_url,
+                          '공지 메시지'
+                        )}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              data-testid="chat-notice-toggle"
+              onClick={() => setNoticeBannerCollapsed((current) => !current)}
+              className="shrink-0 rounded-full border border-orange-500/20 bg-[var(--card)] px-3 py-1.5 text-[11px] font-bold text-orange-600 transition-colors hover:bg-orange-500/10"
+            >
+              {noticeBannerCollapsed ? '공지 펼치기' : '공지 접기'}
+            </button>
           </div>
         </div>
       )}
@@ -293,13 +339,13 @@ export function MessengerTimeline({
           ) : null}
         {!selectedRoomId ? (
           <div className="h-full flex flex-col items-center justify-center text-[var(--toss-gray-3)]">
-            <span className="text-4xl mb-2">💬</span>
-            <p className="text-sm font-bold">채팅방을 선택하세요.</p>
+            <span className="text-4xl mb-2">?뮠</span>
+            <p className="text-sm font-bold">梨꾪똿諛⑹쓣 ?좏깮?섏꽭??</p>
           </div>
         ) : messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center opacity-20">
-            <span className="text-6xl mb-4">💬</span>
-            <p className="font-semibold text-sm">대화 내용이 없습니다.</p>
+            <span className="text-6xl mb-4">?뮠</span>
+            <p className="font-semibold text-sm">????댁슜???놁뒿?덈떎.</p>
           </div>
         ) : (
           (() => {
@@ -309,21 +355,52 @@ export function MessengerTimeline({
             return combinedTimeline.map((item) => {
               if (item.type === 'poll') {
                 const pollItem = item as PollItem;
+                const pollMeta = extractPollMetaFromQuestion(pollItem.question);
+                const deadlineAt = pollMeta.deadlineAt;
+                const deadlineDate = deadlineAt ? new Date(deadlineAt) : null;
+                const isPollClosed = Boolean(deadlineDate && !Number.isNaN(deadlineDate.getTime()) && deadlineDate.getTime() <= Date.now());
                 const votes = pollVotes[pollItem.id] || {};
                 const totalVotes = (Object.values(votes) as number[]).reduce((a: number, b: number) => a + b, 0);
                 return (
                   <div data-testid={`chat-poll-${pollItem.id}`} key={`poll-${pollItem.id}`} className="max-w-[85%] md:max-w-[70%] bg-blue-500/10 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-2xl p-4 shadow-soft">
-                    <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                      <span className="text-sm">🗳️</span> 투표
-                    </p>
-                    <p className="mb-4 text-xs font-bold text-foreground leading-relaxed">{pollItem.question}</p>
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <span className="text-sm">🗳️</span> 투표
+                      </p>
+                      {deadlineDate && !Number.isNaN(deadlineDate.getTime()) ? (
+                        <span
+                          data-testid={`chat-poll-deadline-label-${pollItem.id}`}
+                          className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                            isPollClosed
+                              ? 'bg-rose-500/15 text-rose-600'
+                              : 'bg-blue-500/10 text-blue-600'
+                          }`}
+                        >
+                          {isPollClosed ? '마감' : '마감 예정'} {deadlineDate.toLocaleString('ko-KR', {
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mb-4 text-xs font-bold text-foreground leading-relaxed">{pollMeta.displayQuestion || pollItem.question}</p>
                     <div className="space-y-1.5">
                       {(pollItem.options || []).map((opt: string, idx: number) => (
                         <button
                           data-testid={`chat-poll-vote-${pollItem.id}-${idx}`}
                           key={idx}
-                          onClick={() => onVote(pollItem.id, idx)}
-                          className="w-full flex justify-between items-center px-4 py-2.5 rounded-xl bg-[var(--card)] dark:bg-zinc-800/50 border border-blue-500/20/50 dark:border-blue-700/30 hover:border-blue-400 dark:hover:border-blue-500 transition-all text-[11px] font-medium group"
+                          onClick={() => {
+                            if (isPollClosed) return;
+                            onVote(pollItem.id, idx);
+                          }}
+                          disabled={isPollClosed}
+                          className={`w-full flex justify-between items-center px-4 py-2.5 rounded-xl bg-[var(--card)] dark:bg-zinc-800/50 border text-[11px] font-medium group transition-all ${
+                            isPollClosed
+                              ? 'border-[var(--border)] opacity-60 cursor-not-allowed'
+                              : 'border-blue-500/20/50 dark:border-blue-700/30 hover:border-blue-400 dark:hover:border-blue-500'
+                          }`}
                         >
                           <span className="text-[var(--toss-gray-5)] dark:text-[var(--toss-gray-3)] group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{opt}</span>
                           <span className="text-blue-600 font-bold bg-blue-500/10 dark:bg-blue-900/50 px-2 py-0.5 rounded-md">
@@ -341,7 +418,7 @@ export function MessengerTimeline({
                 const albumItem = item as MessengerAlbumItem;
                 const albumMsgs = albumItem.albumMessages || [];
                 const isMineAlbum = String(albumItem.sender_id) === effectiveChatUserId;
-                const senderName = (albumItem.staff as { name?: string } | null)?.name || albumItem.sender_name || '알 수 없음';
+                const senderName = (albumItem.staff as { name?: string } | null)?.name || albumItem.sender_name || '?????놁쓬';
                 const created = new Date(albumItem.created_at || 0);
                 const dateLabel = formatTimelineDateLabel(albumItem.created_at);
                 const showDateDivider = dateLabel !== lastDateLabel;
@@ -392,11 +469,11 @@ export function MessengerTimeline({
                               className={`relative overflow-hidden bg-[var(--muted)] ${count === 3 && index === 2 ? 'col-span-2' : ''} ${count === 5 && index === 3 ? 'col-span-1' : ''}`}
                               style={{ aspectRatio: count === 1 ? '4/3' : '1/1' }}
                               onClick={() => onOpenAttachmentPreviewForMessage(message)}
-                              aria-label={`${message.file_name || `앨범 사진 ${index + 1}`} 미리보기`}
+                              aria-label={`${message.file_name || `?⑤쾾 ?ъ쭊 ${index + 1}`} 誘몃━蹂닿린`}
                             >
                               <img
                                 src={message.file_url || ''}
-                                alt={message.file_name || '사진'}
+                                alt={message.file_name || '?ъ쭊'}
                                 className="w-full h-full object-cover"
                                 loading="lazy"
                                 onLoad={maintainBottomAfterLayoutChange}
@@ -410,7 +487,7 @@ export function MessengerTimeline({
                           ))}
                         </div>
                         <div className={`mx-1 flex items-center gap-2 text-[10px] ${isMineAlbum ? 'justify-end' : 'justify-start'}`}>
-                          <span className="text-[var(--toss-gray-3)]">{timeStr} · 사진 {count}장</span>
+                          <span className="text-[var(--toss-gray-3)]">{`${timeStr} · 사진 ${count}장`}</span>
                           {albumReplyTarget ? (
                             <button
                               type="button"
@@ -418,7 +495,7 @@ export function MessengerTimeline({
                               onClick={() => onStartReplyToMessage(albumReplyTarget)}
                               className="font-bold text-amber-700 transition-colors hover:text-amber-800"
                             >
-                              답글
+                              ?듦?
                             </button>
                           ) : null}
                         </div>
@@ -457,8 +534,8 @@ export function MessengerTimeline({
               const dateLabel = formatTimelineDateLabel(msg.created_at);
               const showDateDivider = dateLabel !== lastDateLabel;
               if (showDateDivider) lastDateLabel = dateLabel;
-              const isSystemInvite = typeof msg.content === 'string' && msg.content.startsWith('[초대]');
-              const systemText = isSystemInvite ? String(msg.content || '').replace(/^\[초대\]\s*/, '') : '';
+              const isSystemInvite = typeof msg.content === 'string' && msg.content.startsWith('[珥덈?]');
+              const systemText = isSystemInvite ? String(msg.content || '').replace(/^\[珥덈?\]\s*/, '') : '';
               const isContinuous = !showDateDivider && !isSystemInvite && String(msg.sender_id) === lastSenderId;
               const senderProfile =
                 !isMine
@@ -467,7 +544,7 @@ export function MessengerTimeline({
                       (msg.staff as { name?: string } | null | undefined)?.name || null
                     ) || (msg.staff as StaffMember | null | undefined) || null
                   : null;
-              const senderName = senderProfile?.name || (msg.staff as { name?: string } | null | undefined)?.name || '이름 없음';
+              const senderName = senderProfile?.name || (msg.staff as { name?: string } | null | undefined)?.name || '?대쫫 ?놁쓬';
               const senderPhotoUrl = senderProfile ? getProfilePhotoUrl(senderProfile as StaffMember) : null;
               const wardMessageMeta = !isDeletedMessage ? extractWardMessageMeta(msg.content) : { displayContent: '', meta: null };
               const showWardQuickReplies =
@@ -496,7 +573,7 @@ export function MessengerTimeline({
                   {isSystemInvite ? (
                     <div className="flex justify-center my-1">
                       <span className="px-2.5 py-0.5 rounded-full bg-[var(--toss-blue-light)] text-[10px] font-semibold text-[var(--accent)]">
-                        초대 {systemText}
+                        珥덈? {systemText}
                       </span>
                     </div>
                   ) : (
@@ -561,7 +638,7 @@ export function MessengerTimeline({
                               if (isDeletedMessage) return;
                               if (event.key === 'Enter') onMarkMessageRead(msg);
                             }}
-                            aria-label={`${msg.staff?.name || '이름 없음'} ${isDeletedMessage ? '삭제된 메시지' : '메시지'}`}
+                            aria-label={`${msg.staff?.name || '?대쫫 ?놁쓬'} ${isDeletedMessage ? '??젣??硫붿떆吏' : '硫붿떆吏'}`}
                           >
                             {!isDeletedMessage && msg.reply_to_id && (() => {
                               const parent = messages.find((message) => message.id === msg.reply_to_id);
@@ -579,13 +656,13 @@ export function MessengerTimeline({
                                     onScrollToMessage(msg.reply_to_id!);
                                   }}
                                 >
-                                  <span className="font-bold opacity-80">답글 {(parent.staff as { name?: string } | null | undefined)?.name}: </span>
+                                  <span className="font-bold opacity-80">?듦? {(parent.staff as { name?: string } | null | undefined)?.name}: </span>
                                   <span className="truncate block mt-0.5">
                                     {getMessageDisplayText(
                                       parent.content,
                                       parent.file_name,
                                       parent.file_url,
-                                      '첨부 파일'
+                                      '泥⑤? ?뚯씪'
                                     )}
                                   </span>
                                 </div>
@@ -626,7 +703,7 @@ export function MessengerTimeline({
                                           onOpenReactionDetail(msg, emoji);
                                         }}
                                         className={`px-1.5 py-0.5 rounded text-[11px] transition-colors ${isMine ? 'bg-[var(--card)]/20 hover:bg-[var(--card)]/30' : 'bg-[var(--muted)] hover:bg-[var(--toss-blue-light)]'}`}
-                                        aria-label={`${emoji} 반응 누른 사람 ${count}명 보기`}
+                                        aria-label={`${emoji} 諛섏쓳 ?꾨Ⅸ ?щ엺 ${count}紐?蹂닿린`}
                                       >
                                         {emoji} {count}
                                       </button>
@@ -673,10 +750,10 @@ export function MessengerTimeline({
                               onClick={(event) => event.stopPropagation()}
                             >
                               <p className="px-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                                빠른 응답
+                                鍮좊Ⅸ ?묐떟
                               </p>
                               <div className="flex flex-wrap gap-1.5">
-                                {WARD_QUICK_REPLY_OPTIONS.map((option) => (
+                                {WARD_QUICK_REPLY_OPTIONS.map((option: (typeof WARD_QUICK_REPLY_OPTIONS)[number]) => (
                                   <button
                                     key={option.id}
                                     type="button"
@@ -714,9 +791,9 @@ export function MessengerTimeline({
                                 onRetryFailedMessage(String(msg.id));
                               }}
                               className="px-2.5 py-1 rounded-[var(--radius-md)] text-[10px] font-bold bg-red-500/10 text-red-500 hover:bg-red-500/20"
-                              aria-label="재전송"
+                              aria-label="삭제"
                             >
-                              재전송
+                              삭제
                             </button>
                           )}
                         </div>
@@ -735,14 +812,14 @@ export function MessengerTimeline({
                           onClick={() => { onStartReplyToMessage(msg); }}
                           className="touch-manipulation min-h-[32px] p-1 px-2 rounded-lg hover:bg-[var(--tab-bg)] active:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-blue-500 transition-colors"
                         >
-                          답장
+                          ?듭옣
                         </button>
                         <button
                           type="button"
                           onClick={() => { onOpenMessageActions(msg); }}
                           className="touch-manipulation min-h-[32px] p-1 px-2 rounded-lg hover:bg-[var(--tab-bg)] active:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] transition-colors"
                         >
-                          ···
+                          쨌쨌쨌
                         </button>
                       </div>
                     </div>
@@ -766,7 +843,7 @@ export function MessengerTimeline({
             className="pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--card)] text-[0px] text-[var(--foreground)] shadow-lg transition hover:-translate-y-0.5 hover:border-[var(--accent)]/40 hover:bg-[var(--toss-blue-light)] active:translate-y-0"
           >
             <span aria-hidden="true" className="text-xl leading-none">{"\u2193"}</span>
-            최신 메시지
+            理쒖떊 硫붿떆吏
           </button>
         </div>
       )}
