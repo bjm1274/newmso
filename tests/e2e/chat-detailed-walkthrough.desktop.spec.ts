@@ -46,6 +46,7 @@ const peerTwo = {
 };
 
 const noticeRoomId = '00000000-0000-0000-0000-000000000000';
+const longGroupRoomName = '운영지원팀 업무 공유 테스트 채팅방';
 
 test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
@@ -69,7 +70,7 @@ test('chat detailed walkthrough opens each internal menu in practical order', as
       },
       {
         id: 'room-group',
-        name: '운영팀 채팅방',
+        name: longGroupRoomName,
         type: 'group',
         members: [fakeUser.id, peerOne.id],
         created_at: '2026-03-08T09:00:00.000Z',
@@ -97,7 +98,7 @@ test('chat detailed walkthrough opens each internal menu in practical order', as
         created_at: '2026-03-08T10:00:00.000Z',
         is_deleted: false,
         staff: { name: fakeUser.name, photo_url: null },
-        chat_rooms: { id: 'room-group', name: '운영팀 채팅방', type: 'group', members: [fakeUser.id, peerOne.id] },
+        chat_rooms: { id: 'room-group', name: longGroupRoomName, type: 'group', members: [fakeUser.id, peerOne.id] },
       },
       {
         id: 'msg-direct-1',
@@ -123,6 +124,8 @@ test('chat detailed walkthrough opens each internal menu in practical order', as
 
   await expect(page.getByTestId('chat-view')).toBeVisible();
   await expect(page.getByTestId('chat-room-room-group')).toBeVisible();
+  await expect(page.getByTestId('chat-room-icon-room-group')).toHaveCount(0);
+  await expect(page.getByTestId('chat-room-summary-room-group')).toContainText('…');
 
   await page.getByTestId('chat-open-global-search').click();
   await expect(page.getByTestId('chat-global-search-modal')).toBeVisible();

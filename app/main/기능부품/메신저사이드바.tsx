@@ -23,6 +23,28 @@ export type MessengerSidebarRoomItem = {
   pinnedCount: number;
 };
 
+const GROUP_ROOM_LABEL_MAX = 15;
+
+function getCompactGroupRoomLabel(label: string) {
+  const normalized = String(label || '').trim().replace(/\s+/g, ' ');
+  if (!normalized) return '단체 채팅방';
+
+  const memberLikeParts = normalized
+    .split(/\s*[,·/|]\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (memberLikeParts.length >= 3) {
+    return `${memberLikeParts[0]} 외 ${memberLikeParts.length - 1}명`;
+  }
+
+  if (normalized.length > GROUP_ROOM_LABEL_MAX) {
+    return `${normalized.slice(0, GROUP_ROOM_LABEL_MAX - 1)}…`;
+  }
+
+  return normalized;
+}
+
 type MessengerSidebarProps = {
   selectedRoomId: string | null;
   viewMode: MessengerViewMode;
@@ -168,88 +190,89 @@ export function MessengerSidebar({
                 isHidden,
                 pinnedIndex,
                 pinnedCount,
-              }) => (
-                <div
-                  key={roomId}
-                  className={`group p-2.5 rounded-xl cursor-pointer transition-all flex items-center justify-between gap-2.5 border relative overflow-hidden ${
-                    isSelected
-                      ? 'bg-zinc-800 border-zinc-700 shadow-sm'
-                      : 'bg-[var(--card)] dark:bg-zinc-900 border-transparent hover:border-[var(--border)] dark:hover:border-zinc-800'
-                  }`}
-                >
-                  {isSelected ? (
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500/100"></div>
-                  ) : null}
-                  <button
-                    type="button"
-                    data-testid={`chat-room-${roomId}`}
-                    onClick={() => onRoomClick(room.id)}
-                    className="flex min-w-0 flex-1 items-start gap-3 text-left"
+              }) => {
+                const isGroupRoom = room.type === 'group';
+                const displayLabel = isGroupRoom ? getCompactGroupRoomLabel(label) : label;
+
+                return (
+                  <div
+                    key={roomId}
+                    className={`group p-2.5 rounded-xl cursor-pointer transition-all flex items-center justify-between gap-2.5 border relative overflow-hidden ${
+                      isSelected
+                        ? 'bg-zinc-800 border-zinc-700 shadow-sm'
+                        : 'bg-[var(--card)] dark:bg-zinc-900 border-transparent hover:border-[var(--border)] dark:hover:border-zinc-800'
+                    }`}
                   >
-                    {isNoticeChannel ? (
-                      <div
-                        data-testid={`chat-room-icon-${roomId}`}
-                        className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/20 text-[13px] leading-none text-blue-600"
-                      >
-                        📢
-                      </div>
-                    ) : peerName ? (
-                      <div
-                        data-testid={`chat-room-icon-${roomId}`}
-                        className="relative flex h-8 w-8 shrink-0 items-center justify-center"
-                      >
-                        <MessengerAvatar
-                          name={peerName || label}
-                          photoUrl={peerPhotoUrl}
-                          className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-[var(--tab-bg)] text-[11px] font-bold text-[var(--toss-gray-4)] dark:bg-zinc-800"
-                          decorative
-                        />
-                        {isPeerOnline ? (
-                          <span className="absolute -right-0.5 -bottom-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-white dark:border-zinc-900" />
-                        ) : null}
-                      </div>
-                    ) : (
-                      <div
-                        data-testid={`chat-room-icon-${roomId}`}
-                        className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--tab-bg)] text-[13px] leading-none text-[var(--toss-gray-4)] dark:bg-zinc-800"
-                      >
-                        💬
-                      </div>
-                    )}
-                    <div
-                      data-testid={`chat-room-summary-${roomId}`}
-                      className="flex min-w-0 flex-1 flex-col gap-1 py-0.5"
+                    {isSelected ? (
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500/100"></div>
+                    ) : null}
+                    <button
+                      type="button"
+                      data-testid={`chat-room-${roomId}`}
+                      onClick={() => onRoomClick(room.id)}
+                      className={`flex min-w-0 flex-1 items-start ${isGroupRoom ? 'gap-2' : 'gap-3'} text-left`}
                     >
-                      <div className="flex items-start gap-1.5 min-w-0">
-                        {unread > 0 ? (
-                          <span className="shrink-0 min-w-[18px] h-[18px] px-1.5 inline-flex items-center justify-center rounded-[var(--radius-md)] bg-blue-600 text-white text-[9px] font-bold shadow-soft">
-                            {unread > 99 ? '99+' : unread}
-                          </span>
-                        ) : null}
-                        <p
-                          className={`text-[12px] font-bold ${
-                            room.type === 'group'
-                              ? 'line-clamp-2 break-words whitespace-normal leading-4'
-                              : 'truncate'
-                          } ${
-                            isSelected
-                              ? 'text-white'
-                              : 'text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]'
-                          }`}
+                      {isNoticeChannel ? (
+                        <div
+                          data-testid={`chat-room-icon-${roomId}`}
+                          className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/20 text-[13px] leading-none text-blue-600"
                         >
-                          {label}
-                        </p>
-                        {isPinned ? <span className="text-[9px] font-bold text-amber-400">PIN</span> : null}
-                        {isHidden ? <span className="text-[9px] font-bold text-[var(--toss-gray-3)]">HIDE</span> : null}
-                      </div>
+                          📢
+                        </div>
+                      ) : isGroupRoom ? null : peerName ? (
+                        <div
+                          data-testid={`chat-room-icon-${roomId}`}
+                          className="relative flex h-8 w-8 shrink-0 items-center justify-center"
+                        >
+                          <MessengerAvatar
+                            name={peerName || label}
+                            photoUrl={peerPhotoUrl}
+                            className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-[var(--tab-bg)] text-[11px] font-bold text-[var(--toss-gray-4)] dark:bg-zinc-800"
+                            decorative
+                          />
+                          {isPeerOnline ? (
+                            <span className="absolute -right-0.5 -bottom-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-white dark:border-zinc-900" />
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div
+                          data-testid={`chat-room-icon-${roomId}`}
+                          className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--tab-bg)] text-[13px] leading-none text-[var(--toss-gray-4)] dark:bg-zinc-800"
+                        >
+                          💬
+                        </div>
+                      )}
                       <div
-                        data-testid={`chat-room-preview-${roomId}`}
-                        className="text-[10px] text-[var(--toss-gray-3)] font-medium truncate"
+                        data-testid={`chat-room-summary-${roomId}`}
+                        className="flex min-w-0 flex-1 flex-col gap-1 py-0.5"
                       >
-                        {preview}
+                        <div className="flex items-start gap-1.5 min-w-0">
+                          {unread > 0 ? (
+                            <span className="shrink-0 min-w-[18px] h-[18px] px-1.5 inline-flex items-center justify-center rounded-[var(--radius-md)] bg-blue-600 text-white text-[9px] font-bold shadow-soft">
+                              {unread > 99 ? '99+' : unread}
+                            </span>
+                          ) : null}
+                          <p
+                            title={isGroupRoom ? label : undefined}
+                            className={`text-[12px] font-bold truncate ${
+                              isSelected
+                                ? 'text-white'
+                                : 'text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]'
+                            }`}
+                          >
+                            {displayLabel}
+                          </p>
+                          {isPinned ? <span className="text-[9px] font-bold text-amber-400">PIN</span> : null}
+                          {isHidden ? <span className="text-[9px] font-bold text-[var(--toss-gray-3)]">HIDE</span> : null}
+                        </div>
+                        <div
+                          data-testid={`chat-room-preview-${roomId}`}
+                          className="text-[10px] text-[var(--toss-gray-3)] font-medium truncate"
+                        >
+                          {preview}
+                        </div>
                       </div>
-                    </div>
-                  </button>
+                    </button>
                   <div className="flex items-center gap-1 shrink-0">
                     {!isNoticeChannel ? (
                       <>
@@ -326,8 +349,9 @@ export function MessengerSidebar({
                       </>
                     ) : null}
                   </div>
-                </div>
-              )
+                  </div>
+                );
+              }
             )}
           </>
         ) : (
