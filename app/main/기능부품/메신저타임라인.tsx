@@ -453,7 +453,7 @@ export function MessengerTimeline({
                       {!isMineAlbum && (
                         <MessengerAvatar
                           name={senderName}
-                          photoUrl={(albumItem.staff as { photo_url?: string | null } | null)?.photo_url || null}
+                          photoUrl={getProfilePhotoUrl(albumItem.staff as Record<string, unknown> | null)}
                           className="mb-1 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--muted)] text-[11px] font-bold text-[var(--toss-gray-4)]"
                           decorative
                         />
