@@ -59,6 +59,20 @@ export async function triggerManagedBrowserDownload(downloadUrl: string, fileNam
     throw new Error('Browser environment is required.');
   }
 
+  if (isInternalStorageObjectUrl(downloadUrl)) {
+    const anchor = window.document.createElement('a');
+    anchor.href = downloadUrl;
+    anchor.download = String(fileName || '').trim() || 'download';
+    anchor.rel = 'noopener noreferrer';
+    anchor.style.display = 'none';
+    window.document.body.appendChild(anchor);
+    anchor.click();
+    window.setTimeout(() => {
+      anchor.remove();
+    }, 1_000);
+    return;
+  }
+
   const response = await fetch(downloadUrl, {
     credentials: 'include',
     cache: 'no-store',

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  buildResponseContentDisposition,
   createR2DownloadUrl,
   getConfiguredR2ChatBucket,
 } from '@/lib/object-storage';
@@ -42,42 +41,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'This bucket is not available' }, { status: 403 });
     }
 
-    const signedUrl = await createR2DownloadUrl(bucket, objectKey);
+    const signedUrl = await createR2DownloadUrl(
+      bucket,
+      objectKey,
+      download ? { downloadFileName: fileName } : undefined,
+    );
     if (!signedUrl) {
       return NextResponse.json({ error: 'Cloudflare R2 is not configured' }, { status: 500 });
     }
-
-    const upstream = await fetch(signedUrl, {
-      signal: AbortSignal.timeout(30_000),
-    });
-
-    if (!upstream.ok || !upstream.body) {
-      return NextResponse.json({ error: '파일을 불러오지 못했습니다.' }, { status: 404 });
+    const redirectUrl = new URL(signedUrl);
+    if (!download && !redirectUrl.searchParams.has('response-content-disposition')) {
+      redirectUrl.searchParams.set('response-content-disposition', buildInlineContentDisposition(fileName));
     }
 
-    const headers = new Headers();
-    headers.set('Content-Type', upstream.headers.get('content-type') || 'application/octet-stream');
-    headers.set(
-      'Content-Disposition',
-      download ? buildResponseContentDisposition(fileName) : buildInlineContentDisposition(fileName),
-    );
-    headers.set('Cache-Control', download ? 'private, max-age=3600' : 'private, max-age=600');
-    headers.set('X-Content-Type-Options', 'nosniff');
-
-    const contentLength = upstream.headers.get('content-length');
-    if (contentLength) {
-      headers.set('Content-Length', contentLength);
-    }
-
-    const acceptRanges = upstream.headers.get('accept-ranges');
-    if (acceptRanges) {
-      headers.set('Accept-Ranges', acceptRanges);
-    }
-
-    return new NextResponse(upstream.body, {
-      status: 200,
-      headers,
-    });
+    const response = NextResponse.redirect(redirectUrl.toString(), 307);
+    response.headers.set('Cache-Control', 'private, no-store');
+    response.headers.set('X-Content-Type-Options', 'nosniff');
+    return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : '?뚯씪 議고쉶 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.';
     return NextResponse.json({ error: message }, { status: 500 });
