@@ -2,6 +2,36 @@ import { expect, test } from '@playwright/test';
 import * as XLSX from 'xlsx';
 import { dismissDialogs, fakeUser, mockSupabase, seedSession } from './helpers';
 
+function buildSubMenuTestId(mainMenuId: string, subMenuId: string) {
+  const slug = `${mainMenuId}-${subMenuId}`
+    .split('')
+    .map((char) => {
+      const code = char.charCodeAt(0);
+      const isAsciiLetter =
+        (code >= 48 && code <= 57) ||
+        (code >= 65 && code <= 90) ||
+        (code >= 97 && code <= 122);
+      return isAsciiLetter ? char.toLowerCase() : `u${code.toString(16)}`;
+    })
+    .join('-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  return `submenu-${slug}`;
+}
+
+const INVENTORY_MENU_ID = '\uC7AC\uACE0\uAD00\uB9AC';
+const INVENTORY_STATUS_SUBMENU_ID = '\uD604\uD669';
+const INVENTORY_REGISTRATION_SUBMENU_ID = '\uB4F1\uB85D';
+
+async function openInventoryRegistration(page: import('@playwright/test').Page) {
+  await page.goto('/main');
+  await page.getByTestId('sidebar-menu-inventory').click();
+  await expect(page.getByTestId('inventory-view')).toBeVisible();
+  await page.getByTestId(buildSubMenuTestId(INVENTORY_MENU_ID, INVENTORY_REGISTRATION_SUBMENU_ID)).click();
+  await expect(page.getByTestId('inventory-registration-view')).toBeVisible();
+}
+
 test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
 });
@@ -11,101 +41,84 @@ test('ecount inventory excel upload maps the template into inventory payloads', 
     ...fakeUser,
     id: 'inventory-ecount-user',
     employee_no: 'INV-ECOUNT-001',
-    name: '이카운트 업로드 관리자',
-    company: '수연메디칼',
+    name: 'Ecount Upload Manager',
+    company: 'SuyeonMedical',
     company_id: 'company-suyeon',
-    department: '경영지원팀',
+    department: 'Ops',
     role: 'manager',
     permissions: {
       ...fakeUser.permissions,
       inventory: true,
-      ['menu_재고관리']: true,
-      ['inventory_등록']: true,
+      ['menu_\uC7AC\uACE0\uAD00\uB9AC']: true,
+      ['inventory_\uB4F1\uB85D']: true,
     },
   };
 
   await mockSupabase(page, {
     staffMembers: [inventoryUser],
-    companies: [
-      { id: 'company-suyeon', name: '수연메디칼', type: 'HOSPITAL', is_active: true },
-    ],
+    companies: [{ id: 'company-suyeon', name: 'SuyeonMedical', type: 'HOSPITAL', is_active: true }],
     inventoryItems: [],
-    suppliers: [
-      { id: 'supplier-interlife', name: '(주)인터라이프' },
-    ],
+    suppliers: [{ id: 'supplier-a', name: 'Supplier A' }],
   });
 
   await seedSession(page, {
     user: inventoryUser,
     localStorage: {
-      erp_last_menu: '재고관리',
-      erp_last_subview: '등록',
-      erp_inventory_view: '등록',
+      erp_last_menu: INVENTORY_MENU_ID,
+      erp_last_subview: INVENTORY_REGISTRATION_SUBMENU_ID,
+      erp_inventory_view: INVENTORY_REGISTRATION_SUBMENU_ID,
       erp_permission_prompt_shown: '1',
     },
   });
 
-  await page.goto(
-    `/main?${new URLSearchParams({
-      open_menu: '재고관리',
-      open_subview: '등록',
-    }).toString()}`,
-  );
-
-  await expect(page.getByTestId('inventory-view')).toBeVisible();
-  await page.getByRole('button', { name: '등록' }).click();
-  await expect(page.getByTestId('inventory-registration-view')).toBeVisible();
-
-  await page.getByRole('button', { name: '엑셀 업로드' }).click();
-  await expect(page.getByTestId('excel-bulk-upload-trigger')).toBeVisible();
-
+  await openInventoryRegistration(page);
+  await page.getByLabel('\uC5D1\uC140 \uC5C5\uB85C\uB4DC').click();
   await page.getByTestId('excel-bulk-mode-inventory-ecount').click();
-  await page.getByTestId('inventory-ecount-department-select').selectOption('경영지원팀');
+  await expect(page.getByTestId('inventory-ecount-company-select')).toHaveValue('SuyeonMedical');
+  await page.getByTestId('inventory-ecount-department-select').selectOption('Ops');
 
   const workbook = XLSX.utils.book_new();
   const worksheet = XLSX.utils.aoa_to_sheet([
-    ['회사명 : 수연메디칼'],
     [
-      '품목코드',
-      '자사품목코드',
-      '품목명',
-      '규격정보',
-      '단위',
-      '포장단위',
-      '등급명',
-      '입고단가',
-      '출고단가',
-      '요양급여코드',
-      '공급처명',
-      '제조사명',
-      '대표 UDI DI 코드',
-      '식약처 모델명',
-      '요양급여대상 여부',
-      '품목허가번호',
-      '사용',
+      'itemcode',
+      'internalitemcode',
+      'itemname',
+      'spec',
+      'unit',
+      'packunit',
+      'gradename',
+      'purchaseprice',
+      'saleprice',
+      'insurancecode',
+      'suppliername',
+      'manufacturername',
+      'udicode',
+      'modelname',
+      'reimbursementyn',
+      'permitnumber',
+      'useyn',
     ],
     [
       '00001',
-      'EB붕대 2"',
-      '탄력붕대-S (급) /K7204123',
-      '2"',
+      'ITEM-INTERNAL-01',
+      'Test Bandage',
+      '2inch',
       'EA',
       '12EA',
       '',
       1500,
       1800,
       'K7204123',
-      '(주)인터라이프',
-      '인터라이프',
+      'Supplier A',
+      'Maker A',
       '08801234567890',
       'BANDAGE-2',
       'YES',
-      '허가-001',
+      'PERMIT-001',
       'YES',
     ],
-    ['2026/04/01 오전 11:30:20'],
   ]);
-  XLSX.utils.book_append_sheet(workbook, worksheet, '품목등록');
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'inventory');
   const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
   const createRequestPromise = page.waitForRequest(
@@ -124,32 +137,32 @@ test('ecount inventory excel upload maps the template into inventory payloads', 
 
   expect(payloads).toHaveLength(1);
   expect(payloads[0]).toMatchObject({
-    item_name: '탄력붕대-S (급) /K7204123',
-    name: '탄력붕대-S (급) /K7204123',
-    company: '수연메디칼',
-    department: '경영지원팀',
-    category: '의료기기',
+    item_name: 'Test Bandage',
+    name: 'Test Bandage',
+    company: 'SuyeonMedical',
+    department: 'Ops',
+    category: '\uC758\uB8CC\uAE30\uAE30',
     quantity: 0,
     stock: 0,
     min_quantity: 0,
     min_stock: 0,
     unit: 'EA',
-    spec: '2"',
+    spec: '2inch',
     unit_price: 1500,
     price: 1800,
-    supplier_name: '(주)인터라이프',
-    supplier_id: 'supplier-interlife',
+    supplier_name: 'Supplier A',
+    supplier_id: 'supplier-a',
     insurance_code: 'K7204123',
     udi_code: '08801234567890',
     is_udi: true,
     item_code: '00001',
-    internal_code: 'EB붕대 2"',
-    product_code: 'EB붕대 2"',
-    manufacturer_name: '인터라이프',
-    manufacturer: '인터라이프',
+    internal_code: 'ITEM-INTERNAL-01',
+    product_code: 'ITEM-INTERNAL-01',
+    manufacturer_name: 'Maker A',
+    manufacturer: 'Maker A',
     model_name: 'BANDAGE-2',
-    permit_number: '허가-001',
-    permit_no: '허가-001',
+    permit_number: 'PERMIT-001',
+    permit_no: 'PERMIT-001',
     pack_unit: '12EA',
     usage_yn: 'YES',
     reimbursement_yn: 'YES',
@@ -169,17 +182,15 @@ test('excel inventory upload uses the resolved company so uploaded rows appear i
     permissions: {
       ...fakeUser.permissions,
       inventory: true,
-      ['menu_?ш퀬愿由?]: true,
-      ['inventory_?꾪솴']: true,
-      ['inventory_?깅줉']: true,
+      ['menu_\uC7AC\uACE0\uAD00\uB9AC']: true,
+      ['inventory_\uD604\uD669']: true,
+      ['inventory_\uB4F1\uB85D']: true,
     },
   };
 
   await mockSupabase(page, {
     staffMembers: [inventoryUser],
-    companies: [
-      { id: 'company-park', name: 'ParkHospital', type: 'HOSPITAL', is_active: true },
-    ],
+    companies: [{ id: 'company-park', name: 'ParkHospital', type: 'HOSPITAL', is_active: true }],
     inventoryItems: [],
     suppliers: [],
   });
@@ -187,22 +198,15 @@ test('excel inventory upload uses the resolved company so uploaded rows appear i
   await seedSession(page, {
     user: inventoryUser,
     localStorage: {
-      erp_last_menu: '?ш퀬愿由?,
-      erp_last_subview: '?깅줉',
-      erp_inventory_view: '?깅줉',
+      erp_last_menu: INVENTORY_MENU_ID,
+      erp_last_subview: INVENTORY_REGISTRATION_SUBMENU_ID,
+      erp_inventory_view: INVENTORY_REGISTRATION_SUBMENU_ID,
       erp_permission_prompt_shown: '1',
     },
   });
 
-  await page.goto(
-    `/main?${new URLSearchParams({
-      open_menu: '?ш퀬愿由?,
-      open_subview: '?깅줉',
-    }).toString()}`,
-  );
-
-  await expect(page.getByTestId('inventory-view')).toBeVisible();
-  await page.getByTestId('excel-bulk-upload-trigger').click();
+  await openInventoryRegistration(page);
+  await page.getByLabel('\uC5D1\uC140 \uC5C5\uB85C\uB4DC').click();
   await page.getByTestId('excel-bulk-mode-inventory-ecount').click();
   await expect(page.getByTestId('inventory-ecount-company-select')).toHaveValue('ParkHospital');
   await page.getByTestId('inventory-ecount-department-select').selectOption('Ops');
@@ -221,14 +225,8 @@ test('excel inventory upload uses the resolved company so uploaded rows appear i
     buffer,
   });
 
-  await page.goto(
-    `/main?${new URLSearchParams({
-      open_menu: '?ш퀬愿由?,
-      open_subview: '?꾪솴',
-    }).toString()}`,
-  );
-
+  await page.getByTestId(buildSubMenuTestId(INVENTORY_MENU_ID, INVENTORY_STATUS_SUBMENU_ID)).click();
   await expect(page.getByTestId('inventory-view')).toBeVisible();
-  await expect(page.getByText('Test Gauze')).toBeVisible();
-  await expect(page.getByText('ParkHospital')).toBeVisible();
+  await expect(page.getByRole('table').getByText('Test Gauze')).toBeVisible();
+  await expect(page.getByRole('table').getByText('ParkHospital')).toBeVisible();
 });
