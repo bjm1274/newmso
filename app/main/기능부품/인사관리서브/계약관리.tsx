@@ -3,6 +3,7 @@ import { toast } from '@/lib/toast';
 import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { resolveWeeklyWorkingHours, resolveWorkingDaysPerWeek } from '@/lib/payroll-working-hours';
 import ContractList from './계약문서/계약서명단';
 import ContractPreview from './계약문서/계약서미리보기';
 import ContractTemplateEditor from './계약문서/계약서양식편집';
@@ -71,14 +72,14 @@ export default function ContractMain({
   useEffect(() => { fetchContracts(); }, []);
 
   const visibleTabs = [
-    '怨꾩빟?꾪솴',
-    ...(showAdminPolicyTabs ? ['?좉퇋/蹂寃쎄퀎?쎌꽌', '?곕큺怨꾩빟媛깆떊'] : []),
-    ...(showTemplateEditor ? ['?묒떇 ?몄쭛'] : []),
+    '계약현황',
+    ...(showAdminPolicyTabs ? ['신규/변경계약서', '연봉계약갱신'] : []),
+    ...(showTemplateEditor ? ['양식 편집'] : []),
   ];
 
   useEffect(() => {
     if (!visibleTabs.includes(activeTab)) {
-      setActiveTab(visibleTabs[0] || '怨꾩빟?꾪솴');
+      setActiveTab(visibleTabs[0] || '계약현황');
     }
   }, [activeTab, visibleTabs]);
 
@@ -147,8 +148,8 @@ export default function ContractMain({
           status: '서명대기',
           requested_at: new Date().toISOString(),
           contract_type: contractType,
-          working_hours_per_week: s?.working_hours_per_week || salaryInfo.working_hours_per_week || 40,
-          working_days_per_week: s?.working_days_per_week || salaryInfo.working_days_per_week || 5,
+          working_hours_per_week: resolveWeeklyWorkingHours(s, salaryInfo.working_hours_per_week || 40),
+          working_days_per_week: resolveWorkingDaysPerWeek(s, salaryInfo.working_days_per_week || 5),
           shift_id: s?.shift_id || null,
           shift_start_time: staffShift ? String(staffShift.start_time).slice(0, 5) : salaryInfo.shift_start_time,
           shift_end_time: staffShift ? String(staffShift.end_time).slice(0, 5) : salaryInfo.shift_end_time,
@@ -191,6 +192,25 @@ export default function ContractMain({
           new Set(optionalEmploymentContractColumns),
         );
         upsertError = fallbackResult.error;
+      }
+
+      if (
+        upsertError &&
+        String(upsertError.message || '').includes('invalid input syntax for type integer') &&
+        requests.some((request) => {
+          const weeklyHours = Number(request.working_hours_per_week);
+          return Number.isFinite(weeklyHours) && !Number.isInteger(weeklyHours);
+        })
+      ) {
+        const workConditionFallbackResult = await withMissingColumnsFallback(
+          (omittedColumns) =>
+            upsertEmploymentContracts(
+              requests as Record<string, unknown>[],
+              new Set([...omittedColumns, 'working_hours_per_week']),
+            ),
+          optionalEmploymentContractColumns,
+        );
+        upsertError = workConditionFallbackResult.error;
       }
 
       if (upsertError) {
@@ -312,7 +332,7 @@ export default function ContractMain({
                         <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-white/10 mt-1">
                           <div className="space-y-1">
                             <label className="text-[11px] font-bold">주당 시간</label>
-                            <input type="number" value={salaryInfo.working_hours_per_week} onChange={(e) => setSalaryInfo({ ...salaryInfo, working_hours_per_week: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
+                            <input type="number" value={salaryInfo.working_hours_per_week} onChange={(e) => setSalaryInfo({ ...salaryInfo, working_hours_per_week: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" inputMode="decimal" step="0.1" />
                           </div>
                           <div className="space-y-1">
                             <label className="text-[11px] font-bold">주당 일수</label>
@@ -389,7 +409,7 @@ export default function ContractMain({
                     <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/10 mt-2">
                       <div className="space-y-1">
                         <label className="text-[11px] font-bold">주당 시간</label>
-                        <input type="number" value={salaryInfo.working_hours_per_week} onChange={(e) => setSalaryInfo({ ...salaryInfo, working_hours_per_week: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
+                        <input type="number" value={salaryInfo.working_hours_per_week} onChange={(e) => setSalaryInfo({ ...salaryInfo, working_hours_per_week: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" inputMode="decimal" step="0.1" />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[11px] font-bold">주당 일수</label>

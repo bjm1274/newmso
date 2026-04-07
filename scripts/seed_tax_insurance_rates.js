@@ -60,8 +60,8 @@ async function main() {
     effective_year: options.year,
     company_name: options.company,
     national_pension_rate: 0.0475,
-    health_insurance_rate: 0.03545,
-    long_term_care_rate: 0.00459,
+    health_insurance_rate: 0.03595,
+    long_term_care_rate: 0.004724,
     employment_insurance_rate: 0.009,
     income_tax_bracket: incomeTaxBracket,
   };

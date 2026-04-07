@@ -1,7 +1,12 @@
 ﻿'use client';
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { calculateHourlyRateFromMonthlySalary, getMonthlyWorkingHours } from '@/lib/payroll-working-hours';
+import {
+  calculateHourlyRateFromMonthlySalary,
+  getMonthlyWorkingHours,
+  resolveWeeklyWorkingHours,
+  resolveWorkingDaysPerWeek,
+} from '@/lib/payroll-working-hours';
 
 type Props = {
   staff?: any;
@@ -129,6 +134,9 @@ export default function ContractPreview({ staff, contract }: Props) {
 
     const salarySource = contract || user || {};
 
+    const weeklyWorkHours = resolveWeeklyWorkingHours(salarySource, resolveWeeklyWorkingHours(user, 40));
+    const workingDaysPerWeek = resolveWorkingDaysPerWeek(salarySource, resolveWorkingDaysPerWeek(user, 5));
+
     const vars: Record<string, string> = {
       employee_name: user?.name || '',
       employee_no: String(user?.employee_no ?? ''),
@@ -160,8 +168,8 @@ export default function ContractPreview({ staff, contract }: Props) {
       shift_end: shift?.end_time ? String(shift.end_time).slice(0, 5) : (contract?.shift_end_time || '').slice(0, 5),
       break_start: shift?.break_start_time ? String(shift.break_start_time).slice(0, 5) : (contract?.break_start_time || '').slice(0, 5),
       break_end: shift?.break_end_time ? String(shift.break_end_time).slice(0, 5) : (contract?.break_end_time || '').slice(0, 5),
-      working_hours_per_week: String(salarySource.working_hours_per_week || user?.working_hours_per_week || 40),
-      working_days_per_week: String(salarySource.working_days_per_week || user?.working_days_per_week || 5),
+      working_hours_per_week: String(weeklyWorkHours),
+      working_days_per_week: String(workingDaysPerWeek),
       contract_type: user?.employment_type || salarySource.contract_type || user?.고용형태 || '정규직',
       probation_months: String(contract?.probation_months ?? user?.probation_months ?? '3'),
       probation_percent: String(contract?.probation_percent || '90'),
@@ -184,7 +192,7 @@ export default function ContractPreview({ staff, contract }: Props) {
       Number(salarySource.other_taxfree || user?.other_taxfree || 0),
     ];
     const totalMonthlyWage = salaryItems.reduce((s, n) => s + n, 0);
-    const wph = Number(salarySource.working_hours_per_week || user?.working_hours_per_week || 40);
+    const wph = weeklyWorkHours;
     const mwh = getMonthlyWorkingHours(wph);
     const hwage = calculateHourlyRateFromMonthlySalary(totalMonthlyWage, wph);
     vars.total_monthly = formatWon(totalMonthlyWage);
@@ -264,7 +272,7 @@ export default function ContractPreview({ staff, contract }: Props) {
     const totalMonthly = items.reduce((sum, i) => sum + i.amount, 0);
     const taxableTotal = items.filter(i => i.taxable).reduce((sum, i) => sum + i.amount, 0);
     const taxFreeTotal = items.filter(i => !i.taxable).reduce((sum, i) => sum + i.amount, 0);
-    const wph = Number(src.working_hours_per_week || staff?.working_hours_per_week || 40);
+    const wph = resolveWeeklyWorkingHours(src, resolveWeeklyWorkingHours(staff, 40));
     const monthlyWorkHours = getMonthlyWorkingHours(wph);
     const hourlyWage = calculateHourlyRateFromMonthlySalary(totalMonthly, wph);
 

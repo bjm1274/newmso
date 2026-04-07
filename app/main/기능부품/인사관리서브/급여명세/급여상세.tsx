@@ -10,6 +10,7 @@ import {
 import {
   calculateHourlyRateFromMonthlySalary,
   getMonthlyWorkingHours,
+  resolveWeeklyWorkingHours,
 } from '@/lib/payroll-working-hours';
 import {
   calculateEmployeeInsuranceDeductions,
@@ -300,7 +301,7 @@ export default function SalaryDetail({
   const monthLabel = `${year}년 ${Number(month || '1')}월`;
   const advancePayAmount = toNumber(record?.advance_pay);
   const isAdvancePay = advancePayAmount > 0;
-  const weeklyHours = toNumber(staff?.working_hours_per_week || 40);
+  const weeklyHours = resolveWeeklyWorkingHours(staff, 40);
   const monthlyWorkingHours = getMonthlyWorkingHours(weeklyHours);
   const fixedMonthlySalary =
     toNumber(data.base_salary) +
