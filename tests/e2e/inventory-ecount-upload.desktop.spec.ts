@@ -230,3 +230,75 @@ test('excel inventory upload uses the resolved company so uploaded rows appear i
   await expect(page.getByRole('table').getByText('Test Gauze')).toBeVisible();
   await expect(page.getByRole('table').getByText('ParkHospital')).toBeVisible();
 });
+
+test('ecount upload deduplicates duplicate rows before inventory upsert', async ({ page }) => {
+  const inventoryUser = {
+    ...fakeUser,
+    id: 'inventory-ecount-dedupe-user',
+    employee_no: 'INV-ECOUNT-DEDUP-001',
+    name: 'Ecount Dedup Manager',
+    company: 'SuyeonMedical',
+    company_id: 'company-suyeon',
+    department: 'Ops',
+    role: 'manager',
+    permissions: {
+      ...fakeUser.permissions,
+      inventory: true,
+      ['menu_\uC7AC\uACE0\uAD00\uB9AC']: true,
+      ['inventory_\uB4F1\uB85D']: true,
+    },
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [inventoryUser],
+    companies: [{ id: 'company-suyeon', name: 'SuyeonMedical', type: 'HOSPITAL', is_active: true }],
+    inventoryItems: [],
+    suppliers: [],
+  });
+
+  await seedSession(page, {
+    user: inventoryUser,
+    localStorage: {
+      erp_last_menu: INVENTORY_MENU_ID,
+      erp_last_subview: INVENTORY_REGISTRATION_SUBMENU_ID,
+      erp_inventory_view: INVENTORY_REGISTRATION_SUBMENU_ID,
+      erp_permission_prompt_shown: '1',
+    },
+  });
+
+  await openInventoryRegistration(page);
+  await page.getByLabel('\uC5D1\uC140 \uC5C5\uB85C\uB4DC').click();
+  await page.getByTestId('excel-bulk-mode-inventory-ecount').click();
+  await page.getByTestId('inventory-ecount-department-select').selectOption('Ops');
+
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.aoa_to_sheet([
+    ['itemcode', 'internalitemcode', 'itemname', 'spec', 'unit', 'purchaseprice', 'saleprice', 'useyn'],
+    ['00001', 'ITEM-INTERNAL-01', 'Test Bandage', '2inch', 'EA', 1500, 1800, 'YES'],
+    ['00001', 'ITEM-INTERNAL-01', 'Test Bandage', '2inch', 'EA', 1500, 1800, 'YES'],
+  ]);
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'inventory');
+  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+  const createRequestPromise = page.waitForRequest(
+    (request) => request.url().includes('/inventory') && request.method() === 'POST',
+  );
+
+  await page.getByTestId('excel-bulk-upload-input').setInputFiles({
+    name: 'ecount-duplicate-upload.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer,
+  });
+
+  const createRequest = await createRequestPromise;
+  const requestBody = createRequest.postDataJSON();
+  const payloads = Array.isArray(requestBody) ? requestBody : [requestBody];
+
+  expect(payloads).toHaveLength(1);
+  expect(payloads[0]).toMatchObject({
+    item_name: 'Test Bandage',
+    company: 'SuyeonMedical',
+    item_code: '00001',
+    internal_code: 'ITEM-INTERNAL-01',
+  });
+});

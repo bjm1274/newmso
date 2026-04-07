@@ -252,6 +252,7 @@ export default function ProductRegistration({
               <option value="소모품">소모품</option>
               <option value="약품">약품</option>
               <option value="사무용품">사무용품</option>
+              <option value="기타">기타</option>
             </select>
           </div>
 

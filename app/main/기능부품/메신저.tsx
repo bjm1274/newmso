@@ -1578,6 +1578,17 @@ export default function ChatView({
     [persistedPinnedMessages, pinnedMessages]
   );
 
+  const bookmarkedMessages = useMemo(
+    () =>
+      [...messages]
+        .filter((message) => !message.is_deleted && bookmarkedIds.has(String(message.id)))
+        .sort(
+          (left, right) =>
+            new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime(),
+        ),
+    [bookmarkedIds, messages],
+  );
+
   const roomMembers = useMemo(() => {
     if (!selectedRoomId) return [];
     if (selectedRoomId === NOTICE_ROOM_ID) return noticeRoomMembers;
@@ -2134,6 +2145,7 @@ export default function ChatView({
           sharedMediaPreviewMessages={sharedMediaPreviewMessages}
           sharedFilePreviewMessages={sharedFilePreviewMessages}
           sharedLinkPreviewMessages={sharedLinkPreviewMessages}
+          bookmarkedMessages={bookmarkedMessages}
           roomMembers={roomMembers}
           selectedRoom={selectedRoom}
           currentUserId={effectiveChatUserId || user?.id}
@@ -2146,6 +2158,7 @@ export default function ChatView({
           onOpenMediaArchive={openMediaArchive}
           onPreviewMessage={openAttachmentPreviewForMessage}
           onReplyMessage={startReplyToMessage}
+          onScrollToMessage={scrollToMessage}
           onOpenAddMemberModal={() => setShowAddMemberModal(true)}
           onRemoveRoomMember={removeRoomMember}
           onRoomNameDraftChange={setRoomNameDraft}
