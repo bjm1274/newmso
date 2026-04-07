@@ -155,3 +155,80 @@ test('ecount inventory excel upload maps the template into inventory payloads', 
     reimbursement_yn: 'YES',
   });
 });
+
+test('excel inventory upload uses the resolved company so uploaded rows appear in inventory status', async ({ page }) => {
+  const inventoryUser = {
+    ...fakeUser,
+    id: 'inventory-upload-visible-user',
+    employee_no: 'INV-UPLOAD-001',
+    name: 'Inventory Upload Manager',
+    company: 'ParkHospital',
+    company_id: 'company-park',
+    department: 'Ops',
+    role: 'manager',
+    permissions: {
+      ...fakeUser.permissions,
+      inventory: true,
+      ['menu_?ш퀬愿由?]: true,
+      ['inventory_?꾪솴']: true,
+      ['inventory_?깅줉']: true,
+    },
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [inventoryUser],
+    companies: [
+      { id: 'company-park', name: 'ParkHospital', type: 'HOSPITAL', is_active: true },
+    ],
+    inventoryItems: [],
+    suppliers: [],
+  });
+
+  await seedSession(page, {
+    user: inventoryUser,
+    localStorage: {
+      erp_last_menu: '?ш퀬愿由?,
+      erp_last_subview: '?깅줉',
+      erp_inventory_view: '?깅줉',
+      erp_permission_prompt_shown: '1',
+    },
+  });
+
+  await page.goto(
+    `/main?${new URLSearchParams({
+      open_menu: '?ш퀬愿由?,
+      open_subview: '?깅줉',
+    }).toString()}`,
+  );
+
+  await expect(page.getByTestId('inventory-view')).toBeVisible();
+  await page.getByTestId('excel-bulk-upload-trigger').click();
+  await page.getByTestId('excel-bulk-mode-inventory-ecount').click();
+  await expect(page.getByTestId('inventory-ecount-company-select')).toHaveValue('ParkHospital');
+  await page.getByTestId('inventory-ecount-department-select').selectOption('Ops');
+
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.aoa_to_sheet([
+    ['itemcode', 'itemname', 'unit', 'purchaseprice', 'saleprice', 'suppliername', 'useyn'],
+    ['ITEM-001', 'Test Gauze', 'EA', 1200, 1500, 'Supplier A', 'YES'],
+  ]);
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'inventory');
+  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+  await page.getByTestId('excel-bulk-upload-input').setInputFiles({
+    name: 'inventory-upload.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer,
+  });
+
+  await page.goto(
+    `/main?${new URLSearchParams({
+      open_menu: '?ш퀬愿由?,
+      open_subview: '?꾪솴',
+    }).toString()}`,
+  );
+
+  await expect(page.getByTestId('inventory-view')).toBeVisible();
+  await expect(page.getByText('Test Gauze')).toBeVisible();
+  await expect(page.getByText('ParkHospital')).toBeVisible();
+});

@@ -1,6 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import type { StaffMember } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { isActiveStaff } from '@/lib/active-staff';
@@ -1360,7 +1361,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                         <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] bg-[var(--muted)] shadow-sm">
                           {프로필사진미리보기 ? (
-                            <img
+                            <ProfilePhotoThumbnail
                               src={프로필사진미리보기}
                               alt={신규직원.성명 ? `${신규직원.성명} 프로필 사진` : '직원 프로필 사진'}
                               className="h-full w-full object-cover"

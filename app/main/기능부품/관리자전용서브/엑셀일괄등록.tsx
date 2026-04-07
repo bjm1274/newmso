@@ -311,6 +311,33 @@ function parseSheetRows(workbook: XLSX.WorkBook, mode: UploadMode): ParsedSheet 
   return { rows, detectedCompanyName };
 }
 
+function normalizeCompanyLookupKey(value: unknown) {
+  return normalizeText(value)
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[(){}\[\].,·]/g, '');
+}
+
+function resolveKnownCompanyName(value: unknown, companyOptions: readonly string[]) {
+  const normalizedValue = normalizeText(value);
+  if (!normalizedValue) return '';
+
+  const targetKey = normalizeCompanyLookupKey(normalizedValue);
+  if (!targetKey) return normalizedValue;
+
+  const exactMatch = companyOptions.find(
+    (companyName) => normalizeCompanyLookupKey(companyName) === targetKey,
+  );
+  if (exactMatch) return exactMatch;
+
+  const fuzzyMatch = companyOptions.find((companyName) => {
+    const companyKey = normalizeCompanyLookupKey(companyName);
+    return companyKey && (companyKey.includes(targetKey) || targetKey.includes(companyKey));
+  });
+
+  return fuzzyMatch || normalizedValue;
+}
+
 function normalizeUploadUsage(value: string) {
   const normalized = normalizeText(value).toUpperCase();
   if (!normalized) return 'YES';
@@ -388,7 +415,12 @@ function mapStaffRow(row: ExcelRow) {
   };
 }
 
-function mapInventoryRow(row: ExcelRow, defaultCompany: string) {
+function mapInventoryRow(row: ExcelRow, defaultCompany: string, companyOptions: readonly string[] = []) {
+  const resolvedCompany =
+    resolveKnownCompanyName(findCellValue(row, INVENTORY_FIELD_ALIASES.company), companyOptions) ||
+    resolveKnownCompanyName(defaultCompany, companyOptions) ||
+    defaultCompany;
+
   return {
     item_name: normalizeText(findCellValue(row, INVENTORY_FIELD_ALIASES.itemName)),
     name: normalizeText(findCellValue(row, INVENTORY_FIELD_ALIASES.itemName)),
@@ -398,7 +430,7 @@ function mapInventoryRow(row: ExcelRow, defaultCompany: string) {
     min_stock: parseIntegerValue(findCellValue(row, INVENTORY_FIELD_ALIASES.minQuantity), 0),
     unit_price: parseIntegerValue(findCellValue(row, INVENTORY_FIELD_ALIASES.unitPrice)),
     price: parseIntegerValue(findCellValue(row, INVENTORY_FIELD_ALIASES.unitPrice)),
-    company: normalizeText(findCellValue(row, INVENTORY_FIELD_ALIASES.company)) || defaultCompany,
+    company: resolvedCompany,
     category: normalizeText(findCellValue(row, INVENTORY_FIELD_ALIASES.category)) || '소모품',
     unit: normalizeInventoryUnit(normalizeText(findCellValue(row, INVENTORY_FIELD_ALIASES.unit))),
     spec: normalizeText(findCellValue(row, INVENTORY_FIELD_ALIASES.spec)) || null,
@@ -525,8 +557,14 @@ export default function ExcelBulkUpload({ onRefresh }: ExcelBulkUploadProps) {
       setDepartmentOptions(nextDepartments);
 
       setDefaultCompany((previous) => {
-        if (normalizeText(previous)) return previous;
-        return nextCompanies[0] || 'SY INC.';
+        const normalizedPrevious = normalizeText(previous);
+        if (
+          normalizedPrevious &&
+          nextCompanies.some((companyName) => normalizeText(companyName) === normalizedPrevious)
+        ) {
+          return previous;
+        }
+        return nextCompanies[0] || normalizedPrevious || 'SY INC.';
       });
     };
 
@@ -549,10 +587,15 @@ export default function ExcelBulkUpload({ onRefresh }: ExcelBulkUploadProps) {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: 'array' });
       const parsedSheet = parseSheetRows(workbook, mode);
-      const effectiveDetectedCompany = parsedSheet.detectedCompanyName;
+      const effectiveDetectedCompany = resolveKnownCompanyName(parsedSheet.detectedCompanyName, companyOptions);
+      const resolvedDefaultCompany =
+        resolveKnownCompanyName(defaultCompany, companyOptions) ||
+        normalizeText(defaultCompany) ||
+        effectiveDetectedCompany ||
+        'SY INC.';
       const effectiveCompany =
         companyManuallySelected || !effectiveDetectedCompany
-          ? normalizeText(defaultCompany) || effectiveDetectedCompany || 'SY INC.'
+          ? resolvedDefaultCompany
           : effectiveDetectedCompany;
 
       if (!companyManuallySelected && effectiveDetectedCompany) {
@@ -586,7 +629,7 @@ export default function ExcelBulkUpload({ onRefresh }: ExcelBulkUploadProps) {
         toast(`직원 ${payloads.length}건 등록을 완료했습니다.`, 'success');
       } else if (mode === 'inventory') {
         const payloads = parsedSheet.rows
-          .map((row) => mapInventoryRow(row, effectiveCompany))
+          .map((row) => mapInventoryRow(row, effectiveCompany, companyOptions))
           .filter((row) => row.item_name);
 
         setPreview(payloads.slice(0, 10));

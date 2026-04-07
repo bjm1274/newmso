@@ -1,4 +1,6 @@
 'use client';
+import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
+import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import { toast } from '@/lib/toast';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -576,7 +578,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                           {/* 원장/대표 - 프리미엄 카드 */}
                           {(group as OrgPyramidData).director && (() => {
                             const dir = (group as OrgPyramidData).director!;
-                            const photoUrl = dir.photo_url || dir.avatar_url;
+                            const photoUrl = getProfilePhotoUrl(dir);
                             return (
                               <div className="flex flex-col items-center mb-4">
                                 <div
@@ -584,7 +586,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                                   className="flex items-center gap-4 px-8 py-4 bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] rounded-2xl shadow-lg border border-[#334155]/80 cursor-pointer hover:shadow-xl hover:-translate-y-0.5 transition-all min-w-[240px] group"
                                 >
                                   <div className="w-14 h-14 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden border-2 border-white/20 shrink-0">
-                                    {photoUrl ? <img src={photoUrl} alt={dir.name ?? ''} className="w-full h-full object-cover" /> : <span className="text-2xl text-white/50">👤</span>}
+                                    {photoUrl ? <ProfilePhotoThumbnail src={photoUrl} name={dir.name} className="w-full h-full object-cover" /> : <span className="text-2xl text-white/50">👤</span>}
                                   </div>
                                   <div className="flex flex-col min-w-0">
                                     <p className="text-white font-bold text-base leading-tight group-hover:text-blue-200 transition-colors">{dir.name}</p>
@@ -653,14 +655,14 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                         <div className="md:hidden w-full space-y-4">
                           {(group as OrgPyramidData).director && (() => {
                             const dir = (group as OrgPyramidData).director!;
-                            const photoUrl = dir.photo_url || dir.avatar_url;
+                            const photoUrl = getProfilePhotoUrl(dir);
                             return (
                               <div
                                 onClick={() => setSelectedMember(dir)}
                                 className="flex items-center gap-3 px-5 py-3.5 bg-gradient-to-r from-[#0F172A] to-[#1E293B] rounded-2xl shadow-md border border-[#334155]/80 cursor-pointer"
                               >
                                 <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden border border-white/20 shrink-0">
-                                  {photoUrl ? <img src={photoUrl} alt={dir.name ?? ''} className="w-full h-full object-cover" /> : <span className="text-lg text-white/50">👤</span>}
+                                  {photoUrl ? <ProfilePhotoThumbnail src={photoUrl} name={dir.name} className="w-full h-full object-cover" /> : <span className="text-lg text-white/50">👤</span>}
                                 </div>
                                 <div>
                                   <p className="text-white font-bold text-sm">{dir.name}</p>
@@ -721,7 +723,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                   {/* 원장/대표 - 프리미엄 카드 */}
                   {(viewData as OrgPyramidData).director && (() => {
                     const dir = (viewData as OrgPyramidData).director!;
-                    const photoUrl = dir.photo_url || dir.avatar_url;
+                    const photoUrl = getProfilePhotoUrl(dir);
                     return (
                       <div className="flex flex-col items-center mb-4">
                         <div
@@ -729,7 +731,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                           className="flex items-center gap-4 px-8 py-4 bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] rounded-2xl shadow-lg border border-[#334155]/80 cursor-pointer hover:shadow-xl hover:-translate-y-0.5 transition-all min-w-[240px] group"
                         >
                           <div className="w-14 h-14 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden border-2 border-white/20 shrink-0">
-                            {photoUrl ? <img src={photoUrl} alt={dir.name ?? ''} className="w-full h-full object-cover" /> : <span className="text-2xl text-white/50">👤</span>}
+                            {photoUrl ? <ProfilePhotoThumbnail src={photoUrl} name={dir.name} className="w-full h-full object-cover" /> : <span className="text-2xl text-white/50">👤</span>}
                           </div>
                           <div className="flex flex-col min-w-0">
                             <p className="text-white font-bold text-base leading-tight group-hover:text-blue-200 transition-colors">{dir.name}</p>
@@ -800,14 +802,14 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                 <div className="md:hidden w-full space-y-4">
                   {(viewData as OrgPyramidData).director && (() => {
                     const dir = (viewData as OrgPyramidData).director!;
-                    const photoUrl = dir.photo_url || dir.avatar_url;
+                    const photoUrl = getProfilePhotoUrl(dir);
                     return (
                       <div
                         onClick={() => setSelectedMember(dir)}
                         className="flex items-center gap-3 px-5 py-3.5 bg-gradient-to-r from-[#0F172A] to-[#1E293B] rounded-2xl shadow-md border border-[#334155]/80 cursor-pointer"
                       >
                         <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden border border-white/20 shrink-0">
-                          {photoUrl ? <img src={photoUrl} alt={dir.name ?? ''} className="w-full h-full object-cover" /> : <span className="text-lg text-white/50">👤</span>}
+                          {photoUrl ? <ProfilePhotoThumbnail src={photoUrl} name={dir.name} className="w-full h-full object-cover" /> : <span className="text-lg text-white/50">👤</span>}
                         </div>
                         <div>
                           <p className="text-white font-bold text-sm">{dir.name}</p>
@@ -904,9 +906,9 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
             <div className="bg-[var(--card)] w-full max-w-sm rounded-t-[2.5rem] md:rounded-2xl p-5 md:p-5 shadow-sm animate-in slide-in-from-bottom md:zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
               <div className="flex flex-col items-center text-center">
                 <div className="w-24 h-24 md:w-28 md:h-28 bg-[var(--muted)] rounded-[var(--radius-lg)] md:rounded-2xl mb-4 flex items-center justify-center text-5xl border-4 border-[var(--card)] shadow-sm overflow-hidden">
-                  {(selectedMember.photo_url || selectedMember.avatar_url) ? (
-                    <img
-                      src={(selectedMember.photo_url || selectedMember.avatar_url) ?? undefined}
+                  {getProfilePhotoUrl(selectedMember) ? (
+                    <ProfilePhotoThumbnail
+                      src={getProfilePhotoUrl(selectedMember)}
                       alt={selectedMember.name ?? '구성원 사진'}
                       className="w-full h-full object-cover"
                     />
@@ -951,7 +953,7 @@ interface StaffCardRowProps {
 /** 직원 카드: 사진 좌측, 이름·직책 우측 가로 배치 */
 function StaffCardRow({ staff, onClick, isEditMode, setDraggedStaff, draggedStaff, onMoveStaff }: StaffCardRowProps) {
   const isAdmin = staff.role === 'admin' || staff.permissions?.mso === true;
-  const photoUrl = staff.photo_url || staff.avatar_url;
+  const photoUrl = getProfilePhotoUrl(staff);
 
   return (
     <div
@@ -984,7 +986,7 @@ function StaffCardRow({ staff, onClick, isEditMode, setDraggedStaff, draggedStaf
     >
       <div className={`w-[42px] h-[42px] shrink-0 rounded-[var(--radius-md)] flex items-center justify-center text-base overflow-hidden ${isAdmin ? 'bg-red-500/10 text-red-400' : 'bg-[var(--muted)] text-[var(--toss-gray-3)] group-hover:bg-[var(--toss-blue-light)] group-hover:text-[var(--accent)]'}`}>
         {photoUrl ? (
-          <img src={photoUrl} alt={staff.name ?? ''} className="w-full h-full object-cover rounded-[var(--radius-md)]" />
+          <ProfilePhotoThumbnail src={photoUrl} name={staff.name} className="w-full h-full object-cover rounded-[var(--radius-md)]" previewDisabled={isEditMode} />
         ) : (
           <span className="text-sm">印</span>
         )}
