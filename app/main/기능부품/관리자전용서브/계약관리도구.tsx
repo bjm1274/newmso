@@ -2,50 +2,13 @@
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import {
+  CONTRACT_TEMPLATE_VARIABLES,
+  DEFAULT_CONTRACT_TEMPLATE,
+  upgradeLegacyContractTemplate,
+} from '@/lib/contract-template-defaults';
 
 // COMPANIES 상수는 이제 DB에서 동적으로 관리됩니다.
-
-const DEFAULT_CONTRACT_TEMPLATE = `제1조 [계약의 목적]
-본 계약은 사용자와 근로자 간의 근로조건을 명확히 함으로써 상호 신뢰와 협력을 바탕으로 업무를 수행함을 목적으로 한다.
-
-제2조 [담당업무 및 근무장소]
-① (근무장소) 근로자의 근무장소는 {{company_name}} 내 지정된 장소로 한다. 단, 사용자는 업무상 필요 시 근로자와 협의하여 근무장소를 변경할 수 있다.
-② (담당업무) 근로자의 주된 업무는 사용자가 지정한 직무로 하며, 경영상 필요에 따라 부수적인 업무를 수행하거나 직무를 변경할 수 있다.
-
-제3조 [근로계약기간 및 수습]
-① (근계기간) {{join_date}}부터 기간의 정함이 없는 근로계약을 체결한 것으로 한다. (또는 별도로 정한 종료일까지로 한다.)
-② (수습기간) 신규 입사 시 입사일로부터 3개월간을 수습기간으로 둘 수 있으며, 수습기간 중 근무태도, 업무수행능력, 자질, 건강상태 등을 종합적으로 평가하여 채용 부적격자로 판정될 경우 본 채용을 거부할 수 있다.
-
-제4조 [근로시간 및 휴게]
-① (근로시간) 근로자의 소정근로시간은 주 40시간을 원칙으로 하며, 상세 시간은 다음과 같다.
-   - 시업시각: {{shift_start}} / 종업시각: {{shift_end}}
-② (휴게시간) 휴게시간은 중식 또는 휴식을 위해 {{break_start}} ~ {{break_end}}까지 제공하며, 업무 특성 및 운영상 필요한 경우 근로자와 합의하여 휴게시간을 분할하거나 변경하여 부여할 수 있다.
-③ (연장근로) 사용자와 근로자는 필요한 경우 관련 법령이 정하는 범위 내에서 연장·야간·휴일근로를 실시하는 것에 합의한다.
-
-제5조 [임금 및 구성항목]
-① (월급여) 근로자의 임금은 월급제로 하며 구성 항목은 다음과 같다.
-   - 기본급: 금 {{base_salary}}원
-   - 식대: 금 {{meal_allowance}}원
-   - 직책수당: 금 {{position_allowance}}원
-   - 기타수당(비과세 등): 금 {{other_taxfree}}원
-② (지급일) 임금은 매월 1일부터 말일까지 산정하여 익월 지정일에 근로자의 명의로 된 계좌로 지급한다. (지급일이 휴일인 경우 전일 또는 익영업일)
-③ (일할계산) 중도 입·퇴사 시 해당 월의 근무일수에 따라 일할 계산하여 지급한다.
-
-제6조 [휴일 및 휴가]
-① (유급휴일) 주 1회 유급 주휴일, 근로자의 날, 기타 관련 법령에서 정한 공휴일을 유급휴일로 한다.
-② (연차유급휴가) 근로기준법에서 정하는 바에 따라 연차유급휴가를 부여하며, 근로자는 이를 자유롭게 사용한다.
-
-제7조 [사직 및 해고]
-① (사직) 근로자가 퇴직하고자 할 때에는 업무 공백 최소화를 위하여 최소 30일 이전에 사직서를 제출하고, 퇴직일까지 성실히 근무하며 후임자에게 업무 인수인계를 명확히 완료하여야 한다.
-② (해고) 사용자는 근로자가 제 규정을 위반하거나 사회통념상 근로관계를 지속할 수 없는 중대한 사유가 발생한 경우 관련 절차에 따라 계약을 해지할 수 있다.
-
-제8조 [비밀유지 및 손해배상]
-① (비밀유지) 근로자는 재직 중은 물론 퇴직 후에도 업무상 알게 된 회사의 경영·기술·고객 정보 등 비밀을 제3자에게 누설하거나 부당하게 이용하지 않는다.
-② (손해배상) 근로자의 고의 또는 중대한 과실로 인하여 사용자에게 재산상 손해를 입힌 경우, 근로자는 이를 배상할 책임이 있다.
-
-제9조 [기타 및 준용]
-① 근로자는 산업안전보건법 등 관련 법령에 따라 회사가 실시하는 정기 건강검진을 성실히 수검하여야 한다. (미수검으로 인한 과태료 발생 및 불이익은 근로자가 부담한다.)
-② 본 계약서에 명시되지 않은 사항은 취업규칙 및 근로기준법 등 관련 법령과 일반적인 상관례에 따르기로 한다.`;
 
 export default function ContractManager() {
   const [selectedCo, setSelectedCo] = useState('박철홍정형외과');
@@ -71,7 +34,7 @@ export default function ContractManager() {
         .eq('company_name', selectedCo)
         .single();
       if (data?.template_content) {
-        setTemplate(data.template_content);
+        setTemplate(upgradeLegacyContractTemplate(data.template_content));
         setSealUrl(data?.seal_url || null);
       } else {
         setSealUrl(data?.seal_url || null);
@@ -80,7 +43,7 @@ export default function ContractManager() {
           .select('template_content')
           .eq('company_name', '전체')
           .single();
-        setTemplate(fallback?.template_content || DEFAULT_CONTRACT_TEMPLATE);
+        setTemplate(upgradeLegacyContractTemplate(fallback?.template_content || DEFAULT_CONTRACT_TEMPLATE));
       }
       setLoading(false);
     };
@@ -89,10 +52,12 @@ export default function ContractManager() {
 
   const handleSave = async () => {
     setSaving(true);
+    const normalizedTemplate = upgradeLegacyContractTemplate(template);
+    setTemplate(normalizedTemplate);
     const { error } = await supabase.from('contract_templates').upsert(
       {
         company_name: selectedCo,
-        template_content: template,
+        template_content: normalizedTemplate,
         seal_url: sealUrl,
         updated_at: new Date().toISOString()
       },
@@ -166,11 +131,7 @@ export default function ContractManager() {
             <div className="mt-4">
               <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider mb-2">활성 데이터 토큰 (클릭하여 복사)</p>
               <div className="flex flex-wrap gap-1.5">
-                {[
-                  '{{employee_name}}', '{{employee_no}}', '{{join_date}}',
-                  '{{shift_start}}', '{{shift_end}}', '{{base_salary}}',
-                  '{{meal_allowance}}', '{{position_allowance}}'
-                ].map(tkn => (
+                {CONTRACT_TEMPLATE_VARIABLES.map(({ key: tkn }) => (
                   <button
                     key={tkn}
                     onClick={() => {
