@@ -13,6 +13,7 @@ import {
   resolveAttachmentKind,
 } from './메신저첨부';
 import { buildMessengerImageAlt, MessengerAvatar } from './메신저공통';
+import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import { isSelfChatRoom, NOTICE_ROOM_ID } from './메신저유틸';
 
 type DrawerSectionKey = 'media' | 'files' | 'links' | 'bookmarks';
@@ -524,7 +525,7 @@ export function MessengerDrawer({
                     <div className="flex items-center gap-3">
                       <MessengerAvatar
                         name={resolvedMember?.name}
-                        photoUrl={resolvedMember?.photo_url}
+                        photoUrl={getProfilePhotoUrl(resolvedMember)}
                         className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-600 dark:bg-emerald-900/30"
                         decorative
                       />
