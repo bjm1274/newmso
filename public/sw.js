@@ -1,4 +1,10 @@
+// SW_VERSION: 2026-04-07-v2
 importScripts('/push-notification-shared.js');
+
+// 새 버전 배포 시 즉시 구 SW를 교체 (탭 닫기 불필요)
+self.addEventListener('install', (event) => {
+  event.waitUntil(self.skipWaiting());
+});
 
 self.addEventListener('notificationclick', (event) => {
   event.waitUntil(self.__erpPushShared.handleNotificationClick(event));
@@ -112,6 +118,7 @@ self.addEventListener('pushsubscriptionchange', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(Promise.all([
+    // 모든 탭을 즉시 이 SW가 제어하도록 claim
     self.clients.claim(),
     self.__erpPushShared.flushRetryQueue(),
   ]));

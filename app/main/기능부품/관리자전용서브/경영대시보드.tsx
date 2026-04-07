@@ -76,7 +76,7 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
           <div className="absolute top-0 right-0 p-4 text-3xl opacity-10 group-hover:scale-110 transition-transform">📉</div>
           <p className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-widest">AI 예측 이직률 / 퇴사율</p>
           <p className="text-xl font-black text-orange-500 mt-1.5">{(metrics.turnoverPrediction ?? '-') as string}%</p>
-          <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mt-1.5">동종 업계 평균(4.5%) 대비 양호</p>
+          <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mt-1.5">동종 업계 평균 대비 양호</p>
         </div>
         <div className="bg-[var(--card)] p-3 border border-[var(--border)] shadow-sm rounded-[var(--radius-xl)] relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 text-3xl opacity-10 group-hover:scale-110 transition-transform">🏝️</div>

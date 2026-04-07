@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import SignatureCanvas from 'react-signature-canvas';
 import { getOrdinaryWageTable } from '@/lib/ordinary-wage';
 import { jsPDF } from 'jspdf';
+import { resolveWeeklyWorkingHours, resolveWorkingDaysPerWeek } from '@/lib/payroll-working-hours';
 
 type Props = {
     contract: any;
@@ -107,8 +108,8 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                         break_end: (contract?.break_end_time || user?.break_end_time) ? String(contract?.break_end_time || user?.break_end_time).slice(0, 5) : '',
                         payment_day: String(contract?.payment_day || '7'),
                         today: formatDate(new Date().toISOString()),
-                        weekly_work_hours: String(contract?.working_hours_per_week || user?.working_hours_per_week || 40),
-                        work_days_per_week: String(contract?.working_days_per_week || user?.working_days_per_week || 5),
+                        weekly_work_hours: String(resolveWeeklyWorkingHours(contract, resolveWeeklyWorkingHours(user, 40))),
+                        work_days_per_week: String(resolveWorkingDaysPerWeek(contract, resolveWorkingDaysPerWeek(user, 5))),
                         contract_start: formatDate(contract?.contract_start_date || user?.joined_at || user?.join_date),
                         contract_end: contract?.contract_end_date ? formatDate(contract.contract_end_date) : '정년도달시',
                         conditions_applied_at: formatDate(contract?.conditions_applied_at || contract?.effective_date || user?.effective_date),

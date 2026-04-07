@@ -8,7 +8,12 @@ import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import { getChecklistTargetDate, getDefaultChecklist } from '@/lib/hr-checklists';
 import { getMinimumWageByYear, MONTHLY_STANDARD_HOURS } from '@/lib/tax-free-limits';
-import { calculateHourlyRateFromMonthlySalary, getMonthlyWorkingHours } from '@/lib/payroll-working-hours';
+import {
+  calculateHourlyRateFromMonthlySalary,
+  getMonthlyWorkingHours,
+  resolveWeeklyWorkingHours,
+  resolveWorkingDaysPerWeek,
+} from '@/lib/payroll-working-hours';
 import { buildProfilePhotoUrlFromPath, getProfilePhotoUrl } from '@/lib/profile-photo';
 import StaffHistoryTimeline from './인사이력타임라인';
 import OnboardingChecklist from './급여명세/입퇴사온보딩';
@@ -67,6 +72,11 @@ const STAFF_MUTATION_ALLOWANCE_COLUMNS = [
   'annual_leave_pay',
 ] as const;
 
+const STAFF_MUTATION_WORK_CONDITION_COLUMNS = [
+  'working_hours_per_week',
+  'working_days_per_week',
+] as const;
+
 function buildStaffMutationPayload(
   payload: Record<string, unknown>,
   omittedColumns: ReadonlySet<string>,
@@ -84,17 +94,27 @@ function buildStaffMutationPayload(
     permissions.payroll_allowances && typeof permissions.payroll_allowances === 'object' && !Array.isArray(permissions.payroll_allowances)
       ? { ...(permissions.payroll_allowances as Record<string, unknown>) }
       : {};
+  const fallbackWorkConditions =
+    permissions.work_conditions && typeof permissions.work_conditions === 'object' && !Array.isArray(permissions.work_conditions)
+      ? { ...(permissions.work_conditions as Record<string, unknown>) }
+      : {};
 
   omittedColumns.forEach((columnName) => {
     if (!(columnName in nextPayload)) return;
     if ((STAFF_MUTATION_ALLOWANCE_COLUMNS as readonly string[]).includes(columnName)) {
       fallbackAllowances[columnName] = nextPayload[columnName];
     }
+    if ((STAFF_MUTATION_WORK_CONDITION_COLUMNS as readonly string[]).includes(columnName)) {
+      fallbackWorkConditions[columnName] = nextPayload[columnName];
+    }
     delete nextPayload[columnName];
   });
 
   if (Object.keys(fallbackAllowances).length > 0) {
     permissions.payroll_allowances = fallbackAllowances;
+  }
+  if (Object.keys(fallbackWorkConditions).length > 0) {
+    permissions.work_conditions = fallbackWorkConditions;
   }
   nextPayload.permissions = permissions;
   return nextPayload;
@@ -112,6 +132,19 @@ function normalizeStaffName(value: string | null | undefined) {
 function isDuplicateStaffIdentityError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error || '');
   return message.includes('duplicate_staff_identity');
+}
+
+function isInvalidIntegerInputError(error: unknown, value?: unknown) {
+  const message = error instanceof Error ? error.message : String(error || '');
+  if (!message.includes('invalid input syntax for type integer')) {
+    return false;
+  }
+  return value === undefined ? true : message.includes(`"${String(value)}"`);
+}
+
+function hasFractionalValue(value: unknown) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && !Number.isInteger(numeric);
 }
 
 // ESLint가 React 컴포넌트로 인식하도록 함수 이름을
@@ -634,6 +667,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         );
       }
 
+      const weeklyWorkingHours = resolveWeeklyWorkingHours(신규직원, 40);
+      const workingDaysPerWeek = resolveWorkingDaysPerWeek(신규직원, 5);
+
       const commonData = {
         name: normalizeStaffName(신규직원.성명),
         phone: 신규직원.전화번호,
@@ -674,8 +710,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         annual_leave_total: 0,
         annual_leave_used: 0,
         shift_id: 신규직원.근무형태ID || null,
-        working_hours_per_week: 신규직원.working_hours_per_week || 40,
-        working_days_per_week: 신규직원.working_days_per_week || 5,
+        working_hours_per_week: weeklyWorkingHours > 0 ? weeklyWorkingHours : 40,
+        working_days_per_week: workingDaysPerWeek > 0 ? workingDaysPerWeek : 5,
         base_salary: 신규직원.base_salary,
         meal_allowance: 신규직원.meal_allowance ?? 0,
         night_duty_allowance: 신규직원.night_duty_allowance ?? 0,
@@ -704,14 +740,22 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           annual_leave_total: afterStaff.annual_leave_total,
           annual_leave_used: afterStaff.annual_leave_used,
         };
+        const forcedOmittedWorkConditionColumns = hasFractionalValue(updatePayload.working_hours_per_week)
+          ? ['working_hours_per_week']
+          : [];
         const { error: updateErr } = await withMissingColumnsFallback(
-          (omittedColumns) =>
-            supabase
+          (omittedColumns) => {
+            const allOmittedColumns = new Set<string>([
+              ...omittedColumns,
+              ...forcedOmittedWorkConditionColumns,
+            ]);
+            return supabase
               .from('staff_members')
-              .update(buildStaffMutationPayload(updatePayload, omittedColumns))
+              .update(buildStaffMutationPayload(updatePayload, allOmittedColumns))
               .eq('id', String(afterStaff.id || ''))
-              .select(),
-          [...STAFF_MUTATION_ALLOWANCE_COLUMNS],
+              .select();
+          },
+          [...STAFF_MUTATION_ALLOWANCE_COLUMNS, ...STAFF_MUTATION_WORK_CONDITION_COLUMNS],
         );
 
         if (updateErr) {
@@ -776,11 +820,34 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           newEmployeeNo = String(nextNo);
         }
 
-        const { error: insertErr, data: insertedStaff } = await supabase
+        const insertPayload = {
+          ...commonData,
+          employee_no: newEmployeeNo,
+          role: 'staff',
+          password: '',
+          join_date: dateOrNull(신규직원.입사일),
+        };
+        const insertOmittedColumns = new Set<string>(
+          hasFractionalValue(insertPayload.working_hours_per_week) ? ['working_hours_per_week'] : [],
+        );
+        let { error: insertErr, data: insertedStaff } = await supabase
           .from('staff_members')
-          .insert([{ ...commonData, employee_no: newEmployeeNo, role: 'staff', password: '', join_date: dateOrNull(신규직원.입사일) }])
+          .insert([buildStaffMutationPayload(insertPayload, insertOmittedColumns)])
           .select()
           .single();
+
+        if (
+          insertErr &&
+          hasFractionalValue(insertPayload.working_hours_per_week) &&
+          isInvalidIntegerInputError(insertErr, insertPayload.working_hours_per_week)
+        ) {
+          ({ error: insertErr, data: insertedStaff } = await supabase
+            .from('staff_members')
+            .insert([buildStaffMutationPayload(insertPayload, new Set(['working_hours_per_week']))])
+            .select()
+            .single());
+        }
+
         if (insertErr) {
           return toast('직원 등록 실패: ' + (insertErr.message || 'DB 오류'), 'error');
         }
@@ -890,8 +957,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       duru_nuri_start: (ins.duru_nuri_start as string) || '',
       duru_nuri_end: (ins.duru_nuri_end as string) || '',
       other_welfare: (직원.permissions?.other_welfare as string) || '',
-      working_hours_per_week: (직원.working_hours_per_week as number) || 40,
-      working_days_per_week: (직원.working_days_per_week as number) || 5
+      working_hours_per_week: resolveWeeklyWorkingHours(직원, 40),
+      working_days_per_week: resolveWorkingDaysPerWeek(직원, 5)
     });
     편집모드설정(true);
   };
