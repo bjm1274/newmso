@@ -511,6 +511,31 @@ function buildExistingInventoryMatch(
   return matchedByName.length === 1 ? matchedByName[0] : null;
 }
 
+function buildEcountPayloadDedupeKey(
+  company: string,
+  matchedRow: ExistingInventoryRow | null,
+  mappedRow: EcountInventoryRow,
+) {
+  if (matchedRow?.id) {
+    return `existing:${matchedRow.id}`;
+  }
+
+  const normalizedCompany = normalizeCompanyLookupKey(company);
+  const normalizedItemCode = normalizeText(mappedRow.itemCode).toLowerCase();
+  const normalizedInternalCode = normalizeText(mappedRow.internalItemCode).toLowerCase();
+  const normalizedName = normalizeText(mappedRow.itemName).toLowerCase();
+  const normalizedSpec = normalizeText(mappedRow.spec).toLowerCase();
+
+  return [
+    'new',
+    normalizedCompany,
+    normalizedItemCode,
+    normalizedInternalCode,
+    normalizedName,
+    normalizedSpec,
+  ].join(':');
+}
+
 export default function ExcelBulkUpload({ onRefresh }: ExcelBulkUploadProps) {
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<UploadMode>('staff');
@@ -701,10 +726,9 @@ export default function ExcelBulkUpload({ onRefresh }: ExcelBulkUploadProps) {
           return accumulator;
         }, {});
 
-        let insertedCount = 0;
-        let updatedCount = 0;
+        const payloadMap = new Map<string, Record<string, unknown> & { __matchedExisting: boolean }>();
 
-        const payloads = mappedRows.map((row) => {
+        mappedRows.forEach((row) => {
           const matchedRow = buildExistingInventoryMatch(existingRows, effectiveCompany, row);
           const supplierMatch = supplierByName[normalizeText(row.supplierName).toLowerCase()];
           const payload: Record<string, unknown> = {
@@ -742,14 +766,17 @@ export default function ExcelBulkUpload({ onRefresh }: ExcelBulkUploadProps) {
             reimbursement_yn: row.reimbursementYn || null,
           };
 
-          if (matchedRow?.id) {
-            updatedCount += 1;
-          } else {
-            insertedCount += 1;
-          }
-
-          return payload;
+          const dedupeKey = buildEcountPayloadDedupeKey(effectiveCompany, matchedRow || null, row);
+          payloadMap.set(dedupeKey, {
+            ...payload,
+            __matchedExisting: Boolean(matchedRow?.id),
+          });
         });
+
+        const dedupedPayloads = Array.from(payloadMap.values());
+        const insertedCount = dedupedPayloads.filter((payload) => !payload.__matchedExisting).length;
+        const updatedCount = dedupedPayloads.filter((payload) => payload.__matchedExisting).length;
+        const payloads = dedupedPayloads.map(({ __matchedExisting: _matchedExisting, ...payload }) => payload);
 
         for (const batch of chunkArray(payloads, 150)) {
           const { error } = await withMissingColumnsFallback(

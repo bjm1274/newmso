@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
+
 import { toast } from '@/lib/toast';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 import {
@@ -7,10 +9,13 @@ import {
   AttachmentQuickActions,
   extractFirstLinkUrl,
   getAttachmentDisplayName,
+  getMessageDisplayText,
   resolveAttachmentKind,
 } from './메신저첨부';
 import { buildMessengerImageAlt, MessengerAvatar } from './메신저공통';
 import { isSelfChatRoom, NOTICE_ROOM_ID } from './메신저유틸';
+
+type DrawerSectionKey = 'media' | 'files' | 'links' | 'bookmarks';
 
 type MessengerDrawerProps = {
   isOpen: boolean;
@@ -19,6 +24,7 @@ type MessengerDrawerProps = {
   sharedMediaPreviewMessages: ChatMessage[];
   sharedFilePreviewMessages: ChatMessage[];
   sharedLinkPreviewMessages: ChatMessage[];
+  bookmarkedMessages: ChatMessage[];
   roomMembers: StaffMember[];
   selectedRoom: ChatRoom | null;
   currentUserId: string | null | undefined;
@@ -31,6 +37,7 @@ type MessengerDrawerProps = {
   onOpenMediaArchive: (filter: 'media' | 'file') => void;
   onPreviewMessage: (message: ChatMessage) => void;
   onReplyMessage: (message: ChatMessage) => void;
+  onScrollToMessage: (messageId: string) => void;
   onOpenAddMemberModal: () => void;
   onRemoveRoomMember: (memberId: string) => void | Promise<void>;
   onRoomNameDraftChange: (value: string) => void;
@@ -40,6 +47,89 @@ type MessengerDrawerProps = {
   onLeaveRoom: () => void;
 };
 
+const COLLAPSED_LIMITS: Record<DrawerSectionKey, number> = {
+  media: 3,
+  files: 3,
+  links: 2,
+  bookmarks: 3,
+};
+
+const DEFAULT_EXPANDED_SECTIONS: Record<DrawerSectionKey, boolean> = {
+  media: false,
+  files: false,
+  links: false,
+  bookmarks: false,
+};
+
+function sortMessagesByRecent(messages: ChatMessage[]) {
+  return [...messages].sort(
+    (left, right) => new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime(),
+  );
+}
+
+function getVisibleMessages(messages: ChatMessage[], expanded: boolean, limit: number) {
+  return expanded ? messages : messages.slice(0, limit);
+}
+
+function formatMessageMeta(message: ChatMessage) {
+  const senderName = (message.staff as { name?: string } | null | undefined)?.name || '이름 없음';
+  const createdAt = new Date(message.created_at || 0);
+  const dateLabel = Number.isNaN(createdAt.getTime())
+    ? '-'
+    : createdAt.toLocaleDateString('ko-KR');
+  return `${senderName} · ${dateLabel}`;
+}
+
+function DrawerSectionHeader({
+  title,
+  count,
+  expanded,
+  canExpand,
+  onToggle,
+  archiveTestId,
+  onArchive,
+}: {
+  title: string;
+  count: number;
+  expanded: boolean;
+  canExpand: boolean;
+  onToggle: () => void;
+  archiveTestId?: string;
+  onArchive?: (() => void) | null;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 px-1">
+      <div className="flex items-center gap-2 min-w-0">
+        <p className="truncate text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">{title}</p>
+        <span className="rounded-full bg-[var(--tab-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--toss-gray-4)]">
+          {count}
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        {onArchive ? (
+          <button
+            type="button"
+            data-testid={archiveTestId}
+            onClick={onArchive}
+            className="inline-flex items-center rounded-full border border-[var(--border)] px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--tab-bg)]"
+          >
+            보관함
+          </button>
+        ) : null}
+        {canExpand ? (
+          <button
+            type="button"
+            onClick={onToggle}
+            className="inline-flex items-center rounded-full bg-[var(--accent)]/10 px-2.5 py-1 text-[10px] font-bold text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/15"
+          >
+            {expanded ? '접기' : '전체보기'}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function MessengerDrawer({
   isOpen,
   roomNotifyOn,
@@ -47,6 +137,7 @@ export function MessengerDrawer({
   sharedMediaPreviewMessages,
   sharedFilePreviewMessages,
   sharedLinkPreviewMessages,
+  bookmarkedMessages,
   roomMembers,
   selectedRoom,
   currentUserId,
@@ -59,6 +150,7 @@ export function MessengerDrawer({
   onOpenMediaArchive,
   onPreviewMessage,
   onReplyMessage,
+  onScrollToMessage,
   onOpenAddMemberModal,
   onRemoveRoomMember,
   onRoomNameDraftChange,
@@ -67,6 +159,46 @@ export function MessengerDrawer({
   onStartEditingRoomName,
   onLeaveRoom,
 }: MessengerDrawerProps) {
+  const [expandedSections, setExpandedSections] = useState(DEFAULT_EXPANDED_SECTIONS);
+
+  useEffect(() => {
+    setExpandedSections(DEFAULT_EXPANDED_SECTIONS);
+  }, [isOpen, selectedRoom?.id]);
+
+  const sortedMediaMessages = useMemo(
+    () => sortMessagesByRecent(sharedMediaPreviewMessages),
+    [sharedMediaPreviewMessages],
+  );
+  const sortedFileMessages = useMemo(
+    () => sortMessagesByRecent(sharedFilePreviewMessages),
+    [sharedFilePreviewMessages],
+  );
+  const sortedLinkMessages = useMemo(
+    () => sortMessagesByRecent(sharedLinkPreviewMessages),
+    [sharedLinkPreviewMessages],
+  );
+  const sortedBookmarkedMessages = useMemo(
+    () => sortMessagesByRecent(bookmarkedMessages),
+    [bookmarkedMessages],
+  );
+
+  const visibleMediaMessages = useMemo(
+    () => getVisibleMessages(sortedMediaMessages, expandedSections.media, COLLAPSED_LIMITS.media),
+    [expandedSections.media, sortedMediaMessages],
+  );
+  const visibleFileMessages = useMemo(
+    () => getVisibleMessages(sortedFileMessages, expandedSections.files, COLLAPSED_LIMITS.files),
+    [expandedSections.files, sortedFileMessages],
+  );
+  const visibleLinkMessages = useMemo(
+    () => getVisibleMessages(sortedLinkMessages, expandedSections.links, COLLAPSED_LIMITS.links),
+    [expandedSections.links, sortedLinkMessages],
+  );
+  const visibleBookmarkedMessages = useMemo(
+    () => getVisibleMessages(sortedBookmarkedMessages, expandedSections.bookmarks, COLLAPSED_LIMITS.bookmarks),
+    [expandedSections.bookmarks, sortedBookmarkedMessages],
+  );
+
   if (!isOpen) return null;
 
   const ownerId = String(currentUserId || '');
@@ -80,73 +212,96 @@ export function MessengerDrawer({
     selectedRoom?.id !== NOTICE_ROOM_ID &&
     (selectedRoom?.type !== 'direct' || (Array.isArray(selectedRoom?.members) && selectedRoom.members.length > 2));
 
+  const toggleSection = (section: DrawerSectionKey) => {
+    setExpandedSections((current) => ({ ...current, [section]: !current[section] }));
+  };
+
   return (
     <>
-      <div className="absolute inset-0 bg-black/10 z-50 animate-in fade-in duration-200" onClick={onClose} aria-hidden="true" />
-      <div data-testid="chat-room-drawer" className="absolute top-0 right-0 bottom-0 w-full md:w-80 bg-[var(--card)] dark:bg-zinc-900 shadow-sm z-[60] flex flex-col animate-in slide-in-from-right duration-300 border-l border-[var(--border)]">
-        <div className="p-4 border-b border-[var(--border)] flex items-center justify-between bg-[var(--card)]">
+      <div className="absolute inset-0 z-50 animate-in fade-in duration-200 bg-black/10" onClick={onClose} aria-hidden="true" />
+      <div
+        data-testid="chat-room-drawer"
+        className="absolute top-0 right-0 bottom-0 z-[60] flex w-full shrink-0 flex-col border-l border-[var(--border)] bg-[var(--card)] shadow-sm animate-in slide-in-from-right duration-300 md:w-80 dark:bg-zinc-900"
+      >
+        <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--card)] p-4">
           <span className="text-sm font-bold">채팅방 정보</span>
-          <button onClick={onClose} className="p-2 text-[var(--toss-gray-3)] hover:text-black dark:hover:text-white rounded-[var(--radius-md)]">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-[var(--radius-md)] p-2 text-[var(--toss-gray-3)] hover:text-black dark:hover:text-white"
+          >
             닫기
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-          <div className="flex items-center justify-between p-3 bg-[var(--tab-bg)] dark:bg-zinc-800/50 rounded-2xl">
+        <div className="custom-scrollbar flex-1 space-y-4 overflow-y-auto p-4">
+          <div className="flex items-center justify-between rounded-2xl bg-[var(--tab-bg)] p-3 dark:bg-zinc-800/50">
             <span className="text-sm font-semibold">알림 설정</span>
-            <button onClick={() => void onToggleRoomNotify()} className={`w-12 h-6 rounded-full transition-colors relative ${roomNotifyOn ? 'bg-emerald-500' : 'bg-zinc-300'}`}>
-              <div className={`absolute top-1 w-4 h-4 bg-[var(--card)] rounded-full transition-all ${roomNotifyOn ? 'right-1' : 'left-1'}`} />
+            <button
+              type="button"
+              onClick={() => void onToggleRoomNotify()}
+              className={`relative h-6 w-12 rounded-full transition-colors ${roomNotifyOn ? 'bg-emerald-500' : 'bg-zinc-300'}`}
+            >
+              <div className={`absolute top-1 h-4 w-4 rounded-full bg-[var(--card)] transition-all ${roomNotifyOn ? 'right-1' : 'left-1'}`} />
             </button>
           </div>
 
-          <button data-testid="chat-open-poll-modal" onClick={onOpenPollModal} className="w-full flex items-center justify-between p-3.5 bg-blue-500/10 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/50 hover:bg-blue-500/20 dark:hover:bg-blue-900/40 transition-colors group">
+          <button
+            type="button"
+            data-testid="chat-open-poll-modal"
+            onClick={onOpenPollModal}
+            className="group flex w-full items-center justify-between rounded-2xl border border-blue-100 bg-blue-500/10 p-3.5 transition-colors hover:bg-blue-500/20 dark:border-blue-800/50 dark:bg-blue-900/20 dark:hover:bg-blue-900/40"
+          >
             <div className="flex items-center gap-3">
-              <span className="text-lg">🗳️</span>
+              <span className="text-lg">투표</span>
               <span className="text-xs font-bold text-blue-700 dark:text-blue-300">새 투표 만들기</span>
             </div>
-            <span className="text-[10px] text-blue-400 font-bold group-hover:translate-x-1 transition-transform">열기</span>
+            <span className="text-[10px] font-bold text-blue-400 transition-transform group-hover:translate-x-1">열기</span>
           </button>
 
           <div className="space-y-3">
-            <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider px-1">상단 공지</p>
-            <div data-testid="chat-drawer-notice" className="p-4 bg-orange-500/10 dark:bg-orange-950/20 rounded-2xl border border-orange-100 dark:border-orange-900/30">
-              <p className="text-xs font-bold text-orange-800 dark:text-orange-300 mb-1">공지</p>
-              <p className="text-xs text-orange-900/70 dark:text-orange-200/50 leading-relaxed whitespace-pre-wrap">
-                {currentNoticeMessage?.content || '등록된 공지가 없습니다.'}
+            <p className="px-1 text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">상단 공지</p>
+            <div data-testid="chat-drawer-notice" className="rounded-2xl border border-orange-100 bg-orange-500/10 p-4 dark:border-orange-900/30 dark:bg-orange-950/20">
+              <p className="mb-1 text-xs font-bold text-orange-800 dark:text-orange-300">공지</p>
+              <p className="whitespace-pre-wrap text-xs leading-relaxed text-orange-900/70 dark:text-orange-200/50">
+                {getMessageDisplayText(
+                  currentNoticeMessage?.content,
+                  currentNoticeMessage?.file_name,
+                  currentNoticeMessage?.file_url,
+                  '등록된 공지가 없습니다.',
+                )}
               </p>
             </div>
           </div>
 
           <div className="space-y-3">
-            <div className="flex justify-between items-center px-1">
-              <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">사진 및 동영상</p>
-              <button
-                type="button"
-                data-testid="chat-open-media-archive-media"
-                onClick={() => onOpenMediaArchive('media')}
-                className="inline-flex items-center rounded-full bg-[var(--accent)]/10 px-2.5 py-1 text-[10px] font-bold text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/15"
-              >
-                전체보기
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-1 rounded-2xl overflow-hidden">
-              {sharedMediaPreviewMessages.map((message) => (
+            <DrawerSectionHeader
+              title="사진 및 동영상"
+              count={sortedMediaMessages.length}
+              expanded={expandedSections.media}
+              canExpand={sortedMediaMessages.length > COLLAPSED_LIMITS.media}
+              onToggle={() => toggleSection('media')}
+              archiveTestId="chat-open-media-archive-media"
+              onArchive={sortedMediaMessages.length > 0 ? () => onOpenMediaArchive('media') : null}
+            />
+            <div className="grid grid-cols-3 gap-1 overflow-hidden rounded-2xl">
+              {visibleMediaMessages.map((message) => (
                 <div
                   key={message.id}
-                  className="aspect-square bg-[var(--tab-bg)] dark:bg-zinc-800 relative group cursor-pointer"
+                  className="group relative aspect-square cursor-pointer bg-[var(--tab-bg)] dark:bg-zinc-800"
                   onClick={() => onPreviewMessage(message)}
                 >
                   {resolveAttachmentKind(message.file_url, message.file_kind) === 'image' ? (
                     <img
                       src={message.file_url || ''}
-                      alt={buildMessengerImageAlt(message.file_name, '공유된 이미지')}
-                      className="w-full h-full object-cover hover:opacity-90 transition-opacity"
+                      alt={buildMessengerImageAlt(message.file_name, '공유 이미지')}
+                      className="h-full w-full object-cover transition-opacity hover:opacity-90"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-xl">🎬</div>
+                    <div className="flex h-full w-full items-center justify-center text-xl">영상</div>
                   )}
-                  {message.file_url && (
-                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity bg-black/40 flex items-center justify-center rounded-[inherit] pointer-events-none px-2">
+                  {message.file_url ? (
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[inherit] bg-black/40 px-2 opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:opacity-100">
                       <AttachmentQuickActions
                         url={message.file_url}
                         name={getAttachmentDisplayName(message.file_name, message.file_url)}
@@ -155,31 +310,29 @@ export function MessengerDrawer({
                         variant="overlay"
                       />
                     </div>
-                  )}
+                  ) : null}
                 </div>
               ))}
-              {sharedMediaPreviewMessages.length === 0 && (
-                <div className="col-span-3 py-5 text-center bg-[var(--tab-bg)] dark:bg-zinc-800/30 rounded-2xl border border-dashed border-[var(--border)] dark:border-zinc-700">
-                  <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">주고받은 미디어가 없습니다.</p>
+              {visibleMediaMessages.length === 0 ? (
+                <div className="col-span-3 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--tab-bg)] py-5 text-center dark:border-zinc-700 dark:bg-zinc-800/30">
+                  <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">공유된 미디어가 없습니다.</p>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
 
           <div className="space-y-3">
-            <div className="flex justify-between items-center px-1">
-              <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">파일</p>
-              <button
-                type="button"
-                data-testid="chat-open-media-archive-file"
-                onClick={() => onOpenMediaArchive('file')}
-                className="inline-flex items-center rounded-full bg-[var(--accent)]/10 px-2.5 py-1 text-[10px] font-bold text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/15"
-              >
-                전체보기
-              </button>
-            </div>
+            <DrawerSectionHeader
+              title="파일"
+              count={sortedFileMessages.length}
+              expanded={expandedSections.files}
+              canExpand={sortedFileMessages.length > COLLAPSED_LIMITS.files}
+              onToggle={() => toggleSection('files')}
+              archiveTestId="chat-open-media-archive-file"
+              onArchive={sortedFileMessages.length > 0 ? () => onOpenMediaArchive('file') : null}
+            />
             <div className="space-y-2">
-              {sharedFilePreviewMessages.map((message) => {
+              {visibleFileMessages.map((message) => {
                 const fileUrl = String(message.file_url || '');
                 const attachmentName = getAttachmentDisplayName(message.file_name, fileUrl);
                 return (
@@ -188,7 +341,7 @@ export function MessengerDrawer({
                     url={fileUrl}
                     name={attachmentName}
                     kind="file"
-                    meta={`${(message.staff as { name?: string } | null | undefined)?.name || '알 수 없음'} · ${new Date(message.created_at || 0).toLocaleDateString()}`}
+                    meta={formatMessageMeta(message)}
                     onPreview={() => onPreviewMessage(message)}
                     onReply={() => onReplyMessage(message)}
                     replyTestId={`chat-file-reply-${message.id}`}
@@ -196,32 +349,36 @@ export function MessengerDrawer({
                   />
                 );
               })}
-              {sharedFilePreviewMessages.length === 0 && (
-                <div className="py-4 text-center bg-[var(--tab-bg)] dark:bg-zinc-800/30 rounded-xl border border-[var(--border-subtle)] dark:border-zinc-800">
+              {visibleFileMessages.length === 0 ? (
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--tab-bg)] py-4 text-center dark:border-zinc-800 dark:bg-zinc-800/30">
                   <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">공유된 파일이 없습니다.</p>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
 
           <div className="space-y-3">
-            <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider px-1">링크</p>
+            <DrawerSectionHeader
+              title="링크"
+              count={sortedLinkMessages.length}
+              expanded={expandedSections.links}
+              canExpand={sortedLinkMessages.length > COLLAPSED_LIMITS.links}
+              onToggle={() => toggleSection('links')}
+            />
             <div className="space-y-2">
-              {sharedLinkPreviewMessages.map((message) => {
+              {visibleLinkMessages.map((message) => {
                 const url = extractFirstLinkUrl(message.content);
                 return (
                   <div
                     key={message.id}
                     data-testid={`chat-shared-link-${message.id}`}
-                    className="p-3 bg-[var(--tab-bg)] dark:bg-zinc-800/50 rounded-xl border border-[var(--border-subtle)] dark:border-zinc-800"
+                    className="rounded-xl border border-[var(--border-subtle)] bg-[var(--tab-bg)] p-3 dark:border-zinc-800 dark:bg-zinc-800/50"
                   >
-                    <a href={url} target="_blank" rel="noreferrer" className="block hover:opacity-90 transition-opacity">
-                      <p className="text-[11px] font-bold truncate text-emerald-600 mb-0.5">{url}</p>
-                      <p className="text-[10px] text-[var(--toss-gray-4)] truncate">
-                        {(message.staff as { name?: string } | null | undefined)?.name} · {new Date(message.created_at || 0).toLocaleDateString()}
-                      </p>
+                    <a href={url} target="_blank" rel="noreferrer" className="block transition-opacity hover:opacity-90">
+                      <p className="mb-0.5 truncate text-[11px] font-bold text-emerald-600">{url}</p>
+                      <p className="truncate text-[10px] text-[var(--toss-gray-4)]">{formatMessageMeta(message)}</p>
                     </a>
-                    <div className="mt-2 flex items-center gap-2 flex-wrap text-[10px] font-bold">
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-bold">
                       <a href={url} target="_blank" rel="noreferrer" className="text-emerald-600 hover:text-emerald-700">
                         열기
                       </a>
@@ -252,22 +409,107 @@ export function MessengerDrawer({
                   </div>
                 );
               })}
-              {sharedLinkPreviewMessages.length === 0 && (
-                <div className="py-4 text-center bg-[var(--tab-bg)] dark:bg-zinc-800/30 rounded-xl border border-[var(--border-subtle)] dark:border-zinc-800">
+              {visibleLinkMessages.length === 0 ? (
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--tab-bg)] py-4 text-center dark:border-zinc-800 dark:bg-zinc-800/30">
                   <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">공유된 링크가 없습니다.</p>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
 
           <div className="space-y-3">
-            <div className="flex justify-between items-center px-1">
-              <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">참여자 ({roomMembers.length || 0})</p>
-              {selectedRoom?.id !== NOTICE_ROOM_ID && (
-                <button data-testid="chat-open-add-member-modal" onClick={onOpenAddMemberModal} className="w-6 h-6 flex items-center justify-center bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-[var(--radius-md)] text-[var(--toss-gray-4)] hover:text-emerald-500 transition-colors">
+            <DrawerSectionHeader
+              title="북마크"
+              count={sortedBookmarkedMessages.length}
+              expanded={expandedSections.bookmarks}
+              canExpand={sortedBookmarkedMessages.length > COLLAPSED_LIMITS.bookmarks}
+              onToggle={() => toggleSection('bookmarks')}
+            />
+            <div className="space-y-2">
+              {visibleBookmarkedMessages.map((message) => {
+                const messagePreview = getMessageDisplayText(
+                  message.content,
+                  message.file_name,
+                  message.file_url,
+                  '내용 없음',
+                );
+                const linkedUrl = extractFirstLinkUrl(message.content);
+
+                return (
+                  <div
+                    key={message.id}
+                    data-testid={`chat-drawer-bookmark-${message.id}`}
+                    className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--card)] p-3 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="line-clamp-2 text-xs font-bold leading-5 text-[var(--foreground)]">{messagePreview}</p>
+                        <p className="mt-1 truncate text-[10px] font-medium text-[var(--toss-gray-4)]">
+                          {formatMessageMeta(message)}
+                        </p>
+                        {linkedUrl ? (
+                          <p className="mt-1 truncate text-[10px] font-bold text-emerald-600">{linkedUrl}</p>
+                        ) : null}
+                      </div>
+                      <span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-1 text-[9px] font-bold text-amber-700">
+                        북마크
+                      </span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] font-bold">
+                      <button
+                        type="button"
+                        data-testid={`chat-bookmark-jump-${message.id}`}
+                        onClick={() => {
+                          onClose();
+                          onScrollToMessage(message.id);
+                        }}
+                        className="rounded-full bg-[var(--accent)]/10 px-2.5 py-1 text-[var(--accent)] hover:bg-[var(--accent)]/15"
+                      >
+                        메시지로 이동
+                      </button>
+                      {message.file_url ? (
+                        <button
+                          type="button"
+                          onClick={() => onPreviewMessage(message)}
+                          className="rounded-full bg-blue-500/10 px-2.5 py-1 text-blue-600 hover:bg-blue-500/15"
+                        >
+                          미리보기
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => onReplyMessage(message)}
+                        className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-700 hover:bg-amber-100"
+                      >
+                        답글
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {visibleBookmarkedMessages.length === 0 ? (
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--tab-bg)] py-4 text-center dark:border-zinc-800 dark:bg-zinc-800/30">
+                  <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">이 방에서 북마크한 메시지가 없습니다.</p>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">
+                참여자 ({roomMembers.length || 0})
+              </p>
+              {selectedRoom?.id !== NOTICE_ROOM_ID ? (
+                <button
+                  type="button"
+                  data-testid="chat-open-add-member-modal"
+                  onClick={onOpenAddMemberModal}
+                  className="flex h-6 w-6 items-center justify-center rounded-[var(--radius-md)] bg-[var(--tab-bg)] text-[var(--toss-gray-4)] transition-colors hover:text-emerald-500 dark:bg-zinc-800"
+                >
                   +
                 </button>
-              )}
+              ) : null}
             </div>
             <div className="space-y-3">
               {roomMembers.map((member) => {
@@ -276,8 +518,9 @@ export function MessengerDrawer({
                   selectedRoom?.id === NOTICE_ROOM_ID || !selectedRoom
                     ? member
                     : resolveRoomMemberProfile(selectedRoom, memberId) || member;
+
                 return (
-                  <div data-testid={`chat-room-member-${memberId}`} key={memberId} className="flex items-center justify-between group">
+                  <div data-testid={`chat-room-member-${memberId}`} key={memberId} className="group flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <MessengerAvatar
                         name={resolvedMember?.name}
@@ -287,14 +530,23 @@ export function MessengerDrawer({
                       />
                       <div>
                         <p className="text-xs font-bold text-foreground">{resolvedMember?.name || '이름 없음'}</p>
-                        <p className="text-[10px] text-[var(--toss-gray-4)] font-medium">{[resolvedMember?.department, resolvedMember?.position].filter(Boolean).join(' · ')}</p>
+                        <p className="text-[10px] font-medium text-[var(--toss-gray-4)]">
+                          {[resolvedMember?.department, resolvedMember?.position].filter(Boolean).join(' · ')}
+                        </p>
                       </div>
                     </div>
-                    {isOwner && memberId !== ownerId && (
-                      <button data-testid={`chat-remove-member-${memberId}`} onClick={() => { void onRemoveRoomMember(memberId); }} className="touch-manipulation opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 min-h-[36px] px-2 py-1 text-red-500 text-[10px] font-bold hover:bg-red-500/10 active:bg-red-500/10 dark:hover:bg-red-900/20 rounded-md transition-all">
+                    {isOwner && memberId !== ownerId ? (
+                      <button
+                        type="button"
+                        data-testid={`chat-remove-member-${memberId}`}
+                        onClick={() => {
+                          void onRemoveRoomMember(memberId);
+                        }}
+                        className="touch-manipulation min-h-[36px] rounded-md px-2 py-1 text-[10px] font-bold text-red-500 opacity-0 transition-all hover:bg-red-500/10 active:bg-red-500/10 group-hover:opacity-100 [@media(hover:none)]:opacity-100 dark:hover:bg-red-900/20"
+                      >
                         내보내기
                       </button>
-                    )}
+                    ) : null}
                   </div>
                 );
               })}
@@ -302,7 +554,7 @@ export function MessengerDrawer({
           </div>
         </div>
 
-        <div className="p-4 bg-[var(--tab-bg)] dark:bg-zinc-800/50 border-t border-[var(--border)] flex flex-col gap-2">
+        <div className="flex flex-col gap-2 border-t border-[var(--border)] bg-[var(--tab-bg)] p-4 dark:bg-zinc-800/50">
           {editingRoomName ? (
             <div className="flex gap-2">
               <input
@@ -315,28 +567,36 @@ export function MessengerDrawer({
                   }
                   if (event.key === 'Escape') onCancelEditingRoomName();
                 }}
-                placeholder="새 채팅방 이름"
-                className="flex-1 px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] text-sm font-bold outline-none focus:border-[var(--accent)]"
+                placeholder="채팅방 이름"
+                className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-bold outline-none focus:border-[var(--accent)]"
               />
-              <button onClick={() => void onSaveRoomName()} className="px-3 py-2 bg-[var(--accent)] text-white rounded-xl text-xs font-bold">
+              <button type="button" onClick={() => void onSaveRoomName()} className="rounded-xl bg-[var(--accent)] px-3 py-2 text-xs font-bold text-white">
                 저장
               </button>
-              <button onClick={onCancelEditingRoomName} className="px-3 py-2 bg-[var(--muted)] rounded-xl text-xs font-bold">
+              <button type="button" onClick={onCancelEditingRoomName} className="rounded-xl bg-[var(--muted)] px-3 py-2 text-xs font-bold">
                 취소
               </button>
             </div>
           ) : (
             <div className="flex gap-2">
-              {canLeaveRoom && (
-                <button onClick={onLeaveRoom} className="flex-1 py-2.5 bg-red-500/10 dark:bg-red-900/20 text-red-600 rounded-xl text-[11px] font-bold hover:bg-red-500/20 transition-colors">
+              {canLeaveRoom ? (
+                <button
+                  type="button"
+                  onClick={onLeaveRoom}
+                  className="flex-1 rounded-xl bg-red-500/10 py-2.5 text-[11px] font-bold text-red-600 transition-colors hover:bg-red-500/20 dark:bg-red-900/20"
+                >
                   방 나가기
                 </button>
-              )}
-              {canEditRoomName && (
-                <button onClick={onStartEditingRoomName} className="flex-1 py-2.5 bg-[var(--muted)] text-foreground rounded-xl text-[11px] font-bold hover:bg-[var(--toss-gray-2)] transition-colors">
+              ) : null}
+              {canEditRoomName ? (
+                <button
+                  type="button"
+                  onClick={onStartEditingRoomName}
+                  className="flex-1 rounded-xl bg-[var(--muted)] py-2.5 text-[11px] font-bold text-foreground transition-colors hover:bg-[var(--toss-gray-2)]"
+                >
                   이름 수정
                 </button>
-              )}
+              ) : null}
             </div>
           )}
         </div>

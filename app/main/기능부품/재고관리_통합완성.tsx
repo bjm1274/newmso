@@ -44,6 +44,7 @@ const INVENTORY_VIEWS = ['UDI', '발주', '스캔', '등록', '현황', '이력'
 const LEGACY_VIEWS = ['명세서', '유통기한'] as const;
 const VALID_VIEWS = [...INVENTORY_VIEWS, ...LEGACY_VIEWS];
 const EXPIRY_SOON_MS = 30 * 24 * 60 * 60 * 1000;
+const INVENTORY_PRIMARY_CATEGORY_ORDER = ['의료기기', '소모품', '약품', '사무용품', '기타'] as const;
 type InventoryStatusFilter = '전체' | '재고부족' | '유통기한임박' | '정상';
 type SupplierWorkspaceTab = 'suppliers' | 'documents';
 type LinkedSupplyOrderTarget = {
@@ -81,6 +82,21 @@ type ApprovalRecord = {
   created_at?: string | null;
   [key: string]: unknown;
 };
+
+function normalizeInventoryCategoryLabel(value?: string | null) {
+  const raw = String(value || '').trim();
+  if (!raw) return '미분류';
+
+  const compact = raw.replace(/\s+/g, '').toLowerCase();
+
+  if (compact.includes('의료기기')) return '의료기기';
+  if (compact.includes('소모')) return '소모품';
+  if (compact.includes('의약') || compact.includes('약품')) return '약품';
+  if (compact.includes('사무')) return '사무용품';
+  if (compact.includes('기타')) return '기타';
+
+  return raw;
+}
 
 function resolveInventoryView(view?: string | null): {
   view: string;
@@ -199,6 +215,7 @@ export default function IntegratedInventoryManagement({
   );
   const [viewCompany, setViewCompany] = useState<string>('전체'); // 현황 탭용 회사 선택
   const [selectedDept, setSelectedDept] = useState('전체');
+  const [selectedCategory, setSelectedCategory] = useState('전체');
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const inventoryLoadedRef = useRef(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -297,6 +314,16 @@ export default function IntegratedInventoryManagement({
     if (!viewCompany || viewCompany === '전체') return [];
     return getDepartmentsForCompany(viewCompany);
   }, [viewCompany, getDepartmentsForCompany]);
+  const categoryOptions = useMemo(() => {
+    const rawCategories = Array.from(
+      new Set(inventory.map((item) => normalizeInventoryCategoryLabel(item.category)).filter(Boolean))
+    );
+    const prioritized = INVENTORY_PRIMARY_CATEGORY_ORDER.filter((category) => rawCategories.includes(category));
+    const remaining = rawCategories
+      .filter((category) => !INVENTORY_PRIMARY_CATEGORY_ORDER.includes(category as typeof INVENTORY_PRIMARY_CATEGORY_ORDER[number]))
+      .sort((a, b) => a.localeCompare(b, 'ko'));
+    return ['전체', ...prioritized, ...remaining];
+  }, [inventory]);
   const departmentsByStockCompany = useMemo(() => {
     if (!stockModal?.targetCompany || stockModal.targetCompany === '전체') return [];
     return getDepartmentsForCompany(stockModal.targetCompany);
@@ -322,8 +349,11 @@ export default function IntegratedInventoryManagement({
     if (selectedDept && selectedDept !== '전체') {
       list = list.filter((i) => ((i as Record<string, unknown>).department as string || '').trim() === selectedDept);
     }
+    if (selectedCategory && selectedCategory !== '전체') {
+      list = list.filter((i) => normalizeInventoryCategoryLabel(i.category) === selectedCategory);
+    }
     return list;
-  }, [inventory, searchKeyword, selectedDept, activeView, viewCompany]);
+  }, [inventory, searchKeyword, selectedDept, selectedCategory, activeView, viewCompany]);
 
   const filteredInventory = useMemo(() => {
     if (statusFilter === '전체') return baseFilteredInventory;
@@ -718,6 +748,13 @@ export default function IntegratedInventoryManagement({
   useEffect(() => {
     setSelectedDept('전체');
   }, [viewCompany]);
+
+  useEffect(() => {
+    if (selectedCategory === '전체') return;
+    if (!categoryOptions.includes(selectedCategory)) {
+      setSelectedCategory('전체');
+    }
+  }, [categoryOptions, selectedCategory]);
 
   const refreshCurrentInventory = useCallback(() => {
     if (activeView === '현황') {
@@ -1274,26 +1311,47 @@ export default function IntegratedInventoryManagement({
                         className="flex-1 min-w-[160px] max-w-md px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] outline-none"
                       />
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {(['전체', '재고부족', '유통기한임박', '정상'] as const).map((filter) => (
-                        <button
-                          key={filter}
-                          type="button"
-                          onClick={() => setStatusFilter(filter)}
-                          className={`rounded-[var(--radius-md)] px-3 py-2 text-[11px] font-bold transition-all ${
-                            statusFilter === filter
-                              ? 'bg-[var(--foreground)] text-white shadow-sm'
-                              : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
-                          }`}
-                        >
-                          {filter === '유통기한임박' ? '유통기한 임박' : filter}
-                        </button>
-                      ))}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">상태</span>
+                        {(['전체', '재고부족', '유통기한임박', '정상'] as const).map((filter) => (
+                          <button
+                            key={filter}
+                            type="button"
+                            onClick={() => setStatusFilter(filter)}
+                            className={`rounded-[var(--radius-md)] px-3 py-2 text-[11px] font-bold transition-all ${
+                              statusFilter === filter
+                                ? 'bg-[var(--foreground)] text-white shadow-sm'
+                                : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
+                            }`}
+                          >
+                            {filter === '유통기한임박' ? '유통기한 임박' : filter}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">분류</span>
+                        {categoryOptions.map((category) => (
+                          <button
+                            key={category}
+                            type="button"
+                            onClick={() => setSelectedCategory(category)}
+                            className={`rounded-[var(--radius-md)] px-3 py-2 text-[11px] font-bold transition-all ${
+                              selectedCategory === category
+                                ? 'bg-emerald-500 text-white shadow-sm'
+                                : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-emerald-50 hover:text-emerald-700'
+                            }`}
+                          >
+                            {category}
+                          </button>
+                        ))}
+                      </div>
                       <button
                         type="button"
                         onClick={() => {
                           setViewCompany('전체');
                           setSelectedDept('전체');
+                          setSelectedCategory('전체');
                           setSearchKeyword('');
                           setStatusFilter('전체');
                           setShowExpiryCenter(false);
@@ -1321,6 +1379,9 @@ export default function IntegratedInventoryManagement({
                     </span>
                     <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
                       상태 {statusFilter === '유통기한임박' ? '유통기한 임박' : statusFilter}
+                    </span>
+                    <span className="rounded-[var(--radius-md)] bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700">
+                      분류 {selectedCategory === '전체' ? '전체' : selectedCategory}
                     </span>
                     {searchKeyword.trim() && (
                       <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-bold text-[var(--foreground)]">

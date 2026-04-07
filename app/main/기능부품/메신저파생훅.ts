@@ -33,8 +33,7 @@ export function useChatDerivedPreviewState({
   const sharedMediaPreviewMessages = useMemo(
     () =>
       mediaMessages
-        .filter((message) => resolveAttachmentKind(message.file_url, message.file_kind) !== 'file')
-        .slice(-6),
+        .filter((message) => resolveAttachmentKind(message.file_url, message.file_kind) !== 'file'),
     [mediaMessages]
   );
 
@@ -46,13 +45,12 @@ export function useChatDerivedPreviewState({
           if (!fileUrl) return false;
           if (message.file_kind === 'file') return true;
           return resolveAttachmentKind(fileUrl, message.file_kind) === 'file';
-        })
-        .slice(-6),
+        }),
     [mediaMessages]
   );
 
   const sharedLinkPreviewMessages = useMemo(
-    () => messages.filter((message) => message.content && message.content.includes('http')).slice(-3),
+    () => messages.filter((message) => message.content && message.content.includes('http')),
     [messages]
   );
 
