@@ -7,6 +7,10 @@ import {
   resolveWeeklyWorkingHours,
   resolveWorkingDaysPerWeek,
 } from '@/lib/payroll-working-hours';
+import {
+  hasInlineContractReceiptSection,
+  upgradeLegacyContractTemplate,
+} from '@/lib/contract-template-defaults';
 
 type Props = {
   staff?: any;
@@ -69,7 +73,7 @@ export default function ContractPreview({ staff, contract }: Props) {
           templateText = fallback?.template_content || '';
         }
 
-        setText(fillContractTemplate(templateText, staff, contract, shiftData, companyInfo));
+        setText(fillContractTemplate(upgradeLegacyContractTemplate(templateText), staff, contract, shiftData, companyInfo));
       } catch (e) {
         console.warn('ContractPreview load error', e);
         setText('');
@@ -469,6 +473,7 @@ export default function ContractPreview({ staff, contract }: Props) {
 
   const sig = contract?.status === '서명완료' ? (contract?.signature_data as string | undefined) : undefined;
   const sections = parseContractSections(text);
+  const hasInlineClosingSection = hasInlineContractReceiptSection(text);
 
   const companyName = (company?.name as string) || staff.company || '';
   const isHospital = companyName.match(/병원|의원|정형외과|내과|소아과|치과/);
@@ -599,29 +604,33 @@ export default function ContractPreview({ staff, contract }: Props) {
                 )}
               </div>
 
-              {/* ── 동의 문구 ── */}
-              <div className="mt-7 mb-4">
-                <div className="border border-slate-200 rounded-lg px-5 py-3 bg-slate-50 text-center">
-                  <p className="text-[12px] font-bold text-slate-700 leading-relaxed">
-                    하기 위의 부분을 합의합니다.
-                  </p>
-                  <div className="flex items-center justify-center gap-3 mt-2">
-                    <span className="text-[11.5px] text-slate-600">근로자</span>
-                    <div className="border-b-2 border-slate-400 w-32" />
-                    <span className="text-[11px] text-slate-500">(서명)</span>
+              {!hasInlineClosingSection && (
+                <>
+                  {/* ── 동의 문구 ── */}
+                  <div className="mt-7 mb-4">
+                    <div className="border border-slate-200 rounded-lg px-5 py-3 bg-slate-50 text-center">
+                      <p className="text-[12px] font-bold text-slate-700 leading-relaxed">
+                        하기 위의 부분을 합의합니다.
+                      </p>
+                      <div className="flex items-center justify-center gap-3 mt-2">
+                        <span className="text-[11.5px] text-slate-600">근로자</span>
+                        <div className="border-b-2 border-slate-400 w-32" />
+                        <span className="text-[11px] text-slate-500">(서명)</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              {/* ── 날짜 ── */}
-              <div className="text-center mb-5">
-                <p className="text-[13px] font-bold tracking-[0.35em] text-slate-700">
-                  {contract?.requested_at
-                    ? `${new Date(contract.requested_at as string).getFullYear()}년 ${String(new Date(contract.requested_at as string).getMonth() + 1).padStart(2, '0')}월 ${String(new Date(contract.requested_at as string).getDate()).padStart(2, '0')}일`
-                    : `${new Date().getFullYear()}년        월        일`
-                  }
-                </p>
-              </div>
+                  {/* ── 날짜 ── */}
+                  <div className="text-center mb-5">
+                    <p className="text-[13px] font-bold tracking-[0.35em] text-slate-700">
+                      {contract?.requested_at
+                        ? `${new Date(contract.requested_at as string).getFullYear()}년 ${String(new Date(contract.requested_at as string).getMonth() + 1).padStart(2, '0')}월 ${String(new Date(contract.requested_at as string).getDate()).padStart(2, '0')}일`
+                        : `${new Date().getFullYear()}년        월        일`
+                      }
+                    </p>
+                  </div>
+                </>
+              )}
 
               {/* ── 최종 서명란 ── */}
               <div className="grid grid-cols-2 gap-5 mt-2">
