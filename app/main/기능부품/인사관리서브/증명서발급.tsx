@@ -1,4 +1,5 @@
 'use client';
+import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -256,7 +257,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
               >
                 <div className="aspect-[3/4] overflow-hidden bg-[#eef2f6]" style={{ backgroundColor: profilePhotoUrl ? undefined : surface }}>
                 {profilePhotoUrl ? (
-                  <img src={profilePhotoUrl} alt={(selectedStaff?.name as string) || '직원 사진'} className="h-full w-full object-cover" />
+              <ProfilePhotoThumbnail src={profilePhotoUrl} name={selectedStaff?.name as string} className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-4xl font-black text-[var(--toss-gray-3)]">
                     {String(selectedStaff?.name || '?').slice(0, 1)}
@@ -529,7 +530,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
                 >
                   <div className="aspect-[3/4] overflow-hidden rounded-[var(--radius-xl)]" style={{ backgroundColor: surface }}>
                     {profilePhotoUrl ? (
-                      <img src={profilePhotoUrl} alt={(selectedStaff?.name as string) || '직원 사진'} className="h-full w-full object-cover" />
+                <ProfilePhotoThumbnail src={profilePhotoUrl} name={selectedStaff?.name as string} className="h-full w-full object-cover" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-4xl font-black text-[var(--toss-gray-3)]">
                         {String(selectedStaff?.name || '?').slice(0, 1)}

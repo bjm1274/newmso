@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { supabase } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
@@ -441,7 +442,7 @@ function Avatar({ staff, size = 'md', isWorking = false }: { staff: StaffMember;
         className={`${sizeClass} ${photoUrl ? 'overflow-hidden bg-[var(--tab-bg)]' : color} flex items-center justify-center rounded-full font-bold`}
       >
         {photoUrl ? (
-          <img
+          <ProfilePhotoThumbnail
             src={photoUrl}
             alt={`${name} 프로필 사진`}
             className="h-full w-full object-cover"

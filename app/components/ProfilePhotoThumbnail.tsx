@@ -93,10 +93,9 @@ export default function ProfilePhotoThumbnail({
 
   return (
     <>
-      <button
-        type="button"
+      <div
         data-testid={dataTestId}
-        className={`${className} cursor-zoom-in transition-transform hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)]`.trim()}
+        className={`${className} cursor-zoom-in transition-transform hover:scale-[1.02]`.trim()}
         onClick={(event) => {
           event.stopPropagation();
           setIsPreviewOpen(true);
@@ -105,7 +104,7 @@ export default function ProfilePhotoThumbnail({
         title="사진 크게 보기"
       >
         {imageNode}
-      </button>
+      </div>
 
       {isPreviewOpen ? (
         <div
