@@ -124,7 +124,9 @@ test('chat detailed walkthrough opens each internal menu in practical order', as
 
   await expect(page.getByTestId('chat-view')).toBeVisible();
   await expect(page.getByTestId('chat-room-room-group')).toBeVisible();
-  await expect(page.getByTestId('chat-room-icon-room-group')).toHaveCount(0);
+  await expect(page.getByTestId('chat-room-icon-room-group')).toBeVisible();
+  await expect(page.getByTestId('chat-room-icon-room-group').locator('img')).toHaveCount(0);
+  await expect(page.getByTestId('chat-room-header-avatar').locator('img')).toHaveCount(0);
   await expect(page.getByTestId('chat-room-summary-room-group')).toContainText('…');
 
   await page.getByTestId('chat-open-global-search').click();

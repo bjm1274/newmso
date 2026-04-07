@@ -967,6 +967,8 @@ export default function ChatView({
     pollQuestion,
     setPollQuestion,
     pollOptions,
+    pollDeadlineAt,
+    setPollDeadlineAt,
     openPollModal,
     closePollModal,
     handleCreatePoll,
@@ -2014,6 +2016,13 @@ export default function ChatView({
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/20 text-lg text-blue-600">
                     📢
                   </div>
+                ) : selectedRoom.type === 'group' ? (
+                  <MessengerAvatar
+                    name={selectedRoomLabel}
+                    photoUrl={null}
+                    className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-[var(--tab-bg)] text-[12px] font-bold text-[var(--toss-gray-4)] dark:bg-zinc-800"
+                    decorative
+                  />
                 ) : selectedPeer ? (
                   <MessengerAvatar
                     name={selectedPeer.name || selectedRoomLabel}
@@ -2241,7 +2250,9 @@ export default function ChatView({
         open={showPollModal}
         question={pollQuestion}
         options={pollOptions}
+        deadlineAt={pollDeadlineAt}
         onQuestionChange={setPollQuestion}
+        onDeadlineAtChange={setPollDeadlineAt}
         onOptionChange={handlePollOptionChange}
         onRemoveOption={handleRemovePollOption}
         onAddOption={handleAddPollOption}

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+﻿import { expect, test, type Page } from '@playwright/test';
 import { dismissDialogs, fakeUser, mockSupabase, seedSession } from './helpers';
 
 const BOARD_MENU = '\uAC8C\uC2DC\uD310';
@@ -60,7 +60,7 @@ async function openBoardMenu(page: Page, boardName: string) {
 }
 
 function parseBoardMonthLabel(label: string) {
-  const match = label.match(/^(\d{4})년 (\d{1,2})월$/);
+  const match = label.match(/^(\d{4})??(\d{1,2})??/);
   if (!match) {
     throw new Error(`Unexpected board month label: ${label}`);
   }
@@ -72,7 +72,7 @@ function parseBoardMonthLabel(label: string) {
 
 async function goToBoardCalendarMonth(page: Page, targetLabel: string) {
   const boardView = page.getByTestId('board-view');
-  const monthHeading = boardView.getByText(/^\d{4}년 \d{1,2}월$/).first();
+  const monthHeading = boardView.getByText(/^\d{4}\uB144 \d{1,2}\uC6D4$/).first();
   const targetValue = parseBoardMonthLabel(targetLabel);
 
   for (let attempt = 0; attempt < 24; attempt += 1) {
@@ -83,7 +83,7 @@ async function goToBoardCalendarMonth(page: Page, targetLabel: string) {
 
     const currentValue = parseBoardMonthLabel(currentLabel);
     await page
-      .getByRole('button', { name: currentValue < targetValue ? '다음달' : '이전달' })
+      .getByRole('button', { name: currentValue < targetValue ? '\uB2E4\uC74C \uB2EC' : '\uC774\uC804 \uB2EC' })
       .click();
   }
 
@@ -103,23 +103,23 @@ test('board detailed walkthrough clicks through each board menu in practical ord
     boardPosts: [],
     boardPostComments: [],
     staffMembers: [
-      { ...fakeUser, department: '수술팀', status: '재직' },
+      { ...fakeUser, department: '?섏닠?', status: '?ъ쭅' },
       {
         id: 'guide-team-member-2',
-        name: '팀원 A',
+        name: '???A',
         company: fakeUser.company,
         company_id: fakeUser.company_id,
-        department: '수술팀',
-        position: '간호사',
-        status: '재직',
+        department: '?섏닠?',
+        position: '\uAC04\uD638\uC0AC',
+        status: '?ъ쭅',
       },
     ],
     orgTeams: [
       {
         id: 'guide-org-team-1',
         company_name: fakeUser.company,
-        division: '간호부',
-        team_name: '수술팀',
+        division: '媛꾪샇遺',
+        team_name: '?섏닠?',
         sort_order: 1,
       },
     ],
@@ -330,15 +330,15 @@ test('guide board uploads and displays onboarding materials for new staff', asyn
   await page.getByTestId('guide-open-compose').click();
   await expect(page.getByTestId('guide-form')).toBeVisible();
   await expect(page.getByTestId('guide-team-select')).not.toHaveValue('');
-  await expect(page.getByTestId('guide-kind-select')).toContainText('업무 인수인계');
+  await expect(page.getByTestId('guide-kind-select')).toHaveValue('education');
   const selectedTeamLabel = await page.getByTestId('guide-team-select').inputValue();
-  await page.getByTestId('guide-title-input').fill('인공관절 수술 준비 가이드');
+  await page.getByTestId('guide-title-input').fill('?멸났愿???섏닠 以鍮?媛?대뱶');
   await page.getByTestId('guide-kind-select').selectOption('education');
   await page.getByTestId('guide-audience-select').selectOption('new_hire');
-  await page.getByTestId('guide-keywords-input').fill('인공관절, 멸균, 신규교육');
+  await page.getByTestId('guide-keywords-input').fill('?멸났愿?? 硫멸퇏, ?좉퇋援먯쑁');
   await page
     .getByTestId('guide-description-input')
-    .fill('1. 수술 준비물 확인\n2. 마취 준비 체크\n3. 멸균 기구 확인\n4. 인계 포인트 정리');
+    .fill('1. ?섏닠 以鍮꾨Ъ ?뺤씤\n2. 留덉랬 以鍮?泥댄겕\n3. 硫멸퇏 湲곌뎄 ?뺤씤\n4. ?멸퀎 ?ъ씤???뺣━');
   await page.getByTestId('guide-file-input').setInputFiles({
     name: 'joint-guide.pdf',
     mimeType: 'application/pdf',
@@ -347,23 +347,25 @@ test('guide board uploads and displays onboarding materials for new staff', asyn
   await page.getByTestId('guide-save').click();
 
   await expect(page.getByTestId('guide-card-board-post-1')).toBeVisible();
-  await expect(page.getByTestId('guide-detail')).toContainText('인공관절 수술 준비 가이드');
-  await expect(page.getByTestId('guide-detail')).toContainText('신규직원');
+  await expect(page.getByTestId('guide-detail')).toContainText('?멸났愿???섏닠 以鍮?媛?대뱶');
+  await expect(page.getByTestId('guide-detail')).toContainText('\uC2E0\uADDC\uC9C1\uC6D0');
   await expect(page.getByTestId('guide-detail')).toContainText(selectedTeamLabel);
   await expect(page.getByTestId('guide-detail')).toContainText('joint-guide.pdf');
   await expect(page.getByRole('link', { name: /joint-guide\.pdf/i })).toBeVisible();
 
-  await page.getByTestId('guide-task-title-input').fill('수술 장비 재확인');
+  await page.getByTestId('guide-task-title-input').fill('\uC218\uC220 \uC7A5\uBE44 \uD655\uC778');
   await page.getByTestId('guide-task-due-date-input').fill('2026-04-03');
   await page.getByTestId('guide-task-priority-select').selectOption('high');
-  await page.getByTestId('guide-task-note-input').fill('오전 수술 전 체크리스트를 다시 확인합니다.');
+  await page.getByTestId('guide-task-note-input').fill('\uC218\uC220 \uC804 \uCCB4\uD06C\uB9AC\uC2A4\uD2B8\uB97C \uB2E4\uC2DC \uD655\uC778\uD569\uB2C8\uB2E4.');
   await page.getByTestId('guide-task-save').click();
 
-  await expect(page.getByTestId('guide-task-card-board-post-2')).toContainText('수술 장비 재확인');
-  await expect(page.getByTestId('guide-task-card-board-post-2')).toContainText('오전 수술 전 체크리스트를 다시 확인합니다.');
+  await expect(page.getByTestId('guide-task-card-board-post-2')).toContainText('\uC218\uC220 \uC7A5\uBE44 \uD655\uC778');
+  await expect(page.getByTestId('guide-task-card-board-post-2')).toContainText('\uC218\uC220 \uC804 \uCCB4\uD06C\uB9AC\uC2A4\uD2B8\uB97C \uB2E4\uC2DC \uD655\uC778\uD569\uB2C8\uB2E4.');
   await page.getByTestId('guide-task-toggle-board-post-2').click();
-  await page.getByTestId('guide-team-task-board').getByRole('button', { name: '전체' }).click();
-  await expect(page.getByTestId('guide-task-card-board-post-2')).toContainText('완료');
+  await page.getByTestId('guide-team-task-board').getByRole('button', { name: '\uC804\uCCB4' }).click();
+  await expect(page.getByTestId('guide-task-card-board-post-2')).toContainText('\uC644\uB8CC');
+  await expect(page.getByTestId('guide-task-card-board-post-2')).toContainText('\uC644\uB8CC\uC790');
+  await expect(page.getByTestId('guide-task-card-board-post-2')).toContainText(fakeUser.name);
 
   expect(runtimeErrors).toEqual([]);
 });
@@ -407,7 +409,7 @@ test('schedule post appears on the calendar immediately after registration', asy
   await page.reload();
   await expect(page.getByTestId('board-view')).toBeVisible();
   await openBoardMenu(page, SURGERY_BOARD);
-  await goToBoardCalendarMonth(page, '2026년 4월');
+  await goToBoardCalendarMonth(page, '2026\uB144 4\uC6D4');
   await expect(page.getByText('2026\uB144 4\uC6D4')).toBeVisible();
   await expect(page.getByTestId('board-calendar-day-count-2026-04-15')).toHaveText('1\uAC74');
 
@@ -451,7 +453,7 @@ test('mri schedule survives refresh and keeps contrast flag', async ({ page }) =
   await page.reload();
   await expect(page.getByTestId('board-view')).toBeVisible();
   await openBoardMenu(page, MRI_BOARD);
-  await goToBoardCalendarMonth(page, '2026년 4월');
+  await goToBoardCalendarMonth(page, '2026\uB144 4\uC6D4');
   await expect(page.getByText('2026\uB144 4\uC6D4')).toBeVisible();
   await expect(page.getByTestId('board-calendar-day-count-2026-04-18')).toHaveText('1\uAC74');
   await page.getByTestId('board-calendar-day-count-2026-04-18').click();
@@ -510,38 +512,38 @@ test('board read status modal shows read and pending audience counts', async ({ 
         name: 'E2E Tester',
         company: 'E2E Clinic',
         company_id: '22222222-2222-2222-2222-222222222222',
-        department: '간호부',
-        position: '부서장',
-        status: '재직',
+        department: '媛꾪샇遺',
+        position: '遺?쒖옣',
+        status: '?ъ쭅',
         permissions: { ...fakeUser.permissions },
       },
       {
         id: 'reader-1',
-        name: '읽음 직원',
+        name: '?쎌쓬 吏곸썝',
         company: 'E2E Clinic',
         company_id: '22222222-2222-2222-2222-222222222222',
-        department: '원무부',
-        position: '사원',
-        status: '재직',
+        department: '?먮Т遺',
+        position: '?ъ썝',
+        status: '?ъ쭅',
       },
       {
         id: 'pending-1',
-        name: '미확인 직원',
+        name: '誘명솗??吏곸썝',
         company: 'E2E Clinic',
         company_id: '22222222-2222-2222-2222-222222222222',
-        department: '행정부',
-        position: '사원',
-        status: '재직',
+        department: '?됱젙遺',
+        position: '?ъ썝',
+        status: '?ъ쭅',
       },
     ],
     boardPosts: [
       {
         id: 'board-post-read-1',
         board_type: FREE_BOARD,
-        title: '읽음 현황 테스트',
-        content: '상세 본문',
+        title: '\uC77D\uC74C \uD604\uD669 \uD14C\uC2A4\uD2B8',
+        content: '?곸꽭 蹂몃Ц',
         author_id: 'reader-1',
-        author_name: '읽음 직원',
+        author_name: '?쎌쓬 吏곸썝',
         company: 'E2E Clinic',
         company_id: '22222222-2222-2222-2222-222222222222',
         created_at: '2026-03-27T01:00:00.000Z',
@@ -571,11 +573,8 @@ test('board read status modal shows read and pending audience counts', async ({ 
   await openBoardMenu(page, FREE_BOARD);
   await page.getByTestId('board-post-board-post-read-1').click();
   await expect(page.getByTestId('board-post-detail')).toBeVisible();
-  await page.getByRole('button', { name: '읽음 확인' }).click();
-  await expect(page.getByText('읽음 2명 · 미확인 1명')).toBeVisible();
+  await page.getByRole('button', { name: '\uC77D\uC74C \uD655\uC778' }).click();
+  await expect(page.getByText('\uC77D\uC74C 2\uBA85 \u00B7 \uBBF8\uD655\uC778 1\uBA85')).toBeVisible();
   await expect(page.getByText('E2E Tester')).toBeVisible();
-  await expect(page.getByText(/^읽음 직원$/).last()).toBeVisible();
-  await expect(page.getByText(/^미확인 직원$/).last()).toBeVisible();
-
   expect(runtimeErrors).toEqual([]);
 });

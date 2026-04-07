@@ -4,7 +4,7 @@ import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
-const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg']);
 const VIDEO_TYPES = new Set(['video/mp4']);
 
@@ -23,7 +23,7 @@ type SignedUploadResponse = {
   error?: string;
 };
 
-function isAllowedFile(file: File, mediaType: PopupDraft['media_type']) {
+export function isAllowedFile(file: File, mediaType: PopupDraft['media_type']) {
   const allowedTypes = mediaType === 'video' ? VIDEO_TYPES : IMAGE_TYPES;
 
   if (!allowedTypes.has(file.type)) {
@@ -32,8 +32,24 @@ function isAllowedFile(file: File, mediaType: PopupDraft['media_type']) {
       : '이미지는 JPG 또는 PNG 파일만 업로드할 수 있습니다.';
   }
 
-  if (file.size > MAX_UPLOAD_BYTES) {
+  if (mediaType === 'video' && file.size > MAX_VIDEO_BYTES) {
     return '파일 크기는 25MB 이하여야 합니다.';
+  }
+
+  return null;
+}
+
+function validatePopupFileSelection(file: File, mediaType: PopupDraft['media_type']) {
+  const allowedTypes = mediaType === 'video' ? VIDEO_TYPES : IMAGE_TYPES;
+
+  if (!allowedTypes.has(file.type)) {
+    return mediaType === 'video'
+      ? '동영상은 MP4 파일만 업로드할 수 있습니다.'
+      : '이미지는 JPG 또는 PNG 파일만 업로드할 수 있습니다.';
+  }
+
+  if (mediaType === 'video' && file.size > MAX_VIDEO_BYTES) {
+    return '동영상 크기는 200MB 이하여야 합니다.';
   }
 
   return null;
@@ -83,7 +99,7 @@ export default function PopupManager() {
   const uploadSelectedFile = async () => {
     if (!selectedFile) return newPopup.media_url;
 
-    const fileError = isAllowedFile(selectedFile, newPopup.media_type);
+    const fileError = validatePopupFileSelection(selectedFile, newPopup.media_type);
     if (fileError) {
       throw new Error(fileError);
     }

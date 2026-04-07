@@ -219,7 +219,19 @@ export function MessengerSidebar({
                         >
                           📢
                         </div>
-                      ) : isGroupRoom ? null : peerName ? (
+                      ) : isGroupRoom ? (
+                        <div
+                          data-testid={`chat-room-icon-${roomId}`}
+                          className="relative flex h-8 w-8 shrink-0 items-center justify-center"
+                        >
+                          <MessengerAvatar
+                            name={label}
+                            photoUrl={null}
+                            className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-[var(--tab-bg)] text-[11px] font-bold text-[var(--toss-gray-4)] dark:bg-zinc-800"
+                            decorative
+                          />
+                        </div>
+                      ) : peerName ? (
                         <div
                           data-testid={`chat-room-icon-${roomId}`}
                           className="relative flex h-8 w-8 shrink-0 items-center justify-center"
