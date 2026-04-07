@@ -534,8 +534,8 @@ export function MessengerTimeline({
               const dateLabel = formatTimelineDateLabel(msg.created_at);
               const showDateDivider = dateLabel !== lastDateLabel;
               if (showDateDivider) lastDateLabel = dateLabel;
-              const isSystemInvite = typeof msg.content === 'string' && msg.content.startsWith('[珥덈?]');
-              const systemText = isSystemInvite ? String(msg.content || '').replace(/^\[珥덈?\]\s*/, '') : '';
+              const isSystemInvite = typeof msg.content === 'string' && msg.content.startsWith('[초대]');
+              const systemText = isSystemInvite ? String(msg.content || '').replace(/^\[초대\]\s*/, '') : '';
               const isContinuous = !showDateDivider && !isSystemInvite && String(msg.sender_id) === lastSenderId;
               const senderProfile =
                 !isMine
@@ -544,7 +544,7 @@ export function MessengerTimeline({
                       (msg.staff as { name?: string } | null | undefined)?.name || null
                     ) || (msg.staff as StaffMember | null | undefined) || null
                   : null;
-              const senderName = senderProfile?.name || (msg.staff as { name?: string } | null | undefined)?.name || '?대쫫 ?놁쓬';
+              const senderName = senderProfile?.name || (msg.staff as { name?: string } | null | undefined)?.name || '이름 없음';
               const senderPhotoUrl = senderProfile ? getProfilePhotoUrl(senderProfile as StaffMember) : null;
               const wardMessageMeta = !isDeletedMessage ? extractWardMessageMeta(msg.content) : { displayContent: '', meta: null };
               const showWardQuickReplies =
@@ -573,7 +573,7 @@ export function MessengerTimeline({
                   {isSystemInvite ? (
                     <div className="flex justify-center my-1">
                       <span className="px-2.5 py-0.5 rounded-full bg-[var(--toss-blue-light)] text-[10px] font-semibold text-[var(--accent)]">
-                        珥덈? {systemText}
+                        초대 {systemText}
                       </span>
                     </div>
                   ) : (
@@ -638,7 +638,7 @@ export function MessengerTimeline({
                               if (isDeletedMessage) return;
                               if (event.key === 'Enter') onMarkMessageRead(msg);
                             }}
-                            aria-label={`${msg.staff?.name || '?대쫫 ?놁쓬'} ${isDeletedMessage ? '??젣??硫붿떆吏' : '硫붿떆吏'}`}
+                            aria-label={`${msg.staff?.name || '이름 없음'} ${isDeletedMessage ? '삭제된 메시지' : '메시지'}`}
                           >
                             {!isDeletedMessage && msg.reply_to_id && (() => {
                               const parent = messages.find((message) => message.id === msg.reply_to_id);
@@ -656,13 +656,13 @@ export function MessengerTimeline({
                                     onScrollToMessage(msg.reply_to_id!);
                                   }}
                                 >
-                                  <span className="font-bold opacity-80">?듦? {(parent.staff as { name?: string } | null | undefined)?.name}: </span>
+                                  <span className="font-bold opacity-80">답글 {(parent.staff as { name?: string } | null | undefined)?.name}: </span>
                                   <span className="truncate block mt-0.5">
                                     {getMessageDisplayText(
                                       parent.content,
                                       parent.file_name,
                                       parent.file_url,
-                                      '泥⑤? ?뚯씪'
+                                      '첨부 파일'
                                     )}
                                   </span>
                                 </div>
@@ -703,7 +703,7 @@ export function MessengerTimeline({
                                           onOpenReactionDetail(msg, emoji);
                                         }}
                                         className={`px-1.5 py-0.5 rounded text-[11px] transition-colors ${isMine ? 'bg-[var(--card)]/20 hover:bg-[var(--card)]/30' : 'bg-[var(--muted)] hover:bg-[var(--toss-blue-light)]'}`}
-                                        aria-label={`${emoji} 諛섏쓳 ?꾨Ⅸ ?щ엺 ${count}紐?蹂닿린`}
+                                        aria-label={`${emoji} 반응 누른 사람 ${count}명 보기`}
                                       >
                                         {emoji} {count}
                                       </button>
@@ -750,7 +750,7 @@ export function MessengerTimeline({
                               onClick={(event) => event.stopPropagation()}
                             >
                               <p className="px-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                                鍮좊Ⅸ ?묐떟
+                                빠른 응답
                               </p>
                               <div className="flex flex-wrap gap-1.5">
                                 {WARD_QUICK_REPLY_OPTIONS.map((option: (typeof WARD_QUICK_REPLY_OPTIONS)[number]) => (
@@ -791,9 +791,9 @@ export function MessengerTimeline({
                                 onRetryFailedMessage(String(msg.id));
                               }}
                               className="px-2.5 py-1 rounded-[var(--radius-md)] text-[10px] font-bold bg-red-500/10 text-red-500 hover:bg-red-500/20"
-                              aria-label="삭제"
+                              aria-label="재전송"
                             >
-                              삭제
+                              재전송
                             </button>
                           )}
                         </div>
@@ -812,14 +812,14 @@ export function MessengerTimeline({
                           onClick={() => { onStartReplyToMessage(msg); }}
                           className="touch-manipulation min-h-[32px] p-1 px-2 rounded-lg hover:bg-[var(--tab-bg)] active:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-blue-500 transition-colors"
                         >
-                          ?듭옣
+                          답글
                         </button>
                         <button
                           type="button"
                           onClick={() => { onOpenMessageActions(msg); }}
                           className="touch-manipulation min-h-[32px] p-1 px-2 rounded-lg hover:bg-[var(--tab-bg)] active:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] transition-colors"
                         >
-                          쨌쨌쨌
+                          더보기
                         </button>
                       </div>
                     </div>
