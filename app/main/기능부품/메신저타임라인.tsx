@@ -129,6 +129,7 @@ export function MessengerTimeline({
   const scrollDateHideTimeoutRef = useRef<number | null>(null);
   const pendingRoomChangeAlignRef = useRef<string | null>(null);
   const roomOpenAutoStickUntilRef = useRef(0);
+  const autoAlignGenerationRef = useRef(0);
 
   const updateScrollDateIndicator = useCallback(() => {
     const listElement = messageListRef.current;
@@ -162,6 +163,9 @@ export function MessengerTimeline({
     updateScrollDateIndicator();
     const shouldReveal =
       !!listElement && listElement.scrollTop + listElement.clientHeight < listElement.scrollHeight - 32;
+    if (shouldReveal) {
+      autoAlignGenerationRef.current += 1;
+    }
     setShowScrollDateIndicator(shouldReveal);
     if (scrollDateHideTimeoutRef.current !== null) {
       window.clearTimeout(scrollDateHideTimeoutRef.current);
@@ -207,12 +211,14 @@ export function MessengerTimeline({
     if (!selectedRoomId) return;
 
     const roomIdForAlign = selectedRoomId;
+    const alignGeneration = autoAlignGenerationRef.current;
     let cancelled = false;
     let frameId = 0;
     const timeoutIds: number[] = [];
 
     const alignToBottom = () => {
       if (cancelled) return;
+      if (autoAlignGenerationRef.current !== alignGeneration) return;
       if (roomIdForAlign !== selectedRoomId) return;
       forceTimelineToBottom();
     };
@@ -226,7 +232,6 @@ export function MessengerTimeline({
     timeoutIds.push(window.setTimeout(alignToBottom, 220));
     timeoutIds.push(window.setTimeout(alignToBottom, 420));
     timeoutIds.push(window.setTimeout(alignToBottom, 720));
-    timeoutIds.push(window.setTimeout(alignToBottom, 1100));
 
     return () => {
       cancelled = true;
@@ -236,6 +241,7 @@ export function MessengerTimeline({
   }, [forceTimelineToBottom, scrollToLatestRequestToken, selectedRoomId]);
 
   useEffect(() => {
+    autoAlignGenerationRef.current += 1;
     pendingRoomChangeAlignRef.current = selectedRoomId;
     roomOpenAutoStickUntilRef.current = selectedRoomId ? Date.now() + 2800 : 0;
   }, [scrollToLatestRequestToken, selectedRoomId]);
@@ -249,10 +255,12 @@ export function MessengerTimeline({
       combinedTimeline.length > 0
     ) {
       const roomIdForAlign = selectedRoomId;
+      const alignGeneration = autoAlignGenerationRef.current;
       const timeoutIds: number[] = [];
       roomOpenAutoStickUntilRef.current = Math.max(roomOpenAutoStickUntilRef.current, Date.now() + 2800);
       const scheduleAlign = (delay = 0) => {
         const run = () => {
+          if (autoAlignGenerationRef.current !== alignGeneration) return;
           if (pendingRoomChangeAlignRef.current !== null && pendingRoomChangeAlignRef.current !== roomIdForAlign) return;
           if (roomIdForAlign !== selectedRoomId) return;
           forceTimelineToBottom();
