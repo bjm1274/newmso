@@ -80,7 +80,18 @@ test('contract sending succeeds even when employment_contracts misses optional c
     staffMembers: [hrUser, targetStaff],
     companies: [{ id: 'hospital-1', name: '박철홍정형외과', type: 'HOSPITAL', is_active: true }],
     employmentContracts: [],
-    missingEmploymentContractColumns: ['conditions_applied_at', 'contract_start_date'],
+    missingEmploymentContractColumns: [
+      'conditions_applied_at',
+      'contract_start_date',
+      'shift_id',
+      'shift_start_time',
+      'shift_end_time',
+      'break_start_time',
+      'break_end_time',
+      'probation_months',
+      'working_hours_per_week',
+      'working_days_per_week',
+    ],
   });
 
   await seedSession(page, {

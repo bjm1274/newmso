@@ -41,7 +41,18 @@ export default function ContractMain({
     break_end_time: '13:00'
   });
 
-  const optionalEmploymentContractColumns = ['conditions_applied_at', 'contract_start_date'];
+  const optionalEmploymentContractColumns = [
+    'conditions_applied_at',
+    'contract_start_date',
+    'shift_id',
+    'shift_start_time',
+    'shift_end_time',
+    'break_start_time',
+    'break_end_time',
+    'probation_months',
+    'working_hours_per_week',
+    'working_days_per_week',
+  ];
 
   const omitColumnsFromRecord = (
     record: Record<string, unknown>,

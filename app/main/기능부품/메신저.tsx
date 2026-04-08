@@ -1615,7 +1615,7 @@ export default function ChatView({
         : []
     );
     return allKnownStaffs
-      .filter(( s: StaffMember) => s.status !== '??곴텢' && s.status !== '??곸춦')
+      .filter((s: StaffMember) => isActiveChatMember(s))
       .filter(( s: StaffMember) => !currentMemberIds.has(String(s.id)))
       .filter(( s: StaffMember) => {
         if (!deferredAddMemberSearch.trim()) return true;
@@ -1633,8 +1633,7 @@ export default function ChatView({
       allKnownStaffs.filter(
         (staff: StaffMember) =>
           String(staff.id) !== String(effectiveChatUserId || user?.id || '') &&
-          staff.status !== '??곴텢' &&
-          staff.status !== '??곸춦'
+          isActiveChatMember(staff)
       ),
     [allKnownStaffs, effectiveChatUserId, user?.id]
   );
