@@ -174,6 +174,20 @@ export function MessengerTimeline({
     onMessageListScroll();
   }, [messageListRef, onMessageListScroll, updateScrollDateIndicator]);
 
+  const forceTimelineToBottom = useCallback(() => {
+    const listElement = messageListRef.current;
+    if (!listElement) return false;
+
+    onScrollToBottom('auto');
+    listElement.scrollTop = Math.max(0, listElement.scrollHeight - listElement.clientHeight);
+    scrollRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+
+    const distanceFromBottom = Math.abs(
+      listElement.scrollHeight - listElement.clientHeight - listElement.scrollTop
+    );
+    return distanceFromBottom <= 24;
+  }, [messageListRef, onScrollToBottom, scrollRef]);
+
   const maintainBottomAfterLayoutChange = useCallback(() => {
     const listElement = messageListRef.current;
     if (!selectedRoomId || !listElement) return;
@@ -185,22 +199,22 @@ export function MessengerTimeline({
     if (!withinAutoStickWindow && distanceFromBottom > 120) return;
 
     window.requestAnimationFrame(() => {
-      onScrollToBottom('auto');
+      forceTimelineToBottom();
     });
-  }, [messageListRef, onScrollToBottom, selectedRoomId]);
+  }, [forceTimelineToBottom, messageListRef, selectedRoomId]);
 
   useLayoutEffect(() => {
     if (!selectedRoomId) return;
 
+    const roomIdForAlign = selectedRoomId;
+    let cancelled = false;
     let frameId = 0;
     const timeoutIds: number[] = [];
 
     const alignToBottom = () => {
-      const listElement = messageListRef.current;
-      if (!listElement) return;
-
-      listElement.scrollTop = Math.max(0, listElement.scrollHeight - listElement.clientHeight);
-      scrollRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+      if (cancelled) return;
+      if (roomIdForAlign !== selectedRoomId) return;
+      forceTimelineToBottom();
     };
 
     alignToBottom();
@@ -212,12 +226,14 @@ export function MessengerTimeline({
     timeoutIds.push(window.setTimeout(alignToBottom, 220));
     timeoutIds.push(window.setTimeout(alignToBottom, 420));
     timeoutIds.push(window.setTimeout(alignToBottom, 720));
+    timeoutIds.push(window.setTimeout(alignToBottom, 1100));
 
     return () => {
+      cancelled = true;
       window.cancelAnimationFrame(frameId);
       timeoutIds.forEach((id) => window.clearTimeout(id));
     };
-  }, [messageListRef, scrollRef, scrollToLatestRequestToken, selectedRoomId]);
+  }, [forceTimelineToBottom, scrollToLatestRequestToken, selectedRoomId]);
 
   useEffect(() => {
     pendingRoomChangeAlignRef.current = selectedRoomId;
@@ -232,11 +248,36 @@ export function MessengerTimeline({
       pendingRoomChangeAlignRef.current === selectedRoomId &&
       combinedTimeline.length > 0
     ) {
+      const roomIdForAlign = selectedRoomId;
+      const timeoutIds: number[] = [];
       roomOpenAutoStickUntilRef.current = Math.max(roomOpenAutoStickUntilRef.current, Date.now() + 2800);
-      window.requestAnimationFrame(() => onScrollToBottom('auto'));
+      const scheduleAlign = (delay = 0) => {
+        const run = () => {
+          if (pendingRoomChangeAlignRef.current !== null && pendingRoomChangeAlignRef.current !== roomIdForAlign) return;
+          if (roomIdForAlign !== selectedRoomId) return;
+          forceTimelineToBottom();
+        };
+
+        if (delay === 0) {
+          window.requestAnimationFrame(run);
+          return;
+        }
+
+        timeoutIds.push(window.setTimeout(() => {
+          window.requestAnimationFrame(run);
+        }, delay));
+      };
+
+      scheduleAlign();
+      scheduleAlign(80);
+      scheduleAlign(220);
+      scheduleAlign(420);
       pendingRoomChangeAlignRef.current = null;
+      return () => {
+        timeoutIds.forEach((id) => window.clearTimeout(id));
+      };
     }
-  }, [combinedTimeline, onScrollToBottom, selectedRoomId, updateScrollDateIndicator]);
+  }, [combinedTimeline, forceTimelineToBottom, selectedRoomId, updateScrollDateIndicator]);
 
   useEffect(() => {
     return () => {
@@ -339,13 +380,13 @@ export function MessengerTimeline({
           ) : null}
         {!selectedRoomId ? (
           <div className="h-full flex flex-col items-center justify-center text-[var(--toss-gray-3)]">
-            <span className="text-4xl mb-2">?뮠</span>
-            <p className="text-sm font-bold">梨꾪똿諛⑹쓣 ?좏깮?섏꽭??</p>
+            <span className="text-4xl mb-2">💬</span>
+            <p className="text-sm font-bold">채팅방을 선택하세요</p>
           </div>
         ) : messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center opacity-20">
-            <span className="text-6xl mb-4">?뮠</span>
-            <p className="font-semibold text-sm">????댁슜???놁뒿?덈떎.</p>
+            <span className="text-6xl mb-4">💬</span>
+            <p className="font-semibold text-sm">아직 대화 내용이 없습니다.</p>
           </div>
         ) : (
           (() => {
@@ -418,7 +459,7 @@ export function MessengerTimeline({
                 const albumItem = item as MessengerAlbumItem;
                 const albumMsgs = albumItem.albumMessages || [];
                 const isMineAlbum = String(albumItem.sender_id) === effectiveChatUserId;
-                const senderName = (albumItem.staff as { name?: string } | null)?.name || albumItem.sender_name || '?????놁쓬';
+                const senderName = (albumItem.staff as { name?: string } | null)?.name || albumItem.sender_name || '이름 없음';
                 const created = new Date(albumItem.created_at || 0);
                 const dateLabel = formatTimelineDateLabel(albumItem.created_at);
                 const showDateDivider = dateLabel !== lastDateLabel;

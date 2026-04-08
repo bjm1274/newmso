@@ -88,6 +88,7 @@ type PushDebugEntry = {
 };
 
 const PUSH_DEBUG_STORAGE_KEY = 'erp_push_debug_log';
+const pushInitInFlightMap = new Map<string, Promise<void>>();
 
 function normalizePushDebugDetail(detail: Record<string, unknown> | null | undefined) {
   if (!detail) return null;
@@ -626,6 +627,14 @@ function normalizeInitNotificationServiceOptions(options?: InitNotificationServi
 
 export async function initNotificationService(options?: InitNotificationServiceOptions) {
   const { staffId, requestPermission } = normalizeInitNotificationServiceOptions(options);
+  const initKey = `${staffId || 'guest'}:${requestPermission ? 'request' : 'auto'}`;
+  const existingInit = pushInitInFlightMap.get(initKey);
+  if (existingInit) {
+    await existingInit;
+    return;
+  }
+
+  const runInit = async () => {
   if (typeof window === 'undefined') return;
   if (!('serviceWorker' in navigator) || !('Notification' in window)) return;
   if (!window.isSecureContext) return;
@@ -782,6 +791,13 @@ export async function initNotificationService(options?: InitNotificationServiceO
       },
     });
   }
+  };
+
+  const initPromise = runInit().finally(() => {
+    pushInitInFlightMap.delete(initKey);
+  });
+  pushInitInFlightMap.set(initKey, initPromise);
+  await initPromise;
 }
 
 export function sendNotification(title: string, options?: NotificationOptions) {
