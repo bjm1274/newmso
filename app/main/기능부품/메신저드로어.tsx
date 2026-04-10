@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { toast } from '@/lib/toast';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
+import type { ThreadOverview } from './메신저파생훅';
+import type { RoomNotificationMode } from './메신저유틸';
 import {
   AttachmentListCard,
   AttachmentQuickActions,
@@ -22,6 +24,14 @@ type MessengerDrawerProps = {
   isOpen: boolean;
   roomNotifyOn: boolean;
   currentNoticeMessage: ChatMessage | null;
+  noticeReadCount: number;
+  noticeUnreadCount: number;
+  noticeRecipientCount: number;
+  noticeReminderBusy: boolean;
+  threadOverviews: ThreadOverview[];
+  followedThreadIds: Set<string>;
+  roomNotificationMode: RoomNotificationMode;
+  roomNotificationKeyword: string;
   sharedMediaPreviewMessages: ChatMessage[];
   sharedFilePreviewMessages: ChatMessage[];
   sharedLinkPreviewMessages: ChatMessage[];
@@ -34,11 +44,19 @@ type MessengerDrawerProps = {
   resolveRoomMemberProfile: (room: ChatRoom, memberId: string) => StaffMember | null;
   onClose: () => void;
   onToggleRoomNotify: () => void | Promise<void>;
+  onSelectRoomNotificationMode: (mode: RoomNotificationMode) => void;
+  onRoomNotificationKeywordChange: (value: string) => void;
   onOpenPollModal: () => void;
+  onOpenOpsCenter?: (() => void) | null;
   onOpenMediaArchive: (filter: 'media' | 'file') => void;
   onPreviewMessage: (message: ChatMessage) => void;
   onReplyMessage: (message: ChatMessage) => void;
+  onOpenThread: (message: ChatMessage) => void;
+  onToggleThreadFollow: (message: ChatMessage) => void;
   onScrollToMessage: (messageId: string) => void;
+  onJumpToNoticeMessage: () => void;
+  onOpenNoticeReadStatus: () => void;
+  onSendNoticeReminder: () => void | Promise<void>;
   onOpenAddMemberModal: () => void;
   onRemoveRoomMember: (memberId: string) => void | Promise<void>;
   onRoomNameDraftChange: (value: string) => void;
@@ -62,14 +80,16 @@ const DEFAULT_EXPANDED_SECTIONS: Record<DrawerSectionKey, boolean> = {
   bookmarks: false,
 };
 
-function sortMessagesByRecent(messages: ChatMessage[]) {
-  return [...messages].sort(
+function sortMessagesByRecent(messages: ChatMessage[] | null | undefined) {
+  const safeMessages = Array.isArray(messages) ? messages : [];
+  return [...safeMessages].sort(
     (left, right) => new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime(),
   );
 }
 
-function getVisibleMessages(messages: ChatMessage[], expanded: boolean, limit: number) {
-  return expanded ? messages : messages.slice(0, limit);
+function getVisibleMessages(messages: ChatMessage[] | null | undefined, expanded: boolean, limit: number) {
+  const safeMessages = Array.isArray(messages) ? messages : [];
+  return expanded ? safeMessages : safeMessages.slice(0, limit);
 }
 
 function formatMessageMeta(message: ChatMessage) {
@@ -135,6 +155,14 @@ export function MessengerDrawer({
   isOpen,
   roomNotifyOn,
   currentNoticeMessage,
+  noticeReadCount,
+  noticeUnreadCount,
+  noticeRecipientCount,
+  noticeReminderBusy,
+  threadOverviews,
+  followedThreadIds,
+  roomNotificationMode,
+  roomNotificationKeyword,
   sharedMediaPreviewMessages,
   sharedFilePreviewMessages,
   sharedLinkPreviewMessages,
@@ -147,11 +175,19 @@ export function MessengerDrawer({
   resolveRoomMemberProfile,
   onClose,
   onToggleRoomNotify,
+  onSelectRoomNotificationMode,
+  onRoomNotificationKeywordChange,
   onOpenPollModal,
+  onOpenOpsCenter,
   onOpenMediaArchive,
   onPreviewMessage,
   onReplyMessage,
+  onOpenThread,
+  onToggleThreadFollow,
   onScrollToMessage,
+  onJumpToNoticeMessage,
+  onOpenNoticeReadStatus,
+  onSendNoticeReminder,
   onOpenAddMemberModal,
   onRemoveRoomMember,
   onRoomNameDraftChange,
@@ -217,6 +253,9 @@ export function MessengerDrawer({
     setExpandedSections((current) => ({ ...current, [section]: !current[section] }));
   };
 
+  const hasNoticeMessage = Boolean(currentNoticeMessage?.id);
+  const recentThreadOverviews = threadOverviews.slice(0, 4);
+
   return (
     <>
       <div className="absolute inset-0 z-50 animate-in fade-in duration-200 bg-black/10" onClick={onClose} aria-hidden="true" />
@@ -246,6 +285,54 @@ export function MessengerDrawer({
               <div className={`absolute top-1 h-4 w-4 rounded-full bg-[var(--card)] transition-all ${roomNotifyOn ? 'right-1' : 'left-1'}`} />
             </button>
           </div>
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--card)] p-3 shadow-sm">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">방별 알림 방식</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {([
+                ['all', '전체'],
+                ['mention_only', '멘션만'],
+                ['keyword', '키워드'],
+                ['mute', '무음'],
+              ] as const).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  data-testid={`chat-room-notify-mode-${mode}`}
+                  disabled={!roomNotifyOn && mode !== 'mute'}
+                  onClick={() => onSelectRoomNotificationMode(mode)}
+                  className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors ${
+                    roomNotificationMode === mode
+                      ? 'bg-[var(--accent)] text-white'
+                      : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)] hover:text-[var(--accent)]'
+                  } disabled:cursor-not-allowed disabled:opacity-50`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {roomNotificationMode === 'keyword' ? (
+              <div className="mt-3 space-y-2">
+                <input
+                  data-testid="chat-room-notify-keyword"
+                  value={roomNotificationKeyword}
+                  onChange={(event) => onRoomNotificationKeywordChange(event.target.value)}
+                  placeholder="예: 긴급, 수술, 환자명"
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2 text-xs font-semibold outline-none focus:border-[var(--accent)]"
+                />
+                <p className="text-[10px] text-[var(--toss-gray-3)]">
+                  키워드가 포함된 채팅만 알림을 표시합니다.
+                </p>
+              </div>
+            ) : (
+              <p className="mt-3 text-[10px] text-[var(--toss-gray-3)]">
+                {roomNotificationMode === 'mention_only'
+                  ? '@멘션이 있는 메시지만 알림을 표시합니다.'
+                  : roomNotificationMode === 'mute'
+                    ? '이 방의 실시간 알림을 모두 숨깁니다.'
+                    : '이 방의 모든 메시지 알림을 표시합니다.'}
+              </p>
+            )}
+          </div>
 
           <button
             type="button"
@@ -259,11 +346,46 @@ export function MessengerDrawer({
             </div>
             <span className="text-[10px] font-bold text-blue-400 transition-transform group-hover:translate-x-1">열기</span>
           </button>
+          {onOpenOpsCenter ? (
+            <button
+              type="button"
+              data-testid="chat-open-ops-center"
+              onClick={onOpenOpsCenter}
+              className="group flex w-full items-center justify-between rounded-2xl border border-emerald-100 bg-emerald-500/10 p-3.5 transition-colors hover:bg-emerald-500/20 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-lg">운영</span>
+                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">운영센터 열기</span>
+              </div>
+              <span className="text-[10px] font-bold text-emerald-500 transition-transform group-hover:translate-x-1">분석</span>
+            </button>
+          ) : null}
 
           <div className="space-y-3">
             <p className="px-1 text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">상단 공지</p>
             <div data-testid="chat-drawer-notice" className="rounded-2xl border border-orange-100 bg-orange-500/10 p-4 dark:border-orange-900/30 dark:bg-orange-950/20">
-              <p className="mb-1 text-xs font-bold text-orange-800 dark:text-orange-300">공지</p>
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <p className="text-xs font-bold text-orange-800 dark:text-orange-300">공지</p>
+                {hasNoticeMessage ? (
+                  <>
+                    <span
+                      data-testid="chat-notice-read-count"
+                      className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold text-emerald-700"
+                    >
+                      읽음 {noticeReadCount}
+                    </span>
+                    <span
+                      data-testid="chat-notice-unread-count"
+                      className="rounded-full bg-orange-500/10 px-2.5 py-1 text-[10px] font-bold text-orange-700"
+                    >
+                      미확인 {noticeUnreadCount}
+                    </span>
+                    <span className="rounded-full bg-white/60 px-2.5 py-1 text-[10px] font-bold text-orange-900/70">
+                      대상 {noticeRecipientCount}
+                    </span>
+                  </>
+                ) : null}
+              </div>
               <p className="whitespace-pre-wrap text-xs leading-relaxed text-orange-900/70 dark:text-orange-200/50">
                 {getMessageDisplayText(
                   currentNoticeMessage?.content,
@@ -272,6 +394,145 @@ export function MessengerDrawer({
                   '등록된 공지가 없습니다.',
                 )}
               </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  data-testid="chat-notice-jump-message"
+                  disabled={!hasNoticeMessage}
+                  onClick={onJumpToNoticeMessage}
+                  className="rounded-full border border-orange-200 bg-white/80 px-3 py-1.5 text-[11px] font-bold text-orange-800 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  공지 메시지로 이동
+                </button>
+                <button
+                  type="button"
+                  data-testid="chat-notice-open-read-status"
+                  disabled={!hasNoticeMessage}
+                  onClick={onOpenNoticeReadStatus}
+                  className="rounded-full border border-orange-200 bg-white/80 px-3 py-1.5 text-[11px] font-bold text-orange-800 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  읽음 현황 보기
+                </button>
+                <button
+                  type="button"
+                  data-testid="chat-notice-send-reminder"
+                  disabled={!hasNoticeMessage || noticeUnreadCount === 0 || noticeReminderBusy}
+                  onClick={() => void onSendNoticeReminder()}
+                  className="rounded-full border border-orange-300 bg-orange-500/10 px-3 py-1.5 text-[11px] font-bold text-orange-700 transition-colors hover:bg-orange-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {noticeReminderBusy ? '리마인드 전송 중' : '미확인자 리마인드'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">최근 스레드</p>
+              <span className="rounded-full bg-[var(--tab-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--toss-gray-4)]">
+                {threadOverviews.length}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {recentThreadOverviews.map((thread) => {
+                const rootPreview = getMessageDisplayText(
+                  thread.rootMessage.content,
+                  thread.rootMessage.file_name,
+                  thread.rootMessage.file_url,
+                  '내용 없음',
+                );
+                const latestPreview = getMessageDisplayText(
+                  thread.latestMessage.content,
+                  thread.latestMessage.file_name,
+                  thread.latestMessage.file_url,
+                  '답글 없음',
+                );
+                const latestStaff =
+                  (thread.latestMessage.staff as { name?: string } | null | undefined)?.name ||
+                  (selectedRoom && thread.latestReplySenderId
+                    ? resolveRoomMemberProfile(selectedRoom, thread.latestReplySenderId)?.name
+                    : '') ||
+                  '알 수 없음';
+                const latestAtLabel = thread.latestActivityAt
+                  ? new Date(thread.latestActivityAt).toLocaleString('ko-KR', {
+                      month: 'numeric',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                  : '-';
+
+                return (
+                  <div
+                    key={thread.rootId}
+                    data-testid={`chat-drawer-thread-${thread.rootId}`}
+                    className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--card)] p-3 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="line-clamp-2 text-xs font-bold leading-5 text-[var(--foreground)]">{rootPreview}</p>
+                        <p className="mt-1 line-clamp-2 text-[10px] font-medium text-[var(--toss-gray-4)]">
+                          최근 답글 · {latestStaff} · {latestPreview}
+                        </p>
+                        <p className="mt-1 truncate text-[10px] font-medium text-[var(--toss-gray-3)]">
+                          최근 활동 {latestAtLabel}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <span className="rounded-full bg-[var(--toss-blue-light)] px-2 py-1 text-[9px] font-bold text-[var(--accent)]">
+                          답글 {thread.replyCount}
+                        </span>
+                        {thread.needsAttention ? (
+                          <span
+                            data-testid={`chat-drawer-thread-attention-${thread.rootId}`}
+                            className="rounded-full bg-amber-500/10 px-2 py-1 text-[9px] font-bold text-amber-700"
+                          >
+                            답변 필요
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] font-bold">
+                      <button
+                        type="button"
+                        data-testid={`chat-drawer-thread-open-${thread.rootId}`}
+                        onClick={() => onOpenThread(thread.rootMessage)}
+                        className="rounded-full bg-[var(--accent)]/10 px-2.5 py-1 text-[var(--accent)] hover:bg-[var(--accent)]/15"
+                      >
+                        스레드 열기
+                      </button>
+                      <button
+                        type="button"
+                        data-testid={`chat-drawer-thread-follow-${thread.rootId}`}
+                        onClick={() => onToggleThreadFollow(thread.rootMessage)}
+                        className={`rounded-full px-2.5 py-1 ${
+                          followedThreadIds.has(thread.rootId)
+                            ? 'bg-amber-500/10 text-amber-700'
+                            : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)]'
+                        }`}
+                      >
+                        {followedThreadIds.has(thread.rootId) ? '알림 켜짐' : '알림 켜기'}
+                      </button>
+                      <button
+                        type="button"
+                        data-testid={`chat-drawer-thread-jump-${thread.rootId}`}
+                        onClick={() => {
+                          onClose();
+                          onScrollToMessage(thread.rootId);
+                        }}
+                        className="rounded-full bg-[var(--muted)] px-2.5 py-1 text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)]"
+                      >
+                        메시지로 이동
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {recentThreadOverviews.length === 0 ? (
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--tab-bg)] py-4 text-center dark:border-zinc-800 dark:bg-zinc-800/30">
+                  <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">최근 스레드가 없습니다.</p>
+                </div>
+              ) : null}
             </div>
           </div>
 

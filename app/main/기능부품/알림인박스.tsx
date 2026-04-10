@@ -1,11 +1,10 @@
 ﻿'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import {
-  resolveApprovalNotificationId,
-  resolveInventoryNotificationApprovalId,
+  resolveNotificationTarget,
   toNotificationMetadataRecord,
 } from '@/lib/notification-metadata';
 import {
@@ -13,11 +12,15 @@ import {
   getPushConnectionStatus,
   initNotificationService,
   loadNotifSettings,
+  NOTIFICATION_DELIVERY_EVENT,
   NotifSettings,
   PUSH_DEBUG_EVENT,
   PUSH_STATUS_CHANGED_EVENT,
+  readNotificationDeliveryLog,
   readPushDebugLog,
+  saveNotifSettings,
   sendNotification,
+  type NotificationDeliveryLogEntry,
   type PushConnectionStatus,
 } from './알림시스템';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
@@ -32,6 +35,67 @@ const TABS = [
   { id: 'inventory', label: '재고', icon: '📦', types: ['inventory'] },
   { id: 'other', label: '기타', icon: '📌', types: ['board', 'notification'] },
 ] as const;
+
+type InboxDateRange = 'all' | 'today' | '7d' | '30d';
+
+const INBOX_DATE_FILTERS: Array<{ id: InboxDateRange; label: string }> = [
+  { id: 'all', label: '전체 기간' },
+  { id: 'today', label: '오늘' },
+  { id: '7d', label: '최근 7일' },
+  { id: '30d', label: '최근 30일' },
+];
+
+function normalizeKeywordInput(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,]/)
+        .map((token) => token.trim())
+        .filter(Boolean)
+        .slice(0, 30),
+    ),
+  );
+}
+
+function isWithinInboxDateRange(dateValue: string, range: InboxDateRange) {
+  if (range === 'all') return true;
+  const targetTime = new Date(dateValue).getTime();
+  if (Number.isNaN(targetTime)) return false;
+  const now = new Date();
+
+  if (range === 'today') {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    return targetTime >= start;
+  }
+
+  const days = range === '7d' ? 7 : 30;
+  return targetTime >= now.getTime() - days * 24 * 60 * 60 * 1000;
+}
+
+function matchesNotificationSearch(notification: Record<string, unknown>, rawQuery: string) {
+  const query = rawQuery.trim().toLowerCase();
+  if (!query) return true;
+
+  const metadata =
+    notification.metadata && typeof notification.metadata === 'object'
+      ? notification.metadata as Record<string, unknown>
+      : {};
+
+  const haystack = [
+    notification.title,
+    notification.body,
+    notification.type,
+    metadata.sender_name,
+    metadata.room_name,
+    metadata.board_type,
+    metadata.open_menu,
+    metadata.open_subview,
+  ]
+    .map((value) => String(value || '').toLowerCase())
+    .join(' ');
+
+  return haystack.includes(query);
+}
 
 const TYPE_CFG: Record<string, { icon: string; bg: string; text: string; border: string }> = {
   message: { icon: '💬', bg: 'bg-blue-500/10 dark:bg-blue-950/30', text: 'text-blue-600', border: 'border-blue-300' },
@@ -62,62 +126,6 @@ function getDateGroup(dateStr: string): string {
 }
 
 
-function buildApprovalNotificationHref(metadata: Record<string, unknown>) {
-  const params = new URLSearchParams({
-    open_menu: '전자결재',
-  });
-
-  if (typeof metadata?.approval_view === 'string' && metadata.approval_view.trim()) {
-    params.set('open_subview', metadata.approval_view.trim());
-  }
-
-  const approvalId = resolveApprovalNotificationId(metadata);
-  if (approvalId) {
-    params.set('open_approval_id', approvalId);
-  }
-
-  return `/main?${params.toString()}`;
-}
-
-function buildBoardNotificationHref(metadata: Record<string, unknown>) {
-  const params = new URLSearchParams({
-    open_menu: '게시판',
-  });
-
-  if (typeof metadata?.board_type === 'string' && metadata.board_type.trim()) {
-    params.set('open_board', metadata.board_type.trim());
-  }
-
-  const postId = String(metadata?.post_id || '').trim();
-  if (postId) {
-    params.set('open_post', postId);
-  }
-
-  return `/main?${params.toString()}`;
-}
-
-function buildInventoryNotificationHref(metadata: Record<string, unknown>) {
-  const params = new URLSearchParams({
-    open_menu: '재고관리',
-  });
-
-  const inventoryView =
-    typeof metadata?.inventory_view === 'string' && metadata.inventory_view.trim()
-      ? metadata.inventory_view.trim()
-      : '';
-  const approvalId = resolveInventoryNotificationApprovalId(metadata);
-
-  if (inventoryView || approvalId) {
-    params.set('open_inventory_view', inventoryView || '현황');
-  }
-
-  if (approvalId) {
-    params.set('open_inventory_approval', approvalId);
-  }
-
-  return `/main?${params.toString()}`;
-}
-
 const NOTIF_TYPES_FOR_SETTINGS = [
   { id: 'message', label: '채팅 메시지', icon: '💬', desc: '새 채팅 메시지' },
   { id: 'mention', label: '멘션', icon: '📣', desc: '@멘션 알림' },
@@ -142,25 +150,33 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 // ─── 알림 설정 탭 ───
 function SettingsTab({ userId }: { userId?: string | null }) {
   const [settings, setSettings] = useState<NotifSettings>(loadNotifSettings);
+  const [keywordInput, setKeywordInput] = useState('');
   const [pushStatus, setPushStatus] = useState<PushConnectionStatus | null>(null);
   const [pushStatusError, setPushStatusError] = useState<string | null>(null);
   const [pushActionPending, setPushActionPending] = useState(false);
   const [pushTestPending, setPushTestPending] = useState(false);
   const [pushTestResult, setPushTestResult] = useState<string | null>(null);
   const [pushDebugLog, setPushDebugLog] = useState(() => readPushDebugLog());
+  const [deliveryLog, setDeliveryLog] = useState<NotificationDeliveryLogEntry[]>(() => readNotificationDeliveryLog());
   const [serverTestPending, setServerTestPending] = useState(false);
   const [serverTestResult, setServerTestResult] = useState<string | null>(null);
 
   const update = (partial: Partial<NotifSettings>) => {
     const next = { ...settings, ...partial };
     setSettings(next);
-    if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEYS.NOTIF_SETTINGS, JSON.stringify(next));
+    saveNotifSettings(next);
   };
 
   const updateType = (id: string, val: boolean) => {
     const next = { ...settings, types: { ...settings.types, [id]: val } };
     setSettings(next);
-    if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEYS.NOTIF_SETTINGS, JSON.stringify(next));
+    saveNotifSettings(next);
+  };
+
+  const commitKeywords = () => {
+    const nextKeywords = normalizeKeywordInput(keywordInput);
+    update({ keywords: nextKeywords });
+    setKeywordInput(nextKeywords.join(', '));
   };
 
   const refreshPushStatus = useCallback(async () => {
@@ -210,6 +226,24 @@ function SettingsTab({ userId }: { userId?: string | null }) {
     window.addEventListener(PUSH_DEBUG_EVENT, syncPushDebugLog as EventListener);
     return () => {
       window.removeEventListener(PUSH_DEBUG_EVENT, syncPushDebugLog as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
+    setKeywordInput(settings.keywords.join(', '));
+  }, [settings.keywords]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const syncDeliveryLog = () => {
+      setDeliveryLog(readNotificationDeliveryLog());
+    };
+
+    syncDeliveryLog();
+    window.addEventListener(NOTIFICATION_DELIVERY_EVENT, syncDeliveryLog as EventListener);
+    return () => {
+      window.removeEventListener(NOTIFICATION_DELIVERY_EVENT, syncDeliveryLog as EventListener);
     };
   }, []);
 
@@ -523,6 +557,58 @@ function SettingsTab({ userId }: { userId?: string | null }) {
         </div>
       </div>
 
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-[var(--border)] bg-[var(--muted)]/50">
+          <h3 className="text-[11px] font-black text-[var(--toss-gray-3)] uppercase tracking-wider">개인 알림 정책</h3>
+        </div>
+        <div className="divide-y divide-[var(--border)]">
+          <div className="flex items-center justify-between px-5 py-4">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">🗓️</span>
+              <div>
+                <p className="text-sm font-semibold text-[var(--foreground)]">주말 무음</p>
+                <p className="text-xs text-[var(--toss-gray-3)]">주말에는 알림 표시는 유지하고 소리와 진동만 끕니다.</p>
+              </div>
+            </div>
+            <Toggle checked={settings.weekendMute} onChange={v => update({ weekendMute: v })} />
+          </div>
+          <div className="px-5 py-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="text-xl">🏷️</span>
+                <div>
+                  <p className="text-sm font-semibold text-[var(--foreground)]">키워드 알림 우선</p>
+                  <p className="text-xs text-[var(--toss-gray-3)]">일반 채팅·게시판·기타 알림은 등록한 키워드가 있을 때만 토스트를 띄웁니다.</p>
+                </div>
+              </div>
+              <Toggle checked={settings.keywordAlertsEnabled} onChange={v => update({ keywordAlertsEnabled: v })} />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-xs font-medium text-[var(--toss-gray-3)]">키워드</label>
+              <textarea
+                data-testid="notification-settings-keywords"
+                value={keywordInput}
+                onChange={(event) => setKeywordInput(event.target.value)}
+                onBlur={commitKeywords}
+                rows={3}
+                placeholder="예: 결재, 재고, 장애, 야간"
+                className="w-full rounded-2xl border border-[var(--border)] bg-[var(--muted)]/40 px-3 py-2.5 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+              />
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-[var(--toss-gray-3)]">쉼표나 줄바꿈으로 여러 키워드를 등록할 수 있습니다.</p>
+                <button
+                  type="button"
+                  onClick={commitKeywords}
+                  className="px-3 py-1.5 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--foreground)]"
+                >
+                  키워드 저장
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* 기본 설정 */}
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
         <div className="px-5 py-3 border-b border-[var(--border)] bg-[var(--muted)]/50">
@@ -601,6 +687,40 @@ function SettingsTab({ userId }: { userId?: string | null }) {
           ))}
         </div>
       </div>
+
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-[var(--border)] bg-[var(--muted)]/50">
+          <h3 className="text-[11px] font-black text-[var(--toss-gray-3)] uppercase tracking-wider">최근 전달 이력</h3>
+        </div>
+        <div className="px-5 py-4">
+          {deliveryLog.length === 0 ? (
+            <p className="text-xs text-[var(--toss-gray-3)]">아직 기록된 전달 이력이 없습니다.</p>
+          ) : (
+            <div className="space-y-2" data-testid="notification-settings-delivery-log">
+              {deliveryLog.slice(0, 8).map((entry) => (
+                <div key={entry.id} className="rounded-2xl border border-[var(--border)] bg-[var(--muted)]/30 px-3 py-2.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-[var(--foreground)] truncate">{entry.title}</p>
+                      <p className="text-[11px] text-[var(--toss-gray-3)] mt-0.5">
+                        {entry.type} 쨌 {entry.stage}
+                      </p>
+                    </div>
+                    <span className="text-[10px] text-[var(--toss-gray-3)] shrink-0">{timeAgo(entry.at)}</span>
+                  </div>
+                  {entry.detail && Object.keys(entry.detail).length > 0 && (
+                    <p className="text-[11px] text-[var(--toss-gray-3)] mt-2 break-all">
+                      {Object.entries(entry.detail)
+                        .map(([key, value]) => `${key}: ${String(value)}`)
+                        .join(' / ')}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -612,6 +732,11 @@ export default function NotificationInbox({ user: _rawUser, onRefresh }: Record<
   const [notifications, setNotifications] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<string>('all');
   const [activeInnerTab, setActiveInnerTab] = useState<'list' | 'settings'>('list');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [dateRange, setDateRange] = useState<InboxDateRange>('all');
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchNotifications = useCallback(async () => {
@@ -643,6 +768,12 @@ export default function NotificationInbox({ user: _rawUser, onRefresh }: Record<
     return () => clearTimeout(timer);
   }, [_u?.id]);
 
+  useEffect(() => {
+    if (selectionMode) return;
+    if (selectedIds.length === 0) return;
+    setSelectedIds([]);
+  }, [selectedIds.length, selectionMode]);
+
   const emitNotificationReadSync = useCallback(() => {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('erp-notification-read'));
@@ -672,26 +803,63 @@ export default function NotificationInbox({ user: _rawUser, onRefresh }: Record<
     emitNotificationReadSync();
   };
 
+  const toggleSelected = useCallback((id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((targetId) => targetId !== id) : [...prev, id]
+    );
+  }, []);
+
+  const markSelectedAsRead = useCallback(async () => {
+    if (selectedIds.length === 0) return;
+    const readAt = new Date().toISOString();
+    await supabase.from('notifications').update({ read_at: readAt }).in('id', selectedIds);
+    setNotifications((prev) =>
+      prev.map((notification) =>
+        selectedIds.includes(String(notification.id))
+          ? { ...notification, read_at: notification.read_at || readAt }
+          : notification
+      )
+    );
+    setSelectedIds([]);
+    setSelectionMode(false);
+    emitNotificationReadSync();
+  }, [emitNotificationReadSync, selectedIds]);
+
+  const deleteSelected = useCallback(async () => {
+    if (selectedIds.length === 0) return;
+    await supabase.from('notifications').delete().in('id', selectedIds);
+    setNotifications((prev) =>
+      prev.filter((notification) => !selectedIds.includes(String(notification.id)))
+    );
+    setSelectedIds([]);
+    setSelectionMode(false);
+    emitNotificationReadSync();
+  }, [emitNotificationReadSync, selectedIds]);
+
   const handleClick = (n: any) => {
+    if (selectionMode) {
+      toggleSelected(String(n.id));
+      return;
+    }
     if (!n.read_at) markAsRead(n.id);
-    const meta = toNotificationMetadataRecord(n.metadata);
-    if (n.type === 'message' || n.type === 'mention') router.push(meta.room_id ? `/main?open_chat_room=${meta.room_id}` : '/main?open_menu=채팅');
-    else if (n.type === 'approval') {
-      router.push(buildApprovalNotificationHref(meta));
-    }
-    else if (n.type === 'board' || n.type === 'notice' || (n.type === 'notification' && meta?.post_id)) {
-      router.push(buildBoardNotificationHref(meta));
-    }
-    else if (n.type === '인사' || n.type === 'payroll' || n.type === 'education' || n.type === 'attendance') router.push('/main?open_menu=내정보');
-    else if (n.type === 'inventory') router.push(buildInventoryNotificationHref(meta));
+    const target = resolveNotificationTarget(n.type, toNotificationMetadataRecord(n.metadata));
+    router.push(target.href);
   };
 
   // 탭 필터링
   const tabDef = TABS.find(t => t.id === activeTab)!;
   const tabTypes = tabDef.types ? [...tabDef.types] : null;
-  const filtered = tabTypes
-    ? notifications.filter(n => tabTypes.includes(n.type))
-    : notifications;
+  const filtered = useMemo(
+    () =>
+      notifications.filter((notification) => {
+        if (tabTypes && !tabTypes.includes(notification.type)) return false;
+        if (showUnreadOnly && notification.read_at) return false;
+        if (!isWithinInboxDateRange(String(notification.created_at || ''), dateRange)) return false;
+        if (!matchesNotificationSearch(notification, searchQuery)) return false;
+        return true;
+      }),
+    [dateRange, notifications, searchQuery, showUnreadOnly, tabTypes]
+  );
 
   // 안읽음 배지 per 탭
   const tabBadge = (types: readonly string[] | null) =>
@@ -699,6 +867,7 @@ export default function NotificationInbox({ user: _rawUser, onRefresh }: Record<
       : notifications.filter(n => !n.read_at).length;
 
   const unreadCount = notifications.filter(n => !n.read_at).length;
+  const selectedCount = selectedIds.length;
 
   // 날짜 그룹화
   const grouped: Record<string, any[]> = {};
@@ -722,6 +891,16 @@ export default function NotificationInbox({ user: _rawUser, onRefresh }: Record<
             {unreadCount > 0 && activeInnerTab === 'list' && (
               <button onClick={markAllAsRead} className="text-xs font-bold text-[var(--accent)] hover:underline">전체 읽음</button>
             )}
+            {activeInnerTab === 'list' && (
+              <button
+                type="button"
+                data-testid="notification-selection-toggle"
+                onClick={() => setSelectionMode((prev) => !prev)}
+                className="text-xs font-bold text-[var(--toss-gray-3)] hover:text-[var(--foreground)]"
+              >
+                {selectionMode ? '선택 취소' : '여러 개 선택'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -742,6 +921,66 @@ export default function NotificationInbox({ user: _rawUser, onRefresh }: Record<
         <div className="flex-1 overflow-y-auto custom-scrollbar"><SettingsTab userId={_u?.id as string | undefined} /></div>
       ) : (
         <>
+          <div className="shrink-0 border-b border-[var(--border)] bg-[var(--card)] px-4 py-3 space-y-3">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center">
+              <input
+                data-testid="notification-search-input"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="제목, 본문, 발신자, 메뉴명 검색"
+                className="h-10 flex-1 rounded-xl border border-[var(--border)] bg-[var(--muted)]/40 px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  data-testid="notification-unread-filter"
+                  onClick={() => setShowUnreadOnly((prev) => !prev)}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold border ${
+                    showUnreadOnly
+                      ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
+                      : 'border-[var(--border)] text-[var(--toss-gray-3)]'
+                  }`}
+                >
+                  안읽음만
+                </button>
+                <select
+                  data-testid="notification-date-filter"
+                  value={dateRange}
+                  onChange={(event) => setDateRange(event.target.value as InboxDateRange)}
+                  className="h-10 rounded-xl border border-[var(--border)] bg-[var(--muted)]/40 px-3 text-xs font-bold text-[var(--foreground)] outline-none"
+                >
+                  {INBOX_DATE_FILTERS.map((filter) => (
+                    <option key={filter.id} value={filter.id}>
+                      {filter.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {selectionMode && (
+              <div className="flex flex-wrap items-center gap-2" data-testid="notification-selection-toolbar">
+                <span className="text-xs font-bold text-[var(--toss-gray-3)]">선택 {selectedCount}건</span>
+                <button
+                  type="button"
+                  onClick={markSelectedAsRead}
+                  disabled={selectedCount === 0}
+                  className="px-3 py-1.5 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--foreground)] disabled:opacity-40"
+                >
+                  선택 읽음
+                </button>
+                <button
+                  type="button"
+                  onClick={deleteSelected}
+                  disabled={selectedCount === 0}
+                  className="px-3 py-1.5 rounded-xl border border-red-200 bg-red-500/10 text-xs font-bold text-red-600 disabled:opacity-40"
+                >
+                  선택 삭제
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* 타입 탭 가로 스크롤 */}
           <div className="flex items-center gap-1.5 px-4 py-2.5 bg-[var(--card)] border-b border-[var(--border)] overflow-x-auto no-scrollbar shrink-0">
             {TABS.map(tab => {
@@ -788,13 +1027,33 @@ export default function NotificationInbox({ user: _rawUser, onRefresh }: Record<
                     <div className="divide-y divide-[var(--border)]/50">
                       {grouped[group].map(n => {
                         const cfg = getTypeCfg(n.type);
+                        const isSelected = selectedIds.includes(String(n.id));
                         return (
                           <div
                             key={n.id}
                             onClick={() => handleClick(n)}
                             className={`relative flex items-start gap-3.5 px-5 py-4 cursor-pointer transition-colors hover:bg-[var(--muted)] group
-                              ${!n.read_at ? `border-l-4 ${cfg.border} bg-opacity-30` : 'opacity-75'}`}
+                              ${!n.read_at ? `border-l-4 ${cfg.border} bg-opacity-30` : 'opacity-75'}
+                              ${isSelected ? 'bg-[var(--accent)]/10 ring-1 ring-[var(--accent)]' : ''}`}
+                            data-testid={`notification-inbox-item-${n.id}`}
                           >
+                            {selectionMode && (
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  toggleSelected(String(n.id));
+                                }}
+                                className={`mt-1 h-5 w-5 shrink-0 rounded-md border text-[11px] font-black ${
+                                  isSelected
+                                    ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
+                                    : 'border-[var(--border)] text-transparent'
+                                }`}
+                                aria-label="선택"
+                              >
+                                ✓
+                              </button>
+                            )}
                             {/* 타입 아이콘 */}
                             <div className={`w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-xl ${n.read_at ? 'bg-[var(--muted)]' : cfg.bg}`}>
                               {cfg.icon}

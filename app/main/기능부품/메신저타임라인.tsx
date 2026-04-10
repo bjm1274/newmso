@@ -1,6 +1,6 @@
-﻿'use client';
+'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect } from 'react';
 import type { MutableRefObject, ReactNode, RefObject } from 'react';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import type { ChatMessage, StaffMember } from '@/types';
@@ -13,7 +13,8 @@ import {
   type AttachmentPreviewKind,
 } from './메신저첨부';
 import { MessengerAvatar } from './메신저공통';
-import { extractPollMetaFromQuestion, extractWardMessageMeta, WARD_QUICK_REPLY_OPTIONS } from './메신저유틸';
+import { extractWardMessageMeta, WARD_QUICK_REPLY_OPTIONS } from './메신저유틸';
+import type { ThreadSummary } from './메신저파생훅';
 
 type PollItem = {
   id: string;
@@ -40,15 +41,6 @@ type MessengerAlbumItem = ChatMessage & {
 
 export type MessengerTimelineItem = PollItem | MessengerMessageItem | MessengerAlbumItem;
 
-function formatTimelineDateLabel(value: string | number | Date | null | undefined) {
-  return new Date(value || 0).toLocaleDateString('ko-KR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    weekday: 'short',
-  });
-}
-
 type DeliveryState = {
   status: 'sending' | 'failed' | 'sent';
   error?: string | null;
@@ -56,13 +48,13 @@ type DeliveryState = {
 
 type MessengerTimelineProps = {
   selectedRoomId: string | null;
-  noticeMessages: ChatMessage[];
   messages: ChatMessage[];
   combinedTimeline: MessengerTimelineItem[];
   pollVotes: Record<string, Record<number, number>>;
   reactions: Record<string, Record<string, number>>;
   readCounts: Record<string, number>;
   deliveryStates: Record<string, DeliveryState>;
+  threadSummaries: Record<string, ThreadSummary>;
   roomMembers: StaffMember[];
   effectiveChatUserId: string;
   activeMessageHighlightQuery: string;
@@ -71,13 +63,13 @@ type MessengerTimelineProps = {
   messageListRef: RefObject<HTMLDivElement | null>;
   scrollRef: RefObject<HTMLDivElement | null>;
   showScrollToLatest: boolean;
-  scrollToLatestRequestToken: number;
   resolveStaffProfile: (staffId: string | null | undefined, fallbackName?: string | null) => StaffMember | null;
   onScrollToMessage: (messageId: string) => void;
   onMessageListScroll: () => void;
   onVote: (pollId: string, optionIndex: number) => void;
   onOpenAttachmentPreviewForMessage: (message: ChatMessage) => void;
   onStartReplyToMessage: (message: ChatMessage) => void;
+  onOpenThread: (message: ChatMessage) => void;
   onOpenMessageActions: (message: ChatMessage) => void;
   onMarkMessageRead: (message: ChatMessage) => void;
   renderMessageContent: (content: string, isMine?: boolean, highlightQuery?: string) => ReactNode;
@@ -91,13 +83,13 @@ type MessengerTimelineProps = {
 
 export function MessengerTimeline({
   selectedRoomId,
-  noticeMessages,
   messages,
   combinedTimeline,
   pollVotes,
   reactions,
   readCounts,
   deliveryStates,
+  threadSummaries,
   roomMembers,
   effectiveChatUserId,
   activeMessageHighlightQuery,
@@ -106,13 +98,13 @@ export function MessengerTimeline({
   messageListRef,
   scrollRef,
   showScrollToLatest,
-  scrollToLatestRequestToken,
   resolveStaffProfile,
   onScrollToMessage,
   onMessageListScroll,
   onVote,
   onOpenAttachmentPreviewForMessage,
   onStartReplyToMessage,
+  onOpenThread,
   onOpenMessageActions,
   onMarkMessageRead,
   renderMessageContent,
@@ -123,278 +115,63 @@ export function MessengerTimeline({
   onRetryFailedMessage,
   onScrollToBottom,
 }: MessengerTimelineProps) {
-  const [scrollDateLabel, setScrollDateLabel] = useState('');
-  const [showScrollDateIndicator, setShowScrollDateIndicator] = useState(false);
-  const [noticeBannerCollapsed, setNoticeBannerCollapsed] = useState(false);
-  const scrollDateHideTimeoutRef = useRef<number | null>(null);
-  const pendingRoomChangeAlignRef = useRef<string | null>(null);
-  const roomOpenAutoStickUntilRef = useRef(0);
-  const autoAlignGenerationRef = useRef(0);
-
-  const updateScrollDateIndicator = useCallback(() => {
-    const listElement = messageListRef.current;
-    if (!listElement) return;
-
-    const dateDividers = Array.from(
-      listElement.querySelectorAll<HTMLElement>('[data-chat-date-divider="true"]')
-    );
-
-    if (dateDividers.length === 0) {
-      setScrollDateLabel('');
-      return;
-    }
-
-    const threshold = listElement.scrollTop + 24;
-    let activeLabel = dateDividers[0]?.dataset.dateLabel || '';
-
-    for (const divider of dateDividers) {
-      if (divider.offsetTop <= threshold) {
-        activeLabel = divider.dataset.dateLabel || activeLabel;
-      } else {
-        break;
-      }
-    }
-
-    setScrollDateLabel((current) => (current === activeLabel ? current : activeLabel));
-  }, [messageListRef]);
-
-  const handleMessageListScroll = useCallback(() => {
-    const listElement = messageListRef.current;
-    updateScrollDateIndicator();
-    const shouldReveal =
-      !!listElement && listElement.scrollTop + listElement.clientHeight < listElement.scrollHeight - 32;
-    if (shouldReveal) {
-      autoAlignGenerationRef.current += 1;
-    }
-    setShowScrollDateIndicator(shouldReveal);
-    if (scrollDateHideTimeoutRef.current !== null) {
-      window.clearTimeout(scrollDateHideTimeoutRef.current);
-    }
-    if (shouldReveal) {
-      scrollDateHideTimeoutRef.current = window.setTimeout(() => {
-        setShowScrollDateIndicator(false);
-      }, 900);
-    }
-    onMessageListScroll();
-  }, [messageListRef, onMessageListScroll, updateScrollDateIndicator]);
-
-  const forceTimelineToBottom = useCallback(() => {
-    const listElement = messageListRef.current;
-    if (!listElement) return false;
-
-    onScrollToBottom('auto');
-    listElement.scrollTop = Math.max(0, listElement.scrollHeight - listElement.clientHeight);
-    scrollRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
-
-    const distanceFromBottom = Math.abs(
-      listElement.scrollHeight - listElement.clientHeight - listElement.scrollTop
-    );
-    return distanceFromBottom <= 24;
-  }, [messageListRef, onScrollToBottom, scrollRef]);
-
-  const maintainBottomAfterLayoutChange = useCallback(() => {
-    const listElement = messageListRef.current;
-    if (!selectedRoomId || !listElement) return;
-
-    const distanceFromBottom = Math.abs(
-      listElement.scrollHeight - listElement.clientHeight - listElement.scrollTop
-    );
-    const withinAutoStickWindow = Date.now() <= roomOpenAutoStickUntilRef.current;
-    if (!withinAutoStickWindow && distanceFromBottom > 120) return;
-
-    window.requestAnimationFrame(() => {
-      forceTimelineToBottom();
-    });
-  }, [forceTimelineToBottom, messageListRef, selectedRoomId]);
-
   useLayoutEffect(() => {
     if (!selectedRoomId) return;
 
-    const roomIdForAlign = selectedRoomId;
-    const alignGeneration = autoAlignGenerationRef.current;
-    let cancelled = false;
-    let frameId = 0;
-    const timeoutIds: number[] = [];
+    const listElement = messageListRef.current;
+    if (!listElement) return;
 
     const alignToBottom = () => {
-      if (cancelled) return;
-      if (autoAlignGenerationRef.current !== alignGeneration) return;
-      if (roomIdForAlign !== selectedRoomId) return;
-      forceTimelineToBottom();
+      listElement.scrollTop = Math.max(0, listElement.scrollHeight - listElement.clientHeight);
     };
 
+    // 즉시 + 한 번의 rAF(페인트 후) 초기 스크롤
     alignToBottom();
-    frameId = window.requestAnimationFrame(() => {
-      alignToBottom();
-      frameId = window.requestAnimationFrame(alignToBottom);
-    });
-    timeoutIds.push(window.setTimeout(alignToBottom, 80));
-    timeoutIds.push(window.setTimeout(alignToBottom, 220));
-    timeoutIds.push(window.setTimeout(alignToBottom, 420));
-    timeoutIds.push(window.setTimeout(alignToBottom, 720));
+    const frameId = window.requestAnimationFrame(alignToBottom);
 
-    return () => {
-      cancelled = true;
-      window.cancelAnimationFrame(frameId);
-      timeoutIds.forEach((id) => window.clearTimeout(id));
-    };
-  }, [forceTimelineToBottom, scrollToLatestRequestToken, selectedRoomId]);
+    // 방 전환 직후엔 콘텐츠가 없을 수 있으므로, ResizeObserver에서
+    // 콘텐츠가 처음 채워질 때도 하단 정렬 (pendingAlign 플래그로 제어)
+    let pendingAlign = true;
 
-  useEffect(() => {
-    autoAlignGenerationRef.current += 1;
-    pendingRoomChangeAlignRef.current = selectedRoomId;
-    roomOpenAutoStickUntilRef.current = selectedRoomId ? Date.now() + 2800 : 0;
-  }, [scrollToLatestRequestToken, selectedRoomId]);
-
-  useEffect(() => {
-    updateScrollDateIndicator();
-    setShowScrollDateIndicator(false);
-    if (
-      selectedRoomId &&
-      pendingRoomChangeAlignRef.current === selectedRoomId &&
-      combinedTimeline.length > 0
-    ) {
-      const roomIdForAlign = selectedRoomId;
-      const alignGeneration = autoAlignGenerationRef.current;
-      const timeoutIds: number[] = [];
-      roomOpenAutoStickUntilRef.current = Math.max(roomOpenAutoStickUntilRef.current, Date.now() + 2800);
-      const scheduleAlign = (delay = 0) => {
-        const run = () => {
-          if (autoAlignGenerationRef.current !== alignGeneration) return;
-          if (pendingRoomChangeAlignRef.current !== null && pendingRoomChangeAlignRef.current !== roomIdForAlign) return;
-          if (roomIdForAlign !== selectedRoomId) return;
-          forceTimelineToBottom();
-        };
-
-        if (delay === 0) {
-          window.requestAnimationFrame(run);
-          return;
-        }
-
-        timeoutIds.push(window.setTimeout(() => {
-          window.requestAnimationFrame(run);
-        }, delay));
-      };
-
-      scheduleAlign();
-      scheduleAlign(80);
-      scheduleAlign(220);
-      scheduleAlign(420);
-      pendingRoomChangeAlignRef.current = null;
-      return () => {
-        timeoutIds.forEach((id) => window.clearTimeout(id));
-      };
-    }
-  }, [combinedTimeline, forceTimelineToBottom, selectedRoomId, updateScrollDateIndicator]);
-
-  useEffect(() => {
-    return () => {
-      if (scrollDateHideTimeoutRef.current !== null) {
-        window.clearTimeout(scrollDateHideTimeoutRef.current);
+    const observer = new ResizeObserver(() => {
+      const dist = listElement.scrollHeight - listElement.scrollTop - listElement.clientHeight;
+      if (pendingAlign) {
+        // 방 전환 후 첫 콘텐츠 렌더 → 무조건 하단 정렬
+        alignToBottom();
+        if (dist <= 2) pendingAlign = false; // 정착 완료
+      } else if (dist < 80) {
+        // 이미지 로드 등으로 인한 높이 변화 → 하단 근처면 정렬
+        alignToBottom();
       }
-    };
-  }, []);
+    });
 
-  useEffect(() => {
-    setNoticeBannerCollapsed(false);
-  }, [selectedRoomId, noticeMessages.length]);
+    const inner = listElement.firstElementChild;
+    if (inner) observer.observe(inner);
+
+    return () => {
+      pendingAlign = false;
+      window.cancelAnimationFrame(frameId);
+      observer.disconnect();
+    };
+  }, [messageListRef, selectedRoomId]);
 
   return (
     <>
-      {selectedRoomId && noticeMessages.length > 0 && (
-        <div
-          data-testid="chat-notice-banner"
-          className="shrink-0 border-b border-orange-100 bg-orange-500/10 px-3 py-2 md:px-4"
-        >
-          <div className="flex items-center gap-2">
-            <div className="shrink-0 rounded-full bg-orange-500 px-2.5 py-1 text-[10px] font-bold text-white">
-              {`공지 ${noticeMessages.length}`}
-            </div>
-            <div className="min-w-0 flex-1">
-              {noticeBannerCollapsed ? (
-                <button
-                  type="button"
-                  data-testid="chat-notice-collapsed-preview"
-                  onClick={() => {
-                    if (noticeMessages[0]?.id) onScrollToMessage(noticeMessages[0].id);
-                  }}
-                  className="w-full min-w-0 rounded-full border border-orange-500/20 bg-[var(--card)] px-3 py-1.5 text-left text-xs font-semibold text-[var(--foreground)] shadow-sm transition-colors hover:bg-orange-500/10"
-                >
-                  <span className="block truncate">
-                    {getMessageDisplayText(
-                      noticeMessages[0]?.content,
-                      noticeMessages[0]?.file_name,
-                      noticeMessages[0]?.file_url,
-                      '공지 메시지'
-                    )}
-                  </span>
-                </button>
-              ) : (
-                <div
-                  data-testid="chat-notice-items"
-                  className="flex gap-2 overflow-x-auto pb-0.5 custom-scrollbar"
-                >
-                  {noticeMessages.map((pinnedMessage) => (
-                    <button
-                      key={`pin-${pinnedMessage.id}`}
-                      data-testid={`chat-notice-item-${pinnedMessage.id}`}
-                      type="button"
-                      onClick={() => onScrollToMessage(pinnedMessage.id)}
-                      className="min-w-0 max-w-[420px] shrink-0 rounded-full border border-orange-500/20 bg-[var(--card)] px-3 py-1.5 text-left text-xs font-semibold text-[var(--foreground)] shadow-sm transition-colors hover:bg-orange-500/10 md:max-w-[560px]"
-                    >
-                      <span className="block truncate">
-                        {getMessageDisplayText(
-                          pinnedMessage.content,
-                          pinnedMessage.file_name,
-                          pinnedMessage.file_url,
-                          '공지 메시지'
-                        )}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <button
-              type="button"
-              data-testid="chat-notice-toggle"
-              onClick={() => setNoticeBannerCollapsed((current) => !current)}
-              className="shrink-0 rounded-full border border-orange-500/20 bg-[var(--card)] px-3 py-1.5 text-[11px] font-bold text-orange-600 transition-colors hover:bg-orange-500/10"
-            >
-              {noticeBannerCollapsed ? '공지 펼치기' : '공지 접기'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="relative flex-1 min-h-0">
-        <div
-          ref={messageListRef}
-          data-testid="chat-message-list"
-          onScroll={handleMessageListScroll}
-          className="relative h-full min-h-0 overflow-y-auto px-2 py-0.5 pb-1 md:px-4 md:py-2 md:pb-2 space-y-0 custom-scrollbar"
-        >
-          {scrollDateLabel ? (
-            <div className="pointer-events-none absolute inset-y-0 right-2 z-20 flex items-center md:right-4">
-              <div
-                data-testid="chat-scroll-date-indicator"
-                className={`rounded-full bg-[var(--toss-gray-5)]/90 px-2.5 py-1 text-[11px] font-bold text-white shadow-lg backdrop-blur-sm transition-all duration-150 ${
-                  showScrollDateIndicator ? 'translate-x-0 opacity-100' : 'translate-x-2 opacity-0'
-                }`}
-              >
-                {scrollDateLabel}
-              </div>
-            </div>
-          ) : null}
+      <div
+        ref={messageListRef}
+        data-testid="chat-message-list"
+        onScroll={onMessageListScroll}
+        className="flex-1 min-h-0 overflow-y-auto px-2 py-0.5 pb-1 md:px-4 md:py-2 md:pb-2 space-y-0 custom-scrollbar"
+      >
         {!selectedRoomId ? (
           <div className="h-full flex flex-col items-center justify-center text-[var(--toss-gray-3)]">
             <span className="text-4xl mb-2">💬</span>
-            <p className="text-sm font-bold">채팅방을 선택하세요</p>
+            <p className="text-sm font-bold">채팅방을 선택하세요.</p>
           </div>
         ) : messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center opacity-20">
             <span className="text-6xl mb-4">💬</span>
-            <p className="font-semibold text-sm">아직 대화 내용이 없습니다.</p>
+            <p className="font-semibold text-sm">대화 내용이 없습니다.</p>
           </div>
         ) : (
           (() => {
@@ -404,52 +181,21 @@ export function MessengerTimeline({
             return combinedTimeline.map((item) => {
               if (item.type === 'poll') {
                 const pollItem = item as PollItem;
-                const pollMeta = extractPollMetaFromQuestion(pollItem.question);
-                const deadlineAt = pollMeta.deadlineAt;
-                const deadlineDate = deadlineAt ? new Date(deadlineAt) : null;
-                const isPollClosed = Boolean(deadlineDate && !Number.isNaN(deadlineDate.getTime()) && deadlineDate.getTime() <= Date.now());
                 const votes = pollVotes[pollItem.id] || {};
                 const totalVotes = (Object.values(votes) as number[]).reduce((a: number, b: number) => a + b, 0);
                 return (
                   <div data-testid={`chat-poll-${pollItem.id}`} key={`poll-${pollItem.id}`} className="max-w-[85%] md:max-w-[70%] bg-blue-500/10 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-2xl p-4 shadow-soft">
-                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
-                        <span className="text-sm">🗳️</span> 투표
-                      </p>
-                      {deadlineDate && !Number.isNaN(deadlineDate.getTime()) ? (
-                        <span
-                          data-testid={`chat-poll-deadline-label-${pollItem.id}`}
-                          className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                            isPollClosed
-                              ? 'bg-rose-500/15 text-rose-600'
-                              : 'bg-blue-500/10 text-blue-600'
-                          }`}
-                        >
-                          {isPollClosed ? '마감' : '마감 예정'} {deadlineDate.toLocaleString('ko-KR', {
-                            month: '2-digit',
-                            day: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="mb-4 text-xs font-bold text-foreground leading-relaxed">{pollMeta.displayQuestion || pollItem.question}</p>
+                    <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                      <span className="text-sm">🗳️</span> 투표
+                    </p>
+                    <p className="mb-4 text-xs font-bold text-foreground leading-relaxed">{pollItem.question}</p>
                     <div className="space-y-1.5">
                       {(pollItem.options || []).map((opt: string, idx: number) => (
                         <button
                           data-testid={`chat-poll-vote-${pollItem.id}-${idx}`}
                           key={idx}
-                          onClick={() => {
-                            if (isPollClosed) return;
-                            onVote(pollItem.id, idx);
-                          }}
-                          disabled={isPollClosed}
-                          className={`w-full flex justify-between items-center px-4 py-2.5 rounded-xl bg-[var(--card)] dark:bg-zinc-800/50 border text-[11px] font-medium group transition-all ${
-                            isPollClosed
-                              ? 'border-[var(--border)] opacity-60 cursor-not-allowed'
-                              : 'border-blue-500/20/50 dark:border-blue-700/30 hover:border-blue-400 dark:hover:border-blue-500'
-                          }`}
+                          onClick={() => onVote(pollItem.id, idx)}
+                          className="w-full flex justify-between items-center px-4 py-2.5 rounded-xl bg-[var(--card)] dark:bg-zinc-800/50 border border-blue-500/20/50 dark:border-blue-700/30 hover:border-blue-400 dark:hover:border-blue-500 transition-all text-[11px] font-medium group"
                         >
                           <span className="text-[var(--toss-gray-5)] dark:text-[var(--toss-gray-3)] group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{opt}</span>
                           <span className="text-blue-600 font-bold bg-blue-500/10 dark:bg-blue-900/50 px-2 py-0.5 rounded-md">
@@ -467,9 +213,9 @@ export function MessengerTimeline({
                 const albumItem = item as MessengerAlbumItem;
                 const albumMsgs = albumItem.albumMessages || [];
                 const isMineAlbum = String(albumItem.sender_id) === effectiveChatUserId;
-                const senderName = (albumItem.staff as { name?: string } | null)?.name || albumItem.sender_name || '이름 없음';
+                const senderName = (albumItem.staff as { name?: string } | null)?.name || albumItem.sender_name || '알 수 없음';
                 const created = new Date(albumItem.created_at || 0);
-                const dateLabel = formatTimelineDateLabel(albumItem.created_at);
+                const dateLabel = created.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
                 const showDateDivider = dateLabel !== lastDateLabel;
                 if (showDateDivider) lastDateLabel = dateLabel;
                 lastSenderId = String(albumItem.sender_id);
@@ -488,11 +234,7 @@ export function MessengerTimeline({
                     className={showDateDivider ? 'mt-0.5 md:mt-1' : 'mt-[2px]'}
                   >
                     {showDateDivider && (
-                      <div
-                        data-chat-date-divider="true"
-                        data-date-label={dateLabel}
-                        className="my-0.5 flex items-center justify-center gap-1 md:my-1 md:gap-2"
-                      >
+                      <div data-testid="chat-date-divider" className="my-0.5 flex items-center justify-center gap-1 md:my-1 md:gap-2">
                         <div className="flex-1 h-px bg-[var(--border)]" />
                         <span className="px-2.5 py-0.5 rounded-full bg-[var(--muted)] text-[10px] font-semibold text-[var(--toss-gray-3)] shrink-0">{dateLabel}</span>
                         <div className="flex-1 h-px bg-[var(--border)]" />
@@ -502,7 +244,7 @@ export function MessengerTimeline({
                       {!isMineAlbum && (
                         <MessengerAvatar
                           name={senderName}
-                          photoUrl={getProfilePhotoUrl(albumItem.staff as Record<string, unknown> | null)}
+                          photoUrl={(albumItem.staff as { photo_url?: string | null } | null)?.photo_url || null}
                           className="mb-1 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--muted)] text-[11px] font-bold text-[var(--toss-gray-4)]"
                           decorative
                         />
@@ -518,14 +260,13 @@ export function MessengerTimeline({
                               className={`relative overflow-hidden bg-[var(--muted)] ${count === 3 && index === 2 ? 'col-span-2' : ''} ${count === 5 && index === 3 ? 'col-span-1' : ''}`}
                               style={{ aspectRatio: count === 1 ? '4/3' : '1/1' }}
                               onClick={() => onOpenAttachmentPreviewForMessage(message)}
-                              aria-label={`${message.file_name || `?⑤쾾 ?ъ쭊 ${index + 1}`} 誘몃━蹂닿린`}
+                              aria-label={`${message.file_name || `앨범 사진 ${index + 1}`} 미리보기`}
                             >
                               <img
                                 src={message.file_url || ''}
-                                alt={message.file_name || '?ъ쭊'}
+                                alt={message.file_name || '사진'}
                                 className="w-full h-full object-cover"
                                 loading="lazy"
-                                onLoad={maintainBottomAfterLayoutChange}
                               />
                               {index === 4 && count > 5 && (
                                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
@@ -536,7 +277,7 @@ export function MessengerTimeline({
                           ))}
                         </div>
                         <div className={`mx-1 flex items-center gap-2 text-[10px] ${isMineAlbum ? 'justify-end' : 'justify-start'}`}>
-                          <span className="text-[var(--toss-gray-3)]">{`${timeStr} · 사진 ${count}장`}</span>
+                          <span className="text-[var(--toss-gray-3)]">{timeStr} · 사진 {count}장</span>
                           {albumReplyTarget ? (
                             <button
                               type="button"
@@ -544,7 +285,7 @@ export function MessengerTimeline({
                               onClick={() => onStartReplyToMessage(albumReplyTarget)}
                               className="font-bold text-amber-700 transition-colors hover:text-amber-800"
                             >
-                              ?듦?
+                              답글
                             </button>
                           ) : null}
                         </div>
@@ -580,7 +321,12 @@ export function MessengerTimeline({
               const displayedReadStatusSummary = isMine ? readStatusSummary : null;
               const isAttachmentOnlyMessage = !String(msg.content || '').trim() && Boolean(msg.file_url);
               const created = new Date(msg.created_at || 0);
-              const dateLabel = formatTimelineDateLabel(msg.created_at);
+              const dateLabel = created.toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                weekday: 'short',
+              });
               const showDateDivider = dateLabel !== lastDateLabel;
               if (showDateDivider) lastDateLabel = dateLabel;
               const isSystemInvite = typeof msg.content === 'string' && msg.content.startsWith('[초대]');
@@ -602,16 +348,32 @@ export function MessengerTimeline({
                 wardMessageMeta.meta?.type === 'op_ward_request';
               const isWardQuickReplySending = wardQuickReplySendingMessageId === String(msg.id || '');
               const showIncomingAvatar = !isMine && !isContinuous;
+              const threadSummary = threadSummaries[String(msg.id)];
+              const showThreadBadge = Boolean(
+                !isDeletedMessage &&
+                threadSummary &&
+                (threadSummary.replyCount > 0 || threadSummary.rootId !== String(msg.id))
+              );
+              const threadBadgeLabel =
+                threadSummary?.rootId && threadSummary.rootId !== String(msg.id)
+                  ? `스레드 보기 · 답글 ${threadSummary.replyCount}개`
+                  : `답글 ${threadSummary?.replyCount || 0}개`;
+              const threadBadgeTitle = threadSummary
+                ? `참여 ${threadSummary.participantCount}명${threadSummary.latestReplyAt ? ` · 최근 답글 ${new Date(threadSummary.latestReplyAt).toLocaleString('ko-KR')}` : ''}`
+                : '';
+              const showThreadAttention =
+                Boolean(
+                  threadSummary &&
+                  threadSummary.needsAttention &&
+                  String(msg.id) === threadSummary.rootId &&
+                  !isDeletedMessage,
+                );
               lastSenderId = String(msg.sender_id);
 
               return (
                 <div key={msg.id} data-testid={`chat-message-row-${msg.id}`} className={isContinuous ? 'mt-[2px]' : 'mt-0.5 md:mt-1'}>
                   {showDateDivider && (
-                    <div
-                      data-chat-date-divider="true"
-                      data-date-label={dateLabel}
-                      className="my-0.5 flex items-center justify-center gap-1 md:my-1 md:gap-2"
-                    >
+                    <div data-testid="chat-date-divider" className="my-0.5 flex items-center justify-center gap-1 md:my-1 md:gap-2">
                       <div className="flex-1 h-px bg-[var(--border)]" />
                       <span className="px-2.5 py-0.5 rounded-full bg-[var(--muted)] text-[10px] font-semibold text-[var(--toss-gray-3)] shrink-0">
                         {dateLabel}
@@ -733,7 +495,6 @@ export function MessengerTimeline({
                                     onPreview={() => onOpenAttachmentPreview(fileUrl, attachmentName, attachmentKind)}
                                     layout="bubble"
                                     tone={isMine ? 'accent' : 'default'}
-                                    onMediaLoad={maintainBottomAfterLayoutChange}
                                   />
                                 </div>
                               );
@@ -802,7 +563,7 @@ export function MessengerTimeline({
                                 빠른 응답
                               </p>
                               <div className="flex flex-wrap gap-1.5">
-                                {WARD_QUICK_REPLY_OPTIONS.map((option: (typeof WARD_QUICK_REPLY_OPTIONS)[number]) => (
+                                {WARD_QUICK_REPLY_OPTIONS.map((option) => (
                                   <button
                                     key={option.id}
                                     type="button"
@@ -819,6 +580,44 @@ export function MessengerTimeline({
                               </div>
                             </div>
                           )}
+                          {!isDeletedMessage && msg.edited_at && (
+                            <p
+                              data-testid={`chat-message-edited-${msg.id}`}
+                              className={`mt-1 px-1 text-[10px] font-semibold text-amber-600 ${isMine ? 'text-right' : 'text-left'}`}
+                            >
+                              수정됨
+                            </p>
+                          )}
+                          {showThreadBadge && threadSummary ? (
+                            <button
+                              type="button"
+                              data-testid={`chat-thread-badge-${msg.id}`}
+                              title={threadBadgeTitle}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onOpenThread(msg);
+                              }}
+                              className={`mt-1 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-bold transition-colors ${
+                                isMine
+                                  ? 'self-end border-white/30 bg-white/10 text-white hover:bg-white/15'
+                                  : 'border-[var(--accent)]/20 bg-[var(--toss-blue-light)] text-[var(--accent)] hover:bg-[var(--toss-blue-light)]/80'
+                              }`}
+                            >
+                              {threadBadgeLabel}
+                            </button>
+                          ) : null}
+                          {showThreadAttention ? (
+                            <span
+                              data-testid={`chat-thread-needs-attention-${msg.id}`}
+                              className={`mt-1 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                                isMine
+                                  ? 'self-end bg-amber-400/20 text-amber-100'
+                                  : 'bg-amber-500/10 text-amber-700'
+                              }`}
+                            >
+                              답변 필요
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                       {isMine && deliveryStateLabel && (
@@ -834,6 +633,7 @@ export function MessengerTimeline({
                           </span>
                           {deliveryState === 'failed' && (
                             <button
+                              data-testid={`chat-message-retry-${msg.id}`}
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
@@ -861,14 +661,14 @@ export function MessengerTimeline({
                           onClick={() => { onStartReplyToMessage(msg); }}
                           className="touch-manipulation min-h-[32px] p-1 px-2 rounded-lg hover:bg-[var(--tab-bg)] active:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-blue-500 transition-colors"
                         >
-                          답글
+                          답장
                         </button>
                         <button
                           type="button"
                           onClick={() => { onOpenMessageActions(msg); }}
                           className="touch-manipulation min-h-[32px] p-1 px-2 rounded-lg hover:bg-[var(--tab-bg)] active:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] transition-colors"
                         >
-                          더보기
+                          ···
                         </button>
                       </div>
                     </div>
@@ -879,24 +679,20 @@ export function MessengerTimeline({
           })()
         )}
 
-          <div ref={scrollRef} />
-        </div>
+        <div ref={scrollRef} />
+      </div>
 
       {showScrollToLatest && selectedRoomId && (
-        <div className="pointer-events-none absolute bottom-3 right-3 z-20 md:bottom-4 md:right-4">
+        <div className="absolute right-4 bottom-4 z-20">
           <button
-            data-testid="chat-scroll-to-latest-button"
             type="button"
             onClick={() => onScrollToBottom('smooth')}
-            aria-label="\ucd5c\uc2e0 \uba54\uc2dc\uc9c0\ub85c \uc774\ub3d9"
-            className="pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--card)] text-[0px] text-[var(--foreground)] shadow-lg transition hover:-translate-y-0.5 hover:border-[var(--accent)]/40 hover:bg-[var(--toss-blue-light)] active:translate-y-0"
+            className="px-3 py-2 rounded-[var(--radius-md)] bg-[var(--card)] border border-[var(--border)] shadow-sm text-[11px] font-bold text-[var(--foreground)]"
           >
-            <span aria-hidden="true" className="text-xl leading-none">{"\u2193"}</span>
-            理쒖떊 硫붿떆吏
+            최신 메시지
           </button>
         </div>
       )}
-      </div>
     </>
   );
 }

@@ -13,6 +13,10 @@ import {
   sortChatRoomsWithNoticeFirst,
   type MessageRetryPayload,
 } from './메신저유틸';
+import {
+  removeChatRetryQueueEntry,
+  upsertFailedChatRetryEntry,
+} from './메신저재시도큐';
 
 type DeliveryStateLike = {
   status: 'sending' | 'failed' | 'sent';
@@ -203,6 +207,7 @@ export function useChatMessageSending({
     const { data: inserted, error } = await insertChatMessageWithFallback<ChatMessage>(insertPayload);
 
     if (!error && inserted) {
+      removeChatRetryQueueEntry(actorId, optimisticId);
       const optimisticInsertedMessage = {
         ...inserted,
         staff: { name: user.name, photo_url: getProfilePhotoUrl(user) },
@@ -277,6 +282,12 @@ export function useChatMessageSending({
         error: error?.message || '메시지 전송 실패',
       },
     }));
+    upsertFailedChatRetryEntry(actorId, {
+      id: optimisticId,
+      payload: retrySnapshot,
+      error: error?.message || '메시지 전송 실패',
+      createdAt: optimisticMessage.created_at,
+    });
     console.error('message send failed', error);
     return false;
   }, [
@@ -324,9 +335,20 @@ export function useChatMessageSending({
     await handleSendMessage({ retryMessageId: messageId });
   }, [handleSendMessage]);
 
+  const retryAllFailedMessages = useCallback(async (messageIds: string[]) => {
+    for (const messageId of messageIds) {
+      const normalizedId = String(messageId || '').trim();
+      if (!normalizedId) continue;
+      if (deliveryStatesRef.current[normalizedId]?.status !== 'failed') continue;
+      // Sequential retries avoid double-inserts when multiple queued sends recover together.
+      await handleSendMessage({ retryMessageId: normalizedId });
+    }
+  }, [deliveryStatesRef, handleSendMessage]);
+
   return {
     handleSendMessage,
     sendWardQuickReply,
     retryFailedMessage,
+    retryAllFailedMessages,
   };
 }

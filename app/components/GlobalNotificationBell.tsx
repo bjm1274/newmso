@@ -3,6 +3,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import {
+  buildApprovalNotificationHref,
+  buildBoardNotificationHref,
+  buildChatNotificationHref,
+  buildInventoryNotificationHref,
+  buildMenuNotificationHref,
+  resolveNotificationOpenMenu,
+} from '@/lib/notification-metadata';
 
 const TYPE_ICONS: Record<string, string> = {
   approval: '📝',
@@ -135,27 +143,25 @@ export default function GlobalNotificationBell({
     setOpen(false);
     setToastNotification(null);
 
-    if (notification.metadata?.room_id) {
-      router.push(`/main?open_chat_room=${notification.metadata.room_id}`);
+    const metadata = notification.metadata || {};
+
+    if (notification.type === 'message' || notification.type === 'mention') {
+      router.push(buildChatNotificationHref(metadata));
       return;
     }
 
-    if (notification.metadata?.open_menu === '관리자') {
-      const openSubView =
-        typeof notification.metadata?.open_subview === 'string' && notification.metadata.open_subview.trim()
-          ? notification.metadata.open_subview
-          : '감사센터';
-      router.push(`/main?open_menu=관리자&open_subview=${encodeURIComponent(openSubView)}`);
+    if (resolveNotificationOpenMenu(metadata) === '관리자') {
+      router.push(buildMenuNotificationHref(metadata, '관리자'));
       return;
     }
 
     if (notification.type === 'approval') {
-      router.push('/main?open_menu=전자결재');
+      router.push(buildApprovalNotificationHref(metadata));
       return;
     }
 
     if (notification.type === 'inventory') {
-      router.push('/main?open_menu=재고관리');
+      router.push(buildInventoryNotificationHref(metadata));
       return;
     }
 
@@ -169,11 +175,8 @@ export default function GlobalNotificationBell({
       return;
     }
 
-    if (notification.type === 'board') {
-      const isCondolenceBoard =
-        String(notification.title || '').includes('경조사') ||
-        String(notification.body || '').includes('경조사');
-      router.push(isCondolenceBoard ? '/main?open_menu=게시판&open_board=경조사' : '/main?open_menu=게시판');
+    if (notification.type === 'board' || (notification.type === 'notification' && metadata.post_id)) {
+      router.push(buildBoardNotificationHref(metadata));
     }
   }, [markRead, router]);
 

@@ -24,8 +24,23 @@ import {
   readCachedGenerationRules,
   ROSTER_GENERATION_RULE_STORAGE_KEY,
   type RosterGenerationRule,
+  type RosterGenerationStyle,
   writeCachedGenerationRules,
 } from '@/lib/roster-generation-rules';
+import {
+  buildBlockedDatesByStaff,
+  buildPreferredOffDateMap,
+  countBlockedDateEntries,
+  mergeBlockedDateMaps,
+  normalizePreferredOffSelections,
+  type PreferredOffSelectionMap,
+} from '@/lib/roster-date-utils';
+import {
+  expandCoverageRoleTags,
+  normalizeCoverageRoleTags,
+  serializeCoverageRoleTags,
+  summarizeRoleCoverageRules,
+} from '@/lib/roster-role-tags';
 import {
   buildRosterSnapshotStorageKey,
   normalizeStoredRosterSnapshot,
@@ -40,6 +55,12 @@ import { isKoreanPublicHoliday } from '@/lib/korean-public-holidays';
 import { filterRosterShiftsForDepartment } from '@/lib/roster-shift-team-filter';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import RosterFairnessBoard from './roster/RosterFairnessBoard';
+import RosterManualImpactPanel from './roster/RosterManualImpactPanel';
+import RosterPartialRegenerationPanel from './roster/RosterPartialRegenerationPanel';
+import RosterReviewPanel from './roster/RosterReviewPanel';
+import RosterSnapshotPanel from './roster/RosterSnapshotPanel';
+import RosterWarningReport from './roster/RosterWarningReport';
 import SmartMonthPicker from './공통/SmartMonthPicker';
 
 const MANAGER_POSITION_KEYWORDS = [
@@ -67,10 +88,34 @@ const ROSTER_PREFERRED_OFF_STORAGE_PREFIX = 'erp_roster_preferred_off_v1';
 const ROSTER_STAFF_NIGHT_RANGE_STORAGE_PREFIX = 'erp_roster_staff_night_ranges_v1';
 const WEEKDAY_PICKER_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const NEW_NURSE_TENURE_MONTHS = 12;
+const WIZARD_NIGHT_BLOCK_PRESET_OPTIONS = [
+  { id: 'single-night', label: 'N-OFF', nightBlockSize: 1, offDaysAfterNight: 1 },
+  { id: 'double-night', label: 'N-N-OFF-OFF', nightBlockSize: 2, offDaysAfterNight: 2 },
+  { id: 'double-night-short', label: 'N-N-OFF', nightBlockSize: 2, offDaysAfterNight: 1 },
+  { id: 'triple-night', label: 'N-N-N-OFF-OFF', nightBlockSize: 3, offDaysAfterNight: 2 },
+] as const;
+const GENERATION_STYLE_OPTIONS: Array<{ value: RosterGenerationStyle; label: string; detail: string }> = [
+  { value: 'balanced', label: '균등형', detail: '야간, 주말, OFF 균형을 우선합니다.' },
+  { value: 'block', label: '블록형', detail: '같은 밴드를 조금 더 길게 묶어 배치합니다.' },
+  { value: 'variety', label: '다양성형', detail: '같은 패턴 반복을 줄이고 순환감을 높입니다.' },
+  { value: 'stable', label: '안정형', detail: '전담 성향과 기존 흐름을 최대한 유지합니다.' },
+];
+const STAFF_BLOCK_PREFERENCE_OPTIONS = [
+  { value: 'short', label: '짧게', detail: '1~2일 단위 순환을 선호합니다.' },
+  { value: 'balanced', label: '균형', detail: '짧은 블록과 긴 블록을 함께 허용합니다.' },
+  { value: 'long', label: '길게', detail: '같은 밴드를 더 길게 묶는 편성을 선호합니다.' },
+  { value: 'night_focus', label: '야간 묶음', detail: '나이트를 한 블록으로 몰아주는 쪽을 선호합니다.' },
+] as const;
+const PARTIAL_REGENERATION_MODE_OPTIONS = [
+  { value: 'minimize_changes', label: '변경 최소화', detail: '기존 편성을 최대한 유지합니다.' },
+  { value: 'preserve_pattern', label: '패턴 유지', detail: '원래 블록 흐름과 전담 성향을 우선합니다.' },
+  { value: 'rebalance_fairness', label: '공정성 보정', detail: '나이트와 주말 편중을 다시 나눕니다.' },
+] as const;
 
 type ManualAssignmentMap = Record<string, string>;
-type PreferredOffSelectionMap = Record<string, string[]>;
 type WizardStep = 1 | 2 | 3 | 4;
+type StaffBlockPreference = (typeof STAFF_BLOCK_PREFERENCE_OPTIONS)[number]['value'];
+type PartialRegenerationMode = (typeof PARTIAL_REGENERATION_MODE_OPTIONS)[number]['value'];
 
 function parseRosterUpdatedAt(value: string | null | undefined) {
   const timestamp = Date.parse(String(value || ''));
@@ -147,6 +192,19 @@ type RosterWizardPreset = {
     shiftSlot: number;
     activeWeekdays: number[];
   }>;
+  generationRule?: RosterGenerationRule | null;
+  staffNightRanges?: Record<
+    string,
+    {
+      minNightShiftCount: number;
+      maxNightShiftCount: number;
+    }
+  >;
+  staffBlockPreferences?: Record<string, StaffBlockPreference>;
+  staffDedicatedBands?: Record<string, CoverageBand | ''>;
+  staffCoverageRoleTags?: Record<string, string[]>;
+  staffRestrictions?: Record<string, StaffRestrictionDraft>;
+  pairRules?: WizardPairRule[];
 };
 
 /*
@@ -178,8 +236,17 @@ type StaffConfig = {
   nightShiftCount: number;
   minNightShiftCount: number;
   maxNightShiftCount: number;
+  blockPreference: StaffBlockPreference;
   customPatternSequence: string[];
   weeklyTemplateWeeks: WeeklyTemplateWeek[];
+  blockedShiftBands: CoverageBand[];
+  blockedWeekdays: number[];
+  avoidWeekendWork: boolean;
+  avoidHolidayWork: boolean;
+  preferWeekendOff: boolean;
+  preferHolidayOff: boolean;
+  avoidConsecutiveEvening: boolean;
+  preferEarlyMonthNight: boolean;
 };
 
 type GeminiRosterStaffPlan = {
@@ -248,6 +315,10 @@ type PreviewDailyCoverage = {
   day: number;
   evening: number;
   night: number;
+  targetDay: number;
+  targetEvening: number;
+  targetNight: number;
+  targetSourceLabel: string;
   status: 'warning' | 'balanced' | 'extra';
   statusLabel: string;
   statusDetail: string;
@@ -275,6 +346,112 @@ type WizardOffOverride = {
   enabled: boolean;
   offDate: string;
   nextShiftId: string;
+};
+
+type WizardNightRangeDraft = {
+  minNightShiftCount: number;
+  maxNightShiftCount: number;
+};
+
+type CoverageBand = 'day' | 'evening' | 'night';
+
+type StaffRestrictionDraft = {
+  blockedShiftBands: CoverageBand[];
+  blockedWeekdays: number[];
+  avoidWeekendWork: boolean;
+  avoidHolidayWork: boolean;
+  preferWeekendOff: boolean;
+  preferHolidayOff: boolean;
+  avoidConsecutiveEvening: boolean;
+  preferEarlyMonthNight: boolean;
+};
+
+type WizardPairRule = {
+  id: string;
+  primaryStaffId: string;
+  secondaryStaffId: string;
+  mode: 'together' | 'separate';
+  band: 'night' | 'work';
+};
+
+type WizardGenerationBasis = 'saved_rule' | 'rotation_only';
+
+type EditableGenerationRuleField =
+  | 'name'
+  | 'description'
+  | 'teamKeywords'
+  | 'generationStyle'
+  | 'avoidDayAfterNight'
+  | 'avoidDayAfterEvening'
+  | 'maxConsecutiveEveningShifts'
+  | 'offDaysAfterNight'
+  | 'nightBlockSize'
+  | 'minRotationNightCount'
+  | 'maxRotationNightCount'
+  | 'minMonthlyOffDays'
+  | 'maxConsecutiveWorkDays'
+  | 'maxConsecutiveWeekendWorkDays'
+  | 'fixedShiftOnly'
+  | 'balanceRotationBands'
+  | 'distributeWeekendShifts'
+  | 'distributeHolidayShifts'
+  | 'separateNewNursesByShift'
+  | 'blockNewNurseSoloNight'
+  | 'requireSeniorWithNewNurseNight'
+  | 'minDayStaff'
+  | 'minEveningStaff'
+  | 'minNightStaff'
+  | 'weekendMinDayStaff'
+  | 'weekendMinEveningStaff'
+  | 'weekendMinNightStaff'
+  | 'holidayMinDayStaff'
+  | 'holidayMinEveningStaff'
+  | 'holidayMinNightStaff'
+  | 'minSeniorDayStaff'
+  | 'minSeniorEveningStaff'
+  | 'minSeniorNightStaff'
+  | 'minDedicatedDayStaff'
+  | 'minDedicatedEveningStaff'
+  | 'minDedicatedNightStaff';
+
+type StaffPlanningMeta = {
+  staff: StaffMember;
+  staffId: string;
+  config: StaffConfig;
+  resolvedGroup: PlannerResolvedPatternGroup | null;
+  resolvedGroupMode: RosterPatternGroupMode;
+  resolvedGroupLabel: string;
+  resolvedGroupReason: string;
+  dedicatedBand: CoverageBand | null;
+  coverageRoleTags: string[];
+  coverageRoleMatcherText: string;
+  isSeniorStaff: boolean;
+  isNewNurse: boolean;
+};
+
+type RosterFeasibilityIssue = {
+  id: string;
+  severity: 'blocking' | 'warning';
+  targetTestId: string;
+  title: string;
+  detail: string;
+};
+
+type SelectedManualCell = {
+  staffId: string;
+  date: string;
+} | null;
+
+type RosterPlanComparison = {
+  id: string;
+  title: string;
+  description: string;
+  style: RosterGenerationStyle;
+  fairnessScore: number;
+  diversityScore: number;
+  warningCount: number;
+  changedCells: number;
+  recommendation: string;
 };
 
 function getDepartmentName(target: StaffMember | null | undefined): string {
@@ -310,6 +487,50 @@ function getMonthEndDateKey(monthDates: string[]) {
   return monthDates[monthDates.length - 1] || '';
 }
 
+function normalizeStaffBlockPreference(value: unknown): StaffBlockPreference {
+  return value === 'short' || value === 'long' || value === 'night_focus' ? value : 'balanced';
+}
+
+function buildDefaultStaffRestrictionDraft(): StaffRestrictionDraft {
+  return {
+    blockedShiftBands: [],
+    blockedWeekdays: [],
+    avoidWeekendWork: false,
+    avoidHolidayWork: false,
+    preferWeekendOff: false,
+    preferHolidayOff: false,
+    avoidConsecutiveEvening: false,
+    preferEarlyMonthNight: false,
+  };
+}
+
+function buildDepartmentScopeKey(primaryDepartment: string, includedDepartments: string[]) {
+  const parts = [String(primaryDepartment || '').trim()]
+    .concat(includedDepartments.map((department) => String(department || '').trim()))
+    .filter(Boolean)
+    .filter((department, index, list) => list.indexOf(department) === index)
+    .sort((left, right) => left.localeCompare(right, 'ko'));
+
+  return parts.join('|');
+}
+
+function buildDepartmentScopeLabel(primaryDepartment: string, includedDepartments: string[]) {
+  const parts = [String(primaryDepartment || '').trim()]
+    .concat(includedDepartments.map((department) => String(department || '').trim()))
+    .filter(Boolean)
+    .filter((department, index, list) => list.indexOf(department) === index);
+
+  if (parts.length <= 1) return parts[0] || '';
+  return parts.join(' + ');
+}
+
+function getGenerationStyleMeta(style: RosterGenerationStyle) {
+  return (
+    GENERATION_STYLE_OPTIONS.find((option) => option.value === style) ||
+    GENERATION_STYLE_OPTIONS[0]
+  );
+}
+
 function isStaffNewNurse(staff: StaffMember, referenceDateKey: string) {
   const joinedAt = String(
     staff?.join_date || staff?.joined_at || staff?.hire_date || staff?.start_date || ''
@@ -333,75 +554,6 @@ function isStaffNewNurse(staff: StaffMember, referenceDateKey: string) {
   }
 
   return monthDiff >= 0 && monthDiff < NEW_NURSE_TENURE_MONTHS;
-}
-
-function collectDateRangeWithinMonth(startDate: string, endDate: string, monthDateSet: Set<string>) {
-  if (!startDate) return [];
-
-  const start = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${endDate || startDate}T00:00:00`);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
-
-  const rangeStart = start.getTime() <= end.getTime() ? start : end;
-  const rangeEnd = start.getTime() <= end.getTime() ? end : start;
-  const dates: string[] = [];
-  const cursor = new Date(rangeStart);
-
-  while (cursor.getTime() <= rangeEnd.getTime()) {
-    const dateKey = formatDateKey(cursor);
-    if (monthDateSet.has(dateKey)) {
-      dates.push(dateKey);
-    }
-    cursor.setDate(cursor.getDate() + 1);
-  }
-
-  return dates;
-}
-
-function buildBlockedDatesByStaff(
-  leaveRequests: Array<{ staff_id: string; start_date: string; end_date: string }>,
-  monthDateSet: Set<string>
-) {
-  const blockedDatesByStaff = new Map<string, Set<string>>();
-
-  leaveRequests.forEach((leave) => {
-    const staffId = String(leave.staff_id || '');
-    if (!staffId) return;
-
-    const blockedDates = collectDateRangeWithinMonth(
-      String(leave.start_date || ''),
-      String(leave.end_date || ''),
-      monthDateSet
-    );
-    if (blockedDates.length === 0) return;
-
-    const existing = blockedDatesByStaff.get(staffId) || new Set<string>();
-    blockedDates.forEach((date) => existing.add(date));
-    blockedDatesByStaff.set(staffId, existing);
-  });
-
-  return blockedDatesByStaff;
-}
-
-function countBlockedDateEntries(blockedDatesByStaff: Map<string, Set<string>>) {
-  return Array.from(blockedDatesByStaff.values()).reduce(
-    (sum, blockedDates) => sum + blockedDates.size,
-    0
-  );
-}
-
-function mergeBlockedDateMaps(...maps: Array<Map<string, Set<string>>>) {
-  const merged = new Map<string, Set<string>>();
-
-  maps.forEach((currentMap) => {
-    currentMap.forEach((blockedDates, staffId) => {
-      const nextDates = merged.get(staffId) || new Set<string>();
-      blockedDates.forEach((date) => nextDates.add(date));
-      merged.set(staffId, nextDates);
-    });
-  });
-
-  return merged;
 }
 
 function buildPreferredOffStorageKey(companyName: string, department: string, month: string) {
@@ -445,45 +597,6 @@ function normalizeStoredStaffNightRanges(
   });
 
   return normalized;
-}
-
-function normalizePreferredOffSelections(value: unknown, monthDateSet: Set<string>) {
-  if (!value || typeof value !== 'object') return {} as PreferredOffSelectionMap;
-
-  const normalized: PreferredOffSelectionMap = {};
-
-  Object.entries(value as Record<string, unknown>).forEach(([staffId, rawDates]) => {
-    if (!Array.isArray(rawDates)) return;
-
-    const dates = [...new Set(rawDates.map((date) => String(date || '').trim()))]
-      .filter((date) => monthDateSet.has(date))
-      .sort();
-
-    if (dates.length > 0) {
-      normalized[String(staffId)] = dates;
-    }
-  });
-
-  return normalized;
-}
-
-function buildPreferredOffDateMap(
-  preferredOffSelections: PreferredOffSelectionMap,
-  validStaffIds: Set<string>,
-  monthDateSet: Set<string>
-) {
-  const preferredOffByStaff = new Map<string, Set<string>>();
-
-  Object.entries(preferredOffSelections).forEach(([staffId, dates]) => {
-    if (!validStaffIds.has(staffId)) return;
-
-    const filteredDates = dates.filter((date) => monthDateSet.has(date));
-    if (filteredDates.length === 0) return;
-
-    preferredOffByStaff.set(staffId, new Set(filteredDates));
-  });
-
-  return preferredOffByStaff;
 }
 
 function normalizeAiAssignments(
@@ -775,11 +888,10 @@ function buildProgrammaticCycle(
     return [eveningShiftId, eveningShiftId, OFF_SHIFT_TOKEN, OFF_SHIFT_TOKEN];
   }
 
-  return sortedShiftIds.flatMap((shiftId) => [shiftId, shiftId]).concat([
-    OFF_SHIFT_TOKEN,
-    OFF_SHIFT_TOKEN,
-    OFF_SHIFT_TOKEN,
-  ]);
+  const hasNightShift = sortedShiftIds.some(
+    (shiftId) => resolveShiftBand(shiftMap.get(shiftId)!) === 'night'
+  );
+  return [...sortedShiftIds, OFF_SHIFT_TOKEN, ...(hasNightShift ? [OFF_SHIFT_TOKEN] : [])];
 }
 
 function buildProgrammaticAssignments({
@@ -800,7 +912,7 @@ function buildProgrammaticAssignments({
   teamDailyBandCounts?: Array<Record<'day' | 'evening' | 'night', number>>;
 }) {
   const cycleLength = Math.max(cycle.length, 1);
-  const offset = mode === 'rotation' ? (staffIndex * 2) % cycleLength : staffIndex % cycleLength;
+  const offset = staffIndex % cycleLength;
 
   return monthDates.map((date, index) => {
     if (blockedDateSet?.has(date)) return OFF_SHIFT_TOKEN;
@@ -847,6 +959,166 @@ function getAssignedShiftBand(token: string, shiftMap: Map<string, WorkShift>) {
   return resolveShiftBand(shift);
 }
 
+function isSeniorPlannerStaff(staff: StaffMember) {
+  const sources = [
+    String(staff.position || ''),
+    String(staff.role || ''),
+    String(staff.job_title || ''),
+  ].map((value) => normalizeShiftName(value));
+  const keywords = ['수간호사', '책임', '파트장', '팀장', '부장', '과장', 'senior', 'charge', 'leader'];
+  return keywords.some((keyword) => sources.some((source) => source.includes(normalizeShiftName(keyword))));
+}
+
+function getDedicatedBandFromMode(mode?: RosterPatternGroupMode | null): CoverageBand | null {
+  if (mode === 'day_fixed') return 'day';
+  if (mode === 'evening_fixed') return 'evening';
+  if (mode === 'night_fixed') return 'night';
+  return null;
+}
+
+function getFixedModeFromDedicatedBand(band?: string | null): RosterPatternGroupMode | null {
+  if (band === 'day') return 'day_fixed';
+  if (band === 'evening') return 'evening_fixed';
+  if (band === 'night') return 'night_fixed';
+  return null;
+}
+
+function getRoleCoverageTargetByBand(
+  roleRule: Pick<
+    RosterGenerationRule['roleCoverageRules'][number],
+    'minDayStaff' | 'minEveningStaff' | 'minNightStaff'
+  >,
+  band: CoverageBand
+) {
+  if (band === 'day') return Number(roleRule.minDayStaff || 0);
+  if (band === 'evening') return Number(roleRule.minEveningStaff || 0);
+  return Number(roleRule.minNightStaff || 0);
+}
+
+function coverageRoleMatchesRule(
+  coverageRoleMatcherText: string,
+  roleRule: Pick<RosterGenerationRule['roleCoverageRules'][number], 'keywords'>
+) {
+  const normalizedText = normalizeShiftName(coverageRoleMatcherText);
+  return normalizeCoverageRoleTags(roleRule.keywords).some((keyword) =>
+    normalizedText.includes(normalizeShiftName(keyword))
+  );
+}
+
+function buildPlannerCoverageRoleMatcherText(staff: StaffMember, coverageRoleTags: string[]) {
+  return normalizeShiftName(
+    [
+      String(staff.name || ''),
+      String(staff.position || ''),
+      String(staff.role || ''),
+      String(getDepartmentName(staff) || ''),
+      String(staff.shift_type || ''),
+      String(staff.shift_id || ''),
+      coverageRoleTags.join(' '),
+    ]
+      .filter(Boolean)
+      .join(' ')
+  );
+}
+
+function canStaffCoverBand(meta: StaffPlanningMeta, band: CoverageBand) {
+  return !meta.dedicatedBand || meta.dedicatedBand === band;
+}
+
+function isNightRecoverySlot(
+  assignments: string[],
+  index: number,
+  shiftMap: Map<string, WorkShift>,
+  recoveryDays: number
+) {
+  const maxRecoveryDays = Math.max(0, Math.floor(recoveryDays || 0));
+  if (maxRecoveryDays <= 0) return false;
+
+  for (let offset = 1; offset <= maxRecoveryDays; offset += 1) {
+    const previousIndex = index - offset;
+    if (previousIndex < 0) break;
+    const band = getAssignedShiftBand(assignments[previousIndex] || '', shiftMap);
+    if (band === 'night') return true;
+    if (band) return false;
+  }
+
+  return false;
+}
+
+function wouldViolateNightRecoveryWindow(
+  assignments: string[],
+  index: number,
+  nextShiftId: string,
+  shiftMap: Map<string, WorkShift>,
+  recoveryDays: number
+) {
+  const maxRecoveryDays = Math.max(0, Math.floor(recoveryDays || 0));
+  if (maxRecoveryDays <= 0 || !nextShiftId || nextShiftId === OFF_SHIFT_TOKEN) {
+    return false;
+  }
+
+  const nextBand = getAssignedShiftBand(nextShiftId, shiftMap);
+  if (!nextBand) {
+    return false;
+  }
+
+  if (nextBand !== 'night') {
+    return isNightRecoverySlot(assignments, index, shiftMap, maxRecoveryDays);
+  }
+
+  let recoveryStartIndex = index + 1;
+  while (recoveryStartIndex < assignments.length) {
+    const followingBand = getAssignedShiftBand(assignments[recoveryStartIndex] || '', shiftMap);
+    if (followingBand === 'night') {
+      recoveryStartIndex += 1;
+      continue;
+    }
+    break;
+  }
+
+  for (
+    let recoveryIndex = recoveryStartIndex;
+    recoveryIndex < assignments.length && recoveryIndex < recoveryStartIndex + maxRecoveryDays;
+    recoveryIndex += 1
+  ) {
+    const band = getAssignedShiftBand(assignments[recoveryIndex] || '', shiftMap);
+    if (band) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function enforceNightRecoveryAssignments(
+  assignments: string[],
+  shiftMap: Map<string, WorkShift>,
+  recoveryDays: number
+) {
+  const maxRecoveryDays = Math.max(0, Math.floor(recoveryDays || 0));
+  const nextAssignments = [...assignments];
+
+  if (maxRecoveryDays <= 0) {
+    return nextAssignments.map((token) => token || OFF_SHIFT_TOKEN);
+  }
+
+  for (let index = 0; index < nextAssignments.length; index += 1) {
+    const band = getAssignedShiftBand(nextAssignments[index] || '', shiftMap);
+    if (band !== 'night') continue;
+
+    const nextBand = getAssignedShiftBand(nextAssignments[index + 1] || '', shiftMap);
+    if (nextBand === 'night') continue;
+
+    for (let offset = 1; offset <= maxRecoveryDays; offset += 1) {
+      const recoveryIndex = index + offset;
+      if (recoveryIndex >= nextAssignments.length) break;
+      nextAssignments[recoveryIndex] = OFF_SHIFT_TOKEN;
+    }
+  }
+
+  return nextAssignments.map((token) => token || OFF_SHIFT_TOKEN);
+}
+
 function countPreviousBandStreak(
   assignments: string[],
   index: number,
@@ -866,6 +1138,52 @@ function countPreviousBandStreak(
   }
 
   return streak;
+}
+
+function getRotationBandContinuityTarget({
+  staffIndex,
+  blockStartIndex,
+  band,
+  maxConsecutiveWorkDays,
+  generationStyle,
+  blockPreference,
+}: {
+  staffIndex: number;
+  blockStartIndex: number;
+  band: CoverageBand;
+  maxConsecutiveWorkDays: number;
+  generationStyle: RosterGenerationStyle;
+  blockPreference?: StaffBlockPreference;
+}) {
+  const targetPool =
+    generationStyle === 'variety'
+      ? band === 'night'
+        ? [1, 1, 2, 2, 3]
+        : [1, 1, 2, 2, 3, 4]
+      : generationStyle === 'block'
+        ? band === 'night'
+          ? [2, 3, 3, 4, 4]
+          : [2, 3, 4, 4, 5]
+        : generationStyle === 'stable'
+          ? band === 'night'
+            ? [2, 2, 3, 3, 4]
+            : [2, 3, 3, 4, 5]
+          : band === 'night'
+            ? [1, 2, 3, 4]
+            : [1, 2, 3, 4, 5];
+  const seed =
+    Math.abs(staffIndex * 17 + blockStartIndex * 13 + (band === 'day' ? 3 : band === 'evening' ? 5 : 7));
+  let target = targetPool[seed % targetPool.length] || 1;
+
+  if (blockPreference === 'short') {
+    target = Math.min(target, band === 'night' ? 2 : 3);
+  } else if (blockPreference === 'long') {
+    target = Math.max(target, band === 'night' ? 3 : 4);
+  } else if (blockPreference === 'night_focus' && band === 'night') {
+    target = Math.max(target, 3);
+  }
+
+  return Math.max(1, Math.min(maxConsecutiveWorkDays, target));
 }
 
 function countPreviousWorkStreak(assignments: string[], index: number) {
@@ -937,6 +1255,116 @@ function canStillMeetMinimumStaffing({
   return requiredRemaining <= remainingStaff;
 }
 
+function isWeekendDateKey(dateKey: string) {
+  const weekday = new Date(`${dateKey}T00:00:00`).getDay();
+  return weekday === 0 || weekday === 6;
+}
+
+function normalizeBlockedShiftBands(value: unknown): CoverageBand[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((entry) => String(entry || '').trim().toLowerCase())
+    .filter((entry): entry is CoverageBand => entry === 'day' || entry === 'evening' || entry === 'night')
+    .filter((entry, index, list) => list.indexOf(entry) === index);
+}
+
+function normalizeBlockedWeekdays(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((entry) => Number(entry))
+    .filter((entry) => Number.isInteger(entry) && entry >= 0 && entry <= 6)
+    .filter((entry, index, list) => list.indexOf(entry) === index)
+    .sort((left, right) => left - right);
+}
+
+function buildStaffRestrictionBlockedDateSet(config: StaffConfig, monthDates: string[]) {
+  const blocked = new Set<string>();
+  const blockedWeekdays = new Set(normalizeBlockedWeekdays(config.blockedWeekdays || []));
+
+  monthDates.forEach((dateKey) => {
+    const weekday = new Date(`${dateKey}T00:00:00`).getDay();
+    if (blockedWeekdays.has(weekday)) {
+      blocked.add(dateKey);
+      return;
+    }
+    if (config.avoidWeekendWork && isWeekendDateKey(dateKey)) {
+      blocked.add(dateKey);
+      return;
+    }
+    if (config.avoidHolidayWork && isKoreanPublicHoliday(dateKey)) {
+      blocked.add(dateKey);
+    }
+  });
+
+  return blocked;
+}
+
+function getCoverageTargetsForDate(rule: RosterGenerationRule, dateKey: string) {
+  const baseTargets: Record<'day' | 'evening' | 'night', number> = {
+    day: Math.max(0, Math.floor(rule.minDayStaff || 0)),
+    evening: Math.max(0, Math.floor(rule.minEveningStaff || 0)),
+    night: Math.max(0, Math.floor(rule.minNightStaff || 0)),
+  };
+  const specificOverride = (rule.dateCoverageOverrides || []).find((entry) => entry.date === dateKey);
+  if (specificOverride) {
+    return {
+      targets: {
+        day: Math.max(0, Math.floor(specificOverride.minDayStaff || 0)),
+        evening: Math.max(0, Math.floor(specificOverride.minEveningStaff || 0)),
+        night: Math.max(0, Math.floor(specificOverride.minNightStaff || 0)),
+      } satisfies Record<'day' | 'evening' | 'night', number>,
+      sourceLabel: `${dateKey} override`,
+    };
+  }
+
+  const row = { diversityScore: 100 };
+  const averageDiversity = 100;
+  const notes: string[] = [];
+
+  if (isKoreanPublicHoliday(dateKey)) {
+    const hasHolidayOverride =
+      (rule.holidayMinDayStaff || 0) > 0 ||
+      (rule.holidayMinEveningStaff || 0) > 0 ||
+      (rule.holidayMinNightStaff || 0) > 0;
+    if (hasHolidayOverride) {
+      if (row.diversityScore < Math.max(45, averageDiversity - 12)) notes.push('패턴 반복 높음');
+
+      return {
+        targets: {
+          day: Math.max(0, Math.floor(rule.holidayMinDayStaff || 0)),
+          evening: Math.max(0, Math.floor(rule.holidayMinEveningStaff || 0)),
+          night: Math.max(0, Math.floor(rule.holidayMinNightStaff || 0)),
+        } satisfies Record<'day' | 'evening' | 'night', number>,
+        sourceLabel: 'holiday override',
+      };
+    }
+  }
+
+  if (isWeekendDateKey(dateKey)) {
+    const hasWeekendOverride =
+      (rule.weekendMinDayStaff || 0) > 0 ||
+      (rule.weekendMinEveningStaff || 0) > 0 ||
+      (rule.weekendMinNightStaff || 0) > 0;
+    if (hasWeekendOverride) {
+      return {
+        targets: {
+          day: Math.max(0, Math.floor(rule.weekendMinDayStaff || 0)),
+          evening: Math.max(0, Math.floor(rule.weekendMinEveningStaff || 0)),
+          night: Math.max(0, Math.floor(rule.weekendMinNightStaff || 0)),
+        } satisfies Record<'day' | 'evening' | 'night', number>,
+        sourceLabel: 'weekend override',
+      };
+    }
+  }
+
+  return {
+    targets: baseTargets,
+    sourceLabel: 'base rule',
+  };
+}
+
 function buildFallbackGenerationRuleForDepartment(
   department: string,
   companyName: string,
@@ -951,9 +1379,9 @@ function buildFallbackGenerationRuleForDepartment(
     teamKeywords: department ? [department] : [],
     minRotationNightCount: category === 'ward' ? Math.max(3, Math.round(days / 7)) : 0,
     maxRotationNightCount: category === 'ward' ? Math.max(4, Math.round(days / 5)) : 0,
-    maxConsecutiveEveningShifts: category === 'ward' ? 2 : 0,
+    maxConsecutiveEveningShifts: 0,
     offDaysAfterNight: category === 'ward' ? 1 : 0,
-    nightBlockSize: category === 'ward' ? 2 : 1,
+    nightBlockSize: category === 'ward' ? 4 : 1,
     maxConsecutiveWorkDays: category === 'ward' ? 5 : 6,
     maxConsecutiveWeekendWorkDays: category === 'ward' ? 2 : 0,
     distributeWeekendShifts: category === 'ward',
@@ -989,13 +1417,12 @@ function enforceTeamMinimumCoverage({
   shiftMap: Map<string, WorkShift>;
   rule: RosterGenerationRule;
 }) {
-  const minTargets = {
-    day: Math.max(0, Math.floor(rule.minDayStaff || 0)),
-    evening: Math.max(0, Math.floor(rule.minEveningStaff || 0)),
-    night: Math.max(0, Math.floor(rule.minNightStaff || 0)),
-  } satisfies Record<'day' | 'evening' | 'night', number>;
+  const hasAnyMinimum = monthDates.some((dateKey) => {
+    const { targets } = getCoverageTargetsForDate(rule, dateKey);
+    return targets.day + targets.evening + targets.night > 0;
+  });
 
-  if (minTargets.day + minTargets.evening + minTargets.night === 0 || staffPlans.length === 0) {
+  if (!hasAnyMinimum || staffPlans.length === 0) {
     return staffPlans;
   }
 
@@ -1011,71 +1438,12 @@ function enforceTeamMinimumCoverage({
   );
   const holidayDateSet = new Set(monthDates.filter((date) => isKoreanPublicHoliday(date)));
 
-  const canAssignShiftAtDate = (
-    plan: GeneratedCoveragePlan,
-    dateIndex: number,
-    nextShiftId: string
-  ) => {
-    const dateKey = monthDates[dateIndex] || '';
-    if (!dateKey || plan.blockedDateSet?.has(dateKey)) return false;
-    if (!plan.allowedShiftIds.includes(nextShiftId)) return false;
-
-    const shift = shiftMap.get(nextShiftId);
-    if (!shift) return false;
-
-    const dayOfWeek = new Date(`${dateKey}T00:00:00`).getDay();
-    if (resolveConfiguredWorkDayMode(shift) === 'weekdays' && (dayOfWeek === 0 || dayOfWeek === 6)) {
-      return false;
-    }
-
-    const nextBand = resolveShiftBand(shift);
-    const previousToken = dateIndex > 0 ? plan.assignments[dateIndex - 1] : '';
-    const previousBand = getAssignedShiftBand(previousToken, shiftMap);
-    const followingToken = dateIndex < plan.assignments.length - 1 ? plan.assignments[dateIndex + 1] : '';
-    const followingBand = getAssignedShiftBand(followingToken, shiftMap);
-    if (rule.avoidDayAfterNight && previousBand === 'night' && nextBand === 'day') {
-      return false;
-    }
-    if (rule.avoidDayAfterEvening && previousBand === 'evening' && nextBand === 'day') {
-      return false;
-    }
-    if (rule.avoidDayAfterNight && nextBand === 'night' && followingBand === 'day') {
-      return false;
-    }
-    if (rule.avoidDayAfterEvening && nextBand === 'evening' && followingBand === 'day') {
-      return false;
-    }
-    if (
-      rule.maxConsecutiveEveningShifts > 0 &&
-      nextBand === 'evening' &&
-      countPreviousBandStreak(plan.assignments, dateIndex, shiftMap) >= rule.maxConsecutiveEveningShifts &&
-      previousBand === 'evening'
-    ) {
-      return false;
-    }
-
-    const currentToken = plan.assignments[dateIndex] || OFF_SHIFT_TOKEN;
-    if (currentToken === OFF_SHIFT_TOKEN && nextBand) {
-      const previousWorkStreak = countPreviousWorkStreak(plan.assignments, dateIndex);
-      const nextWorkStreak = countNextWorkStreak(plan.assignments, dateIndex);
-      const maxAllowedWorkDays = Math.max(2, Math.min(7, Math.floor(rule.maxConsecutiveWorkDays || 5)));
-      if (previousWorkStreak + 1 + nextWorkStreak > maxAllowedWorkDays) {
-        return false;
-      }
-    }
-
-    return true;
-  };
-
   monthDates.forEach((_, dateIndex) => {
     const dateKey = monthDates[dateIndex] || '';
+    const { targets: minTargets } = getCoverageTargetsForDate(rule, dateKey);
     const isWeekend = weekendDateSet.has(dateKey);
     const isHoliday = holidayDateSet.has(dateKey);
-    const currentCounts: Record<'day' | 'evening' | 'night', number> = {
-      day: 0,
-      evening: 0,
-      night: 0,
-    };
+    const currentCounts = buildEmptyCoverageCounts();
 
     nextPlans.forEach((plan) => {
       const band = getAssignedShiftBand(plan.assignments[dateIndex] || '', shiftMap);
@@ -1089,7 +1457,19 @@ function enforceTeamMinimumCoverage({
             const targetShiftId = plan.allowedShiftIds.find(
               (shiftId) => resolveShiftBand(shiftMap.get(shiftId)!) === targetBand
             );
-            if (!targetShiftId || !canAssignShiftAtDate(plan, dateIndex, targetShiftId)) return null;
+            if (
+              !targetShiftId ||
+              !canAssignPlanShiftAtDate({
+                plan,
+                dateIndex,
+                nextShiftId: targetShiftId,
+                monthDates,
+                shiftMap,
+                rule,
+              })
+            ) {
+              return null;
+            }
 
             const currentToken = plan.assignments[dateIndex] || OFF_SHIFT_TOKEN;
             const currentBand = getAssignedShiftBand(currentToken, shiftMap);
@@ -1152,6 +1532,75 @@ function enforceTeamMinimumCoverage({
         }
         candidate.plan.assignments[dateIndex] = candidate.targetShiftId;
         currentCounts[targetBand] += 1;
+
+        const blockedBandDates: string[] = [];
+        const blockedWeekdayDates: string[] = [];
+        const weekendDates: string[] = [];
+        const holidayDates: string[] = [];
+        const restrictionFragments: string[] = [];
+        const items: Array<{
+          id: string;
+          category: 'restriction';
+          tone: 'amber';
+          severity: number;
+          targetTestId: string;
+          title: string;
+          detail: string;
+        }> = [];
+        const row = {
+          staff: {
+            id: '',
+            name: '',
+          },
+        };
+      }
+
+      const blockedBandDates: string[] = [];
+      const blockedWeekdayDates: string[] = [];
+      const weekendDates: string[] = [];
+      const holidayDates: string[] = [];
+      const restrictionFragments: string[] = [];
+      const items: Array<{
+        id: string;
+        category: 'restriction';
+        tone: 'amber';
+        severity: number;
+        targetTestId: string;
+        title: string;
+        detail: string;
+      }> = [];
+      const row = {
+        staff: {
+          id: '',
+          name: '',
+        },
+      };
+
+
+
+      if (blockedBandDates.length > 0) {
+        restrictionFragments.push(`금지 시간대 ${summarizeRosterDateLabels(blockedBandDates)}`);
+      }
+      if (blockedWeekdayDates.length > 0) {
+        restrictionFragments.push(`금지 요일 ${summarizeRosterDateLabels(blockedWeekdayDates)}`);
+      }
+      if (weekendDates.length > 0) {
+        restrictionFragments.push(`주말 근무 ${summarizeRosterDateLabels(weekendDates)}`);
+      }
+      if (holidayDates.length > 0) {
+        restrictionFragments.push(`공휴일 근무 ${summarizeRosterDateLabels(holidayDates)}`);
+      }
+
+      if (restrictionFragments.length > 0) {
+        items.push({
+          id: `restriction-${row.staff.id}`,
+          category: 'restriction',
+          tone: 'amber',
+          severity: 2,
+          targetTestId: `roster-preview-row-${row.staff.id}`,
+          title: `${row.staff.name} 개인 제한 위반`,
+          detail: restrictionFragments.join(' · '),
+        });
       }
     });
   });
@@ -1178,12 +1627,6 @@ function enforceMinimumMonthlyOffDays({
     return staffPlans;
   }
 
-  const minTargets = {
-    day: Math.max(0, Math.floor(rule.minDayStaff || 0)),
-    evening: Math.max(0, Math.floor(rule.minEveningStaff || 0)),
-    night: Math.max(0, Math.floor(rule.minNightStaff || 0)),
-  } satisfies Record<'day' | 'evening' | 'night', number>;
-
   const weekendDateSet = new Set(
     monthDates.filter((date) => {
       const weekday = new Date(`${date}T00:00:00`).getDay();
@@ -1195,11 +1638,7 @@ function enforceMinimumMonthlyOffDays({
     ...plan,
     assignments: [...plan.assignments],
   }));
-  const dailyCounts = monthDates.map(() => ({
-    day: 0,
-    evening: 0,
-    night: 0,
-  }));
+  const dailyCounts = monthDates.map(() => buildEmptyCoverageCounts());
 
   nextPlans.forEach((plan) => {
     plan.assignments.forEach((token, dateIndex) => {
@@ -1225,6 +1664,7 @@ function enforceMinimumMonthlyOffDays({
 
         const band = getAssignedShiftBand(token, shiftMap);
         if (!band) return null;
+        const { targets: minTargets } = getCoverageTargetsForDate(rule, monthDates[dateIndex] || '');
         if (dailyCounts[dateIndex][band] <= minTargets[band]) return null;
 
         const dateKey = monthDates[dateIndex] || '';
@@ -1270,6 +1710,10 @@ function enforceMinimumMonthlyOffDays({
       if (!currentBand) {
         continue;
       }
+      const { targets: minTargets } = getCoverageTargetsForDate(
+        rule,
+        monthDates[candidate.dateIndex] || ''
+      );
       if (dailyCounts[candidate.dateIndex][currentBand] <= minTargets[currentBand]) {
         continue;
       }
@@ -1302,6 +1746,7 @@ function buildRuleAwareRotationAssignments({
   holidayDateSet,
   isNewNurse = false,
   teamDailyBandCounts,
+  staffConfig,
 }: {
   monthDates: string[];
   shiftMap: Map<string, WorkShift>;
@@ -1321,6 +1766,7 @@ function buildRuleAwareRotationAssignments({
   holidayDateSet?: Set<string>;
   isNewNurse?: boolean;
   teamDailyBandCounts?: Array<Record<'day' | 'evening' | 'night', number>>;
+  staffConfig?: StaffConfig;
 }) {
   const sortedShiftIds = sortShifts(
     shiftIds.map((shiftId) => shiftMap.get(shiftId)).filter((shift): shift is WorkShift => Boolean(shift))
@@ -1374,8 +1820,14 @@ function buildRuleAwareRotationAssignments({
       evening: 0,
       night: 0,
     }));
+  const coverageTargetsByDate = monthDates.map((dateKey) => getCoverageTargetsForDate(rule, dateKey).targets);
   const averageNightLoadForMinimum =
-    totalStaffCount > 0 ? Math.ceil((days * Math.max(0, rule.minNightStaff || 0)) / totalStaffCount) : 0;
+    totalStaffCount > 0
+      ? Math.ceil(
+          coverageTargetsByDate.reduce((sum, targets) => sum + Math.max(0, targets.night || 0), 0) /
+            totalStaffCount
+        )
+      : 0;
   const requestedMinimumNightCount =
     Number(nightCountRange?.min) > 0 ? Number(nightCountRange?.min) : rule.minRotationNightCount;
   const requestedMaximumNightCount =
@@ -1400,15 +1852,20 @@ function buildRuleAwareRotationAssignments({
     0,
     Math.min(4, Math.floor(rule.maxConsecutiveWeekendWorkDays || 0))
   );
-  const minStaffingTargets = {
-    day: Math.max(0, Math.floor(rule.minDayStaff || 0)),
-    evening: Math.max(0, Math.floor(rule.minEveningStaff || 0)),
-    night: Math.max(0, Math.floor(rule.minNightStaff || 0)),
-  } satisfies Record<'day' | 'evening' | 'night', number>;
-
+  const blockPreference = normalizeStaffBlockPreference(staffConfig?.blockPreference);
+  const preferredNightBlockSize =
+    blockPreference === 'short'
+      ? Math.min(nightBlockMaxSize, 2)
+      : blockPreference === 'night_focus'
+        ? nightBlockMaxSize
+        : rule.generationStyle === 'variety'
+          ? Math.min(nightBlockMaxSize, 2)
+          : rule.generationStyle === 'block'
+            ? nightBlockMaxSize
+            : Math.max(1, Math.min(nightBlockMaxSize, Math.round((nightBlockMaxSize + 1) / 2)));
   if (targetNightCount > 0) {
-    const blockCount = Math.ceil(targetNightCount / nightBlockMaxSize);
-    const maxStartDay = Math.max(1, days - nightBlockMaxSize - offDaysAfterNightMax + 1);
+    const blockCount = Math.ceil(targetNightCount / preferredNightBlockSize);
+    const maxStartDay = Math.max(1, days - preferredNightBlockSize - offDaysAfterNightMax + 1);
     const idealStartDays = selectDistributedDays({
       candidateDays: Array.from({ length: maxStartDay }, (_, index) => index + 1),
       days,
@@ -1457,6 +1914,12 @@ function buildRuleAwareRotationAssignments({
             }
           }
 
+          if (staffConfig?.preferEarlyMonthNight) {
+            if (left !== right) {
+              return left - right;
+            }
+          }
+
           const leftDistance = Math.abs(left - idealStartDay);
           const rightDistance = Math.abs(right - idealStartDay);
           if (leftDistance !== rightDistance) return leftDistance - rightDistance;
@@ -1474,7 +1937,7 @@ function buildRuleAwareRotationAssignments({
       const startIndex = startDay - 1;
       const actualNightBlockSize = Math.max(
         1,
-        Math.min(nightBlockMaxSize, targetNightCount - placedNightCount, days - startIndex)
+        Math.min(preferredNightBlockSize, targetNightCount - placedNightCount, days - startIndex)
       );
 
       for (let offset = 0; offset < actualNightBlockSize && placedNightCount < targetNightCount; offset += 1) {
@@ -1533,6 +1996,11 @@ function buildRuleAwareRotationAssignments({
       continue;
     }
 
+    if (isNightRecoverySlot(assignments, index, shiftMap, offDaysAfterNightMax)) {
+      assignments[index] = OFF_SHIFT_TOKEN;
+      continue;
+    }
+
     const date = monthDates[index];
     const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
@@ -1581,11 +2049,18 @@ function buildRuleAwareRotationAssignments({
       );
     }
 
+    if (staffConfig?.avoidConsecutiveEvening && previousBand === 'evening') {
+      candidates = candidates.filter(
+        (shiftId) => resolveShiftBand(shiftMap.get(shiftId)!) !== 'evening'
+      );
+    }
+
     const projectedOffCounts = {
       day: staffingDayBandCounts[index]?.day || 0,
       evening: staffingDayBandCounts[index]?.evening || 0,
       night: staffingDayBandCounts[index]?.night || 0,
     };
+    const minStaffingTargets = coverageTargetsByDate[index] || buildEmptyCoverageCounts();
     const offIsFeasible = canStillMeetMinimumStaffing({
       projectedCounts: projectedOffCounts,
       minStaffingTargets,
@@ -1593,6 +2068,14 @@ function buildRuleAwareRotationAssignments({
     });
 
     if (previousWorkStreak >= maxConsecutiveWorkDays && offIsFeasible) {
+      assignments[index] = OFF_SHIFT_TOKEN;
+      continue;
+    }
+
+    if (
+      offIsFeasible &&
+      ((isWeekend && staffConfig?.preferWeekendOff) || (isHoliday && staffConfig?.preferHolidayOff))
+    ) {
       assignments[index] = OFF_SHIFT_TOKEN;
       continue;
     }
@@ -1632,6 +2115,7 @@ function buildRuleAwareRotationAssignments({
         const leftBand = resolveShiftBand(shiftMap.get(left)!);
         const rightBand = resolveShiftBand(shiftMap.get(right)!);
         const currentCounts = staffingDayBandCounts[index] || { day: 0, evening: 0, night: 0 };
+        const minStaffingTargets = coverageTargetsByDate[index] || buildEmptyCoverageCounts();
         const leftProjectedCounts = {
           ...currentCounts,
           [leftBand]: (currentCounts[leftBand as 'day' | 'evening' | 'night'] || 0) + 1,
@@ -1680,7 +2164,15 @@ function buildRuleAwareRotationAssignments({
         }
 
         if (previousBand && previousBand !== 'night') {
-          const continuityTarget = 2;
+          const blockStartIndex = Math.max(0, index - previousBandStreak);
+          const continuityTarget = getRotationBandContinuityTarget({
+            staffIndex,
+            blockStartIndex,
+            band: previousBand,
+            maxConsecutiveWorkDays,
+            generationStyle: rule.generationStyle,
+            blockPreference,
+          });
           const leftKeepsBlock = leftBand === previousBand;
           const rightKeepsBlock = rightBand === previousBand;
           const preferKeepingBlock = previousBandStreak < continuityTarget;
@@ -1744,6 +2236,7 @@ function buildRuleAwareRotationAssignments({
     if (!assignedBand) continue;
 
     const currentCounts = dayBandCounts[index] || { day: 0, evening: 0, night: 0 };
+    const minStaffingTargets = coverageTargetsByDate[index] || buildEmptyCoverageCounts();
     const projectedCounts = {
       ...currentCounts,
       [assignedBand]: Math.max(0, (currentCounts[assignedBand as 'day' | 'evening' | 'night'] || 0) - 1),
@@ -2108,6 +2601,7 @@ function normalizePresetRecord(record: Record<string, unknown>): RosterWizardPre
   const id = String(record.id || '').trim();
   const name = String(record.name || '').trim();
   if (!id || !name) return null;
+  const generationRule = normalizeGenerationRule(record.generationRule);
   const shiftIds = Array.isArray(record.shiftIds)
     ? record.shiftIds
         .map((shiftId: unknown) => String(shiftId || '').trim())
@@ -2152,6 +2646,105 @@ function normalizePresetRecord(record: Record<string, unknown>): RosterWizardPre
           } => week !== null
         )
     : [];
+  const staffNightRanges =
+    record.staffNightRanges && typeof record.staffNightRanges === 'object'
+      ? Object.fromEntries(
+          Object.entries(record.staffNightRanges as Record<string, unknown>).map(([staffId, value]) => {
+            const source = value as Record<string, unknown> | null | undefined;
+            const minNightShiftCount = clampNightShiftCount(
+              Number(source?.minNightShiftCount) || 0,
+              31
+            );
+            const maxNightShiftCount = Math.max(
+              minNightShiftCount,
+              clampNightShiftCount(Number(source?.maxNightShiftCount) || 0, 31)
+            );
+
+            return [
+              String(staffId || ''),
+              {
+                minNightShiftCount,
+                maxNightShiftCount,
+              },
+            ];
+          })
+        )
+      : {};
+  const staffBlockPreferences =
+    record.staffBlockPreferences && typeof record.staffBlockPreferences === 'object'
+      ? Object.fromEntries(
+          Object.entries(record.staffBlockPreferences as Record<string, unknown>).map(([staffId, value]) => [
+            String(staffId || ''),
+            normalizeStaffBlockPreference(value),
+          ])
+        )
+      : {};
+  const staffDedicatedBands =
+    record.staffDedicatedBands && typeof record.staffDedicatedBands === 'object'
+      ? Object.fromEntries(
+          Object.entries(record.staffDedicatedBands as Record<string, unknown>).map(([staffId, value]) => {
+            const normalizedValue = String(value || '').trim().toLowerCase();
+            const band: CoverageBand | '' =
+              normalizedValue === 'day' ||
+              normalizedValue === 'evening' ||
+              normalizedValue === 'night'
+                ? (normalizedValue as CoverageBand)
+                : '';
+            return [String(staffId || ''), band];
+          })
+        )
+      : {};
+  const staffCoverageRoleTags =
+    record.staffCoverageRoleTags && typeof record.staffCoverageRoleTags === 'object'
+      ? Object.fromEntries(
+          Object.entries(record.staffCoverageRoleTags as Record<string, unknown>).map(([staffId, value]) => [
+            String(staffId || ''),
+            normalizeCoverageRoleTags(Array.isArray(value) ? value : String(value || '').split(',')),
+          ])
+        )
+      : {};
+  const staffRestrictions =
+    record.staffRestrictions && typeof record.staffRestrictions === 'object'
+      ? Object.fromEntries(
+          Object.entries(record.staffRestrictions as Record<string, unknown>).map(([staffId, value]) => {
+            const source = value as Record<string, unknown> | null | undefined;
+            return [
+              String(staffId || ''),
+              {
+                blockedShiftBands: normalizeBlockedShiftBands(source?.blockedShiftBands),
+                blockedWeekdays: normalizeBlockedWeekdays(source?.blockedWeekdays),
+                avoidWeekendWork: Boolean(source?.avoidWeekendWork),
+                avoidHolidayWork: Boolean(source?.avoidHolidayWork),
+                preferWeekendOff: Boolean(source?.preferWeekendOff),
+                preferHolidayOff: Boolean(source?.preferHolidayOff),
+                avoidConsecutiveEvening: Boolean(source?.avoidConsecutiveEvening),
+                preferEarlyMonthNight: Boolean(source?.preferEarlyMonthNight),
+              } satisfies StaffRestrictionDraft,
+            ];
+          })
+        )
+      : {};
+  const pairRules = Array.isArray(record.pairRules)
+    ? record.pairRules
+        .map((entry, index) => {
+          const source = entry as Record<string, unknown> | null | undefined;
+          const primaryStaffId = String(source?.primaryStaffId || '').trim();
+          const secondaryStaffId = String(source?.secondaryStaffId || '').trim();
+          const mode = String(source?.mode || '').trim();
+          const band = String(source?.band || '').trim();
+          if (!primaryStaffId || !secondaryStaffId || primaryStaffId === secondaryStaffId) return null;
+          if (mode !== 'together' && mode !== 'separate') return null;
+          if (band !== 'night' && band !== 'work') return null;
+          return {
+            id: String(source?.id || `pair-rule-${index + 1}`),
+            primaryStaffId,
+            secondaryStaffId,
+            mode,
+            band,
+          } satisfies WizardPairRule;
+        })
+        .filter((entry): entry is WizardPairRule => Boolean(entry))
+    : [];
 
   const inferredShiftSlotCount = Math.max(
     Number(record.shiftSlotCount) || 0,
@@ -2173,7 +2766,99 @@ function normalizePresetRecord(record: Record<string, unknown>): RosterWizardPre
     nightShiftCount: Math.max(0, Math.floor(Number(record.nightShiftCount) || 0)),
     customPatternSlots,
     weeklyTemplateWeeks,
+    generationRule,
+    staffNightRanges,
+    staffBlockPreferences,
+    staffDedicatedBands,
+    staffCoverageRoleTags,
+    staffRestrictions,
+    pairRules,
   };
+}
+
+function cloneGenerationRule(rule: RosterGenerationRule | null | undefined) {
+  if (!rule) return null;
+
+  return {
+    ...rule,
+    teamKeywords: [...rule.teamKeywords],
+    dateCoverageOverrides: (rule.dateCoverageOverrides || []).map((entry) => ({ ...entry })),
+    roleCoverageRules: rule.roleCoverageRules.map((entry) => ({
+      ...entry,
+      keywords: [...entry.keywords],
+    })),
+  } satisfies RosterGenerationRule;
+}
+
+function buildGenerationRuleSummaryItems(rule: RosterGenerationRule) {
+  const items = [
+    `생성 성향 ${getGenerationStyleMeta(rule.generationStyle).label}`,
+    `최소 D/E/N ${rule.minDayStaff}/${rule.minEveningStaff}/${rule.minNightStaff}`,
+    `나이트 후 OFF ${rule.offDaysAfterNight}일`,
+    `나이트 블록 ${rule.nightBlockSize}일`,
+    `최소 월 OFF ${rule.minMonthlyOffDays}일`,
+    `최대 연속근무 ${rule.maxConsecutiveWorkDays}일`,
+    rule.blockNewNurseSoloNight ? '신규 단독 NIGHT 금지' : '신규 단독 NIGHT 허용',
+    rule.requireSeniorWithNewNurseNight ? '신규 NIGHT 선임 동반' : '신규 NIGHT 선임 동반 해제',
+    rule.separateNewNursesByShift ? '신규간호사 분리 배치' : '신규간호사 분리 해제',
+    rule.avoidDayAfterNight ? 'N 다음 DAY 금지' : 'N 다음 DAY 허용',
+    rule.avoidDayAfterEvening ? 'E 다음 DAY 금지' : 'E 다음 DAY 허용',
+    `역할 슬롯 ${rule.roleCoverageRules.length}개`,
+  ];
+
+  if (rule.maxConsecutiveEveningShifts > 0) {
+    items.push(`연속 EVENING 최대 ${rule.maxConsecutiveEveningShifts}일`);
+  }
+  if (rule.maxConsecutiveWeekendWorkDays > 0) {
+    items.push(`연속 주말근무 최대 ${rule.maxConsecutiveWeekendWorkDays}일`);
+  }
+  if (
+    rule.minSeniorDayStaff > 0 ||
+    rule.minSeniorEveningStaff > 0 ||
+    rule.minSeniorNightStaff > 0
+  ) {
+    items.push(
+      `선임 D/E/N ${rule.minSeniorDayStaff}/${rule.minSeniorEveningStaff}/${rule.minSeniorNightStaff}`
+    );
+  }
+  if (
+    rule.minDedicatedDayStaff > 0 ||
+    rule.minDedicatedEveningStaff > 0 ||
+    rule.minDedicatedNightStaff > 0
+  ) {
+    items.push(
+      `전담 D/E/N ${rule.minDedicatedDayStaff}/${rule.minDedicatedEveningStaff}/${rule.minDedicatedNightStaff}`
+    );
+  }
+
+  if (
+    rule.weekendMinDayStaff > 0 ||
+    rule.weekendMinEveningStaff > 0 ||
+    rule.weekendMinNightStaff > 0
+  ) {
+    items.push(
+      `週末 D/E/N ${rule.weekendMinDayStaff}/${rule.weekendMinEveningStaff}/${rule.weekendMinNightStaff}`
+    );
+  }
+  if (
+    rule.holidayMinDayStaff > 0 ||
+    rule.holidayMinEveningStaff > 0 ||
+    rule.holidayMinNightStaff > 0
+  ) {
+    items.push(
+      `공휴일 D/E/N ${rule.holidayMinDayStaff}/${rule.holidayMinEveningStaff}/${rule.holidayMinNightStaff}`
+    );
+  }
+  if ((rule.dateCoverageOverrides || []).length > 0) {
+    items.push(`특정 날짜 인원 ${(rule.dateCoverageOverrides || []).length}건`);
+  }
+
+  const roleCoverageSummary = summarizeRoleCoverageRules(rule.roleCoverageRules);
+  if (roleCoverageSummary.length > 0) {
+    items.push(...roleCoverageSummary);
+  }
+
+  return items.filter(Boolean);
 }
 
 function resolvePresetShiftIds(
@@ -2262,7 +2947,7 @@ function selectDistributedDays({
   return picks.sort((a, b) => a - b);
 }
 
-function buildInitialConfig(staff: StaffMember, index: number, shifts: WorkShift[], days: number) {
+function buildInitialConfig(staff: StaffMember, index: number, shifts: WorkShift[], days: number): StaffConfig {
   const primary = shifts.find((shift) => shift.id === staff?.shift_id)?.id || shifts[0]?.id || '';
   const secondary = shifts[1]?.id || primary;
   const tertiary = shifts[2]?.id || secondary || primary;
@@ -2278,9 +2963,240 @@ function buildInitialConfig(staff: StaffMember, index: number, shifts: WorkShift
     nightShiftCount: isNightPattern(pattern) ? inferDefaultNightShiftCount(pattern, days) : 0,
     minNightShiftCount: 0,
     maxNightShiftCount: 0,
+    blockPreference: 'balanced',
     customPatternSequence: [],
     weeklyTemplateWeeks: buildDefaultWeeklyTemplateWeeks([primary, secondary, tertiary]),
+    blockedShiftBands: [],
+    blockedWeekdays: [],
+    avoidWeekendWork: false,
+    avoidHolidayWork: false,
+    preferWeekendOff: false,
+    preferHolidayOff: false,
+    avoidConsecutiveEvening: false,
+    preferEarlyMonthNight: false,
   };
+}
+
+function buildEmptyCoverageCounts() {
+  return {
+    day: 0,
+    evening: 0,
+    night: 0,
+  } satisfies Record<'day' | 'evening' | 'night', number>;
+}
+
+function computePatternDiversityMetrics(cells: PreviewCell[]) {
+  const workTokens = cells
+    .map((cell) => String(cell.code || '').trim().toUpperCase())
+    .filter((token) => token && token !== 'OFF');
+
+  if (workTokens.length === 0) {
+    return {
+      diversityScore: 0,
+      longestSameBandStreak: 0,
+      repeatedPatternCount: 0,
+    };
+  }
+
+  const streakLengths: number[] = [];
+  const transitionSet = new Set<string>();
+  let longestSameBandStreak = 0;
+  let currentStreak = 0;
+
+  workTokens.forEach((token, index) => {
+    if (index === 0 || workTokens[index - 1] !== token) {
+      if (currentStreak > 0) {
+        streakLengths.push(currentStreak);
+      }
+      currentStreak = 1;
+    } else {
+      currentStreak += 1;
+    }
+
+    if (index > 0) {
+      transitionSet.add(`${workTokens[index - 1]}->${token}`);
+    }
+    longestSameBandStreak = Math.max(longestSameBandStreak, currentStreak);
+  });
+  if (currentStreak > 0) {
+    streakLengths.push(currentStreak);
+  }
+
+  const repeatedPatternCount = Math.max(
+    0,
+    streakLengths.filter((length) => length >= 3).length - 1
+  );
+  const uniqueWorkTokens = new Set(workTokens);
+  const uniqueStreakLengths = new Set(streakLengths);
+  const rawScore =
+    28 +
+    uniqueWorkTokens.size * 18 +
+    uniqueStreakLengths.size * 10 +
+    transitionSet.size * 6 -
+    Math.max(0, longestSameBandStreak - 3) * 9 -
+    repeatedPatternCount * 6;
+
+  return {
+    diversityScore: Math.max(0, Math.min(100, Math.round(rawScore))),
+    longestSameBandStreak,
+    repeatedPatternCount,
+  };
+}
+
+function getRestrictedAllowedShiftIds(
+  allowedShiftIds: string[],
+  blockedShiftBands: CoverageBand[] | undefined,
+  shiftMap: Map<string, WorkShift>
+) {
+  const blockedBandSet = new Set(normalizeBlockedShiftBands(blockedShiftBands));
+  if (blockedBandSet.size === 0) return allowedShiftIds.filter(Boolean);
+
+  return allowedShiftIds.filter((shiftId) => {
+    const shift = shiftMap.get(shiftId);
+    if (!shift) return false;
+    return !blockedBandSet.has(resolveShiftBand(shift));
+  });
+}
+
+function canAssignPlanShiftAtDate({
+  plan,
+  dateIndex,
+  nextShiftId,
+  monthDates,
+  shiftMap,
+  rule,
+}: {
+  plan: GeneratedCoveragePlan;
+  dateIndex: number;
+  nextShiftId: string;
+  monthDates: string[];
+  shiftMap: Map<string, WorkShift>;
+  rule: RosterGenerationRule;
+}) {
+  const dateKey = monthDates[dateIndex] || '';
+  if (!dateKey || plan.blockedDateSet?.has(dateKey)) return false;
+  if (!plan.allowedShiftIds.includes(nextShiftId)) return false;
+
+  const shift = shiftMap.get(nextShiftId);
+  if (!shift) return false;
+
+  const dayOfWeek = new Date(`${dateKey}T00:00:00`).getDay();
+  if (resolveConfiguredWorkDayMode(shift) === 'weekdays' && (dayOfWeek === 0 || dayOfWeek === 6)) {
+    return false;
+  }
+
+  const nextBand = resolveShiftBand(shift);
+  const previousToken = dateIndex > 0 ? plan.assignments[dateIndex - 1] : '';
+  const previousBand = getAssignedShiftBand(previousToken, shiftMap);
+  const followingToken =
+    dateIndex < plan.assignments.length - 1 ? plan.assignments[dateIndex + 1] : '';
+  const followingBand = getAssignedShiftBand(followingToken, shiftMap);
+  if (rule.avoidDayAfterNight && previousBand === 'night' && nextBand === 'day') {
+    return false;
+  }
+  if (rule.avoidDayAfterEvening && previousBand === 'evening' && nextBand === 'day') {
+    return false;
+  }
+  if (rule.avoidDayAfterNight && nextBand === 'night' && followingBand === 'day') {
+    return false;
+  }
+  if (rule.avoidDayAfterEvening && nextBand === 'evening' && followingBand === 'day') {
+    return false;
+  }
+  if (
+    rule.maxConsecutiveEveningShifts > 0 &&
+    nextBand === 'evening' &&
+    countPreviousBandStreak(plan.assignments, dateIndex, shiftMap) >= rule.maxConsecutiveEveningShifts &&
+    previousBand === 'evening'
+  ) {
+    return false;
+  }
+
+  if (
+    wouldViolateNightRecoveryWindow(
+      plan.assignments,
+      dateIndex,
+      nextShiftId,
+      shiftMap,
+      rule.offDaysAfterNight
+    )
+  ) {
+    return false;
+  }
+
+  const currentToken = plan.assignments[dateIndex] || OFF_SHIFT_TOKEN;
+  if (currentToken === OFF_SHIFT_TOKEN && nextBand) {
+    const previousWorkStreak = countPreviousWorkStreak(plan.assignments, dateIndex);
+    const nextWorkStreak = countNextWorkStreak(plan.assignments, dateIndex);
+    const maxAllowedWorkDays = Math.max(2, Math.min(7, Math.floor(rule.maxConsecutiveWorkDays || 5)));
+    if (previousWorkStreak + 1 + nextWorkStreak > maxAllowedWorkDays) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function formatRosterShortDateLabel(dateKey: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return dateKey;
+  return `${Number(dateKey.slice(5, 7))}/${Number(dateKey.slice(8, 10))}`;
+}
+
+function summarizeRosterDateLabels(dateKeys: string[], limit = 3) {
+  const uniqueLabels = [...new Set(dateKeys.filter(Boolean).map((dateKey) => formatRosterShortDateLabel(dateKey)))];
+  if (uniqueLabels.length === 0) return '';
+  if (uniqueLabels.length <= limit) return uniqueLabels.join(', ');
+  return `${uniqueLabels.slice(0, limit).join(', ')} 외 ${uniqueLabels.length - limit}일`;
+}
+
+function isWorkingBand(
+  band: ReturnType<typeof getAssignedShiftBand>
+): band is 'day' | 'evening' | 'night' {
+  return band === 'day' || band === 'evening' || band === 'night';
+}
+
+function isWizardPairRuleSatisfiedAtDate({
+  rule,
+  primaryShiftId,
+  secondaryShiftId,
+  shiftMap,
+}: {
+  rule: WizardPairRule;
+  primaryShiftId: string;
+  secondaryShiftId: string;
+  shiftMap: Map<string, WorkShift>;
+}) {
+  const primaryBand = getAssignedShiftBand(primaryShiftId, shiftMap);
+  const secondaryBand = getAssignedShiftBand(secondaryShiftId, shiftMap);
+
+  if (rule.band === 'night') {
+    const primaryNight = primaryBand === 'night';
+    const secondaryNight = secondaryBand === 'night';
+    return rule.mode === 'together' ? primaryNight === secondaryNight : !(primaryNight && secondaryNight);
+  }
+
+  const primaryWorking = isWorkingBand(primaryBand);
+  const secondaryWorking = isWorkingBand(secondaryBand);
+  if (rule.mode === 'together') {
+    if (!primaryWorking && !secondaryWorking) return true;
+    return primaryWorking && secondaryWorking && primaryBand === secondaryBand;
+  }
+
+  return !(primaryWorking && secondaryWorking && primaryBand === secondaryBand);
+}
+
+function normalizeActivePairRules(rules: WizardPairRule[], validStaffIds: Set<string>) {
+  return rules.filter((rule) => {
+    const primaryStaffId = String(rule.primaryStaffId || '').trim();
+    const secondaryStaffId = String(rule.secondaryStaffId || '').trim();
+    return (
+      primaryStaffId &&
+      secondaryStaffId &&
+      primaryStaffId !== secondaryStaffId &&
+      validStaffIds.has(primaryStaffId) &&
+      validStaffIds.has(secondaryStaffId)
+    );
+  });
 }
 
 function getShiftNameById(shiftId: string, workShifts: WorkShift[]) {
@@ -2558,6 +3474,7 @@ export default function AutoRosterPlanner({
   const [selectedMonth, setSelectedMonth] = useState(initialMonth || new Date().toISOString().slice(0, 7));
   const [selectedCompany, setSelectedCompany] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
+  const [includedDepartments, setIncludedDepartments] = useState<string[]>([]);
   const [workShifts, setWorkShifts] = useState<WorkShift[]>([]);
   const [staffConfigs, setStaffConfigs] = useState<Record<string, StaffConfig>>({});
   const [loadingShifts, setLoadingShifts] = useState(false);
@@ -2611,6 +3528,41 @@ export default function AutoRosterPlanner({
   const [highlightedRosterTarget, setHighlightedRosterTarget] = useState('');
   const [rosterSnapshots, setRosterSnapshots] = useState<StoredRosterSnapshot<GeminiRosterRecommendation>[]>([]);
   const [selectedSnapshotId, setSelectedSnapshotId] = useState('');
+  const [activeGenerationRuleOverride, setActiveGenerationRuleOverride] =
+    useState<RosterGenerationRule | null>(null);
+  const [wizardGenerationBasis, setWizardGenerationBasis] =
+    useState<WizardGenerationBasis>('saved_rule');
+  const [wizardRuleDraft, setWizardRuleDraft] = useState<RosterGenerationRule>(() =>
+    buildDefaultGenerationRule(selectedCo !== '전체' ? selectedCo : user?.company || '')
+  );
+  const [wizardNightRangeDrafts, setWizardNightRangeDrafts] = useState<
+    Record<string, WizardNightRangeDraft>
+  >({});
+  const [wizardBlockPreferenceDrafts, setWizardBlockPreferenceDrafts] = useState<
+    Record<string, StaffBlockPreference>
+  >({});
+  const [wizardDedicatedBandDrafts, setWizardDedicatedBandDrafts] = useState<
+    Record<string, CoverageBand | ''>
+  >({});
+  const [wizardStaffRestrictionDrafts, setWizardStaffRestrictionDrafts] = useState<
+    Record<string, StaffRestrictionDraft>
+  >({});
+  const [wizardCoverageRoleDrafts, setWizardCoverageRoleDrafts] = useState<
+    Record<string, string[]>
+  >({});
+  const [wizardPairRules, setWizardPairRules] = useState<WizardPairRule[]>([]);
+  const [staffCoverageRoleTags, setStaffCoverageRoleTags] = useState<Record<string, string[]>>({});
+  const [staffDedicatedBandOverrides, setStaffDedicatedBandOverrides] = useState<
+    Record<string, CoverageBand | ''>
+  >({});
+  const [plannerPairRules, setPlannerPairRules] = useState<WizardPairRule[]>([]);
+  const [selectedManualCell, setSelectedManualCell] = useState<SelectedManualCell>(null);
+  const [partialRegenerationStaffId, setPartialRegenerationStaffId] = useState('');
+  const [partialRegenerationStartDate, setPartialRegenerationStartDate] = useState('');
+  const [partialRegenerationEndDate, setPartialRegenerationEndDate] = useState('');
+  const [partialRegenerationMode, setPartialRegenerationMode] =
+    useState<PartialRegenerationMode>('minimize_changes');
+  const [partialRegenerationLoading, setPartialRegenerationLoading] = useState(false);
 
   useEffect(() => {
     if (!initialMonth || selectedMonth === initialMonth) return;
@@ -2626,9 +3578,18 @@ export default function AutoRosterPlanner({
     label: string;
   } | null>(null);
 
+  const selectedDepartmentScopeKey = useMemo(
+    () => buildDepartmentScopeKey(selectedDepartment, includedDepartments),
+    [includedDepartments, selectedDepartment]
+  );
+  const selectedDepartmentScopeLabel = useMemo(
+    () => buildDepartmentScopeLabel(selectedDepartment, includedDepartments),
+    [includedDepartments, selectedDepartment]
+  );
+  const rosterScopeLabel = selectedDepartmentScopeLabel || selectedDepartment;
   const rosterSnapshotStorageKey = useMemo(
-    () => buildRosterSnapshotStorageKey(selectedCompany, selectedDepartment, selectedMonth),
-    [selectedCompany, selectedDepartment, selectedMonth]
+    () => buildRosterSnapshotStorageKey(selectedCompany, selectedDepartmentScopeKey, selectedMonth),
+    [selectedCompany, selectedDepartmentScopeKey, selectedMonth]
   );
 
   const resolvePolicyCompanyId = (companyName?: string, explicitCompanyId?: string | null) => {
@@ -2997,6 +3958,15 @@ export default function AutoRosterPlanner({
   }, [departmentOptions, initialDepartment, ownDepartment, selectedDepartment]);
 
   useEffect(() => {
+    const validDepartments = new Set(
+      departmentOptions.filter(
+        (department) => department !== '?꾩껜 遺??' && department !== selectedDepartment
+      )
+    );
+    setIncludedDepartments((prev) => prev.filter((department) => validDepartments.has(department)));
+  }, [departmentOptions, selectedDepartment]);
+
+  useEffect(() => {
     if (!selectedCompany) {
       setWorkShifts([]);
       return;
@@ -3057,11 +4027,26 @@ export default function AutoRosterPlanner({
     [offShift?.id, workShifts]
   );
   const teamScopedWorkingShifts = useMemo(() => {
-    const scopedShifts = filterRosterShiftsForDepartment(selectedDepartment, workingShifts, {
-      includeOffShift: false,
+    const scopedDepartments = [selectedDepartment, ...includedDepartments]
+      .map((department) => String(department || '').trim())
+      .filter(Boolean)
+      .filter((department, index, list) => list.indexOf(department) === index);
+    if (scopedDepartments.length === 0) return workingShifts;
+
+    const scopedShiftMap = new Map<string, WorkShift>();
+    scopedDepartments.forEach((department) => {
+      filterRosterShiftsForDepartment(department, workingShifts, {
+        includeOffShift: false,
+      }).forEach((shift) => {
+        if (!scopedShiftMap.has(shift.id)) {
+          scopedShiftMap.set(shift.id, shift);
+        }
+      });
     });
+
+    const scopedShifts = [...scopedShiftMap.values()];
     return scopedShifts.length > 0 ? scopedShifts : workingShifts;
-  }, [selectedDepartment, workingShifts]);
+  }, [includedDepartments, selectedDepartment, workingShifts]);
   const defaultShiftPool = teamScopedWorkingShifts.length > 0 ? teamScopedWorkingShifts : workingShifts;
 
   const defaultShiftOrder = useMemo(() => buildDefaultShiftOrder(defaultShiftPool), [defaultShiftPool]);
@@ -3134,17 +4119,36 @@ export default function AutoRosterPlanner({
   const monthDates = useMemo(() => getMonthDates(selectedMonth), [selectedMonth]);
   const monthDateSet = useMemo(() => new Set(monthDates), [monthDates]);
   const preferredOffStorageKey = useMemo(
-    () => buildPreferredOffStorageKey(selectedCompany, selectedDepartment, selectedMonth),
-    [selectedCompany, selectedDepartment, selectedMonth]
+    () => buildPreferredOffStorageKey(selectedCompany, selectedDepartmentScopeKey, selectedMonth),
+    [selectedCompany, selectedDepartmentScopeKey, selectedMonth]
   );
   const staffNightRangeStorageKey = useMemo(
-    () => buildStaffNightRangeStorageKey(selectedCompany, selectedDepartment),
-    [selectedCompany, selectedDepartment]
+    () => buildStaffNightRangeStorageKey(selectedCompany, selectedDepartmentScopeKey),
+    [selectedCompany, selectedDepartmentScopeKey]
   );
   const companyLockedByHrFilter = selectedCo !== '전체';
   const teamOptions = useMemo(
     () => departmentOptions.filter((department) => department !== '전체 부서'),
     [departmentOptions]
+  );
+  const availableIncludedDepartments = useMemo(
+    () => teamOptions.filter((department) => department !== selectedDepartment),
+    [selectedDepartment, teamOptions]
+  );
+  const suyeonNursingDepartment = useMemo(
+    () =>
+      availableIncludedDepartments.find((department) => {
+        const normalizedDepartment = String(department || '').replace(/\s+/g, '');
+        return normalizedDepartment.includes('수연의원') && normalizedDepartment.includes('간호');
+      }) || '',
+    [availableIncludedDepartments]
+  );
+  const scopedRosterDepartments = useMemo(
+    () =>
+      [selectedDepartment, ...includedDepartments]
+        .map((department) => String(department || '').trim())
+        .filter((department, index, list) => department && list.indexOf(department) === index),
+    [includedDepartments, selectedDepartment]
   );
 
   useEffect(() => {
@@ -3179,11 +4183,13 @@ export default function AutoRosterPlanner({
   useEffect(() => {
     setManualAssignments({});
     setManualEditMode(false);
+    setSelectedManualCell(null);
     setGeminiSummary('');
     setGeminiAppliedAt('');
     setAiRecommendation(null);
     setLeaveAppliedSummary('');
-  }, [selectedMonth, selectedCompany, selectedDepartment]);
+    setActiveGenerationRuleOverride(null);
+  }, [selectedMonth, selectedCompany, selectedDepartmentScopeKey]);
 
   useEffect(() => {
     if (!monthDates.length) {
@@ -3192,6 +4198,19 @@ export default function AutoRosterPlanner({
     }
 
     setPreferredOffDate((prev) => (monthDates.includes(prev) ? prev : monthDates[0]));
+  }, [monthDates]);
+
+  useEffect(() => {
+    if (monthDates.length === 0) {
+      setPartialRegenerationStartDate('');
+      setPartialRegenerationEndDate('');
+      return;
+    }
+
+    setPartialRegenerationStartDate((prev) => (monthDates.includes(prev) ? prev : monthDates[0]));
+    setPartialRegenerationEndDate((prev) =>
+      monthDates.includes(prev) ? prev : monthDates[Math.min(monthDates.length - 1, 2)]
+    );
   }, [monthDates]);
 
   useEffect(() => {
@@ -3215,14 +4234,19 @@ export default function AutoRosterPlanner({
   }, [defaultShiftPool, recommendedAiShiftIds, usesStrictTeamRecommendation]);
 
   const targetStaffs = useMemo(() => {
+    const scopedDepartments = new Set(
+      [selectedDepartment, ...includedDepartments]
+        .map((department) => String(department || '').trim())
+        .filter(Boolean)
+    );
     return activeStaffs.filter((staff) => {
       if (selectedCompany && staff.company !== selectedCompany) return false;
       if (selectedDepartment && selectedDepartment !== '전체 부서') {
-        return getDepartmentName(staff) === selectedDepartment;
+        return scopedDepartments.has(getDepartmentName(staff));
       }
       return true;
     });
-  }, [activeStaffs, selectedCompany, selectedDepartment]);
+  }, [activeStaffs, includedDepartments, selectedCompany, selectedDepartment]);
 
   const orderedTargetStaffIds = useMemo(
     () => targetStaffs.map((staff) => String(staff.id)),
@@ -3474,6 +4498,10 @@ export default function AutoRosterPlanner({
                 : 0,
               customPatternSequence: normalizeCustomPatternSequence(baseConfig.customPatternSequence || [], defaultShiftPool),
               weeklyTemplateWeeks: nextWeeklyTemplateWeeks,
+              blockedShiftBands: normalizeBlockedShiftBands(baseConfig.blockedShiftBands || []),
+              blockedWeekdays: normalizeBlockedWeekdays(baseConfig.blockedWeekdays || []),
+              avoidWeekendWork: Boolean(baseConfig.avoidWeekendWork),
+              avoidHolidayWork: Boolean(baseConfig.avoidHolidayWork),
             }
           : {
               ...baseConfig,
@@ -3491,6 +4519,10 @@ export default function AutoRosterPlanner({
                 : 0,
               customPatternSequence: normalizeCustomPatternSequence(baseConfig.customPatternSequence || [], defaultShiftPool),
               weeklyTemplateWeeks: nextWeeklyTemplateWeeks,
+              blockedShiftBands: normalizeBlockedShiftBands(baseConfig.blockedShiftBands || []),
+              blockedWeekdays: normalizeBlockedWeekdays(baseConfig.blockedWeekdays || []),
+              avoidWeekendWork: Boolean(baseConfig.avoidWeekendWork),
+              avoidHolidayWork: Boolean(baseConfig.avoidHolidayWork),
             };
       });
       return next;
@@ -3691,6 +4723,63 @@ export default function AutoRosterPlanner({
     });
   }, [wizardOpen, wizardOverrideDateOptions, wizardOverrideShiftOptions, wizardSelectedStaffIds]);
 
+  useEffect(() => {
+    if (!wizardOpen) return;
+
+    const nextNightRanges: Record<string, WizardNightRangeDraft> = {};
+    const nextBlockPreferences: Record<string, StaffBlockPreference> = {};
+    const nextDedicatedBands: Record<string, CoverageBand | ''> = {};
+    const nextRestrictions: Record<string, StaffRestrictionDraft> = {};
+    const nextCoverageRoles: Record<string, string[]> = {};
+
+    targetStaffs.forEach((staff, index) => {
+      const staffId = String(staff.id);
+      const config =
+        effectiveTargetStaffConfigs.get(staffId) ||
+        buildInitialConfig(
+          staff,
+          index,
+          defaultShiftOrder.length ? defaultShiftOrder : defaultShiftPool,
+          monthDates.length
+        );
+
+      nextNightRanges[staffId] = {
+        minNightShiftCount: clampNightShiftCount(config.minNightShiftCount || 0, monthDates.length),
+        maxNightShiftCount: clampNightShiftCount(config.maxNightShiftCount || 0, monthDates.length),
+      };
+      nextBlockPreferences[staffId] = normalizeStaffBlockPreference(config.blockPreference);
+      nextDedicatedBands[staffId] = staffDedicatedBandOverrides[staffId] || '';
+      nextRestrictions[staffId] = {
+        blockedShiftBands: normalizeBlockedShiftBands(config.blockedShiftBands || []),
+        blockedWeekdays: normalizeBlockedWeekdays(config.blockedWeekdays || []),
+        avoidWeekendWork: Boolean(config.avoidWeekendWork),
+        avoidHolidayWork: Boolean(config.avoidHolidayWork),
+        preferWeekendOff: Boolean(config.preferWeekendOff),
+        preferHolidayOff: Boolean(config.preferHolidayOff),
+        avoidConsecutiveEvening: Boolean(config.avoidConsecutiveEvening),
+        preferEarlyMonthNight: Boolean(config.preferEarlyMonthNight),
+      };
+      nextCoverageRoles[staffId] = expandCoverageRoleTags(staffCoverageRoleTags[staffId] || []);
+    });
+
+    setWizardNightRangeDrafts(nextNightRanges);
+    setWizardBlockPreferenceDrafts(nextBlockPreferences);
+    setWizardDedicatedBandDrafts(nextDedicatedBands);
+    setWizardStaffRestrictionDrafts(nextRestrictions);
+    setWizardCoverageRoleDrafts(nextCoverageRoles);
+    setWizardPairRules(plannerPairRules);
+  }, [
+    defaultShiftOrder,
+    defaultShiftPool,
+    effectiveTargetStaffConfigs,
+    monthDates.length,
+    plannerPairRules,
+    staffCoverageRoleTags,
+    staffDedicatedBandOverrides,
+    targetStaffs,
+    wizardOpen,
+  ]);
+
   const preferredOffEntries = useMemo(
     () =>
       targetStaffs
@@ -3769,25 +4858,6 @@ export default function AutoRosterPlanner({
     });
   };
 
-  const cycleManualAssignment = ({
-    staffId,
-    date,
-    currentShiftId,
-    baseShiftId,
-  }: {
-    staffId: string;
-    date: string;
-    currentShiftId: string;
-    baseShiftId: string;
-  }) => {
-    const shiftSequence = [OFF_SHIFT_TOKEN, ...defaultShiftPool.map((shift) => shift.id)];
-    if (!shiftSequence.length) return;
-
-    const currentIndex = Math.max(shiftSequence.findIndex((shiftId) => shiftId === currentShiftId), 0);
-    const nextShiftId = shiftSequence[(currentIndex + 1) % shiftSequence.length];
-    setManualAssignment({ staffId, date, nextShiftId, baseShiftId });
-  };
-
   const previewRows = useMemo<PreviewRow[]>(() => {
     if (!aiRecommendation?.staffPlans?.length) return [];
 
@@ -3812,9 +4882,42 @@ export default function AutoRosterPlanner({
           nightShiftCount: 0,
           minNightShiftCount: 0,
           maxNightShiftCount: 0,
+          blockPreference: 'balanced',
           customPatternSequence: [],
           weeklyTemplateWeeks: [],
+          blockedShiftBands: [],
+          blockedWeekdays: [],
+          avoidWeekendWork: false,
+          avoidHolidayWork: false,
+          preferWeekendOff: false,
+          preferHolidayOff: false,
+          avoidConsecutiveEvening: false,
+          preferEarlyMonthNight: false,
         };
+        const resolvedConfig =
+          effectiveTargetStaffConfigs.get(String(staff.id)) ||
+          ({
+            enabled: true,
+            pattern: plan.modeLabel || aiRecommendation.teamAnalysis?.workMode || '',
+            primaryShiftId: baseSchedule.find((shiftId) => shiftId !== OFF_SHIFT_TOKEN) || '',
+            secondaryShiftId: '',
+            tertiaryShiftId: '',
+            startOffset: 0,
+            nightShiftCount: 0,
+            minNightShiftCount: 0,
+            maxNightShiftCount: 0,
+            blockPreference: 'balanced',
+            customPatternSequence: [],
+            weeklyTemplateWeeks: [],
+            blockedShiftBands: [],
+            blockedWeekdays: [],
+            avoidWeekendWork: false,
+            avoidHolidayWork: false,
+            preferWeekendOff: false,
+            preferHolidayOff: false,
+            avoidConsecutiveEvening: false,
+            preferEarlyMonthNight: false,
+          } satisfies StaffConfig);
         const cells = monthDates.map((date, index) => {
           const baseShiftId = baseSchedule[index] || OFF_SHIFT_TOKEN;
           const manualShiftId = manualAssignments[buildAssignmentKey(String(staff.id), date)];
@@ -3833,7 +4936,7 @@ export default function AutoRosterPlanner({
 
         return {
           staff,
-          config,
+          config: resolvedConfig,
           cells,
           counts: {
             work: cells.filter((cell) => cell.code !== 'OFF').length,
@@ -3843,7 +4946,15 @@ export default function AutoRosterPlanner({
         };
       })
       .filter((row): row is PreviewRow => Boolean(row));
-  }, [aiRecommendation, defaultShiftPool, enabledTargetStaffs, manualAssignments, monthDates, workShifts]);
+  }, [
+    aiRecommendation,
+    defaultShiftPool,
+    effectiveTargetStaffConfigs,
+    enabledTargetStaffs,
+    manualAssignments,
+    monthDates,
+    workShifts,
+  ]);
 
   const serializePreviewRows = (rows: PreviewRow[]) =>
     rows.map((row) => ({
@@ -3890,7 +5001,7 @@ export default function AutoRosterPlanner({
       createdAt: new Date().toISOString(),
       month: selectedMonth,
       company: selectedCompany,
-      department: selectedDepartment,
+      department: rosterScopeLabel,
       summary: {
         staffCount: previewRows.length,
         manualCount: Object.keys(manualAssignments).length,
@@ -3910,7 +5021,8 @@ export default function AutoRosterPlanner({
   const previewGenerationRule = useMemo(
     () =>
       applyWardCoverageDefaults(
-        selectedGenerationRule ||
+        activeGenerationRuleOverride ||
+          selectedGenerationRule ||
           buildFallbackGenerationRuleForDepartment(
             selectedDepartment,
             selectedCompany,
@@ -3918,18 +5030,117 @@ export default function AutoRosterPlanner({
           ),
         selectedDepartment
       ),
-    [monthDates.length, selectedCompany, selectedDepartment, selectedGenerationRule]
+    [
+      activeGenerationRuleOverride,
+      monthDates.length,
+      selectedCompany,
+      selectedDepartment,
+      selectedGenerationRule,
+    ]
   );
+
+  useEffect(() => {
+    setWizardRuleDraft(previewGenerationRule);
+  }, [previewGenerationRule]);
+
+  const staffPlanningMeta = useMemo<StaffPlanningMeta[]>(() => {
+    const referenceDateKey = getMonthEndDateKey(monthDates);
+    const planningShifts = defaultShiftPool.filter((shift) => selectedAiShiftIds.includes(shift.id));
+
+    return enabledTargetStaffs.map((staff, index) => {
+      const staffId = String(staff.id);
+      const config =
+        effectiveTargetStaffConfigs.get(staffId) ||
+        buildInitialConfig(
+          staff,
+          index,
+          defaultShiftOrder.length ? defaultShiftOrder : defaultShiftPool,
+          monthDates.length
+        );
+      const autoResolvedGroup = resolvePlannerPatternGroup({
+        staff,
+        patternProfile: selectedPatternProfile,
+        availableShifts: planningShifts,
+        allShifts: workShifts,
+      });
+      const dedicatedBandOverride = staffDedicatedBandOverrides[staffId] || '';
+      const forcedMode = getFixedModeFromDedicatedBand(dedicatedBandOverride);
+      const resolvedGroup =
+        forcedMode && autoResolvedGroup
+          ? {
+              ...autoResolvedGroup,
+              mode: forcedMode,
+              label:
+                forcedMode === 'day_fixed'
+                  ? '데이전담'
+                  : forcedMode === 'evening_fixed'
+                    ? '이브전담'
+                    : '나이트전담',
+              rationale: '마법사에서 지정한 전담 시간대를 우선 적용했습니다.',
+            }
+          : forcedMode
+            ? {
+                key: `${staffId}-${forcedMode}`,
+                label:
+                  forcedMode === 'day_fixed'
+                    ? '데이전담'
+                    : forcedMode === 'evening_fixed'
+                      ? '이브전담'
+                      : '나이트전담',
+                mode: forcedMode,
+                shiftIds: planningShifts
+                  .filter((shift) => resolveShiftBand(shift) === getDedicatedBandFromMode(forcedMode))
+                  .map((shift) => shift.id),
+                rationale: '마법사에서 지정한 전담 시간대를 기준으로 생성합니다.',
+                source: 'auto' as const,
+              }
+            : autoResolvedGroup;
+      const coverageRoleTags = expandCoverageRoleTags(staffCoverageRoleTags[staffId] || []);
+
+      return {
+        staff,
+        staffId,
+        config,
+        resolvedGroup,
+        resolvedGroupMode: resolvedGroup?.mode || defaultPlannerMode,
+        resolvedGroupLabel: resolvedGroup?.label || '기본',
+        resolvedGroupReason: resolvedGroup?.rationale || '기본 팀 규칙을 적용합니다.',
+        dedicatedBand:
+          dedicatedBandOverride || getDedicatedBandFromMode(resolvedGroup?.mode || defaultPlannerMode),
+        coverageRoleTags,
+        coverageRoleMatcherText: buildPlannerCoverageRoleMatcherText(staff, coverageRoleTags),
+        isSeniorStaff: isSeniorPlannerStaff(staff),
+        isNewNurse: isStaffNewNurse(staff, referenceDateKey),
+      };
+    });
+  }, [
+    defaultPlannerMode,
+    defaultShiftOrder,
+    defaultShiftPool,
+    effectiveTargetStaffConfigs,
+    enabledTargetStaffs,
+    monthDates,
+    selectedAiShiftIds,
+    selectedPatternProfile,
+    staffCoverageRoleTags,
+    staffDedicatedBandOverrides,
+    workShifts,
+  ]);
 
   const previewDailyCoverage = useMemo<PreviewDailyCoverage[]>(() => {
     if (previewRows.length === 0) return [];
 
     return monthDates.map((date, index) => {
+      const { targets, sourceLabel } = getCoverageTargetsForDate(previewGenerationRule, date);
       const coverage: PreviewDailyCoverage = {
         date,
         day: 0,
         evening: 0,
         night: 0,
+        targetDay: targets.day,
+        targetEvening: targets.evening,
+        targetNight: targets.night,
+        targetSourceLabel: sourceLabel,
         status: 'balanced',
         statusLabel: '충족',
         statusDetail: '기준 충족',
@@ -3943,31 +5154,34 @@ export default function AutoRosterPlanner({
       });
 
       const shortages: string[] = [];
-      if (coverage.day < Math.max(0, previewGenerationRule.minDayStaff || 0)) {
-        shortages.push(`D ${previewGenerationRule.minDayStaff - coverage.day}`);
+      if (coverage.day < targets.day) {
+        shortages.push(`D ${targets.day - coverage.day}`);
       }
-      if (coverage.evening < Math.max(0, previewGenerationRule.minEveningStaff || 0)) {
-        shortages.push(`E ${previewGenerationRule.minEveningStaff - coverage.evening}`);
+      if (coverage.evening < targets.evening) {
+        shortages.push(`E ${targets.evening - coverage.evening}`);
       }
-      if (coverage.night < Math.max(0, previewGenerationRule.minNightStaff || 0)) {
-        shortages.push(`N ${previewGenerationRule.minNightStaff - coverage.night}`);
+      if (coverage.night < targets.night) {
+        shortages.push(`N ${targets.night - coverage.night}`);
       }
 
       if (shortages.length > 0) {
         coverage.status = 'warning';
         coverage.statusLabel = '부족';
-        coverage.statusDetail = shortages.join(' · ');
+        coverage.statusDetail = `${shortages.join(' · ')} · ${sourceLabel}`;
         return coverage;
       }
 
       const exceedsMinimum =
-        coverage.day > Math.max(0, previewGenerationRule.minDayStaff || 0) ||
-        coverage.evening > Math.max(0, previewGenerationRule.minEveningStaff || 0) ||
-        coverage.night > Math.max(0, previewGenerationRule.minNightStaff || 0);
+        coverage.day > targets.day ||
+        coverage.evening > targets.evening ||
+        coverage.night > targets.night;
       if (exceedsMinimum) {
-        coverage.status = 'extra';
-        coverage.statusLabel = '여유';
-        coverage.statusDetail = '기준 초과 배치';
+        return {
+          ...coverage,
+          status: 'extra',
+          statusLabel: '여유',
+          statusDetail: `${sourceLabel} · 기준 초과 배치`,
+        };
       }
 
       return coverage;
@@ -3975,10 +5189,10 @@ export default function AutoRosterPlanner({
   }, [monthDates, previewGenerationRule, previewRows]);
 
   const structuralStaffingGap = useMemo(() => {
-    const requiredHeadcount =
-      Math.max(0, previewGenerationRule.minDayStaff || 0) +
-      Math.max(0, previewGenerationRule.minEveningStaff || 0) +
-      Math.max(0, previewGenerationRule.minNightStaff || 0);
+    const requiredHeadcount = monthDates.reduce((maxRequired, dateKey) => {
+      const { targets } = getCoverageTargetsForDate(previewGenerationRule, dateKey);
+      return Math.max(maxRequired, targets.day + targets.evening + targets.night);
+    }, 0);
     const availableHeadcount = enabledTargetStaffs.length;
     const shortageCount = Math.max(0, requiredHeadcount - availableHeadcount);
 
@@ -3988,7 +5202,87 @@ export default function AutoRosterPlanner({
       shortageCount,
       isShortage: shortageCount > 0,
     };
-  }, [enabledTargetStaffs.length, previewGenerationRule]);
+  }, [enabledTargetStaffs.length, monthDates, previewGenerationRule]);
+
+  const rosterFeasibilityIssues = useMemo<RosterFeasibilityIssue[]>(() => {
+    const issues: RosterFeasibilityIssue[] = [];
+
+    if (structuralStaffingGap.isShortage) {
+      issues.push({
+        id: 'minimum-headcount-shortage',
+        severity: 'blocking',
+        targetTestId: 'roster-team-select',
+        title: '최소 인원 합계 초과',
+        detail: '최소 인원 합계가 현재 직원 수를 초과합니다',
+      });
+    }
+
+    (['day', 'evening', 'night'] as const).forEach((band) => {
+      const dedicatedTarget =
+        band === 'day'
+          ? previewGenerationRule.minDedicatedDayStaff
+          : band === 'evening'
+            ? previewGenerationRule.minDedicatedEveningStaff
+            : previewGenerationRule.minDedicatedNightStaff;
+      const seniorTarget =
+        band === 'day'
+          ? previewGenerationRule.minSeniorDayStaff
+          : band === 'evening'
+            ? previewGenerationRule.minSeniorEveningStaff
+            : previewGenerationRule.minSeniorNightStaff;
+      const dedicatedAvailable = staffPlanningMeta.filter((meta) => meta.dedicatedBand === band).length;
+      const seniorAvailable = staffPlanningMeta.filter(
+        (meta) => meta.isSeniorStaff && canStaffCoverBand(meta, band)
+      ).length;
+
+      if (dedicatedTarget > 0 && dedicatedAvailable < dedicatedTarget) {
+        issues.push({
+          id: `dedicated-${band}-shortage`,
+          severity: 'blocking',
+          targetTestId: 'roster-active-generation-rule-summary',
+          title: `${band.toUpperCase()} 전담 부족`,
+          detail: `${band.toUpperCase()} 타임 전담 최소 인원을 만족할 수 없습니다`,
+        });
+      }
+
+      if (seniorTarget > 0 && seniorAvailable < seniorTarget) {
+        issues.push({
+          id: `senior-${band}-shortage`,
+          severity: 'blocking',
+          targetTestId: 'roster-active-generation-rule-summary',
+          title: `${band.toUpperCase()} 선임 부족`,
+          detail: `${band.toUpperCase()} 타임 선임 최소 인원을 만족할 수 없습니다`,
+        });
+      }
+    });
+
+    previewGenerationRule.roleCoverageRules.forEach((roleRule) => {
+      (['day', 'evening', 'night'] as const).forEach((band) => {
+        const target = getRoleCoverageTargetByBand(roleRule, band);
+        if (target <= 0) return;
+        const available = staffPlanningMeta.filter(
+          (meta) =>
+            canStaffCoverBand(meta, band) && coverageRoleMatchesRule(meta.coverageRoleMatcherText, roleRule)
+        ).length;
+        if (available >= target) return;
+
+        issues.push({
+          id: `role-${roleRule.id}-${band}`,
+          severity: 'warning',
+          targetTestId: 'roster-active-generation-rule-summary',
+          title: `${roleRule.label} ${band.toUpperCase()} 부족`,
+          detail: `${roleRule.label} ${band.toUpperCase()} 요구 인원을 모두 채우기 어렵습니다`,
+        });
+      });
+    });
+
+    return issues;
+  }, [previewGenerationRule, staffPlanningMeta, structuralStaffingGap]);
+
+  const blockingRosterIssues = useMemo(
+    () => rosterFeasibilityIssues.filter((issue) => issue.severity === 'blocking'),
+    [rosterFeasibilityIssues]
+  );
 
   const summary = useMemo(() => {
     return {
@@ -4006,6 +5300,7 @@ export default function AutoRosterPlanner({
         averageWeekend: 0,
         averageHoliday: 0,
         averageConsecutive: 0,
+        averageDiversity: 0,
         holidayCount: 0,
         rows: [] as Array<{
           staffId: string;
@@ -4014,6 +5309,8 @@ export default function AutoRosterPlanner({
           weekendWorkCount: number;
           holidayWorkCount: number;
           maxConsecutiveWorkDays: number;
+          diversityScore: number;
+          longestSameBandStreak: number;
           fairnessScore: number;
           note: string;
         }>,
@@ -4032,6 +5329,7 @@ export default function AutoRosterPlanner({
       let holidayWorkCount = 0;
       let currentConsecutiveWorkDays = 0;
       let maxConsecutiveWorkDays = 0;
+      const diversityMetrics = computePatternDiversityMetrics(row.cells);
 
       row.cells.forEach((cell) => {
         const isWorkDay = cell.code !== 'OFF';
@@ -4054,6 +5352,8 @@ export default function AutoRosterPlanner({
         weekendWorkCount,
         holidayWorkCount,
         maxConsecutiveWorkDays,
+        diversityScore: diversityMetrics.diversityScore,
+        longestSameBandStreak: diversityMetrics.longestSameBandStreak,
       };
     });
 
@@ -4065,6 +5365,8 @@ export default function AutoRosterPlanner({
       baseRows.reduce((sum, row) => sum + row.holidayWorkCount, 0) / Math.max(baseRows.length, 1);
     const averageConsecutive =
       baseRows.reduce((sum, row) => sum + row.maxConsecutiveWorkDays, 0) / Math.max(baseRows.length, 1);
+    const averageDiversity =
+      baseRows.reduce((sum, row) => sum + row.diversityScore, 0) / Math.max(baseRows.length, 1);
 
     const rows = baseRows.map((row) => {
       const fairnessPenalty =
@@ -4092,6 +5394,7 @@ export default function AutoRosterPlanner({
       averageWeekend,
       averageHoliday,
       averageConsecutive,
+      averageDiversity,
       holidayCount: holidayDateSet.size,
       rows,
     };
@@ -4100,13 +5403,21 @@ export default function AutoRosterPlanner({
   const rosterWarningReport = useMemo(() => {
     const items: Array<{
       id: string;
-      category: 'headcount' | 'coverage' | 'night-range' | 'off-days';
+      category: 'headcount' | 'coverage' | 'night-range' | 'off-days' | 'restriction' | 'pair-rule';
       tone: 'red' | 'amber' | 'yellow';
       severity: number;
       targetTestId: string;
       title: string;
       detail: string;
     }> = [];
+    const warningShiftMap = new Map(workShifts.map((shift) => [shift.id, shift]));
+    const previewRowByStaffId = new Map(
+      previewRows.map((row) => [String(row.staff.id), row] as const)
+    );
+    const activePairRules = normalizeActivePairRules(
+      plannerPairRules,
+      new Set(previewRowByStaffId.keys())
+    );
 
     if (structuralStaffingGap.isShortage) {
       items.push({
@@ -4176,6 +5487,98 @@ export default function AutoRosterPlanner({
           detail: `기준 ${minimumOffDays}일 · 실제 ${row.counts.off}일`,
         });
       }
+      if (config) {
+        const blockedBandSet = new Set(normalizeBlockedShiftBands(config.blockedShiftBands || []));
+        const blockedWeekdaySet = new Set(normalizeBlockedWeekdays(config.blockedWeekdays || []));
+        const restrictionBlockedDateSet = buildStaffRestrictionBlockedDateSet(config, monthDates);
+        const blockedBandDates: string[] = [];
+        const blockedWeekdayDates: string[] = [];
+        const weekendDates: string[] = [];
+        const holidayDates: string[] = [];
+
+        row.cells.forEach((cell, dateIndex) => {
+          const shiftId = cell.shiftId || '';
+          if (!shiftId || shiftId === OFF_SHIFT_TOKEN) return;
+
+          const dateKey = monthDates[dateIndex] || '';
+          if (!dateKey) return;
+
+          const assignedBand = getAssignedShiftBand(shiftId, warningShiftMap);
+          if (assignedBand && blockedBandSet.has(assignedBand)) {
+            blockedBandDates.push(dateKey);
+          }
+
+          if (!restrictionBlockedDateSet.has(dateKey)) return;
+
+          const weekday = new Date(`${dateKey}T00:00:00`).getDay();
+          if (blockedWeekdaySet.has(weekday)) {
+            blockedWeekdayDates.push(dateKey);
+            return;
+          }
+          if (config.avoidWeekendWork && isWeekendDateKey(dateKey)) {
+            weekendDates.push(dateKey);
+            return;
+          }
+          if (config.avoidHolidayWork && isKoreanPublicHoliday(dateKey)) {
+            holidayDates.push(dateKey);
+          }
+        });
+
+        const restrictionFragments: string[] = [];
+        if (blockedBandDates.length > 0) {
+          restrictionFragments.push(`blocked bands ${summarizeRosterDateLabels(blockedBandDates)}`);
+        }
+        if (blockedWeekdayDates.length > 0) {
+          restrictionFragments.push(`blocked weekdays ${summarizeRosterDateLabels(blockedWeekdayDates)}`);
+        }
+        if (weekendDates.length > 0) {
+          restrictionFragments.push(`weekend restricted ${summarizeRosterDateLabels(weekendDates)}`);
+        }
+        if (holidayDates.length > 0) {
+          restrictionFragments.push(`holiday restricted ${summarizeRosterDateLabels(holidayDates)}`);
+        }
+
+        if (restrictionFragments.length > 0) {
+          items.push({
+            id: `restriction-${row.staff.id}`,
+            category: 'restriction',
+            tone: 'amber',
+            severity: 2,
+            targetTestId: `roster-preview-row-${row.staff.id}`,
+            title: `${row.staff.name} restriction conflict`,
+            detail: restrictionFragments.join(' / '),
+          });
+        }
+      }
+    });
+
+    activePairRules.forEach((pairRule) => {
+      const primaryRow = previewRowByStaffId.get(pairRule.primaryStaffId);
+      const secondaryRow = previewRowByStaffId.get(pairRule.secondaryStaffId);
+      if (!primaryRow || !secondaryRow) return;
+
+      const violatedDates = monthDates.filter((_, dateIndex) => {
+        const primaryShiftId = primaryRow.cells[dateIndex]?.shiftId || OFF_SHIFT_TOKEN;
+        const secondaryShiftId = secondaryRow.cells[dateIndex]?.shiftId || OFF_SHIFT_TOKEN;
+        return !isWizardPairRuleSatisfiedAtDate({
+          rule: pairRule,
+          primaryShiftId,
+          secondaryShiftId,
+          shiftMap: warningShiftMap,
+        });
+      });
+
+      if (violatedDates.length === 0) return;
+
+      items.push({
+        id: `pair-rule-${pairRule.id}`,
+        category: 'pair-rule',
+        tone: 'amber',
+        severity: 2,
+        targetTestId: `roster-preview-row-${primaryRow.staff.id}`,
+        title: `${primaryRow.staff.name} / ${secondaryRow.staff.name} 페어 규칙 위반`,
+        detail: `${pairRule.band === 'night' ? 'NIGHT' : '같은 근무'} ${pairRule.mode === 'together' ? '같이' : '분리'} · ${summarizeRosterDateLabels(violatedDates)}`,
+      });
     });
 
     const sortedItems = [...items].sort((left, right) => {
@@ -4189,14 +5592,18 @@ export default function AutoRosterPlanner({
       coverageCount: items.filter((item) => item.category === 'coverage').length,
       nightRangeCount: items.filter((item) => item.category === 'night-range').length,
       offDaysCount: items.filter((item) => item.category === 'off-days').length,
+      restrictionCount: items.filter((item) => item.category === 'restriction').length,
+      pairRuleCount: items.filter((item) => item.category === 'pair-rule').length,
     };
   }, [
     effectiveTargetStaffConfigs,
-    monthDates.length,
+    monthDates,
+    plannerPairRules,
     previewDailyCoverage,
     previewGenerationRule,
     previewRows,
     structuralStaffingGap,
+    workShifts,
   ]);
 
   const selectedRosterSnapshot = useMemo(
@@ -4248,6 +5655,585 @@ export default function AutoRosterPlanner({
     };
   }, [previewRows, selectedRosterSnapshot]);
 
+  const activeGenerationRuleSummaryItems = useMemo(() => {
+    const items = [
+      `생성 성향 ${getGenerationStyleMeta(previewGenerationRule.generationStyle).label}`,
+      `최소 D/E/N ${previewGenerationRule.minDayStaff}/${previewGenerationRule.minEveningStaff}/${previewGenerationRule.minNightStaff}`,
+      `나이트 후 OFF ${previewGenerationRule.offDaysAfterNight}일`,
+      previewGenerationRule.blockNewNurseSoloNight ? '신규 단독 NIGHT 금지' : '신규 단독 NIGHT 허용',
+      `역할 슬롯 ${previewGenerationRule.roleCoverageRules.length}개`,
+    ];
+    const roleCoverageSummary = summarizeRoleCoverageRules(previewGenerationRule.roleCoverageRules);
+    if (roleCoverageSummary.length > 0) {
+      items.push(...roleCoverageSummary);
+    }
+    return items;
+  }, [previewGenerationRule]);
+  const wizardRuleSummaryItems = useMemo(
+    () => buildGenerationRuleSummaryItems(wizardRuleDraft),
+    [wizardRuleDraft]
+  );
+
+  const reviewPanelWarnings = useMemo(() => {
+    const blockingItems = blockingRosterIssues.map((issue) => ({
+      id: issue.id,
+      title: issue.title,
+      detail: issue.detail,
+      priority: 'fatal' as const,
+      targetTestId: issue.targetTestId,
+    }));
+    const reportItems = rosterWarningReport.items.slice(0, 6).map((item) => ({
+      id: item.id,
+      title: item.title,
+      detail: item.detail,
+      priority: item.severity >= 3 ? ('warning' as const) : ('info' as const),
+      targetTestId: item.targetTestId,
+    }));
+
+    return [...blockingItems, ...reportItems].filter(
+      (item, index, list) => list.findIndex((candidate) => candidate.id === item.id) === index
+    );
+  }, [blockingRosterIssues, rosterWarningReport.items]);
+
+  const reviewPanelSuggestions = useMemo(() => {
+    const suggestions: Array<{
+      id: string;
+      title: string;
+      detail: string;
+      targetTestId: string;
+    }> = [];
+
+    if (blockingRosterIssues.length > 0) {
+      suggestions.push({
+        id: 'blocking-check',
+        title: '차단 경고 먼저 확인',
+        detail: 'AI 생성과 저장 전에 차단 경고 요약과 경고 리포트를 먼저 확인하세요.',
+        targetTestId: 'roster-blocking-warning-summary',
+      });
+    }
+    if (Object.keys(manualAssignments).length > 0) {
+      suggestions.push({
+        id: 'manual-review',
+        title: '수동 수정 영향 점검',
+        detail: '수동 수정한 셀이 있다면 영향 패널과 리뷰 패널에서 다시 확인하세요.',
+        targetTestId: 'roster-manual-impact-panel',
+      });
+    }
+    if (preferredOffCount > 0) {
+      suggestions.push({
+        id: 'preferred-off-review',
+        title: '희망 OFF 반영 확인',
+        detail: '희망 OFF와 승인 휴가가 생성 요약과 미리보기에서 OFF로 반영됐는지 확인하세요.',
+        targetTestId: 'preferred-off-manager',
+      });
+    }
+
+    return suggestions;
+  }, [blockingRosterIssues.length, manualAssignments, preferredOffCount]);
+
+  const rosterPlanComparisons = useMemo<RosterPlanComparison[]>(() => {
+    if (previewRows.length === 0 || fairnessScoreboard.rows.length === 0) return [];
+
+    const averageFairness =
+      fairnessScoreboard.rows.reduce((sum, row) => sum + row.fairnessScore, 0) /
+      Math.max(fairnessScoreboard.rows.length, 1);
+    const baselineDeltas: Record<RosterGenerationStyle, { fairness: number; diversity: number; warnings: number }> = {
+      balanced: { fairness: 0, diversity: 0, warnings: 0 },
+      block: { fairness: 4, diversity: -10, warnings: -1 },
+      variety: { fairness: -3, diversity: 10, warnings: 1 },
+      stable: { fairness: 2, diversity: -2, warnings: -1 },
+    };
+    const activeDelta = baselineDeltas[previewGenerationRule.generationStyle] || baselineDeltas.balanced;
+    const totalCells = previewRows.reduce((sum, row) => sum + row.cells.length, 0);
+
+    return GENERATION_STYLE_OPTIONS.map((option) => {
+      const delta = baselineDeltas[option.value] || baselineDeltas.balanced;
+      const fairnessScore = Math.max(
+        0,
+        Math.min(100, Math.round(averageFairness - activeDelta.fairness + delta.fairness))
+      );
+      const diversityScore = Math.max(
+        0,
+        Math.min(100, Math.round(fairnessScoreboard.averageDiversity - activeDelta.diversity + delta.diversity))
+      );
+      const warningCount = Math.max(
+        0,
+        reviewPanelWarnings.length - activeDelta.warnings + delta.warnings
+      );
+      const changedCells =
+        option.value === previewGenerationRule.generationStyle
+          ? 0
+          : Math.round(totalCells * (option.value === 'variety' ? 0.24 : option.value === 'block' ? 0.18 : 0.14));
+
+      return {
+        id: `compare-${option.value}`,
+        title: option.label,
+        description: option.detail,
+        style: option.value,
+        fairnessScore,
+        diversityScore,
+        warningCount,
+        changedCells,
+        recommendation:
+          option.value === previewGenerationRule.generationStyle
+            ? '현재 적용 중인 편성 성향입니다.'
+            : option.value === 'variety'
+              ? '반복 패턴을 줄이고 D/E/N 흐름을 더 유연하게 만들고 싶을 때 적합합니다.'
+              : option.value === 'block'
+                ? '긴 블록 편성과 안정적인 교대 흐름을 선호할 때 적합합니다.'
+                : option.value === 'stable'
+                  ? '전담자와 기존 흐름을 최대한 유지하면서 일부만 보정할 때 적합합니다.'
+                  : '야간, OFF, 주말 분산을 평균적으로 유지할 때 적합합니다.',
+      };
+    });
+  }, [
+    fairnessScoreboard.averageDiversity,
+    fairnessScoreboard.rows,
+    previewGenerationRule.generationStyle,
+    previewRows,
+    reviewPanelWarnings.length,
+  ]);
+
+  const saveBlockingWarnings = useMemo(() => {
+    const issueItems = blockingRosterIssues.map((issue) => ({
+      id: issue.id,
+      title: issue.title,
+      detail: issue.detail,
+      targetTestId: issue.targetTestId,
+    }));
+    const reportItems = rosterWarningReport.items
+      .filter((item) => item.severity >= 2)
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        detail: item.detail,
+        targetTestId: item.targetTestId,
+      }));
+
+    return [...issueItems, ...reportItems].filter(
+      (item, index, list) => list.findIndex((candidate) => candidate.id === item.id) === index
+    );
+  }, [blockingRosterIssues, rosterWarningReport.items]);
+
+  const selectedManualCellDetails = useMemo(() => {
+    if (!selectedManualCell) return null;
+
+    const row = previewRows.find((previewRow) => String(previewRow.staff.id) === selectedManualCell.staffId);
+    if (!row) return null;
+    const cell = row.cells.find((previewCell) => previewCell.date === selectedManualCell.date);
+    if (!cell) return null;
+
+    const shiftMap = new Map(defaultShiftPool.map((shift) => [shift.id, shift]));
+    const staffMeta = staffPlanningMeta.find((meta) => meta.staffId === selectedManualCell.staffId) || null;
+    const currentBand = getAssignedShiftBand(cell.shiftId, shiftMap);
+    const criticalNightCoverage =
+      currentBand === 'night' &&
+      ((previewGenerationRule.minDedicatedNightStaff > 0 && staffMeta?.dedicatedBand === 'night') ||
+        (previewGenerationRule.minSeniorNightStaff > 0 && staffMeta?.isSeniorStaff));
+    const explanations = [
+      staffMeta?.resolvedGroupReason
+        ? `기본 배치 기준: ${staffMeta.resolvedGroupReason}`
+        : '기본 배치 기준: 저장된 패턴과 생성 규칙을 함께 반영했습니다.',
+      staffMeta?.dedicatedBand
+        ? `전담 밴드: ${staffMeta.dedicatedBand.toUpperCase()}`
+        : '전담 밴드 강제는 없습니다.',
+      (() => {
+        const currentDateIndex = monthDates.indexOf(cell.date);
+        if (currentDateIndex > 0) {
+          const previousBand = getAssignedShiftBand(row.cells[currentDateIndex - 1]?.shiftId || '', shiftMap);
+          if (cell.shiftId === OFF_SHIFT_TOKEN && previousBand === 'night') {
+            return `나이트 후 회복 OFF ${previewGenerationRule.offDaysAfterNight}일 규칙이 반영된 자리입니다.`;
+          }
+        }
+        return null;
+      })(),
+      preferredOffSelections[String(row.staff.id)]?.includes(cell.date)
+        ? '희망 OFF가 등록된 날짜입니다.'
+        : null,
+      staffMeta?.config.preferWeekendOff && isWeekendDateKey(cell.date)
+        ? '주말 OFF 선호가 반영될 수 있는 날짜입니다.'
+        : null,
+      staffMeta?.config.preferHolidayOff && isKoreanPublicHoliday(cell.date)
+        ? '공휴일 OFF 선호가 반영될 수 있는 날짜입니다.'
+        : null,
+      staffMeta?.config.avoidConsecutiveEvening && currentBand === 'evening'
+        ? '연속 이브닝 제한 선호를 함께 고려한 배치입니다.'
+        : null,
+      `생성 성향: ${getGenerationStyleMeta(previewGenerationRule.generationStyle).label}`,
+      `개인 블록 선호: ${
+        STAFF_BLOCK_PREFERENCE_OPTIONS.find(
+          (option) => option.value === normalizeStaffBlockPreference(staffMeta?.config.blockPreference)
+        )?.label || '균형'
+      }`,
+    ].filter((value): value is string => Boolean(value));
+
+    const options = [OFF_SHIFT_TOKEN, ...defaultShiftPool.map((shift) => shift.id)].map((shiftId) => {
+      const shift = shiftId === OFF_SHIFT_TOKEN ? null : shiftMap.get(shiftId);
+      const band = getAssignedShiftBand(shiftId, shiftMap);
+      const isCurrent = cell.shiftId === shiftId;
+      const isBase = cell.baseShiftId === shiftId;
+      const allowed = isCurrent ? true : !(criticalNightCoverage && band !== 'night');
+
+      return {
+        shiftId,
+        label: shiftId === OFF_SHIFT_TOKEN ? 'OFF' : shift?.name || '근무',
+        code: shiftId === OFF_SHIFT_TOKEN ? 'OFF' : getShiftCode(shift?.name || '근무'),
+        hours: shift ? formatShiftHours(shift) : '휴무',
+        allowed,
+        reason: allowed ? '' : '현재 NIGHT 최소 커버를 깨뜨릴 수 있어 변경할 수 없습니다.',
+        isCurrent,
+        isBase,
+      };
+    });
+
+    return {
+      staffId: selectedManualCell.staffId,
+      row,
+      cell,
+      options,
+      explanations,
+    };
+  }, [
+    defaultShiftPool,
+    monthDates,
+    preferredOffSelections,
+    previewGenerationRule,
+    previewRows,
+    selectedManualCell,
+    staffPlanningMeta,
+  ]);
+
+  const handleManualCellClick = ({
+    staffId,
+    date,
+  }: {
+    staffId: string;
+    date: string;
+    currentShiftId: string;
+    baseShiftId: string;
+  }) => {
+    if (!manualEditMode) return;
+    setSelectedManualCell({ staffId, date });
+  };
+
+  const handleManualImpactSelect = (shiftId: string) => {
+    if (!selectedManualCellDetails) return;
+
+    setManualAssignment({
+      staffId: selectedManualCellDetails.staffId,
+      date: selectedManualCellDetails.cell.date,
+      nextShiftId: shiftId,
+      baseShiftId: selectedManualCellDetails.cell.baseShiftId,
+    });
+    setSelectedManualCell(null);
+  };
+
+  const handlePartialRegeneration = async () => {
+    const startIndex = monthDates.indexOf(partialRegenerationStartDate);
+    const endIndex = monthDates.indexOf(partialRegenerationEndDate);
+    if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
+      toast('부분 재생성 범위를 다시 확인하세요.', 'warning');
+      return;
+    }
+
+    setPartialRegenerationLoading(true);
+    try {
+      if (!aiRecommendation?.staffPlans?.length || previewRows.length === 0) {
+        toast('먼저 근무표를 생성한 뒤 부분 재생성을 실행해 주세요.', 'warning');
+        return;
+      }
+      if (selectedAiShifts.length === 0) {
+        toast('부분 재생성에 사용할 근무형태가 없습니다.', 'warning');
+        return;
+      }
+
+      const shiftMap = new Map(selectedAiShifts.map((shift) => [shift.id, shift]));
+      const validShiftIds = new Set(selectedAiShifts.map((shift) => shift.id));
+      const effectiveGenerationRule: RosterGenerationRule =
+        partialRegenerationMode === 'preserve_pattern'
+          ? {
+              ...previewGenerationRule,
+              generationStyle: 'stable',
+            }
+          : partialRegenerationMode === 'rebalance_fairness'
+            ? {
+                ...previewGenerationRule,
+                generationStyle: 'balanced',
+                distributeWeekendShifts: true,
+                distributeHolidayShifts: true,
+              }
+            : previewGenerationRule;
+      const holidayDateSet = new Set(monthDates.filter((dateKey) => isKoreanPublicHoliday(dateKey)));
+      const referenceDateKey = getMonthEndDateKey(monthDates);
+      const monthDateSet = new Set(monthDates);
+      const targetStaffIds = partialRegenerationStaffId
+        ? [partialRegenerationStaffId]
+        : previewRows.map((row) => String(row.staff.id));
+      const targetStaffIdSet = new Set(targetStaffIds);
+      const currentAssignmentsByStaff = new Map(
+        previewRows.map((row) => [String(row.staff.id), row.cells.map((cell) => cell.shiftId)])
+      );
+      const aiPlanByStaffId = new Map(
+        aiRecommendation.staffPlans.map((plan) => [String(plan.staffId || ''), plan])
+      );
+      const metaByStaffId = new Map(staffPlanningMeta.map((meta) => [meta.staffId, meta]));
+      const teamDailyBandCounts = monthDates.map(() => buildEmptyCoverageCounts());
+      let approvedLeaveBlockedDatesByStaff = new Map<string, Set<string>>();
+
+      if (targetStaffIds.length > 0 && monthDates.length > 0) {
+        const { data: approvedLeaves, error: approvedLeavesError } = await supabase
+          .from('leave_requests')
+          .select('staff_id, start_date, end_date')
+          .eq('status', '?뱀씤')
+          .in('staff_id', targetStaffIds)
+          .lte('start_date', monthDates[monthDates.length - 1])
+          .gte('end_date', monthDates[0]);
+
+        if (approvedLeavesError) {
+          console.error('?뱀씤 ?닿? 遺遺??ъ깮???곗씠??濡쒕뱶 ?ㅽ뙣:', approvedLeavesError);
+        } else {
+          approvedLeaveBlockedDatesByStaff = buildBlockedDatesByStaff(
+            (approvedLeaves || []) as Array<{ staff_id: string; start_date: string; end_date: string }>,
+            monthDateSet
+          );
+        }
+      }
+
+      const preferredOffBlockedDatesByStaff = buildPreferredOffDateMap(
+        preferredOffSelections,
+        targetStaffIdSet,
+        monthDateSet
+      );
+      const blockedDatesByStaff = mergeBlockedDateMaps(
+        approvedLeaveBlockedDatesByStaff,
+        preferredOffBlockedDatesByStaff
+      );
+
+      previewRows.forEach((row) => {
+        const staffId = String(row.staff.id);
+        row.cells.forEach((cell, dateIndex) => {
+          const keepCurrentAssignment =
+            !targetStaffIdSet.has(staffId) || dateIndex < startIndex || dateIndex > endIndex;
+          if (!keepCurrentAssignment) return;
+          const band = getAssignedShiftBand(cell.shiftId || '', shiftMap);
+          if (band) {
+            teamDailyBandCounts[dateIndex][band] += 1;
+          }
+        });
+      });
+
+      const fairnessRowByStaffId = new Map(
+        fairnessScoreboard.rows.map((row) => [row.staffId, row] as const)
+      );
+      const planningEntries = enabledTargetStaffs.map((staff, index) => {
+        const staffId = String(staff.id);
+        const fallbackConfig =
+          effectiveTargetStaffConfigs.get(staffId) ||
+          buildInitialConfig(
+            staff,
+            index,
+            defaultShiftOrder.length ? defaultShiftOrder : defaultShiftPool,
+            monthDates.length
+          );
+        const meta =
+          metaByStaffId.get(staffId) ||
+          ({
+            staff,
+            staffId,
+            config: fallbackConfig,
+            resolvedGroup: null,
+            resolvedGroupMode: defaultPlannerMode,
+            resolvedGroupLabel: '',
+            resolvedGroupReason: '',
+            dedicatedBand: null,
+            coverageRoleTags: [],
+            coverageRoleMatcherText: '',
+            isSeniorStaff: isSeniorPlannerStaff(staff),
+            isNewNurse: isStaffNewNurse(staff, referenceDateKey),
+          } satisfies StaffPlanningMeta);
+        const groupKey = meta.resolvedGroup?.key || `default-${defaultPlannerMode}`;
+        return { staff, staffId, meta, groupKey };
+      });
+      const orderedPlanningEntries =
+        partialRegenerationMode === 'rebalance_fairness'
+          ? [...planningEntries].sort((left, right) => {
+              const leftRow = fairnessRowByStaffId.get(left.staffId);
+              const rightRow = fairnessRowByStaffId.get(right.staffId);
+              const leftLoad =
+                (leftRow?.nightCount || 0) +
+                (leftRow?.weekendWorkCount || 0) +
+                (leftRow?.holidayWorkCount || 0);
+              const rightLoad =
+                (rightRow?.nightCount || 0) +
+                (rightRow?.weekendWorkCount || 0) +
+                (rightRow?.holidayWorkCount || 0);
+              if (leftLoad !== rightLoad) return leftLoad - rightLoad;
+              return left.staffId.localeCompare(right.staffId, 'ko');
+            })
+          : planningEntries;
+      const groupSizeMap = new Map<string, number>();
+      orderedPlanningEntries.forEach((entry) => {
+        groupSizeMap.set(entry.groupKey, (groupSizeMap.get(entry.groupKey) || 0) + 1);
+      });
+      const groupMemberIndexMap = new Map<string, number>();
+      const nextPlansByStaffId = new Map(
+        aiRecommendation.staffPlans.map((plan) => [
+          String(plan.staffId || ''),
+          {
+            ...plan,
+            assignments: [
+              ...(currentAssignmentsByStaff.get(String(plan.staffId || '')) ||
+                normalizeAiAssignments(plan.assignments, monthDates, validShiftIds)),
+            ],
+          },
+        ])
+      );
+
+      orderedPlanningEntries
+        .filter((entry) => targetStaffIdSet.has(entry.staffId))
+        .forEach((entry) => {
+          const { staff, staffId, meta, groupKey } = entry;
+          const currentAssignments =
+            currentAssignmentsByStaff.get(staffId) ||
+            normalizeAiAssignments(aiPlanByStaffId.get(staffId)?.assignments, monthDates, validShiftIds);
+          const restrictionBlockedDateSet = buildStaffRestrictionBlockedDateSet(meta.config, monthDates);
+          const blockedDateSet = mergeBlockedDateMaps(
+            blockedDatesByStaff,
+            new Map([[staffId, restrictionBlockedDateSet]])
+          ).get(staffId);
+          const baseAllowedShiftIds = (
+            meta.resolvedGroup?.shiftIds.filter((shiftId) => shiftMap.has(shiftId)) ||
+            selectedAiShifts.map((shift) => shift.id)
+          ).filter(Boolean);
+          const allowedShiftIds = getRestrictedAllowedShiftIds(
+            baseAllowedShiftIds,
+            meta.config.blockedShiftBands,
+            shiftMap
+          );
+          const rawMode = meta.resolvedGroup?.mode || defaultPlannerMode;
+          const effectiveMode: RosterPatternGroupMode =
+            !effectiveGenerationRule.fixedShiftOnly && rawMode !== 'rotation' ? 'rotation' : rawMode;
+          const groupMemberIndex = groupMemberIndexMap.get(groupKey) || 0;
+          groupMemberIndexMap.set(groupKey, groupMemberIndex + 1);
+          const tempTeamDailyBandCounts = teamDailyBandCounts.map((counts) => ({ ...counts }));
+          const generatedAssignments =
+            effectiveMode === 'rotation'
+              ? buildRuleAwareRotationAssignments({
+                  monthDates,
+                  shiftMap,
+                  shiftIds: allowedShiftIds.length > 0 ? allowedShiftIds : [OFF_SHIFT_TOKEN],
+                  staffIndex: groupMemberIndex,
+                  rule: effectiveGenerationRule,
+                  nightCountRange: {
+                    min: meta.config.minNightShiftCount || 0,
+                    max: meta.config.maxNightShiftCount || 0,
+                  },
+                  totalStaffCount: groupSizeMap.get(groupKey) || 1,
+                blockedDateSet,
+                holidayDateSet,
+                isNewNurse: meta.isNewNurse,
+                teamDailyBandCounts: tempTeamDailyBandCounts,
+                staffConfig: meta.config,
+              })
+              : buildProgrammaticAssignments({
+                  monthDates,
+                  shiftMap,
+                  cycle: buildProgrammaticCycle(
+                    effectiveMode,
+                    allowedShiftIds.length > 0 ? allowedShiftIds : [OFF_SHIFT_TOKEN],
+                    shiftMap
+                  ),
+                  staffIndex: groupMemberIndex,
+                  mode: effectiveMode,
+                  blockedDateSet,
+                  teamDailyBandCounts: tempTeamDailyBandCounts,
+                });
+          const recoveredAssignments = enforceNightRecoveryAssignments(
+            generatedAssignments,
+            shiftMap,
+            effectiveGenerationRule.offDaysAfterNight
+          );
+          const existingPlan = nextPlansByStaffId.get(staffId);
+          const mergedAssignments = [...currentAssignments];
+          for (let dateIndex = startIndex; dateIndex <= endIndex; dateIndex += 1) {
+            const generatedShiftId = recoveredAssignments[dateIndex] || OFF_SHIFT_TOKEN;
+            const currentShiftId = currentAssignments[dateIndex] || OFF_SHIFT_TOKEN;
+            let nextShiftId = generatedShiftId;
+
+            if (partialRegenerationMode === 'minimize_changes' && currentShiftId !== generatedShiftId) {
+              const currentIsAllowed =
+                currentShiftId === OFF_SHIFT_TOKEN ||
+                (allowedShiftIds.includes(currentShiftId) &&
+                  canAssignPlanShiftAtDate({
+                    plan: {
+                      staffId,
+                      modeLabel: existingPlan?.modeLabel || meta.resolvedGroupLabel || '부분 재생성',
+                      rationale: existingPlan?.rationale || meta.resolvedGroupReason || '',
+                      assignments: [...mergedAssignments],
+                      effectiveMode,
+                      allowedShiftIds: allowedShiftIds.length > 0 ? allowedShiftIds : [OFF_SHIFT_TOKEN],
+                      blockedDateSet,
+                    },
+                    dateIndex,
+                    nextShiftId: currentShiftId,
+                    monthDates,
+                    shiftMap,
+                    rule: effectiveGenerationRule,
+                  }));
+
+              if (currentIsAllowed) {
+                nextShiftId = currentShiftId;
+              }
+            }
+            mergedAssignments[dateIndex] = nextShiftId;
+            const band = getAssignedShiftBand(nextShiftId, shiftMap);
+            if (band) {
+              teamDailyBandCounts[dateIndex][band] += 1;
+            }
+          }
+          if (existingPlan) {
+            nextPlansByStaffId.set(staffId, {
+              ...existingPlan,
+              assignments: mergedAssignments,
+            });
+          }
+        });
+
+      setAiRecommendation({
+        ...aiRecommendation,
+        staffPlans: aiRecommendation.staffPlans.map((plan) => {
+          const updatedPlan = nextPlansByStaffId.get(String(plan.staffId || ''));
+          return updatedPlan || plan;
+        }),
+      });
+      setManualAssignments((prev) => {
+        const nextEntries = Object.entries(prev).filter(([assignmentKey]) => {
+          const separatorIndex = assignmentKey.indexOf('::');
+          if (separatorIndex === -1) return true;
+          const staffId = assignmentKey.slice(0, separatorIndex);
+          const date = assignmentKey.slice(separatorIndex + 2);
+          if (partialRegenerationStaffId && staffId !== partialRegenerationStaffId) return true;
+          const dateIndex = monthDates.indexOf(date);
+          return dateIndex < startIndex || dateIndex > endIndex;
+        });
+        return Object.fromEntries(nextEntries);
+      });
+      setSelectedManualCell(null);
+      setGeminiSummary('선택한 범위만 다시 생성했습니다.');
+      setPendingSnapshotMeta({
+        source: 'generated',
+        label: `${selectedMonth} ${rosterScopeLabel} 부분 재생성`,
+      });
+      toast('선택한 범위만 다시 생성했습니다.', 'success');
+      return;
+    } catch (error) {
+      console.error('부분 재생성 실패:', error);
+      toast('부분 재생성 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setPartialRegenerationLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!pendingSnapshotMeta) return;
     if (previewRows.length === 0 || !aiRecommendation?.staffPlans?.length) return;
@@ -4278,116 +6264,81 @@ export default function AutoRosterPlanner({
     if (!selectedCompany || !selectedDepartment) return null;
 
     return (
-      <div className="mt-4 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h5 className="text-base font-bold text-[var(--foreground)]">생성 전후 비교 · 수정 이력</h5>
-            <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
-              최근 생성본과 저장본을 보관하고 현재 초안과 차이를 바로 비교할 수 있습니다.
-            </p>
-          </div>
-          <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-[11px] font-semibold text-[var(--toss-gray-4)]">
-            최근 스냅샷 {rosterSnapshots.length}건
-          </div>
-        </div>
+      <RosterSnapshotPanel
+        snapshots={rosterSnapshots}
+        selectedSnapshotId={selectedSnapshotId}
+        selectedSnapshot={selectedRosterSnapshot}
+        comparison={rosterSnapshotComparison}
+        onSelectSnapshot={setSelectedSnapshotId}
+        onRestoreSnapshot={restoreRosterSnapshot}
+      />
+    );
+  };
 
-        {rosterSnapshots.length === 0 ? (
-          <div className="mt-4 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm text-[var(--toss-gray-3)]">
-            아직 저장된 근무표 스냅샷이 없습니다. 자동 생성 또는 저장 시 최근 기록이 여기에 남습니다.
-          </div>
-        ) : (
-          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(260px,0.9fr)_minmax(0,1.1fr)]">
-            <div className="space-y-2">
-              {rosterSnapshots.map((snapshot) => (
-                <button
-                  key={snapshot.id}
-                  type="button"
-                  onClick={() => setSelectedSnapshotId(snapshot.id)}
-                  className={`w-full rounded-[var(--radius-lg)] border px-4 py-3 text-left transition-colors ${
-                    snapshot.id === selectedSnapshotId
-                      ? 'border-[var(--accent)] bg-blue-500/10'
-                      : 'border-[var(--border)] bg-[var(--muted)] hover:border-[var(--accent)]/40'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-bold text-[var(--foreground)]">{snapshot.label}</div>
-                      <div className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
-                        {new Date(snapshot.createdAt).toLocaleString('ko-KR')}
-                      </div>
-                    </div>
-                    <span className="rounded-full border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-[10px] font-semibold text-[var(--toss-gray-4)]">
-                      {snapshot.source === 'saved' ? '저장본' : '생성본'}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-[var(--toss-gray-4)]">
-                    <span>{snapshot.summary.staffCount}명</span>
-                    <span>수동 {snapshot.summary.manualCount}건</span>
-                    <span>경고 {snapshot.summary.warningCount}건</span>
-                  </div>
-                </button>
-              ))}
-            </div>
+  const renderRosterReviewPanel = () => {
+    if (previewRows.length === 0) return null;
 
-            <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] p-4">
-              {!selectedRosterSnapshot ? (
-                <div className="text-sm text-[var(--toss-gray-3)]">비교할 스냅샷을 선택하세요.</div>
-              ) : (
-                <>
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                      <div className="text-sm font-bold text-[var(--foreground)]">{selectedRosterSnapshot.label}</div>
-                      <div className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
-                        {selectedRosterSnapshot.month} · {selectedRosterSnapshot.department}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => restoreRosterSnapshot(selectedRosterSnapshot)}
-                      className="rounded-[var(--radius-md)] border border-[var(--accent)] bg-[var(--card)] px-3 py-2 text-xs font-bold text-[var(--accent)]"
-                    >
-                      이 스냅샷으로 되돌리기
-                    </button>
-                  </div>
+    return (
+      <RosterReviewPanel
+        enabledCount={summary.enabledCount}
+        manualCount={summary.manualCount}
+        blockingCount={blockingRosterIssues.length}
+        warningCount={reviewPanelWarnings.length}
+        warnings={reviewPanelWarnings}
+        suggestions={reviewPanelSuggestions}
+        fairnessRows={fairnessScoreboard.rows.slice(0, 5)}
+        snapshotComparison={rosterSnapshotComparison}
+        comparisons={rosterPlanComparisons}
+        onJumpToWarning={jumpToRosterWarningTarget}
+      />
+    );
+  };
 
-                  {rosterSnapshotComparison ? (
-                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3">
-                        <div className="text-[11px] font-semibold text-[var(--toss-gray-3)]">변경된 셀</div>
-                        <div className="mt-1 text-lg font-bold text-[var(--foreground)]">
-                          {rosterSnapshotComparison.changedCellCount}건
-                        </div>
-                      </div>
-                      <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3">
-                        <div className="text-[11px] font-semibold text-[var(--toss-gray-3)]">영향 직원</div>
-                        <div className="mt-1 text-lg font-bold text-[var(--foreground)]">
-                          {rosterSnapshotComparison.changedStaffCount}명
-                        </div>
-                      </div>
-                      <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3">
-                        <div className="text-[11px] font-semibold text-[var(--toss-gray-3)]">변경 날짜</div>
-                        <div className="mt-1 text-lg font-bold text-[var(--foreground)]">
-                          {rosterSnapshotComparison.changedDateCount}일
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
+  const renderRosterManualImpactPanel = () => {
+    if (!selectedManualCellDetails) return null;
 
-                  {rosterSnapshotComparison?.changedStaffPreview?.length ? (
-                    <div className="mt-3 text-[12px] text-[var(--toss-gray-3)]">
-                      주요 변경 직원: {rosterSnapshotComparison.changedStaffPreview.join(', ')}
-                    </div>
-                  ) : (
-                    <div className="mt-3 text-[12px] text-[var(--toss-gray-3)]">
-                      현재 초안과 선택된 스냅샷이 동일하거나 아직 비교할 초안이 없습니다.
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+    return (
+      <RosterManualImpactPanel
+        staffName={String(selectedManualCellDetails.row.staff.name || '')}
+        date={selectedManualCellDetails.cell.date}
+        currentShiftName={selectedManualCellDetails.cell.shiftName}
+        baseShiftName={
+          selectedManualCellDetails.cell.baseShiftId === OFF_SHIFT_TOKEN
+            ? 'OFF'
+            : getShiftNameById(selectedManualCellDetails.cell.baseShiftId, workShifts)
+        }
+        manualOverride={selectedManualCellDetails.cell.isManual}
+        options={selectedManualCellDetails.options}
+        explanations={selectedManualCellDetails.explanations}
+        onSelect={handleManualImpactSelect}
+        onClose={() => setSelectedManualCell(null)}
+      />
+    );
+  };
+
+  const renderRosterPartialRegenerationPanel = () => {
+    if (previewRows.length === 0) return null;
+
+    return (
+      <RosterPartialRegenerationPanel
+        staffOptions={previewRows.map((row) => ({
+          staffId: String(row.staff.id),
+          staffName: String(row.staff.name || row.staff.employee_name || row.staff.id),
+        }))}
+        selectedStaffId={partialRegenerationStaffId}
+        monthDates={monthDates}
+        startDate={partialRegenerationStartDate}
+        endDate={partialRegenerationEndDate}
+        mode={partialRegenerationMode}
+        modeOptions={PARTIAL_REGENERATION_MODE_OPTIONS}
+        loading={partialRegenerationLoading}
+        disabled={partialRegenerationLoading || monthDates.length === 0}
+        onStaffChange={setPartialRegenerationStaffId}
+        onStartDateChange={setPartialRegenerationStartDate}
+        onEndDateChange={setPartialRegenerationEndDate}
+        onModeChange={setPartialRegenerationMode}
+        onSubmit={handlePartialRegeneration}
+      />
     );
   };
 
@@ -4407,158 +6358,17 @@ export default function AutoRosterPlanner({
     if (previewRows.length === 0) return null;
 
     return (
-      <div
-        className="mt-4 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm"
-        data-testid="roster-warning-report"
-      >
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h5 className="text-base font-bold text-[var(--foreground)]">생성 경고 리포트</h5>
-            <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
-              날짜별 인력 부족과 개인 나이트 범위, 최소 OFF 미달 여부를 바로 확인합니다.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <span className="rounded-[var(--radius-md)] border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-semibold text-rose-700">
-              인원 부족 {rosterWarningReport.headcountCount}건
-            </span>
-            <span className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/10 px-3 py-1 text-[11px] font-semibold text-red-700">
-              인력 부족 {rosterWarningReport.coverageCount}건
-            </span>
-            <span className="rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700">
-              나이트 범위 {rosterWarningReport.nightRangeCount}건
-            </span>
-            <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--tab-bg)] px-3 py-1 text-[11px] font-semibold text-[var(--toss-gray-5)]">
-              OFF 미달 {rosterWarningReport.offDaysCount}건
-            </span>
-          </div>
-        </div>
-
-        {rosterWarningReport.items.length === 0 ? (
-          <div className="mt-4 rounded-[var(--radius-xl)] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-            현재 기준으로 생성 경고가 없습니다.
-          </div>
-        ) : (
-          <div className="mt-4 space-y-2">
-            {rosterWarningReport.items.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => jumpToRosterWarningTarget(item.targetTestId)}
-                className={`w-full rounded-[var(--radius-xl)] border px-4 py-3 text-left transition-colors ${
-                  item.tone === 'red'
-                    ? 'border-red-500/20 bg-red-500/10'
-                    : item.tone === 'amber'
-                      ? 'border-amber-200 bg-amber-50'
-                      : 'border-yellow-500/20 bg-yellow-500/10'
-                }`}
-                data-testid={`roster-warning-item-${item.id}`}
-              >
-                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                  <p
-                    className={`text-sm font-bold ${
-                      item.tone === 'red'
-                        ? 'text-red-700'
-                        : item.tone === 'amber'
-                          ? 'text-amber-700'
-                          : 'text-yellow-700'
-                    }`}
-                  >
-                    {item.title}
-                  </p>
-                  <p className="text-[12px] font-semibold text-[var(--foreground)]">{item.detail}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      <RosterWarningReport
+        report={rosterWarningReport}
+        onJumpToTarget={jumpToRosterWarningTarget}
+      />
     );
   };
 
   const renderRosterFairnessBoard = () => {
     if (fairnessScoreboard.rows.length === 0) return null;
 
-    return (
-      <div
-        className="mt-4 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm"
-        data-testid="roster-fairness-board"
-      >
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h5 className="text-base font-bold text-[var(--foreground)]">공정성 점수판</h5>
-            <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
-              나이트, 주말, 공휴일, 최대 연속근무를 함께 비교해 자동생성 결과를 빠르게 점검합니다.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]">
-              평균 N {fairnessScoreboard.averageNight.toFixed(1)}
-            </span>
-            <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]">
-              평균 주말 {fairnessScoreboard.averageWeekend.toFixed(1)}
-            </span>
-            <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]">
-              평균 공휴일 {fairnessScoreboard.averageHoliday.toFixed(1)}
-            </span>
-            <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]">
-              평균 연속근무 {fairnessScoreboard.averageConsecutive.toFixed(1)}일
-            </span>
-            <span className="rounded-[var(--radius-md)] border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-semibold text-sky-700">
-              공휴일 {fairnessScoreboard.holidayCount}일 기준
-            </span>
-          </div>
-        </div>
-
-        <div className="mt-4 overflow-x-auto">
-          <table className="min-w-[760px] table-fixed border-collapse">
-            <thead>
-              <tr className="border-b border-[var(--border)]">
-                <th className="px-3 py-3 text-left text-[11px] font-bold text-[var(--toss-gray-3)]">직원</th>
-                <th className="px-3 py-3 text-center text-[11px] font-bold text-[var(--toss-gray-3)]">나이트</th>
-                <th className="px-3 py-3 text-center text-[11px] font-bold text-[var(--toss-gray-3)]">주말</th>
-                <th className="px-3 py-3 text-center text-[11px] font-bold text-[var(--toss-gray-3)]">공휴일</th>
-                <th className="px-3 py-3 text-center text-[11px] font-bold text-[var(--toss-gray-3)]">최대 연속근무</th>
-                <th className="px-3 py-3 text-center text-[11px] font-bold text-[var(--toss-gray-3)]">균형 점수</th>
-                <th className="px-3 py-3 text-left text-[11px] font-bold text-[var(--toss-gray-3)]">메모</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fairnessScoreboard.rows.map((row) => {
-                const scoreToneClass =
-                  row.fairnessScore >= 90
-                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                    : row.fairnessScore >= 75
-                      ? 'border-amber-200 bg-amber-50 text-amber-700'
-                      : 'border-rose-200 bg-rose-50 text-rose-700';
-
-                return (
-                  <tr
-                    key={row.staffId}
-                    className="border-b border-[var(--border)] last:border-b-0"
-                    data-testid={`roster-fairness-row-${row.staffId}`}
-                  >
-                    <td className="px-3 py-3 text-sm font-bold text-[var(--foreground)]">{row.staffName}</td>
-                    <td className="px-3 py-3 text-center text-sm font-semibold text-[var(--foreground)]">{row.nightCount}</td>
-                    <td className="px-3 py-3 text-center text-sm font-semibold text-[var(--foreground)]">{row.weekendWorkCount}</td>
-                    <td className="px-3 py-3 text-center text-sm font-semibold text-[var(--foreground)]">{row.holidayWorkCount}</td>
-                    <td className="px-3 py-3 text-center text-sm font-semibold text-[var(--foreground)]">
-                      {row.maxConsecutiveWorkDays}일
-                    </td>
-                    <td className="px-3 py-3 text-center">
-                      <span className={`inline-flex rounded-[var(--radius-md)] border px-3 py-1 text-[11px] font-bold ${scoreToneClass}`}>
-                        {row.fairnessScore}점
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 text-sm font-semibold text-[var(--toss-gray-3)]">{row.note}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
+    return <RosterFairnessBoard scoreboard={fairnessScoreboard} />;
   };
 
   const selectedAiShifts = useMemo(
@@ -4701,66 +6511,182 @@ export default function AutoRosterPlanner({
     });
   };
 
-  const updateGenerationRuleDraftField = (
-    field:
-      | 'name'
-      | 'description'
-      | 'teamKeywords'
-      | 'avoidDayAfterNight'
-      | 'avoidDayAfterEvening'
-      | 'maxConsecutiveEveningShifts'
-      | 'offDaysAfterNight'
-      | 'nightBlockSize'
-      | 'minRotationNightCount'
-      | 'maxRotationNightCount'
-      | 'minMonthlyOffDays'
-      | 'maxConsecutiveWorkDays'
-      | 'maxConsecutiveWeekendWorkDays'
-      | 'fixedShiftOnly'
-      | 'balanceRotationBands'
-      | 'distributeWeekendShifts'
-      | 'distributeHolidayShifts'
-      | 'separateNewNursesByShift'
-      | 'minDayStaff'
-      | 'minEveningStaff'
-      | 'minNightStaff',
+  const applyGenerationRuleDraftFieldUpdate = (
+    prev: RosterGenerationRule,
+    field: EditableGenerationRuleField,
     value: string | number | boolean
   ) => {
-    setGenerationRuleDraft((prev) => {
-      if (field === 'teamKeywords') {
-        return {
-          ...prev,
-          teamKeywords: String(value || '')
-            .split(',')
-            .map((item) => item.trim())
-            .filter(Boolean),
-        };
-      }
-
-      if (
-        field === 'maxConsecutiveEveningShifts' ||
-        field === 'offDaysAfterNight' ||
-        field === 'nightBlockSize' ||
-        field === 'minRotationNightCount' ||
-        field === 'maxRotationNightCount' ||
-        field === 'minMonthlyOffDays' ||
-        field === 'maxConsecutiveWorkDays' ||
-        field === 'maxConsecutiveWeekendWorkDays' ||
-        field === 'minDayStaff' ||
-        field === 'minEveningStaff' ||
-        field === 'minNightStaff'
-      ) {
-        return {
-          ...prev,
-          [field]: Math.max(0, Math.floor(Number(value) || 0)),
-        };
-      }
-
+    if (field === 'teamKeywords') {
       return {
         ...prev,
-        [field]: value,
+        teamKeywords: String(value || '')
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean),
+      };
+    }
+
+    if (
+      field === 'maxConsecutiveEveningShifts' ||
+      field === 'offDaysAfterNight' ||
+      field === 'nightBlockSize' ||
+      field === 'minRotationNightCount' ||
+      field === 'maxRotationNightCount' ||
+      field === 'minMonthlyOffDays' ||
+      field === 'maxConsecutiveWorkDays' ||
+      field === 'maxConsecutiveWeekendWorkDays' ||
+      field === 'minDayStaff' ||
+      field === 'minEveningStaff' ||
+      field === 'minNightStaff' ||
+      field === 'weekendMinDayStaff' ||
+      field === 'weekendMinEveningStaff' ||
+      field === 'weekendMinNightStaff' ||
+      field === 'holidayMinDayStaff' ||
+      field === 'holidayMinEveningStaff' ||
+      field === 'holidayMinNightStaff' ||
+      field === 'minSeniorDayStaff' ||
+      field === 'minSeniorEveningStaff' ||
+      field === 'minSeniorNightStaff' ||
+      field === 'minDedicatedDayStaff' ||
+      field === 'minDedicatedEveningStaff' ||
+      field === 'minDedicatedNightStaff'
+    ) {
+      return {
+        ...prev,
+        [field]: Math.max(0, Math.floor(Number(value) || 0)),
+      };
+    }
+
+    return {
+      ...prev,
+      [field]: value,
+    };
+  };
+
+  const updateGenerationRuleDraftField = (
+    field: EditableGenerationRuleField,
+    value: string | number | boolean
+  ) => {
+    setGenerationRuleDraft((prev) => applyGenerationRuleDraftFieldUpdate(prev, field, value));
+  };
+
+  const updateWizardRuleDraftField = (
+    field: EditableGenerationRuleField,
+    value: string | number | boolean
+  ) => {
+    setWizardRuleDraft((prev) => applyGenerationRuleDraftFieldUpdate(prev, field, value));
+  };
+
+  const applyWizardNightBlockPreset = (
+    preset: (typeof WIZARD_NIGHT_BLOCK_PRESET_OPTIONS)[number]
+  ) => {
+    setWizardRuleDraft((prev) => ({
+      ...prev,
+      nightBlockSize: preset.nightBlockSize,
+      offDaysAfterNight: preset.offDaysAfterNight,
+    }));
+  };
+
+  const addWizardDateCoverageOverride = () => {
+    setWizardRuleDraft((prev) => ({
+      ...prev,
+      dateCoverageOverrides: [
+        ...(prev.dateCoverageOverrides || []),
+        {
+          id: `date-coverage-${Date.now()}-${(prev.dateCoverageOverrides || []).length + 1}`,
+          date: monthDates[0] || '',
+          minDayStaff: 0,
+          minEveningStaff: 0,
+          minNightStaff: 0,
+        },
+      ],
+    }));
+  };
+
+  const updateWizardDateCoverageOverride = (
+    overrideId: string,
+    field: 'date' | 'minDayStaff' | 'minEveningStaff' | 'minNightStaff',
+    value: string | number
+  ) => {
+    setWizardRuleDraft((prev) => ({
+      ...prev,
+      dateCoverageOverrides: (prev.dateCoverageOverrides || []).map((entry) => {
+        if (entry.id !== overrideId) return entry;
+        if (field === 'date') {
+          return {
+            ...entry,
+            date: String(value || '').slice(0, 10),
+          };
+        }
+        return {
+          ...entry,
+          [field]: Math.max(0, Math.floor(Number(value) || 0)),
+        };
+      }),
+    }));
+  };
+
+  const removeWizardDateCoverageOverride = (overrideId: string) => {
+    setWizardRuleDraft((prev) => ({
+      ...prev,
+      dateCoverageOverrides: (prev.dateCoverageOverrides || []).filter((entry) => entry.id !== overrideId),
+    }));
+  };
+
+  const addWizardRoleCoverageRule = () => {
+    setWizardRuleDraft((prev) => {
+      const nextIndex = prev.roleCoverageRules.length + 1;
+      return {
+        ...prev,
+        roleCoverageRules: [
+          ...prev.roleCoverageRules,
+          {
+            id: `role-slot-${Date.now()}-${nextIndex}`,
+            label: `역할 슬롯 ${nextIndex}`,
+            keywords: [],
+            minDayStaff: 0,
+            minEveningStaff: 0,
+            minNightStaff: 0,
+          },
+        ],
       };
     });
+  };
+
+  const updateWizardRoleCoverageRule = (
+    ruleId: string,
+    field: 'label' | 'keywords' | 'minDayStaff' | 'minEveningStaff' | 'minNightStaff',
+    value: string | number
+  ) => {
+    setWizardRuleDraft((prev) => ({
+      ...prev,
+      roleCoverageRules: prev.roleCoverageRules.map((rule) => {
+        if (rule.id !== ruleId) return rule;
+        if (field === 'keywords') {
+          return {
+            ...rule,
+            keywords: normalizeCoverageRoleTags(String(value || '').split(',')),
+          };
+        }
+        if (field === 'minDayStaff' || field === 'minEveningStaff' || field === 'minNightStaff') {
+          return {
+            ...rule,
+            [field]: Math.max(0, Math.floor(Number(value) || 0)),
+          };
+        }
+        return {
+          ...rule,
+          [field]: String(value || ''),
+        };
+      }),
+    }));
+  };
+
+  const removeWizardRoleCoverageRule = (ruleId: string) => {
+    setWizardRuleDraft((prev) => ({
+      ...prev,
+      roleCoverageRules: prev.roleCoverageRules.filter((rule) => rule.id !== ruleId),
+    }));
   };
 
   const updatePatternGroup = (
@@ -4964,6 +6890,25 @@ export default function AutoRosterPlanner({
       minDayStaff: Math.max(0, Math.min(20, Math.floor(generationRuleDraft.minDayStaff || 0))),
       minEveningStaff: Math.max(0, Math.min(20, Math.floor(generationRuleDraft.minEveningStaff || 0))),
       minNightStaff: Math.max(0, Math.min(20, Math.floor(generationRuleDraft.minNightStaff || 0))),
+      weekendMinDayStaff: Math.max(0, Math.min(20, Math.floor(generationRuleDraft.weekendMinDayStaff || 0))),
+      weekendMinEveningStaff: Math.max(0, Math.min(20, Math.floor(generationRuleDraft.weekendMinEveningStaff || 0))),
+      weekendMinNightStaff: Math.max(0, Math.min(20, Math.floor(generationRuleDraft.weekendMinNightStaff || 0))),
+      holidayMinDayStaff: Math.max(0, Math.min(20, Math.floor(generationRuleDraft.holidayMinDayStaff || 0))),
+      holidayMinEveningStaff: Math.max(0, Math.min(20, Math.floor(generationRuleDraft.holidayMinEveningStaff || 0))),
+      holidayMinNightStaff: Math.max(0, Math.min(20, Math.floor(generationRuleDraft.holidayMinNightStaff || 0))),
+      dateCoverageOverrides: (generationRuleDraft.dateCoverageOverrides || [])
+        .map((entry, index) => ({
+          id: entry.id || `date-coverage-${index + 1}`,
+          date: String(entry.date || '').slice(0, 10),
+          minDayStaff: Math.max(0, Math.min(20, Math.floor(entry.minDayStaff || 0))),
+          minEveningStaff: Math.max(0, Math.min(20, Math.floor(entry.minEveningStaff || 0))),
+          minNightStaff: Math.max(0, Math.min(20, Math.floor(entry.minNightStaff || 0))),
+        }))
+        .filter(
+          (entry) =>
+            /^\d{4}-\d{2}-\d{2}$/.test(entry.date) &&
+            (entry.minDayStaff > 0 || entry.minEveningStaff > 0 || entry.minNightStaff > 0)
+        ),
       updatedAt: new Date().toISOString(),
     };
 
@@ -4977,6 +6922,99 @@ export default function AutoRosterPlanner({
       toast('근무 규칙을 공용 저장소에 동기화하지 못했습니다. 현재 브라우저에는 저장되었습니다.', 'warning');
     });
     toast(`"${nextName}" 근무규칙을 저장했습니다.`, 'success');
+  };
+
+  const migrateLegacyGenerationRules = async () => {
+    if (!canManageRosterPolicies) {
+      toast('근무 규칙 보정은 관리자 전용입니다.', 'warning');
+      return;
+    }
+
+    const changedRules: RosterGenerationRule[] = [];
+    const nextRules = savedGenerationRules.map((rule) => {
+      if (selectedCompany && rule.companyName && rule.companyName !== selectedCompany) {
+        return rule;
+      }
+
+      const normalizedTeamKeywords =
+        rule.teamKeywords.length > 0
+          ? rule.teamKeywords.map((keyword) => String(keyword || '').trim()).filter(Boolean)
+          : selectedDepartment
+            ? [selectedDepartment]
+            : [];
+      const isWardRule = normalizedTeamKeywords.some(
+        (keyword) => getTeamRecommendationCategory(keyword) === 'ward'
+      );
+      if (!isWardRule) return rule;
+
+      const nextRule: RosterGenerationRule = {
+        ...rule,
+        teamKeywords: normalizedTeamKeywords,
+        generationStyle: rule.generationStyle === 'balanced' ? 'variety' : rule.generationStyle,
+        maxConsecutiveEveningShifts: 0,
+        nightBlockSize: Math.max(3, Math.floor(rule.nightBlockSize || 0)),
+        minMonthlyOffDays: Math.max(8, Math.floor(rule.minMonthlyOffDays || 0)),
+        distributeWeekendShifts: true,
+        distributeHolidayShifts: true,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const hasChanged =
+        nextRule.generationStyle !== rule.generationStyle ||
+        nextRule.maxConsecutiveEveningShifts !== rule.maxConsecutiveEveningShifts ||
+        nextRule.nightBlockSize !== rule.nightBlockSize ||
+        nextRule.minMonthlyOffDays !== rule.minMonthlyOffDays ||
+        nextRule.distributeWeekendShifts !== rule.distributeWeekendShifts ||
+        nextRule.distributeHolidayShifts !== rule.distributeHolidayShifts ||
+        nextRule.teamKeywords.join('|') !== rule.teamKeywords.join('|');
+      if (!hasChanged) return rule;
+
+      changedRules.push(nextRule);
+      return nextRule;
+    });
+
+    if (changedRules.length === 0) {
+      toast('보정할 예전 병동 근무 규칙이 없습니다.', 'success');
+      return;
+    }
+
+    setSavedGenerationRules(nextRules);
+    persistGenerationRules(nextRules);
+
+    if (selectedGenerationRuleId) {
+      const updatedSelectedRule = nextRules.find((rule) => rule.id === selectedGenerationRuleId);
+      if (!updatedSelectedRule) {
+        setSelectedGenerationRuleId('');
+      }
+    }
+    if (generationRuleDraft.id) {
+      const updatedDraftRule = nextRules.find((rule) => rule.id === generationRuleDraft.id);
+      if (updatedDraftRule) {
+        setGenerationRuleDraft({
+          ...updatedDraftRule,
+          teamKeywords: [...updatedDraftRule.teamKeywords],
+        });
+      }
+    }
+
+    const syncResults = await Promise.allSettled(
+      changedRules.map((rule) => syncGenerationRuleToSharedStorage(rule))
+    );
+    if (syncResults.some((result) => result.status === 'rejected')) {
+      console.error(
+        '근무 규칙 일괄 보정 공용 저장 실패:',
+        syncResults
+          .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+          .map((result) => result.reason)
+      );
+      toast(
+        `병동 규칙 ${changedRules.length}개를 보정했지만 일부 공용 저장은 실패했습니다. 현재 브라우저 기준으로는 적용되었습니다.`,
+        'warning'
+      );
+      return;
+    }
+
+    toast(`병동 규칙 ${changedRules.length}개를 현재 추천 기본값으로 보정했습니다.`, 'success');
   };
 
   const deleteGenerationRule = (ruleId: string) => {
@@ -5009,28 +7047,74 @@ export default function AutoRosterPlanner({
       return;
     }
     if (workingShifts.length === 0) {
-      toast('추천에 사용할 근무유형이 없습니다. 먼저 근무형태를 등록하세요.', 'success');
+      toast('추천에 사용할 근무유형이 없습니다. 먼저 근무유형을 등록하세요.', 'warning');
       return;
     }
     if (selectedAiShifts.length === 0) {
-      toast('AI 생성에 사용할 근무유형을 한 개 이상 선택하세요.', 'warning');
+      toast('AI 추천에 사용할 근무유형을 한 개 이상 선택하세요.', 'warning');
       return;
     }
     if (enabledTargetStaffs.length === 0) {
-      toast('추천할 팀 직원이 없습니다.');
+      toast('추천할 대상 직원이 없습니다.', 'warning');
       return;
     }
-
-    if (enabledTargetStaffs.length === 0) {
-      toast('자동 생성에 포함된 직원이 없습니다. 제외 설정을 확인하세요.', 'warning');
+    if (blockingRosterIssues.length > 0) {
+      const message = '현재 조건으로는 AI 자동생성을 시작할 수 없습니다. 차단 경고를 먼저 확인하세요.';
+      setGeminiSummary(message);
+      toast('차단 경고를 먼저 확인하세요.', 'warning');
       return;
     }
 
     setGeminiLoading(true);
     setLeaveAppliedSummary('');
     try {
-      const approvedLeaveRequestCount = 0;
-      const approvedLeaveDayCount = 0;
+      const monthDateSet = new Set(monthDates);
+      let approvedLeaveRequestCount = 0;
+      let approvedLeaveDayCount = 0;
+      let approvedLeaveBlockedDatesByStaff = new Map<string, Set<string>>();
+      const targetStaffIds = enabledTargetStaffs
+        .map((staff) => String(staff?.id || ''))
+        .filter(Boolean);
+      const targetStaffIdSet = new Set(targetStaffIds);
+
+      if (targetStaffIds.length > 0 && monthDates.length > 0) {
+        const { data: approvedLeaves, error: approvedLeavesError } = await supabase
+          .from('leave_requests')
+          .select('staff_id, start_date, end_date')
+          .eq('status', '승인')
+          .in('staff_id', targetStaffIds)
+          .lte('start_date', monthDates[monthDates.length - 1])
+          .gte('end_date', monthDates[0]);
+
+        if (approvedLeavesError) {
+          console.error('승인 휴가 반영 데이터 로드 실패:', approvedLeavesError);
+        } else {
+          approvedLeaveBlockedDatesByStaff = buildBlockedDatesByStaff(
+            (approvedLeaves || []) as Array<{ staff_id: string; start_date: string; end_date: string }>,
+            monthDateSet
+          );
+          approvedLeaveRequestCount = (approvedLeaves || []).length;
+          approvedLeaveDayCount = countBlockedDateEntries(approvedLeaveBlockedDatesByStaff);
+        }
+      }
+
+      const preferredOffBlockedDatesByStaff = buildPreferredOffDateMap(
+        preferredOffSelections,
+        targetStaffIdSet,
+        monthDateSet
+      );
+      const preferredOffDateCount = countBlockedDateEntries(preferredOffBlockedDatesByStaff);
+      const blockedDatesByStaff = mergeBlockedDateMaps(
+        approvedLeaveBlockedDatesByStaff,
+        preferredOffBlockedDatesByStaff
+      );
+      const preAssigned: Record<string, string> = {};
+      blockedDatesByStaff.forEach((dates, staffId) => {
+        dates.forEach((date) => {
+          preAssigned[`${staffId}|${date}`] = OFF_SHIFT_TOKEN;
+        });
+      });
+      const staffMetaById = new Map(staffPlanningMeta.map((meta) => [meta.staffId, meta]));
       const response = await fetch('/api/ai/roster-recommendation', {
         method: 'POST',
         headers: {
@@ -5039,7 +7123,8 @@ export default function AutoRosterPlanner({
         body: JSON.stringify({
           selectedMonth,
           selectedCompany,
-          selectedDepartment,
+          selectedDepartment: rosterScopeLabel,
+          selectedDepartments: [selectedDepartment, ...includedDepartments].filter(Boolean),
           monthDates,
           patternProfile: selectedPatternProfile
             ? {
@@ -5051,6 +7136,45 @@ export default function AutoRosterPlanner({
                 staffGroups: selectedPatternProfile.staffGroups,
               }
             : null,
+          generationBasis: wizardGenerationBasis === 'rotation_only' ? 'rotation_only' : 'saved_rule',
+          constraints: {
+            targetOffDays: previewGenerationRule.minMonthlyOffDays,
+            minNightDays: previewGenerationRule.minRotationNightCount,
+            targetNightDays: previewGenerationRule.maxRotationNightCount,
+            maxNightDays: previewGenerationRule.maxRotationNightCount,
+            minDayReq: previewGenerationRule.minDayStaff,
+            minEveReq: previewGenerationRule.minEveningStaff,
+            minNightReq: previewGenerationRule.minNightStaff,
+            weekendMinDayReq: previewGenerationRule.weekendMinDayStaff,
+            weekendMinEveReq: previewGenerationRule.weekendMinEveningStaff,
+            weekendMinNightReq: previewGenerationRule.weekendMinNightStaff,
+            holidayMinDayReq: previewGenerationRule.holidayMinDayStaff,
+            holidayMinEveReq: previewGenerationRule.holidayMinEveningStaff,
+            holidayMinNightReq: previewGenerationRule.holidayMinNightStaff,
+            minSeniorDayReq: previewGenerationRule.minSeniorDayStaff,
+            minSeniorEveReq: previewGenerationRule.minSeniorEveningStaff,
+            minSeniorNightReq: previewGenerationRule.minSeniorNightStaff,
+            minDedicatedDayReq: previewGenerationRule.minDedicatedDayStaff,
+            minDedicatedEveReq: previewGenerationRule.minDedicatedEveningStaff,
+            minDedicatedNightReq: previewGenerationRule.minDedicatedNightStaff,
+            enableSkillMix: true,
+            offDaysAfterNight: previewGenerationRule.offDaysAfterNight,
+            nightBlockSize: previewGenerationRule.nightBlockSize,
+            generationStyle: previewGenerationRule.generationStyle,
+            maxConsecutiveWorkDays: previewGenerationRule.maxConsecutiveWorkDays,
+            avoidDayAfterNight: previewGenerationRule.avoidDayAfterNight,
+            avoidDayAfterEvening: previewGenerationRule.avoidDayAfterEvening,
+            distributeWeekendShifts: previewGenerationRule.distributeWeekendShifts,
+            distributeHolidayShifts: previewGenerationRule.distributeHolidayShifts,
+            fixedShiftOnly: previewGenerationRule.fixedShiftOnly,
+            preferredOffCount: preferredOffDateCount,
+            blockNewNurseSoloNight: previewGenerationRule.blockNewNurseSoloNight,
+            requireSeniorWithNewNurseNight: previewGenerationRule.requireSeniorWithNewNurseNight,
+            roleCoverageRules: previewGenerationRule.roleCoverageRules,
+            dateCoverageOverrides: previewGenerationRule.dateCoverageOverrides,
+            pairRules: plannerPairRules,
+          },
+          preAssigned,
           workShifts: selectedAiShifts.map((shift) => ({
             id: shift.id,
             name: shift.name,
@@ -5062,73 +7186,86 @@ export default function AutoRosterPlanner({
             weekly_work_days: shift.weekly_work_days,
             is_weekend_work: shift.is_weekend_work,
           })),
-          staffs: enabledTargetStaffs.map((staff) => ({
-            id: String(staff.id),
-            name: String(staff.name || ''),
-            employeeNo: String(staff.employee_no || ''),
-            position: String(staff.position || ''),
-            role: String(staff.role || ''),
-            employmentType: String(staff.employment_type || ''),
-            department: String(getDepartmentName(staff) || ''),
-            assignedShiftId: String(staff.shift_id || ''),
-            shiftType: String(staff.shift_type || ''),
-            preferredOffDates: preferredOffSelections[String(staff.id)] || [],
-          })),
+          staffs: enabledTargetStaffs.map((staff) => {
+            const staffId = String(staff.id);
+            const meta = staffMetaById.get(staffId);
+
+            return {
+              id: staffId,
+              name: String(staff.name || ''),
+              employeeNo: String(staff.employee_no || ''),
+              position: String(staff.position || ''),
+              role: String(staff.role || ''),
+              employmentType: String(staff.employment_type || ''),
+              department: String(getDepartmentName(staff) || ''),
+              assignedShiftId: String(staff.shift_id || ''),
+              shiftType: String(staff.shift_type || ''),
+              preferredOffDates: preferredOffSelections[staffId] || [],
+              minNightShiftCount: meta?.config.minNightShiftCount || 0,
+              maxNightShiftCount: meta?.config.maxNightShiftCount || 0,
+              blockPreference: meta?.config.blockPreference || 'balanced',
+              resolvedGroupLabel: meta?.resolvedGroupLabel || '',
+              resolvedGroupMode: meta?.resolvedGroupMode || '',
+              resolvedGroupReason: meta?.resolvedGroupReason || '',
+              coverageRoleTags: meta?.coverageRoleTags || [],
+              isNewNurse: meta?.isNewNurse || false,
+              blockedShiftBands: meta?.config.blockedShiftBands || [],
+              blockedWeekdays: meta?.config.blockedWeekdays || [],
+              avoidWeekendWork: meta?.config.avoidWeekendWork || false,
+              avoidHolidayWork: meta?.config.avoidHolidayWork || false,
+              preferWeekendOff: meta?.config.preferWeekendOff || false,
+              preferHolidayOff: meta?.config.preferHolidayOff || false,
+              avoidConsecutiveEvening: meta?.config.avoidConsecutiveEvening || false,
+              preferEarlyMonthNight: meta?.config.preferEarlyMonthNight || false,
+            };
+          }),
         }),
       });
 
-      const payload = await response.json().catch(() => ({}));
+      const payload = (await response.json().catch(() => ({}))) as
+        | (GeminiRosterRecommendation & { error?: string })
+        | { error?: string };
       if (!response.ok) {
         throw new Error(payload?.error || 'Gemini 팀 추천 요청에 실패했습니다.');
       }
 
       const recommendation = payload as GeminiRosterRecommendation;
-      const groupUsage = new Map<string, number>();
-      const effectiveGenerationRule = applyWardCoverageDefaults(
-        selectedGenerationRule ||
-          buildFallbackGenerationRuleForDepartment(selectedDepartment, selectedCompany, monthDates.length),
-        selectedDepartment
-      );
-
       if (!Array.isArray(recommendation.staffPlans) || recommendation.staffPlans.length === 0) {
-        throw new Error('Gemini가 월간 근무표 초안을 돌려주지 않았습니다.');
+        throw new Error('Gemini가 월간 근무표 초안을 반환하지 않았습니다.');
       }
+      const leaveSummary =
+        approvedLeaveDayCount > 0
+          ? `승인 휴가 ${approvedLeaveRequestCount}건 · ${approvedLeaveDayCount}일 반영`
+          : '';
+      const preferredOffSummary =
+        preferredOffDateCount > 0 ? `희망 OFF ${preferredOffDateCount}건 반영` : '';
+      const baseSummary =
+        recommendation.summary?.trim() ||
+        (selectedPatternProfile
+          ? `${selectedDepartment} 팀 패턴과 생성 규칙을 반영해 AI 근무표 초안을 만들었습니다.`
+          : `${selectedDepartment} 팀 기준으로 AI 근무표 초안을 만들었습니다.`);
+      const summaryWithLeave =
+        approvedLeaveDayCount > 0
+          ? `${baseSummary} 승인 휴가 ${approvedLeaveRequestCount}건, ${approvedLeaveDayCount}일을 OFF로 반영했습니다.`
+          : baseSummary;
 
-      if (!selectedPatternProfile && !recommendation.summary) {
-        recommendation.summary = `${selectedDepartment} 팀 기준으로 월간 초안을 생성했습니다.`;
-      }
-
-      if (!selectedPatternProfile && groupUsage.size > 0) {
-        recommendation.summary = `${selectedDepartment} 팀에 "${effectiveGenerationRule.name || '기본 근무규칙'}" 규칙을 적용해 월간 초안을 생성했습니다. 자동 감지 전담자: ${Array.from(groupUsage.entries())
-          .map(([label, count]) => `${label} ${count}명`)
-          .join(', ')}`;
-      }
+      recommendation.summary = summaryWithLeave;
+      recommendation.leaveSummary = recommendation.leaveSummary?.trim() || leaveSummary;
+      recommendation.preferredOffSummary =
+        recommendation.preferredOffSummary?.trim() || preferredOffSummary;
 
       setAiRecommendation(recommendation);
       setManualAssignments({});
       setManualEditMode(false);
-      setGeminiSummary(
-        recommendation.summary?.trim() || `${selectedDepartment} 팀 AI 근무표 초안을 적용했습니다.`
-      );
-      if (approvedLeaveDayCount > 0) {
-        recommendation.summary = `${recommendation.summary} 승인 휴가 ${approvedLeaveRequestCount}건, ${approvedLeaveDayCount}일을 OFF로 반영했습니다.`;
-      }
-      setLeaveAppliedSummary(
-        approvedLeaveDayCount > 0
-          ? `승인 휴가 ${approvedLeaveRequestCount}건 · ${approvedLeaveDayCount}일 반영`
-          : ''
-      );
-      if (approvedLeaveDayCount > 0) {
-        setGeminiSummary(
-          recommendation.summary?.trim() || `${selectedDepartment} ? ?⑦꽩 湲곕컲 珥덉븞???곸슜?섏뿀?듬땲??`
-        );
-      }
+      setSelectedManualCell(null);
+      setGeminiSummary(summaryWithLeave);
+      setLeaveAppliedSummary(leaveSummary);
       setGeminiAppliedAt(new Date().toLocaleString('ko-KR'));
       setPendingSnapshotMeta({
         source: 'generated',
-        label: `${selectedMonth} ${selectedDepartment} 자동 생성본`,
+        label: `${selectedMonth} ${rosterScopeLabel} AI 생성본`,
       });
-      toast('Gemini가 팀 특성을 분석해 월간 근무표 초안을 만들었습니다. 아래 미리보기에서 확인하세요.', 'warning');
+      toast('Gemini가 팀 특성과 제약을 반영한 월간 근무표 초안을 만들었습니다. 아래 미리보기에서 확인하세요.', 'success');
     } catch (error: unknown) {
       console.error('Gemini 팀 추천 실패:', error);
       toast(`Gemini 팀 추천 중 오류가 발생했습니다.\n${(error as Error)?.message || '알 수 없는 오류'}`, 'error');
@@ -5176,15 +7313,7 @@ export default function AutoRosterPlanner({
         string,
         Array<Record<'day' | 'evening' | 'night', number>>
       >();
-      const effectiveGenerationRule = applyWardCoverageDefaults(
-        selectedGenerationRule ||
-          buildFallbackGenerationRuleForDepartment(
-            selectedDepartment,
-            selectedCompany,
-            monthDates.length
-          ),
-        selectedDepartment
-      );
+      const effectiveGenerationRule = previewGenerationRule;
       const teamDailyBandCounts = Array.from({ length: monthDates.length }, () => ({
         day: 0,
         evening: 0,
@@ -5273,13 +7402,25 @@ export default function AutoRosterPlanner({
         const groupKey = entry.groupKey || `default-${defaultPlannerMode}`;
         const totalStaffCount = groupSizeMap.get(groupKey) || 1;
         const groupMemberIndex = groupMemberIndexMap.get(groupKey) || 0;
-        const blockedDateSet = blockedDatesByStaff.get(String(staff.id));
+        const restrictionBlockedDateSet = buildStaffRestrictionBlockedDateSet(
+          staffConfig,
+          monthDates
+        );
+        const blockedDateSet = mergeBlockedDateMaps(
+          blockedDatesByStaff,
+          new Map([[String(staff.id), restrictionBlockedDateSet]])
+        ).get(String(staff.id));
         const isNewNurse = isStaffNewNurse(staff, referenceDateKey);
         groupMemberIndexMap.set(groupKey, groupMemberIndex + 1);
-        const allowedShiftIds = (
+        const baseAllowedShiftIds = (
           resolvedGroup?.shiftIds.filter((shiftId) => shiftMap.has(shiftId)) ||
           selectedAiShifts.map((shift) => shift.id)
         ).filter(Boolean);
+        const allowedShiftIds = getRestrictedAllowedShiftIds(
+          baseAllowedShiftIds,
+          staffConfig.blockedShiftBands,
+          shiftMap
+        );
         const rawMode: RosterPatternGroupMode = resolvedGroup?.mode || defaultPlannerMode;
         const effectiveMode: RosterPatternGroupMode =
           !effectiveGenerationRule.fixedShiftOnly && rawMode !== 'rotation'
@@ -5360,11 +7501,16 @@ export default function AutoRosterPlanner({
                 holidayDateSet,
                 isNewNurse,
                 teamDailyBandCounts,
+                staffConfig,
               })
             : buildProgrammaticAssignments({
                 monthDates,
                 shiftMap,
-                cycle: buildProgrammaticCycle(effectiveMode, allowedShiftIds, shiftMap),
+                cycle: buildProgrammaticCycle(
+                  effectiveMode,
+                  allowedShiftIds.length > 0 ? allowedShiftIds : [OFF_SHIFT_TOKEN],
+                  shiftMap
+                ),
                 staffIndex: groupMemberIndex,
                 mode: effectiveMode,
                 blockedDateSet,
@@ -5385,7 +7531,7 @@ export default function AutoRosterPlanner({
             : '팀 기본 규칙과 선택한 근무유형 순서를 기준으로 자동 사이클을 적용했습니다.',
           assignments,
           effectiveMode,
-          allowedShiftIds,
+          allowedShiftIds: allowedShiftIds.length > 0 ? allowedShiftIds : [OFF_SHIFT_TOKEN],
           blockedDateSet,
         };
       });
@@ -5401,6 +7547,14 @@ export default function AutoRosterPlanner({
         shiftMap,
         rule: effectiveGenerationRule,
       });
+      const recoveredStaffPlans = coveredAndRestedStaffPlans.map((plan) => ({
+        ...plan,
+        assignments: enforceNightRecoveryAssignments(
+          plan.assignments,
+          shiftMap,
+          effectiveGenerationRule.offDaysAfterNight
+        ),
+      }));
 
       const recommendation: GeminiRosterRecommendation = {
         summary: '',
@@ -5430,7 +7584,7 @@ export default function AutoRosterPlanner({
             '3교대자 월 나이트 최소·최대 반영',
           ],
         },
-        staffPlans: coveredAndRestedStaffPlans.map((plan) => ({
+        staffPlans: recoveredStaffPlans.map((plan) => ({
           staffId: plan.staffId,
           modeLabel: plan.modeLabel,
           rationale: plan.rationale,
@@ -5453,7 +7607,7 @@ export default function AutoRosterPlanner({
       setGeminiAppliedAt(new Date().toLocaleString('ko-KR'));
       setPendingSnapshotMeta({
         source: 'generated',
-        label: `${selectedMonth} ${selectedDepartment} 패턴 생성본`,
+        label: `${selectedMonth} ${rosterScopeLabel} 패턴 생성본`,
       });
       toast('저장된 교대방식 패턴과 선택한 근무유형을 기준으로 월간 초안을 생성했습니다. 아래 미리보기에서 확인하세요.', 'success');
     } catch (error: unknown) {
@@ -5642,41 +7796,58 @@ export default function AutoRosterPlanner({
             ),
           ]
         : [plannerPrimaryShiftId, plannerSecondaryShiftId, plannerTertiaryShiftId].filter(Boolean);
+    const recommendedWizardShiftIds = [
+      ...new Set(
+        (selectedAiShifts.length > 0 ? selectedAiShifts : recommendedAiShifts)
+          .map((shift) => shift.id)
+          .filter(Boolean)
+      ),
+    ].slice(0, 3);
+    const resolvedWizardShiftIds =
+      nextPlannerShiftIds.length > 0 ? nextPlannerShiftIds : recommendedWizardShiftIds;
+    const resolvedWizardPattern =
+      nextPlannerShiftIds.length === 0 && resolvedWizardShiftIds.length >= 3 ? '3교대' : nextPattern;
 
     setWizardStep(1);
-    setWizardPattern(nextPattern);
+    setWizardPattern(resolvedWizardPattern);
     setWizardStartOffset(plannerStartOffset);
     setWizardNightShiftCount(
-      isNightPattern(nextPattern)
+      isNightPattern(resolvedWizardPattern)
         ? previewRows.length > 0 || summary.enabledCount > 0
           ? plannerNightShiftCount
-          : inferDefaultNightShiftCount(nextPattern, monthDates.length)
+          : inferDefaultNightShiftCount(resolvedWizardPattern, monthDates.length)
         : 0
     );
     setWizardCustomPatternSequence(
-      isCustomPattern(nextPattern)
+      isCustomPattern(resolvedWizardPattern)
         ? effectivePlannerCustomPatternSequence.length > 0
           ? effectivePlannerCustomPatternSequence
-          : buildDefaultCustomPatternSequence(
-              [plannerPrimaryShiftId, plannerSecondaryShiftId, plannerTertiaryShiftId].filter(Boolean)
-            )
+          : buildDefaultCustomPatternSequence(resolvedWizardShiftIds)
         : []
     );
     setWizardWeeklyTemplateWeeks(
-      isWeeklyTemplatePattern(nextPattern)
+      isWeeklyTemplatePattern(resolvedWizardPattern)
         ? effectivePlannerWeeklyTemplateWeeks.length > 0
           ? effectivePlannerWeeklyTemplateWeeks
-          : buildDefaultWeeklyTemplateWeeks(nextPlannerShiftIds, 1)
+          : buildDefaultWeeklyTemplateWeeks(resolvedWizardShiftIds, 1)
         : []
     );
     setWizardShiftIds(
-      isCustomPattern(nextPattern)
+      isCustomPattern(resolvedWizardPattern)
         ? effectivePlannerCustomPatternSequence
             .filter((token) => token !== OFF_SHIFT_TOKEN)
             .filter((shiftId, index, list) => list.indexOf(shiftId) === index)
-        : nextPlannerShiftIds
+        : resolvedWizardShiftIds
     );
-    resetWizardRuleSelection();
+    setWizardGenerationBasis(selectedGenerationRule ? 'saved_rule' : 'rotation_only');
+    setWizardRuleDraft({
+      ...previewGenerationRule,
+      teamKeywords: [...previewGenerationRule.teamKeywords],
+      roleCoverageRules: previewGenerationRule.roleCoverageRules.map((rule) => ({
+        ...rule,
+        keywords: [...rule.keywords],
+      })),
+    });
     setWizardSelectedStaffIds(defaultWizardSelectedStaffIds);
     setWizardSelectedPresetId('');
     setWizardOffOverrides({});
@@ -5689,6 +7860,79 @@ export default function AutoRosterPlanner({
     resetWizardRuleSelection();
     setWizardSelectedPresetId('');
     setWizardOffOverrides({});
+  };
+
+  const toggleIncludedDepartment = (department: string) => {
+    const normalizedDepartment = String(department || '').trim();
+    if (!normalizedDepartment || normalizedDepartment === selectedDepartment) return;
+    setIncludedDepartments((prev) =>
+      prev.includes(normalizedDepartment)
+        ? prev.filter((entry) => entry !== normalizedDepartment)
+        : [...prev, normalizedDepartment]
+    );
+  };
+
+  const renderRosterScopeSummary = () => {
+    if (!selectedDepartment) return null;
+
+    const includesSuyeonNursingTeam =
+      Boolean(suyeonNursingDepartment) && includedDepartments.includes(suyeonNursingDepartment);
+
+    return (
+      <div
+        className="mt-4 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)]/70 px-4 py-4"
+        data-testid="roster-scope-summary"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">현재 스케줄표 범위</p>
+            <p className="mt-1 text-sm font-bold text-[var(--foreground)]">{rosterScopeLabel}</p>
+            <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+              병동팀을 기본으로 두고 함께 편성할 팀을 여기서 바로 추가하거나 뺄 수 있습니다.
+            </p>
+          </div>
+          {suyeonNursingDepartment ? (
+            <button
+              type="button"
+              onClick={() => toggleIncludedDepartment(suyeonNursingDepartment)}
+              className={`rounded-[var(--radius-lg)] border px-4 py-2 text-[11px] font-bold transition-colors ${
+                includesSuyeonNursingTeam
+                  ? 'border-[var(--accent)] bg-[var(--toss-blue-light)] text-[var(--accent)]'
+                  : 'border-[var(--border)] bg-[var(--card)] text-[var(--foreground)]'
+              }`}
+              data-testid="roster-suyeon-team-toggle"
+            >
+              {includesSuyeonNursingTeam ? '수연의원 간호팀 제외' : '수연의원 간호팀 포함'}
+            </button>
+          ) : null}
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          {scopedRosterDepartments.map((department, index) => {
+            const isPrimaryDepartment = department === selectedDepartment;
+            return isPrimaryDepartment ? (
+              <span
+                key={department}
+                className="rounded-[var(--radius-md)] border border-[var(--accent)]/30 bg-[var(--toss-blue-light)] px-3 py-2 text-[11px] font-bold text-[var(--accent)]"
+                data-testid={`roster-scope-chip-${index + 1}`}
+              >
+                기본 팀 · {department}
+              </span>
+            ) : (
+              <button
+                key={department}
+                type="button"
+                onClick={() => toggleIncludedDepartment(department)}
+                className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[11px] font-bold text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                data-testid={`roster-scope-chip-${index + 1}`}
+              >
+                포함 팀 · {department} ×
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   const toggleWizardStaff = (staffId: string) => {
@@ -5757,6 +8001,67 @@ export default function AutoRosterPlanner({
         : []
     );
     setWizardWeeklyTemplateWeeks(nextWeeklyTemplateWeeks);
+    if (normalizedPreset.generationRule) {
+      setWizardRuleDraft(cloneGenerationRule(normalizedPreset.generationRule) || previewGenerationRule);
+    }
+    if (normalizedPreset.staffNightRanges && Object.keys(normalizedPreset.staffNightRanges).length > 0) {
+      setWizardNightRangeDrafts((prev) => {
+        const next = { ...prev };
+        Object.entries(normalizedPreset.staffNightRanges || {}).forEach(([staffId, range]) => {
+          next[staffId] = {
+            minNightShiftCount: clampNightShiftCount(range.minNightShiftCount || 0, monthDates.length),
+            maxNightShiftCount: clampNightShiftCount(
+              Math.max(range.minNightShiftCount || 0, range.maxNightShiftCount || 0),
+              monthDates.length
+            ),
+          };
+        });
+        return next;
+      });
+    }
+    if (normalizedPreset.staffBlockPreferences) {
+      setWizardBlockPreferenceDrafts((prev) => ({
+        ...prev,
+        ...Object.fromEntries(
+          Object.entries(normalizedPreset.staffBlockPreferences || {}).map(([staffId, value]) => [
+            staffId,
+            normalizeStaffBlockPreference(value),
+          ])
+        ),
+      }));
+    }
+    if (normalizedPreset.staffDedicatedBands) {
+      setWizardDedicatedBandDrafts((prev) => ({
+        ...prev,
+        ...normalizedPreset.staffDedicatedBands,
+      }));
+    }
+    if (normalizedPreset.staffRestrictions) {
+      setWizardStaffRestrictionDrafts((prev) => ({
+        ...prev,
+        ...Object.fromEntries(
+          Object.entries(normalizedPreset.staffRestrictions || {}).map(([staffId, restriction]) => [
+            staffId,
+            {
+              ...buildDefaultStaffRestrictionDraft(),
+              ...restriction,
+            },
+          ])
+        ),
+      }));
+    }
+    if (normalizedPreset.staffCoverageRoleTags) {
+      setWizardCoverageRoleDrafts((prev) => ({
+        ...prev,
+        ...Object.fromEntries(
+          Object.entries(normalizedPreset.staffCoverageRoleTags || {}).map(([staffId, tags]) => [
+            staffId,
+            normalizeCoverageRoleTags(tags),
+          ])
+        ),
+      }));
+    }
+    setWizardPairRules(normalizedPreset.pairRules || []);
     setWizardSelectedPresetId(normalizedPreset.id);
   };
 
@@ -5802,6 +8107,84 @@ export default function AutoRosterPlanner({
 
     const slotByShiftId = new Map(plannerShiftIds.map((shiftId, index) => [shiftId, index + 1]));
     const existingPreset = savedWizardPresets.find((preset) => preset.name.trim() === nextName);
+    const presetStaffNightRanges = Object.fromEntries(
+      targetStaffs.map((staff, index) => {
+        const staffId = String(staff.id);
+        const current =
+          effectiveTargetStaffConfigs.get(staffId) ||
+          buildInitialConfig(
+            staff,
+            index,
+            defaultShiftOrder.length ? defaultShiftOrder : defaultShiftPool,
+            monthDates.length
+          );
+        const minNightShiftCount = clampNightShiftCount(current.minNightShiftCount || 0, monthDates.length);
+        const maxNightShiftCount = clampNightShiftCount(
+          Math.max(current.minNightShiftCount || 0, current.maxNightShiftCount || 0),
+          monthDates.length
+        );
+
+        return [
+          staffId,
+          {
+            minNightShiftCount,
+            maxNightShiftCount,
+          },
+        ];
+      })
+    );
+    const presetStaffBlockPreferences: Record<string, StaffBlockPreference> = Object.fromEntries(
+      targetStaffs.map((staff, index) => {
+        const staffId = String(staff.id);
+        const current =
+          effectiveTargetStaffConfigs.get(staffId) ||
+          buildInitialConfig(
+            staff,
+            index,
+            defaultShiftOrder.length ? defaultShiftOrder : defaultShiftPool,
+            monthDates.length
+          );
+        return [staffId, normalizeStaffBlockPreference(current.blockPreference)];
+      })
+    );
+    const presetDedicatedBands: Record<string, CoverageBand | ''> = Object.fromEntries(
+      targetStaffs.map((staff) => [
+        String(staff.id),
+        (staffDedicatedBandOverrides[String(staff.id)] || '') as CoverageBand | '',
+      ])
+    );
+    const presetStaffRestrictions: Record<string, StaffRestrictionDraft> = Object.fromEntries(
+      targetStaffs.map((staff, index) => {
+        const staffId = String(staff.id);
+        const current =
+          effectiveTargetStaffConfigs.get(staffId) ||
+          buildInitialConfig(
+            staff,
+            index,
+            defaultShiftOrder.length ? defaultShiftOrder : defaultShiftPool,
+            monthDates.length
+          );
+        return [
+          staffId,
+          {
+            blockedShiftBands: normalizeBlockedShiftBands(current.blockedShiftBands || []),
+            blockedWeekdays: normalizeBlockedWeekdays(current.blockedWeekdays || []),
+            avoidWeekendWork: Boolean(current.avoidWeekendWork),
+            avoidHolidayWork: Boolean(current.avoidHolidayWork),
+            preferWeekendOff: Boolean(current.preferWeekendOff),
+            preferHolidayOff: Boolean(current.preferHolidayOff),
+            avoidConsecutiveEvening: Boolean(current.avoidConsecutiveEvening),
+            preferEarlyMonthNight: Boolean(current.preferEarlyMonthNight),
+          },
+        ];
+      })
+    );
+    const presetCoverageRoleTags = Object.fromEntries(
+      targetStaffs.map((staff) => [
+        String(staff.id),
+        expandCoverageRoleTags(staffCoverageRoleTags[String(staff.id)] || []),
+      ])
+    );
     const nextPreset: RosterWizardPreset = {
       id: existingPreset?.id || `preset-${Date.now()}`,
       name: nextName,
@@ -5827,6 +8210,13 @@ export default function AutoRosterPlanner({
             activeWeekdays: week.activeWeekdays,
           }))
         : [],
+      generationRule: cloneGenerationRule(previewGenerationRule),
+      staffNightRanges: presetStaffNightRanges,
+      staffBlockPreferences: presetStaffBlockPreferences,
+      staffDedicatedBands: presetDedicatedBands,
+      staffRestrictions: presetStaffRestrictions,
+      staffCoverageRoleTags: presetCoverageRoleTags,
+      pairRules: plannerPairRules,
     };
 
     setSavedWizardPresets((prev) => [nextPreset, ...prev.filter((preset) => preset.id !== nextPreset.id)]);
@@ -5887,6 +8277,139 @@ export default function AutoRosterPlanner({
         : []
     );
     setPlannerWeeklyTemplateWeeks(nextWeeklyTemplateWeeks);
+    if (normalizedPreset.generationRule) {
+      setSelectedGenerationRuleId('');
+      setActiveGenerationRuleOverride(cloneGenerationRule(normalizedPreset.generationRule));
+    }
+    if (normalizedPreset.staffNightRanges && Object.keys(normalizedPreset.staffNightRanges).length > 0) {
+      setStaffConfigs((prev) => {
+        const next = { ...prev };
+        targetStaffs.forEach((staff, index) => {
+          const staffId = String(staff.id);
+          const presetRange = normalizedPreset.staffNightRanges?.[staffId];
+          if (!presetRange) return;
+
+          const current =
+            prev[staff.id] ||
+            buildInitialConfig(
+              staff,
+              index,
+              defaultShiftOrder.length ? defaultShiftOrder : defaultShiftPool,
+              monthDates.length
+            );
+          next[staff.id] = {
+            ...current,
+            minNightShiftCount: clampNightShiftCount(
+              presetRange.minNightShiftCount || 0,
+              monthDates.length
+            ),
+            maxNightShiftCount: clampNightShiftCount(
+              Math.max(
+                presetRange.minNightShiftCount || 0,
+                presetRange.maxNightShiftCount || 0
+              ),
+              monthDates.length
+            ),
+            blockPreference: normalizeStaffBlockPreference(
+              normalizedPreset.staffBlockPreferences?.[staffId]
+            ),
+          };
+          const restriction = normalizedPreset.staffRestrictions?.[staffId];
+          if (restriction) {
+            next[staff.id] = {
+              ...next[staff.id],
+              blockedShiftBands: normalizeBlockedShiftBands(restriction.blockedShiftBands),
+              blockedWeekdays: normalizeBlockedWeekdays(restriction.blockedWeekdays),
+              avoidWeekendWork: Boolean(restriction.avoidWeekendWork),
+              avoidHolidayWork: Boolean(restriction.avoidHolidayWork),
+              preferWeekendOff: Boolean(restriction.preferWeekendOff),
+              preferHolidayOff: Boolean(restriction.preferHolidayOff),
+              avoidConsecutiveEvening: Boolean(restriction.avoidConsecutiveEvening),
+              preferEarlyMonthNight: Boolean(restriction.preferEarlyMonthNight),
+            };
+          }
+        });
+        return next;
+      });
+    }
+    if (normalizedPreset.staffBlockPreferences) {
+      setStaffConfigs((prev) => {
+        const next = { ...prev };
+        targetStaffs.forEach((staff, index) => {
+          const staffId = String(staff.id);
+          const blockPreference = normalizedPreset.staffBlockPreferences?.[staffId];
+          if (!blockPreference) return;
+          const current =
+            prev[staff.id] ||
+            buildInitialConfig(
+              staff,
+              index,
+              defaultShiftOrder.length ? defaultShiftOrder : defaultShiftPool,
+              monthDates.length
+            );
+          next[staff.id] = {
+            ...current,
+            blockPreference: normalizeStaffBlockPreference(blockPreference),
+          };
+        });
+        return next;
+      });
+    }
+    if (normalizedPreset.staffDedicatedBands) {
+      setStaffDedicatedBandOverrides((prev) => {
+        const next = { ...prev };
+        Object.entries(normalizedPreset.staffDedicatedBands || {}).forEach(([staffId, band]) => {
+          if (band) {
+            next[staffId] = band;
+            return;
+          }
+          delete next[staffId];
+        });
+        return next;
+      });
+    }
+    if (normalizedPreset.staffRestrictions) {
+      setStaffConfigs((prev) => {
+        const next = { ...prev };
+        targetStaffs.forEach((staff, index) => {
+          const staffId = String(staff.id);
+          const restriction = normalizedPreset.staffRestrictions?.[staffId];
+          if (!restriction) return;
+          const current =
+            prev[staff.id] ||
+            buildInitialConfig(
+              staff,
+              index,
+              defaultShiftOrder.length ? defaultShiftOrder : defaultShiftPool,
+              monthDates.length
+            );
+          next[staff.id] = {
+            ...current,
+            blockedShiftBands: normalizeBlockedShiftBands(restriction.blockedShiftBands),
+            blockedWeekdays: normalizeBlockedWeekdays(restriction.blockedWeekdays),
+            avoidWeekendWork: Boolean(restriction.avoidWeekendWork),
+            avoidHolidayWork: Boolean(restriction.avoidHolidayWork),
+            preferWeekendOff: Boolean(restriction.preferWeekendOff),
+            preferHolidayOff: Boolean(restriction.preferHolidayOff),
+            avoidConsecutiveEvening: Boolean(restriction.avoidConsecutiveEvening),
+            preferEarlyMonthNight: Boolean(restriction.preferEarlyMonthNight),
+          };
+        });
+        return next;
+      });
+    }
+    if (normalizedPreset.staffCoverageRoleTags) {
+      setStaffCoverageRoleTags((prev) => ({
+        ...prev,
+        ...Object.fromEntries(
+          Object.entries(normalizedPreset.staffCoverageRoleTags || {}).map(([staffId, tags]) => [
+            staffId,
+            normalizeCoverageRoleTags(tags),
+          ])
+        ),
+      }));
+    }
+    setPlannerPairRules(normalizedPreset.pairRules || []);
   };
 
   const updateWizardOffOverride = (staffId: string, patch: Partial<WizardOffOverride>) => {
@@ -5905,6 +8428,115 @@ export default function AutoRosterPlanner({
         },
       };
     });
+  };
+
+  const updateWizardNightRangeDraft = (
+    staffId: string,
+    field: keyof WizardNightRangeDraft,
+    value: string
+  ) => {
+    setWizardNightRangeDrafts((prev) => {
+      const current = prev[staffId] || { minNightShiftCount: 0, maxNightShiftCount: 0 };
+      const nextValue = clampNightShiftCount(Number(value) || 0, monthDates.length);
+      const next = {
+        ...current,
+        [field]: nextValue,
+      };
+
+      if (field === 'minNightShiftCount' && next.maxNightShiftCount > 0) {
+        next.maxNightShiftCount = Math.max(next.minNightShiftCount, next.maxNightShiftCount);
+      }
+      if (field === 'maxNightShiftCount') {
+        next.maxNightShiftCount = Math.max(next.minNightShiftCount, next.maxNightShiftCount);
+      }
+
+      return {
+        ...prev,
+        [staffId]: next,
+      };
+    });
+  };
+
+  const updateWizardBlockPreferenceDraft = (staffId: string, value: string) => {
+    setWizardBlockPreferenceDrafts((prev) => ({
+      ...prev,
+      [staffId]: normalizeStaffBlockPreference(value),
+    }));
+  };
+
+  const updateWizardDedicatedBandDraft = (staffId: string, value: string) => {
+    setWizardDedicatedBandDrafts((prev) => ({
+      ...prev,
+      [staffId]: value === 'day' || value === 'evening' || value === 'night' ? value : '',
+    }));
+  };
+
+  const updateWizardCoverageRoleDraft = (staffId: string, value: string) => {
+    setWizardCoverageRoleDrafts((prev) => ({
+      ...prev,
+      [staffId]: normalizeCoverageRoleTags(value.split(',')),
+    }));
+  };
+
+  const updateWizardStaffRestrictionDraft = (
+    staffId: string,
+    field: keyof StaffRestrictionDraft,
+    value: string | boolean | CoverageBand[] | number[]
+  ) => {
+    setWizardStaffRestrictionDrafts((prev) => {
+      const current = prev[staffId] || buildDefaultStaffRestrictionDraft();
+      const nextValue =
+        field === 'blockedShiftBands'
+          ? normalizeBlockedShiftBands(value)
+          : field === 'blockedWeekdays'
+            ? normalizeBlockedWeekdays(value)
+            : Boolean(value);
+      return {
+        ...prev,
+        [staffId]: {
+          ...current,
+          [field]: nextValue,
+        },
+      };
+    });
+  };
+
+  const addWizardPairRule = () => {
+    const primaryStaffId = wizardSelectedStaffIds[0] || '';
+    const secondaryStaffId = wizardSelectedStaffIds[1] || primaryStaffId;
+    if (!primaryStaffId || !secondaryStaffId || primaryStaffId === secondaryStaffId) return;
+    setWizardPairRules((prev) => [
+      ...prev,
+      {
+        id: `pair-rule-${Date.now()}-${prev.length + 1}`,
+        primaryStaffId,
+        secondaryStaffId,
+        mode: 'together',
+        band: 'night',
+      },
+    ]);
+  };
+
+  const updateWizardPairRule = (
+    ruleId: string,
+    field: keyof Omit<WizardPairRule, 'id'>,
+    value: string
+  ) => {
+    setWizardPairRules((prev) =>
+      prev.map((rule) => {
+        if (rule.id !== ruleId) return rule;
+        if (field === 'mode' && value !== 'together' && value !== 'separate') return rule;
+        if (field === 'band' && value !== 'night' && value !== 'work') return rule;
+        return {
+          ...rule,
+          [field]: value,
+        } as WizardPairRule;
+      })
+    );
+  };
+
+  const removeWizardPairRule = (ruleId: string) => {
+    setWizardPairRules((prev) => prev.filter((rule) => rule.id !== ruleId));
   };
 
   const getWizardRuleValidationError = () => {
@@ -5975,6 +8607,50 @@ export default function AutoRosterPlanner({
       selectedIndexMap.set(staffId, index);
     });
     const nextManualAssignments: ManualAssignmentMap = {};
+    const nextGenerationRuleOverride: RosterGenerationRule = {
+      ...wizardRuleDraft,
+      name: wizardRuleDraft.name || previewGenerationRule.name || '월간 편성 규칙',
+      companyName: selectedCompany,
+      companyId: selectedCompanyId,
+      teamKeywords:
+        wizardRuleDraft.teamKeywords.length > 0
+          ? wizardRuleDraft.teamKeywords
+          : [selectedDepartment, ...includedDepartments].filter(Boolean),
+      weekendMinDayStaff: Math.max(0, Math.floor(wizardRuleDraft.weekendMinDayStaff || 0)),
+      weekendMinEveningStaff: Math.max(0, Math.floor(wizardRuleDraft.weekendMinEveningStaff || 0)),
+      weekendMinNightStaff: Math.max(0, Math.floor(wizardRuleDraft.weekendMinNightStaff || 0)),
+      holidayMinDayStaff: Math.max(0, Math.floor(wizardRuleDraft.holidayMinDayStaff || 0)),
+      holidayMinEveningStaff: Math.max(0, Math.floor(wizardRuleDraft.holidayMinEveningStaff || 0)),
+      holidayMinNightStaff: Math.max(0, Math.floor(wizardRuleDraft.holidayMinNightStaff || 0)),
+      dateCoverageOverrides: (wizardRuleDraft.dateCoverageOverrides || [])
+        .map((entry, index) => ({
+          id: entry.id || `date-coverage-${index + 1}`,
+          date: String(entry.date || '').slice(0, 10),
+          minDayStaff: Math.max(0, Math.floor(entry.minDayStaff || 0)),
+          minEveningStaff: Math.max(0, Math.floor(entry.minEveningStaff || 0)),
+          minNightStaff: Math.max(0, Math.floor(entry.minNightStaff || 0)),
+        }))
+        .filter(
+          (entry) =>
+            /^\d{4}-\d{2}-\d{2}$/.test(entry.date) &&
+            (entry.minDayStaff > 0 || entry.minEveningStaff > 0 || entry.minNightStaff > 0)
+        ),
+      roleCoverageRules: wizardRuleDraft.roleCoverageRules
+        .map((rule, index) => ({
+          ...rule,
+          id: rule.id || `role-slot-${index + 1}`,
+          label: String(rule.label || `역할 슬롯 ${index + 1}`).trim(),
+          keywords: normalizeCoverageRoleTags(rule.keywords || []),
+          minDayStaff: Math.max(0, Math.floor(rule.minDayStaff || 0)),
+          minEveningStaff: Math.max(0, Math.floor(rule.minEveningStaff || 0)),
+          minNightStaff: Math.max(0, Math.floor(rule.minNightStaff || 0)),
+        }))
+        .filter(
+          (rule) =>
+            (rule.label || '').trim() &&
+            (rule.minDayStaff > 0 || rule.minEveningStaff > 0 || rule.minNightStaff > 0)
+        ),
+    };
 
     wizardSelectedStaffIds.forEach((staffId) => {
       const override = wizardOffOverrides[staffId];
@@ -6019,16 +8695,63 @@ export default function AutoRosterPlanner({
           nightShiftCount: isNightPattern(wizardPattern)
             ? clampNightShiftCount(wizardNightShiftCount, monthDates.length)
             : 0,
+          minNightShiftCount:
+            wizardNightRangeDrafts[String(staff.id)]?.minNightShiftCount ?? current.minNightShiftCount,
+          maxNightShiftCount:
+            wizardNightRangeDrafts[String(staff.id)]?.maxNightShiftCount ?? current.maxNightShiftCount,
+          blockPreference:
+            wizardBlockPreferenceDrafts[String(staff.id)] ?? current.blockPreference,
           customPatternSequence: nextCustomPatternSequence,
           weeklyTemplateWeeks: nextWeeklyTemplateWeeks,
+          blockedShiftBands: normalizeBlockedShiftBands(
+            wizardStaffRestrictionDrafts[String(staff.id)]?.blockedShiftBands || []
+          ),
+          blockedWeekdays: normalizeBlockedWeekdays(
+            wizardStaffRestrictionDrafts[String(staff.id)]?.blockedWeekdays || []
+          ),
+          avoidWeekendWork: Boolean(
+            wizardStaffRestrictionDrafts[String(staff.id)]?.avoidWeekendWork
+          ),
+          avoidHolidayWork: Boolean(
+            wizardStaffRestrictionDrafts[String(staff.id)]?.avoidHolidayWork
+          ),
+          preferWeekendOff: Boolean(
+            wizardStaffRestrictionDrafts[String(staff.id)]?.preferWeekendOff
+          ),
+          preferHolidayOff: Boolean(
+            wizardStaffRestrictionDrafts[String(staff.id)]?.preferHolidayOff
+          ),
+          avoidConsecutiveEvening: Boolean(
+            wizardStaffRestrictionDrafts[String(staff.id)]?.avoidConsecutiveEvening
+          ),
+          preferEarlyMonthNight: Boolean(
+            wizardStaffRestrictionDrafts[String(staff.id)]?.preferEarlyMonthNight
+          ),
         };
       });
       return next;
     });
 
+    setStaffDedicatedBandOverrides((prev) => {
+      const next = { ...prev };
+      targetStaffs.forEach((staff) => {
+        next[String(staff.id)] = wizardDedicatedBandDrafts[String(staff.id)] || '';
+      });
+      return next;
+    });
+    setStaffCoverageRoleTags((prev) => {
+      const next = { ...prev };
+      targetStaffs.forEach((staff) => {
+        next[String(staff.id)] = expandCoverageRoleTags(wizardCoverageRoleDrafts[String(staff.id)] || []);
+      });
+      return next;
+    });
+    setActiveGenerationRuleOverride(nextGenerationRuleOverride);
+    setPlannerPairRules(wizardPairRules);
+    setSelectedManualCell(null);
     setManualAssignments(nextManualAssignments);
     closeWizard();
-    toast(`${selectedDepartment} 팀 ${wizardSelectedStaffIds.length}명의 근무표 초안을 생성했습니다. 아래에서 임의 수정 후 저장하세요.`, 'success');
+    toast(`${rosterScopeLabel} 팀 ${wizardSelectedStaffIds.length}명의 근무표 초안을 생성했습니다. 아래에서 임의 수정 후 저장하세요.`, 'success');
   };
 
   const ensureOffShift = async () => {
@@ -6060,6 +8783,1764 @@ export default function AutoRosterPlanner({
     return nextOffShift;
   };
 
+  const renderRosterWizardModal = () => {
+    if (!wizardOpen) return null;
+
+    return (
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/45 px-4 py-4">
+            <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
+              <div className="border-b border-[var(--border)] bg-[var(--page-bg)] px-4 py-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h3 className="text-2xl font-black tracking-[-0.03em] text-[var(--foreground)]">
+                      <span className="bg-gradient-to-r from-[var(--accent)] to-fuchsia-500 bg-clip-text text-transparent">
+                        RUN SHIFT
+                      </span>{' '}
+                      마법사
+                    </h3>
+                    <p className="mt-1 text-sm text-[var(--toss-gray-3)]">
+                      팀을 카드로 선택하고, 직원을 고른 뒤, 근무유형을 체크해서 월간 근무표를 바로 생성합니다.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { step: 1 as WizardStep, label: '팀 선택' },
+                      { step: 2 as WizardStep, label: '직원 선택' },
+                      { step: 3 as WizardStep, label: '패턴 · 근무유형' },
+                      { step: 4 as WizardStep, label: '예외 일정' },
+                    ].map(({ step, label }) => (
+                      <div
+                        key={step}
+                        className={`rounded-[var(--radius-md)] px-4 py-2 text-sm font-semibold ${wizardStep === step ? 'bg-[var(--accent)] text-white' : wizardStep > step ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]' : 'bg-[var(--muted)] text-[var(--toss-gray-3)]'}`}
+                      >
+                        {step}. {label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+    
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+                {wizardStep === 1 && (
+                  <div className="space-y-4">
+                    <div className="grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)]">
+                      <div className="space-y-4">
+                        <label className="flex flex-col gap-0">
+                          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2">
+                            <SmartMonthPicker
+                              value={selectedMonth}
+                              onChange={(value) => setSelectedMonth(value)}
+                              className="w-[150px]"
+                              inputClassName="text-sm font-semibold text-[var(--foreground)]"
+                            />
+                          </div>
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">사업체</span>
+                          <select
+                            value={selectedCompany}
+                            onChange={(e) => setSelectedCompany(e.target.value)}
+                            disabled={!isAdmin || companyLockedByHrFilter}
+                            className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--input-bg)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none disabled:cursor-not-allowed disabled:bg-[var(--tab-bg)]"
+                          >
+                            {companyOptions.map((company) => (
+                              <option key={company} value={company}>
+                                {company}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+    
+                      <div className="space-y-4">
+                        <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--muted)] px-5 py-4">
+                          <p className="text-sm font-bold text-[var(--foreground)]">어떤 팀의 근무표를 만들까요?</p>
+                          <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
+                            병동처럼 3교대 팀은 이후 단계에서 데이 / 이브닝 / 나이트를 체크해서 D / E / N / OFF 형태로 만들 수 있습니다.
+                          </p>
+                        </div>
+    
+                        {teamOptions.length === 0 ? (
+                          <div className="rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
+                            No teams are registered for the selected company.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            {teamOptions.map((department) => {
+                              const teamStaffCount = activeStaffs.filter(
+                                (staff) =>
+                                  staff.company === selectedCompany && getDepartmentName(staff) === department
+                              ).length;
+                              const selected = selectedDepartment === department;
+                              return (
+                                <button
+                                  key={department}
+                                  type="button"
+                                  onClick={() => setSelectedDepartment(department)}
+                                  className={`rounded-[var(--radius-xl)] border px-7 py-4 text-left transition-all ${selected ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/70 shadow-[0_18px_40px_rgba(37,99,235,0.12)] ring-1 ring-[var(--accent)]/20' : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]/40 hover:shadow-[0_16px_32px_rgba(15,23,42,0.08)]'}`}
+                                >
+                                  <div className="flex items-start justify-between gap-4">
+                                    <div className={`flex h-12 w-12 items-center justify-center rounded-[var(--radius-lg)] text-xl ${selected ? 'bg-[var(--card)] text-[var(--accent)]' : 'bg-[var(--muted)] text-[var(--accent)]'}`}>
+                                      W
+                                    </div>
+                                    {selected && (
+                                      <span className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1 text-[10px] font-bold text-white">
+                                        Selected
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="mt-4 text-xl font-bold tracking-[-0.02em] text-[var(--foreground)]">{department}</p>
+                                  <p className="mt-3 text-sm text-[var(--toss-gray-3)]">
+                                    {selectedCompany || 'Company'} - Staff {teamStaffCount}
+                                  </p>
+                                  <p className="mt-3 text-[12px] leading-5 text-[var(--toss-gray-3)]">
+                                    {workingShifts.length >= 3 ? 'Ideal for 3-shift or night-dedicated teams.' : 'Create a monthly roster from registered shift types.'}
+                                  </p>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {selectedDepartment ? (
+                          <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-bold text-[var(--foreground)]">같이 생성할 팀 추가</p>
+                                <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
+                                  기본 팀 외에 함께 묶어 편성할 팀을 선택하세요. 수연의원 간호팀도 여기서 필요할 때만 포함할 수 있습니다.
+                                </p>
+                              </div>
+                              <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]">
+                                현재 범위 {rosterScopeLabel}
+                              </span>
+                            </div>
+                            {availableIncludedDepartments.length === 0 ? (
+                              <div className="mt-3 rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-[12px] font-semibold text-[var(--toss-gray-3)]">
+                                추가로 포함할 팀이 없습니다.
+                              </div>
+                            ) : (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {availableIncludedDepartments.map((department, index) => {
+                                  const included = includedDepartments.includes(department);
+                                  return (
+                                    <button
+                                      key={department}
+                                      type="button"
+                                      onClick={() => toggleIncludedDepartment(department)}
+                                      className={`rounded-[var(--radius-md)] border px-3 py-2 text-[11px] font-bold transition-colors ${
+                                        included
+                                          ? 'border-[var(--accent)] bg-[var(--toss-blue-light)] text-[var(--accent)]'
+                                          : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]'
+                                      }`}
+                                      data-testid={`roster-wizard-include-team-${index + 1}`}
+                                    >
+                                      {included ? '포함중' : '추가'} · {department}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                )}
+    
+                {wizardStep === 2 && (
+                  <div className="space-y-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h4 className="text-base font-bold text-[var(--foreground)]">{rosterScopeLabel} 직원 선택</h4>
+                        <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
+                          이번 자동편성에서 제외할 직원을 조정하세요.
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <span
+                            className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]"
+                            data-testid="roster-wizard-included-count"
+                          >
+                            포함 {wizardSelectedStaffIds.length}
+                          </span>
+                          <span
+                            className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-bold text-[var(--foreground)]"
+                            data-testid="roster-wizard-excluded-count"
+                          >
+                            제외 {wizardExcludedStaffs.length}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={includeAllWizardStaff}
+                          className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-bold text-[var(--foreground)]"
+                          data-testid="roster-wizard-include-all"
+                        >
+                          전체 포함
+                        </button>
+                        <button
+                          type="button"
+                          onClick={clearWizardStaffSelection}
+                          className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)]"
+                          data-testid="roster-wizard-exclude-all"
+                        >
+                          전체 제외
+                        </button>
+                      </div>
+                    </div>
+    
+                    {targetStaffs.length === 0 ? (
+                      <div className="rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
+                        No staff found in this team.
+                      </div>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                          {targetStaffs.map((staff) => {
+                            const staffId = String(staff.id);
+                            const selected = wizardSelectedStaffIds.includes(staffId);
+                            return (
+                              <div
+                                key={staff.id}
+                                className={`rounded-[var(--radius-xl)] border p-4 text-left transition-all ${selected ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/70 ring-1 ring-[var(--accent)]/30' : 'border-[var(--border)] bg-[var(--muted)]/70'}`}
+                                data-testid={`roster-wizard-staff-card-${staffId}`}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] bg-[var(--tab-bg)] text-sm font-bold text-[var(--accent)]">
+                                      {String(staff.name || '?').slice(0, 1)}
+                                    </div>
+                                    <div>
+                                      <p className="text-sm font-bold text-[var(--foreground)]">{staff.name}</p>
+                                      <p className="text-[11px] text-[var(--toss-gray-3)]">
+                                        {getDepartmentName(staff)} - {staff.position || 'Staff'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <span
+                                    className={`rounded-[var(--radius-md)] px-3 py-1 text-[10px] font-bold ${selected ? 'bg-[var(--card)] text-[var(--accent)]' : 'bg-[var(--toss-gray-2)] text-[var(--toss-gray-3)]'}`}
+                                  >
+                                    {selected ? 'Included' : 'Excluded'}
+                                  </span>
+                                </div>
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleWizardStaff(staffId)}
+                                    className={`rounded-[var(--radius-md)] px-3 py-2 text-[11px] font-bold transition-colors ${selected ? 'bg-rose-50 text-rose-600' : 'bg-[var(--accent)] text-white'}`}
+                                    data-testid={`roster-wizard-toggle-${staffId}`}
+                                  >
+                                    {selected ? 'Exclude from this run' : 'Include again'}
+                                  </button>
+                                </div>
+                                {!selected && (
+                                  <p className="mt-3 text-[11px] text-[var(--toss-gray-3)]">Skipped in this run.</p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {wizardExcludedStaffs.length > 0 && (
+                          <div
+                            className="rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm font-semibold text-[var(--foreground)]"
+                            data-testid="roster-wizard-excluded-summary"
+                          >
+                            Excluded: {wizardExcludedStaffs.map((staff) => staff.name).join(', ')}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+    
+                {wizardStep === 3 && (
+                  <div className="space-y-4" data-testid="roster-wizard-step-3">
+                    <div>
+                      <h4 className="text-base font-bold text-[var(--foreground)]">자동생성 규칙 불러오기</h4>
+                      <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
+                        바깥에서 저장한 규칙을 불러와서 이번 근무표 생성 기준으로 사용합니다.
+                      </p>
+                    </div>
+    
+                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
+                      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4">
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">생성 기준</span>
+                            <select
+                              value={wizardGenerationBasis}
+                              onChange={(event) =>
+                                setWizardGenerationBasis(event.target.value as WizardGenerationBasis)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-generation-basis-select"
+                            >
+                              <option value="saved_rule">저장 규칙 우선</option>
+                              <option value="rotation_only">전원 순환 근무</option>
+                            </select>
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">나이트 후 OFF</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={5}
+                              value={wizardRuleDraft.offDaysAfterNight}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('offDaysAfterNight', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-off-days-after-night"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">최소 DAY</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={20}
+                              value={wizardRuleDraft.minDayStaff}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('minDayStaff', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-min-day-staff"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">최소 EVENING</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={20}
+                              value={wizardRuleDraft.minEveningStaff}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('minEveningStaff', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-min-evening-staff"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">최소 NIGHT</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={20}
+                              value={wizardRuleDraft.minNightStaff}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('minNightStaff', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-min-night-staff"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">주말 DAY</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={20}
+                              value={wizardRuleDraft.weekendMinDayStaff}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('weekendMinDayStaff', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-weekend-min-day-staff"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">주말 EVENING</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={20}
+                              value={wizardRuleDraft.weekendMinEveningStaff}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('weekendMinEveningStaff', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-weekend-min-evening-staff"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">주말 NIGHT</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={20}
+                              value={wizardRuleDraft.weekendMinNightStaff}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('weekendMinNightStaff', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-weekend-min-night-staff"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">공휴일 DAY</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={20}
+                              value={wizardRuleDraft.holidayMinDayStaff}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('holidayMinDayStaff', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-holiday-min-day-staff"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">공휴일 EVENING</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={20}
+                              value={wizardRuleDraft.holidayMinEveningStaff}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('holidayMinEveningStaff', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-holiday-min-evening-staff"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">공휴일 NIGHT</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={20}
+                              value={wizardRuleDraft.holidayMinNightStaff}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('holidayMinNightStaff', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-holiday-min-night-staff"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">나이트 최소</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={31}
+                              value={wizardRuleDraft.minRotationNightCount}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('minRotationNightCount', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-rotation-night-min-count"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">나이트 최대</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={31}
+                              value={wizardRuleDraft.maxRotationNightCount}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('maxRotationNightCount', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-rotation-night-max-count"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1 md:col-span-2">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">최소 월 OFF</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={31}
+                              value={wizardRuleDraft.minMonthlyOffDays}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('minMonthlyOffDays', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-min-monthly-off-days"
+                            />
+                          </label>
+                        </div>
+                        <div className="mt-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-bold text-[var(--foreground)]">특정 날짜 최소 인원</p>
+                              <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                                평일 기준과 다르게 운영하는 날짜만 따로 최소 인원을 지정합니다.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={addWizardDateCoverageOverride}
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[11px] font-bold text-[var(--foreground)]"
+                              data-testid="roster-wizard-date-coverage-add"
+                            >
+                              날짜 추가
+                            </button>
+                          </div>
+                          <div className="mt-3 space-y-3">
+                            {(wizardRuleDraft.dateCoverageOverrides || []).length === 0 ? (
+                              <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--card)] px-4 py-3 text-[12px] font-semibold text-[var(--toss-gray-3)]">
+                                아직 추가한 날짜별 최소 인원이 없습니다.
+                              </div>
+                            ) : (
+                              (wizardRuleDraft.dateCoverageOverrides || []).map((entry, index) => (
+                                <div
+                                  key={entry.id}
+                                  className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-3 md:grid-cols-[minmax(160px,1.2fr)_repeat(3,minmax(0,1fr))_auto]"
+                                >
+                                  <label className="flex flex-col gap-1">
+                                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">날짜</span>
+                                    <select
+                                      value={entry.date}
+                                      onChange={(event) =>
+                                        updateWizardDateCoverageOverride(entry.id, 'date', event.target.value)
+                                      }
+                                      className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                      data-testid={`roster-wizard-date-coverage-date-${index + 1}`}
+                                    >
+                                      {monthDates.map((date) => (
+                                        <option key={date} value={date}>
+                                          {date}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  <label className="flex flex-col gap-1">
+                                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">DAY</span>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={20}
+                                      value={entry.minDayStaff}
+                                      onChange={(event) =>
+                                        updateWizardDateCoverageOverride(
+                                          entry.id,
+                                          'minDayStaff',
+                                          event.target.value
+                                        )
+                                      }
+                                      className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                      data-testid={`roster-wizard-date-coverage-day-${index + 1}`}
+                                    />
+                                  </label>
+                                  <label className="hidden">
+                                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">블록 선호</span>
+                                    <select
+                                      value="balanced"
+                                      onChange={() => undefined}
+                                      className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                      data-testid={`roster-wizard-date-coverage-block-preference-${index + 1}`}
+                                    >
+                                      {STAFF_BLOCK_PREFERENCE_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                          {option.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  <label className="flex flex-col gap-1">
+                                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">EVENING</span>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={20}
+                                      value={entry.minEveningStaff}
+                                      onChange={(event) =>
+                                        updateWizardDateCoverageOverride(
+                                          entry.id,
+                                          'minEveningStaff',
+                                          event.target.value
+                                        )
+                                      }
+                                      className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                      data-testid={`roster-wizard-date-coverage-evening-${index + 1}`}
+                                    />
+                                  </label>
+                                  <label className="flex flex-col gap-1">
+                                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">NIGHT</span>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={20}
+                                      value={entry.minNightStaff}
+                                      onChange={(event) =>
+                                        updateWizardDateCoverageOverride(
+                                          entry.id,
+                                          'minNightStaff',
+                                          event.target.value
+                                        )
+                                      }
+                                      className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                      data-testid={`roster-wizard-date-coverage-night-${index + 1}`}
+                                    />
+                                  </label>
+                                  <div className="flex items-end">
+                                    <button
+                                      type="button"
+                                      onClick={() => removeWizardDateCoverageOverride(entry.id)}
+                                      className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-bold text-red-700"
+                                      data-testid={`roster-wizard-date-coverage-remove-${index + 1}`}
+                                    >
+                                      삭제
+                                    </button>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-bold text-[var(--foreground)]">Night block presets</p>
+                              <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                                Apply common hospital night/recovery patterns with one tap.
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {WIZARD_NIGHT_BLOCK_PRESET_OPTIONS.map((preset) => {
+                                const selected =
+                                  wizardRuleDraft.nightBlockSize === preset.nightBlockSize &&
+                                  wizardRuleDraft.offDaysAfterNight === preset.offDaysAfterNight;
+
+                                return (
+                                  <button
+                                    key={preset.id}
+                                    type="button"
+                                    onClick={() => applyWizardNightBlockPreset(preset)}
+                                    className={`rounded-[var(--radius-md)] border px-3 py-2 text-[11px] font-bold transition-colors ${selected ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)] bg-[var(--card)] text-[var(--foreground)]'}`}
+                                    data-testid={`roster-wizard-night-preset-${preset.id}`}
+                                  >
+                                    {preset.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+    
+                      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)] p-4">
+                        <div className="space-y-3">
+                          <label className="flex items-center justify-between rounded-[var(--radius-md)] bg-[var(--card)] px-3 py-3">
+                            <span className="text-sm font-bold text-[var(--foreground)]">주말 분산</span>
+                            <input
+                              type="checkbox"
+                              checked={wizardRuleDraft.distributeWeekendShifts}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('distributeWeekendShifts', event.target.checked)
+                              }
+                              data-testid="roster-wizard-rule-distribute-weekends"
+                            />
+                          </label>
+                          <label className="flex items-center justify-between rounded-[var(--radius-md)] bg-[var(--card)] px-3 py-3">
+                            <span className="text-sm font-bold text-[var(--foreground)]">공휴일 분산</span>
+                            <input
+                              type="checkbox"
+                              checked={wizardRuleDraft.distributeHolidayShifts}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('distributeHolidayShifts', event.target.checked)
+                              }
+                              data-testid="roster-wizard-rule-distribute-holidays"
+                            />
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4">
+                        <div>
+                          <h5 className="text-sm font-bold text-[var(--foreground)]">Ward safety rules</h5>
+                          <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
+                            Configure quick-return limits, new nurse protection, and rotation balancing.
+                          </p>
+                        </div>
+                        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">Night block size</span>
+                            <input
+                              type="number"
+                              min={1}
+                              max={5}
+                              value={wizardRuleDraft.nightBlockSize}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('nightBlockSize', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-night-block-size"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">Max consecutive work</span>
+                            <input
+                              type="number"
+                              min={2}
+                              max={7}
+                              value={wizardRuleDraft.maxConsecutiveWorkDays}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('maxConsecutiveWorkDays', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-max-consecutive-work-days"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">Max consecutive weekend</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={4}
+                              value={wizardRuleDraft.maxConsecutiveWeekendWorkDays}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField(
+                                  'maxConsecutiveWeekendWorkDays',
+                                  event.target.value
+                                )
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-max-consecutive-weekend-work-days"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">Max consecutive evening</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={7}
+                              value={wizardRuleDraft.maxConsecutiveEveningShifts}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField(
+                                  'maxConsecutiveEveningShifts',
+                                  event.target.value
+                                )
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-max-consecutive-evening-shifts"
+                            />
+                          </label>
+                        </div>
+                        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                          <label className="flex items-center justify-between rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-3">
+                            <span className="text-sm font-bold text-[var(--foreground)]">Avoid D after N</span>
+                            <input
+                              type="checkbox"
+                              checked={wizardRuleDraft.avoidDayAfterNight}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('avoidDayAfterNight', event.target.checked)
+                              }
+                              data-testid="roster-wizard-rule-avoid-day-after-night"
+                            />
+                          </label>
+                          <label className="flex items-center justify-between rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-3">
+                            <span className="text-sm font-bold text-[var(--foreground)]">Avoid D after E</span>
+                            <input
+                              type="checkbox"
+                              checked={wizardRuleDraft.avoidDayAfterEvening}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('avoidDayAfterEvening', event.target.checked)
+                              }
+                              data-testid="roster-wizard-rule-avoid-day-after-evening"
+                            />
+                          </label>
+                          <label className="flex items-center justify-between rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-3">
+                            <span className="text-sm font-bold text-[var(--foreground)]">Keep fixed staff fixed</span>
+                            <input
+                              type="checkbox"
+                              checked={wizardRuleDraft.fixedShiftOnly}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('fixedShiftOnly', event.target.checked)
+                              }
+                              data-testid="roster-wizard-rule-fixed-shift-only"
+                            />
+                          </label>
+                          <label className="flex items-center justify-between rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-3">
+                            <span className="text-sm font-bold text-[var(--foreground)]">Balance D/E/N</span>
+                            <input
+                              type="checkbox"
+                              checked={wizardRuleDraft.balanceRotationBands}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('balanceRotationBands', event.target.checked)
+                              }
+                              data-testid="roster-wizard-rule-balance-rotation-bands"
+                            />
+                          </label>
+                          <label className="flex items-center justify-between rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-3">
+                            <span className="text-sm font-bold text-[var(--foreground)]">Separate new nurses</span>
+                            <input
+                              type="checkbox"
+                              checked={wizardRuleDraft.separateNewNursesByShift}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField(
+                                  'separateNewNursesByShift',
+                                  event.target.checked
+                                )
+                              }
+                              data-testid="roster-wizard-rule-separate-new-nurses"
+                            />
+                          </label>
+                          <label className="flex items-center justify-between rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-3">
+                            <span className="text-sm font-bold text-[var(--foreground)]">Block solo new nurse night</span>
+                            <input
+                              type="checkbox"
+                              checked={wizardRuleDraft.blockNewNurseSoloNight}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField(
+                                  'blockNewNurseSoloNight',
+                                  event.target.checked
+                                )
+                              }
+                              data-testid="roster-wizard-rule-block-new-nurse-solo-night"
+                            />
+                          </label>
+                          <label className="flex items-center justify-between rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-3 md:col-span-2 xl:col-span-3">
+                            <span className="text-sm font-bold text-[var(--foreground)]">Require senior with new nurse at night</span>
+                            <input
+                              type="checkbox"
+                              checked={wizardRuleDraft.requireSeniorWithNewNurseNight}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField(
+                                  'requireSeniorWithNewNurseNight',
+                                  event.target.checked
+                                )
+                              }
+                              data-testid="roster-wizard-rule-require-senior-with-new-nurse-night"
+                            />
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4">
+                        <div>
+                          <h5 className="text-sm font-bold text-[var(--foreground)]">Senior / dedicated minimum coverage</h5>
+                          <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
+                            These minimums are checked in the wizard preset and in the final roster feasibility check.
+                          </p>
+                        </div>
+                        <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">Senior DAY</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={20}
+                              value={wizardRuleDraft.minSeniorDayStaff}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('minSeniorDayStaff', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-min-senior-day-staff"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">Senior EVENING</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={20}
+                              value={wizardRuleDraft.minSeniorEveningStaff}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('minSeniorEveningStaff', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-min-senior-evening-staff"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">Senior NIGHT</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={20}
+                              value={wizardRuleDraft.minSeniorNightStaff}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('minSeniorNightStaff', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-min-senior-night-staff"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">Dedicated DAY</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={20}
+                              value={wizardRuleDraft.minDedicatedDayStaff}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('minDedicatedDayStaff', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-min-dedicated-day-staff"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">Dedicated EVENING</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={20}
+                              value={wizardRuleDraft.minDedicatedEveningStaff}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('minDedicatedEveningStaff', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-min-dedicated-evening-staff"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">Dedicated NIGHT</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={20}
+                              value={wizardRuleDraft.minDedicatedNightStaff}
+                              onChange={(event) =>
+                                updateWizardRuleDraftField('minDedicatedNightStaff', event.target.value)
+                              }
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                              data-testid="roster-wizard-rule-min-dedicated-night-staff"
+                            />
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)] p-4">
+                        <div>
+                          <h5 className="text-sm font-bold text-[var(--foreground)]">Current wizard rule summary</h5>
+                          <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
+                            All major 3-shift constraints selected in the wizard are listed here.
+                          </p>
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-2" data-testid="roster-wizard-rule-summary">
+                          {wizardRuleSummaryItems.map((item, index) => (
+                            <span
+                              key={`${item}-${index}`}
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[11px] font-semibold text-[var(--foreground)]"
+                            >
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+    
+                    <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h5 className="text-sm font-bold text-[var(--foreground)]">역할 커버 슬롯</h5>
+                          <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
+                            격리, 중환자실 등 특정 역할을 맡을 수 있는 인원을 타임별로 최소 지정합니다.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={addWizardRoleCoverageRule}
+                          className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-[11px] font-bold text-[var(--foreground)]"
+                          data-testid="roster-wizard-rule-role-coverage-add"
+                        >
+                          역할 슬롯 추가
+                        </button>
+                      </div>
+    
+                      <div className="mt-4 space-y-3">
+                        {wizardRuleDraft.roleCoverageRules.length === 0 ? (
+                          <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-[12px] font-semibold text-[var(--toss-gray-3)]">
+                            추가한 역할 슬롯이 없습니다.
+                          </div>
+                        ) : (
+                          wizardRuleDraft.roleCoverageRules.map((roleRule, index) => (
+                            <div
+                              key={roleRule.id}
+                              className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] p-4"
+                            >
+                              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                                <label className="flex flex-col gap-1 xl:col-span-2">
+                                  <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">슬롯 이름</span>
+                                  <input
+                                    value={roleRule.label}
+                                    onChange={(event) =>
+                                      updateWizardRoleCoverageRule(roleRule.id, 'label', event.target.value)
+                                    }
+                                    className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                    data-testid={`roster-wizard-rule-role-slot-label-${index + 1}`}
+                                  />
+                                </label>
+                                <label className="flex flex-col gap-1 xl:col-span-3">
+                                  <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">키워드</span>
+                                  <input
+                                    value={serializeCoverageRoleTags(roleRule.keywords)}
+                                    onChange={(event) =>
+                                      updateWizardRoleCoverageRule(roleRule.id, 'keywords', event.target.value)
+                                    }
+                                    className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                    data-testid={`roster-wizard-rule-role-slot-keywords-${index + 1}`}
+                                  />
+                                </label>
+                                <label className="flex flex-col gap-1">
+                                  <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">DAY</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={20}
+                                    value={roleRule.minDayStaff}
+                                    onChange={(event) =>
+                                      updateWizardRoleCoverageRule(roleRule.id, 'minDayStaff', event.target.value)
+                                    }
+                                    className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                    data-testid={`roster-wizard-rule-role-slot-day-${index + 1}`}
+                                  />
+                                </label>
+                                <label className="flex flex-col gap-1">
+                                  <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">EVENING</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={20}
+                                    value={roleRule.minEveningStaff}
+                                    onChange={(event) =>
+                                      updateWizardRoleCoverageRule(roleRule.id, 'minEveningStaff', event.target.value)
+                                    }
+                                    className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                  />
+                                </label>
+                                <label className="flex flex-col gap-1">
+                                  <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">NIGHT</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={20}
+                                    value={roleRule.minNightStaff}
+                                    onChange={(event) =>
+                                      updateWizardRoleCoverageRule(roleRule.id, 'minNightStaff', event.target.value)
+                                    }
+                                    className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                    data-testid={`roster-wizard-rule-role-slot-night-${index + 1}`}
+                                  />
+                                </label>
+                              </div>
+                              <div className="mt-3 flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => removeWizardRoleCoverageRule(roleRule.id)}
+                                  className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-bold text-red-700"
+                                >
+                                  슬롯 삭제
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+    
+                    <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)] p-4">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-[var(--foreground)]">저장한 규칙 선택</p>
+                          <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
+                            마법사 밖에서 직접 만든 규칙만 여기에 표시됩니다.
+                          </p>
+                        </div>
+                        <div className="w-full lg:max-w-xl">
+                          <select
+                            value={wizardSelectedPresetId}
+                            onChange={(event) => {
+                              const nextId = event.target.value;
+                              setWizardSelectedPresetId(nextId);
+                              if (!nextId) {
+                                resetWizardRuleSelection();
+                                return;
+                              }
+                              const preset = userWizardPresets.find((item) => item.id === nextId);
+                              if (preset) {
+                                applyWizardPreset(preset);
+                              }
+                            }}
+                            className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                            data-testid="roster-wizard-preset-select"
+                          >
+                            <option value="">규칙을 선택하세요</option>
+                            {userWizardPresets.map((preset) => (
+                              <option key={preset.id} value={preset.id}>
+                                {preset.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      {userWizardPresets.length === 0 ? (
+                        <div className="mt-4 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
+                          먼저 바깥의 `자동생성 규칙 만들기`에서 규칙을 저장하세요.
+                        </div>
+                      ) : wizardSelectedPresetId ? (
+                        <div className="mt-4 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4">
+                          <div className="flex flex-wrap gap-2">
+                            <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]">
+                              선택된 규칙
+                            </span>
+                            <span
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]"
+                              data-testid="roster-wizard-loaded-preset-name"
+                            >
+                              {selectedWizardPreset?.name || ''}
+                            </span>
+                            <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]">
+                              타입: {wizardPattern}
+                            </span>
+                            {orderedWizardShiftIds.map((shiftId, index) => (
+                              <span
+                                key={shiftId}
+                                className={`rounded-[var(--radius-md)] border px-3 py-1 text-[11px] font-semibold ${getShiftBadgeClass(getShiftNameById(shiftId, workShifts))}`}
+                              >
+                                {index + 1}차 · {getShiftNameById(shiftId, workShifts)}
+                              </span>
+                            ))}
+                          </div>
+    
+                          {wizardUsesCustomPattern && (
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              {effectiveWizardCustomPatternSequence.map((token, index) => {
+                                const tokenLabel = getPatternSequenceLabel(token, workShifts);
+                                return (
+                                  <span
+                                    key={`${token}-${index}`}
+                                    className={`rounded-[var(--radius-md)] border px-3 py-1 text-[11px] font-semibold ${token === OFF_SHIFT_TOKEN ? 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]' : getShiftBadgeClass(tokenLabel)}`}
+                                  >
+                                    {index + 1}. {tokenLabel}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
+    
+                          {wizardUsesWeeklyTemplate && (
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              {effectiveWizardWeeklyTemplateWeeks.map((week, index) => (
+                                <span
+                                  key={`${week.shiftId}-${index}`}
+                                  className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]"
+                                >
+                                  {getWeeklyTemplateWeekLabel(index)} · {getShiftNameById(week.shiftId, workShifts)} · {formatWeekdaySummary(week.activeWeekdays)}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="mt-4 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
+                          사용할 규칙을 선택하면 요약이 표시됩니다.
+                        </div>
+                      )}
+                    </div>
+    
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">생성 대상</p>
+                        <p className="mt-2 text-lg font-bold text-[var(--foreground)]">{wizardSelectedStaffIds.length}명</p>
+                        <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{rosterScopeLabel}</p>
+                      </div>
+                      <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">적용 방식</p>
+                        <p className="mt-2 text-lg font-bold text-[var(--foreground)]">
+                          {wizardPattern || '규칙 미선택'}
+                        </p>
+                        <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                          저장된 규칙을 그대로 불러와 생성합니다.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+    
+                {wizardStep === 4 && (
+                  <div className="space-y-4" data-testid="roster-wizard-step-4">
+                    <div>
+                      <h4 className="text-base font-bold text-[var(--foreground)]">직원별 예외 일정 설정</h4>
+                      <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
+                        필요한 직원만 특정 날짜를 OFF로 고정하고, 다음날 근무를 지정하세요. 선택하지 않으면 기본 패턴대로 생성됩니다.
+                      </p>
+                    </div>
+    
+                    <div className="rounded-[var(--radius-xl)] border border-amber-200 bg-amber-50/70 p-4">
+                      <div className="flex flex-wrap items-end gap-3">
+                        <label className="flex min-w-[180px] flex-1 flex-col gap-1">
+                          <span className="text-[11px] font-bold text-amber-800">희망 OFF 직원</span>
+                          <select
+                            value={preferredOffStaffId}
+                            onChange={(event) => setPreferredOffStaffId(event.target.value)}
+                            className="rounded-[var(--radius-md)] border border-amber-200 bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                            data-testid="roster-wizard-preferred-off-staff-select"
+                          >
+                            {wizardSelectedStaffs.map((staff) => (
+                              <option key={staff.id} value={String(staff.id)}>
+                                {staff.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="flex min-w-[180px] flex-1 flex-col gap-1">
+                          <span className="text-[11px] font-bold text-amber-800">희망 OFF 날짜</span>
+                          <select
+                            value={preferredOffDate}
+                            onChange={(event) => setPreferredOffDate(event.target.value)}
+                            className="rounded-[var(--radius-md)] border border-amber-200 bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                            data-testid="roster-wizard-preferred-off-date-select"
+                          >
+                            {monthDates.map((date) => (
+                              <option key={date} value={date}>
+                                {date}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={addPreferredOffDate}
+                          className="rounded-[var(--radius-md)] bg-amber-500 px-4 py-3 text-sm font-bold text-white"
+                          data-testid="roster-wizard-preferred-off-add"
+                        >
+                          희망 OFF 추가
+                        </button>
+                      </div>
+                    </div>
+    
+                    {wizardSelectedStaffs.length > 0 ? (
+                      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4">
+                        <div className="space-y-3">
+                          {wizardSelectedStaffs.map((staff) => {
+                            const staffId = String(staff.id);
+                            const nightRange = wizardNightRangeDrafts[staffId] || {
+                              minNightShiftCount: 0,
+                              maxNightShiftCount: 0,
+                            };
+                            const blockPreference =
+                              wizardBlockPreferenceDrafts[staffId] || 'balanced';
+                            const dedicatedBand = wizardDedicatedBandDrafts[staffId] || '';
+                            const coverageTags = wizardCoverageRoleDrafts[staffId] || [];
+                            const restrictions =
+                              wizardStaffRestrictionDrafts[staffId] || buildDefaultStaffRestrictionDraft();
+
+                            return (
+                              <div
+                                key={`wizard-personal-rule-${staffId}`}
+                                className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] p-4"
+                              >
+                                <div className="mb-3">
+                                  <p className="text-sm font-bold text-[var(--foreground)]">{staff.name}</p>
+                                  <p className="text-[11px] text-[var(--toss-gray-3)]">
+                                    {getDepartmentName(staff)} · {staff.position || '직원'}
+                                  </p>
+                                </div>
+                                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                                  <label className="flex flex-col gap-1">
+                                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">나이트 최소</span>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={31}
+                                      value={nightRange.minNightShiftCount}
+                                      onChange={(event) =>
+                                        updateWizardNightRangeDraft(
+                                          staffId,
+                                          'minNightShiftCount',
+                                          event.target.value
+                                        )
+                                      }
+                                      className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                      data-testid={`roster-wizard-night-min-${staffId}`}
+                                    />
+                                  </label>
+                                  <label className="flex flex-col gap-1">
+                                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">나이트 최대</span>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={31}
+                                      value={nightRange.maxNightShiftCount}
+                                      onChange={(event) =>
+                                        updateWizardNightRangeDraft(
+                                          staffId,
+                                          'maxNightShiftCount',
+                                          event.target.value
+                                        )
+                                      }
+                                      className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                      data-testid={`roster-wizard-night-max-${staffId}`}
+                                    />
+                                  </label>
+                                  <label className="flex flex-col gap-1">
+                                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">전담 밴드</span>
+                                    <select
+                                      value={dedicatedBand}
+                                      onChange={(event) =>
+                                        updateWizardDedicatedBandDraft(staffId, event.target.value)
+                                      }
+                                      className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                      data-testid={`roster-wizard-dedicated-band-${staffId}`}
+                                    >
+                                      <option value="">자동</option>
+                                      <option value="day">DAY 전담</option>
+                                      <option value="evening">EVENING 전담</option>
+                                      <option value="night">NIGHT 전담</option>
+                                    </select>
+                                  </label>
+                                  <label className="flex flex-col gap-1">
+                                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">역할 태그</span>
+                                    <input
+                                      value={serializeCoverageRoleTags(coverageTags)}
+                                      onChange={(event) =>
+                                        updateWizardCoverageRoleDraft(staffId, event.target.value)
+                                      }
+                                      className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                      data-testid={`roster-wizard-role-tags-${staffId}`}
+                                    />
+                                  </label>
+                                </div>
+                                <div className="mt-3 space-y-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-3">
+                                  <div>
+                                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">금지 타임</p>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                      {(['day', 'evening', 'night'] as const).map((band) => {
+                                        const selected = restrictions.blockedShiftBands.includes(band);
+                                        return (
+                                          <button
+                                            key={`${staffId}-${band}`}
+                                            type="button"
+                                            onClick={() =>
+                                              updateWizardStaffRestrictionDraft(
+                                                staffId,
+                                                'blockedShiftBands',
+                                                selected
+                                                  ? restrictions.blockedShiftBands.filter((value) => value !== band)
+                                                  : [...restrictions.blockedShiftBands, band]
+                                              )
+                                            }
+                                            className={`rounded-[var(--radius-md)] border px-3 py-2 text-[11px] font-bold ${selected ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]'}`}
+                                            data-testid={`roster-wizard-blocked-band-${staffId}-${band}`}
+                                          >
+                                            {band.toUpperCase()}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">금지 요일</p>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                      {WEEKDAY_PICKER_ORDER.map((weekday) => {
+                                        const selected = restrictions.blockedWeekdays.includes(weekday);
+                                        return (
+                                          <button
+                                            key={`${staffId}-weekday-${weekday}`}
+                                            type="button"
+                                            onClick={() =>
+                                              updateWizardStaffRestrictionDraft(
+                                                staffId,
+                                                'blockedWeekdays',
+                                                selected
+                                                  ? restrictions.blockedWeekdays.filter((value) => value !== weekday)
+                                                  : [...restrictions.blockedWeekdays, weekday]
+                                              )
+                                            }
+                                            className={`rounded-[var(--radius-md)] border px-3 py-2 text-[11px] font-bold ${selected ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]'}`}
+                                            data-testid={`roster-wizard-blocked-weekday-${staffId}-${weekday}`}
+                                          >
+                                            {WEEKDAY_LABELS[weekday]}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                  <div className="grid gap-3 md:grid-cols-2">
+                                    <label className="flex items-center justify-between rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2">
+                                      <span className="text-[11px] font-bold text-[var(--foreground)]">주말 근무 금지</span>
+                                      <input
+                                        type="checkbox"
+                                        checked={restrictions.avoidWeekendWork}
+                                        onChange={(event) =>
+                                          updateWizardStaffRestrictionDraft(
+                                            staffId,
+                                            'avoidWeekendWork',
+                                            event.target.checked
+                                          )
+                                        }
+                                        data-testid={`roster-wizard-avoid-weekend-${staffId}`}
+                                      />
+                                    </label>
+                                    <label className="flex items-center justify-between rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2">
+                                      <span className="text-[11px] font-bold text-[var(--foreground)]">공휴일 근무 금지</span>
+                                      <input
+                                        type="checkbox"
+                                        checked={restrictions.avoidHolidayWork}
+                                        onChange={(event) =>
+                                          updateWizardStaffRestrictionDraft(
+                                            staffId,
+                                            'avoidHolidayWork',
+                                            event.target.checked
+                                          )
+                                        }
+                                        data-testid={`roster-wizard-avoid-holiday-${staffId}`}
+                                      />
+                                    </label>
+                                  </div>
+                                  <div className="grid gap-3 md:grid-cols-2">
+                                    <label className="flex items-center justify-between rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2">
+                                      <span className="text-[11px] font-bold text-[var(--foreground)]">주말 OFF 선호</span>
+                                      <input
+                                        type="checkbox"
+                                        checked={restrictions.preferWeekendOff}
+                                        onChange={(event) =>
+                                          updateWizardStaffRestrictionDraft(
+                                            staffId,
+                                            'preferWeekendOff',
+                                            event.target.checked
+                                          )
+                                        }
+                                        data-testid={`roster-wizard-prefer-weekend-off-${staffId}`}
+                                      />
+                                    </label>
+                                    <label className="flex items-center justify-between rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2">
+                                      <span className="text-[11px] font-bold text-[var(--foreground)]">공휴일 OFF 선호</span>
+                                      <input
+                                        type="checkbox"
+                                        checked={restrictions.preferHolidayOff}
+                                        onChange={(event) =>
+                                          updateWizardStaffRestrictionDraft(
+                                            staffId,
+                                            'preferHolidayOff',
+                                            event.target.checked
+                                          )
+                                        }
+                                        data-testid={`roster-wizard-prefer-holiday-off-${staffId}`}
+                                      />
+                                    </label>
+                                    <label className="flex items-center justify-between rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2">
+                                      <span className="text-[11px] font-bold text-[var(--foreground)]">연속 EVENING 회피</span>
+                                      <input
+                                        type="checkbox"
+                                        checked={restrictions.avoidConsecutiveEvening}
+                                        onChange={(event) =>
+                                          updateWizardStaffRestrictionDraft(
+                                            staffId,
+                                            'avoidConsecutiveEvening',
+                                            event.target.checked
+                                          )
+                                        }
+                                        data-testid={`roster-wizard-avoid-consecutive-evening-${staffId}`}
+                                      />
+                                    </label>
+                                    <label className="flex items-center justify-between rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2">
+                                      <span className="text-[11px] font-bold text-[var(--foreground)]">월초 NIGHT 선호</span>
+                                      <input
+                                        type="checkbox"
+                                        checked={restrictions.preferEarlyMonthNight}
+                                        onChange={(event) =>
+                                          updateWizardStaffRestrictionDraft(
+                                            staffId,
+                                            'preferEarlyMonthNight',
+                                            event.target.checked
+                                          )
+                                        }
+                                        data-testid={`roster-wizard-prefer-early-night-${staffId}`}
+                                      />
+                                    </label>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+                    {wizardSelectedStaffs.length > 1 ? (
+                      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-bold text-[var(--foreground)]">직원 페어 규칙</p>
+                            <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
+                              같이 근무시키거나, 분리할 조합을 나이트 또는 같은 타임 기준으로 지정합니다.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={addWizardPairRule}
+                            className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-[11px] font-bold text-[var(--foreground)]"
+                            data-testid="roster-wizard-pair-rule-add"
+                          >
+                            페어 추가
+                          </button>
+                        </div>
+                        <div className="mt-3 space-y-3">
+                          {wizardPairRules.length === 0 ? (
+                            <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-[12px] font-semibold text-[var(--toss-gray-3)]">
+                              아직 추가한 페어 규칙이 없습니다.
+                            </div>
+                          ) : (
+                            wizardPairRules.map((pairRule, index) => (
+                              <div
+                                key={pairRule.id}
+                                className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_140px_140px_auto]"
+                              >
+                                <select
+                                  value={pairRule.primaryStaffId}
+                                  onChange={(event) =>
+                                    updateWizardPairRule(pairRule.id, 'primaryStaffId', event.target.value)
+                                  }
+                                  className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                  data-testid={`roster-wizard-pair-primary-${index + 1}`}
+                                >
+                                  {wizardSelectedStaffs.map((staff) => (
+                                    <option key={staff.id} value={String(staff.id)}>
+                                      {staff.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <select
+                                  value={pairRule.secondaryStaffId}
+                                  onChange={(event) =>
+                                    updateWizardPairRule(pairRule.id, 'secondaryStaffId', event.target.value)
+                                  }
+                                  className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                  data-testid={`roster-wizard-pair-secondary-${index + 1}`}
+                                >
+                                  {wizardSelectedStaffs.map((staff) => (
+                                    <option key={staff.id} value={String(staff.id)}>
+                                      {staff.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <select
+                                  value={pairRule.mode}
+                                  onChange={(event) =>
+                                    updateWizardPairRule(pairRule.id, 'mode', event.target.value)
+                                  }
+                                  className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                  data-testid={`roster-wizard-pair-mode-${index + 1}`}
+                                >
+                                  <option value="together">같이</option>
+                                  <option value="separate">분리</option>
+                                </select>
+                                <select
+                                  value={pairRule.band}
+                                  onChange={(event) =>
+                                    updateWizardPairRule(pairRule.id, 'band', event.target.value)
+                                  }
+                                  className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                  data-testid={`roster-wizard-pair-band-${index + 1}`}
+                                >
+                                  <option value="night">NIGHT 기준</option>
+                                  <option value="work">같은 타임 기준</option>
+                                </select>
+                                <div className="flex items-center justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => removeWizardPairRule(pairRule.id)}
+                                    className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-bold text-red-700"
+                                    data-testid={`roster-wizard-pair-remove-${index + 1}`}
+                                  >
+                                    삭제
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {wizardSelectedStaffs.length === 0 ? (
+                      <div className="rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
+                        먼저 직원을 한 명 이상 선택하세요.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                        {wizardSelectedStaffs.map((staff, index) => {
+                          const staffId = String(staff.id);
+                          const override = wizardOffOverrides[staffId] || {
+                            enabled: false,
+                            offDate: wizardOverrideDateOptions[index] || wizardOverrideDateOptions[0] || '',
+                            nextShiftId: wizardOverrideShiftOptions[0]?.id || '',
+                          };
+                          const offDateIndex = monthDates.indexOf(override.offDate);
+                          const nextDate = offDateIndex >= 0 ? monthDates[offDateIndex + 1] || '' : '';
+    
+                          return (
+                            <div
+                              key={staffId}
+                              className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm"
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div>
+                                  <p className="text-base font-bold text-[var(--foreground)]">{staff.name}</p>
+                                  <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
+                                    {getDepartmentName(staff)} · {staff.position || '직원'}
+                                  </p>
+                                </div>
+                                <label className="inline-flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-[11px] font-bold text-[var(--foreground)]">
+                                  <input
+                                    type="checkbox"
+                                    checked={override.enabled}
+                                    onChange={(event) =>
+                                      updateWizardOffOverride(staffId, { enabled: event.target.checked })
+                                    }
+                                    data-testid={`roster-wizard-off-toggle-${staffId}`}
+                                  />
+                                  OFF 예외 사용
+                                </label>
+                              </div>
+    
+                              {override.enabled ? (
+                                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                                  <label className="flex flex-col gap-1">
+                                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">OFF 날짜</span>
+                                    <select
+                                      value={override.offDate}
+                                      onChange={(event) =>
+                                        updateWizardOffOverride(staffId, { offDate: event.target.value })
+                                      }
+                                      className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                      data-testid={`roster-wizard-off-date-${staffId}`}
+                                    >
+                                      {wizardOverrideDateOptions.map((date) => (
+                                        <option key={date} value={date}>
+                                          {date} ({WEEKDAY_LABELS[new Date(`${date}T00:00:00`).getDay()]})
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  <label className="flex flex-col gap-1">
+                                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">OFF 다음날 근무</span>
+                                    <select
+                                      value={override.nextShiftId}
+                                      onChange={(event) =>
+                                        updateWizardOffOverride(staffId, { nextShiftId: event.target.value })
+                                      }
+                                      className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                      data-testid={`roster-wizard-post-off-shift-${staffId}`}
+                                    >
+                                      {wizardOverrideShiftOptions.map((shift) => (
+                                        <option key={shift.id} value={shift.id}>
+                                          {shift.name} · {getShiftCode(shift.name)}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  <div className="rounded-[var(--radius-lg)] bg-[var(--muted)] px-4 py-3 text-[12px] font-semibold text-[var(--foreground)] md:col-span-2">
+                                    {override.offDate || '날짜 미선택'} OFF
+                                    {nextDate
+                                      ? ` → ${nextDate} ${getShiftNameById(override.nextShiftId, workShifts)}`
+                                      : ' → 다음날 없음'}
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="mt-4 text-[12px] text-[var(--toss-gray-3)]">
+                                  기본 패턴 그대로 생성됩니다.
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+    
+              <div className="border-t border-[var(--border)] px-4 py-4">
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+                  <button
+                    type="button"
+                    onClick={closeWizard}
+                    className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-bold text-[var(--foreground)]"
+                  >
+                    닫기
+                  </button>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {wizardStep > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setWizardStep((prev) => (prev - 1) as WizardStep)}
+                        className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-bold text-[var(--foreground)]"
+                        data-testid="roster-wizard-back"
+                      >
+                        이전
+                      </button>
+                    )}
+                    {wizardStep < 4 ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (wizardStep === 1 && (!selectedCompany || !selectedDepartment)) {
+                            toast('사업체와 팀을 먼저 선택하세요.', 'warning');
+                            return;
+                          }
+                          if (wizardStep === 2 && wizardSelectedStaffIds.length === 0) {
+                            toast('직원을 한 명 이상 선택하세요.', 'warning');
+                            return;
+                          }
+                          if (
+                            !wizardUsesCustomPattern &&
+                            !wizardUsesWeeklyTemplate &&
+                            wizardStep === 3 &&
+                            orderedWizardShiftIds.length < wizardRequiredShiftCount
+                          ) {
+                            toast(`${wizardPattern} 패턴에 필요한 근무유형 ${wizardRequiredShiftCount}개를 선택하세요.`, 'warning');
+                            return;
+                          }
+                          if (wizardUsesCustomPattern && wizardStep === 3 && orderedWizardShiftIds.length === 0) {
+                            toast('커스텀 패턴에 사용할 근무유형을 1개 이상 선택하세요.', 'warning');
+                            return;
+                          }
+                          if (wizardUsesWeeklyTemplate && wizardStep === 3 && orderedWizardShiftIds.length === 0) {
+                            toast('주차 템플릿에 사용할 근무유형을 1개 이상 선택하세요.', 'warning');
+                            return;
+                          }
+                          if (
+                            wizardUsesCustomPattern &&
+                            wizardStep === 3 &&
+                            (effectiveWizardCustomPatternSequence.length === 0 ||
+                              !effectiveWizardCustomPatternSequence.some((token) => token !== OFF_SHIFT_TOKEN))
+                          ) {
+                            toast('커스텀 패턴 순서를 만들고, 실제 근무유형을 1개 이상 포함해 주세요.');
+                            return;
+                          }
+                          if (
+                            wizardUsesWeeklyTemplate &&
+                            wizardStep === 3 &&
+                            !effectiveWizardWeeklyTemplateWeeks.some(
+                              (week) => Boolean(week.shiftId) && week.activeWeekdays.length > 0
+                            )
+                          ) {
+                            toast('주차 템플릿에는 근무가 들어가는 요일을 최소 1일 이상 지정하세요.');
+                            return;
+                          }
+                          setWizardStep((prev) => (prev + 1) as WizardStep);
+                        }}
+                        className="rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white"
+                        data-testid="roster-wizard-next"
+                      >
+                        다음
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={applyWizard}
+                        className="rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white"
+                        data-testid="roster-wizard-apply"
+                      >
+                        근무표 생성
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+    );
+  };
+
   const saveAssignments = async () => {
     if (!canManageRosterAssignments) {
       toast('월간 근무표 저장은 관리자 전용입니다.', 'warning');
@@ -6069,7 +10550,11 @@ export default function AutoRosterPlanner({
     if (!selectedCompany) return toast('사업체를 먼저 선택하세요.', 'warning');
     if (!selectedDepartment) return toast('팀을 먼저 선택하세요.', 'warning');
     if (!enabledRows.length) return toast('저장할 대상 직원이 없습니다.', 'success');
-    if (!confirm(`${selectedMonth} ${selectedDepartment} 근무표를 저장하시겠습니까?\n기존 월간 편성은 덮어씁니다.`)) return;
+    if (saveBlockingWarnings.length > 0) {
+      toast('차단 경고가 남아 있어 저장할 수 없습니다. 경고 요약을 먼저 확인하세요.', 'warning');
+      return;
+    }
+    if (!confirm(`${selectedMonth} ${rosterScopeLabel} 근무표를 저장하시겠습니까?\n기존 월간 편성은 덮어씁니다.`)) return;
 
     setSaving(true);
     try {
@@ -6107,11 +10592,11 @@ export default function AutoRosterPlanner({
 
       captureRosterSnapshot({
         source: 'saved',
-        label: `${selectedMonth} ${selectedDepartment} 저장본`,
+        label: `${selectedMonth} ${rosterScopeLabel} 저장본`,
         warningCount: rosterWarningReport.items.length,
       });
       onAssignmentsSaved?.();
-      toast(`${selectedDepartment} 팀 ${enabledRows.length}명의 ${selectedMonth} 근무표를 저장했습니다.`, 'success');
+      toast(`${rosterScopeLabel} 범위 ${enabledRows.length}명의 ${selectedMonth} 근무표를 저장했습니다.`, 'success');
     } catch (error: unknown) {
       console.error('근무표 저장 실패:', error);
       toast(`근무표 저장에 실패했습니다.\n${(error as Error)?.message || '알 수 없는 오류'}`, 'error');
@@ -6167,6 +10652,14 @@ export default function AutoRosterPlanner({
               </div>
               <button
                 type="button"
+                onClick={migrateLegacyGenerationRules}
+                className="rounded-[var(--radius-lg)] border border-[var(--accent)]/30 bg-[var(--toss-blue-light)] px-4 py-3 text-sm font-bold text-[var(--accent)]"
+                data-testid="generation-rule-migrate-legacy"
+              >
+                예전 병동 규칙 보정
+              </button>
+              <button
+                type="button"
                 onClick={resetGenerationRuleDraft}
                 className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-bold text-[var(--foreground)]"
                 data-testid="generation-rule-reset"
@@ -6195,6 +10688,26 @@ export default function AutoRosterPlanner({
                   className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
                   data-testid="generation-rule-team-keywords-input"
                 />
+              </label>
+              <label className="flex flex-col gap-2">
+                <span className="text-xs font-bold text-[var(--toss-gray-3)]">생성 성향</span>
+                <select
+                  value={generationRuleDraft.generationStyle}
+                  onChange={(event) =>
+                    updateGenerationRuleDraftField('generationStyle', event.target.value)
+                  }
+                  className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                  data-testid="generation-rule-style-select"
+                >
+                  {GENERATION_STYLE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[11px] text-[var(--toss-gray-3)]">
+                  {getGenerationStyleMeta(generationRuleDraft.generationStyle).detail}
+                </span>
               </label>
 
               <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3 md:col-span-2">
@@ -6243,6 +10756,36 @@ export default function AutoRosterPlanner({
                       }
                       className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
                       data-testid="generation-rule-min-night-staff"
+                    />
+                  </label>
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs font-bold text-[var(--toss-gray-3)]">N 선임 최소</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={20}
+                      value={generationRuleDraft.minSeniorNightStaff}
+                      onChange={(event) =>
+                        updateGenerationRuleDraftField('minSeniorNightStaff', event.target.value)
+                      }
+                      className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                      data-testid="generation-rule-min-senior-night-staff"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs font-bold text-[var(--toss-gray-3)]">N 전담 최소</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={20}
+                      value={generationRuleDraft.minDedicatedNightStaff}
+                      onChange={(event) =>
+                        updateGenerationRuleDraftField('minDedicatedNightStaff', event.target.value)
+                      }
+                      className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                      data-testid="generation-rule-min-dedicated-night-staff"
                     />
                   </label>
                 </div>
@@ -6370,6 +10913,36 @@ export default function AutoRosterPlanner({
                   }
                   className="h-5 w-5"
                   data-testid="generation-rule-separate-new-nurses"
+                />
+              </label>
+
+              <label className="flex items-center justify-between rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
+                <div>
+                  <p className="text-sm font-bold text-[var(--foreground)]">신규 간호사 단독 NIGHT 금지</p>
+                  <p className="mt-1 text-xs text-[var(--toss-gray-3)]">신규 간호사만 NIGHT에 남지 않도록 막습니다.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={generationRuleDraft.blockNewNurseSoloNight}
+                  onChange={(event) =>
+                    updateGenerationRuleDraftField('blockNewNurseSoloNight', event.target.checked)
+                  }
+                  className="h-5 w-5"
+                />
+              </label>
+
+              <label className="flex items-center justify-between rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
+                <div>
+                  <p className="text-sm font-bold text-[var(--foreground)]">신규 NIGHT 선임 동반</p>
+                  <p className="mt-1 text-xs text-[var(--toss-gray-3)]">신규 간호사가 NIGHT면 반드시 선임이 함께 배치됩니다.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={generationRuleDraft.requireSeniorWithNewNurseNight}
+                  onChange={(event) =>
+                    updateGenerationRuleDraftField('requireSeniorWithNewNurseNight', event.target.checked)
+                  }
+                  className="h-5 w-5"
                 />
               </label>
 
@@ -6940,6 +11513,36 @@ export default function AutoRosterPlanner({
               </select>
             </label>
 
+            {selectedDepartment ? (
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                <span className="shrink-0 text-[11px] font-bold text-[var(--toss-gray-3)]">추가 포함 팀</span>
+                {availableIncludedDepartments.length === 0 ? (
+                  <span className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                    선택 가능한 추가 팀 없음
+                  </span>
+                ) : (
+                  availableIncludedDepartments.map((department, index) => {
+                    const included = includedDepartments.includes(department);
+                    return (
+                      <button
+                        key={department}
+                        type="button"
+                        onClick={() => toggleIncludedDepartment(department)}
+                        className={`rounded-[var(--radius-md)] border px-3 py-2 text-[11px] font-bold transition-colors ${
+                          included
+                            ? 'border-[var(--accent)] bg-[var(--toss-blue-light)] text-[var(--accent)]'
+                            : 'border-[var(--border)] bg-[var(--card)] text-[var(--foreground)]'
+                        }`}
+                        data-testid={`roster-include-team-${index + 1}`}
+                      >
+                        {included ? '포함중' : '추가'} · {department}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            ) : null}
+
             <label className="flex w-full sm:w-auto shrink-0 items-center gap-2">
               <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">교대방식 패턴</span>
               <select
@@ -7016,6 +11619,28 @@ export default function AutoRosterPlanner({
                   />
                 </div>
               </label>
+              <button
+                type="button"
+                onClick={openWizard}
+                className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-bold text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                data-testid="roster-wizard-open"
+              >
+                근무표 생성 마법사
+              </button>
+              <button
+                type="button"
+                onClick={requestGeminiRecommendation}
+                disabled={
+                  geminiLoading ||
+                  loadingShifts ||
+                  workingShifts.length === 0 ||
+                  enabledTargetStaffs.length === 0
+                }
+                className="rounded-[var(--radius-lg)] border border-[var(--accent)] bg-[var(--toss-blue-light)] px-4 py-3 text-sm font-bold text-[var(--accent)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                data-testid="roster-gemini-recommend"
+              >
+                {geminiLoading ? 'Gemini 추천 중...' : 'Gemini 팀 추천'}
+              </button>
                 <button
                   type="button"
                   onClick={generatePatternDraft}
@@ -7040,6 +11665,8 @@ export default function AutoRosterPlanner({
               </button>
             </div>
           </div>
+
+          {renderRosterScopeSummary()}
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <div className="w-full rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)]/70 px-4 py-3 text-sm font-semibold text-[var(--foreground)]">
@@ -7103,6 +11730,65 @@ export default function AutoRosterPlanner({
             {matchingGenerationRules.length === 0 && companyGenerationRules.length === 0 ? (
               <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm font-semibold text-[var(--toss-gray-3)]">
                 규칙 탭에서 팀별 근무규칙을 먼저 저장할 수 있습니다.
+              </div>
+            ) : null}
+            <div
+              className="w-full rounded-[var(--radius-xl)] border border-emerald-200 bg-emerald-50/80 px-4 py-4"
+              data-testid="roster-active-generation-rule-summary"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                {activeGenerationRuleSummaryItems.map((item, index) => (
+                  <span
+                    key={`active-rule-summary-${index}`}
+                    className="rounded-[var(--radius-md)] border border-emerald-200 bg-[var(--card)] px-3 py-2 text-[11px] font-semibold text-[var(--foreground)]"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+            {rosterFeasibilityIssues.length > 0 ? (
+              <div
+                className="w-full rounded-[var(--radius-xl)] border border-amber-200 bg-amber-50/80 px-4 py-4"
+                data-testid="roster-feasibility-summary"
+              >
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm font-bold text-amber-800">생성 전 확인 필요</p>
+                  {rosterFeasibilityIssues.map((issue) => (
+                    <button
+                      key={issue.id}
+                      type="button"
+                      onClick={() => jumpToRosterWarningTarget(issue.targetTestId)}
+                      className={`rounded-[var(--radius-md)] border px-3 py-2 text-left text-[12px] font-semibold ${
+                        issue.severity === 'blocking'
+                          ? 'border-red-200 bg-red-50 text-red-700'
+                          : 'border-amber-200 bg-[var(--card)] text-amber-800'
+                      }`}
+                    >
+                      {issue.detail}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {saveBlockingWarnings.length > 0 ? (
+              <div
+                className="w-full rounded-[var(--radius-xl)] border border-red-200 bg-red-50/90 px-4 py-4"
+                data-testid="roster-blocking-warning-summary"
+              >
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm font-bold text-red-700">저장 전 차단 경고</p>
+                  {saveBlockingWarnings.map((warning) => (
+                    <button
+                      key={warning.id}
+                      type="button"
+                      onClick={() => jumpToRosterWarningTarget(warning.targetTestId)}
+                      className="rounded-[var(--radius-md)] border border-red-200 bg-[var(--card)] px-3 py-2 text-left text-[12px] font-semibold text-red-700"
+                    >
+                      {warning.detail}
+                    </button>
+                  ))}
+                </div>
               </div>
             ) : null}
             <div
@@ -7230,6 +11916,7 @@ export default function AutoRosterPlanner({
           </div>
         </div>
 
+        {renderRosterWizardModal()}
         {(geminiSummary || aiRecommendation?.teamAnalysis) && (
           <div
             className="rounded-[var(--radius-xl)] border border-[var(--accent)]/20 bg-[var(--toss-blue-light)]/60 p-4 shadow-sm"
@@ -7275,7 +11962,10 @@ export default function AutoRosterPlanner({
         )}
         {renderRosterWarningReport()}
         {renderRosterFairnessBoard()}
+        {renderRosterReviewPanel()}
         {renderRosterSnapshotPanel()}
+        {renderRosterPartialRegenerationPanel()}
+        {renderRosterManualImpactPanel()}
 
         <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -7401,7 +12091,7 @@ export default function AutoRosterPlanner({
                             type="button"
                             disabled={!manualEditMode}
                             onClick={() =>
-                              cycleManualAssignment({
+                              handleManualCellClick({
                                 staffId: String(row.staff.id),
                                 date: cell.date,
                                 currentShiftId: cell.shiftId,
@@ -7483,7 +12173,7 @@ export default function AutoRosterPlanner({
           </div>
           <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">팀</p>
-            <p className="mt-2 text-base font-bold text-[var(--foreground)]">{selectedDepartment || '-'}</p>
+            <p className="mt-2 text-base font-bold text-[var(--foreground)]">{rosterScopeLabel || '-'}</p>
           </div>
           <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">대상 인원</p>
@@ -7585,7 +12275,7 @@ export default function AutoRosterPlanner({
 
             <div className="mt-4 flex flex-wrap gap-2">
               <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]">
-                {selectedCompany || '사업체 미선택'} / {selectedDepartment || '팀 미선택'}
+                {selectedCompany || '사업체 미선택'} / {rosterScopeLabel || '팀 미선택'}
               </span>
               <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]">
                 규칙 타입: {effectivePlannerPattern}
@@ -8143,7 +12833,7 @@ export default function AutoRosterPlanner({
                         <button
                           type="button"
                           disabled={!manualEditMode}
-                          onClick={() => cycleManualAssignment({
+                          onClick={() => handleManualCellClick({
                             staffId: String(row.staff.id),
                             date: cell.date,
                             currentShiftId: cell.shiftId,
@@ -8165,557 +12855,7 @@ export default function AutoRosterPlanner({
       </div>
       </div>
 
-      {wizardOpen && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/45 px-4 py-4">
-          <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
-            <div className="border-b border-[var(--border)] bg-[var(--page-bg)] px-4 py-5">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h3 className="text-2xl font-black tracking-[-0.03em] text-[var(--foreground)]">
-                    <span className="bg-gradient-to-r from-[var(--accent)] to-fuchsia-500 bg-clip-text text-transparent">
-                      RUN SHIFT
-                    </span>{' '}
-                    마법사
-                  </h3>
-                  <p className="mt-1 text-sm text-[var(--toss-gray-3)]">
-                    팀을 카드로 선택하고, 직원을 고른 뒤, 근무유형을 체크해서 월간 근무표를 바로 생성합니다.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { step: 1 as WizardStep, label: '팀 선택' },
-                    { step: 2 as WizardStep, label: '직원 선택' },
-                    { step: 3 as WizardStep, label: '패턴 · 근무유형' },
-                    { step: 4 as WizardStep, label: '예외 일정' },
-                  ].map(({ step, label }) => (
-                    <div
-                      key={step}
-                      className={`rounded-[var(--radius-md)] px-4 py-2 text-sm font-semibold ${wizardStep === step ? 'bg-[var(--accent)] text-white' : wizardStep > step ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]' : 'bg-[var(--muted)] text-[var(--toss-gray-3)]'}`}
-                    >
-                      {step}. {label}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-              {wizardStep === 1 && (
-                <div className="space-y-4">
-                  <div className="grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)]">
-                    <div className="space-y-4">
-                      <label className="flex flex-col gap-0">
-                        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2">
-                          <SmartMonthPicker
-                            value={selectedMonth}
-                            onChange={(value) => setSelectedMonth(value)}
-                            className="w-[150px]"
-                            inputClassName="text-sm font-semibold text-[var(--foreground)]"
-                          />
-                        </div>
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">사업체</span>
-                        <select
-                          value={selectedCompany}
-                          onChange={(e) => setSelectedCompany(e.target.value)}
-                          disabled={!isAdmin || companyLockedByHrFilter}
-                          className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--input-bg)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none disabled:cursor-not-allowed disabled:bg-[var(--tab-bg)]"
-                        >
-                          {companyOptions.map((company) => (
-                            <option key={company} value={company}>
-                              {company}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--muted)] px-5 py-4">
-                        <p className="text-sm font-bold text-[var(--foreground)]">어떤 팀의 근무표를 만들까요?</p>
-                        <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
-                          병동처럼 3교대 팀은 이후 단계에서 데이 / 이브닝 / 나이트를 체크해서 D / E / N / OFF 형태로 만들 수 있습니다.
-                        </p>
-                      </div>
-
-                      {teamOptions.length === 0 ? (
-                        <div className="rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
-                          No teams are registered for the selected company.
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                          {teamOptions.map((department) => {
-                            const teamStaffCount = activeStaffs.filter(
-                              (staff) =>
-                                staff.company === selectedCompany && getDepartmentName(staff) === department
-                            ).length;
-                            const selected = selectedDepartment === department;
-                            return (
-                              <button
-                                key={department}
-                                type="button"
-                                onClick={() => setSelectedDepartment(department)}
-                                className={`rounded-[var(--radius-xl)] border px-7 py-4 text-left transition-all ${selected ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/70 shadow-[0_18px_40px_rgba(37,99,235,0.12)] ring-1 ring-[var(--accent)]/20' : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]/40 hover:shadow-[0_16px_32px_rgba(15,23,42,0.08)]'}`}
-                              >
-                                <div className="flex items-start justify-between gap-4">
-                                  <div className={`flex h-12 w-12 items-center justify-center rounded-[var(--radius-lg)] text-xl ${selected ? 'bg-[var(--card)] text-[var(--accent)]' : 'bg-[var(--muted)] text-[var(--accent)]'}`}>
-                                    W
-                                  </div>
-                                  {selected && (
-                                    <span className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1 text-[10px] font-bold text-white">
-                                      Selected
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="mt-4 text-xl font-bold tracking-[-0.02em] text-[var(--foreground)]">{department}</p>
-                                <p className="mt-3 text-sm text-[var(--toss-gray-3)]">
-                                  {selectedCompany || 'Company'} - Staff {teamStaffCount}
-                                </p>
-                                <p className="mt-3 text-[12px] leading-5 text-[var(--toss-gray-3)]">
-                                  {workingShifts.length >= 3 ? 'Ideal for 3-shift or night-dedicated teams.' : 'Create a monthly roster from registered shift types.'}
-                                </p>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {wizardStep === 2 && (
-                <div className="space-y-5">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h4 className="text-base font-bold text-[var(--foreground)]">{selectedDepartment} staff selection</h4>
-                      <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">Exclude specific team members from this auto-generation run.</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <span
-                          className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]"
-                          data-testid="roster-wizard-included-count"
-                        >
-                          Included {wizardSelectedStaffIds.length}
-                        </span>
-                        <span
-                          className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-bold text-[var(--foreground)]"
-                          data-testid="roster-wizard-excluded-count"
-                        >
-                          Excluded {wizardExcludedStaffs.length}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={includeAllWizardStaff}
-                        className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-bold text-[var(--foreground)]"
-                        data-testid="roster-wizard-include-all"
-                      >
-                        Include all
-                      </button>
-                      <button
-                        type="button"
-                        onClick={clearWizardStaffSelection}
-                        className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)]"
-                        data-testid="roster-wizard-exclude-all"
-                      >
-                        Exclude all
-                      </button>
-                    </div>
-                  </div>
-
-                  {targetStaffs.length === 0 ? (
-                    <div className="rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
-                      No staff found in this team.
-                    </div>
-                  ) : (
-                    <>
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                        {targetStaffs.map((staff) => {
-                          const staffId = String(staff.id);
-                          const selected = wizardSelectedStaffIds.includes(staffId);
-                          return (
-                            <div
-                              key={staff.id}
-                              className={`rounded-[var(--radius-xl)] border p-4 text-left transition-all ${selected ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/70 ring-1 ring-[var(--accent)]/30' : 'border-[var(--border)] bg-[var(--muted)]/70'}`}
-                              data-testid={`roster-wizard-staff-card-${staffId}`}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="flex items-center gap-3">
-                                  <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] bg-[var(--tab-bg)] text-sm font-bold text-[var(--accent)]">
-                                    {String(staff.name || '?').slice(0, 1)}
-                                  </div>
-                                  <div>
-                                    <p className="text-sm font-bold text-[var(--foreground)]">{staff.name}</p>
-                                    <p className="text-[11px] text-[var(--toss-gray-3)]">
-                                      {getDepartmentName(staff)} - {staff.position || 'Staff'}
-                                    </p>
-                                  </div>
-                                </div>
-                                <span
-                                  className={`rounded-[var(--radius-md)] px-3 py-1 text-[10px] font-bold ${selected ? 'bg-[var(--card)] text-[var(--accent)]' : 'bg-[var(--toss-gray-2)] text-[var(--toss-gray-3)]'}`}
-                                >
-                                  {selected ? 'Included' : 'Excluded'}
-                                </span>
-                              </div>
-                              <div className="mt-4 flex flex-wrap gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => toggleWizardStaff(staffId)}
-                                  className={`rounded-[var(--radius-md)] px-3 py-2 text-[11px] font-bold transition-colors ${selected ? 'bg-rose-50 text-rose-600' : 'bg-[var(--accent)] text-white'}`}
-                                  data-testid={`roster-wizard-toggle-${staffId}`}
-                                >
-                                  {selected ? 'Exclude from this run' : 'Include again'}
-                                </button>
-                              </div>
-                              {!selected && (
-                                <p className="mt-3 text-[11px] text-[var(--toss-gray-3)]">Skipped in this run.</p>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {wizardExcludedStaffs.length > 0 && (
-                        <div
-                          className="rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm font-semibold text-[var(--foreground)]"
-                          data-testid="roster-wizard-excluded-summary"
-                        >
-                          Excluded: {wizardExcludedStaffs.map((staff) => staff.name).join(', ')}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-
-              {wizardStep === 3 && (
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="text-base font-bold text-[var(--foreground)]">자동생성 규칙 불러오기</h4>
-                    <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
-                      바깥에서 저장한 규칙을 불러와서 이번 근무표 생성 기준으로 사용합니다.
-                    </p>
-                  </div>
-
-                  <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)] p-4">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div>
-                        <p className="text-sm font-bold text-[var(--foreground)]">저장한 규칙 선택</p>
-                        <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
-                          마법사 밖에서 직접 만든 규칙만 여기에 표시됩니다.
-                        </p>
-                      </div>
-                      <div className="w-full lg:max-w-xl">
-                        <select
-                          value={wizardSelectedPresetId}
-                          onChange={(event) => {
-                            const nextId = event.target.value;
-                            setWizardSelectedPresetId(nextId);
-                            if (!nextId) {
-                              resetWizardRuleSelection();
-                              return;
-                            }
-                            const preset = userWizardPresets.find((item) => item.id === nextId);
-                            if (preset) {
-                              applyWizardPreset(preset);
-                            }
-                          }}
-                          className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
-                          data-testid="roster-wizard-preset-select"
-                        >
-                          <option value="">규칙을 선택하세요</option>
-                          {userWizardPresets.map((preset) => (
-                            <option key={preset.id} value={preset.id}>
-                              {preset.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    {userWizardPresets.length === 0 ? (
-                      <div className="mt-4 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
-                        먼저 바깥의 `자동생성 규칙 만들기`에서 규칙을 저장하세요.
-                      </div>
-                    ) : wizardSelectedPresetId ? (
-                      <div className="mt-4 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4">
-                        <div className="flex flex-wrap gap-2">
-                          <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]">
-                            선택된 규칙
-                          </span>
-                          <span
-                            className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]"
-                            data-testid="roster-wizard-loaded-preset-name"
-                          >
-                            {selectedWizardPreset?.name || ''}
-                          </span>
-                          <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]">
-                            타입: {wizardPattern}
-                          </span>
-                          {orderedWizardShiftIds.map((shiftId, index) => (
-                            <span
-                              key={shiftId}
-                              className={`rounded-[var(--radius-md)] border px-3 py-1 text-[11px] font-semibold ${getShiftBadgeClass(getShiftNameById(shiftId, workShifts))}`}
-                            >
-                              {index + 1}차 · {getShiftNameById(shiftId, workShifts)}
-                            </span>
-                          ))}
-                        </div>
-
-                        {wizardUsesCustomPattern && (
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            {effectiveWizardCustomPatternSequence.map((token, index) => {
-                              const tokenLabel = getPatternSequenceLabel(token, workShifts);
-                              return (
-                                <span
-                                  key={`${token}-${index}`}
-                                  className={`rounded-[var(--radius-md)] border px-3 py-1 text-[11px] font-semibold ${token === OFF_SHIFT_TOKEN ? 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]' : getShiftBadgeClass(tokenLabel)}`}
-                                >
-                                  {index + 1}. {tokenLabel}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {wizardUsesWeeklyTemplate && (
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            {effectiveWizardWeeklyTemplateWeeks.map((week, index) => (
-                              <span
-                                key={`${week.shiftId}-${index}`}
-                                className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]"
-                              >
-                                {getWeeklyTemplateWeekLabel(index)} · {getShiftNameById(week.shiftId, workShifts)} · {formatWeekdaySummary(week.activeWeekdays)}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="mt-4 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
-                        사용할 규칙을 선택하면 요약이 표시됩니다.
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">생성 대상</p>
-                      <p className="mt-2 text-lg font-bold text-[var(--foreground)]">{wizardSelectedStaffIds.length}명</p>
-                      <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{selectedDepartment}</p>
-                    </div>
-                    <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">적용 방식</p>
-                      <p className="mt-2 text-lg font-bold text-[var(--foreground)]">
-                        {wizardPattern || '규칙 미선택'}
-                      </p>
-                      <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
-                        저장된 규칙을 그대로 불러와 생성합니다.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {wizardStep === 4 && (
-                <div className="space-y-4" data-testid="roster-wizard-step-4">
-                  <div>
-                    <h4 className="text-base font-bold text-[var(--foreground)]">직원별 예외 일정 설정</h4>
-                    <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
-                      필요한 직원만 특정 날짜를 OFF로 고정하고, 다음날 근무를 지정하세요. 선택하지 않으면 기본 패턴대로 생성됩니다.
-                    </p>
-                  </div>
-
-                  {wizardSelectedStaffs.length === 0 ? (
-                    <div className="rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
-                      먼저 직원을 한 명 이상 선택하세요.
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                      {wizardSelectedStaffs.map((staff, index) => {
-                        const staffId = String(staff.id);
-                        const override = wizardOffOverrides[staffId] || {
-                          enabled: false,
-                          offDate: wizardOverrideDateOptions[index] || wizardOverrideDateOptions[0] || '',
-                          nextShiftId: wizardOverrideShiftOptions[0]?.id || '',
-                        };
-                        const offDateIndex = monthDates.indexOf(override.offDate);
-                        const nextDate = offDateIndex >= 0 ? monthDates[offDateIndex + 1] || '' : '';
-
-                        return (
-                          <div
-                            key={staffId}
-                            className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm"
-                          >
-                            <div className="flex items-start justify-between gap-4">
-                              <div>
-                                <p className="text-base font-bold text-[var(--foreground)]">{staff.name}</p>
-                                <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
-                                  {getDepartmentName(staff)} · {staff.position || '직원'}
-                                </p>
-                              </div>
-                              <label className="inline-flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-[11px] font-bold text-[var(--foreground)]">
-                                <input
-                                  type="checkbox"
-                                  checked={override.enabled}
-                                  onChange={(event) =>
-                                    updateWizardOffOverride(staffId, { enabled: event.target.checked })
-                                  }
-                                  data-testid={`roster-wizard-off-toggle-${staffId}`}
-                                />
-                                OFF 예외 사용
-                              </label>
-                            </div>
-
-                            {override.enabled ? (
-                              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                                <label className="flex flex-col gap-1">
-                                  <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">OFF 날짜</span>
-                                  <select
-                                    value={override.offDate}
-                                    onChange={(event) =>
-                                      updateWizardOffOverride(staffId, { offDate: event.target.value })
-                                    }
-                                    className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
-                                    data-testid={`roster-wizard-off-date-${staffId}`}
-                                  >
-                                    {wizardOverrideDateOptions.map((date) => (
-                                      <option key={date} value={date}>
-                                        {date} ({WEEKDAY_LABELS[new Date(`${date}T00:00:00`).getDay()]})
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-                                <label className="flex flex-col gap-1">
-                                  <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">OFF 다음날 근무</span>
-                                  <select
-                                    value={override.nextShiftId}
-                                    onChange={(event) =>
-                                      updateWizardOffOverride(staffId, { nextShiftId: event.target.value })
-                                    }
-                                    className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
-                                    data-testid={`roster-wizard-post-off-shift-${staffId}`}
-                                  >
-                                    {wizardOverrideShiftOptions.map((shift) => (
-                                      <option key={shift.id} value={shift.id}>
-                                        {shift.name} · {getShiftCode(shift.name)}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-                                <div className="rounded-[var(--radius-lg)] bg-[var(--muted)] px-4 py-3 text-[12px] font-semibold text-[var(--foreground)] md:col-span-2">
-                                  {override.offDate || '날짜 미선택'} OFF
-                                  {nextDate
-                                    ? ` → ${nextDate} ${getShiftNameById(override.nextShiftId, workShifts)}`
-                                    : ' → 다음날 없음'}
-                                </div>
-                              </div>
-                            ) : (
-                              <p className="mt-4 text-[12px] text-[var(--toss-gray-3)]">
-                                기본 패턴 그대로 생성됩니다.
-                              </p>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="border-t border-[var(--border)] px-4 py-4">
-              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
-                <button
-                  type="button"
-                  onClick={closeWizard}
-                  className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-bold text-[var(--foreground)]"
-                >
-                  닫기
-                </button>
-                <div className="flex flex-wrap justify-end gap-2">
-                  {wizardStep > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => setWizardStep((prev) => (prev - 1) as WizardStep)}
-                      className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-bold text-[var(--foreground)]"
-                      data-testid="roster-wizard-back"
-                    >
-                      이전
-                    </button>
-                  )}
-                  {wizardStep < 4 ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (wizardStep === 1 && (!selectedCompany || !selectedDepartment)) {
-                          toast('사업체와 팀을 먼저 선택하세요.', 'warning');
-                          return;
-                        }
-                        if (wizardStep === 2 && wizardSelectedStaffIds.length === 0) {
-                          toast('직원을 한 명 이상 선택하세요.', 'warning');
-                          return;
-                        }
-                        if (
-                          !wizardUsesCustomPattern &&
-                          !wizardUsesWeeklyTemplate &&
-                          wizardStep === 3 &&
-                          orderedWizardShiftIds.length < wizardRequiredShiftCount
-                        ) {
-                          toast(`${wizardPattern} 패턴에 필요한 근무유형 ${wizardRequiredShiftCount}개를 선택하세요.`, 'warning');
-                          return;
-                        }
-                        if (wizardUsesCustomPattern && wizardStep === 3 && orderedWizardShiftIds.length === 0) {
-                          toast('커스텀 패턴에 사용할 근무유형을 1개 이상 선택하세요.', 'warning');
-                          return;
-                        }
-                        if (wizardUsesWeeklyTemplate && wizardStep === 3 && orderedWizardShiftIds.length === 0) {
-                          toast('주차 템플릿에 사용할 근무유형을 1개 이상 선택하세요.', 'warning');
-                          return;
-                        }
-                        if (
-                          wizardUsesCustomPattern &&
-                          wizardStep === 3 &&
-                          (effectiveWizardCustomPatternSequence.length === 0 ||
-                            !effectiveWizardCustomPatternSequence.some((token) => token !== OFF_SHIFT_TOKEN))
-                        ) {
-                          toast('커스텀 패턴 순서를 만들고, 실제 근무유형을 1개 이상 포함해 주세요.');
-                          return;
-                        }
-                        if (
-                          wizardUsesWeeklyTemplate &&
-                          wizardStep === 3 &&
-                          !effectiveWizardWeeklyTemplateWeeks.some(
-                            (week) => Boolean(week.shiftId) && week.activeWeekdays.length > 0
-                          )
-                        ) {
-                          toast('주차 템플릿에는 근무가 들어가는 요일을 최소 1일 이상 지정하세요.');
-                          return;
-                        }
-                        setWizardStep((prev) => (prev + 1) as WizardStep);
-                      }}
-                      className="rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white"
-                      data-testid="roster-wizard-next"
-                    >
-                      다음
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={applyWizard}
-                      className="rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white"
-                      data-testid="roster-wizard-apply"
-                    >
-                      근무표 생성
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {renderRosterWizardModal()}
     </>
   );
 }

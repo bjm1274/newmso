@@ -221,6 +221,7 @@ export interface ChatMessage {
   album_id?: string | null;
   album_index?: number | null;
   album_total?: number | null;
+  edited_at?: string | null;
   type?: string | null;
   created_at?: string | null;
   read_by?: string[] | null;

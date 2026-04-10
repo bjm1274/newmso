@@ -498,18 +498,33 @@ test("chat retries a failed message send from the bubble", async ({ page }) => {
   await seedSession(page, { localStorage: { erp_chat_last_room: "room-1" } });
   await page.goto("/main");
   await page.getByTestId("sidebar-menu-chat").click();
+  await expect(page.getByTestId("chat-view")).toBeVisible();
+  await expect(page.getByText("채팅방을 선택하세요.")).toBeVisible();
+  await expect(page.getByTestId("chat-message-input")).toBeHidden();
+  await page.getByTestId("chat-room-room-1").click();
   await expect(page.getByTestId("chat-message-input")).toBeVisible();
   await page.getByTestId("chat-message-input").fill("retry smoke message");
   await page.getByTestId("chat-send-button").click();
-  await expect(page.getByRole("button", { name: "재전송" })).toBeVisible();
-  await page.getByRole("button", { name: "재전송" }).click();
+  await expect(page.getByTestId("chat-retry-queue-banner")).toBeVisible();
+
+  await page.reload();
+  await page.getByTestId("sidebar-menu-chat").click();
+  await page.getByTestId("chat-room-room-1").click();
+  await expect(page.getByTestId("chat-retry-queue-banner")).toBeVisible();
+  await expect(
+    page
+      .locator("span.break-words.whitespace-pre-wrap")
+      .filter({ hasText: "retry smoke message" }),
+  ).toBeVisible();
+
+  await page.getByTestId("chat-retry-all-failed").click();
   await expect(
     page
       .locator("span.break-words.whitespace-pre-wrap")
       .filter({ hasText: "retry smoke message" }),
   ).toBeVisible();
   await expect(page.getByText("전송 실패")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "재전송" })).toBeHidden();
+  await expect(page.getByTestId("chat-retry-queue-banner")).toBeHidden();
 });
 test("board view opens from the main menu routing state", async ({ page }) => {
   await mockSupabase(page, {

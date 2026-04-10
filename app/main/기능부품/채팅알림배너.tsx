@@ -30,11 +30,12 @@ const toBannerText = (value: unknown, fallback = '') => toNotificationText(value
 
 export default function ChatAlertBanner(props: {
   onOpenChat: (roomId: string) => void;
+  onOpenMessage?: (roomId: string, messageId: string) => void;
   onOpenApproval?: () => void;
   onOpenNotifications?: () => void;
   onOpenInventory?: () => void;
 }) {
-  const { onOpenChat } = props;
+  const { onOpenChat, onOpenMessage } = props;
   const [current, setCurrent] = useState<BannerItem | null>(null);
   const [progressKey, setProgressKey] = useState(0);
   const queueRef = useRef<BannerItem[]>([]);
@@ -128,7 +129,11 @@ export default function ChatAlertBanner(props: {
 
   const handleClick = () => {
     if (current.roomId) {
-      onOpenChat(current.roomId);
+      if (current.messageId && onOpenMessage) {
+        onOpenMessage(current.roomId, current.messageId);
+      } else {
+        onOpenChat(current.roomId);
+      }
     }
     dismiss();
   };

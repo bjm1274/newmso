@@ -6,6 +6,87 @@ test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
 });
 
+test("chat global search supports advanced operator filters for sender, attachment, and date", async ({ page }) => {
+  await mockSupabase(page, {
+    chatRooms: [
+      {
+        id: "00000000-0000-0000-0000-000000000000",
+        name: "Notice",
+        type: "notice",
+        members: [],
+        created_at: "2026-03-08T00:00:00.000Z",
+        last_message_at: "2026-03-08T00:00:00.000Z",
+      },
+      {
+        id: "room-advanced-search",
+        name: "Advanced Search Room",
+        type: "group",
+        members: [fakeUser.id, "peer-advanced-1"],
+        created_at: "2026-03-08T09:00:00.000Z",
+        last_message_at: "2026-03-10T11:30:00.000Z",
+        last_message_preview: "handoff.pdf",
+      },
+    ],
+    staffMembers: [
+      fakeUser,
+      {
+        ...fakeUser,
+        id: "peer-advanced-1",
+        name: "Advanced Search Peer",
+        employee_no: "E2E-CHAT-ADV-001",
+      },
+    ],
+    messages: [
+      {
+        id: "msg-advanced-search-old",
+        room_id: "room-advanced-search",
+        sender_id: "peer-advanced-1",
+        sender_name: "Advanced Search Peer",
+        content: "",
+        file_url: "https://example.com/uploads/old-note.pdf",
+        file_name: "old-note.pdf",
+        file_kind: "file",
+        created_at: "2026-02-25T11:30:00.000Z",
+        is_deleted: false,
+      },
+      {
+        id: "msg-advanced-search-target",
+        room_id: "room-advanced-search",
+        sender_id: "peer-advanced-1",
+        sender_name: "Advanced Search Peer",
+        content: "handoff packet attached",
+        file_url: "https://example.com/uploads/handoff.pdf",
+        file_name: "handoff.pdf",
+        file_kind: "file",
+        created_at: "2026-03-10T11:30:00.000Z",
+        is_deleted: false,
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: "\uCC44\uD305",
+      erp_chat_last_room: "room-advanced-search",
+    },
+  });
+
+  await page.goto(`/main?${new URLSearchParams({ open_menu: "\uCC44\uD305" }).toString()}`);
+  await expect(page.getByTestId("chat-view")).toBeVisible();
+  await page.getByTestId("chat-room-room-advanced-search").click();
+  await expect(page.getByTestId("chat-message-input")).toBeVisible();
+
+  await page.getByTestId("chat-open-global-search").click();
+  await expect(page.getByTestId("chat-global-search-modal")).toBeVisible();
+  await page
+    .getByTestId("chat-global-search-input")
+    .fill("from:advanced has:file after:2026-03-01 handoff");
+  await page.getByTestId("chat-global-search-tab-file").click();
+
+  await expect(page.getByTestId("chat-global-search-result-msg-advanced-search-target")).toBeVisible();
+  await expect(page.getByTestId("chat-global-search-result-msg-advanced-search-old")).toHaveCount(0);
+});
+
 test("chat renders incoming realtime messages immediately in the open conversation", async ({ page }) => {
   await mockSupabase(page, {
     chatRooms: [
@@ -1210,10 +1291,10 @@ test("chat shows a floating date indicator while scrolling through older message
     list.dispatchEvent(new Event("scroll"));
   });
 
-  const floatingDate = page.getByTestId("chat-scroll-date-indicator");
-  await expect(floatingDate).toBeVisible();
-  await expect(floatingDate).toContainText("2026");
-  await expect(floatingDate).toContainText("19");
+  const dateDivider = page.getByTestId("chat-date-divider").first();
+  await expect(dateDivider).toBeVisible();
+  await expect(dateDivider).toContainText("2026");
+  await expect(dateDivider).toContainText("19");
 });
 
 test("chat global search finds files by original attachment name", async ({ page }) => {

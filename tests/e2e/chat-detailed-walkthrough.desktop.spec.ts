@@ -127,11 +127,12 @@ test('chat detailed walkthrough opens each internal menu in practical order', as
   await expect(page.getByTestId('chat-room-icon-room-group')).toBeVisible();
   await expect(page.getByTestId('chat-room-icon-room-group').locator('img')).toHaveCount(0);
   await expect(page.getByTestId('chat-room-header-avatar').locator('img')).toHaveCount(0);
-  await expect(page.getByTestId('chat-room-summary-room-group')).toContainText('…');
+  await expect(page.getByTestId('chat-room-summary-room-group')).toContainText(longGroupRoomName.slice(0, 4));
 
   await page.getByTestId('chat-open-global-search').click();
   await expect(page.getByTestId('chat-global-search-modal')).toBeVisible();
   await page.getByTestId('chat-global-search-input').fill('운영');
+  await page.getByTestId('chat-global-search-save').click();
   await page.getByTestId('chat-global-search-submit').click();
   await expect(page.getByTestId('chat-global-search-result-msg-group-1')).toBeVisible();
   await page.getByTestId('chat-global-search-result-msg-group-1').click();
@@ -139,6 +140,9 @@ test('chat detailed walkthrough opens each internal menu in practical order', as
 
   await page.getByTestId('chat-open-global-search').click();
   await expect(page.getByTestId('chat-global-search-modal')).toBeVisible();
+  await expect(page.locator('[data-testid^="chat-saved-search-empty-"]').first()).toBeVisible();
+  await page.locator('[data-testid^="chat-saved-search-empty-"]').first().click();
+  await expect(page.getByTestId('chat-global-search-input')).toHaveValue('운영');
   await page.getByTestId('chat-open-group-modal').click();
   await expect(page.getByTestId('chat-group-modal')).toBeVisible();
   await page.getByTestId('chat-group-modal').locator('button').first().click();
@@ -175,6 +179,104 @@ test('chat detailed walkthrough opens each internal menu in practical order', as
   await page.getByTestId('chat-tab-chat').click();
   await page.getByTestId('chat-toggle-hidden-rooms').click();
   await page.getByTestId('chat-toggle-hidden-rooms').click();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('chat recent mention inbox opens the exact target message and marks it read', async ({
+  page,
+}) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    staffMembers: [fakeUser, peerOne, peerTwo],
+    chatRooms: [
+      {
+        id: noticeRoomId,
+        name: '공지메시지',
+        type: 'notice',
+        members: [fakeUser.id],
+        created_at: '2026-03-08T00:00:00.000Z',
+        last_message_at: '2026-03-08T00:00:00.000Z',
+      },
+      {
+        id: 'room-mention-home',
+        name: '일반 채팅방',
+        type: 'group',
+        members: [fakeUser.id, peerOne.id],
+        created_at: '2026-03-08T09:00:00.000Z',
+        last_message_at: '2026-03-08T10:00:00.000Z',
+        last_message_preview: '일반 메시지',
+        created_by: fakeUser.id,
+      },
+      {
+        id: 'room-mention-target',
+        name: '멘션 대상 채팅방',
+        type: 'group',
+        members: [fakeUser.id, peerTwo.id],
+        created_at: '2026-03-08T09:30:00.000Z',
+        last_message_at: '2026-03-08T11:00:00.000Z',
+        last_message_preview: '@E2E Tester 확인 부탁드립니다',
+        created_by: fakeUser.id,
+      },
+    ],
+    messages: [
+      {
+        id: 'msg-mention-home',
+        room_id: 'room-mention-home',
+        sender_id: peerOne.id,
+        content: '일반 메시지',
+        created_at: '2026-03-08T10:00:00.000Z',
+        is_deleted: false,
+        staff: { name: peerOne.name, photo_url: null },
+      },
+      {
+        id: 'msg-mention-target',
+        room_id: 'room-mention-target',
+        sender_id: peerTwo.id,
+        content: '@E2E Tester 확인 부탁드립니다',
+        created_at: '2026-03-08T11:00:00.000Z',
+        is_deleted: false,
+        staff: { name: peerTwo.name, photo_url: null },
+      },
+    ],
+    notifications: [
+      {
+        id: 'notif-mention-1',
+        user_id: fakeUser.id,
+        type: 'mention',
+        title: `📣 ${peerTwo.name}님이 멘션`,
+        body: '@E2E Tester 확인 부탁드립니다',
+        created_at: '2026-03-08T11:00:00.000Z',
+        read_at: null,
+        metadata: {
+          room_id: 'room-mention-target',
+          message_id: 'msg-mention-target',
+          room_name: '멘션 대상 채팅방',
+          sender_name: peerTwo.name,
+        },
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '채팅',
+      erp_chat_last_room: 'room-mention-home',
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent('채팅')}`);
+
+  const mentionItem = page.getByTestId('chat-mention-inbox-notif-mention-1');
+  await expect(mentionItem).toBeVisible();
+  await expect(mentionItem).toContainText('NEW');
+
+  await mentionItem.click();
+
+  await expect(page.getByTestId('chat-message-msg-mention-target')).toContainText('@E2E Tester 확인 부탁드립니다');
+  await expect(page.getByTestId('chat-message-msg-mention-home')).toHaveCount(0);
+  await expect(mentionItem).not.toContainText('NEW');
 
   expect(runtimeErrors).toEqual([]);
 });

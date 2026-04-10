@@ -21,6 +21,105 @@ function erpSetQueryParam(params, key, value) {
   params.set(key, normalized);
 }
 
+const ERP_MENU_CHAT = '\uCC44\uD305';
+const ERP_MENU_APPROVAL = '\uC804\uC790\uACB0\uC7AC';
+const ERP_MENU_BOARD = '\uAC8C\uC2DC\uD310';
+const ERP_MENU_INVENTORY = '\uC7AC\uACE0\uAD00\uB9AC';
+const ERP_MENU_MY_PAGE = '\uB0B4\uC815\uBCF4';
+const ERP_MENU_NOTIFICATIONS = '\uC54C\uB9BC';
+const ERP_DEFAULT_APPROVAL_VIEW = '\uACB0\uC7AC\uD568';
+const ERP_DEFAULT_BOARD_TYPE = '\uACF5\uC9C0\uC0AC\uD56D';
+const ERP_DEFAULT_INVENTORY_VIEW = '\uD604\uD669';
+
+function erpToMetadataRecord(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function erpResolveChatRoomId(metadata) {
+  const record = erpToMetadataRecord(metadata);
+  return erpNormalizeString(record.room_id || record.open_chat_room);
+}
+
+function erpResolveChatMessageId(metadata) {
+  const record = erpToMetadataRecord(metadata);
+  const metadataType = erpNormalizeString(record.type);
+  return (
+    erpNormalizeString(record.message_id || record.open_msg) ||
+    ((metadataType === 'message' || metadataType === 'mention' || erpResolveChatRoomId(record))
+      ? erpNormalizeString(record.id)
+      : '')
+  );
+}
+
+function erpResolveApprovalId(metadata) {
+  const record = erpToMetadataRecord(metadata);
+  const metadataType = erpNormalizeString(record.type);
+  return (
+    erpNormalizeString(record.approval_id || record.open_approval_id) ||
+    ((metadataType === 'approval' || metadataType === 'electronic_approval')
+      ? erpNormalizeString(record.id)
+      : '')
+  );
+}
+
+function erpResolveApprovalView(metadata) {
+  const record = erpToMetadataRecord(metadata);
+  const approvalView = erpNormalizeString(record.approval_view);
+  if (approvalView) return approvalView;
+  const openMenu = erpNormalizeString(record.open_menu);
+  const openSubView = erpNormalizeString(record.open_subview);
+  if (openMenu === ERP_MENU_APPROVAL && openSubView) {
+    return openSubView;
+  }
+  return '';
+}
+
+function erpResolveInventoryApprovalId(metadata) {
+  const record = erpToMetadataRecord(metadata);
+  return erpNormalizeString(
+    record.inventory_approval || record.open_inventory_approval || record.approval_id
+  );
+}
+
+function erpResolveExplicitInventoryApprovalId(metadata) {
+  const record = erpToMetadataRecord(metadata);
+  return erpNormalizeString(record.inventory_approval || record.open_inventory_approval);
+}
+
+function erpResolveInventoryView(metadata) {
+  const record = erpToMetadataRecord(metadata);
+  return erpNormalizeString(record.inventory_view || record.open_inventory_view);
+}
+
+function erpResolveBoardType(metadata) {
+  const record = erpToMetadataRecord(metadata);
+  return erpNormalizeString(record.board_type || record.open_board);
+}
+
+function erpResolveBoardPostId(metadata) {
+  const record = erpToMetadataRecord(metadata);
+  return erpNormalizeString(record.post_id || record.open_post);
+}
+
+function erpResolveOpenMenu(metadata) {
+  const record = erpToMetadataRecord(metadata);
+  return erpNormalizeString(record.open_menu);
+}
+
+function erpResolveOpenSubView(metadata) {
+  const record = erpToMetadataRecord(metadata);
+  return erpNormalizeString(record.open_subview);
+}
+
+function erpBuildMainUrl(baseUrl, entries) {
+  const params = new URLSearchParams();
+  (entries || []).forEach(([key, value]) => {
+    erpSetQueryParam(params, key, value);
+  });
+  const query = params.toString();
+  return query ? `${baseUrl}/main?${query}` : `${baseUrl}/main`;
+}
+
 async function erpBroadcastMessage(type, payload) {
   const clientList = await erpGetWindowClients();
   clientList.forEach((client) => {
@@ -384,21 +483,38 @@ async function erpDisplayIncomingNotification(rawPayload) {
 
   // 앱이 포그라운드(화면 표시 중)여도 항상 시스템 알림 표시 (카카오톡 방식)
   // 동시에 앱 내부에 preview broadcast해서 인앱 토스트도 표시
-  await erpBroadcastPreviewToVisibleClients(payload);
+  const keepForegroundPopup = erpShouldShowForegroundPopup(payload);
+  const previewPayload = keepForegroundPopup
+    ? {
+        ...payload,
+        data: {
+          ...(payload.data && typeof payload.data === 'object' ? payload.data : {}),
+          _foreground_popup_shown: true,
+        },
+      }
+    : payload;
+  const previewShown = await erpBroadcastPreviewToVisibleClients(previewPayload);
   await erpBroadcastDebug('preview-sync', '앱 화면에 알림 미리보기를 전송했습니다.', {
     tag: payload.tag,
   });
 
+  if (previewShown && !keepForegroundPopup) {
+    return;
+  }
+
   try {
-    await self.registration.showNotification(payload.title, erpBuildNotificationOptions(payload));
+    await self.registration.showNotification(
+      previewPayload.title,
+      erpBuildNotificationOptions(previewPayload),
+    );
     await erpBroadcastDebug('show-success', '서비스워커에서 시스템 팝업 표시를 요청했습니다.', {
       tag: payload.tag,
-      title: payload.title,
+      title: previewPayload.title,
     });
   } catch (error) {
     await erpBroadcastDebug('show-error', '서비스워커에서 시스템 팝업 표시 요청이 실패했습니다.', {
       tag: payload.tag,
-      title: payload.title,
+      title: previewPayload.title,
       error: String(error && error.message ? error.message : error || ''),
     });
     throw error;
@@ -419,41 +535,72 @@ async function erpHandleFcmBackgroundMessage(rawPayload) {
 
 function erpBuildTargetUrl(data) {
   const baseUrl = self.registration.scope.replace(/\/$/, '');
-  const params = new URLSearchParams();
-
-  if (data.room_id) {
-    params.set('open_chat_room', erpNormalizeString(data.room_id));
-    erpSetQueryParam(params, 'open_msg', data.message_id);
-    return `${baseUrl}/main?${params.toString()}`;
+  const metadata = erpToMetadataRecord(data);
+  const notificationType = erpNormalizeString(metadata.type);
+  const roomId = erpResolveChatRoomId(metadata);
+  if (roomId) {
+    return erpBuildMainUrl(baseUrl, [
+      ['open_chat_room', roomId],
+      ['open_msg', erpResolveChatMessageId(metadata)],
+    ]);
   }
 
-  if (data.type === 'inventory' || data.inventory_view || data.inventory_approval) {
-    params.set('open_menu', '재고관리');
-    params.set('open_inventory_view', erpNormalizeString(data.inventory_view) || '현황');
-    erpSetQueryParam(params, 'open_inventory_approval', data.inventory_approval || data.approval_id);
-    return `${baseUrl}/main?${params.toString()}`;
+  const explicitInventoryApprovalId = erpResolveExplicitInventoryApprovalId(metadata);
+  const inventoryApprovalId =
+    explicitInventoryApprovalId ||
+    (notificationType === 'inventory' ? erpResolveInventoryApprovalId(metadata) : '');
+  const inventoryView = erpResolveInventoryView(metadata);
+  if (notificationType === 'inventory' || explicitInventoryApprovalId || inventoryView) {
+    return erpBuildMainUrl(baseUrl, [
+      ['open_menu', ERP_MENU_INVENTORY],
+      ['open_inventory_view', inventoryView || ((notificationType === 'inventory' || inventoryApprovalId) ? ERP_DEFAULT_INVENTORY_VIEW : '')],
+      ['open_inventory_approval', inventoryApprovalId],
+    ]);
   }
 
-  if (data.type === 'approval' || data.approval_view || data.approval_id) {
-    params.set('open_menu', '전자결재');
-    erpSetQueryParam(params, 'open_subview', data.approval_view);
-    erpSetQueryParam(params, 'open_approval_id', data.approval_id);
-    return `${baseUrl}/main?${params.toString()}`;
+  const approvalId = erpResolveApprovalId(metadata);
+  const approvalView = erpResolveApprovalView(metadata);
+  if (notificationType === 'approval' || approvalId || approvalView) {
+    return erpBuildMainUrl(baseUrl, [
+      ['open_menu', ERP_MENU_APPROVAL],
+      ['open_subview', approvalView || ERP_DEFAULT_APPROVAL_VIEW],
+      ['open_approval_id', approvalId],
+    ]);
   }
 
-  if (data.type === 'board' || data.post_id || data.board_type) {
-    params.set('open_menu', '게시판');
-    erpSetQueryParam(params, 'open_board', data.board_type);
-    erpSetQueryParam(params, 'open_post', data.post_id);
-    return `${baseUrl}/main?${params.toString()}`;
+  const postId = erpResolveBoardPostId(metadata);
+  const boardType = erpResolveBoardType(metadata);
+  if (notificationType === 'board' || notificationType === 'notice' || postId || boardType) {
+    return erpBuildMainUrl(baseUrl, [
+      ['open_menu', ERP_MENU_BOARD],
+      ['open_board', boardType || ERP_DEFAULT_BOARD_TYPE],
+      ['open_post', postId],
+    ]);
   }
 
-  if (data.type === '인사' || data.type === 'payroll' || data.type === 'education' || data.type === 'attendance') {
-    params.set('open_menu', '내정보');
-    return `${baseUrl}/main?${params.toString()}`;
+  const openMenu = erpResolveOpenMenu(metadata);
+  if (openMenu) {
+    return erpBuildMainUrl(baseUrl, [
+      ['open_menu', openMenu],
+      ['open_subview', erpResolveOpenSubView(metadata)],
+    ]);
   }
 
-  return `${baseUrl}/main`;
+  if (
+    notificationType === 'payroll' ||
+    notificationType === 'education' ||
+    notificationType === 'attendance' ||
+    notificationType === 'hr' ||
+    notificationType === '\uC778\uC0AC'
+  ) {
+    return erpBuildMainUrl(baseUrl, [['open_menu', ERP_MENU_MY_PAGE]]);
+  }
+
+  if (notificationType === 'notification') {
+    return erpBuildMainUrl(baseUrl, [['open_menu', ERP_MENU_NOTIFICATIONS]]);
+  }
+
+  return erpBuildMainUrl(baseUrl);
 }
 
 async function erpMarkNotificationAsRead(data) {

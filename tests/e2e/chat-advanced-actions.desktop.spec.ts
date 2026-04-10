@@ -106,6 +106,16 @@ test('chat advanced actions can bookmark, inspect reads, view thread, and forwar
         staff: { name: peerOne.name, photo_url: null, position: peerOne.position },
       },
       {
+        id: 'msg-reply-2',
+        room_id: 'room-group',
+        sender_id: peerTwo.id,
+        content: '후속 스레드 답장입니다.',
+        reply_to_id: 'msg-reply',
+        created_at: '2026-03-08T10:07:00.000Z',
+        is_deleted: false,
+        staff: { name: peerTwo.name, photo_url: null, position: peerTwo.position },
+      },
+      {
         id: 'msg-target-1',
         room_id: 'room-target',
         sender_id: peerTwo.id,
@@ -115,11 +125,32 @@ test('chat advanced actions can bookmark, inspect reads, view thread, and forwar
         staff: { name: peerTwo.name, photo_url: null, position: peerTwo.position },
       },
     ],
-    messageReads: [
+    notifications: [
       {
-        id: 'read-1',
-        message_id: 'msg-root',
+        id: 'notif-thread-1',
+        user_id: fakeUser.id,
+        type: 'message',
+        title: 'Thread reply',
+        body: 'Newest thread reply',
+        created_at: '2026-03-08T10:08:00.000Z',
+        read_at: null,
+        metadata: {
+          room_id: 'room-group',
+          room_name: 'Thread room',
+          message_id: 'msg-reply-2',
+          reply_to_id: 'msg-reply',
+          thread_root_id: 'msg-root',
+          is_thread_reply: true,
+          sender_name: peerTwo.name,
+        },
+      },
+    ],
+    roomReadCursors: [
+      {
+        id: 'room-read-1',
+        room_id: 'room-group',
         user_id: peerOne.id,
+        last_read_at: '2026-03-08T10:10:00.000Z',
       },
     ],
   });
@@ -134,6 +165,8 @@ test('chat advanced actions can bookmark, inspect reads, view thread, and forwar
   await page.goto(`/main?open_menu=${encodeURIComponent('채팅')}`);
 
   await expect(page.getByTestId('chat-view')).toBeVisible();
+  await expect(page.getByTestId('chat-thread-inbox-notif-thread-1')).toBeVisible();
+  await expect(page.getByTestId('chat-thread-attention-msg-root')).toBeVisible();
 
   await page.getByTestId('chat-message-msg-root').click();
   await page.getByTestId('chat-message-action-bookmark').click();
@@ -154,12 +187,30 @@ test('chat advanced actions can bookmark, inspect reads, view thread, and forwar
   await expect(page.getByTestId('chat-read-status-modal')).toContainText('Chat Peer Two');
   await page.getByTestId('chat-read-status-modal').locator('button').first().click();
 
-  await page.getByTestId('chat-message-msg-root').click();
-  await page.getByTestId('chat-message-action-thread').click();
+  await expect(page.getByTestId('chat-thread-needs-attention-msg-root')).toContainText('답변 필요');
+
+  await page.getByTestId('chat-open-drawer').click();
+  await expect(page.getByTestId('chat-drawer-thread-msg-root')).toBeVisible();
+  await expect(page.getByTestId('chat-drawer-thread-attention-msg-root')).toContainText('답변 필요');
+  await page.getByTestId('chat-drawer-thread-open-msg-root').click();
+  await expect(page.getByTestId('chat-room-drawer')).toBeHidden();
   await expect(page.getByTestId('chat-thread-panel')).toBeVisible();
+  await page.getByTestId('chat-thread-close').click();
+
+  await page.getByTestId('chat-thread-badge-msg-reply').click();
+  await expect(page.getByTestId('chat-thread-panel')).toBeVisible();
+  await expect(page.getByTestId('chat-thread-toggle-follow')).toBeVisible();
+  await page.getByTestId('chat-thread-toggle-follow').click();
   await expect(page.getByTestId('chat-thread-panel')).toContainText('북마크 테스트 메시지');
   await expect(page.getByTestId('chat-thread-panel')).toContainText('스레드 답장입니다.');
-  await page.getByTestId('chat-thread-panel').locator('button').first().click();
+  await expect(page.getByTestId('chat-thread-panel')).toContainText('후속 스레드 답장입니다.');
+  await expect(page.getByTestId('chat-thread-summary-replies')).toContainText('답글 2개');
+  await expect(page.getByTestId('chat-thread-summary-participants')).toContainText('참여 3명');
+  await page.getByTestId('chat-thread-close').click();
+
+  await page.getByTestId('chat-thread-badge-msg-root').click();
+  await expect(page.getByTestId('chat-thread-panel')).toBeVisible();
+  await page.getByTestId('chat-thread-close').click();
 
   await page.getByTestId('chat-message-msg-root').click();
   await page.getByTestId('chat-message-action-forward').click();
@@ -168,7 +219,73 @@ test('chat advanced actions can bookmark, inspect reads, view thread, and forwar
   await expect(page.getByTestId('chat-forward-modal')).toBeHidden();
 
   await page.getByTestId('chat-room-room-target').click();
-  await expect(page.getByTestId('chat-message-msg-4')).toContainText('[전달] E2E Tester: 북마크 테스트 메시지');
+  await expect(page.getByTestId('chat-message-msg-5')).toContainText('[전달] E2E Tester: 북마크 테스트 메시지');
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('chat edit history records revisions and shows the edited marker', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    staffMembers: [fakeUser],
+    chatRooms: [
+      {
+        id: '00000000-0000-0000-0000-000000000000',
+        name: '공지메시지',
+        type: 'notice',
+        members: [fakeUser.id],
+        created_at: '2026-03-08T00:00:00.000Z',
+        last_message_at: '2026-03-08T00:00:00.000Z',
+      },
+      {
+        id: 'room-edit',
+        name: '수정 테스트방',
+        type: 'group',
+        members: [fakeUser.id],
+        created_at: '2026-03-08T09:00:00.000Z',
+        last_message_at: '2026-03-08T10:00:00.000Z',
+        last_message_preview: '수정 전 메시지',
+        created_by: fakeUser.id,
+      },
+    ],
+    messages: [
+      {
+        id: 'msg-edit',
+        room_id: 'room-edit',
+        sender_id: fakeUser.id,
+        content: '수정 전 메시지',
+        created_at: '2026-03-08T10:00:00.000Z',
+        is_deleted: false,
+        staff: { name: fakeUser.name, photo_url: null, position: fakeUser.position },
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '채팅',
+      erp_chat_last_room: 'room-edit',
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent('채팅')}`);
+  await page.getByTestId('chat-room-room-edit').click();
+
+  await page.getByTestId('chat-message-msg-edit').click();
+  await page.getByTestId('chat-message-action-edit').click();
+  await page.getByTestId('chat-message-edit-input').fill('수정 후 메시지');
+  await page.getByTestId('chat-message-edit-save').click();
+
+  await expect(page.getByTestId('chat-message-msg-edit')).toContainText('수정 후 메시지');
+  await expect(page.getByTestId('chat-message-edited-msg-edit')).toBeVisible();
+
+  await page.getByTestId('chat-message-msg-edit').click();
+  await page.getByTestId('chat-message-action-edit-history').click();
+  await expect(page.getByTestId('chat-message-edit-history-modal')).toBeVisible();
+  await expect(page.getByTestId('chat-message-edit-history-entry-0')).toContainText('수정 전');
+  await expect(page.getByTestId('chat-message-edit-history-entry-0')).toContainText('수정 전 메시지');
+  await expect(page.getByTestId('chat-message-edit-history-entry-0')).toContainText('수정 후 메시지');
 
   expect(runtimeErrors).toEqual([]);
 });

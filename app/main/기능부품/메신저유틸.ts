@@ -17,7 +17,7 @@ const WARD_MESSAGE_META_PREFIX = '[[WARD_MESSAGE_META]]';
 const WARD_MESSAGE_META_SUFFIX = '[[/WARD_MESSAGE_META]]';
 const POLL_META_PREFIX = '[[POLL_META]]';
 const POLL_META_SUFFIX = '[[/POLL_META]]';
-export const MESSAGE_READ_WRITES_ENABLED = false;
+const RESIGNED_STATUSES = new Set(['\uD1F4\uC0AC', '\uD1F4\uC9C1']);
 
 export type WardMessageMeta = {
   type?: string;
@@ -31,6 +31,15 @@ export type WardMessageMeta = {
 export type RoomPreference = {
   pinned?: boolean;
   hidden?: boolean;
+  notifyMode?: RoomNotificationMode;
+  notifyKeyword?: string;
+};
+
+export type RoomNotificationMode = 'all' | 'mention_only' | 'keyword' | 'mute';
+
+export type ThreadPreference = {
+  followed?: boolean;
+  lastOpenedAt?: string | null;
 };
 
 export type MessageRetryPayload = {
@@ -115,6 +124,40 @@ export function normalizeMemberIds(members: unknown): string[] {
   return Array.isArray(members) ? members.map((id: unknown) => String(id)) : [];
 }
 
+export function getChatRoomParticipantCount(room: ChatRoom | null | undefined): number {
+  return normalizeMemberIds(room?.members).length;
+}
+
+export function getGroupChatRoomBadgeText(value: string | null | undefined): string {
+  const normalized = String(value || '').trim().replace(/\s+/g, ' ');
+  if (!normalized) return 'GR';
+
+  const latinTokens = normalized
+    .split(/\s+/)
+    .map((token) => token.replace(/[^A-Za-z0-9]/g, ''))
+    .filter(Boolean);
+
+  if (latinTokens.length > 0) {
+    const firstToken = latinTokens[0].toUpperCase();
+    if (firstToken.length >= 2) return firstToken.slice(0, 2);
+
+    const secondInitial = (latinTokens[1] || '').slice(0, 1).toUpperCase();
+    const combined = `${firstToken}${secondInitial}`.trim();
+    if (combined) return combined.slice(0, 2);
+  }
+
+  const compact = normalized.replace(/[\s.,/|()[\]{}_-]+/g, '');
+  if (!compact) return 'GR';
+  return Array.from(compact).slice(0, 2).join('').toUpperCase();
+}
+
+export function isGroupChatRoom(room: ChatRoom | null | undefined): boolean {
+  if (!room) return false;
+  if (String(room.id) === NOTICE_ROOM_ID) return false;
+  if (room.type === 'group') return true;
+  return getChatRoomParticipantCount(room) > 2;
+}
+
 export function isSelfChatRoom(room: ChatRoom | null | undefined, currentUserId: string | null | undefined): boolean {
   if (room?.type !== 'direct') return false;
   const normalizedCurrentUserId = String(currentUserId || '').trim();
@@ -133,7 +176,7 @@ export function isActiveChatMember(staff: StaffMember | null | undefined): boole
   const isActiveFlag = dynamicStaff.is_active;
 
   if (isActiveFlag === false) return false;
-  if (status === '퇴사' || status === '퇴직') return false;
+  if (RESIGNED_STATUSES.has(status)) return false;
   if (resignedAt) return false;
   if (resignDate) return false;
   return true;
@@ -171,7 +214,7 @@ export function isActiveNoticeMember(staff: StaffMember | null | undefined): boo
   const isActiveFlag = dynamicStaff.is_active;
 
   if (isActiveFlag === false) return false;
-  if (status === '퇴사') return false;
+  if (RESIGNED_STATUSES.has(status)) return false;
   if (resignedAt) return false;
   if (resignDate) return false;
   return true;
@@ -286,6 +329,40 @@ export function getRoomPrefsStorageKey(userId: string | null | undefined): strin
   return STORAGE_KEYS.chatRoomPrefs(userId || 'guest');
 }
 
+export function normalizeRoomNotificationMode(value: unknown): RoomNotificationMode {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'mention_only' || normalized === 'keyword' || normalized === 'mute') {
+    return normalized;
+  }
+  return 'all';
+}
+
+export function normalizeRoomNotificationKeyword(value: unknown): string {
+  return String(value || '').trim().slice(0, 40);
+}
+
+export function readStoredRoomPreferences(userId: string | null | undefined): Record<string, RoomPreference> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(getRoomPrefsStorageKey(userId));
+    const parsed = raw ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return Object.entries(parsed as Record<string, unknown>).reduce<Record<string, RoomPreference>>((acc, [roomId, value]) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return acc;
+      const roomPref = value as Record<string, unknown>;
+      acc[roomId] = {
+        pinned: roomPref.pinned === true,
+        hidden: roomPref.hidden === true,
+        notifyMode: normalizeRoomNotificationMode(roomPref.notifyMode),
+        notifyKeyword: normalizeRoomNotificationKeyword(roomPref.notifyKeyword),
+      };
+      return acc;
+    }, {});
+  } catch {
+    return {};
+  }
+}
+
 export function isUuidLike(value: string | null | undefined): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
 }
@@ -300,6 +377,10 @@ export function getBookmarkStorageKey(userId: string | null | undefined): string
 
 export function getPinnedRoomOrderStorageKey(userId: string | null | undefined): string {
   return STORAGE_KEYS.chatPinnedRoomOrder(userId || 'guest');
+}
+
+export function getThreadPrefsStorageKey(userId: string | null | undefined): string {
+  return STORAGE_KEYS.chatThreadPrefs(userId || 'guest');
 }
 
 export function readStoredStringArray(storageKey: string): string[] {
@@ -332,6 +413,41 @@ export function readStoredBookmarks(userId: string | null | undefined): string[]
 
 export function writeStoredBookmarks(userId: string | null | undefined, messageIds: string[]) {
   writeStoredStringArray(getBookmarkStorageKey(userId), messageIds);
+}
+
+export function readStoredThreadPreferences(userId: string | null | undefined): Record<string, ThreadPreference> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(getThreadPrefsStorageKey(userId));
+    const parsed = raw ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return Object.entries(parsed as Record<string, unknown>).reduce<Record<string, ThreadPreference>>((acc, [threadId, value]) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return acc;
+      const record = value as Record<string, unknown>;
+      acc[threadId] = {
+        followed: record.followed === true,
+        lastOpenedAt:
+          typeof record.lastOpenedAt === 'string' && record.lastOpenedAt.trim()
+            ? record.lastOpenedAt.trim()
+            : null,
+      };
+      return acc;
+    }, {});
+  } catch {
+    return {};
+  }
+}
+
+export function writeStoredThreadPreferences(
+  userId: string | null | undefined,
+  preferences: Record<string, ThreadPreference>,
+) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(getThreadPrefsStorageKey(userId), JSON.stringify(preferences));
+  } catch {
+    // ignore storage failures
+  }
 }
 
 export function arraysMatch(left: string[], right: string[]): boolean {

@@ -4,6 +4,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
 
 export async function POST(req: NextRequest) {
   try {
@@ -64,16 +65,15 @@ export async function POST(req: NextRequest) {
     }
 
     // 메시지 삽입
-    const { data: message, error: insertError } = await supabase
-      .from('messages')
-      .insert({
+    const { data: message, error: insertError } = await insertChatMessageWithFallback<{ id: string }>(
+      supabase,
+      {
         room_id,
         sender_id: senderId,
         content: content.trim().slice(0, 2000),
-        type: 'text',
-      })
-      .select('id')
-      .single();
+      },
+      'id',
+    );
 
     if (insertError || !message) {
       console.error('[quick-reply] insert error:', insertError);

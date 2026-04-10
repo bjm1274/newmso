@@ -3,12 +3,14 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push';
 import { sendFcmBatch } from '@/lib/firebase-admin';
 import { shouldDeferStaleChatPush } from '@/lib/push-quiet-hours';
+import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
 
 type MessageRow = {
   id: string;
   room_id: string;
   sender_id: string | null;
   content: string | null;
+  reply_to_id: string | null;
   created_at: string;
   file_url: string | null;
   file_kind: string | null;
@@ -256,6 +258,33 @@ function buildPreview(message: MessageRow) {
   return '새 메시지가 도착했습니다.';
 }
 
+async function resolveThreadRootIdForMessage(
+  supabase: SupabaseClient,
+  message: MessageRow,
+) {
+  let currentParentId = String(message.reply_to_id || '').trim();
+  if (!currentParentId) return null;
+
+  const visited = new Set<string>();
+  let resolvedRootId = currentParentId;
+
+  while (currentParentId && !visited.has(currentParentId)) {
+    visited.add(currentParentId);
+    resolvedRootId = currentParentId;
+
+    const { data, error } = await supabase
+      .from('messages')
+      .select('id, reply_to_id')
+      .eq('id', currentParentId)
+      .maybeSingle();
+
+    if (error || !data) break;
+    currentParentId = String(data.reply_to_id || '').trim();
+  }
+
+  return resolvedRootId || null;
+}
+
 function buildDeterministicNotificationId(userId: string, stableKey: string) {
   const bytes = createHash('sha256')
     .update(`chat-notification:${userId}:${stableKey}`)
@@ -352,7 +381,7 @@ export async function dispatchChatPushForMessage(params: {
     Promise.all([
       supabase
         .from('messages')
-        .select('id, room_id, sender_id, content, created_at, file_url, file_kind, album_id, album_index, album_total')
+        .select('id, room_id, sender_id, content, reply_to_id, created_at, file_url, file_kind, album_id, album_index, album_total')
         .eq('id', params.messageId)
         .single(),
       supabase
@@ -465,6 +494,7 @@ export async function dispatchChatPushForMessage(params: {
         : senderName;
 
   const previewBody = buildPreview(message);
+  const threadRootId = await resolveThreadRootIdForMessage(supabase, message);
   const { data: existingNotificationData, error: existingNotificationError } = await supabase
     .from('notifications')
     .select('id,user_id,type,metadata,created_at')
@@ -501,22 +531,26 @@ export async function dispatchChatPushForMessage(params: {
       type: 'message',
       title,
       body: previewBody,
-      metadata: {
-        room_id: params.roomId,
-        id: params.messageId,
-        message_id: params.messageId,
-        album_id: albumContext.albumId,
-        album_index: albumContext.albumIndex,
-        album_total: albumContext.albumTotal,
-        sender_name: senderName,
-        room_name: room.name || '',
-        type: 'message',
-        created_at: message.created_at,
-        dedupe_key:
+      metadata: buildChatNotificationMetadata({
+        roomId: params.roomId,
+        messageId: params.messageId,
+        notificationType: 'message',
+        dedupeKey:
           albumContext.isAlbumBatch && albumContext.albumId
             ? `chat:album:${albumContext.albumId}:${targetId}`
             : `chat:${params.messageId}:${targetId}`,
-      },
+        extra: {
+          album_id: albumContext.albumId,
+          album_index: albumContext.albumIndex,
+          album_total: albumContext.albumTotal,
+          sender_name: senderName,
+          room_name: room.name || '',
+          created_at: message.created_at,
+          is_thread_reply: Boolean(message.reply_to_id),
+          reply_to_id: message.reply_to_id || null,
+          thread_root_id: threadRootId,
+        },
+      }),
       read_at: null,
       created_at: message.created_at || new Date().toISOString(),
     };
@@ -603,22 +637,35 @@ export async function dispatchChatPushForMessage(params: {
   let failed = 0;
   const expiredIds: string[] = [];
   const notificationTag = albumContext.notificationTag;
-  const payloadData = {
-    room_id: params.roomId,
-    message_id: params.messageId,
-    created_at: message.created_at,
-    type: 'message',
-    tag: notificationTag,
-    ...(albumContext.albumId ? { album_id: albumContext.albumId } : {}),
-    ...(albumContext.albumIndex !== null ? { album_index: String(albumContext.albumIndex) } : {}),
-    ...(albumContext.albumTotal !== null ? { album_total: String(albumContext.albumTotal) } : {}),
-  };
+  const payloadData = buildChatNotificationMetadata({
+    roomId: params.roomId,
+    messageId: params.messageId,
+    notificationType: 'message',
+    extra: {
+      created_at: message.created_at,
+      tag: notificationTag,
+      is_thread_reply: Boolean(message.reply_to_id),
+      reply_to_id: message.reply_to_id || null,
+      thread_root_id: threadRootId,
+      ...(albumContext.albumId ? { album_id: albumContext.albumId } : {}),
+      ...(albumContext.albumIndex !== null ? { album_index: String(albumContext.albumIndex) } : {}),
+      ...(albumContext.albumTotal !== null ? { album_total: String(albumContext.albumTotal) } : {}),
+    },
+  });
   const webPushPayload = JSON.stringify({
     title,
     body: previewBody,
     tag: notificationTag,
     data: payloadData,
   });
+  const fcmPayloadData = Object.entries(payloadData).reduce<Record<string, string>>(
+    (acc, [key, value]) => {
+      if (value === null || value === undefined) return acc;
+      acc[key] = typeof value === 'string' ? value : JSON.stringify(value);
+      return acc;
+    },
+    {},
+  );
 
   const fcmPromise = (async () => {
     if (uniqueFcmTokens.length === 0) return;
@@ -626,7 +673,7 @@ export async function dispatchChatPushForMessage(params: {
       const fcmResult = await sendFcmBatch(uniqueFcmTokens, {
         title,
         body: previewBody,
-        data: payloadData,
+        data: fcmPayloadData,
       });
       sent += fcmResult.success.length;
       if (fcmResult.expired.length > 0) {

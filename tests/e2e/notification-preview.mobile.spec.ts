@@ -209,6 +209,15 @@ test('mobile chat preview banner shows the message preview and opens the chat ro
         is_deleted: false,
         staff: { name: 'Chat Preview Peer', photo_url: null },
       },
+      {
+        id: 'msg-live-preview-1',
+        room_id: 'room-live-message',
+        sender_id: 'chat-preview-peer',
+        content: 'Pinned live preview target',
+        created_at: '2026-03-31T08:35:00.000Z',
+        is_deleted: false,
+        staff: { name: 'Chat Preview Peer', photo_url: null },
+      },
     ],
   });
 
@@ -240,6 +249,7 @@ test('mobile chat preview banner shows the message preview and opens the chat ro
 
   await expect(page.getByTestId('chat-view')).toBeVisible();
   await expect(page.getByTestId('chat-message-input')).toBeVisible();
+  await expect(page.getByTestId('chat-message-msg-live-preview-1')).toBeVisible();
 });
 
 test('mobile notification service retries push registration when focus returns without an active subscription', async ({

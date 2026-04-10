@@ -12,6 +12,7 @@ import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase
 import { toast } from '@/lib/toast';
 import type { AttachmentItem, BoardPost, StaffMember } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
+import { uploadBoardAttachmentFile } from '../게시판업로드';
 
 const GUIDE_BOARD_TYPE = '업무가이드';
 const GUIDE_DISPLAY_NAME = '업무공유';
@@ -907,23 +908,11 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
   const activeTeamHandoverCount = activeTeam ? handoverCountsByTeamKey[activeTeam.key] || 0 : 0;
 
   const uploadGuideAttachment = useCallback(async (file: File) => {
-    const formData = new FormData();
-    formData.append('boardType', GUIDE_BOARD_TYPE);
-    formData.append('file', file);
-
-    const response = await fetch('/api/board/upload', {
-      method: 'POST',
-      body: formData,
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(String(payload?.error || '파일 업로드에 실패했습니다.'));
-    }
-
+    const uploaded = await uploadBoardAttachmentFile(file, GUIDE_BOARD_TYPE);
     return {
-      name: normalizeText(payload?.fileName || file.name),
-      url: normalizeText(payload?.url),
-      type: inferAttachmentType(normalizeText(payload?.fileName || file.name), normalizeText(payload?.type)),
+      name: normalizeText(uploaded.name),
+      url: normalizeText(uploaded.url),
+      type: inferAttachmentType(normalizeText(uploaded.name), normalizeText(uploaded.type)),
     } satisfies AttachmentItem;
   }, []);
 

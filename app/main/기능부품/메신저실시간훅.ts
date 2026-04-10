@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { toast } from '@/lib/toast';
 
 export type ChatRealtimeState = 'idle' | 'connecting' | 'connected' | 'reconnecting';
 
@@ -51,18 +52,30 @@ export function useRoomNotificationSetting({
   const toggleRoomNotify = useCallback(async () => {
     if (!(effectiveChatUserId || userId) || !selectedRoomId) return;
 
-    const nextValue = !roomNotifyRef.current;
+    const previousValue = roomNotifyRef.current;
+    const nextValue = !previousValue;
     setRoomNotifyOn(nextValue);
     roomNotifyRef.current = nextValue;
 
-    await supabase.from('room_notification_settings').upsert(
-      {
-        user_id: effectiveChatUserId || userId,
-        room_id: selectedRoomId,
-        notifications_enabled: nextValue,
-      },
-      { onConflict: 'user_id,room_id' }
-    );
+    try {
+      const { error } = await supabase.from('room_notification_settings').upsert(
+        {
+          user_id: effectiveChatUserId || userId,
+          room_id: selectedRoomId,
+          notifications_enabled: nextValue,
+        },
+        { onConflict: 'user_id,room_id' }
+      );
+
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      console.warn('room_notification_settings upsert failed', error);
+      setRoomNotifyOn(previousValue);
+      roomNotifyRef.current = previousValue;
+      toast('채팅방 알림 설정을 저장하지 못했습니다.', 'error');
+    }
   }, [effectiveChatUserId, selectedRoomId, userId]);
 
   return {

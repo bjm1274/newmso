@@ -27,8 +27,10 @@ type UseChatMessageActionsParams = {
   setPersistedPinnedMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   fetchData: () => void | Promise<void>;
   syncRoomSummaryFromMessages: (roomId: string | null | undefined, nextMessages: ChatMessage[]) => void;
-  persistMessageReads: (messageIds: string[]) => Promise<void>;
-  persistRoomReadCursor: (roomId: string, readAt: string) => Promise<void>;
+  persistRoomReadCursors: (
+    roomIds: Array<string | null | undefined>,
+    readAt?: string | null,
+  ) => Promise<boolean>;
   broadcastChatSync: (type: string, roomId: string | null | undefined) => void;
   auditUserId: string | null | undefined;
   auditUserName: string | null | undefined;
@@ -50,8 +52,7 @@ export function useChatMessageActions({
   setPersistedPinnedMessages,
   fetchData,
   syncRoomSummaryFromMessages,
-  persistMessageReads,
-  persistRoomReadCursor,
+  persistRoomReadCursors,
   broadcastChatSync,
   auditUserId,
   auditUserName,
@@ -160,18 +161,18 @@ export function useChatMessageActions({
     try {
       const targetRoomIds = getConversationRoomIdsByRoomId(message.room_id, chatRoomsRef.current as ChatRoom[]);
       const readAt = new Date().toISOString();
-      await persistMessageReads([message.id]);
-      await Promise.allSettled(
-        (targetRoomIds.length > 0 ? targetRoomIds : [String(message.room_id)]).map((roomId) =>
-          persistRoomReadCursor(roomId, readAt)
-        )
+      const cursorWriteOk = await persistRoomReadCursors(
+        targetRoomIds.length > 0 ? targetRoomIds : [String(message.room_id)],
+        readAt,
       );
-      broadcastChatSync('message-read', message.room_id);
+      if (cursorWriteOk) {
+        broadcastChatSync('message-read', message.room_id);
+      }
       await fetchData();
     } catch {
       // 읽음 처리는 UX 우선이므로 실패해도 조용히 넘긴다.
     }
-  }, [actorId, broadcastChatSync, chatRoomsRef, fetchData, persistMessageReads, persistRoomReadCursor]);
+  }, [actorId, broadcastChatSync, chatRoomsRef, fetchData, persistRoomReadCursors]);
 
   const deleteMessage = useCallback(async (message: ChatMessage) => {
     if (selectedRoom?.id === NOTICE_ROOM_ID && !isMso) {
