@@ -15,6 +15,14 @@ import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import { buildUploadRequestFileName } from './메신저첨부';
 import type { SendMessageOptions } from './메신저메시지서비스';
+import {
+  CHAT_ATTACHMENT_RETRY_EVENT,
+  clearFailedAttachmentRetryQueue,
+  queueFailedAttachmentRetryEntry,
+  readFailedAttachmentRetryQueue,
+  removeFailedAttachmentRetryEntry,
+  type AttachmentRetryQueueEntry,
+} from './메신저첨부재시도큐';
 
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
 const MAX_VIDEO_SIZE_BYTES = 200 * 1024 * 1024;
@@ -29,6 +37,8 @@ type ShareTarget = {
 
 type UseChatUploadsParams = {
   selectedRoomId: string | null;
+  actorId: string | null | undefined;
+  replyToId?: string | null;
   shareTarget?: ShareTarget | null;
   onConsumeShareTarget?: () => void;
   inputMsgRef: MutableRefObject<string>;
@@ -46,6 +56,8 @@ function getFileKind(mime: string): 'image' | 'video' | 'file' {
 
 export function useChatUploads({
   selectedRoomId,
+  actorId,
+  replyToId,
   shareTarget,
   onConsumeShareTarget,
   inputMsgRef,
@@ -57,11 +69,34 @@ export function useChatUploads({
   const [albumPreviewUrls, setAlbumPreviewUrls] = useState<string[]>([]);
   const [fileUploading, setFileUploading] = useState(false);
   const [pendingAttachmentFiles, setPendingAttachmentFiles] = useState<File[]>([]);
+  const [failedAttachmentRetryEntries, setFailedAttachmentRetryEntries] = useState<AttachmentRetryQueueEntry[]>([]);
   const albumPreviewUrlsRef = useRef<string[]>([]);
 
   useEffect(() => {
     albumPreviewUrlsRef.current = albumPreviewUrls;
   }, [albumPreviewUrls]);
+
+  const refreshFailedAttachmentRetries = useCallback(async () => {
+    if (!actorId) {
+      setFailedAttachmentRetryEntries([]);
+      return;
+    }
+    setFailedAttachmentRetryEntries(await readFailedAttachmentRetryQueue(actorId));
+  }, [actorId]);
+
+  useEffect(() => {
+    void refreshFailedAttachmentRetries();
+    if (typeof window === 'undefined') return;
+
+    const syncRetries = () => {
+      void refreshFailedAttachmentRetries();
+    };
+
+    window.addEventListener(CHAT_ATTACHMENT_RETRY_EVENT, syncRetries as EventListener);
+    return () => {
+      window.removeEventListener(CHAT_ATTACHMENT_RETRY_EVENT, syncRetries as EventListener);
+    };
+  }, [refreshFailedAttachmentRetries]);
 
   const revokeAlbumPreviewUrls = useCallback((urls: string[]) => {
     urls.forEach((url) => URL.revokeObjectURL(url));
@@ -140,6 +175,8 @@ export function useChatUploads({
         albumId?: string | null;
         albumIndex?: number | null;
         albumTotal?: number | null;
+        replyToId?: string | null;
+        skipRetryQueue?: boolean;
       }
     ) => {
       if (file.type.startsWith('video/')) {
@@ -283,6 +320,7 @@ export function useChatUploads({
           fileName: uploadFileName,
           contentOverride: contentSnapshot.trim(),
           clearComposerIfUnchangedFrom: options?.shouldClearSnapshot === false ? undefined : contentSnapshot,
+          replyToIdOverride: options?.replyToId ?? replyToId ?? undefined,
           albumId: options?.albumId ?? null,
           albumIndex: options?.albumIndex ?? null,
           albumTotal: options?.albumTotal ?? null,
@@ -297,13 +335,25 @@ export function useChatUploads({
             : message.includes('413') || message.toLowerCase().includes('entity too large')
               ? '서버 요청 한도를 초과했습니다. 최신 경로가 반영된 상태인지 확인한 뒤 다시 시도해 주세요.'
               : message;
+        if (actorId && selectedRoomId && !options?.skipRetryQueue) {
+          await queueFailedAttachmentRetryEntry(actorId, {
+            roomId: selectedRoomId,
+            content: contentSnapshot.trim(),
+            replyToId: options?.replyToId ?? replyToId ?? null,
+            file,
+            error: hint,
+          });
+          await refreshFailedAttachmentRetries();
+          toast(`파일 업로드에 실패했습니다.\n\n${hint}\n\n재시도 보관함에 저장했습니다.`, 'error');
+          return false;
+        }
         toast(`파일 업로드에 실패했습니다.\n\n${hint}`, 'error');
         return false;
       } finally {
         setFileUploading(false);
       }
     },
-    [handleSendMessage, inputMsgRef],
+    [actorId, handleSendMessage, inputMsgRef, refreshFailedAttachmentRetries, replyToId, selectedRoomId],
   );
 
   const confirmPendingAttachmentUpload = useCallback(async () => {
@@ -448,10 +498,67 @@ export function useChatUploads({
     });
   }, [revokeAlbumPreviewUrls, selectedRoomId]);
 
+  const retryFailedAttachmentUpload = useCallback(async (entryId: string) => {
+    const target = failedAttachmentRetryEntries.find((entry) => entry.id === entryId) || null;
+    if (!target) return false;
+
+    const sent = await processFileUpload(target.file, {
+      contentSnapshot: target.content,
+      shouldClearSnapshot: false,
+      replyToId: target.replyToId,
+      skipRetryQueue: true,
+    });
+
+    if (sent && actorId) {
+      await removeFailedAttachmentRetryEntry(actorId, entryId);
+      await refreshFailedAttachmentRetries();
+    }
+    return sent;
+  }, [actorId, failedAttachmentRetryEntries, processFileUpload, refreshFailedAttachmentRetries]);
+
+  const retryAllFailedAttachmentUploads = useCallback(async (roomId?: string | null) => {
+    const normalizedRoomId = String(roomId || '').trim();
+    const targets = failedAttachmentRetryEntries.filter((entry) =>
+      normalizedRoomId ? entry.roomId === normalizedRoomId : true,
+    );
+
+    for (const entry of targets) {
+      await retryFailedAttachmentUpload(entry.id);
+    }
+  }, [failedAttachmentRetryEntries, retryFailedAttachmentUpload]);
+
+  const dismissFailedAttachmentUpload = useCallback(async (entryId: string) => {
+    if (!actorId) return;
+    await removeFailedAttachmentRetryEntry(actorId, entryId);
+    await refreshFailedAttachmentRetries();
+  }, [actorId, refreshFailedAttachmentRetries]);
+
+  const clearAllFailedAttachmentUploads = useCallback(async () => {
+    if (!actorId) return;
+    await clearFailedAttachmentRetryQueue(actorId);
+    await refreshFailedAttachmentRetries();
+  }, [actorId, refreshFailedAttachmentRetries]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const flushOnReconnect = () => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+      const roomId = String(selectedRoomId || '').trim() || null;
+      void retryAllFailedAttachmentUploads(roomId);
+    };
+
+    window.addEventListener('online', flushOnReconnect);
+    return () => {
+      window.removeEventListener('online', flushOnReconnect);
+    };
+  }, [retryAllFailedAttachmentUploads, selectedRoomId]);
+
   return {
     pendingAlbumFiles,
     albumPreviewUrls,
     pendingAttachmentFiles,
+    failedAttachmentRetryEntries,
     fileUploading,
     processFileUpload,
     confirmPendingAttachmentUpload,
@@ -463,5 +570,9 @@ export function useChatUploads({
     handleComposerPaste,
     queueDroppedFiles,
     handleAttachmentSelect,
+    retryFailedAttachmentUpload,
+    retryAllFailedAttachmentUploads,
+    dismissFailedAttachmentUpload,
+    clearAllFailedAttachmentUploads,
   };
 }

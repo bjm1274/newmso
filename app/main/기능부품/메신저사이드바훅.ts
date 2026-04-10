@@ -7,11 +7,13 @@ import type { MessengerSidebarRoomItem } from './메신저사이드바';
 import {
   NOTICE_ROOM_ID,
   arraysMatch,
+  getChatRoomParticipantCount,
   getConversationUnreadCountForRoom,
   getDirectRoomMembersKey,
   getPinnedRoomOrderStorageKey,
   getRoomDisplayName,
   getRoomPreviewText,
+  isGroupChatRoom,
   isSelfChatRoom,
   normalizeMemberIds,
   sortRoomsForSidebar,
@@ -164,9 +166,10 @@ export function useChatSidebarState({
     return sidebarRooms.map((room) => {
       const roomId = String(room.id);
       const members = normalizeMemberIds(room.members);
+      const isGroupRoom = isGroupChatRoom(room);
       const selfRoom = isSelfChatRoom(room, effectiveChatUserId || '');
       const peer =
-        room.type === 'direct'
+        !isGroupRoom && room.type === 'direct'
           ? selfRoom
             ? resolveStaffProfile(effectiveChatUserId)
             : members
@@ -180,6 +183,8 @@ export function useChatSidebarState({
         unread: getConversationUnreadCountForRoom(room, roomUnreadCounts, chatRooms),
         isSelected: String(selectedRoomId || '') === roomId,
         isNoticeChannel: String(room.id) === NOTICE_ROOM_ID,
+        isGroupRoom,
+        participantCount: getChatRoomParticipantCount(room),
         label: roomLabelMap.get(roomId) || '',
         preview: getRoomPreviewText(room),
         peerName: peer?.name || '',

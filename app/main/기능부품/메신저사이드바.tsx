@@ -1,6 +1,7 @@
 'use client';
 
 import { MessengerAvatar } from './메신저공통';
+import { getGroupChatRoomBadgeText } from './메신저유틸';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import type { ChatRoom, StaffMember } from '@/types';
 
@@ -12,6 +13,8 @@ export type MessengerSidebarRoomItem = {
   unread: number;
   isSelected: boolean;
   isNoticeChannel: boolean;
+  isGroupRoom: boolean;
+  participantCount: number;
   label: string;
   preview: string;
   peerName: string;
@@ -23,33 +26,38 @@ export type MessengerSidebarRoomItem = {
   pinnedCount: number;
 };
 
-const GROUP_ROOM_LABEL_MAX = 15;
+export type MessengerMentionInboxItem = {
+  id: string;
+  roomId: string;
+  messageId: string;
+  roomName: string;
+  senderName: string;
+  body: string;
+  createdAt: string;
+  unread: boolean;
+};
 
-function getCompactGroupRoomLabel(label: string) {
-  const normalized = String(label || '').trim().replace(/\s+/g, ' ');
-  if (!normalized) return '단체 채팅방';
-
-  const memberLikeParts = normalized
-    .split(/\s*[,·/|]\s*/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  if (memberLikeParts.length >= 3) {
-    return `${memberLikeParts[0]} 외 ${memberLikeParts.length - 1}명`;
-  }
-
-  if (normalized.length > GROUP_ROOM_LABEL_MAX) {
-    return `${normalized.slice(0, GROUP_ROOM_LABEL_MAX - 1)}…`;
-  }
-
-  return normalized;
-}
+export type MessengerThreadInboxItem = {
+  id: string;
+  roomId: string;
+  messageId: string;
+  threadRootId: string;
+  roomName: string;
+  senderName: string;
+  body: string;
+  createdAt: string;
+  unread: boolean;
+  followed: boolean;
+};
 
 type MessengerSidebarProps = {
   selectedRoomId: string | null;
   viewMode: MessengerViewMode;
   showHiddenRooms: boolean;
   sidebarRoomItems: MessengerSidebarRoomItem[];
+  attentionThreadItems: MessengerThreadInboxItem[];
+  mentionInboxItems: MessengerMentionInboxItem[];
+  threadInboxItems: MessengerThreadInboxItem[];
   groupedStaffs: Record<string, Record<string, StaffMember[]>>;
   expandedDepts: Set<string>;
   onViewModeChange: (mode: MessengerViewMode) => void;
@@ -57,6 +65,9 @@ type MessengerSidebarProps = {
   onOpenGlobalSearch: () => void;
   onToggleHiddenRooms: () => void;
   onRoomClick: (roomId: string) => void;
+  onOpenAttentionThreadItem: (item: MessengerThreadInboxItem) => void;
+  onOpenMentionItem: (item: MessengerMentionInboxItem) => void;
+  onOpenThreadItem: (item: MessengerThreadInboxItem) => void;
   onToggleRoomPinned: (roomId: string, shouldPin: boolean) => void;
   onMovePinnedRoom: (roomId: string, direction: 'up' | 'down') => void;
   onToggleRoomHidden: (roomId: string, hidden: boolean) => void;
@@ -69,6 +80,9 @@ export function MessengerSidebar({
   viewMode,
   showHiddenRooms,
   sidebarRoomItems,
+  attentionThreadItems,
+  mentionInboxItems,
+  threadInboxItems,
   groupedStaffs,
   expandedDepts,
   onViewModeChange,
@@ -76,6 +90,9 @@ export function MessengerSidebar({
   onOpenGlobalSearch,
   onToggleHiddenRooms,
   onRoomClick,
+  onOpenAttentionThreadItem,
+  onOpenMentionItem,
+  onOpenThreadItem,
   onToggleRoomPinned,
   onMovePinnedRoom,
   onToggleRoomHidden,
@@ -174,6 +191,135 @@ export function MessengerSidebar({
                 {showHiddenRooms ? '숨김방 닫기' : '숨김방 보기'}
               </button>
             </div>
+            <div className="mb-3 space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">답변 필요</span>
+                <span className="rounded-full bg-[var(--tab-bg)] px-2 py-0.5 text-[9px] font-bold text-[var(--toss-gray-4)]">
+                  {attentionThreadItems.length}
+                </span>
+              </div>
+              {attentionThreadItems.length > 0 ? (
+                attentionThreadItems.slice(0, 3).map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    data-testid={`chat-thread-attention-${item.threadRootId}`}
+                    onClick={() => onOpenAttentionThreadItem(item)}
+                    className="flex w-full items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-left transition-colors hover:border-amber-500/40 hover:bg-amber-500/15"
+                  >
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-[11px] font-black text-amber-700">
+                      !
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate text-[11px] font-bold text-foreground">{item.senderName}</p>
+                        <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">
+                          답변 필요
+                        </span>
+                        {item.followed ? (
+                          <span className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-bold text-blue-600">
+                            팔로우
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="truncate text-[10px] font-semibold text-[var(--toss-gray-4)]">{item.roomName}</p>
+                      <p className="truncate text-[10px] text-[var(--toss-gray-3)]">{item.body}</p>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--tab-bg)] py-3 text-center text-[10px] font-bold text-[var(--toss-gray-3)]">
+                  답변이 필요한 스레드가 없습니다.
+                </div>
+              )}
+            </div>
+            <div className="mb-3 space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">최근 멘션</span>
+                <span className="rounded-full bg-[var(--tab-bg)] px-2 py-0.5 text-[9px] font-bold text-[var(--toss-gray-4)]">
+                  {mentionInboxItems.length}
+                </span>
+              </div>
+              {mentionInboxItems.length > 0 ? (
+                mentionInboxItems.slice(0, 3).map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    data-testid={`chat-mention-inbox-${item.id}`}
+                    onClick={() => onOpenMentionItem(item)}
+                    className="flex w-full items-start gap-2 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-left transition-colors hover:border-[var(--accent)] hover:bg-[var(--toss-blue-light)]/40"
+                  >
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-[11px] font-black text-indigo-600">
+                      @
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate text-[11px] font-bold text-foreground">{item.senderName}</p>
+                        {item.unread ? (
+                          <span className="rounded-full bg-indigo-500/10 px-1.5 py-0.5 text-[9px] font-bold text-indigo-600">
+                            NEW
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="truncate text-[10px] font-semibold text-[var(--toss-gray-4)]">{item.roomName}</p>
+                      <p className="truncate text-[10px] text-[var(--toss-gray-3)]">{item.body}</p>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--tab-bg)] py-3 text-center text-[10px] font-bold text-[var(--toss-gray-3)]">
+                  최근 멘션이 없습니다.
+                </div>
+              )}
+            </div>
+            <div className="mb-3 space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">스레드함</span>
+                <span className="rounded-full bg-[var(--tab-bg)] px-2 py-0.5 text-[9px] font-bold text-[var(--toss-gray-4)]">
+                  {threadInboxItems.length}
+                </span>
+              </div>
+              {threadInboxItems.length > 0 ? (
+                threadInboxItems.slice(0, 3).map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    data-testid={`chat-thread-inbox-${item.id}`}
+                    onClick={() => onOpenThreadItem(item)}
+                    className="flex w-full items-start gap-2 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-left transition-colors hover:border-[var(--accent)] hover:bg-[var(--toss-blue-light)]/40"
+                  >
+                    <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[11px] font-black ${
+                      item.followed
+                        ? 'bg-amber-500/10 text-amber-600'
+                        : 'bg-blue-500/10 text-blue-600'
+                    }`}>
+                      {item.followed ? '☆' : '↪'}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate text-[11px] font-bold text-foreground">{item.senderName}</p>
+                        {item.unread ? (
+                          <span className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-bold text-blue-600">
+                            NEW
+                          </span>
+                        ) : null}
+                        {item.followed ? (
+                          <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold text-amber-600">
+                            팔로우
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="truncate text-[10px] font-semibold text-[var(--toss-gray-4)]">{item.roomName}</p>
+                      <p className="truncate text-[10px] text-[var(--toss-gray-3)]">{item.body}</p>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--tab-bg)] py-3 text-center text-[10px] font-bold text-[var(--toss-gray-3)]">
+                  최근 스레드 알림이 없습니다.
+                </div>
+              )}
+            </div>
             {sidebarRoomItems.map(
               ({
                 room,
@@ -181,6 +327,8 @@ export function MessengerSidebar({
                 unread,
                 isSelected,
                 isNoticeChannel,
+                isGroupRoom,
+                participantCount,
                 label,
                 preview,
                 peerName,
@@ -191,8 +339,7 @@ export function MessengerSidebar({
                 pinnedIndex,
                 pinnedCount,
               }) => {
-                const isGroupRoom = room.type === 'group';
-                const displayLabel = isGroupRoom ? getCompactGroupRoomLabel(label) : label;
+                const groupBadgeText = isGroupRoom ? getGroupChatRoomBadgeText(label) : '';
 
                 return (
                   <div
@@ -222,14 +369,9 @@ export function MessengerSidebar({
                       ) : isGroupRoom ? (
                         <div
                           data-testid={`chat-room-icon-${roomId}`}
-                          className="relative flex h-8 w-8 shrink-0 items-center justify-center"
+                          className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-[10px] font-black leading-none tracking-tight text-amber-700 shadow-sm dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200"
                         >
-                          <MessengerAvatar
-                            name={label}
-                            photoUrl={null}
-                            className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-[var(--tab-bg)] text-[11px] font-bold text-[var(--toss-gray-4)] dark:bg-zinc-800"
-                            decorative
-                          />
+                          {groupBadgeText}
                         </div>
                       ) : peerName ? (
                         <div
@@ -272,8 +414,17 @@ export function MessengerSidebar({
                                 : 'text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]'
                             }`}
                           >
-                            {displayLabel}
+                            {label || '단체 채팅방'}
                           </p>
+                          {isGroupRoom && participantCount > 0 ? (
+                            <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                              isSelected
+                                ? 'bg-white/10 text-white/80'
+                                : 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-200'
+                            }`}>
+                              {participantCount}명
+                            </span>
+                          ) : null}
                           {isPinned ? <span className="text-[9px] font-bold text-amber-400">PIN</span> : null}
                           {isHidden ? <span className="text-[9px] font-bold text-[var(--toss-gray-3)]">HIDE</span> : null}
                         </div>

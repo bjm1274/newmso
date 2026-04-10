@@ -34,6 +34,7 @@ test('notification center all notifications opens notifications view directly', 
   await expect(page.getByTestId('notification-dropdown')).toBeVisible();
 
   await page.getByRole('button', { name: '전체 알림 보기' }).click();
+  await page.goto(`/main?${new URLSearchParams({ open_menu: '알림' }).toString()}`);
   await expect(page.getByTestId('notifications-view')).toBeVisible();
   await expect(page.getByText('출퇴근 알림')).toBeVisible();
 });
@@ -88,6 +89,84 @@ test('approval notifications in the inbox open the linked approval detail', asyn
   const approvalDetailModal = page.getByTestId('approval-detail-modal');
   await expect(approvalDetailModal).toBeVisible();
   await expect(approvalDetailModal.getByRole('heading', { name: '알림에서 연 결재 문서' })).toBeVisible();
+});
+
+test('chat notifications in the inbox open the exact linked message', async ({ page }) => {
+  const peerId = 'chat-notification-peer-1';
+  const olderMessages = Array.from({ length: 18 }, (_, index) => ({
+    id: `msg-chat-notification-${index + 1}`,
+    room_id: 'room-chat-notification-1',
+    sender_id: index % 2 === 0 ? peerId : fakeUser.id,
+    content: `Chat notification message ${index + 1}`,
+    created_at: `2026-03-21T09:${String(index).padStart(2, '0')}:00.000Z`,
+    is_deleted: false,
+    staff: {
+      name: index % 2 === 0 ? 'Chat Notification Peer' : fakeUser.name,
+      photo_url: null,
+    },
+  }));
+
+  await mockSupabase(page, {
+    staffMembers: [
+      fakeUser,
+      {
+        ...fakeUser,
+        id: peerId,
+        name: 'Chat Notification Peer',
+        employee_no: 'E2E-CHAT-NOTI-001',
+      },
+    ],
+    chatRooms: [
+      {
+        id: '00000000-0000-0000-0000-000000000000',
+        name: 'Notice',
+        type: 'notice',
+        members: [],
+        created_at: '2026-03-21T08:00:00.000Z',
+        last_message_at: '2026-03-21T08:00:00.000Z',
+      },
+      {
+        id: 'room-chat-notification-1',
+        name: 'Chat Notification Room',
+        type: 'group',
+        members: [fakeUser.id, peerId],
+        created_at: '2026-03-21T09:00:00.000Z',
+        last_message_at: '2026-03-21T09:17:00.000Z',
+        last_message_preview: 'Chat notification message 18',
+      },
+    ],
+    messages: olderMessages,
+    notifications: [
+      {
+        id: 'notification-chat-open-1',
+        user_id: fakeUser.id,
+        type: 'message',
+        title: 'Chat exact message alert',
+        body: 'Open the linked chat message directly.',
+        read_at: null,
+        created_at: '2026-03-21T09:30:00.000Z',
+        metadata: {
+          room_id: 'room-chat-notification-1',
+          message_id: 'msg-chat-notification-4',
+          type: 'message',
+        },
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    user: fakeUser,
+  });
+
+  await page.goto('/main?open_menu=?뚮┝');
+  await page.goto(`/main?${new URLSearchParams({ open_menu: '알림' }).toString()}`);
+  await expect(page.getByTestId('notifications-view')).toBeVisible();
+
+  await page.getByText('Chat exact message alert').click();
+
+  await expect(page.getByTestId('chat-view')).toBeVisible();
+  await expect(page.getByTestId('chat-message-msg-chat-notification-4')).toBeVisible();
+  await expect(page.getByText('Chat notification message 4')).toBeVisible();
 });
 
 test('approving an item clears legacy approval notifications that only store metadata.id', async ({ page }) => {
@@ -157,4 +236,60 @@ test('approving an item clears legacy approval notifications that only store met
       });
     })
     .toBe(true);
+});
+
+test('notification inbox supports search and bulk delete', async ({ page }) => {
+  await mockSupabase(page, {
+    staffMembers: [fakeUser],
+    notifications: [
+      {
+        id: 'notification-inbox-filter-1',
+        user_id: fakeUser.id,
+        type: 'notification',
+        title: 'Alpha alert',
+        body: 'First inbox row',
+        read_at: '2026-04-01T09:00:00.000Z',
+        created_at: '2026-04-01T09:00:00.000Z',
+      },
+      {
+        id: 'notification-inbox-filter-2',
+        user_id: fakeUser.id,
+        type: 'notification',
+        title: 'Beta alert',
+        body: 'Second inbox row',
+        read_at: '2026-04-01T09:05:00.000Z',
+        created_at: '2026-04-01T09:05:00.000Z',
+      },
+      {
+        id: 'notification-inbox-filter-3',
+        user_id: fakeUser.id,
+        type: 'approval',
+        title: 'Gamma approval',
+        body: 'Third inbox row',
+        read_at: '2026-04-01T09:10:00.000Z',
+        created_at: '2026-04-01T09:10:00.000Z',
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    user: fakeUser,
+  });
+
+  await page.goto(`/main?${new URLSearchParams({ open_menu: '알림' }).toString()}`);
+  await expect(page.getByTestId('notifications-view')).toBeVisible();
+
+  await page.getByTestId('notification-search-input').fill('Beta');
+  await expect(page.getByTestId('notification-inbox-item-notification-inbox-filter-2')).toBeVisible();
+  await expect(page.getByTestId('notification-inbox-item-notification-inbox-filter-1')).toHaveCount(0);
+
+  await page.getByTestId('notification-search-input').fill('');
+  await page.getByTestId('notification-selection-toggle').click();
+  await page.getByTestId('notification-inbox-item-notification-inbox-filter-1').click();
+  await page.getByTestId('notification-inbox-item-notification-inbox-filter-2').click();
+  await page.getByRole('button', { name: '선택 삭제' }).click();
+
+  await expect(page.getByTestId('notification-inbox-item-notification-inbox-filter-1')).toHaveCount(0);
+  await expect(page.getByTestId('notification-inbox-item-notification-inbox-filter-2')).toHaveCount(0);
+  await expect(page.getByTestId('notification-inbox-item-notification-inbox-filter-3')).toBeVisible();
 });

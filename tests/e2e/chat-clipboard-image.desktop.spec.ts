@@ -589,3 +589,89 @@ test('chat falls back to app-server upload when direct storage upload fails', as
   expect(fallbackUploadCalls).toBe(1);
   expect(runtimeErrors).toEqual([]);
 });
+
+test('chat keeps failed attachment uploads in a retry queue and can recover after reload', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  let uploadAttempt = 0;
+
+  await mockSupabase(page, {
+    staffMembers: [fakeUser, peerUser],
+    chatRooms: [buildNoticeRoom(), buildClipboardRoom()],
+    messages: [],
+  });
+
+  await page.unroute('**/api/chat/upload');
+  await page.route('**/api/chat/upload', async (route) => {
+    const contentType = (await route.request().headerValue('content-type')) || '';
+    if (!contentType.includes('application/json')) {
+      return route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'fallback upload disabled for retry test' }),
+      });
+    }
+
+    uploadAttempt += 1;
+    if (uploadAttempt === 1) {
+      return route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'temporary upload failure' }),
+      });
+    }
+
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        provider: 'r2',
+        bucket: 'pchos-files',
+        path: 'chat/queued-retry-image.png',
+        signedUrl: 'https://example-r2.invalid/upload/queued-retry-image.png',
+        headers: {
+          'content-type': 'image/png',
+        },
+        url: '/api/storage/object?provider=r2&bucket=pchos-files&key=chat%2Fqueued-retry-image.png',
+      }),
+    });
+  });
+
+  await page.route('**://example-r2.invalid/**', async (route) => {
+    await route.fulfill({ status: 200, body: '' });
+  });
+
+  await openClipboardChat(page);
+
+  await page.getByTestId('chat-file-input').setInputFiles({
+    name: 'queued-retry-image.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+  });
+
+  await expect(page.getByTestId('chat-pending-upload-panel')).toBeVisible();
+  await page.getByTestId('chat-pending-upload-send-button').click();
+  await expect(page.getByTestId('chat-failed-attachment-retry-panel')).toBeVisible();
+  runtimeErrors.length = 0;
+
+  await page.reload();
+  await expect(page.getByTestId('chat-view')).toBeVisible();
+  await expect(page.getByTestId('chat-failed-attachment-retry-panel')).toBeVisible();
+
+  await page.getByTestId('chat-failed-attachment-retry-all').click();
+
+  await expect
+    .poll(async () => {
+      const savedMessages = await getSavedClipboardMessages(page);
+      return savedMessages.some(
+        (message) =>
+          String(message?.file_name || '') === 'queued-retry-image.png' &&
+          String(message?.file_url || '').includes('/api/storage/object?provider=r2'),
+      );
+    })
+    .toBeTruthy();
+
+  await expect(page.getByTestId('chat-failed-attachment-retry-panel')).toBeHidden();
+  expect(uploadAttempt).toBe(2);
+  expect(runtimeErrors).toEqual([]);
+});

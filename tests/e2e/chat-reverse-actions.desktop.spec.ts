@@ -163,6 +163,7 @@ test('chat reverse actions can unpin, vote, remove a participant, and edit/delet
 
   await page.getByTestId('chat-message-msg-edit').click();
   await page.getByTestId('chat-message-action-edit').click();
+  await expect(page.getByTestId('chat-message-actions-panel')).toHaveCount(0);
   await page.getByTestId('chat-message-edit-input').fill('수정 후 메시지');
   await page.getByTestId('chat-message-edit-save').click();
   await expect(page.getByText('수정 후 메시지')).toBeVisible();

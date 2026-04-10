@@ -3,8 +3,17 @@ import { toast } from '@/lib/toast';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { StaffMember } from '@/types';
+import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
 import { supabase } from '@/lib/supabase';
-import { isActiveChatMember, NOTICE_ROOM_ID } from './메신저유틸';
+import { isActiveChatMember, isMessageReadByCursor, NOTICE_ROOM_ID } from './메신저유틸';
+import {
+  CHAT_NOTICE_SCHEDULE_EVENT,
+  cancelScheduledNoticeJob,
+  readScheduledNoticeJobs,
+  removeScheduledNoticeJob,
+  saveScheduledNoticeJob,
+  type NoticeScheduleJob,
+} from './메신저공지스케줄';
 const DEFAULT_DRIVE_LINKS = [
   { name: 'OneDrive 공유문서', url: '', sort_order: 0 },
   { name: '병원 NAS', url: '', sort_order: 1 },
@@ -52,6 +61,18 @@ function formatDateLabel(dateString: string) {
   });
 }
 
+function normalizeReminderInput(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(',')
+        .map((token) => Number(token.trim()))
+        .filter((entry) => Number.isFinite(entry) && entry > 0)
+        .map((entry) => Math.min(7 * 24 * 60, Math.floor(entry))),
+    ),
+  ).sort((left, right) => left - right);
+}
+
 export default function MessengerOperationsCenter({
   user,
   staffs = [],
@@ -65,7 +86,7 @@ export default function MessengerOperationsCenter({
 }) {
   const [loading, setLoading] = useState(true);
   const [noticeMessages, setNoticeMessages] = useState<NoticeMessage[]>([]);
-  const [messageReads, setMessageReads] = useState<any[]>([]);
+  const [noticeReadCursors, setNoticeReadCursors] = useState<Array<{ user_id: string; last_read_at: string | null }>>([]);
   const [roomFiles, setRoomFiles] = useState<any[]>([]);
   const [attendanceRows, setAttendanceRows] = useState<any[]>([]);
   const [shiftAssignments, setShiftAssignments] = useState<any[]>([]);
@@ -73,6 +94,10 @@ export default function MessengerOperationsCenter({
   const [newDriveName, setNewDriveName] = useState('');
   const [newDriveUrl, setNewDriveUrl] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [scheduleContent, setScheduleContent] = useState('');
+  const [scheduleSendAt, setScheduleSendAt] = useState('');
+  const [scheduleReminderInput, setScheduleReminderInput] = useState('60, 240');
+  const [scheduledNotices, setScheduledNotices] = useState<NoticeScheduleJob[]>([]);
 
   const activeStaffs = useMemo(
     () => (staffs as unknown as StaffMember[]).filter((staff) => isActiveChatMember(staff)),
@@ -80,6 +105,7 @@ export default function MessengerOperationsCenter({
   );
   const _user = (user ?? {}) as Record<string, unknown>;
   const companyScope = (_user.company as string) || '전체';
+  const scheduleActorId = String(_user.id || '').trim() || null;
 
   const loadDriveLinks = useCallback(async () => {
     const { data, error } = await supabase
@@ -164,19 +190,25 @@ export default function MessengerOperationsCenter({
         setShiftAssignments(shiftRes.data || []);
         await loadDriveLinks();
 
-        if (notices.length > 0) {
-          const { data: reads } = await supabase
-            .from('message_reads')
-            .select('message_id, user_id, read_at')
-            .in('message_id', notices.map((notice) => notice.id));
-          setMessageReads(reads || []);
+        if (notices.length > 0 && activeStaffs.length > 0) {
+          const { data: readCursors } = await supabase
+            .from('room_read_cursors')
+            .select('user_id, last_read_at')
+            .eq('room_id', NOTICE_ROOM_ID)
+            .in('user_id', activeStaffs.map((staff) => String(staff.id)));
+          setNoticeReadCursors(
+            (readCursors || []).map((cursor) => ({
+              user_id: String(cursor.user_id || ''),
+              last_read_at: typeof cursor.last_read_at === 'string' ? cursor.last_read_at : null,
+            }))
+          );
         } else {
-          setMessageReads([]);
+          setNoticeReadCursors([]);
         }
       } catch (error) {
         console.error('메신저 운영센터 로드 실패:', error);
         setNoticeMessages([]);
-        setMessageReads([]);
+        setNoticeReadCursors([]);
         setRoomFiles([]);
         setAttendanceRows([]);
         setShiftAssignments([]);
@@ -187,25 +219,45 @@ export default function MessengerOperationsCenter({
     };
 
     load();
-  }, [loadDriveLinks, selectedRoomId]);
+  }, [activeStaffs, loadDriveLinks, selectedRoomId]);
+
+  useEffect(() => {
+    const syncSchedules = () => {
+      setScheduledNotices(readScheduledNoticeJobs(scheduleActorId));
+    };
+
+    syncSchedules();
+    if (typeof window === 'undefined') return;
+
+    window.addEventListener(CHAT_NOTICE_SCHEDULE_EVENT, syncSchedules as EventListener);
+    return () => {
+      window.removeEventListener(CHAT_NOTICE_SCHEDULE_EVENT, syncSchedules as EventListener);
+    };
+  }, [scheduleActorId]);
 
   const importantNotices = useMemo(
     () => noticeMessages.filter((message) => String(message.content || '').startsWith('[중요공지]')),
     [noticeMessages]
   );
 
-  const readMap = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    messageReads.forEach((read: any) => {
-      if (!map.has(read.message_id)) map.set(read.message_id, new Set());
-      map.get(read.message_id)?.add(String(read.user_id));
+  const noticeReadCursorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    noticeReadCursors.forEach((cursor) => {
+      const userId = String(cursor.user_id || '').trim();
+      const lastReadAt = String(cursor.last_read_at || '').trim();
+      if (!userId || !lastReadAt) return;
+      map.set(userId, lastReadAt);
     });
     return map;
-  }, [messageReads]);
+  }, [noticeReadCursors]);
 
   const noticeRows = useMemo(() => {
     return noticeMessages.map((message) => {
-      const readers = Array.from(readMap.get(message.id) || []);
+      const readers = activeStaffs
+        .filter((staff) =>
+          isMessageReadByCursor(message.created_at, noticeReadCursorMap.get(String(staff.id)) || null)
+        )
+        .map((staff) => String(staff.id));
       const readRate = activeStaffs.length > 0 ? Math.round((readers.length / activeStaffs.length) * 100) : 0;
       const hoursAgo = formatHoursAgo(message.created_at);
       const isOverSla = hoursAgo >= 4 && readRate < 100;
@@ -219,7 +271,7 @@ export default function MessengerOperationsCenter({
         isImportant: String(message.content || '').startsWith('[중요공지]'),
       };
     });
-  }, [activeStaffs.length, noticeMessages, readMap]);
+  }, [activeStaffs, noticeMessages, noticeReadCursorMap]);
 
   const presenceRows = useMemo(() => {
     const attendanceMap = new Map(attendanceRows.map((row: Record<string, unknown>) => [String(row.staff_id), row.status]));
@@ -262,6 +314,10 @@ export default function MessengerOperationsCenter({
       : 0;
     const busyStaff = presenceRows.filter((row) => row.status === '근무중').length;
     const awayStaff = presenceRows.filter((row) => row.status === '부재중').length;
+    const scheduledCount = scheduledNotices.filter((job) => job.status === 'scheduled').length;
+    const pendingReminderCount = scheduledNotices
+      .filter((job) => job.status === 'sent' && job.sentMessageId && job.sentAt)
+      .reduce((sum, job) => sum + Math.max(0, job.reminderMinutes.length - job.reminderLog.length), 0);
 
     return {
       overdue,
@@ -269,8 +325,10 @@ export default function MessengerOperationsCenter({
       importantCount: importantNotices.length,
       busyStaff,
       awayStaff,
+      scheduledCount,
+      pendingReminderCount,
     };
-  }, [importantNotices.length, noticeRows, presenceRows]);
+  }, [importantNotices.length, noticeRows, presenceRows, scheduledNotices]);
 
   const markAsImportant = async (message: NoticeMessage) => {
     const trimmed = String(message.content || '').trim();
@@ -306,10 +364,19 @@ export default function MessengerOperationsCenter({
     try {
       const payload = nonReaders.map((staff) => ({
         user_id: staff.id,
-        type: 'notice_reminder',
+        type: 'message',
         title: '중요 공지 확인 요청',
         body: `${formatDateLabel(row.created_at)} 공지를 아직 확인하지 않았습니다. 즉시 확인해 주세요.`,
         read_at: null,
+        metadata: buildChatNotificationMetadata({
+          roomId: NOTICE_ROOM_ID,
+          messageId: String(row.id),
+          notificationType: 'message',
+          extra: {
+            reminder_kind: 'notice_ops',
+            room_name: '공지메시지',
+          },
+        }),
       }));
       const { error } = await supabase.from('notifications').insert(payload);
       if (error) throw error;
@@ -320,6 +387,55 @@ export default function MessengerOperationsCenter({
     } finally {
       setBusyId(null);
     }
+  };
+
+  const createScheduledNotice = () => {
+    const content = scheduleContent.trim();
+    const sendAt = scheduleSendAt.trim();
+    if (!scheduleActorId) {
+      toast('예약 공지를 저장할 계정 정보를 찾지 못했습니다.', 'error');
+      return;
+    }
+    if (!content || !sendAt) {
+      toast('예약 공지 내용과 발송 시각을 입력해 주세요.', 'warning');
+      return;
+    }
+
+    const reminderMinutes = normalizeReminderInput(scheduleReminderInput);
+    saveScheduledNoticeJob(scheduleActorId, {
+      actorName: String(_user.name || '알 수 없음'),
+      content,
+      sendAt: new Date(sendAt).toISOString(),
+      reminderMinutes,
+    });
+    setScheduleContent('');
+    setScheduleSendAt('');
+    setScheduleReminderInput(reminderMinutes.join(', '));
+    toast('예약 공지를 등록했습니다.', 'success');
+  };
+
+  const scheduleNow = (job: NoticeScheduleJob) => {
+    if (!scheduleActorId) return;
+    saveScheduledNoticeJob(scheduleActorId, {
+      id: job.id,
+      actorName: job.actorName,
+      content: job.content,
+      sendAt: new Date().toISOString(),
+      reminderMinutes: job.reminderMinutes,
+    });
+    toast('예약 공지를 즉시 발송 대상으로 전환했습니다.', 'success');
+  };
+
+  const cancelSchedule = (jobId: string) => {
+    if (!scheduleActorId) return;
+    cancelScheduledNoticeJob(scheduleActorId, jobId);
+    toast('예약 공지를 취소했습니다.', 'warning');
+  };
+
+  const removeSchedule = (jobId: string) => {
+    if (!scheduleActorId) return;
+    removeScheduledNoticeJob(scheduleActorId, jobId);
+    toast('예약 공지를 목록에서 제거했습니다.', 'success');
   };
 
   const addDriveLink = async () => {
@@ -407,7 +523,7 @@ export default function MessengerOperationsCenter({
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 p-4" onClick={onClose}>
+    <div data-testid="chat-ops-center" className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 p-4" onClick={onClose}>
       <div
         className="max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-[var(--card)] p-4 shadow-sm custom-scrollbar"
         onClick={(event) => event.stopPropagation()}
@@ -420,7 +536,7 @@ export default function MessengerOperationsCenter({
               읽음 SLA, 중요공지 확인, 공지 읽음률, 근무 상태, 파일 버전, 대용량 드라이브 링크를 한 화면에서 관리합니다.
             </p>
           </div>
-          <button onClick={onClose} className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-sm font-bold text-[var(--toss-gray-4)]">
+          <button data-testid="chat-ops-center-close" onClick={onClose} className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-sm font-bold text-[var(--toss-gray-4)]">
             닫기
           </button>
         </div>
@@ -429,13 +545,15 @@ export default function MessengerOperationsCenter({
           <div className="py-10 text-center text-sm font-semibold text-[var(--toss-gray-3)]">운영 데이터를 불러오는 중입니다.</div>
         ) : (
           <div className="mt-4 space-y-4">
-            <div className="grid gap-3 md:grid-cols-5">
+            <div className="grid gap-3 md:grid-cols-7">
               {[
                 { label: 'SLA 초과', value: `${stats.overdue}건`, tone: 'text-red-600' },
                 { label: '평균 읽음률', value: `${stats.averageReadRate}%`, tone: 'text-[var(--accent)]' },
                 { label: '중요 공지', value: `${stats.importantCount}건`, tone: 'text-orange-600' },
                 { label: '근무중', value: `${stats.busyStaff}명`, tone: 'text-emerald-600' },
                 { label: '부재중', value: `${stats.awayStaff}명`, tone: 'text-[var(--toss-gray-4)]' },
+                { label: '예약 공지', value: `${stats.scheduledCount}건`, tone: 'text-violet-600' },
+                { label: '남은 리마인드', value: `${stats.pendingReminderCount}건`, tone: 'text-indigo-600' },
               ].map((card) => (
                 <div key={card.label} className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">{card.label}</p>
@@ -567,6 +685,126 @@ export default function MessengerOperationsCenter({
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] p-5">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-base font-bold text-[var(--foreground)]">공지 예약 발송 / 자동 리마인드</h3>
+                  <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
+                    예약 공지는 앱이 열려 있을 때 자동 발송되며, 설정한 분 단위로 미열람자 리마인드를 보냅니다.
+                  </p>
+                </div>
+                <div className="grid min-w-[320px] flex-1 gap-2 md:grid-cols-[1.6fr_0.9fr_0.8fr_auto]">
+                  <textarea
+                    data-testid="chat-ops-schedule-content"
+                    value={scheduleContent}
+                    onChange={(event) => setScheduleContent(event.target.value)}
+                    rows={2}
+                    placeholder="예약 공지 내용을 입력하세요."
+                    className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none"
+                  />
+                  <input
+                    data-testid="chat-ops-schedule-send-at"
+                    type="datetime-local"
+                    value={scheduleSendAt}
+                    onChange={(event) => setScheduleSendAt(event.target.value)}
+                    className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none"
+                  />
+                  <input
+                    data-testid="chat-ops-schedule-reminders"
+                    type="text"
+                    value={scheduleReminderInput}
+                    onChange={(event) => setScheduleReminderInput(event.target.value)}
+                    placeholder="60, 240"
+                    className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none"
+                  />
+                  <button
+                    type="button"
+                    data-testid="chat-ops-schedule-create"
+                    onClick={createScheduledNotice}
+                    className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white"
+                  >
+                    예약 등록
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {scheduledNotices.length === 0 ? (
+                  <div className="rounded-[var(--radius-lg)] bg-[var(--muted)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
+                    등록된 예약 공지가 없습니다.
+                  </div>
+                ) : (
+                  scheduledNotices.map((job) => (
+                    <div
+                      key={job.id}
+                      data-testid={`chat-ops-schedule-${job.id}`}
+                      className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`rounded-[var(--radius-md)] px-2 py-0.5 text-[10px] font-bold ${
+                              job.status === 'sent'
+                                ? 'bg-emerald-500/15 text-emerald-700'
+                                : job.status === 'cancelled'
+                                  ? 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'
+                                  : 'bg-violet-500/15 text-violet-700'
+                            }`}>
+                              {job.status === 'sent' ? '발송 완료' : job.status === 'cancelled' ? '취소됨' : '예약중'}
+                            </span>
+                            <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                              {new Date(job.sendAt).toLocaleString('ko-KR')}
+                            </span>
+                            <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                              리마인드 {job.reminderMinutes.join(', ')}분
+                            </span>
+                          </div>
+                          <p className="mt-2 whitespace-pre-wrap break-words text-sm font-semibold text-[var(--foreground)]">
+                            {job.content}
+                          </p>
+                          {job.reminderLog.length > 0 ? (
+                            <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">
+                              리마인드 로그: {job.reminderLog.map((entry) => `${entry.offsetMinutes}분 후 ${entry.unreadCount}명`).join(' · ')}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {job.status === 'scheduled' ? (
+                            <>
+                              <button
+                                type="button"
+                                data-testid={`chat-ops-schedule-now-${job.id}`}
+                                onClick={() => scheduleNow(job)}
+                                className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[11px] font-bold text-[var(--foreground)]"
+                              >
+                                지금 발송
+                              </button>
+                              <button
+                                type="button"
+                                data-testid={`chat-ops-schedule-cancel-${job.id}`}
+                                onClick={() => cancelSchedule(job.id)}
+                                className="rounded-[var(--radius-md)] border border-orange-500/20 bg-orange-500/10 px-3 py-2 text-[11px] font-bold text-orange-600"
+                              >
+                                취소
+                              </button>
+                            </>
+                          ) : null}
+                          <button
+                            type="button"
+                            data-testid={`chat-ops-schedule-remove-${job.id}`}
+                            onClick={() => removeSchedule(job.id)}
+                            className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/10 px-3 py-2 text-[11px] font-bold text-red-600"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 

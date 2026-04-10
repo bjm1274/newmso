@@ -16,9 +16,11 @@ type MessengerMessageActionsProps = {
   onTogglePin: () => void | Promise<void>;
   onToggleBookmark: () => void | Promise<void>;
   onStartEdit: () => void;
+  onOpenEditHistory: () => void;
   onDelete: () => void | Promise<void>;
   onReply: () => void;
   onForward: () => void;
+  onCopyLink: () => void | Promise<void>;
   onOpenReadStatus: () => void;
   onOpenThread: () => void;
 };
@@ -53,9 +55,11 @@ export function MessengerMessageActions({
   onTogglePin,
   onToggleBookmark,
   onStartEdit,
+  onOpenEditHistory,
   onDelete,
   onReply,
   onForward,
+  onCopyLink,
   onOpenReadStatus,
   onOpenThread,
 }: MessengerMessageActionsProps) {
@@ -102,6 +106,12 @@ export function MessengerMessageActions({
                 <span className="text-sm font-bold">수정</span>
               </button>
             )}
+            {message.edited_at && !message.is_deleted && (
+              <button data-testid="chat-message-action-edit-history-mobile" onClick={onOpenEditHistory} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
+                <span className="text-xl">🕘</span>
+                <span className="text-sm font-bold">수정 이력</span>
+              </button>
+            )}
             {canDelete && (
               <button onClick={() => { void onDelete(); }} className="w-full flex items-center gap-4 p-4 hover:bg-red-500/10 dark:hover:bg-red-900/20 rounded-[var(--radius-md)] transition-colors text-red-500">
                 <span className="text-xl">🗑️</span>
@@ -115,6 +125,10 @@ export function MessengerMessageActions({
             <button onClick={onForward} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
               <span className="text-xl">📤</span>
               <span className="text-sm font-bold">전달</span>
+            </button>
+            <button data-testid="chat-message-action-copy-link-mobile" onClick={() => { void onCopyLink(); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
+              <span className="text-xl">🔗</span>
+              <span className="text-sm font-bold">메시지 링크 복사</span>
             </button>
           </div>
         </div>
@@ -142,6 +156,11 @@ export function MessengerMessageActions({
             {canEdit && (
               <button data-testid="chat-message-action-edit" onClick={onStartEdit} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">메시지 수정</button>
             )}
+            {message.edited_at && !message.is_deleted && (
+              <button data-testid="chat-message-action-edit-history" onClick={onOpenEditHistory} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">
+                수정 이력 보기
+              </button>
+            )}
             {canDelete && (
               <button data-testid="chat-message-action-delete" onClick={() => { void onDelete(); }} className="w-full p-3 text-left hover:bg-red-500/10 rounded-[var(--radius-md)] text-xs font-semibold text-red-600 transition-colors">메시지 삭제</button>
             )}
@@ -154,6 +173,9 @@ export function MessengerMessageActions({
             </button>
             <button data-testid="chat-message-action-forward" onClick={onForward} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">
               다른 채팅방으로 전달
+            </button>
+            <button data-testid="chat-message-action-copy-link" onClick={() => { void onCopyLink(); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">
+              메시지 링크 복사
             </button>
             <button data-testid="chat-message-action-thread" onClick={onOpenThread} className="w-full p-3 text-left hover:bg-[var(--toss-blue-light)] rounded-[var(--radius-md)] text-xs font-semibold text-[var(--accent)] transition-colors">
               이 메시지 스레드 보기

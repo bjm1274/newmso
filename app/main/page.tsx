@@ -952,6 +952,17 @@ function MainPageContent() {
       return;
     }
 
+    if (menu === '채팅') {
+      clearMenuNavigationTargets();
+      resetPersistedMenuState(menu);
+      startTransition(() => {
+        setChatListResetToken((prev) => prev + 1);
+        setMainMenu(menu);
+        if (sub !== undefined) setSubView(sub);
+      });
+      return;
+    }
+
     startTransition(() => {
       setMainMenu(menu);
       if (sub !== undefined) setSubView(sub);
@@ -1049,6 +1060,11 @@ function MainPageContent() {
         {/* 채팅·전자결재·연차촉진·출퇴근 실시간 알림 통합 배너 (웹·모바일 즉시 표시) */}
         <ChatAlertBanner
           onOpenChat={(roomId) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); }}
+          onOpenMessage={(roomId, messageId) => {
+            setMainMenu('채팅');
+            setInitialOpenChatRoomId(roomId);
+            setInitialOpenMessageId(messageId);
+          }}
         />
         {/* 전역 알림 및 푸시 처리 (채팅 탭을 열지 않아도 작동) */}
         <NotificationSystem

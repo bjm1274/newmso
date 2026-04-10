@@ -273,6 +273,26 @@ test('shared push click opens the exact approval, board, and inventory targets',
   expect(inventoryUrl.searchParams.get('open_inventory_approval')).toBe('inventory-approval-1');
 });
 
+test('shared push click respects explicit menu metadata when a feature sends a direct menu target', async () => {
+  const adminHarness = createPushSharedHarness({ clients: [] });
+  await adminHarness.shared?.handleNotificationClick({
+    action: 'open',
+    notification: {
+      close: () => undefined,
+      data: {
+        type: 'notification',
+        open_menu: '관리자',
+        open_subview: '급여이상치',
+        notification_id: 'notification-admin-1',
+      },
+    },
+  });
+
+  const adminUrl = new URL(adminHarness.openedUrls[0]);
+  expect(adminUrl.searchParams.get('open_menu')).toBe('관리자');
+  expect(adminUrl.searchParams.get('open_subview')).toBe('급여이상치');
+});
+
 test('shared push subscription change re-subscribes and syncs the new endpoint', async () => {
   const postedMessages: Array<unknown> = [];
   const harness = createPushSharedHarness({

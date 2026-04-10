@@ -22,6 +22,7 @@ type UseChatMessageWorkflowParams = {
   setForwardSourceMsg: Dispatch<SetStateAction<ChatMessage | null>>;
   setShowForwardModal: Dispatch<SetStateAction<boolean>>;
   setThreadRoot: Dispatch<SetStateAction<ChatMessage | null>>;
+  resolveThreadRootMessage: (message: ChatMessage) => ChatMessage;
   markMessageRead: (message: ChatMessage) => void | Promise<void>;
   loadReadStatusForMessage: (message: ChatMessage) => void | Promise<void>;
   deleteMessage: (message: ChatMessage) => void | Promise<void>;
@@ -42,6 +43,7 @@ export function useChatMessageWorkflow({
   setForwardSourceMsg,
   setShowForwardModal,
   setThreadRoot,
+  resolveThreadRootMessage,
   markMessageRead,
   loadReadStatusForMessage,
   deleteMessage,
@@ -136,9 +138,9 @@ export function useChatMessageWorkflow({
   }, [loadReadStatusForMessage, setActiveActionMsg]);
 
   const openThreadPanel = useCallback((message: ChatMessage) => {
-    setThreadRoot(message);
+    setThreadRoot(resolveThreadRootMessage(message));
     setActiveActionMsg(null);
-  }, [setActiveActionMsg, setThreadRoot]);
+  }, [resolveThreadRootMessage, setActiveActionMsg, setThreadRoot]);
 
   const deleteMessageFromActions = useCallback(async (message: ChatMessage) => {
     await deleteMessage(message);

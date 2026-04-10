@@ -5,12 +5,14 @@ import type { ChatMessage, StaffMember } from '@/types';
 import { getPendingAttachmentDisplayName } from './메신저첨부';
 import { buildMessengerImageAlt } from './메신저공통';
 import { isMobileChatViewport, NOTICE_ROOM_ID } from './메신저유틸';
+import type { AttachmentRetryQueueEntry } from './메신저첨부재시도큐';
 
 type MessengerComposerProps = {
   replyTo: ChatMessage | null;
   pendingAlbumFiles: File[];
   albumPreviewUrls: string[];
   pendingAttachmentFiles: File[];
+  failedAttachmentRetryEntries: AttachmentRetryQueueEntry[];
   fileUploading: boolean;
   typingNoticeText: string;
   selectedRoomId: string | null;
@@ -25,6 +27,10 @@ type MessengerComposerProps = {
   onSendAlbum: () => void | Promise<unknown>;
   onCancelPendingAttachmentUpload: () => void;
   onConfirmPendingAttachmentUpload: () => void | Promise<unknown>;
+  onRetryFailedAttachmentUpload: (entryId: string) => void | Promise<unknown>;
+  onRetryAllFailedAttachmentUploads: () => void | Promise<unknown>;
+  onDismissFailedAttachmentUpload: (entryId: string) => void | Promise<unknown>;
+  onClearAllFailedAttachmentUploads: () => void | Promise<unknown>;
   onAttachmentSelect: (event: ChangeEvent<HTMLInputElement>) => void;
   onAlbumFileSelect: (event: ChangeEvent<HTMLInputElement>) => void;
   onQueueDroppedFiles: (files: File[]) => void;
@@ -39,6 +45,7 @@ export function MessengerComposer({
   pendingAlbumFiles,
   albumPreviewUrls,
   pendingAttachmentFiles,
+  failedAttachmentRetryEntries,
   fileUploading,
   typingNoticeText,
   selectedRoomId,
@@ -53,6 +60,10 @@ export function MessengerComposer({
   onSendAlbum,
   onCancelPendingAttachmentUpload,
   onConfirmPendingAttachmentUpload,
+  onRetryFailedAttachmentUpload,
+  onRetryAllFailedAttachmentUploads,
+  onDismissFailedAttachmentUpload,
+  onClearAllFailedAttachmentUploads,
   onAttachmentSelect,
   onAlbumFileSelect,
   onQueueDroppedFiles,
@@ -209,6 +220,67 @@ export function MessengerComposer({
             >
               전송
             </button>
+          </div>
+        </div>
+      )}
+
+      {failedAttachmentRetryEntries.length > 0 && (
+        <div
+          data-testid="chat-failed-attachment-retry-panel"
+          className="mb-1 flex flex-col gap-2 rounded-[var(--radius-lg)] border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[12px]"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-semibold text-amber-700">업로드 실패 파일 {failedAttachmentRetryEntries.length}개</p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                data-testid="chat-failed-attachment-retry-all"
+                onClick={() => void onRetryAllFailedAttachmentUploads()}
+                className="rounded-[var(--radius-md)] bg-amber-500/15 px-2.5 py-1 text-[11px] font-bold text-amber-700"
+              >
+                모두 재시도
+              </button>
+              <button
+                type="button"
+                data-testid="chat-failed-attachment-clear-all"
+                onClick={() => void onClearAllFailedAttachmentUploads()}
+                className="rounded-[var(--radius-md)] border border-amber-500/20 bg-white/80 px-2.5 py-1 text-[11px] font-bold text-amber-700"
+              >
+                모두 지우기
+              </button>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            {failedAttachmentRetryEntries.slice(0, 4).map((entry) => (
+              <div
+                key={entry.id}
+                data-testid={`chat-failed-attachment-${entry.id}`}
+                className="flex items-center justify-between gap-2 rounded-[var(--radius-md)] border border-amber-500/10 bg-white/70 px-2.5 py-2"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[11px] font-bold text-amber-800">{entry.fileName}</p>
+                  <p className="truncate text-[10px] text-amber-700/80">{entry.error || '업로드 실패'}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    data-testid={`chat-failed-attachment-retry-${entry.id}`}
+                    onClick={() => void onRetryFailedAttachmentUpload(entry.id)}
+                    className="rounded-[var(--radius-md)] bg-amber-500/15 px-2 py-1 text-[10px] font-bold text-amber-700"
+                  >
+                    재시도
+                  </button>
+                  <button
+                    type="button"
+                    data-testid={`chat-failed-attachment-dismiss-${entry.id}`}
+                    onClick={() => void onDismissFailedAttachmentUpload(entry.id)}
+                    className="rounded-[var(--radius-md)] border border-amber-500/20 bg-white/80 px-2 py-1 text-[10px] font-bold text-amber-700"
+                  >
+                    삭제
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

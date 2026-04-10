@@ -4,6 +4,7 @@ import { AttachmentListCard, getAttachmentDisplayName, resolveAttachmentKind } f
 import { MessengerAvatar } from './메신저공통';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
+import type { SavedChatSearch } from './메신저검색훅';
 
 export type MessengerMediaFilter = 'all' | 'media' | 'image' | 'video' | 'file';
 export type MessengerGlobalSearchTab = 'all' | 'member' | 'room' | 'message' | 'file';
@@ -133,12 +134,16 @@ type GlobalSearchModalProps = {
   messageResults: ChatMessage[];
   fileResults: ChatMessage[];
   allResults: ChatMessage[];
+  savedSearches: SavedChatSearch[];
   allKnownStaffs: StaffMember[];
   effectiveChatUserId: string | null | undefined;
   onClose: () => void;
   onQueryChange: (value: string) => void;
   onTabChange: (tab: MessengerGlobalSearchTab) => void;
   onSearchSubmit: (query: string) => void | Promise<void>;
+  onSaveCurrentSearch: (query?: string) => void;
+  onApplySavedSearch: (query: string) => void;
+  onRemoveSavedSearch: (searchId: string) => void;
   onOpenGroup: () => void;
   onOpenMember: (staff: StaffMember) => void | Promise<void>;
   onOpenRoom: (roomId: string, messageId?: string) => void;
@@ -160,12 +165,16 @@ export function GlobalSearchModal({
   messageResults,
   fileResults,
   allResults,
+  savedSearches,
   allKnownStaffs,
   effectiveChatUserId,
   onClose,
   onQueryChange,
   onTabChange,
   onSearchSubmit,
+  onSaveCurrentSearch,
+  onApplySavedSearch,
+  onRemoveSavedSearch,
   onOpenGroup,
   onOpenMember,
   onOpenRoom,
@@ -233,6 +242,15 @@ export function GlobalSearchModal({
               검색
             </button>
             <button
+              data-testid="chat-global-search-save"
+              type="button"
+              disabled={!query.trim()}
+              onClick={() => onSaveCurrentSearch(query)}
+              className="px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 text-xs font-bold hover:bg-amber-100 transition-colors whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              저장
+            </button>
+            <button
               onClick={onClose}
               className="text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] text-lg font-bold leading-none px-1"
             >
@@ -263,12 +281,59 @@ export function GlobalSearchModal({
               </button>
             ))}
           </div>
+          <p className="px-1 text-[10px] text-[var(--toss-gray-3)]">
+            예: `from:영희 has:file after:2026-03-01`, `in:공지 before:2026-03-31`
+          </p>
+          {savedSearches.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {savedSearches.map((search) => (
+                <div
+                  key={search.id}
+                  data-testid={`chat-saved-search-${search.id}`}
+                  className="inline-flex items-center gap-1 rounded-full bg-[var(--tab-bg)] px-2 py-1 text-[10px] font-bold text-[var(--toss-gray-4)]"
+                >
+                  <button
+                    type="button"
+                    onClick={() => onApplySavedSearch(search.query)}
+                    className="max-w-[180px] truncate hover:text-[var(--accent)]"
+                    title={search.query}
+                  >
+                    {search.label}
+                  </button>
+                  <button
+                    type="button"
+                    data-testid={`chat-saved-search-remove-${search.id}`}
+                    onClick={() => onRemoveSavedSearch(search.id)}
+                    className="rounded-full px-1 text-[var(--toss-gray-3)] hover:bg-[var(--card)] hover:text-red-500"
+                    aria-label="저장 검색 삭제"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar bg-[var(--tab-bg)] dark:bg-zinc-950 p-3">
           {!query.trim() ? (
             <div className="h-40 flex flex-col items-center justify-center text-[var(--toss-gray-3)] gap-2">
               <p className="text-sm font-bold">통합 검색으로 멤버, 채팅방, 메시지, 파일을 한 번에 찾을 수 있습니다.</p>
+              {savedSearches.length > 0 ? (
+                <div className="flex max-w-xl flex-wrap items-center justify-center gap-2">
+                  {savedSearches.map((search) => (
+                    <button
+                      key={`empty-${search.id}`}
+                      type="button"
+                      data-testid={`chat-saved-search-empty-${search.id}`}
+                      onClick={() => onApplySavedSearch(search.query)}
+                      className="rounded-full bg-[var(--card)] px-3 py-1.5 text-[11px] font-bold text-[var(--accent)] shadow-sm"
+                    >
+                      {search.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               <button
                 type="button"
                 onClick={onOpenGroup}

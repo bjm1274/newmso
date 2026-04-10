@@ -151,6 +151,7 @@ export type MockFixtures = {
   messageReads?: any[];
   roomReadCursors?: any[];
   messageBookmarks?: any[];
+  auditLogs?: any[];
   messageInsertFailures?: number;
   missingMessageColumns?: string[];
   missingBoardPostColumns?: string[];
@@ -419,6 +420,7 @@ function buildFixtures(overrides: MockFixtures = {}) {
     messageReads: overrides.messageReads ?? [],
     roomReadCursors: overrides.roomReadCursors ?? [],
     messageBookmarks: overrides.messageBookmarks ?? [],
+    auditLogs: overrides.auditLogs ?? [],
     messageInsertFailures: overrides.messageInsertFailures ?? 0,
     approvals:
       overrides.approvals ??
@@ -734,6 +736,7 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   let messageReads = [...fixtures.messageReads];
   let roomReadCursors = [...fixtures.roomReadCursors];
   let messageBookmarks = [...fixtures.messageBookmarks];
+  let auditLogs = [...(fixtures.auditLogs ?? [])];
   let companies = [...fixtures.companies];
   let inventoryItems = [...fixtures.inventoryItems];
   let inventoryLogs = [...fixtures.inventoryLogs];
@@ -1646,6 +1649,26 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       }
 
       return json(route, notifications);
+    }
+
+    if (path.includes('/audit_logs')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(auditLogs, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `audit-log-${auditLogs.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        auditLogs = [...inserted, ...auditLogs];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      return json(route, auditLogs);
     }
 
     if (path.includes('/email_queue')) {

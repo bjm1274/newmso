@@ -1,16 +1,29 @@
 ﻿'use client';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { sound } from '@/lib/sounds';
 import { isNamedSystemMasterAccount } from '@/lib/system-master';
 import { canAccessAdminSection } from '@/lib/access-control';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { bindChannelHealthcheck, bindPageRefresh } from '@/lib/realtime-maintenance';
+import {
+  DEFAULT_ADMIN_SUBVIEW,
+  DEFAULT_BOARD_TYPE,
+  NOTIFICATION_MENU_LABELS,
+  resolveNotificationTarget,
+} from '@/lib/notification-metadata';
 import { detectPayrollAnomalies } from './관리자전용서브/급여이상치감지';
 import { CHAT_ACTIVE_ROOM_KEY as ACTIVE_CHAT_ROOM_SESSION_KEY } from '@/app/main/navigation-state';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { toNotificationText, getInitials, timeAgo } from '@/lib/notification-utils';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
+import {
+  normalizeRoomNotificationKeyword,
+  normalizeRoomNotificationMode,
+  readStoredRoomPreferences,
+  readStoredThreadPreferences,
+} from './메신저유틸';
 
 /**
  * [실시간 알림 엔진 + KakaoTalk 스타일 Toast UI]
@@ -26,12 +39,18 @@ export interface NotifSettings {
   dndEnabled: boolean;
   dndFrom: string;
   dndTo: string;
+  weekendMute: boolean;
+  keywordAlertsEnabled: boolean;
+  keywords: string[];
   types: Record<string, boolean>;
 }
 
 const DEFAULT_SETTINGS: NotifSettings = {
   sound: true, vibration: true, dndEnabled: false,
   dndFrom: '22:00', dndTo: '08:00',
+  weekendMute: false,
+  keywordAlertsEnabled: false,
+  keywords: [],
   types: {
     message: true, mention: true, approval: true, payroll: true,
     inventory: true, attendance: true, board: true, 인사: true,
@@ -39,13 +58,98 @@ const DEFAULT_SETTINGS: NotifSettings = {
   },
 };
 
+export type NotificationDeliveryLogEntry = {
+  id: string;
+  notificationId?: string | null;
+  type: string;
+  title: string;
+  stage: string;
+  at: string;
+  detail?: Record<string, unknown> | null;
+};
+
+const NOTIFICATION_DELIVERY_LOG_KEY = 'erp_notification_delivery_log';
+export const NOTIFICATION_DELIVERY_EVENT = 'erp-notification-delivery-log';
+
+function normalizeKeywordList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(
+      value
+        .map((entry) => String(entry || '').trim().toLowerCase())
+        .filter(Boolean)
+        .slice(0, 30),
+    ),
+  );
+}
+
+export function saveNotifSettings(next: NotifSettings) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.NOTIF_SETTINGS, JSON.stringify(next));
+  } catch {
+    // ignore storage failures
+  }
+}
+
+export function readNotificationDeliveryLog(): NotificationDeliveryLogEntry[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(NOTIFICATION_DELIVERY_LOG_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed as NotificationDeliveryLogEntry[] : [];
+  } catch {
+    return [];
+  }
+}
+
+export function recordNotificationDelivery(
+  entry: Omit<NotificationDeliveryLogEntry, 'id' | 'at'> & { id?: string; at?: string },
+) {
+  if (typeof window === 'undefined') return;
+  const nextEntry: NotificationDeliveryLogEntry = {
+    id:
+      entry.id ||
+      (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`),
+    notificationId: entry.notificationId || null,
+    type: entry.type,
+    title: entry.title,
+    stage: entry.stage,
+    at: entry.at || new Date().toISOString(),
+    detail: normalizePushDebugDetail(entry.detail),
+  };
+
+  try {
+    const nextLog = [nextEntry, ...readNotificationDeliveryLog()].slice(0, 40);
+    window.localStorage.setItem(NOTIFICATION_DELIVERY_LOG_KEY, JSON.stringify(nextLog));
+  } catch {
+    // ignore storage failures
+  }
+
+  try {
+    window.dispatchEvent(new CustomEvent(NOTIFICATION_DELIVERY_EVENT, {
+      detail: nextEntry,
+    }));
+  } catch {
+    // ignore event failures
+  }
+}
+
 export function loadNotifSettings(): NotifSettings {
   if (typeof window === 'undefined') return DEFAULT_SETTINGS;
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.NOTIF_SETTINGS);
     if (!raw) return DEFAULT_SETTINGS;
     const p = JSON.parse(raw);
-    return { ...DEFAULT_SETTINGS, ...p, types: { ...DEFAULT_SETTINGS.types, ...(p.types || {}) } };
+    return {
+      ...DEFAULT_SETTINGS,
+      ...p,
+      keywords: normalizeKeywordList(p.keywords),
+      types: { ...DEFAULT_SETTINGS.types, ...(p.types || {}) },
+    };
   } catch { return DEFAULT_SETTINGS; }
 }
 
@@ -57,6 +161,129 @@ function isInDND(s: NotifSettings): boolean {
   const [th, tm] = s.dndTo.split(':').map(Number);
   const from = fh * 60 + fm, to = th * 60 + tm;
   return from <= to ? cur >= from && cur < to : cur >= from || cur < to;
+}
+
+function isWeekendQuiet(s: NotifSettings): boolean {
+  if (!s.weekendMute) return false;
+  const day = new Date().getDay();
+  return day === 0 || day === 6;
+}
+
+function shouldApplyKeywordFilter(type: string) {
+  return type === 'message' || type === 'board' || type === 'notification';
+}
+
+function matchesNotificationKeywords(
+  settings: NotifSettings,
+  type: string,
+  title: string,
+  body: string,
+  metadata: Record<string, unknown>,
+) {
+  if (!settings.keywordAlertsEnabled) return true;
+  const keywords = normalizeKeywordList(settings.keywords);
+  if (keywords.length === 0) return true;
+  if (!shouldApplyKeywordFilter(type)) return true;
+
+  const haystack = [
+    title,
+    body,
+    metadata.sender_name,
+    metadata.room_name,
+    metadata.board_type,
+    metadata.open_menu,
+    metadata.open_subview,
+  ]
+    .map((value) => String(value || '').toLowerCase())
+    .join(' ');
+
+  return keywords.some((keyword) => haystack.includes(keyword));
+}
+
+function matchesChatRoomKeywordPreference(
+  keyword: string,
+  title: string,
+  body: string,
+  metadata: Record<string, unknown>,
+) {
+  const normalizedKeyword = normalizeRoomNotificationKeyword(keyword).toLowerCase();
+  if (!normalizedKeyword) return false;
+
+  const haystack = [
+    title,
+    body,
+    metadata.sender_name,
+    metadata.room_name,
+    metadata.message_preview,
+    metadata.content,
+  ]
+    .map((value) => String(value || '').toLowerCase())
+    .join(' ');
+
+  return haystack.includes(normalizedKeyword);
+}
+
+function resolveChatRoomSurfaceSuppression(params: {
+  effectiveUserId: string | null | undefined;
+  roomId: string;
+  type: string;
+  title: string;
+  body: string;
+  metadata: Record<string, unknown>;
+}) {
+  const preferences = readStoredRoomPreferences(params.effectiveUserId);
+  const preference = preferences[params.roomId] || {};
+  const mode = normalizeRoomNotificationMode(preference.notifyMode);
+  const keyword = normalizeRoomNotificationKeyword(preference.notifyKeyword);
+
+  if (mode === 'mute') {
+    return {
+      suppressLiveSurface: true,
+      mode,
+      keyword,
+    };
+  }
+
+  if (mode === 'mention_only') {
+    return {
+      suppressLiveSurface: params.type !== 'mention',
+      mode,
+      keyword,
+    };
+  }
+
+  if (mode === 'keyword') {
+    return {
+      suppressLiveSurface:
+        params.type !== 'mention' &&
+        !matchesChatRoomKeywordPreference(keyword, params.title, params.body, params.metadata),
+      mode,
+      keyword,
+    };
+  }
+
+  return {
+    suppressLiveSurface: false,
+    mode,
+    keyword,
+  };
+}
+
+function isFollowedThreadNotification(
+  effectiveUserId: string | null | undefined,
+  metadata: Record<string, unknown>,
+) {
+  const preferences = readStoredThreadPreferences(effectiveUserId);
+  const candidateIds = [
+    metadata.thread_root_id,
+    metadata.reply_to_id,
+    metadata.message_id,
+    metadata.id,
+  ]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+
+  return candidateIds.some((threadId) => preferences[threadId]?.followed === true);
 }
 
 // ─── 타입별 스타일 ───
@@ -952,6 +1179,7 @@ export default function NotificationSystem({
   onOpenPost?: (boardId: string, postId: string) => void;
   onOpenAdmin?: (subView?: string) => void;
 }) {
+  const router = useRouter();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const shownIdsRef = useRef<Set<string>>(new Set());
@@ -1125,13 +1353,62 @@ export default function NotificationSystem({
 
     const settings = loadNotifSettings();
     const type = String(row.type || 'notification');
-    if (settings.types[type] === false) return;
-
     const rowMetadata = (row.metadata && typeof row.metadata === 'object') ? row.metadata as Record<string, unknown> : {};
     const title = toNotificationText(row.title, '알림');
     const body = toNotificationText(row.body, '');
+    recordNotificationDelivery({
+      notificationId: rowId,
+      type,
+      title,
+      stage: 'received',
+      detail: {
+        displayKey,
+      },
+    });
+    if (settings.types[type] === false) {
+      recordNotificationDelivery({
+        notificationId: rowId,
+        type,
+        title,
+        stage: 'skipped-type-disabled',
+      });
+      return;
+    }
+    if (!matchesNotificationKeywords(settings, type, title, body, rowMetadata)) {
+      recordNotificationDelivery({
+        notificationId: rowId,
+        type,
+        title,
+        stage: 'skipped-keyword-filtered',
+      });
+      return;
+    }
+
     const isChatType = type === 'message' || type === 'mention';
     const incomingRoomId = String(rowMetadata.room_id || '').trim();
+    const roomSurfaceDecision =
+      isChatType && incomingRoomId
+        ? resolveChatRoomSurfaceSuppression({
+            effectiveUserId,
+            roomId: incomingRoomId,
+            type,
+            title,
+            body,
+            metadata: rowMetadata,
+          })
+        : {
+            suppressLiveSurface: false,
+            mode: 'all',
+            keyword: '',
+          };
+    const isThreadReplyNotification =
+      rowMetadata.is_thread_reply === true || String(rowMetadata.is_thread_reply || '').toLowerCase() === 'true';
+    const isFollowedThreadAlert = Boolean(
+      isChatType &&
+      isThreadReplyNotification &&
+      isFollowedThreadNotification(effectiveUserId, rowMetadata),
+    );
+    const suppressByRoomPreference = Boolean(roomSurfaceDecision.suppressLiveSurface && !isFollowedThreadAlert);
     const activeChatRoomId = getVisibleActiveChatRoomId();
     const suppressLiveDisplay = Boolean(isChatType && incomingRoomId && activeChatRoomId === incomingRoomId);
     const useMobileChatPreview = Boolean(isChatType && isMobileClientDevice());
@@ -1142,7 +1419,7 @@ export default function NotificationSystem({
       Notification.permission === 'granted'
     );
 
-    if (!suppressLiveDisplay && !useMobileChatPreview) {
+    if (!suppressLiveDisplay && !useMobileChatPreview && !suppressByRoomPreference) {
       addToast({
         id: rowId,
         title,
@@ -1151,10 +1428,16 @@ export default function NotificationSystem({
         senderName: rowMetadata.sender_name as string | undefined,
         data: rowMetadata,
       });
+      recordNotificationDelivery({
+        notificationId: rowId,
+        type,
+        title,
+        stage: 'toast-shown',
+      });
     }
 
     if (typeof window !== 'undefined') {
-      if (!suppressLiveDisplay) {
+      if (!suppressLiveDisplay && !suppressByRoomPreference) {
         const evt = isChatType ? 'erp-chat-notification' : 'erp-alert';
         window.dispatchEvent(new CustomEvent(evt, {
           detail: {
@@ -1172,10 +1455,13 @@ export default function NotificationSystem({
     }
 
     const isDND = isInDND(settings);
+    const isWeekendMuted = isWeekendQuiet(settings);
     const shouldPlayLocalSound = !isMobileClientDevice();
     if (
       !suppressLiveDisplay &&
+      !suppressByRoomPreference &&
       !isDND &&
+      !isWeekendMuted &&
       !wasForegroundPopupAlreadyShown &&
       (settings.sound || settings.vibration)
     ) {
@@ -1184,9 +1470,41 @@ export default function NotificationSystem({
         allowSound: Boolean(settings.sound && shouldPlayLocalSound),
         allowVibration: Boolean(settings.vibration),
       });
+      recordNotificationDelivery({
+        notificationId: rowId,
+        type,
+        title,
+        stage: 'feedback-played',
+      });
     }
 
     if (suppressLiveDisplay) {
+      recordNotificationDelivery({
+        notificationId: rowId,
+        type,
+        title,
+        stage: 'suppressed-active-room',
+        detail: {
+          room_id: incomingRoomId,
+        },
+      });
+      void syncBadge();
+      return;
+    }
+
+    if (suppressByRoomPreference) {
+      recordNotificationDelivery({
+        notificationId: rowId,
+        type,
+        title,
+        stage: 'suppressed-room-preference',
+        detail: {
+          room_id: incomingRoomId,
+          mode: roomSurfaceDecision.mode,
+          keyword: roomSurfaceDecision.keyword || null,
+          thread_follow_override: isFollowedThreadAlert,
+        },
+      });
       void syncBadge();
       return;
     }
@@ -1211,6 +1529,12 @@ export default function NotificationSystem({
         shouldShowSystemNotification &&
         !wasForegroundPopupAlreadyShown
       ) {
+        recordNotificationDelivery({
+          notificationId: rowId,
+          type,
+          title,
+          stage: 'system-popup-requested',
+        });
         sendNotification(title, {
           body,
           tag: displayKey || type,
@@ -1247,40 +1571,58 @@ export default function NotificationSystem({
   useEffect(() => {
     onActionRef.current = (notif: ToastItem) => {
       removeToast(notif.id);
-      const t = notif.type;
-      if ((t === 'message' || t === 'mention') && notif.data?.room_id) {
-        if (notif.data.id && onOpenMessage) onOpenMessage(notif.data.room_id, notif.data.id);
-        else if (onOpenChatRoom) onOpenChatRoom(notif.data.room_id);
-      } else if (t === 'approval' && onOpenApproval) {
-        const approvalView =
-          typeof notif.data?.approval_view === 'string' && notif.data.approval_view.trim()
-            ? notif.data.approval_view
-            : undefined;
+      const target = resolveNotificationTarget(notif.type, notif.data);
+
+      if (target.kind === 'chat') {
+        if (target.messageId && onOpenMessage) {
+          onOpenMessage(target.roomId, target.messageId);
+          return;
+        }
+        if (onOpenChatRoom) {
+          onOpenChatRoom(target.roomId);
+          return;
+        }
+      }
+
+      if (target.kind === 'approval' && onOpenApproval) {
         onOpenApproval({
-          ...(approvalView ? { viewMode: approvalView } : {}),
-          ...(notif.data?.approval_id ? { approvalId: notif.data.approval_id } : {}),
+          ...(target.approvalView ? { viewMode: target.approvalView } : {}),
+          ...(target.approvalId ? { approvalId: target.approvalId } : {}),
         });
+        return;
       }
-      else if (t === 'inventory' && onOpenInventory) {
+
+      if (target.kind === 'inventory' && onOpenInventory) {
         onOpenInventory({
-          view: notif.data?.approval_id ? '현황' : null,
-          approvalId: notif.data?.approval_id || null,
+          view: target.inventoryView,
+          approvalId: target.approvalId,
         });
+        return;
       }
-      else if (t === 'board') {
-        if (notif.data?.post_id && onOpenPost) onOpenPost(notif.data.board_type || '공지사항', notif.data.post_id);
-        else if (onOpenBoard) onOpenBoard(notif.data?.board_type);
-      } else if (t === 'notification' && notif.data?.open_menu === '관리자' && onOpenAdmin) {
-        onOpenAdmin(
-          typeof notif.data?.open_subview === 'string' && notif.data.open_subview.trim()
-            ? notif.data.open_subview
-            : '감사센터'
-        );
-      } else if (t === 'notification' && notif.data?.post_id && onOpenPost) {
-        onOpenPost(notif.data.board_type || '공지사항', notif.data.post_id);
+
+      if (target.kind === 'board') {
+        if (target.postId && onOpenPost) {
+          onOpenPost(target.boardType || DEFAULT_BOARD_TYPE, target.postId);
+          return;
+        }
+        if (onOpenBoard) {
+          onOpenBoard(target.boardType || undefined);
+          return;
+        }
       }
+
+      if (
+        target.kind === 'menu' &&
+        target.menu === NOTIFICATION_MENU_LABELS.admin &&
+        onOpenAdmin
+      ) {
+        onOpenAdmin(target.subView || DEFAULT_ADMIN_SUBVIEW);
+        return;
+      }
+
+      router.push(target.href);
     };
-  }, [removeToast, onOpenAdmin, onOpenMessage, onOpenChatRoom, onOpenApproval, onOpenInventory, onOpenPost, onOpenBoard]);
+  }, [removeToast, onOpenAdmin, onOpenMessage, onOpenChatRoom, onOpenApproval, onOpenInventory, onOpenPost, onOpenBoard, router]);
 
   // ─── Supabase Realtime 구독 ───
   useEffect(() => {

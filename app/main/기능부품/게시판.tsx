@@ -13,6 +13,7 @@ import {
 import { CHAT_FOCUS_KEY, CHAT_ROOM_KEY } from '@/app/main/navigation-state';
 import SmartDatePicker from './공통/SmartDatePicker';
 import GuideLibrary from './게시판서브/업무가이드';
+import { uploadBoardAttachmentFile } from './게시판업로드';
 import type { StaffMember, BoardPost, ScheduleItem, AttachmentItem } from '@/types';
 import { BOARD_MENU_ITEMS, BOARD_META_MAP } from './게시판메뉴';
 import {
@@ -1466,27 +1467,10 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   };
 
   const uploadBoardAttachment = useCallback(async (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('boardType', activeBoard);
-
-    const response = await fetch('/api/board/upload', {
-      method: 'POST',
-      body: formData,
-    });
-
-    const payload = await response.json().catch(() => null);
-    if (!response.ok || !payload?.url) {
-      throw new Error(payload?.error || '첨부파일 업로드에 실패했습니다.');
-    }
-
+    const uploaded = await uploadBoardAttachmentFile(file, activeBoard);
     return {
-      url: `${payload.url}?t=${Date.now()}`,
-      name: String(payload.fileName || file.name || '첨부파일'),
-      type: String(
-        payload.type ||
-          (file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'file')
-      ),
+      ...uploaded,
+      url: `${uploaded.url}?t=${Date.now()}`,
     };
   }, [activeBoard]);
 

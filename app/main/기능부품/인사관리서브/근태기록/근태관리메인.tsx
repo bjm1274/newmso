@@ -7,7 +7,7 @@ import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { filterRosterShiftsForDepartment } from '@/lib/roster-shift-team-filter';
 import SmartDatePicker from '../../공통/SmartDatePicker';
 import SmartMonthPicker from '../../공통/SmartMonthPicker';
-import AutoRosterPlanner from '../../근무표자동편성';
+import NurseSchedule from '../간호근무표';
 
 type StaffMember = {
   id: string;
@@ -18,6 +18,10 @@ type StaffMember = {
   shift_type?: string;
   [key: string]: unknown;
 };
+
+function isWardDept(dept: string) {
+  return /병동|ward|icu|중환자|응급|간호|nicu|picu/i.test(dept);
+}
 
 const ROSTER_CREATOR_POSITIONS = ['간호과장', '간호부장', '실장'];
 const ROSTER_APPROVER_POSITIONS = ['총무부장', '이사'];
@@ -129,6 +133,141 @@ function getAttendanceStatusMeta(status: string) {
 function isWeekendDate(dateStr: string) {
   const dayOfWeek = new Date(dateStr).getDay();
   return dayOfWeek === 0 || dayOfWeek === 6;
+}
+
+type ShiftBand = 'day' | 'evening' | 'night' | 'off';
+
+function normalizeShiftSearchText(...values: Array<unknown>) {
+  return values
+    .map((value) => String(value || '').trim().toLowerCase())
+    .filter(Boolean)
+    .join(' ');
+}
+
+function hasBandPrefix(rawText: string, compactText: string, prefix: 'd' | 'e' | 'n' | 'o') {
+  if (compactText === prefix) return true;
+  if (compactText.startsWith(`${prefix}/`) || compactText.startsWith(`${prefix}-`) || compactText.startsWith(`${prefix}_`)) {
+    return true;
+  }
+  if (compactText.startsWith(`${prefix}병동`) || compactText.startsWith(`${prefix}ward`) || compactText.startsWith(`${prefix}shift`)) {
+    return true;
+  }
+  return rawText.split(/[\s/_()[\]-]+/).some((token) => token === prefix);
+}
+
+function resolveRosterShiftBand(
+  shift:
+    | {
+        name?: string | null;
+        start_time?: string | null;
+        end_time?: string | null;
+        shift_type?: string | null;
+        description?: string | null;
+      }
+    | null
+    | undefined
+): ShiftBand {
+  const rawText = normalizeShiftSearchText(shift?.name, shift?.shift_type, shift?.description);
+  const compactText = rawText.replace(/\s+/g, '');
+  const hasStartTime = Boolean(String(shift?.start_time || '').trim());
+  const hasEndTime = Boolean(String(shift?.end_time || '').trim());
+  const startHour = Number(String(shift?.start_time || '').slice(0, 2) || '0');
+  const endHour = Number(String(shift?.end_time || '').slice(0, 2) || '0');
+  const overnight = Boolean(hasStartTime && hasEndTime && startHour > endHour);
+
+  if (
+    rawText.includes('off') ||
+    rawText.includes('휴무') ||
+    rawText.includes('비번') ||
+    rawText.includes('오프') ||
+    hasBandPrefix(rawText, compactText, 'o')
+  ) {
+    return 'off';
+  }
+
+  if (
+    rawText.includes('night') ||
+    rawText.includes('나이트') ||
+    rawText.includes('야간') ||
+    hasBandPrefix(rawText, compactText, 'n') ||
+    (hasStartTime && startHour >= 20) ||
+    (hasStartTime && startHour <= 4) ||
+    overnight ||
+    (hasEndTime && endHour <= 8)
+  ) {
+    return 'night';
+  }
+
+  if (
+    rawText.includes('evening') ||
+    rawText.includes('eve') ||
+    rawText.includes('이브닝') ||
+    rawText.includes('오후') ||
+    hasBandPrefix(rawText, compactText, 'e') ||
+    (hasStartTime && startHour >= 12 && startHour < 20)
+  ) {
+    return 'evening';
+  }
+
+  return 'day';
+}
+
+function isWorkedShiftAssignment(
+  shiftId: string | null | undefined,
+  shiftLookup: Map<string, { id?: string | null; name?: string | null; start_time?: string | null; end_time?: string | null; shift_type?: string | null; description?: string | null }>
+) {
+  if (!shiftId) return false;
+  return resolveRosterShiftBand(shiftLookup.get(String(shiftId)) || null) !== 'off';
+}
+
+function getShiftBandColorClass(band: ShiftBand, variant: 'tool' | 'cell') {
+  if (variant === 'tool') {
+    switch (band) {
+      case 'day':
+        return 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/40';
+      case 'evening':
+        return 'bg-orange-500/10 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 border-orange-500/20 dark:border-orange-800/50 hover:bg-orange-500/20 dark:hover:bg-orange-900/40';
+      case 'night':
+        return 'bg-blue-500/10 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-500/20 dark:border-blue-800/50 hover:bg-blue-500/20 dark:hover:bg-blue-900/40';
+      case 'off':
+        return 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800/50 hover:bg-rose-100 dark:hover:bg-rose-900/40';
+      default:
+        return 'bg-[var(--tab-bg)] dark:bg-zinc-900 text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] border-[var(--border)] dark:border-zinc-700 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800';
+    }
+  }
+
+  switch (band) {
+    case 'day':
+      return 'bg-emerald-100/50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-bold';
+    case 'evening':
+      return 'bg-orange-500/20/50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 font-bold';
+    case 'night':
+      return 'bg-blue-500/20/50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-bold';
+    case 'off':
+      return 'bg-rose-100/50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 font-bold';
+    default:
+      return 'bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] font-bold';
+  }
+}
+
+function getCompactShiftLabel(
+  shift:
+    | {
+        name?: string | null;
+        start_time?: string | null;
+        end_time?: string | null;
+        shift_type?: string | null;
+        description?: string | null;
+      }
+    | null
+    | undefined
+) {
+  const band = resolveRosterShiftBand(shift);
+  if (band === 'day') return 'D';
+  if (band === 'evening') return 'E';
+  if (band === 'night') return 'N';
+  if (band === 'off') return '휴무';
+  return String(shift?.name || '').replace('근무', '').slice(0, 3);
 }
 
 function buildWeekDates(anchorDate: string) {
@@ -471,6 +610,10 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
     const scopedShifts = filterRosterShiftsForDepartment(scopedDepartment, workShifts as any[]);
     return scopedShifts.length > 0 ? scopedShifts : workShifts;
   }, [rosterTeam, workShifts]);
+  const shiftLookup = useMemo(
+    () => new Map((workShifts || []).map((shift: any) => [String(shift.id || ''), shift])),
+    [workShifts]
+  );
 
   useEffect(() => {
     if (!activeTool || activeTool === 'eraser') return;
@@ -478,6 +621,263 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
       setActiveTool(null);
     }
   }, [activeTool, visibleWorkShifts]);
+
+  const repairAiAssignments = (
+    draftAssignments: Record<string, string>,
+    monthDates: string[],
+    teamStaffs: StaffMember[],
+    scopedShifts: any[]
+  ) => {
+    const repaired = { ...draftAssignments };
+    const shiftMap = new Map(scopedShifts.map((shift: any) => [String(shift.id || ''), shift]));
+    const preferredShiftByBand: Record<ShiftBand, string> = {
+      day: '',
+      evening: '',
+      night: '',
+      off: '',
+    };
+    const requiredCounts = {
+      day: Math.max(0, Math.floor(aiConfig.minDayReq || 0)),
+      evening: Math.max(0, Math.floor(aiConfig.minEveReq || 0)),
+      night: Math.max(0, Math.floor(aiConfig.minNightReq || 0)),
+    };
+    const targetOffDays = Math.max(0, Math.floor(aiConfig.targetOffDays || 0));
+    const targetNightDays = Math.max(0, Math.floor(aiConfig.targetNightDays || 0));
+    const maxConsecutiveWorkDays = 5;
+
+    scopedShifts.forEach((shift: any) => {
+      const band = resolveRosterShiftBand(shift);
+      if (!preferredShiftByBand[band]) {
+        preferredShiftByBand[band] = String(shift.id || '');
+      }
+    });
+
+    const buildKey = (staffId: string, date: string) => `${staffId}_${date}`;
+    const getShiftId = (staffId: string, dateIndex: number) =>
+      String(repaired[buildKey(staffId, monthDates[dateIndex])] || '');
+    const getBand = (staffId: string, dateIndex: number): ShiftBand =>
+      resolveRosterShiftBand(shiftMap.get(getShiftId(staffId, dateIndex)) || null);
+
+    const dailyCounts = monthDates.map((_, dateIndex) => {
+      const counts = { day: 0, evening: 0, night: 0 };
+      teamStaffs.forEach((staff) => {
+        const band = getBand(String(staff.id), dateIndex);
+        if (band === 'day' || band === 'evening' || band === 'night') {
+          counts[band] += 1;
+        }
+      });
+      return counts;
+    });
+
+    const offCountByStaff = new Map<string, number>();
+    const nightCountByStaff = new Map<string, number>();
+
+    teamStaffs.forEach((staff) => {
+      let offCount = 0;
+      let nightCount = 0;
+
+      monthDates.forEach((_, dateIndex) => {
+        const band = getBand(String(staff.id), dateIndex);
+        if (band === 'off') offCount += 1;
+        if (band === 'night') nightCount += 1;
+      });
+
+      offCountByStaff.set(String(staff.id), offCount);
+      nightCountByStaff.set(String(staff.id), nightCount);
+    });
+
+    const applyShift = (staffId: string, dateIndex: number, nextShiftId: string) => {
+      const key = buildKey(staffId, monthDates[dateIndex]);
+      const previousShiftId = String(repaired[key] || '');
+      if (previousShiftId === nextShiftId) return;
+
+      const previousBand = resolveRosterShiftBand(shiftMap.get(previousShiftId) || null);
+      const nextBand = resolveRosterShiftBand(shiftMap.get(nextShiftId) || null);
+
+      if (previousBand === 'day' || previousBand === 'evening' || previousBand === 'night') {
+        dailyCounts[dateIndex][previousBand] = Math.max(0, dailyCounts[dateIndex][previousBand] - 1);
+      }
+      if (nextBand === 'day' || nextBand === 'evening' || nextBand === 'night') {
+        dailyCounts[dateIndex][nextBand] += 1;
+      }
+
+      if (previousBand === 'off' && nextBand !== 'off') {
+        offCountByStaff.set(staffId, Math.max(0, (offCountByStaff.get(staffId) ?? 0) - 1));
+      }
+      if (previousBand !== 'off' && nextBand === 'off') {
+        offCountByStaff.set(staffId, (offCountByStaff.get(staffId) ?? 0) + 1);
+      }
+
+      if (previousBand === 'night' && nextBand !== 'night') {
+        nightCountByStaff.set(staffId, Math.max(0, (nightCountByStaff.get(staffId) ?? 0) - 1));
+      }
+      if (previousBand !== 'night' && nextBand === 'night') {
+        nightCountByStaff.set(staffId, (nightCountByStaff.get(staffId) ?? 0) + 1);
+      }
+
+      repaired[key] = nextShiftId;
+    };
+
+    const wouldExceedMaxStreak = (staffId: string, dateIndex: number, nextShiftId: string) => {
+      const nextBand = resolveRosterShiftBand(shiftMap.get(nextShiftId) || null);
+      if (nextBand === 'off') return false;
+
+      let streak = 1;
+      for (let cursor = dateIndex - 1; cursor >= 0; cursor -= 1) {
+        if (getBand(staffId, cursor) === 'off') break;
+        streak += 1;
+      }
+      for (let cursor = dateIndex + 1; cursor < monthDates.length; cursor += 1) {
+        if (getBand(staffId, cursor) === 'off') break;
+        streak += 1;
+      }
+      return streak > maxConsecutiveWorkDays;
+    };
+
+    const ensureMinimumOffDays = () => {
+      teamStaffs.forEach((staff) => {
+        const staffId = String(staff.id);
+
+        while ((offCountByStaff.get(staffId) ?? 0) < targetOffDays) {
+          let bestDateIndex = -1;
+          let bestScore = Number.POSITIVE_INFINITY;
+
+          monthDates.forEach((_, dateIndex) => {
+            const currentBand = getBand(staffId, dateIndex);
+            if (currentBand !== 'day' && currentBand !== 'evening' && currentBand !== 'night') {
+              return;
+            }
+            if (dailyCounts[dateIndex][currentBand] <= requiredCounts[currentBand]) {
+              return;
+            }
+
+            const previousBand = dateIndex > 0 ? getBand(staffId, dateIndex - 1) : 'off';
+            const nextBand = dateIndex < monthDates.length - 1 ? getBand(staffId, dateIndex + 1) : 'off';
+            const margin = dailyCounts[dateIndex][currentBand] - requiredCounts[currentBand];
+
+            let score = 20 - margin * 4;
+            if (currentBand === 'night') score += 8;
+            if (previousBand === 'night') score -= 6;
+            if (previousBand === 'off' || nextBand === 'off') score -= 2;
+            if (nextBand === 'night') score += 2;
+
+            if (score < bestScore) {
+              bestScore = score;
+              bestDateIndex = dateIndex;
+            }
+          });
+
+          if (bestDateIndex === -1) break;
+          applyShift(staffId, bestDateIndex, preferredShiftByBand.off);
+        }
+      });
+    };
+
+    const pickCoverageCandidate = (
+      dateIndex: number,
+      targetBand: 'day' | 'evening' | 'night',
+      allowBelowMinimumOff: boolean
+    ) => {
+      let bestStaffId: string | null = null;
+      let bestScore = Number.POSITIVE_INFINITY;
+
+      teamStaffs.forEach((staff) => {
+        const staffId = String(staff.id);
+        const currentBand = getBand(staffId, dateIndex);
+        if (currentBand === targetBand) return;
+
+        if (
+          currentBand !== 'off' &&
+          dailyCounts[dateIndex][currentBand] <= requiredCounts[currentBand]
+        ) {
+          return;
+        }
+
+        if (
+          !allowBelowMinimumOff &&
+          currentBand === 'off' &&
+          (offCountByStaff.get(staffId) ?? 0) <= targetOffDays
+        ) {
+          return;
+        }
+
+        const targetShiftId = preferredShiftByBand[targetBand];
+        if (!targetShiftId || wouldExceedMaxStreak(staffId, dateIndex, targetShiftId)) {
+          return;
+        }
+
+        const previousBand = dateIndex > 0 ? getBand(staffId, dateIndex - 1) : 'off';
+        const nextBand = dateIndex < monthDates.length - 1 ? getBand(staffId, dateIndex + 1) : 'off';
+        const currentNightCount = nightCountByStaff.get(staffId) ?? 0;
+        const projectedOffCount =
+          currentBand === 'off'
+            ? (offCountByStaff.get(staffId) ?? 0) - 1
+            : offCountByStaff.get(staffId) ?? 0;
+
+        let score = currentBand === 'off' ? 0 : 14;
+        if (currentBand !== 'off') {
+          score += Math.max(0, requiredCounts[currentBand] - (dailyCounts[dateIndex][currentBand] - 1)) * 100;
+        }
+        if (currentBand === 'off') {
+          score += Math.max(0, targetOffDays - projectedOffCount) * 12;
+        }
+        if (targetBand === 'night') {
+          score += currentNightCount;
+          score += Math.max(0, currentNightCount - targetNightDays) * 3;
+          if (previousBand === 'night') score -= 1;
+          if (nextBand === 'night') score -= 1;
+          if (nextBand !== 'off' && nextBand !== 'night') score += 5;
+        } else {
+          if (previousBand === 'night') score += 18;
+          if (targetBand === 'evening' && nextBand === 'day') score += 8;
+        }
+
+        if (score < bestScore) {
+          bestScore = score;
+          bestStaffId = staffId;
+        }
+      });
+
+      return bestStaffId;
+    };
+
+    const ensureMinimumCoverage = () => {
+      (['night', 'day', 'evening'] as const).forEach((targetBand) => {
+        const targetShiftId = preferredShiftByBand[targetBand];
+        if (!targetShiftId) return;
+
+        monthDates.forEach((_, dateIndex) => {
+          while (dailyCounts[dateIndex][targetBand] < requiredCounts[targetBand]) {
+            const candidateStaffId =
+              pickCoverageCandidate(dateIndex, targetBand, false) ||
+              pickCoverageCandidate(dateIndex, targetBand, true);
+
+            if (!candidateStaffId) break;
+            applyShift(candidateStaffId, dateIndex, targetShiftId);
+
+            if (targetBand === 'night' && preferredShiftByBand.off) {
+              const nextIndex = dateIndex + 1;
+              if (nextIndex < monthDates.length) {
+                const nextBand = getBand(candidateStaffId, nextIndex);
+                if (
+                  nextBand !== 'off' &&
+                  dailyCounts[nextIndex][nextBand] > requiredCounts[nextBand]
+                ) {
+                  applyShift(candidateStaffId, nextIndex, preferredShiftByBand.off);
+                }
+              }
+            }
+          }
+        });
+      });
+    };
+
+    ensureMinimumOffDays();
+    ensureMinimumCoverage();
+    ensureMinimumOffDays();
+
+    return repaired;
+  };
 
   const handleSwapRequest = async (targetDate: string, reason: string) => {
     if (!swapData || !user) return;
@@ -544,8 +944,8 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
           const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
           const key = `${staff.id}_${dStr}`;
           const shiftId = shiftAssignments[key];
-          if (shiftId) {
-            const shift = workShifts.find((s: any) => s.id === shiftId);
+          if (isWorkedShiftAssignment(shiftId, shiftLookup)) {
+            const shift = shiftLookup.get(String(shiftId));
             if (shift?.start_time && shift?.end_time) {
               const [sh, sm] = shift.start_time.split(':').map(Number);
               const [eh, em] = shift.end_time.split(':').map(Number);
@@ -566,22 +966,24 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
       // Check consecutive 7+ days
       let consecutive = 0;
       let startDay = 0;
-      for (let d = 1; d <= lastDay; d++) {
+      for (let d = 1; d <= lastDay + 1; d++) {
         const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
         const key = `${staff.id}_${dStr}`;
-        if (shiftAssignments[key]) {
+        const isWorkedDay = d <= lastDay && isWorkedShiftAssignment(shiftAssignments[key], shiftLookup);
+        if (isWorkedDay) {
           if (consecutive === 0) startDay = d;
           consecutive++;
-          if (consecutive >= 7) {
-            warnings.push(`⚠️ 연속 7일 근무: ${staff.name} (${selectedMonth}-${String(startDay).padStart(2, '0')} ~ ${dStr})`);
-          }
         } else {
+          if (consecutive >= 7) {
+            const endDate = `${selectedMonth}-${String(d - 1).padStart(2, '0')}`;
+            warnings.push(`⚠️ 연속 7일 근무: ${staff.name} (${selectedMonth}-${String(startDay).padStart(2, '0')} ~ ${endDate})`);
+          }
           consecutive = 0;
         }
       }
     });
     return warnings;
-  }, [viewMode, shiftAssignments, rosterFiltered, workShifts, selectedMonth]);
+  }, [viewMode, shiftAssignments, rosterFiltered, shiftLookup, selectedMonth]);
 
   // Fetch pending approvals & swaps
   useEffect(() => {
@@ -642,10 +1044,9 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
     try {
       const monthDates = daysArray.map((day) => `${selectedMonth}-${String(day).padStart(2, '0')}`);
       const validShiftIds = new Set(visibleWorkShifts.map((shift: any) => String(shift.id)));
-      const offShift = visibleWorkShifts.find((shift: any) => {
-        const name = String(shift?.name || '').toLowerCase();
-        return name.includes('off') || name.includes('오프') || name.includes('휴무') || name === 'o';
-      });
+      const offShift = visibleWorkShifts.find(
+        (shift: any) => resolveRosterShiftBand(shift) === 'off'
+      );
       const teamStaffs = rosterFiltered.map((s: StaffMember) => ({
         id: s.id, name: s.name, department: s.department, position: s.position, shiftType: s.shift_type || '',
       }));
@@ -719,7 +1120,14 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
         throw new Error('AI 결과를 현재 근무표에 반영하지 못했습니다. 응답 형식 또는 근무유형 설정을 확인해주세요.');
       }
 
-      setShiftAssignments(newAssignments);
+      const repairedAssignments = repairAiAssignments(
+        newAssignments,
+        monthDates,
+        rosterFiltered,
+        visibleWorkShifts
+      );
+
+      setShiftAssignments(repairedAssignments);
       setApprovalStatus('idle');
       toast('AI 근무표 생성 완료! 수정 후 승인요청 해주세요.', 'success');
     } catch (e) {
@@ -1132,6 +1540,30 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
         ? `${weekDates[0]} ~ ${weekDates[weekDates.length - 1]}`
         : selectedMonth;
 
+  // 병동 3교대 근무표 — 전체 영역 대체 렌더링
+  if (showShiftWizard) {
+    const wardStaffs = (filtered as AppStaffMember[]).filter(
+      s => isWardDept(String(s.department || (s as any).team || ''))
+    );
+    return (
+      <div className="flex flex-col h-full overflow-hidden relative">
+        <NurseSchedule
+          staffs={wardStaffs}
+          selectedCo={selectedCo}
+          user={user as AppStaffMember}
+        />
+        <button
+          type="button"
+          onClick={() => setShowShiftWizard(false)}
+          className="absolute top-3 right-4 z-50 w-9 h-9 flex items-center justify-center bg-white/25 hover:bg-white/40 rounded-full text-white font-black text-base transition-colors shadow-md"
+          title="근태관리로 돌아가기"
+        >
+          ✕
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-[var(--page-bg)] animate-in fade-in duration-500">
       <header className="px-4 pt-4 pb-3 border-b border-[var(--border)] bg-[var(--card)] shrink-0 shadow-sm z-10 sticky top-0">
@@ -1324,11 +1756,7 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
                 <div className="w-px h-6 bg-[var(--tab-bg)] dark:bg-zinc-700 mr-2"></div>
                 {visibleWorkShifts.map((sh: any) => {
                   const isActive = activeTool === sh.id;
-                  let colorClass = 'bg-[var(--tab-bg)] dark:bg-zinc-900 text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] border-[var(--border)] dark:border-zinc-700 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800';
-                  if (sh.name.includes('Day') || sh.name.includes('데이') || sh.name === 'D') colorClass = 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/40';
-                  if (sh.name.includes('Evening') || sh.name.includes('이브') || sh.name === 'E') colorClass = 'bg-orange-500/10 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 border-orange-500/20 dark:border-orange-800/50 hover:bg-orange-500/20 dark:hover:bg-orange-900/40';
-                  if (sh.name.includes('Night') || sh.name.includes('나이트') || sh.name === 'N') colorClass = 'bg-blue-500/10 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-500/20 dark:border-blue-800/50 hover:bg-blue-500/20 dark:hover:bg-blue-900/40';
-                  if (sh.name.includes('Off') || sh.name.includes('오프') || sh.name === 'O') colorClass = 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800/50 hover:bg-rose-100 dark:hover:bg-rose-900/40';
+                  const colorClass = getShiftBandColorClass(resolveRosterShiftBand(sh), 'tool');
 
                   return (
                     <button
@@ -1384,20 +1812,18 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
                         const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
                         const key = `${s.id}_${dStr}`;
                         const value = shiftAssignments[key] ?? '';
-                        const shiftObj = workShifts.find(w => w.id === value);
+                        const shiftObj = shiftLookup.get(String(value));
                         const isWeekend = new Date(dStr).getDay() === 0 || new Date(dStr).getDay() === 6;
-
-                        let cellColor = isWeekend ? 'bg-red-500/10/30 dark:bg-red-900/5 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800/50' : 'hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800/50';
-                        if (shiftObj) {
-                          if (shiftObj.name.includes('Day') || shiftObj.name.includes('데이') || shiftObj.name === 'D') cellColor = 'bg-emerald-100/50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-bold';
-                          else if (shiftObj.name.includes('Evening') || shiftObj.name.includes('이브') || shiftObj.name === 'E') cellColor = 'bg-orange-500/20/50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 font-bold';
-                          else if (shiftObj.name.includes('Night') || shiftObj.name.includes('나이트') || shiftObj.name === 'N') cellColor = 'bg-blue-500/20/50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-bold';
-                          else if (shiftObj.name.includes('Off') || shiftObj.name.includes('오프') || shiftObj.name === 'O') cellColor = 'bg-rose-100/50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 font-bold';
-                          else cellColor = 'bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] font-bold';
-                        }
+                        const cellBand = shiftObj ? resolveRosterShiftBand(shiftObj) : null;
+                        const cellColor = shiftObj
+                          ? getShiftBandColorClass(cellBand || 'day', 'cell')
+                          : isWeekend
+                            ? 'bg-red-500/10/30 dark:bg-red-900/5 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800/50'
+                            : 'hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800/50';
                         return (
                           <td
                             key={d}
+                            title={shiftObj?.name || ''}
                             className={`p-1 border-r border-[var(--border)] dark:border-zinc-800 min-w-[44px] cursor-pointer select-none transition-colors border-b-0 border-t-0 active:bg-blue-500/10 dark:active:bg-blue-900/20 active:ring-inset active:ring-2 active:ring-blue-400 ${cellColor}`}
                             onMouseDown={() => {
                               if (canCreateRoster) {
@@ -1417,7 +1843,7 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
                             }}
                           >
                             <div className="w-full h-8 flex items-center justify-center text-[11px] rounded transition-all">
-                              {shiftObj ? (shiftObj.name.replace('근무', '').slice(0, 3)) : <span className="opacity-0 group-hover:opacity-20 text-[9px] text-[var(--toss-gray-3)] font-black">+</span>}
+                              {shiftObj ? getCompactShiftLabel(shiftObj) : <span className="opacity-0 group-hover:opacity-20 text-[9px] text-[var(--toss-gray-3)] font-black">+</span>}
                             </div>
                           </td>
                         );
@@ -1446,30 +1872,7 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
               </div>
             )}
             
-            {/* Shift Wizard Modal */}
-            {showShiftWizard && (
-              <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-2 md:p-4 animate-in fade-in duration-200">
-                <div className="bg-[var(--background)] rounded-2xl w-full max-w-[1400px] h-full max-h-[95vh] overflow-hidden flex flex-col shadow-2xl relative border border-[var(--border)] dark:border-zinc-800">
-                  <div className="p-4 border-b border-[var(--border)] dark:border-zinc-800 flex justify-between items-center bg-[var(--card)] dark:bg-zinc-900 shrink-0">
-                    <h3 className="font-bold text-lg flex items-center gap-2"><span className="text-2xl">🪄</span> 병동 3교대 패턴 관리 마법사</h3>
-                    <button onClick={() => setShowShiftWizard(false)} className="w-8 h-8 flex items-center justify-center bg-[var(--muted)]/50 rounded-full hover:bg-[var(--muted)] transition-colors font-bold text-foreground">✕</button>
-                  </div>
-                  <div className="flex-1 overflow-auto custom-scrollbar relative">
-                    <AutoRosterPlanner
-                      staffs={rosterFiltered as AppStaffMember[]}
-                      selectedCo={selectedCo}
-                      initialDepartment={rosterTeam !== '전체' ? rosterTeam : undefined}
-                      initialMonth={selectedMonth}
-                      user={(user as AppStaffMember) || undefined}
-                      onAssignmentsSaved={() => {
-                        void loadShiftAssignments();
-                        setShowShiftWizard(false);
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* 병동 3교대 근무표는 early return으로 처리됨 */}
             
             {/* AI Generator Settings Modal */}
             {showAiModal && (
@@ -1484,7 +1887,7 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
                       <h4 className="text-[12px] font-bold text-blue-600 flex items-center gap-1"><span className="text-sm">🎯</span> 월간 개인 목표 수치</h4>
                       <div className="grid grid-cols-2 gap-3">
                         <label className="flex flex-col gap-1">
-                          <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">인당 기본 보장 OFF (일)</span>
+                          <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">인당 최소 OFF (일)</span>
                           <input type="number" min={0} max={15} value={aiConfig.targetOffDays} onChange={e => setAiConfig(p => ({ ...p, targetOffDays: Number(e.target.value) }))} className="px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] text-sm font-bold" />
                         </label>
                         <label className="flex flex-col gap-1">
@@ -1492,6 +1895,7 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
                           <input type="number" min={0} max={15} value={aiConfig.targetNightDays} onChange={e => setAiConfig(p => ({ ...p, targetNightDays: Number(e.target.value) }))} className="px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] text-sm font-bold" />
                         </label>
                       </div>
+                      <p className="text-[10px] text-[var(--toss-gray-4)] leading-relaxed">AI 결과 적용 후에도 각 직원의 최소 OFF와 하루 Night 최소 인원을 다시 확인해서 부족하면 이 화면에서 한 번 더 보정합니다.</p>
                     </div>
                     
                     <div className="space-y-3">

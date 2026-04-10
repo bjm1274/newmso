@@ -192,6 +192,15 @@ test('live message, approval, and board notifications route to the correct scree
         last_message_at: '2026-03-24T09:00:00.000Z',
       },
     ],
+    messages: Array.from({ length: 12 }, (_, index) => ({
+      id: `msg-live-message-${index + 1}`,
+      room_id: 'room-live-message',
+      sender_id: '11111111-1111-1111-1111-111111111111',
+      content: `Live routed chat message ${index + 1}`,
+      created_at: `2026-03-24T09:${String(index).padStart(2, '0')}:00.000Z`,
+      is_deleted: false,
+      staff: { name: 'E2E Tester', photo_url: null },
+    })),
     boardPosts: [
       {
         id: 'board-live-1',
@@ -216,10 +225,13 @@ test('live message, approval, and board notifications route to the correct scree
     body: '채팅방으로 이동해야 합니다.',
     metadata: {
       room_id: 'room-live-message',
+      message_id: 'msg-live-message-3',
+      type: 'message',
     },
   });
   await page.getByTestId('notification-toast-notification-message-1').click();
   await expect(page.getByTestId('chat-view')).toBeVisible();
+  await expect(page.getByTestId('chat-message-msg-live-message-3')).toBeVisible();
 
   await insertLiveNotification(page, {
     id: 'notification-approval-1',

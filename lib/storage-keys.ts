@@ -55,4 +55,9 @@ export const STORAGE_KEYS = {
 
   /** 고정 채팅방 순서 (userId 필요) */
   chatPinnedRoomOrder: (userId: string) => `erp_chat_pinned_room_order:${userId || 'guest'}`,
+  chatRetryQueue: (userId: string) => `erp_chat_retry_queue:${userId || 'guest'}`,
+  chatSavedSearches: (userId: string) => `erp_chat_saved_searches:${userId || 'guest'}`,
+  chatThreadPrefs: (userId: string) => `erp_chat_thread_prefs:${userId || 'guest'}`,
+  chatNoticeSchedules: (userId: string) => `erp_chat_notice_schedules:${userId || 'guest'}`,
+  chatAttachmentRetryQueue: (userId: string) => `erp_chat_attachment_retry_queue:${userId || 'guest'}`,
 } as const;

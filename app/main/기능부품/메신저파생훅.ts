@@ -121,17 +121,231 @@ export function useChatSelectedRoomLabel({
   );
 }
 
+export type ThreadSummary = {
+  rootId: string;
+  replyCount: number;
+  participantCount: number;
+  latestReplyAt: string | null;
+  latestActivityAt: string | null;
+  latestReplySenderId: string | null;
+  rootSenderId: string | null;
+  needsAttention: boolean;
+};
+
+export type ThreadOverview = ThreadSummary & {
+  rootMessage: ChatMessage;
+  latestMessage: ChatMessage;
+};
+
+function buildChatMessageMap(messages: ChatMessage[]) {
+  return new Map(messages.map((message) => [String(message.id), message]));
+}
+
+function resolveThreadRootFromMap(message: ChatMessage, messageMap: Map<string, ChatMessage>) {
+  let current = message;
+  const visitedIds = new Set<string>();
+
+  while (current?.reply_to_id) {
+    const currentId = String(current.id || '');
+    const parentId = String(current.reply_to_id || '');
+    if (!parentId || visitedIds.has(currentId)) break;
+    visitedIds.add(currentId);
+    const parent = messageMap.get(parentId);
+    if (!parent) break;
+    current = parent;
+  }
+
+  return current;
+}
+
+function resolveThreadRootIdFromMap(message: ChatMessage, messageMap: Map<string, ChatMessage>) {
+  return String(resolveThreadRootFromMap(message, messageMap)?.id || message.id || '');
+}
+
+export function resolveThreadRootMessage(message: ChatMessage | null, messages: ChatMessage[]) {
+  if (!message) return null;
+  const messageMap = buildChatMessageMap(messages);
+  return resolveThreadRootFromMap(message, messageMap);
+}
+
+type ThreadGroup = {
+  rootId: string;
+  rootMessage: ChatMessage;
+  messages: ChatMessage[];
+  participants: Set<string>;
+  latestMessage: ChatMessage;
+  latestReplyAt: string | null;
+  latestReplySenderId: string | null;
+};
+
+function getMessageTimeValue(message: ChatMessage | null | undefined) {
+  const timeValue = new Date(message?.created_at || 0).getTime();
+  return Number.isFinite(timeValue) ? timeValue : 0;
+}
+
+function getDateStringTimeValue(value: string | null | undefined) {
+  const timeValue = new Date(value || 0).getTime();
+  return Number.isFinite(timeValue) ? timeValue : 0;
+}
+
+function buildThreadGroups(messages: ChatMessage[]) {
+  const messageMap = buildChatMessageMap(messages);
+  const groupedThreads = new Map<string, ThreadGroup>();
+
+  messages.forEach((message) => {
+    const resolvedRoot = resolveThreadRootFromMap(message, messageMap);
+    const rootId = String(resolvedRoot.id || message.id || '');
+    const existingGroup = groupedThreads.get(rootId);
+
+    if (!existingGroup) {
+      groupedThreads.set(rootId, {
+        rootId,
+        rootMessage: resolvedRoot,
+        messages: [message],
+        participants: new Set(
+          String(message.sender_id || '').trim() ? [String(message.sender_id || '').trim()] : [],
+        ),
+        latestMessage: message,
+        latestReplyAt: String(message.id) === rootId ? null : (message.created_at || null),
+        latestReplySenderId:
+          String(message.id) === rootId ? null : (String(message.sender_id || '').trim() || null),
+      });
+      return;
+    }
+
+    existingGroup.messages.push(message);
+
+    const senderId = String(message.sender_id || '').trim();
+    if (senderId) {
+      existingGroup.participants.add(senderId);
+    }
+
+    if (String(message.id) === rootId) {
+      existingGroup.rootMessage = message;
+    }
+
+    if (getMessageTimeValue(message) >= getMessageTimeValue(existingGroup.latestMessage)) {
+      existingGroup.latestMessage = message;
+    }
+
+    if (
+      String(message.id) !== rootId &&
+      getMessageTimeValue(message) >= getDateStringTimeValue(existingGroup.latestReplyAt)
+    ) {
+      existingGroup.latestReplyAt = message.created_at || null;
+      existingGroup.latestReplySenderId = senderId || null;
+    }
+  });
+
+  return groupedThreads;
+}
+
+export function useThreadSummaries(messages: ChatMessage[], currentUserId?: string | null) {
+  return useMemo(() => {
+    const messageMap = buildChatMessageMap(messages);
+    const groupedThreads = buildThreadGroups(messages);
+    const normalizedCurrentUserId = String(currentUserId || '').trim();
+
+    return messages.reduce<Record<string, ThreadSummary>>((acc, message) => {
+      const rootId = resolveThreadRootIdFromMap(message, messageMap);
+      const thread = groupedThreads.get(rootId);
+      if (!thread) return acc;
+
+      const hasRootMessage = thread.messages.some((item) => String(item.id) === rootId);
+      const rootSenderId = String(thread.rootMessage.sender_id || '').trim() || null;
+      const latestReplySenderId = thread.latestReplySenderId || null;
+      const userParticipated = normalizedCurrentUserId
+        ? thread.messages.some((item) => String(item.sender_id || '').trim() === normalizedCurrentUserId)
+        : false;
+      const needsAttention = Boolean(
+        normalizedCurrentUserId &&
+        latestReplySenderId &&
+        latestReplySenderId !== normalizedCurrentUserId &&
+        (rootSenderId === normalizedCurrentUserId || userParticipated),
+      );
+
+      acc[String(message.id)] = {
+        rootId,
+        replyCount: Math.max(0, thread.messages.length - (hasRootMessage ? 1 : 0)),
+        participantCount: thread.participants.size,
+        latestReplyAt: thread.latestReplyAt,
+        latestActivityAt: thread.latestMessage.created_at || thread.rootMessage.created_at || null,
+        latestReplySenderId,
+        rootSenderId,
+        needsAttention,
+      };
+      return acc;
+    }, {});
+  }, [currentUserId, messages]);
+}
+
+export function useThreadOverviews(messages: ChatMessage[], currentUserId?: string | null) {
+  return useMemo(() => {
+    const groupedThreads = buildThreadGroups(messages);
+    const normalizedCurrentUserId = String(currentUserId || '').trim();
+
+    return Array.from(groupedThreads.values())
+      .map((thread): ThreadOverview | null => {
+        const replyCount = Math.max(
+          0,
+          thread.messages.length - (thread.messages.some((message) => String(message.id) === thread.rootId) ? 1 : 0),
+        );
+        if (replyCount <= 0) return null;
+
+        const rootSenderId = String(thread.rootMessage.sender_id || '').trim() || null;
+        const latestReplySenderId = thread.latestReplySenderId || null;
+        const userParticipated = normalizedCurrentUserId
+          ? thread.messages.some((item) => String(item.sender_id || '').trim() === normalizedCurrentUserId)
+          : false;
+        const needsAttention = Boolean(
+          normalizedCurrentUserId &&
+          latestReplySenderId &&
+          latestReplySenderId !== normalizedCurrentUserId &&
+          (rootSenderId === normalizedCurrentUserId || userParticipated),
+        );
+
+        return {
+          rootId: thread.rootId,
+          rootMessage: thread.rootMessage,
+          latestMessage: thread.latestMessage,
+          replyCount,
+          participantCount: thread.participants.size,
+          latestReplyAt: thread.latestReplyAt,
+          latestActivityAt: thread.latestMessage.created_at || thread.rootMessage.created_at || null,
+          latestReplySenderId,
+          rootSenderId,
+          needsAttention,
+        };
+      })
+      .filter((thread): thread is ThreadOverview => Boolean(thread))
+      .sort(
+        (left, right) =>
+          getMessageTimeValue(right.latestMessage) - getMessageTimeValue(left.latestMessage),
+      );
+  }, [currentUserId, messages]);
+}
+
 export function useThreadMessages(threadRoot: ChatMessage | null, messages: ChatMessage[]) {
   return useMemo(() => {
     if (!threadRoot) return [];
-    const rootId = threadRoot.id;
-
-    return messages
-      .filter((message: ChatMessage) => message.id === rootId || message.reply_to_id === rootId)
+    const messageMap = buildChatMessageMap(messages);
+    const resolvedRoot = resolveThreadRootFromMap(threadRoot, messageMap);
+    const rootId = String(resolvedRoot.id || threadRoot.id || '');
+    const threadMessages = messages
+      .filter((message: ChatMessage) => resolveThreadRootIdFromMap(message, messageMap) === rootId)
       .sort(
         (left: ChatMessage, right: ChatMessage) =>
           new Date(left.created_at || 0).getTime() - new Date(right.created_at || 0).getTime()
       );
+
+    if (threadMessages.some((message) => String(message.id) === rootId)) {
+      return threadMessages;
+    }
+
+    return [resolvedRoot, ...threadMessages].sort(
+      (left: ChatMessage, right: ChatMessage) =>
+        new Date(left.created_at || 0).getTime() - new Date(right.created_at || 0).getTime()
+    );
   }, [threadRoot, messages]);
 }
 

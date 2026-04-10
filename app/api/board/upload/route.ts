@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { canAccessBoard } from '@/lib/access-control';
 import {
+  createChatAttachmentUploadPlan,
+  isR2ChatStorageEnabled,
+  uploadChatAttachmentToR2,
+} from '@/lib/object-storage';
+import {
   normalizeSessionUser,
   readSessionFromRequest,
   resolveLatestSessionUser,
@@ -10,9 +15,38 @@ import {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;   // 일반 파일: 50MB
-const MAX_VIDEO_SIZE_BYTES = 200 * 1024 * 1024; // 동영상: 200MB
+const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+const MAX_VIDEO_SIZE_BYTES = 200 * 1024 * 1024;
 const BOARD_BUCKET_CANDIDATES = ['board-attachments', 'pchos-files'] as const;
+
+type UploadPlanRequest = {
+  boardType?: string;
+  fileName?: string;
+  mimeType?: string;
+  fileSize?: number;
+};
+
+type UploadPlanResponse =
+  | {
+      success: true;
+      provider: 'supabase';
+      bucket: string;
+      path: string;
+      token: string;
+      signedUrl: string;
+      fileName: string;
+      url: string;
+    }
+  | {
+      success: true;
+      provider: 'r2';
+      bucket: string;
+      path: string;
+      signedUrl: string;
+      fileName: string;
+      url: string;
+      headers: Record<string, string>;
+    };
 
 function getAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -40,6 +74,25 @@ function guessFileExtension(fileName: string, mimeType: string) {
   return 'bin';
 }
 
+function buildFallbackFileName(mimeType: string, ext: string) {
+  if (mimeType.startsWith('image/')) return `image.${ext}`;
+  if (mimeType.startsWith('video/')) return `video.${ext}`;
+  if (mimeType === 'application/pdf') return `document.${ext}`;
+  return `attachment.${ext}`;
+}
+
+function normalizeUploadFileName(fileName: string, mimeType: string) {
+  const ext = guessFileExtension(fileName, mimeType);
+  const rawName = String(fileName || '').trim() || buildFallbackFileName(mimeType, ext);
+  const withoutPath = rawName.split(/[/\\]/).pop() || rawName;
+  const sanitized = withoutPath
+    .replace(/[\u0000-\u001f<>:"/\\|?*]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return sanitized || buildFallbackFileName(mimeType, ext);
+}
+
 function buildSafeFilePath(fileName: string, mimeType: string) {
   const ext = guessFileExtension(fileName, mimeType);
   const safeExt = /^[a-z0-9]+$/i.test(ext) ? ext.toLowerCase() : 'bin';
@@ -60,7 +113,7 @@ function isMissingBucketError(error: unknown, bucketName: string) {
   const message = String(
     (error as { message?: string; details?: string })?.message ||
       (error as { message?: string; details?: string })?.details ||
-      ''
+      '',
   ).toLowerCase();
 
   return (
@@ -70,11 +123,113 @@ function isMissingBucketError(error: unknown, bucketName: string) {
   );
 }
 
+function validateUploadTarget(fileName: string, mimeType: string, fileSize: number) {
+  if (!fileName.trim()) {
+    throw new Error('업로드할 파일 이름이 없습니다.');
+  }
+
+  if (mimeType.startsWith('image/')) {
+    return;
+  }
+
+  if (mimeType.startsWith('video/')) {
+    if (fileSize > MAX_VIDEO_SIZE_BYTES) {
+      throw new Error('동영상 크기는 200MB 이하여야 합니다.');
+    }
+    return;
+  }
+
+  if (fileSize > MAX_FILE_SIZE_BYTES) {
+    throw new Error('파일 크기는 50MB 이하여야 합니다.');
+  }
+}
+
+async function createSignedUploadPlan(
+  supabase: ReturnType<typeof getAdminClient>,
+  payload: UploadPlanRequest,
+) {
+  const mimeType = String(payload.mimeType || 'application/octet-stream').trim() || 'application/octet-stream';
+  const fileName = normalizeUploadFileName(String(payload.fileName || '').trim(), mimeType);
+  const fileSize = Number(payload.fileSize || 0);
+
+  validateUploadTarget(fileName, mimeType, fileSize);
+
+  const filePath = buildSafeFilePath(fileName, mimeType);
+  if (isR2ChatStorageEnabled()) {
+    const r2Plan = await createChatAttachmentUploadPlan(filePath, mimeType);
+    if (r2Plan) {
+      const response: UploadPlanResponse = {
+        success: true,
+        provider: 'r2',
+        bucket: r2Plan.bucket,
+        path: r2Plan.path,
+        signedUrl: r2Plan.signedUrl,
+        fileName,
+        url: r2Plan.url,
+        headers: r2Plan.headers,
+      };
+      return NextResponse.json(response);
+    }
+  }
+
+  let lastError: unknown = null;
+
+  for (const bucket of BOARD_BUCKET_CANDIDATES) {
+    const { data, error } = await supabase.storage.from(bucket).createSignedUploadUrl(filePath);
+
+    if (!error && data?.token) {
+      const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
+      const response: UploadPlanResponse = {
+        success: true,
+        provider: 'supabase',
+        bucket,
+        path: filePath,
+        token: data.token,
+        signedUrl: data.signedUrl,
+        fileName,
+        url: publicUrlData.publicUrl,
+      };
+      return NextResponse.json(response);
+    }
+
+    lastError = error;
+    if (!isMissingBucketError(error, bucket)) {
+      return NextResponse.json(
+        { error: error?.message || '파일 업로드 준비에 실패했습니다.' },
+        { status: 500 },
+      );
+    }
+  }
+
+  const message =
+    (lastError as { message?: string })?.message || '게시판 첨부 업로드용 Storage 버킷을 찾지 못했습니다.';
+  return NextResponse.json({ error: message }, { status: 500 });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await readSessionFromRequest(request);
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const latestUser = await resolveLatestSessionUser(normalizeSessionUser(session.user));
+    const supabase = getAdminClient();
+    const contentType = request.headers.get('content-type') || '';
+
+    if (contentType.includes('application/json')) {
+      const payload = (await request.json().catch(() => ({}))) as UploadPlanRequest;
+      const boardType = String(payload.boardType || '').trim();
+
+      if (!boardType) {
+        return NextResponse.json({ error: 'boardType is required.' }, { status: 400 });
+      }
+
+      if (!canAccessBoard(latestUser, boardType, 'write')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      return await createSignedUploadPlan(supabase, payload);
     }
 
     const formData = await request.formData();
@@ -85,7 +240,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'boardType is required.' }, { status: 400 });
     }
 
-    const latestUser = await resolveLatestSessionUser(normalizeSessionUser(session.user));
     if (!canAccessBoard(latestUser, boardType, 'write')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -94,26 +248,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '업로드할 파일이 없습니다.' }, { status: 400 });
     }
 
-    if (file.type.startsWith('image/')) {
-      // 이미지: 크기 제한 없음
-    } else if (file.type.startsWith('video/')) {
-      if (file.size > MAX_VIDEO_SIZE_BYTES) {
-        return NextResponse.json({ error: '동영상 크기는 200MB 이하여야 합니다.' }, { status: 400 });
-      }
-    } else {
-      if (file.size > MAX_FILE_SIZE_BYTES) {
-        return NextResponse.json({ error: '파일 크기는 50MB 이하여야 합니다.' }, { status: 400 });
-      }
+    const mimeType = file.type || 'application/octet-stream';
+    const normalizedFileName = normalizeUploadFileName(String(file.name || '').trim(), mimeType);
+    validateUploadTarget(normalizedFileName, mimeType, file.size);
+
+    const filePath = buildSafeFilePath(normalizedFileName, mimeType);
+    const arrayBuffer = await file.arrayBuffer();
+
+    if (isR2ChatStorageEnabled()) {
+      const uploaded = await uploadChatAttachmentToR2(filePath, Buffer.from(arrayBuffer), mimeType);
+      return NextResponse.json({
+        success: true,
+        provider: uploaded.provider,
+        bucket: uploaded.bucket,
+        path: uploaded.path,
+        fileName: normalizedFileName,
+        type: detectAttachmentType(normalizedFileName, mimeType),
+        url: uploaded.url,
+      });
     }
 
-    const supabase = getAdminClient();
-    const filePath = buildSafeFilePath(file.name, file.type || 'application/octet-stream');
-    const arrayBuffer = await file.arrayBuffer();
     let lastError: unknown = null;
 
     for (const bucket of BOARD_BUCKET_CANDIDATES) {
       const { error } = await supabase.storage.from(bucket).upload(filePath, Buffer.from(arrayBuffer), {
-        contentType: file.type || 'application/octet-stream',
+        contentType: mimeType,
         upsert: false,
         cacheControl: '3600',
       });
@@ -122,10 +281,11 @@ export async function POST(request: NextRequest) {
         const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
         return NextResponse.json({
           success: true,
+          provider: 'supabase',
           bucket,
           path: filePath,
-          fileName: file.name,
-          type: detectAttachmentType(file.name, file.type || ''),
+          fileName: normalizedFileName,
+          type: detectAttachmentType(normalizedFileName, mimeType),
           url: data.publicUrl,
         });
       }
@@ -137,8 +297,7 @@ export async function POST(request: NextRequest) {
     }
 
     const message =
-      (lastError as { message?: string })?.message ||
-      '게시판 첨부 업로드용 Storage 버킷을 찾지 못했습니다.';
+      (lastError as { message?: string })?.message || '게시판 첨부 업로드용 Storage 버킷을 찾지 못했습니다.';
     return NextResponse.json({ error: message }, { status: 500 });
   } catch (error) {
     const message = error instanceof Error ? error.message : '게시판 첨부 업로드 중 오류가 발생했습니다.';

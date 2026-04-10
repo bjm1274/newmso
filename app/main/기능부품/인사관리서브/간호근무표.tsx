@@ -14,12 +14,12 @@ type WorkShift = {
 };
 type StaffMember = {
   id: string;
-  name?: string;
-  position?: string;
-  department?: string;
-  team?: string;
-  company?: string;
-  status?: string;
+  name?: string | null;
+  position?: string | null;
+  department?: string | null;
+  team?: string | null;
+  company?: string | null;
+  status?: string | null;
   [key: string]: unknown;
 };
 type ShiftRole = 'D' | 'E' | 'N' | 'OFF' | 'LEAVE' | 'TRAINING';
@@ -27,6 +27,7 @@ type StaffShiftType = 'rotation' | 'day_fixed' | 'evening_fixed' | 'night_fixed'
 type Violation = 'N_THEN_D' | 'CONSECUTIVE_N';
 type StaffConfig = { staffId: string; shiftType: StaffShiftType; preferredOffDays: number[] };
 type MinStaffConfig = { D: number; E: number; N: number };
+type GenerationRules = { maxNightShifts: number; minOffDays: number };
 type ScheduleMap = Record<string, Record<number, ShiftRole>>;
 type WizardStep = 1 | 2 | 3 | 4;
 
@@ -41,20 +42,40 @@ const ROLE_META: Record<ShiftRole, { label: string; short: string; bg: string; t
 };
 
 const SHIFT_TYPE_OPTIONS: Array<{ value: StaffShiftType; label: string; desc: string }> = [
-  { value: 'rotation',      label: '순환',  desc: 'D→D→E→E→N→N→오프→오프 8일 주기' },
+  { value: 'rotation',      label: '순환',  desc: 'D/E/N/OFF 가변 블록으로 자동 순환' },
   { value: 'day_fixed',     label: 'D전담', desc: '데이 근무 고정 (희망 오프만 쉼)' },
   { value: 'evening_fixed', label: 'E전담', desc: '이브닝 고정 (희망 오프만 쉼)' },
-  { value: 'night_fixed',   label: 'N전담', desc: 'N→N→오프→오프 4일 반복' },
+  { value: 'night_fixed',   label: 'N전담', desc: 'N 블록 + 회복 OFF 위주로 반복' },
 ];
 
-const CYCLE_SEQ: ShiftRole[] = ['D', 'D', 'E', 'E', 'N', 'N', 'OFF', 'OFF'];
+const ROTATION_PATTERNS_WITH_N: ShiftRole[][] = [
+  ['D', 'E', 'N', 'OFF', 'OFF'],
+  ['D', 'D', 'E', 'N', 'OFF', 'OFF'],
+  ['D', 'E', 'E', 'N', 'OFF', 'OFF'],
+  ['D', 'D', 'E', 'E', 'N', 'OFF', 'OFF'],
+  ['D', 'E', 'N', 'N', 'OFF', 'OFF'],
+  ['D', 'D', 'E', 'N', 'N', 'OFF', 'OFF'],
+  ['D', 'E', 'E', 'N', 'N', 'OFF', 'OFF'],
+  ['D', 'E', 'N', 'N', 'N', 'OFF', 'OFF', 'OFF'],
+];
+const ROTATION_PATTERNS_NO_N: ShiftRole[][] = [
+  ['D', 'E', 'OFF', 'OFF'],
+  ['D', 'D', 'E', 'OFF', 'OFF'],
+  ['D', 'E', 'E', 'OFF', 'OFF'],
+  ['D', 'D', 'E', 'E', 'OFF', 'OFF'],
+  ['D', 'E', 'OFF', 'OFF', 'OFF'],
+];
+const NIGHT_FIXED_PATTERNS: ShiftRole[][] = [
+  ['N', 'N', 'OFF', 'OFF'],
+  ['N', 'N', 'N', 'OFF', 'OFF', 'OFF'],
+];
 const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
 const WIZARD_STEPS = [
   { num: 1, title: '대상 병동', desc: '3교대 적용 병동 선택' },
   { num: 2, title: '근무 매핑', desc: 'D/E/N 근무유형 연결' },
   { num: 3, title: '인력 설정', desc: '근무유형 및 희망 오프' },
-  { num: 4, title: '최소 인원', desc: '교대별 최소 투입 인원' },
+  { num: 4, title: '생성 규칙', desc: '최소 인원과 OFF/Night 기준' },
 ];
 
 // ─────────────────────── 유틸 ───────────────────────
@@ -70,7 +91,79 @@ function normalizeShiftCode(code: string): ShiftRole {
   if (['D', 'E', 'N', 'OFF', 'LEAVE', 'TRAINING'].includes(code)) return code as ShiftRole;
   return 'OFF';
 }
-function getInitials(name?: string) { return name ? name.slice(0, 1) : '?'; }
+function getInitials(name?: string | null) { return name ? name.slice(0, 1) : '?'; }
+function countRoleInPattern(pattern: ShiftRole[], role: ShiftRole) {
+  return pattern.reduce((count, current) => count + (current === role ? 1 : 0), 0);
+}
+function splitPatternSegments(pattern: ShiftRole[]) {
+  const segments: ShiftRole[][] = [];
+  pattern.forEach((role) => {
+    const last = segments[segments.length - 1];
+    if (last && last[0] === role) {
+      last.push(role);
+    } else {
+      segments.push([role]);
+    }
+  });
+  return segments;
+}
+function rotatePatternBySegments(pattern: ShiftRole[], segmentOffset: number) {
+  const segments = splitPatternSegments(pattern);
+  if (segments.length <= 1) return pattern;
+  const safeOffset = ((segmentOffset % segments.length) + segments.length) % segments.length;
+  return [...segments.slice(safeOffset), ...segments.slice(0, safeOffset)].flat();
+}
+function hashSeed(value: string) {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+function seededIndex(seed: number, salt: number, length: number) {
+  if (length <= 0) return 0;
+  const mixed = Math.imul(seed ^ Math.imul(salt + 1, 1597334677), 2246822519) >>> 0;
+  return mixed % length;
+}
+function buildRotationPattern(seed: number, cycleIndex: number, remainingNightAllowance: number) {
+  const sourcePatterns = remainingNightAllowance > 0 ? ROTATION_PATTERNS_WITH_N : ROTATION_PATTERNS_NO_N;
+  const eligiblePatterns = sourcePatterns.filter(
+    (pattern) => countRoleInPattern(pattern, 'N') <= remainingNightAllowance
+  );
+  const basePatternPool = eligiblePatterns.length > 0 ? eligiblePatterns : sourcePatterns;
+  const basePattern = basePatternPool[seededIndex(seed, cycleIndex * 5 + 1, basePatternPool.length)];
+  const rotatedPattern = rotatePatternBySegments(
+    basePattern,
+    seededIndex(seed, cycleIndex * 5 + 2, splitPatternSegments(basePattern).length)
+  );
+  return rotatedPattern;
+}
+function buildNightFixedPattern(seed: number, cycleIndex: number, remainingNightAllowance: number) {
+  const eligiblePatterns = NIGHT_FIXED_PATTERNS.filter(
+    (pattern) => countRoleInPattern(pattern, 'N') <= remainingNightAllowance
+  );
+  const basePatternPool = eligiblePatterns.length > 0 ? eligiblePatterns : NIGHT_FIXED_PATTERNS;
+  return basePatternPool[seededIndex(seed, cycleIndex * 3 + 1, basePatternPool.length)];
+}
+function countAssignedRole(row: Record<number, ShiftRole>, role: ShiftRole) {
+  return Object.values(row).reduce((count, current) => count + (current === role ? 1 : 0), 0);
+}
+function buildDailyRoleCounts(schedule: ScheduleMap, staffIds: string[], days: number) {
+  return Array.from({ length: days + 1 }, (_, day) => {
+    if (day === 0) {
+      return { D: 0, E: 0, N: 0 };
+    }
+    const counts = { D: 0, E: 0, N: 0 };
+    staffIds.forEach((sid) => {
+      const role = schedule[sid]?.[day];
+      if (role === 'D' || role === 'E' || role === 'N') {
+        counts[role] += 1;
+      }
+    });
+    return counts;
+  });
+}
 
 // ─────────────────────── 자동생성 엔진 ───────────────────────
 function generateSchedule(params: {
@@ -78,11 +171,15 @@ function generateSchedule(params: {
   staffConfigs: StaffConfig[];
   year: number; month: number; days: number;
   minStaff: MinStaffConfig;
+  rules: GenerationRules;
 }): ScheduleMap {
-  const { staffs, staffConfigs, days, minStaff } = params;
+  const { staffs, staffConfigs, year, month, days, minStaff, rules } = params;
   const schedule: ScheduleMap = {};
   const configMap = new Map(staffConfigs.map(c => [c.staffId, c]));
+  const allStaffIds = staffs.map((staff) => String(staff.id));
   const rotationSids: string[] = [];
+  const maxNightShifts = Math.max(0, Math.floor(rules.maxNightShifts || 0));
+  const minOffDays = Math.max(0, Math.floor(rules.minOffDays || 0));
 
   for (const staff of staffs) {
     const sid = String(staff.id);
@@ -93,8 +190,38 @@ function generateSchedule(params: {
     } else if (cfg.shiftType === 'evening_fixed') {
       for (let d = 1; d <= days; d++) schedule[sid][d] = cfg.preferredOffDays.includes(d) ? 'OFF' : 'E';
     } else if (cfg.shiftType === 'night_fixed') {
-      const seq: ShiftRole[] = ['N', 'N', 'OFF', 'OFF'];
-      for (let d = 1; d <= days; d++) schedule[sid][d] = cfg.preferredOffDays.includes(d) ? 'OFF' : seq[(d - 1) % seq.length];
+      const seed = hashSeed(`${sid}-${year}-${month}-night`);
+      let assignedNightCount = 0;
+      let dayCursor = 1;
+      let cycleIndex = 0;
+
+      while (dayCursor <= days) {
+        const pattern = buildNightFixedPattern(
+          seed,
+          cycleIndex,
+          Math.max(0, maxNightShifts - assignedNightCount)
+        );
+
+        for (const role of pattern) {
+          if (dayCursor > days) break;
+          if (cfg.preferredOffDays.includes(dayCursor)) {
+            schedule[sid][dayCursor] = 'OFF';
+            dayCursor += 1;
+            continue;
+          }
+
+          const nextRole =
+            role === 'N' && assignedNightCount >= maxNightShifts
+              ? 'OFF'
+              : role;
+
+          schedule[sid][dayCursor] = nextRole;
+          if (nextRole === 'N') assignedNightCount += 1;
+          dayCursor += 1;
+        }
+
+        cycleIndex += 1;
+      }
     } else {
       rotationSids.push(sid);
     }
@@ -102,9 +229,37 @@ function generateSchedule(params: {
 
   rotationSids.forEach((sid, idx) => {
     const cfg = configMap.get(sid) ?? { staffId: sid, shiftType: 'rotation' as StaffShiftType, preferredOffDays: [] };
-    const offset = idx * 2;
-    for (let d = 1; d <= days; d++) {
-      schedule[sid][d] = cfg.preferredOffDays.includes(d) ? 'OFF' : CYCLE_SEQ[(d - 1 + offset) % CYCLE_SEQ.length];
+    const seed = hashSeed(`${sid}-${year}-${month}-${idx}`);
+    let assignedNightCount = 0;
+    let dayCursor = 1;
+    let cycleIndex = 0;
+
+    while (dayCursor <= days) {
+      const pattern = buildRotationPattern(
+        seed,
+        cycleIndex,
+        Math.max(0, maxNightShifts - assignedNightCount)
+      );
+
+      for (const role of pattern) {
+        if (dayCursor > days) break;
+        if (cfg.preferredOffDays.includes(dayCursor)) {
+          schedule[sid][dayCursor] = 'OFF';
+          dayCursor += 1;
+          continue;
+        }
+
+        const nextRole =
+          role === 'N' && assignedNightCount >= maxNightShifts
+            ? 'OFF'
+            : role;
+
+        schedule[sid][dayCursor] = nextRole;
+        if (nextRole === 'N') assignedNightCount += 1;
+        dayCursor += 1;
+      }
+
+      cycleIndex += 1;
     }
   });
 
@@ -119,26 +274,88 @@ function generateSchedule(params: {
     }
   }
 
-  for (let d = 1; d <= days; d++) {
-    const counts = { D: 0, E: 0, N: 0 };
-    for (const sid of Object.keys(schedule)) {
-      const r = schedule[sid][d];
-      if (r === 'D' || r === 'E' || r === 'N') counts[r]++;
+  const dailyCounts = buildDailyRoleCounts(schedule, allStaffIds, days);
+  const setScheduledRole = (sid: string, day: number, nextRole: ShiftRole) => {
+    const previousRole = schedule[sid]?.[day] ?? 'OFF';
+    if (previousRole === nextRole) return;
+    if (previousRole === 'D' || previousRole === 'E' || previousRole === 'N') {
+      dailyCounts[day][previousRole] = Math.max(0, dailyCounts[day][previousRole] - 1);
     }
-    for (const role of ['D', 'E', 'N'] as const) {
-      const shortage = minStaff[role] - counts[role];
-      if (shortage <= 0) continue;
-      const candidates = rotationSids.filter(sid => {
-        if (schedule[sid][d] !== 'OFF') return false;
-        const cfg = configMap.get(sid);
-        if (cfg?.preferredOffDays.includes(d)) return false;
-        if (role === 'D' && d > 1 && schedule[sid][d - 1] === 'N') return false;
-        if (role === 'N' && d < days && schedule[sid][d + 1] === 'D') return false;
-        return true;
-      });
-      for (let i = 0; i < Math.min(shortage, candidates.length); i++) schedule[candidates[i]][d] = role;
+    if (nextRole === 'D' || nextRole === 'E' || nextRole === 'N') {
+      dailyCounts[day][nextRole] += 1;
     }
-  }
+    schedule[sid][day] = nextRole;
+  };
+
+  const ensureMinimumOffDays = () => {
+    allStaffIds.forEach((sid) => {
+      while (countAssignedRole(schedule[sid] ?? {}, 'OFF') < minOffDays) {
+        let bestDay = 0;
+        let bestScore = Number.POSITIVE_INFINITY;
+
+        for (let d = 1; d <= days; d++) {
+          const currentRole = schedule[sid]?.[d] ?? 'OFF';
+          if (currentRole !== 'D' && currentRole !== 'E' && currentRole !== 'N') continue;
+          if (dailyCounts[d][currentRole] <= minStaff[currentRole]) continue;
+
+          const prevRole = d > 1 ? (schedule[sid]?.[d - 1] ?? 'OFF') : 'OFF';
+          const nextRole = d < days ? (schedule[sid]?.[d + 1] ?? 'OFF') : 'OFF';
+          const margin = dailyCounts[d][currentRole] - minStaff[currentRole];
+
+          let score = 20 - margin * 4;
+          if (currentRole === 'N') score += 6;
+          if (prevRole === 'OFF') score -= 3;
+          if (nextRole === 'OFF') score -= 3;
+          if (prevRole === 'N') score -= 2;
+          if (nextRole === 'N') score += 2;
+
+          if (score < bestScore) {
+            bestScore = score;
+            bestDay = d;
+          }
+        }
+
+        if (bestDay === 0) break;
+        setScheduledRole(sid, bestDay, 'OFF');
+      }
+    });
+  };
+
+  const ensureMinimumCoverage = () => {
+    for (let d = 1; d <= days; d++) {
+      for (const role of ['D', 'E', 'N'] as const) {
+        let shortage = minStaff[role] - dailyCounts[d][role];
+        if (shortage <= 0) continue;
+
+        const candidates = rotationSids.filter(sid => {
+          if (schedule[sid][d] !== 'OFF') return false;
+          const cfg = configMap.get(sid);
+          if (cfg?.preferredOffDays.includes(d)) return false;
+          if (role === 'D' && d > 1 && schedule[sid][d - 1] === 'N') return false;
+          if (role === 'N' && d < days && schedule[sid][d + 1] === 'D') return false;
+          if (role === 'N' && countAssignedRole(schedule[sid], 'N') >= maxNightShifts) return false;
+          return true;
+        }).sort((leftSid, rightSid) => {
+          const leftRow = schedule[leftSid] ?? {};
+          const rightRow = schedule[rightSid] ?? {};
+          const leftTargetCount = countAssignedRole(leftRow, role);
+          const rightTargetCount = countAssignedRole(rightRow, role);
+          if (leftTargetCount !== rightTargetCount) return leftTargetCount - rightTargetCount;
+          return countAssignedRole(leftRow, 'N') - countAssignedRole(rightRow, 'N');
+        });
+
+        for (const candidateSid of candidates) {
+          if (shortage <= 0) break;
+          setScheduledRole(candidateSid, d, role);
+          shortage -= 1;
+        }
+      }
+    }
+  };
+
+  ensureMinimumOffDays();
+  ensureMinimumCoverage();
+  ensureMinimumOffDays();
   return schedule;
 }
 
@@ -228,7 +445,7 @@ function WizardOverlay({
   wizardEShiftId, setWizardEShiftId, wizardNShiftId, setWizardNShiftId,
   wizardStaffs, staffConfigs, setStaffConfigs,
   preferredOffStaffId, setPreferredOffStaffId,
-  wizardMinStaff, setWizardMinStaff, generating,
+  wizardMinStaff, setWizardMinStaff, wizardRules, setWizardRules, generating,
   onGenerate, onClose, year, month,
 }: {
   step: WizardStep; setStep: (s: WizardStep) => void;
@@ -242,6 +459,7 @@ function WizardOverlay({
   staffConfigs: StaffConfig[]; setStaffConfigs: (c: StaffConfig[]) => void;
   preferredOffStaffId: string; setPreferredOffStaffId: (s: string) => void;
   wizardMinStaff: MinStaffConfig; setWizardMinStaff: (m: MinStaffConfig) => void;
+  wizardRules: GenerationRules; setWizardRules: (rules: GenerationRules) => void;
   generating: boolean; onGenerate: () => void; onClose: () => void;
   year: number; month: number;
 }) {
@@ -520,11 +738,69 @@ function WizardOverlay({
                   );
                 })}
               </div>
+              <div className="mt-5 p-5 rounded-xl bg-[var(--tab-bg)] border border-[var(--border)]">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black shrink-0 bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+                    O
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-black text-[var(--foreground)] text-base">인당 최소 오프일</p>
+                    <p className="text-[12px] text-[var(--toss-gray-3)]">
+                      자동생성 후 각 직원에게 최소한 이 일수만큼 OFF를 확보하도록 보정합니다.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setWizardRules({ ...wizardRules, minOffDays: Math.max(0, wizardRules.minOffDays - 1) })}
+                      className="w-9 h-9 rounded-xl border border-[var(--border)] bg-[var(--card)] text-lg font-black hover:bg-[var(--muted)] transition-colors"
+                    >−</button>
+                    <span className="w-10 text-center text-2xl font-black text-[var(--foreground)]">
+                      {wizardRules.minOffDays}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setWizardRules({ ...wizardRules, minOffDays: wizardRules.minOffDays + 1 })}
+                      className="w-9 h-9 rounded-xl border border-[var(--border)] bg-[var(--card)] text-lg font-black hover:bg-[var(--muted)] transition-colors"
+                    >+</button>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-5 p-5 rounded-xl bg-[var(--tab-bg)] border border-[var(--border)]">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black shrink-0 bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                    N
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-black text-[var(--foreground)] text-base">인당 최대 나이트 수</p>
+                    <p className="text-[12px] text-[var(--toss-gray-3)]">
+                      자동생성 시 한 직원에게 배정할 수 있는 월간 Night 최대 횟수입니다.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setWizardRules({ ...wizardRules, maxNightShifts: Math.max(0, wizardRules.maxNightShifts - 1) })}
+                      className="w-9 h-9 rounded-xl border border-[var(--border)] bg-[var(--card)] text-lg font-black hover:bg-[var(--muted)] transition-colors"
+                    >−</button>
+                    <span className="w-10 text-center text-2xl font-black text-[var(--foreground)]">
+                      {wizardRules.maxNightShifts}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setWizardRules({ ...wizardRules, maxNightShifts: wizardRules.maxNightShifts + 1 })}
+                      className="w-9 h-9 rounded-xl border border-[var(--border)] bg-[var(--card)] text-lg font-black hover:bg-[var(--muted)] transition-colors"
+                    >+</button>
+                  </div>
+                </div>
+              </div>
               <div className="mt-8 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 text-[12px] text-blue-700 dark:text-blue-300">
                 <p className="font-black mb-1">⚙ 자동생성 규칙 안내</p>
                 <ul className="list-disc list-inside space-y-0.5 opacity-80">
-                  <li>순환자: D→D→E→E→N→N→오프→오프 (8일 주기, 2일씩 엇갈림)</li>
-                  <li>나이트 전담: N→N→오프→오프 반복</li>
+                  <li>순환자: D/E/N/OFF 블록 길이를 직원별로 다르게 섞어 고정 DDEENN 패턴을 줄입니다.</li>
+                  <li>나이트 전담도 N 2~3일 + 회복 OFF 중심으로 자동 배치합니다.</li>
+                  <li>직원별 최소 OFF 일수를 먼저 확보한 뒤 부족한 교대만 보정합니다.</li>
+                  <li>인당 최대 나이트 수를 넘기지 않도록 Night 배정을 제한합니다.</li>
                   <li>N 다음날 D 배치 금지 (근기법 §54, 11시간 연속 휴식)</li>
                   <li>3일 초과 연속 야간 배치 금지</li>
                   <li>최소 인원 부족 시 OFF 인원 자동 차출</li>
@@ -595,6 +871,7 @@ export default function NurseSchedule({
   const [editMode, setEditMode] = useState(false);
   const [dept, setDept] = useState('');
   const [activeMinStaff, setActiveMinStaff] = useState<MinStaffConfig>({ D: 2, E: 2, N: 2 });
+  const [activeGenerationRules, setActiveGenerationRules] = useState<GenerationRules>({ maxNightShifts: 8, minOffDays: 8 });
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState<WizardStep>(1);
@@ -604,6 +881,7 @@ export default function NurseSchedule({
   const [wizardNShiftId, setWizardNShiftId] = useState('');
   const [staffConfigs, setStaffConfigs] = useState<StaffConfig[]>([]);
   const [wizardMinStaff, setWizardMinStaff] = useState<MinStaffConfig>({ D: 2, E: 2, N: 2 });
+  const [wizardRules, setWizardRules] = useState<GenerationRules>({ maxNightShifts: 8, minOffDays: 8 });
   const [generating, setGenerating] = useState(false);
   const [preferredOffStaffId, setPreferredOffStaffId] = useState('');
 
@@ -711,7 +989,7 @@ export default function NurseSchedule({
     setWizardDShiftId(prev => prev || autoD?.id || wizardShifts[0]?.id || '');
     setWizardEShiftId(prev => prev || autoE?.id || wizardShifts[1]?.id || '');
     setWizardNShiftId(prev => prev || autoN?.id || wizardShifts[2]?.id || '');
-  }, [wizardDept, wizardOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [wizardDept, wizardOpen, wizardShifts]);
 
   const saveSchedule = async () => {
     const staffIds = visibleStaffs.map(s => s.id).filter(Boolean);
@@ -754,10 +1032,12 @@ export default function NurseSchedule({
       year, month,
       days: getDaysInMonth(year, month),
       minStaff: wizardMinStaff,
+      rules: wizardRules,
     });
     setSchedule(prev => ({ ...prev, ...result }));
     setDept(wizardDept);
     setActiveMinStaff(wizardMinStaff);
+    setActiveGenerationRules(wizardRules);
     setWizardOpen(false);
     setWizardStep(1);
     setGenerating(false);
@@ -775,7 +1055,7 @@ export default function NurseSchedule({
   const dayArr = Array.from({ length: days }, (_, i) => i + 1);
 
   return (
-    <>
+    <div className="h-full flex flex-col overflow-hidden relative">
       {/* 마법사 오버레이 (전체화면) */}
       {wizardOpen && (
         <WizardOverlay
@@ -790,6 +1070,7 @@ export default function NurseSchedule({
           staffConfigs={staffConfigs} setStaffConfigs={setStaffConfigs}
           preferredOffStaffId={preferredOffStaffId} setPreferredOffStaffId={setPreferredOffStaffId}
           wizardMinStaff={wizardMinStaff} setWizardMinStaff={setWizardMinStaff}
+          wizardRules={wizardRules} setWizardRules={setWizardRules}
           generating={generating} onGenerate={handleGenerate}
           onClose={() => { setWizardOpen(false); setWizardStep(1); }}
           year={year} month={month}
@@ -797,7 +1078,7 @@ export default function NurseSchedule({
       )}
 
       {/* 메인 레이아웃 */}
-      <div className="h-full flex flex-col gap-0 overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
 
         {/* ── 헤더 배너 ── */}
         <div className="shrink-0 bg-[var(--foreground)] text-[var(--card)] px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
@@ -814,6 +1095,12 @@ export default function NurseSchedule({
             </div>
             {/* 뱃지 */}
             <div className="flex gap-2">
+              <span className="px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-200 text-[10px] font-black">
+                OFF 최소 {activeGenerationRules.minOffDays}
+              </span>
+              <span className="px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-200 text-[10px] font-black">
+                N 최대 {activeGenerationRules.maxNightShifts}
+              </span>
               {totalViolations > 0 && (
                 <span className="px-2.5 py-1 rounded-full bg-red-500 text-white text-[10px] font-black">
                   ⚠ 위반 {totalViolations}건
@@ -829,7 +1116,12 @@ export default function NurseSchedule({
           <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
-              onClick={() => { setWizardDept(wardDepts.includes(dept) ? dept : (wardDepts[0] ?? '')); setWizardOpen(true); setWizardStep(1); }}
+              onClick={() => {
+                setWizardDept(wardDepts.includes(dept) ? dept : (wardDepts[0] ?? ''));
+                setWizardRules(activeGenerationRules);
+                setWizardOpen(true);
+                setWizardStep(1);
+              }}
               className="px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-[12px] font-bold hover:opacity-90 transition-all flex items-center gap-1.5"
             >
               ✨ 3교대 마법사
@@ -910,7 +1202,11 @@ export default function NurseSchedule({
               <p className="text-sm">✨ 3교대 마법사로 근무표를 생성하거나, 인사관리에서 부서를 확인하세요.</p>
               <button
                 type="button"
-                onClick={() => { setWizardOpen(true); setWizardStep(1); }}
+                onClick={() => {
+                  setWizardRules(activeGenerationRules);
+                  setWizardOpen(true);
+                  setWizardStep(1);
+                }}
                 className="mt-2 px-6 py-3 rounded-xl bg-[var(--accent)] text-white font-bold text-sm hover:opacity-90 transition-all"
               >
                 ✨ 3교대 마법사 시작
@@ -1047,6 +1343,6 @@ export default function NurseSchedule({
           )}
         </div>
       </div>
-    </>
+    </div>
   );
 }

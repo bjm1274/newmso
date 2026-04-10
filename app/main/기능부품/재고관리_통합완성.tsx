@@ -24,6 +24,7 @@ import DeliveryConfirmation from './재고관리서브/납품확인서';
 import InventoryDemandForecast from './재고관리서브/재고수요예측';
 import SupplierDocumentWorkspace from './재고관리서브/SupplierDocumentWorkspace';
 import AssetLoanSettingsAdminView from './관리자전용서브/비품대여물품설정';
+import InventoryStatusView from './재고관리서브/재고현황뷰';
 import {
   buildSupplyRequestWorkflowItems,
   fetchSupportInventoryRows,
@@ -44,7 +45,6 @@ const INVENTORY_VIEWS = ['UDI', '발주', '스캔', '등록', '현황', '이력'
 const LEGACY_VIEWS = ['명세서', '유통기한'] as const;
 const VALID_VIEWS = [...INVENTORY_VIEWS, ...LEGACY_VIEWS];
 const EXPIRY_SOON_MS = 30 * 24 * 60 * 60 * 1000;
-const INVENTORY_PRIMARY_CATEGORY_ORDER = ['의료기기', '소모품', '약품', '사무용품', '기타'] as const;
 type InventoryStatusFilter = '전체' | '재고부족' | '유통기한임박' | '정상';
 type SupplierWorkspaceTab = 'suppliers' | 'documents';
 type LinkedSupplyOrderTarget = {
@@ -82,21 +82,6 @@ type ApprovalRecord = {
   created_at?: string | null;
   [key: string]: unknown;
 };
-
-function normalizeInventoryCategoryLabel(value?: string | null) {
-  const raw = String(value || '').trim();
-  if (!raw) return '미분류';
-
-  const compact = raw.replace(/\s+/g, '').toLowerCase();
-
-  if (compact.includes('의료기기')) return '의료기기';
-  if (compact.includes('소모')) return '소모품';
-  if (compact.includes('의약') || compact.includes('약품')) return '약품';
-  if (compact.includes('사무')) return '사무용품';
-  if (compact.includes('기타')) return '기타';
-
-  return raw;
-}
 
 function resolveInventoryView(view?: string | null): {
   view: string;
@@ -209,13 +194,8 @@ export default function IntegratedInventoryManagement({
   const [activeView, setActiveView] = useState(
     canAccessInventorySection(user, initialResolvedView.view) ? initialResolvedView.view : defaultInventoryView
   );
-  const hasRestoredViewRef = useRef(false);
-  const lastRequestedInitialViewRef = useRef<string | null>(
-    initialView && (VALID_VIEWS as readonly string[]).includes(initialView) ? initialView : null
-  );
   const [viewCompany, setViewCompany] = useState<string>('전체'); // 현황 탭용 회사 선택
   const [selectedDept, setSelectedDept] = useState('전체');
-  const [selectedCategory, setSelectedCategory] = useState('전체');
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const inventoryLoadedRef = useRef(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -314,16 +294,6 @@ export default function IntegratedInventoryManagement({
     if (!viewCompany || viewCompany === '전체') return [];
     return getDepartmentsForCompany(viewCompany);
   }, [viewCompany, getDepartmentsForCompany]);
-  const categoryOptions = useMemo(() => {
-    const rawCategories = Array.from(
-      new Set(inventory.map((item) => normalizeInventoryCategoryLabel(item.category)).filter(Boolean))
-    );
-    const prioritized = INVENTORY_PRIMARY_CATEGORY_ORDER.filter((category) => rawCategories.includes(category));
-    const remaining = rawCategories
-      .filter((category) => !INVENTORY_PRIMARY_CATEGORY_ORDER.includes(category as typeof INVENTORY_PRIMARY_CATEGORY_ORDER[number]))
-      .sort((a, b) => a.localeCompare(b, 'ko'));
-    return ['전체', ...prioritized, ...remaining];
-  }, [inventory]);
   const departmentsByStockCompany = useMemo(() => {
     if (!stockModal?.targetCompany || stockModal.targetCompany === '전체') return [];
     return getDepartmentsForCompany(stockModal.targetCompany);
@@ -349,11 +319,8 @@ export default function IntegratedInventoryManagement({
     if (selectedDept && selectedDept !== '전체') {
       list = list.filter((i) => ((i as Record<string, unknown>).department as string || '').trim() === selectedDept);
     }
-    if (selectedCategory && selectedCategory !== '전체') {
-      list = list.filter((i) => normalizeInventoryCategoryLabel(i.category) === selectedCategory);
-    }
     return list;
-  }, [inventory, searchKeyword, selectedDept, selectedCategory, activeView, viewCompany]);
+  }, [inventory, searchKeyword, selectedDept, activeView, viewCompany]);
 
   const filteredInventory = useMemo(() => {
     if (statusFilter === '전체') return baseFilteredInventory;
@@ -603,42 +570,22 @@ export default function IntegratedInventoryManagement({
   // 로컬스토리지 복구 또는 initialView 반영
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const normalizedInitialView =
-      initialView && (VALID_VIEWS as readonly string[]).includes(initialView) ? initialView : null;
-    const shouldBootstrapFromStorage = !hasRestoredViewRef.current;
-    const shouldApplyExternalView = normalizedInitialView !== lastRequestedInitialViewRef.current;
-    const requestedView = normalizedInitialView || (shouldBootstrapFromStorage ? window.localStorage.getItem(INV_VIEW_KEY) : null);
+    const requestedView =
+      initialView && (VALID_VIEWS as readonly string[]).includes(initialView)
+        ? initialView
+        : window.localStorage.getItem(INV_VIEW_KEY);
 
-    if (!requestedView || !(VALID_VIEWS as readonly string[]).includes(requestedView)) {
-      hasRestoredViewRef.current = true;
-      lastRequestedInitialViewRef.current = normalizedInitialView;
-      return;
-    }
-    if (!canAccessInventorySection(user, requestedView) && !fallbackInventoryView) {
-      hasRestoredViewRef.current = true;
-      lastRequestedInitialViewRef.current = normalizedInitialView;
-      return;
-    }
+    if (!requestedView || !(VALID_VIEWS as readonly string[]).includes(requestedView)) return;
+    if (!canAccessInventorySection(user, requestedView) && !fallbackInventoryView) return;
 
     const nextView = canAccessInventorySection(user, requestedView) ? requestedView : fallbackInventoryView;
-    if (!nextView) {
-      hasRestoredViewRef.current = true;
-      lastRequestedInitialViewRef.current = normalizedInitialView;
-      return;
-    }
+    if (!nextView) return;
 
-    if (shouldBootstrapFromStorage || shouldApplyExternalView) {
-      const resolved = resolveInventoryView(nextView);
-      applyResolvedView(nextView);
-      try {
-        window.localStorage.setItem(INV_VIEW_KEY, resolved.view);
-      } catch {
-        // ignore localStorage failures
-      }
-    }
-
-    hasRestoredViewRef.current = true;
-    lastRequestedInitialViewRef.current = normalizedInitialView;
+    const resolved = resolveInventoryView(nextView);
+    applyResolvedView(nextView);
+    try {
+      window.localStorage.setItem(INV_VIEW_KEY, resolved.view);
+    } catch { /* ignore */ }
   }, [applyResolvedView, fallbackInventoryView, initialView, user]);
 
   useEffect(() => {
@@ -748,13 +695,6 @@ export default function IntegratedInventoryManagement({
   useEffect(() => {
     setSelectedDept('전체');
   }, [viewCompany]);
-
-  useEffect(() => {
-    if (selectedCategory === '전체') return;
-    if (!categoryOptions.includes(selectedCategory)) {
-      setSelectedCategory('전체');
-    }
-  }, [categoryOptions, selectedCategory]);
 
   const refreshCurrentInventory = useCallback(() => {
     if (activeView === '현황') {
@@ -1273,659 +1213,57 @@ export default function IntegratedInventoryManagement({
             </div>
           </section>
 
+
           {activeView === '현황' && (
-            loading ? (
-              <div className="h-full flex items-center justify-center font-bold text-[var(--toss-gray-3)]">데이터 동기화 중...</div>
-            ) : (
-              <div className="space-y-4">
-                <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-                  <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-                    <div className="flex-1 flex flex-wrap items-center gap-2">
-                      <select
-                        value={viewCompany}
-                        onChange={(e) => setViewCompany(e.target.value)}
-                        className="px-3 py-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-bold min-w-[140px]"
-                        title="회사 선택"
-                      >
-                        <option value="전체">전체 회사</option>
-                        {companiesInInventory.map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={selectedDept}
-                        onChange={(e) => setSelectedDept(e.target.value)}
-                        className="px-3 py-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-bold min-w-[120px]"
-                        title="부서 선택 (선택한 회사 기준)"
-                      >
-                        <option value="전체">전체 부서</option>
-                        {departmentsByViewCompany.map((d) => (
-                          <option key={d} value={d}>{d}</option>
-                        ))}
-                      </select>
-                      <input
-                        type="text"
-                        placeholder="품목명 · 분류 · LOT · 시리얼 · 회사 검색"
-                        value={searchKeyword}
-                        onChange={(e) => setSearchKeyword(e.target.value)}
-                        className="flex-1 min-w-[160px] max-w-md px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] outline-none"
-                      />
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">상태</span>
-                        {(['전체', '재고부족', '유통기한임박', '정상'] as const).map((filter) => (
-                          <button
-                            key={filter}
-                            type="button"
-                            onClick={() => setStatusFilter(filter)}
-                            className={`rounded-[var(--radius-md)] px-3 py-2 text-[11px] font-bold transition-all ${
-                              statusFilter === filter
-                                ? 'bg-[var(--foreground)] text-white shadow-sm'
-                                : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
-                            }`}
-                          >
-                            {filter === '유통기한임박' ? '유통기한 임박' : filter}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">분류</span>
-                        {categoryOptions.map((category) => (
-                          <button
-                            key={category}
-                            type="button"
-                            onClick={() => setSelectedCategory(category)}
-                            className={`rounded-[var(--radius-md)] px-3 py-2 text-[11px] font-bold transition-all ${
-                              selectedCategory === category
-                                ? 'bg-emerald-500 text-white shadow-sm'
-                                : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-emerald-50 hover:text-emerald-700'
-                            }`}
-                          >
-                            {category}
-                          </button>
-                        ))}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setViewCompany('전체');
-                          setSelectedDept('전체');
-                          setSelectedCategory('전체');
-                          setSearchKeyword('');
-                          setStatusFilter('전체');
-                          setShowExpiryCenter(false);
-                        }}
-                        className="px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[11px] font-bold text-[var(--foreground)] transition-all hover:bg-[var(--muted)]"
-                      >
-                        초기화
-                      </button>
-                      <button
-                        onClick={() => void refreshCurrentInventory()}
-                        className="px-4 py-3 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] text-xs font-semibold hover:bg-[var(--border)] transition-all shrink-0"
-                      >
-                        새로고침
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--border)] pt-4">
-                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">현재 필터</span>
-                    <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]">
-                      회사 {viewCompany === '전체' ? '전체' : viewCompany}
-                    </span>
-                    <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
-                      부서 {selectedDept === '전체' ? '전체' : selectedDept}
-                    </span>
-                    <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
-                      상태 {statusFilter === '유통기한임박' ? '유통기한 임박' : statusFilter}
-                    </span>
-                    <span className="rounded-[var(--radius-md)] bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700">
-                      분류 {selectedCategory === '전체' ? '전체' : selectedCategory}
-                    </span>
-                    {searchKeyword.trim() && (
-                      <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-bold text-[var(--foreground)]">
-                        검색어 {searchKeyword.trim()}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {isInventoryOpsUser && pendingSupplyApprovals.length > 0 && (
-                  <section
-                    className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm"
-                    data-testid="inventory-supply-approval-panel"
-                  >
-                    <div className="flex flex-col gap-3 border-b border-[var(--border)] pb-4 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">Approved Supply Requests</p>
-                        <h3 className="mt-1 text-lg font-black text-[var(--foreground)]">승인된 물품신청 처리</h3>
-                        <p className="mt-1 text-xs text-[var(--toss-gray-3)]">경영지원팀 재고 기준으로 불출 가능 여부를 확인하고, 부족하면 발주로 넘겨주세요.</p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]">
-                          문서 {pendingSupplyApprovalSummary.approval_count}건
-                        </span>
-                        <span className="rounded-[var(--radius-md)] bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-600">
-                          불출 가능 {pendingSupplyApprovalSummary.issue_ready_count}건
-                        </span>
-                        <span className="rounded-[var(--radius-md)] bg-orange-500/10 px-3 py-1 text-[11px] font-bold text-orange-600">
-                          발주 필요 {pendingSupplyApprovalSummary.order_required_count}건
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 space-y-3">
-                      {pendingSupplyApprovals.map((approval) => {
-                        const workflowItems = approval?.live_inventory_workflow?.items || [];
-                        const workflowSummary = approval?.live_inventory_workflow?.summary || {
-                          issue_ready_count: 0,
-                          order_required_count: 0,
-                        };
-
-                        return (
-                          <article
-                            key={approval.id}
-                            className={`rounded-[var(--radius-xl)] border bg-[var(--page-bg)] p-4 transition-all ${
-                              highlightedSupplyApprovalId === String(approval.id)
-                                ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/20 shadow-sm'
-                                : 'border-[var(--border)]'
-                            }`}
-                            data-testid={`inventory-supply-approval-${approval.id}`}
-                            data-supply-approval-id={String(approval.id)}
-                            data-highlighted={highlightedSupplyApprovalId === String(approval.id) ? 'true' : 'false'}
-                          >
-                            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                              <div>
-                                <h4 className="text-sm font-bold text-[var(--foreground)]">{approval.title}</h4>
-                                <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
-                                  신청자 {approval.sender_name || '-'} / 회사 {approval.sender_company || '-'} / 문서번호 {approval.doc_number || approval.meta_data?.doc_number || '-'}
-                                </p>
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                <span className="rounded-[var(--radius-md)] bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-600">
-                                  불출 가능 {workflowSummary.issue_ready_count}건
-                                </span>
-                                <span className="rounded-[var(--radius-md)] bg-orange-500/10 px-2.5 py-1 text-[10px] font-bold text-orange-600">
-                                  발주 필요 {workflowSummary.order_required_count}건
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="mt-3 space-y-2">
-                              {(workflowItems as Record<string, unknown>[]).map((workflowItem) => {
-                                const actionKeyPrefix = `${approval.id}:${workflowItem.request_index}`;
-                                const isBusy =
-                                  workflowActionKey === `${actionKeyPrefix}:issue` ||
-                                  workflowActionKey === `${actionKeyPrefix}:order` ||
-                                  workflowActionKey === `${actionKeyPrefix}:order-cancel`;
-                                const isIssued = workflowItem.status === 'issued';
-                                const isOrdered = workflowItem.status === 'ordered';
-                                const canIssue = workflowItem.recommended_action === 'issue' && !isIssued && !isOrdered;
-                                const canOrder = workflowItem.recommended_action === 'order' && !isOrdered && !isIssued;
-
-                                return (
-                                  <div
-                                    key={`${approval.id}-${workflowItem.request_index}`}
-                                    className="grid gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 lg:grid-cols-[minmax(0,1.7fr)_88px_88px_120px_auto]"
-                                    data-testid={`inventory-supply-approval-item-${approval.id}-${workflowItem.request_index}`}
-                                  >
-                                    <div className="min-w-0">
-                                      <p className="truncate text-sm font-bold text-[var(--foreground)]">{String(workflowItem.name ?? '')}</p>
-                                      <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
-                                        용도 {String(workflowItem.purpose ?? '') || '-'} / 수령부서 {String(workflowItem.dept ?? '') || '-'}
-                                      </p>
-                                      {!!workflowItem.note && (
-                                        <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">{String(workflowItem.note)}</p>
-                                      )}
-                                    </div>
-                                    <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-center">
-                                      <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">요청</p>
-                                      <p className="mt-1 text-sm font-bold text-[var(--foreground)]">{String(workflowItem.qty ?? '')}</p>
-                                    </div>
-                                    <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-center">
-                                      <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">재고</p>
-                                      <p className={`mt-1 text-sm font-bold ${Number(workflowItem.shortage_qty) > 0 ? 'text-orange-600' : 'text-emerald-600'}`}>
-                                        {String(workflowItem.available_qty ?? '')}
-                                      </p>
-                                    </div>
-                                    <div className="flex items-center">
-                                      <span className={`rounded-[var(--radius-md)] px-3 py-1 text-[10px] font-bold ${
-                                        isIssued
-                                          ? 'bg-emerald-50 text-emerald-600'
-                                          : isOrdered
-                                            ? 'bg-orange-500/10 text-orange-600'
-                                            : workflowItem.recommended_action === 'issue'
-                                              ? 'bg-blue-500/10 text-[var(--accent)]'
-                                              : 'bg-red-500/10 text-red-600'
-                                      }`}>
-                                        {isIssued
-                                          ? '불출 완료'
-                                          : isOrdered
-                                            ? '발주 처리'
-                                            : workflowItem.recommended_action === 'issue'
-                                              ? '불출 확인'
-                                              : '재고 부족'}
-                                      </span>
-                                    </div>
-                                    <div className="flex flex-wrap items-center justify-end gap-2">
-                                      {canIssue && (
-                                        <button
-                                          type="button"
-                                          onClick={() => void handleSupplyIssue(approval, workflowItem)}
-                                          disabled={isBusy}
-                                          className="rounded-full bg-[var(--accent)] px-3 py-2 text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                                          data-testid={`inventory-supply-issue-${approval.id}-${workflowItem.request_index}`}
-                                        >
-                                          {isBusy ? '처리 중...' : '불출 처리'}
-                                        </button>
-                                      )}
-                                      {canOrder && (
-                                        <button
-                                          type="button"
-                                          onClick={() => void handleSupplyOrder(approval, workflowItem)}
-                                          disabled={isBusy}
-                                          className="rounded-full bg-orange-600 px-3 py-2 text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                                          data-testid={`inventory-supply-order-${approval.id}-${workflowItem.request_index}`}
-                                        >
-                                          {isBusy ? '처리 중...' : '발주 처리'}
-                                        </button>
-                                      )}
-                                      {isOrdered && !workflowItem.order_approval_requested && (
-                                        <button
-                                          type="button"
-                                          onClick={() => void handleSupplyOrderCancel(approval, workflowItem)}
-                                          disabled={isBusy}
-                                          className="rounded-full border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] disabled:cursor-not-allowed disabled:opacity-50"
-                                          data-testid={`inventory-supply-order-cancel-${approval.id}-${workflowItem.request_index}`}
-                                        >
-                                          {isBusy ? '처리 중...' : '발주 취소'}
-                                        </button>
-                                      )}
-                                      {(isIssued || isOrdered) && (
-                                        <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">
-                                          {String(workflowItem.processed_by_name ?? '') || '처리 완료'}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </article>
-                        );
-                      })}
-                    </div>
-                  </section>
-                )}
-                {isInventoryOpsUser && completedSupplyApprovals.length > 0 && (
-                  <section
-                    className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm"
-                    data-testid="inventory-supply-history-panel"
-                  >
-                    <div className="flex flex-col gap-3 border-b border-[var(--border)] pb-4 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">Processed Supply History</p>
-                        <h3 className="mt-1 text-lg font-black text-[var(--foreground)]">처리 완료 히스토리</h3>
-                        <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
-                          최근 처리된 물품신청 결과를 확인하고, 발주 건은 바로 발주관리 탭으로 이어서 확인할 수 있습니다.
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]">
-                          문서 {completedSupplyApprovalSummary.approval_count}건
-                        </span>
-                        <span className="rounded-[var(--radius-md)] bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-600">
-                          불출 완료 {completedSupplyApprovalSummary.issued_count}건
-                        </span>
-                        <span className="rounded-[var(--radius-md)] bg-orange-500/10 px-3 py-1 text-[11px] font-bold text-orange-600">
-                          발주 전환 {completedSupplyApprovalSummary.ordered_count}건
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 space-y-3">
-                      {completedSupplyApprovals.slice(0, 8).map((approval) => {
-                        const workflowItems = approval?.live_inventory_workflow?.items || [];
-                        const latestProcessedAt =
-                          workflowItems.reduce((latest: string | null, item) => {
-                            const processedAt = item?.processed_at as string | null | undefined;
-                            if (!processedAt) return latest;
-                            if (!latest) return processedAt;
-                            return new Date(processedAt).getTime() > new Date(latest).getTime()
-                              ? processedAt
-                              : latest;
-                          }, null) || approval.created_at;
-
-                        return (
-                          <article
-                            key={`history-${approval.id}`}
-                            className={`rounded-[var(--radius-xl)] border bg-[var(--page-bg)] p-4 transition-all ${
-                              highlightedSupplyApprovalId === String(approval.id)
-                                ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/20 shadow-sm'
-                                : 'border-[var(--border)]'
-                            }`}
-                            data-testid={`inventory-supply-history-${approval.id}`}
-                            data-supply-approval-id={String(approval.id)}
-                            data-highlighted={highlightedSupplyApprovalId === String(approval.id) ? 'true' : 'false'}
-                          >
-                            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                              <div>
-                                <h4 className="text-sm font-bold text-[var(--foreground)]">{approval.title}</h4>
-                                <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
-                                  신청자 {approval.sender_name || '-'} / 회사 {approval.sender_company || '-'}
-                                </p>
-                              </div>
-                              <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                                최근 처리 {latestProcessedAt ? new Date(latestProcessedAt).toLocaleString('ko-KR') : '-'}
-                              </p>
-                            </div>
-
-                            <div className="mt-3 space-y-2">
-                              {workflowItems.map((workflowItem) => {
-                                const isOrdered = workflowItem.status === 'ordered';
-                                const isIssued = workflowItem.status === 'issued';
-
-                                return (
-                                  <div
-                                    key={`history-item-${approval.id}-${String(workflowItem.request_index ?? '')}`}
-                                    className="grid gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 lg:grid-cols-[minmax(0,1.6fr)_88px_130px_auto]"
-                                    data-testid={`inventory-supply-history-item-${approval.id}-${String(workflowItem.request_index ?? '')}`}
-                                  >
-                                    <div className="min-w-0">
-                                      <p className="truncate text-sm font-bold text-[var(--foreground)]">{String(workflowItem.name ?? '')}</p>
-                                      <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
-                                        용도 {String(workflowItem.purpose ?? '') || '-'} / 수령부서 {String(workflowItem.dept ?? '') || '-'}
-                                      </p>
-                                      {!!workflowItem.note && (
-                                        <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">{String(workflowItem.note)}</p>
-                                      )}
-                                    </div>
-                                    <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-center">
-                                      <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">처리수량</p>
-                                      <p className="mt-1 text-sm font-bold text-[var(--foreground)]">{String(workflowItem.qty ?? '')}</p>
-                                    </div>
-                                    <div className="flex items-center">
-                                      <span className={`rounded-[var(--radius-md)] px-3 py-1 text-[10px] font-bold ${
-                                        isIssued ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-500/10 text-orange-600'
-                                      }`}>
-                                        {isIssued ? '불출 완료' : '발주 처리'}
-                                      </span>
-                                    </div>
-                                    <div className="flex flex-wrap items-center justify-end gap-2">
-                                      <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">
-                                        {String(workflowItem.processed_by_name ?? '') || '처리 완료'}
-                                      </span>
-                                      {isOrdered && (
-                                        <>
-                                          {workflowItem.order_approval_requested ? (
-                                            <button
-                                              type="button"
-                                              onClick={() => openLinkedSupplyOrder(approval.id ?? '', workflowItem.request_index as number)}
-                                              className="rounded-full bg-[var(--foreground)] px-3 py-2 text-[11px] font-bold text-white"
-                                              data-testid={`inventory-supply-history-open-order-${approval.id}-${String(workflowItem.request_index ?? '')}`}
-                                            >
-                                              발주 보기
-                                            </button>
-                                          ) : (
-                                            <button
-                                              type="button"
-                                              onClick={() => void handleSupplyOrderCancel(approval, workflowItem)}
-                                              disabled={workflowActionKey === `${approval.id}:${workflowItem.request_index}:order-cancel`}
-                                              className="rounded-full border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] disabled:cursor-not-allowed disabled:opacity-50"
-                                              data-testid={`inventory-supply-history-cancel-order-${approval.id}-${String(workflowItem.request_index ?? '')}`}
-                                            >
-                                              {workflowActionKey === `${approval.id}:${workflowItem.request_index}:order-cancel` ? '처리 중...' : '발주 취소'}
-                                            </button>
-                                          )}
-                                        </>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </article>
-                        );
-                      })}
-                    </div>
-                  </section>
-                )}
-                <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-                  <div className="bg-[var(--card)] p-4 rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm text-center">
-                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">조회 품목</p>
-                    <p className="mt-1 text-xl font-semibold text-[var(--accent)]">{filteredInventory.length}</p>
-                  </div>
-                  <div className="bg-[var(--card)] p-4 rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm text-center">
-                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">안전재고 미달</p>
-                    <p className="mt-1 text-xl font-semibold text-red-600">{lowStockFilteredItems.length}</p>
-                  </div>
-                  <div className="bg-[var(--card)] p-4 rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm text-center">
-                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">유효기간 임박</p>
-                    <p className="mt-1 text-xl font-semibold text-orange-600">{expiryFilteredItems.length}</p>
-                  </div>
-                  <div className="bg-[var(--card)] p-4 rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm text-center">
-                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">총 재고 수량</p>
-                    <p className="mt-1 text-xl font-semibold text-[var(--foreground)]">{totalQuantity.toLocaleString('ko-KR')}</p>
-                  </div>
-                  <div className="bg-[var(--card)] p-4 rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm text-center">
-                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">재고 평가 금액</p>
-                    <p className="mt-1.5 break-keep text-[13px] font-semibold text-[var(--foreground)]">{formatCurrency(totalInventoryValue)}</p>
-                  </div>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-3">
-                  <button
-                    type="button"
-                    onClick={() => openInventoryView('발주')}
-                    className="rounded-[var(--radius-lg)] border border-red-100 bg-red-500/10 px-4 py-3.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
-                  >
-                    <p className="text-[11px] font-bold text-red-500">우선 처리</p>
-                    <p className="mt-1.5 text-sm font-bold text-red-700">발주 관리로 이동</p>
-                    <p className="mt-1 text-[11px] text-red-500">지금 보충이 필요한 품목 {lowStockFilteredItems.length}건</p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openInventoryView('유통기한')}
-                    className="rounded-[var(--radius-lg)] border border-orange-100 bg-orange-500/10 px-4 py-3.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
-                  >
-                    <p className="text-[11px] font-bold text-orange-500">품질 점검</p>
-                    <p className="mt-1.5 text-sm font-bold text-orange-700">유효기간 센터 열기</p>
-                    <p className="mt-1 text-[11px] text-orange-500">빠른 확인이 필요한 품목 {expiryFilteredItems.length}건</p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSearchKeyword('')}
-                    className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
-                  >
-                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">현황 확인</p>
-                    <p className="mt-1.5 text-sm font-bold text-[var(--foreground)]">품절 품목 빠르게 파악</p>
-                    <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">현재 범위에서 재고 0개 품목 {outOfStockItems.length}건</p>
-                  </button>
-                </div>
-
-                <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
-                  <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <h3 className="text-base font-bold text-[var(--foreground)]">우선 확인 품목</h3>
-                        <p className="mt-1 text-xs text-[var(--toss-gray-3)]">재고부족과 유통기한 임박 품목을 먼저 확인하세요.</p>
-                      </div>
-                      <span className="rounded-[var(--radius-md)] bg-red-500/10 px-3 py-1 text-[11px] font-bold text-red-600">
-                        {urgentActionItems.length}건
-                      </span>
-                    </div>
-
-                    <div className="mt-3 grid gap-3 md:grid-cols-2">
-                      {urgentActionItems.length === 0 && (
-                        <div className="empty-state col-span-full rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)]/30 px-4 py-4 text-sm">
-                          긴급 조치가 필요한 품목이 없습니다.
-                        </div>
-                      )}
-
-                      {urgentActionItems.map((item) => {
-                        const quantity = getItemQuantity(item);
-                        const minQuantity = getItemMinQuantity(item);
-                        const expiryImminent = isExpirySoon(item, expiryThreshold);
-                        const itemExtra = item as Record<string, unknown>;
-                        const itemName = String(itemExtra.item_name || item.name || '');
-                        const itemDept = String(itemExtra.department || '');
-
-                        return (
-                          <article key={item.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] p-3.5">
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <p className="text-sm font-bold text-[var(--foreground)]">{itemName}</p>
-                                <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{item.company || '-'} · {itemDept || '부서 미지정'}</p>
-                              </div>
-                              <span className={`rounded-[var(--radius-md)] px-2.5 py-1 text-[10px] font-bold ${
-                                quantity <= minQuantity ? 'bg-red-500/10 text-red-600' : 'bg-orange-500/10 text-orange-600'
-                              }`}>
-                                {quantity <= minQuantity ? '재고부족' : '기한임박'}
-                              </span>
-                            </div>
-                            <div className="mt-2.5 flex flex-wrap gap-2 text-[11px] font-semibold text-[var(--toss-gray-4)]">
-                              <span>현재고 {quantity}</span>
-                              <span>안전 {minQuantity}</span>
-                              {expiryImminent && <span>기한 {item.expiry_date}</span>}
-                            </div>
-                            <div className="mt-2.5 flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setStockModal({ item, type: 'in', targetCompany: item.company || '전체', targetDept: itemDept || '전체' });
-                                  setStockAmount(Math.max(1, minQuantity - quantity + 1));
-                                }}
-                                className="flex-1 rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white"
-                              >
-                                입고
-                              </button>
-                              {quantity <= minQuantity && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleAutoApprovalRequest(item)}
-                                  className="flex-1 rounded-[var(--radius-md)] bg-orange-600 px-3 py-1.5 text-[11px] font-bold text-white"
-                                >
-                                  발주
-                                </button>
-                              )}
-                            </div>
-                          </article>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[1000px]">
-                      <thead>
-                        <tr className="bg-[var(--muted)]/50 border-b border-[var(--border)]">
-                          <th className="px-5 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">회사/분류</th>
-                          <th className="px-5 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">품목명/LOT/시리얼</th>
-                          <th className="px-5 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-center">현재고</th>
-                          <th className="px-5 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-center">단가</th>
-                          <th className="px-5 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-center">유효기간</th>
-                          <th className="px-5 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">상태</th>
-                          <th className="px-5 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-right">관리</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[var(--border)]">
-                        {filteredInventory.map(item => {
-                          const quantity = getItemQuantity(item);
-                          const minQuantity = getItemMinQuantity(item);
-                          const isExpiryImminent = isExpirySoon(item, expiryThreshold);
-                          const itemEx = item as Record<string, unknown>;
-                          const displayName = String(itemEx.item_name || item.name || '');
-                          const itemDepartment = String(itemEx.department || '');
-                          const lotNumber = itemEx.lot_number ? String(itemEx.lot_number) : null;
-                          const serialNumber = itemEx.serial_number ? String(itemEx.serial_number) : null;
-                          const isUdi = Boolean(itemEx.is_udi);
-                          return (
-                            <tr key={item.id} className="hover:bg-[var(--toss-blue-light)]/50 transition-all group">
-                              <td className="px-5 py-3.5">
-                                <p className="text-[11px] font-semibold text-[var(--accent)]">{item.company || '-'}</p>
-                                <p className="text-[8px] font-bold text-[var(--toss-gray-3)]">{item.category || '미분류'}</p>
-                              </td>
-                              <td className="px-5 py-3.5">
-                                <p className="text-xs font-semibold text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors">{displayName}</p>
-                                <div className="flex gap-1 mt-0.5">
-                                  {lotNumber && <span className="text-[7px] font-semibold bg-[var(--muted)] text-[var(--toss-gray-4)] px-1 py-0.5 rounded">LOT: {lotNumber}</span>}
-                                  {serialNumber && <span className="text-[7px] font-semibold bg-emerald-50 text-emerald-600 px-1 py-0.5 rounded">S/N: {serialNumber}</span>}
-                                  {isUdi && <span className="text-[7px] font-semibold bg-purple-500/10 text-purple-500 px-1 py-0.5 rounded uppercase">UDI</span>}
-                                </div>
-                              </td>
-                              <td className="px-5 py-3.5 text-center">
-                                <span className={`text-xs font-semibold ${quantity <= minQuantity ? 'text-red-600' : 'text-[var(--foreground)]'}`}>{quantity}</span>
-                                <p className="text-[8px] font-bold text-[var(--toss-gray-3)]">안전: {minQuantity}</p>
-                              </td>
-                              <td className="px-5 py-3.5 text-center">
-                                <p className="text-xs font-semibold text-[var(--toss-gray-4)]">{formatCurrency(Number(item.unit_price || 0))}</p>
-                                <p className="text-[8px] font-bold text-[var(--toss-gray-3)]">총액: {formatCurrency((Number(item.unit_price || 0) * quantity))}</p>
-                              </td>
-                              <td className="px-5 py-3.5 text-center">
-                                <p className={`text-[11px] font-semibold ${isExpiryImminent ? 'text-orange-600' : 'text-[var(--toss-gray-3)]'}`}>
-                                  {item.expiry_date || '-'}
-                                </p>
-                                {isExpiryImminent && <p className="text-[7px] font-semibold text-orange-400 animate-pulse">임박</p>}
-                              </td>
-                              <td className="px-5 py-3.5">
-                                <span className={`px-2 py-0.5 rounded-full text-[8px] font-semibold ${quantity <= minQuantity ? 'bg-red-500/10 text-red-600' : isExpiryImminent ? 'bg-orange-500/10 text-orange-600' : 'bg-green-500/10 text-green-600'}`}>
-                                  {quantity <= minQuantity ? '재고부족' : isExpiryImminent ? '기한임박' : '정상'}
-                                </span>
-                              </td>
-                              <td data-testid={`inventory-actions-${item.id}`} className="px-5 py-3.5 text-right space-x-1">
-                                <button data-testid={`inventory-stock-in-${item.id}`} onClick={() => { setStockModal({ item, type: 'in', targetCompany: item.company || '전체', targetDept: itemDepartment || '전체' }); setStockAmount(1); }} className="px-3 py-1.5 bg-[var(--toss-blue-light)] text-[var(--accent)] text-[11px] font-semibold rounded-md hover:bg-[var(--toss-blue-light)]">입고</button>
-                                <button data-testid={`inventory-stock-out-${item.id}`} onClick={() => { setStockModal({ item, type: 'out', targetCompany: item.company || '전체', targetDept: itemDepartment || '전체' }); setStockAmount(1); }} className="px-3 py-1.5 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-md hover:bg-[var(--muted)]/80">출고</button>
-                                {quantity <= minQuantity && (
-                                  <button data-testid={`inventory-reorder-${item.id}`} onClick={() => handleAutoApprovalRequest(item)} className="px-3 py-1.5 bg-orange-600 text-white text-[11px] font-semibold rounded-md shadow-sm">발주</button>
-                                )}
-                                <button
-                                  data-testid={`inventory-delete-${item.id}`}
-                                  onClick={async () => {
-                                    if (confirm(`[${displayName}] 품목을 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
-                                      try {
-                                        await supabase.from('inventory').delete().eq('id', item.id);
-                                        toast('삭제되었습니다.', 'success');
-                                        refreshCurrentInventory();
-                                      } catch (err) {
-                                        toast('삭제 오류가 발생했습니다.', 'error');
-                                      }
-                                    }
-                                  }}
-                                  className="px-3 py-1.5 bg-red-500/10 text-red-600 text-[11px] font-semibold rounded-md hover:bg-red-500/20"
-                                >
-                                  삭제
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {showExpiryCenter && (
-                  <section className="rounded-[var(--radius-xl)] border border-orange-100 bg-[var(--card)] p-5 shadow-sm">
-                    <div className="mb-4 flex flex-col gap-3 border-b border-orange-100 pb-4 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <h3 className="text-base font-bold text-[var(--foreground)]">유효기간 관리 센터</h3>
-                        <p className="mt-1 text-xs text-[var(--toss-gray-3)]">임박 품목 확인과 알림 발송, 보고서 다운로드를 한 화면에서 처리합니다.</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowExpiryCenter(false)}
-                        className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-2 text-[11px] font-bold text-[var(--foreground)] transition-all hover:bg-[var(--muted)]"
-                      >
-                        센터 닫기
-                      </button>
-                    </div>
-                    <ExpirationAlert />
-                  </section>
-                )}
-              </div>
-            )
+            <InventoryStatusView
+              filteredInventory={filteredInventory}
+              lowStockCount={lowStockFilteredItems.length}
+              expiryCount={expiryFilteredItems.length}
+              outOfStockCount={outOfStockItems.length}
+              urgentItems={urgentActionItems}
+              totalQuantity={totalQuantity}
+              totalValue={totalInventoryValue}
+              viewCompany={viewCompany}
+              setViewCompany={setViewCompany}
+              selectedDept={selectedDept}
+              setSelectedDept={setSelectedDept}
+              searchKeyword={searchKeyword}
+              setSearchKeyword={setSearchKeyword}
+              statusFilter={statusFilter}
+              setStatusFilter={setStatusFilter}
+              companiesInInventory={companiesInInventory}
+              departmentsByViewCompany={departmentsByViewCompany}
+              loading={loading}
+              onRefresh={refreshCurrentInventory}
+              onStockIn={(item) => { setStockModal({ item, type: 'in', targetCompany: item.company || '전체', targetDept: (item as Record<string, unknown>).department as string || '전체' }); setStockAmount(1); }}
+              onStockOut={(item) => { setStockModal({ item, type: 'out', targetCompany: item.company || '전체', targetDept: (item as Record<string, unknown>).department as string || '전체' }); setStockAmount(1); }}
+              onReorder={(item) => handleAutoApprovalRequest(item)}
+              onDelete={async (item) => {
+                const displayName = String((item as Record<string, unknown>).item_name || item.name || '');
+                if (confirm(`[${displayName}] 품목을 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
+                  try {
+                    await supabase.from('inventory').delete().eq('id', item.id);
+                    toast('삭제되었습니다.', 'success');
+                    refreshCurrentInventory();
+                  } catch {
+                    toast('삭제 오류가 발생했습니다.', 'error');
+                  }
+                }
+              }}
+              isOpsUser={isInventoryOpsUser}
+              pendingApprovals={pendingSupplyApprovals}
+              completedApprovals={completedSupplyApprovals}
+              workflowActionKey={workflowActionKey}
+              highlightedApprovalId={highlightedSupplyApprovalId}
+              onSupplyIssue={(approval, item) => void handleSupplyIssue(approval, item)}
+              onSupplyOrder={(approval, item) => void handleSupplyOrder(approval, item)}
+              onSupplyOrderCancel={(approval, item) => void handleSupplyOrderCancel(approval, item)}
+              onOpenLinkedOrder={openLinkedSupplyOrder}
+              showExpiryCenter={showExpiryCenter}
+              setShowExpiryCenter={setShowExpiryCenter}
+              expiryThreshold={expiryThreshold}
+              openView={openInventoryView}
+            />
           )}
           {activeView === '이력' && (
             <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-sm">

@@ -28,6 +28,7 @@ const CHAT_MESSAGE_COLUMNS = [
   'album_id',
   'album_index',
   'album_total',
+  'edited_at',
 ];
 
 export const CHAT_MESSAGE_OPTIONAL_COLUMNS = [
@@ -41,6 +42,7 @@ export const CHAT_MESSAGE_OPTIONAL_COLUMNS = [
   'album_id',
   'album_index',
   'album_total',
+  'edited_at',
 ] as const;
 
 export const CHAT_MESSAGE_SELECT = CHAT_MESSAGE_COLUMNS.join(', ');

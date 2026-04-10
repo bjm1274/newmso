@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { sound } from '@/lib/sounds';
 import {
-  resolveApprovalNotificationId,
-  resolveInventoryNotificationApprovalId,
+  NOTIFICATION_MENU_LABELS,
+  resolveNotificationTarget,
   toNotificationMetadataRecord,
 } from '@/lib/notification-metadata';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
@@ -28,37 +28,6 @@ const TYPE_CFG: Record<string, { icon: string; color: string; label: string }> =
 
 const getTypeCfg = (type: string) => TYPE_CFG[type] || TYPE_CFG.default;
 
-
-function buildInventoryNotificationHref(metadata: Record<string, unknown>) {
-  const params = new URLSearchParams({
-    open_menu: '재고관리',
-  });
-
-  const approvalId = resolveInventoryNotificationApprovalId(metadata);
-  if (approvalId) {
-    params.set('open_inventory_view', '현황');
-    params.set('open_inventory_approval', approvalId);
-  }
-
-  return `/main?${params.toString()}`;
-}
-
-function buildApprovalNotificationHref(metadata: Record<string, unknown>) {
-  const params = new URLSearchParams({
-    open_menu: '전자결재',
-  });
-
-  if (typeof metadata?.approval_view === 'string' && metadata.approval_view.trim()) {
-    params.set('open_subview', metadata.approval_view.trim());
-  }
-
-  const approvalId = resolveApprovalNotificationId(metadata);
-  if (approvalId) {
-    params.set('open_approval_id', approvalId);
-  }
-
-  return `/main?${params.toString()}`;
-}
 
 export default function NotificationCenter({
   user,
@@ -221,17 +190,28 @@ export default function NotificationCenter({
     }
   }, []);
 
-  const openMyPage = useCallback(() => {
-    if (onOpenMenu) {
-      onOpenMenu('내정보');
+  const openNotificationTarget = useCallback((notification: any) => {
+    const target = resolveNotificationTarget(
+      notification.type,
+      toNotificationMetadataRecord(notification.metadata),
+    );
+
+    if (target.kind === 'my_page' && onOpenMenu) {
+      onOpenMenu(NOTIFICATION_MENU_LABELS.myPage);
       return;
     }
-    router.push('/main?open_menu=내정보');
+
+    if (target.kind === 'notifications' && onOpenMenu) {
+      onOpenMenu(NOTIFICATION_MENU_LABELS.notifications);
+      return;
+    }
+
+    router.push(target.href);
   }, [onOpenMenu, router]);
 
-  const openMyNotifications = useCallback(() => {
+  const openNotificationsInbox = useCallback(() => {
     if (onOpenMenu) {
-      onOpenMenu('알림');
+      onOpenMenu(NOTIFICATION_MENU_LABELS.notifications);
       return;
     }
     router.push('/main?open_menu=알림');
@@ -243,41 +223,8 @@ export default function NotificationCenter({
     }
 
     setIsOpen(false);
-
-    const meta = toNotificationMetadataRecord(notification.metadata);
-    if (notification.type === 'message' || notification.type === 'mention') {
-      router.push(meta.room_id ? `/main?open_chat_room=${meta.room_id}` : '/main?open_menu=채팅');
-      return;
-    }
-
-    if (notification.type === 'approval') {
-      router.push(buildApprovalNotificationHref(meta));
-      return;
-    }
-
-    if (notification.type === 'inventory') {
-      router.push(buildInventoryNotificationHref(meta));
-      return;
-    }
-
-    if (
-      notification.type === 'payroll' ||
-      notification.type === 'education' ||
-      notification.type === 'attendance' ||
-      notification.type === 'hr' ||
-      notification.type === '인사'
-    ) {
-      openMyNotifications();
-      return;
-    }
-
-    if (notification.type === 'board') {
-      router.push('/main?open_menu=게시판');
-      return;
-    }
-
-    openMyPage();
-  }, [markAsRead, openMyNotifications, openMyPage, router]);
+    openNotificationTarget(notification);
+  }, [markAsRead, openNotificationTarget]);
 
   const unread = useMemo(
     () => notifications.filter((notification) => !notification.read_at),
@@ -443,7 +390,7 @@ export default function NotificationCenter({
               type="button"
               onClick={() => {
                 setIsOpen(false);
-                openMyNotifications();
+                openNotificationsInbox();
               }}
               className="text-[11px] font-semibold text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
             >

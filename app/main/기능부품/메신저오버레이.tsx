@@ -8,6 +8,7 @@ import {
   resolveAttachmentKind,
 } from './메신저첨부';
 import { MessengerStatusUserRow } from './메신저공통';
+import type { MessageEditHistoryEntry } from './메신저상태훅';
 
 type SlashCommandForm = {
   startDate: string;
@@ -23,6 +24,14 @@ type MessageEditModalProps = {
   onDraftChange: (value: string) => void;
   onClose: () => void;
   onSave: () => void | Promise<void>;
+};
+
+type MessageEditHistoryModalProps = {
+  open: boolean;
+  message: ChatMessage | null;
+  loading: boolean;
+  entries: MessageEditHistoryEntry[];
+  onClose: () => void;
 };
 
 type PollComposerModalProps = {
@@ -53,7 +62,9 @@ type ThreadPanelProps = {
   rootMessage: ChatMessage | null;
   messages: ChatMessage[];
   resolveStaffProfile: (staffId: string | null | undefined) => StaffMember | null;
+  isFollowingThread: boolean;
   onClose: () => void;
+  onToggleFollowThread: (message: ChatMessage) => void;
   onPreviewAttachment: (message: ChatMessage) => void;
   onReplyMessage: (message: ChatMessage) => void;
 };
@@ -96,6 +107,96 @@ export function MessageEditModal({
           </button>
           <button data-testid="chat-message-edit-save" type="button" onClick={() => void onSave()} className="flex-1 py-3 bg-[var(--accent)] text-white rounded-[var(--radius-md)] font-semibold text-sm shadow-sm">
             저장
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function MessageEditHistoryModal({
+  open,
+  message,
+  loading,
+  entries,
+  onClose,
+}: MessageEditHistoryModalProps) {
+  if (!open || !message) return null;
+
+  return (
+    <div
+      data-testid="chat-message-edit-history-modal"
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[116] p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[var(--card)] w-full max-w-xl rounded-2xl p-5 shadow-sm border border-[var(--border)] space-y-4 max-h-[80vh] flex flex-col"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="space-y-1 shrink-0">
+          <h3 className="text-lg font-bold text-foreground">수정 이력</h3>
+          <p className="text-[11px] font-medium text-[var(--toss-gray-3)] line-clamp-2">
+            {getMessageDisplayText(message.content, message.file_name, message.file_url, '메시지')}
+          </p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-1">
+          {loading ? (
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--muted)] px-4 py-6 text-center text-sm font-semibold text-[var(--toss-gray-3)]">
+              수정 이력을 불러오는 중입니다.
+            </div>
+          ) : entries.length === 0 ? (
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--muted)] px-4 py-6 text-center text-sm font-semibold text-[var(--toss-gray-3)]">
+              저장된 수정 이력이 없습니다.
+            </div>
+          ) : (
+            entries.map((entry, index) => (
+              <article
+                key={entry.id}
+                data-testid={`chat-message-edit-history-entry-${index}`}
+                className="rounded-2xl border border-[var(--border)] bg-[var(--muted)] p-4 space-y-3"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{entry.editorName}</p>
+                    <p className="text-[11px] text-[var(--toss-gray-3)]">
+                      {entry.editedAt
+                        ? new Date(entry.editedAt).toLocaleString('ko-KR')
+                        : '시간 정보 없음'}
+                    </p>
+                  </div>
+                  {entry.isFallback ? (
+                    <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold text-amber-700">
+                      현재 버전만 확인 가능
+                    </span>
+                  ) : null}
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
+                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">수정 전</p>
+                    <p className="mt-2 whitespace-pre-wrap break-words text-sm text-foreground">
+                      {entry.previousContent || '기록 없음'}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
+                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">수정 후</p>
+                    <p className="mt-2 whitespace-pre-wrap break-words text-sm text-foreground">
+                      {entry.nextContent || '기록 없음'}
+                    </p>
+                  </div>
+                </div>
+              </article>
+            ))
+          )}
+        </div>
+
+        <div className="flex justify-end shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-[var(--radius-md)] bg-[var(--muted)] px-4 py-2 text-sm font-semibold text-[var(--toss-gray-3)]"
+          >
+            닫기
           </button>
         </div>
       </div>
@@ -313,24 +414,70 @@ export function ThreadPanel({
   rootMessage,
   messages,
   resolveStaffProfile,
+  isFollowingThread,
   onClose,
+  onToggleFollowThread,
   onPreviewAttachment,
   onReplyMessage,
 }: ThreadPanelProps) {
   if (!rootMessage) return null;
+
+  const participantCount = new Set(
+    messages
+      .map((message) => String(message.sender_id || '').trim())
+      .filter(Boolean)
+  ).size;
+  const replyCount = Math.max(
+    0,
+    messages.filter((message) => String(message.id) !== String(rootMessage.id)).length,
+  );
 
   return (
     <>
       <div className="absolute inset-0 bg-black/10 z-40" onClick={onClose} aria-hidden="true" />
       <aside data-testid="chat-thread-panel" className="absolute top-0 right-0 bottom-0 w-80 bg-[var(--card)] border-l border-[var(--border)] shadow-sm z-50 flex flex-col animate-in slide-in-from-right duration-300">
         <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
-          <div className="min-w-0">
+          <div className="min-w-0 space-y-2">
             <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">스레드</p>
             <p className="text-xs font-semibold text-[var(--foreground)] mt-0.5 line-clamp-2">
               {getMessageDisplayText(rootMessage.content, rootMessage.file_name, rootMessage.file_url, '첨부 파일 메시지')}
             </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                data-testid="chat-thread-summary-replies"
+                className="rounded-full bg-[var(--muted)] px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-4)]"
+              >
+                답글 {replyCount}개
+              </span>
+              <span
+                data-testid="chat-thread-summary-participants"
+                className="rounded-full bg-[var(--muted)] px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-4)]"
+              >
+                참여 {participantCount}명
+              </span>
+              <button
+                type="button"
+                data-testid="chat-thread-reply-root"
+                onClick={() => onReplyMessage(rootMessage)}
+                className="rounded-full bg-[var(--accent)]/10 px-2.5 py-1 text-[10px] font-bold text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/15"
+              >
+                답글 작성
+              </button>
+              <button
+                type="button"
+                data-testid="chat-thread-toggle-follow"
+                onClick={() => onToggleFollowThread(rootMessage)}
+                className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition-colors ${
+                  isFollowingThread
+                    ? 'bg-amber-500/10 text-amber-700 hover:bg-amber-500/15'
+                    : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)]'
+                }`}
+              >
+                {isFollowingThread ? '알림 켜짐' : '알림 켜기'}
+              </button>
+            </div>
           </div>
-          <button onClick={onClose} className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[var(--radius-md)] hover:bg-[var(--muted)]">
+          <button data-testid="chat-thread-close" onClick={onClose} className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[var(--radius-md)] hover:bg-[var(--muted)]">
             닫기
           </button>
         </div>

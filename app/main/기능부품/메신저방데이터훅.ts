@@ -41,7 +41,6 @@ type UseChatRoomDataSyncParams = {
   effectiveTodoUserId: string | null | undefined;
   userId: string | null | undefined;
   setRoom: (roomId: string | null) => void;
-  alignRoomToLatest: (roomId: string | null | undefined, behavior?: ScrollBehavior) => void;
   resolveStaffProfile: (staffId: string | null | undefined, fallbackName?: string | null) => StaffMember | null;
   getEffectiveRoomMemberIds: (room: ChatRoom | null | undefined) => string[];
   isRoomAccessibleToCurrentUser: (room: ChatRoom | null | undefined) => boolean;
@@ -72,7 +71,6 @@ export function useChatRoomDataSync({
   effectiveTodoUserId,
   userId,
   setRoom,
-  alignRoomToLatest,
   resolveStaffProfile,
   getEffectiveRoomMemberIds,
   isRoomAccessibleToCurrentUser,
@@ -681,14 +679,11 @@ export function useChatRoomDataSync({
     }
 
     if (pendingBottomAlignRoomIdRef.current === roomIdForFetch) {
-      if (loadedMessages.length > 0) {
-        alignRoomToLatest(roomIdForFetch, 'auto');
-      } else {
+      if (loadedMessages.length === 0) {
         pendingBottomAlignRoomIdRef.current = null;
       }
     }
   }, [
-    alignRoomToLatest,
     applyRoomSummaryToState,
     buildRoomSummaryFromMessages,
     deliveryStatesRef,

@@ -238,7 +238,6 @@ export function useChatRealtimeSubscriptions({
           void fetchDataLatestRef.current();
         }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reads' }, () => fetchDataLatestRef.current())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, () => fetchDataLatestRef.current())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_bookmarks', filter: `user_id=eq.${effectiveTodoUserId || userId}` }, () => fetchDataLatestRef.current())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pinned_messages' }, () => fetchDataLatestRef.current())

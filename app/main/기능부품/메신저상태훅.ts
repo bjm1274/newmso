@@ -9,12 +9,24 @@ import { compareStaffMembers, isMessageReadByCursor } from './메신저유틸';
 type UseChatMessageEditingParams = {
   currentUserId: string | null | undefined;
   fallbackUserId: string | null | undefined;
+  auditUserId: string | null | undefined;
+  auditUserName: string | null | undefined;
   isMso: boolean;
   selectedRoomId: string | null;
   fetchData: () => void | Promise<void>;
   syncRoomSummaryFromMessages: (roomId: string | null | undefined, nextMessages: ChatMessage[]) => void;
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   setPersistedPinnedMessages: Dispatch<SetStateAction<ChatMessage[]>>;
+};
+
+export type MessageEditHistoryEntry = {
+  id: string;
+  editorId: string | null;
+  editorName: string;
+  previousContent: string | null;
+  nextContent: string | null;
+  editedAt: string | null;
+  isFallback?: boolean;
 };
 
 type UseReadStatusParams = {
@@ -29,6 +41,10 @@ type UseChatMobileBackLayerParams<TReactionDetail> = {
   closeAttachmentPreview: () => void;
   activeActionMsg: ChatMessage | null;
   setActiveActionMsg: Dispatch<SetStateAction<ChatMessage | null>>;
+  threadRoot: ChatMessage | null;
+  setThreadRoot: Dispatch<SetStateAction<ChatMessage | null>>;
+  editHistoryTarget: ChatMessage | null;
+  closeEditHistory: () => void;
   reactionDetailTarget: TReactionDetail | null;
   setReactionDetailTarget: Dispatch<SetStateAction<TReactionDetail | null>>;
   unreadModalMsg: ChatMessage | null;
@@ -53,6 +69,8 @@ type UseChatMobileBackLayerParams<TReactionDetail> = {
 export function useChatMessageEditing({
   currentUserId,
   fallbackUserId,
+  auditUserId,
+  auditUserName,
   isMso,
   selectedRoomId,
   fetchData,
@@ -62,6 +80,9 @@ export function useChatMessageEditing({
 }: UseChatMessageEditingParams) {
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [editingMessageDraft, setEditingMessageDraft] = useState('');
+  const [editHistoryTarget, setEditHistoryTarget] = useState<ChatMessage | null>(null);
+  const [editHistoryEntries, setEditHistoryEntries] = useState<MessageEditHistoryEntry[]>([]);
+  const [editHistoryLoading, setEditHistoryLoading] = useState(false);
 
   const startEditMessage = useCallback((message: ChatMessage) => {
     if (String(message.sender_id) !== String(currentUserId || fallbackUserId || '') && !isMso) return;
@@ -74,6 +95,72 @@ export function useChatMessageEditing({
     setEditingMessageDraft('');
   }, []);
 
+  const closeEditHistory = useCallback(() => {
+    setEditHistoryTarget(null);
+    setEditHistoryEntries([]);
+    setEditHistoryLoading(false);
+  }, []);
+
+  const openEditHistory = useCallback(async (message: ChatMessage) => {
+    setEditHistoryTarget(message);
+    setEditHistoryEntries([]);
+    setEditHistoryLoading(true);
+    const fallbackEntries: MessageEditHistoryEntry[] = message.edited_at
+      ? [{
+          id: `fallback-${String(message.id)}`,
+          editorId: String(message.sender_id || '').trim() || null,
+          editorName: String((message.staff as { name?: string } | null | undefined)?.name || message.sender_name || '알 수 없음'),
+          previousContent: null,
+          nextContent: message.content || null,
+          editedAt: message.edited_at || message.created_at || null,
+          isFallback: true,
+        }]
+      : [];
+
+    try {
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('id, user_id, user_name, details, created_at')
+        .eq('action', 'message_edit')
+        .eq('target_type', 'message')
+        .eq('target_id', String(message.id))
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const parsedEntries = (data || []).map((row: Record<string, unknown>) => {
+        const details =
+          row.details && typeof row.details === 'object' && !Array.isArray(row.details)
+            ? row.details as Record<string, unknown>
+            : {};
+
+        return {
+          id: String(row.id || `history-${String(message.id)}`),
+          editorId: String(row.user_id || '').trim() || null,
+          editorName: String(row.user_name || details.editor_name || '알 수 없음'),
+          previousContent:
+            typeof details.previous_content === 'string' ? details.previous_content : null,
+          nextContent:
+            typeof details.next_content === 'string' ? details.next_content : null,
+          editedAt:
+            typeof details.edited_at === 'string' && details.edited_at.trim()
+              ? details.edited_at
+              : (typeof row.created_at === 'string' ? row.created_at : null),
+        } satisfies MessageEditHistoryEntry;
+      });
+
+      setEditHistoryEntries(parsedEntries.length > 0 ? parsedEntries : fallbackEntries);
+    } catch (error) {
+      console.error('openEditHistory error', error);
+      setEditHistoryEntries(fallbackEntries);
+      if (!fallbackEntries.length) {
+        toast('수정 이력을 불러오지 못했습니다.', 'error');
+      }
+    } finally {
+      setEditHistoryLoading(false);
+    }
+  }, []);
+
   const saveEditedMessage = useCallback(async () => {
     if (!editingMessage) return;
     const targetMessage = editingMessage;
@@ -82,14 +169,20 @@ export function useChatMessageEditing({
       toast('메시지 내용을 입력해 주세요.', 'warning');
       return;
     }
+    if (nextContent === String(targetMessage.content || '').trim()) {
+      closeEditingMessage();
+      return;
+    }
 
     const messageId = String(targetMessage.id);
+    const editedAt = new Date().toISOString();
+    const previousContent = targetMessage.content || null;
     closeEditingMessage();
     let nextMessagesSnapshot: ChatMessage[] = [];
     setMessages((prev) => {
       nextMessagesSnapshot = prev.map((message) =>
         String(message.id) === messageId
-          ? { ...message, content: nextContent }
+          ? { ...message, content: nextContent, edited_at: editedAt }
           : message
       );
       return nextMessagesSnapshot;
@@ -97,7 +190,7 @@ export function useChatMessageEditing({
     setPersistedPinnedMessages((prev) =>
       prev.map((message) =>
         String(message.id) === messageId
-          ? { ...message, content: nextContent }
+          ? { ...message, content: nextContent, edited_at: editedAt }
           : message
       )
     );
@@ -105,21 +198,47 @@ export function useChatMessageEditing({
 
     const { error } = await supabase
       .from('messages')
-      .update({ content: nextContent })
+      .update({ content: nextContent, edited_at: editedAt })
       .eq('id', targetMessage.id);
 
     if (error) {
       toast('메시지 수정 실패', 'error');
       void fetchData();
+      return;
     }
-  }, [closeEditingMessage, editingMessage, editingMessageDraft, fetchData, selectedRoomId, setMessages, setPersistedPinnedMessages, syncRoomSummaryFromMessages]);
+
+    try {
+      await supabase.from('audit_logs').insert([{
+        user_id: auditUserId || currentUserId || fallbackUserId || null,
+        user_name: auditUserName || (targetMessage.staff as { name?: string } | null | undefined)?.name || null,
+        action: 'message_edit',
+        target_type: 'message',
+        target_id: messageId,
+        details: {
+          room_id: targetMessage.room_id || selectedRoomId || null,
+          previous_content: previousContent,
+          next_content: nextContent,
+          edited_at: editedAt,
+          editor_name:
+            auditUserName || (targetMessage.staff as { name?: string } | null | undefined)?.name || null,
+        },
+      }]);
+    } catch (auditError) {
+      console.error('message edit audit log insert failed', auditError);
+    }
+  }, [auditUserId, auditUserName, closeEditingMessage, currentUserId, editingMessage, editingMessageDraft, fallbackUserId, fetchData, selectedRoomId, setMessages, setPersistedPinnedMessages, syncRoomSummaryFromMessages]);
 
   return {
     editingMessage,
     editingMessageDraft,
+    editHistoryTarget,
+    editHistoryEntries,
+    editHistoryLoading,
     setEditingMessageDraft,
     startEditMessage,
     closeEditingMessage,
+    openEditHistory,
+    closeEditHistory,
     saveEditedMessage,
   };
 }
@@ -187,6 +306,10 @@ export function useChatMobileBackLayer<TReactionDetail>({
   closeAttachmentPreview,
   activeActionMsg,
   setActiveActionMsg,
+  threadRoot,
+  setThreadRoot,
+  editHistoryTarget,
+  closeEditHistory,
   reactionDetailTarget,
   setReactionDetailTarget,
   unreadModalMsg,
@@ -214,6 +337,14 @@ export function useChatMobileBackLayer<TReactionDetail>({
     }
     if (activeActionMsg) {
       setActiveActionMsg(null);
+      return true;
+    }
+    if (threadRoot) {
+      setThreadRoot(null);
+      return true;
+    }
+    if (editHistoryTarget) {
+      closeEditHistory();
       return true;
     }
     if (reactionDetailTarget) {
@@ -254,28 +385,32 @@ export function useChatMobileBackLayer<TReactionDetail>({
     }
     return false;
   }, [
-    activeActionMsg,
-    attachmentPreviewOpen,
-    closeAddMemberModal,
-    closeAttachmentPreview,
+      activeActionMsg,
+      attachmentPreviewOpen,
+      closeAddMemberModal,
+      closeAttachmentPreview,
+      closeEditHistory,
     closeForwardModal,
     closeGlobalSearch,
     closeGroupModal,
     closePollModal,
-    closeReadStatusModal,
-    forwardSourceMsg,
-    reactionDetailTarget,
-    setActiveActionMsg,
-    setReactionDetailTarget,
-    setShowDrawer,
-    setShowMediaPanel,
-    showAddMemberModal,
-    showDrawer,
-    showForwardModal,
-    showGlobalSearch,
-    showGroupModal,
-    showMediaPanel,
-    showPollModal,
-    unreadModalMsg,
-  ]);
+      closeReadStatusModal,
+      editHistoryTarget,
+      forwardSourceMsg,
+      reactionDetailTarget,
+      setActiveActionMsg,
+      setReactionDetailTarget,
+      setShowDrawer,
+      setShowMediaPanel,
+      setThreadRoot,
+      showAddMemberModal,
+      showDrawer,
+      showForwardModal,
+      showGlobalSearch,
+      showGroupModal,
+      showMediaPanel,
+      showPollModal,
+      threadRoot,
+      unreadModalMsg,
+    ]);
 }
