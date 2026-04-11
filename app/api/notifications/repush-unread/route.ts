@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { processUnreadNotificationRepushServer } from '@/lib/notification-repush';
 
-export const runtime = 'nodejs';
+
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {

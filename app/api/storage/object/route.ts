@@ -5,7 +5,7 @@ import {
 } from '@/lib/object-storage';
 import { readSessionFromRequest } from '@/lib/server-session';
 
-export const runtime = 'nodejs';
+
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {

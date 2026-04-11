@@ -6,7 +6,7 @@ import {
 } from '@/lib/server-deposit-access';
 import { normalizeDepositDraft } from '@/lib/virtual-account-deposits';
 
-export const runtime = 'nodejs';
+
 export const dynamic = 'force-dynamic';
 
 function getAdminClient() {

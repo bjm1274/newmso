@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { processUnreadNotificationRepushServer } from '@/lib/notification-repush';
 
-export const runtime = 'nodejs';
+
 export const dynamic = 'force-dynamic';
 
 const CRON_SECRET = process.env.CRON_SECRET;

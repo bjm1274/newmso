@@ -50,3 +50,5 @@ tmp_bugreport/
 tmp_bugreport_*/
 tmp_zhsunyco_*
 
+.open-next/
+*.bak

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildResponseContentDisposition, isAllowedPublicStorageUrl } from '@/lib/object-storage';
 
-export const runtime = 'nodejs';
+
 export const dynamic = 'force-dynamic';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';

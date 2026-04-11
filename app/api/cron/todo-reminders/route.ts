@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { processDueTodoRemindersServer } from '@/lib/todo-reminder-cron';
 
-export const runtime = 'nodejs';
+
 export const dynamic = 'force-dynamic';
 
 const CRON_SECRET = process.env.CRON_SECRET;

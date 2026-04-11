@@ -1,0 +1,14 @@
+name = "erp-pchos"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+main = ".open-next/worker.js"
+
+# Cron Triggers (vercel.json에서 이전)
+[triggers]
+crons = [
+  "0 15 * * *",   # /api/cron/backup
+  "0 17 * * *",   # /api/cron/chat-retention
+  "0 23 * * *",   # /api/cron/chat-push-dispatch
+  "0 8 * * *",    # /api/cron/leave-notice-announcements
+  "0 3 * * *",    # /api/cron/push-subscription-cleanup
+]

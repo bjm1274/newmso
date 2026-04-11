@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push';
-import { sendFcmBatch } from '@/lib/firebase-admin';
+import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push-cloudflare';
+import { sendFcmBatch } from '@/lib/fcm-http';
 import { isWithinPushQuietHours } from '@/lib/push-quiet-hours';
 
 type NotificationRow = {

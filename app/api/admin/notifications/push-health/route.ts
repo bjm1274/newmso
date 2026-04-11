@@ -6,7 +6,7 @@ import {
   readSessionFromRequest,
 } from '@/lib/server-session';
 
-export const runtime = 'nodejs';
+
 export const dynamic = 'force-dynamic';
 
 type QueueHealthRow = {
