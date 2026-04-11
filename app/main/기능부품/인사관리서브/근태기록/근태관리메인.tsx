@@ -1698,7 +1698,7 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
                     <span className="text-base">📨</span> 승인 대기 근무표 {pendingApprovals.length}건
                   </p>
                   {pendingApprovals.map((req: any) => (
-                    <div key={req.id} className="bg-white dark:bg-zinc-800 border border-amber-200/50 dark:border-zinc-700 rounded-lg p-3 flex flex-col md:flex-row md:items-center gap-3">
+                    <div key={req.id} className="bg-[var(--card)] dark:bg-zinc-800 border border-amber-200/50 dark:border-zinc-700 rounded-lg p-3 flex flex-col md:flex-row md:items-center gap-3">
                       <div className="flex-1 text-[11px]">
                         <p className="font-bold text-foreground">{req.team_name || '전체'} · {req.year_month}</p>
                         <p className="text-[var(--toss-gray-4)] mt-0.5">요청: {req.requested_by_name} · {new Date(req.created_at).toLocaleDateString('ko-KR')}</p>
@@ -1723,7 +1723,7 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
                     <span className="text-base">🔄</span> 근무 교환(Swap) 요청 {pendingSwaps.length}건
                   </p>
                   {pendingSwaps.map((req: any) => (
-                    <div key={req.id} className="bg-white dark:bg-zinc-800 border border-emerald-200/50 dark:border-zinc-700 rounded-lg p-3 flex flex-col md:flex-row md:items-center gap-3">
+                    <div key={req.id} className="bg-[var(--card)] dark:bg-zinc-800 border border-emerald-200/50 dark:border-zinc-700 rounded-lg p-3 flex flex-col md:flex-row md:items-center gap-3">
                       <div className="flex-1 text-[11px]">
                         <p className="font-bold text-foreground">{req.requested_by_name} ➔ {req.work_date} 근무 변경 희망</p>
                         <p className="text-[var(--toss-gray-4)] mt-0.5">사유: {req.reason || '사유 미입력'}</p>

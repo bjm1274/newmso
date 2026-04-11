@@ -291,7 +291,7 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: Record<str
             <p className="text-sm font-semibold text-[var(--foreground)]">{scope} 물품 목록</p>
             <p className="text-xs text-[var(--toss-gray-3)]">비품대여 등록 시 이 목록에서 바로 선택합니다.</p>
           </div>
-          <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[var(--accent)]">
+          <span className="rounded-full bg-[var(--card)] px-2.5 py-1 text-[11px] font-semibold text-[var(--accent)]">
             {assetTypes.length}개
           </span>
         </div>
@@ -299,7 +299,7 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: Record<str
           {assetTypes.map((item) => (
             <span
               key={item}
-              className="rounded-full border border-[var(--border)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--foreground)]"
+              className="rounded-full border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--foreground)]"
             >
               {item}
             </span>

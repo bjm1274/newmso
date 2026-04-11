@@ -159,7 +159,7 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
                     type="button"
                     data-testid={`certificate-print-${c.id}`}
                     onClick={() => handlePrint({ title: c.cert_type, content: `${c.staff_members?.name || ''} ${c.cert_type}\n발급번호: ${c.serial_no}\n용도: ${c.purpose || ''}` })}
-                    className="w-full py-3 bg-gray-900 text-white rounded-[var(--radius-lg)] text-xs font-semibold"
+                    className="w-full py-3 bg-[var(--foreground)] text-[var(--card)] rounded-[var(--radius-lg)] text-xs font-semibold"
                   >
                     🖨️ 인쇄
                   </button>
@@ -177,7 +177,7 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
             {approvedDocs.map((doc) => (
               <div data-testid={`certificate-approved-${doc.id}`} key={doc.id} className="p-4 border border-[var(--border)] rounded-[var(--radius-md)] hover:shadow-md transition-all flex flex-col justify-between bg-[var(--card)] group">
                 <div>
-                  <span className="px-2 py-1 bg-green-100 text-green-600 rounded text-[11px] font-semibold">승인완료</span>
+                  <span className="px-2 py-1 bg-green-500/15 text-green-600 dark:text-green-400 rounded text-[11px] font-semibold">승인완료</span>
                   <h4 className="font-semibold text-[var(--foreground)] text-lg mt-2 mb-1 truncate">{doc.title}</h4>
                   <p className="text-xs text-[var(--toss-gray-3)] line-clamp-2">{doc.content}</p>
                 </div>
@@ -186,7 +186,7 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
                     type="button"
                     data-testid={`certificate-print-${doc.id}`}
                     onClick={() => handlePrint(doc)}
-                    className="w-full py-3 bg-gray-900 text-white rounded-[var(--radius-lg)] text-xs font-semibold"
+                    className="w-full py-3 bg-[var(--foreground)] text-[var(--card)] rounded-[var(--radius-lg)] text-xs font-semibold"
                   >
                     🖨️ 인쇄
                   </button>

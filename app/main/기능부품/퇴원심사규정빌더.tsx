@@ -145,7 +145,7 @@ export default function DischargeRuleBuilder({
             value={draft.label}
             onChange={(e) => setDraft((prev) => ({ ...prev, label: e.target.value }))}
             placeholder="예: 감염 표현 시 감염관리 재검토"
-            className="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
           />
         </div>
         <div className="space-y-1.5">
@@ -155,7 +155,7 @@ export default function DischargeRuleBuilder({
             onChange={(e) =>
               setDraft((prev) => ({ ...prev, matchType: e.target.value as DischargeCustomRuleMatchType }))
             }
-            className="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
           >
             <option value="contains_any">키워드 일부 포함</option>
             <option value="contains_all">키워드 모두 포함</option>
@@ -170,7 +170,7 @@ export default function DischargeRuleBuilder({
             onChange={(e) =>
               setDraft((prev) => ({ ...prev, category: e.target.value as DischargeCustomRuleCategory }))
             }
-            className="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
           >
             <option value="documentation">기록 보완</option>
             <option value="missing">누락</option>
@@ -186,7 +186,7 @@ export default function DischargeRuleBuilder({
             onChange={(e) =>
               setDraft((prev) => ({ ...prev, severity: e.target.value as DischargeCustomRuleSeverity }))
             }
-            className="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
           >
             <option value="review">Review</option>
             <option value="warning">Warning</option>
@@ -201,7 +201,7 @@ export default function DischargeRuleBuilder({
             value={draft.keywords}
             onChange={(e) => setDraft((prev) => ({ ...prev, keywords: e.target.value }))}
             placeholder="감염, culture, 발열"
-            className="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
           />
         </div>
         <div className="space-y-1.5 md:col-span-2">
@@ -210,7 +210,7 @@ export default function DischargeRuleBuilder({
             value={draft.detail}
             onChange={(e) => setDraft((prev) => ({ ...prev, detail: e.target.value }))}
             placeholder="차트에 감염 표현이 있으면 감염관리, 추가 처치, DRG 적정성을 다시 확인합니다."
-            className="h-24 w-full resize-none rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+            className="h-24 w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
           />
         </div>
         <div className="space-y-1.5 md:col-span-2">
@@ -219,7 +219,7 @@ export default function DischargeRuleBuilder({
             value={draft.basis}
             onChange={(e) => setDraft((prev) => ({ ...prev, basis: e.target.value }))}
             placeholder="예: 병원 퇴원심사 내부 규정 v1"
-            className="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
           />
         </div>
         <label className="flex items-center gap-2 text-xs font-semibold text-[var(--foreground)] md:col-span-2">
@@ -235,7 +235,7 @@ export default function DischargeRuleBuilder({
           {draft.id && (
             <button
               onClick={() => setDraft(createEmptyDraft())}
-              className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-[var(--toss-gray-4)]"
+              className="rounded-xl bg-[var(--card)] px-4 py-2 text-xs font-bold text-[var(--toss-gray-4)]"
             >
               취소
             </button>
@@ -258,12 +258,12 @@ export default function DischargeRuleBuilder({
           sortedRules.map((rule) => (
             <div
               key={rule.id}
-              className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-white p-4 md:flex-row md:items-center md:justify-between"
+              className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 md:flex-row md:items-center md:justify-between"
             >
               <div className="min-w-0 flex-1 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-bold text-[var(--foreground)]">{rule.label}</p>
-                  <span className="rounded-lg bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600">
+                  <span className="rounded-lg bg-[var(--muted)] px-2 py-1 text-[10px] font-bold text-[var(--toss-gray-4)]">
                     {matchTypeLabel(rule.matchType)}
                   </span>
                   <span className="rounded-lg bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">

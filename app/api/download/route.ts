@@ -32,11 +32,11 @@ export async function GET(request: NextRequest) {
     const fileName = String(searchParams.get('name') ?? '').trim() || 'download';
 
     if (!fileUrl) {
-      return NextResponse.json({ error: 'url ?뚮씪誘명꽣媛 ?꾩슂?⑸땲??' }, { status: 400 });
+      return NextResponse.json({ error: 'url 파라미터가 필요합니다' }, { status: 400 });
     }
 
     if (!isAllowedUrl(fileUrl)) {
-      return NextResponse.json({ error: '?덉슜?섏? ?딅뒗 URL?낅땲??' }, { status: 403 });
+      return NextResponse.json({ error: '허용되지 않는 URL입니다' }, { status: 403 });
     }
 
     const upstream = await fetch(fileUrl, {
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
       headers,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : '?ㅼ슫濡쒕뱶 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.';
+    const message = err instanceof Error ? err.message : '다운로드 중 오류가 발생했습니다.';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

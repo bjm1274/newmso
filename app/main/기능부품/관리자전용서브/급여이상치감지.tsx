@@ -398,7 +398,7 @@ export default function SalaryAnomalyDetector({ staffs = [] as StaffLike[] }) {
               type="month"
               value={currentMonth}
               onChange={(event) => setCurrentMonth(event.target.value)}
-              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none transition focus:border-[var(--accent)]"
+              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none transition focus:border-[var(--accent)]"
             />
             <button
               type="button"
@@ -479,7 +479,7 @@ export default function SalaryAnomalyDetector({ staffs = [] as StaffLike[] }) {
                       <span className="text-lg font-black text-[var(--foreground)]">
                         {getStaffLabel(item.staff, item.staffId)}
                       </span>
-                      <span className="rounded-full bg-[var(--muted)] px-2 py-0.5 text-[11px] font-bold text-[var(--toss-gray-4)]">
+                      <span className="rounded-full bg-[var(--card)]/80 px-2 py-0.5 text-[11px] font-bold text-[var(--toss-gray-4)]">
                         {item.type}
                       </span>
                     </div>
@@ -513,7 +513,7 @@ export default function SalaryAnomalyDetector({ staffs = [] as StaffLike[] }) {
             {newPayments.map((item) => (
               <div
                 key={`${item.staffId}-${item.type}`}
-                className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--accent)]/20 bg-[var(--card)] px-4 py-3 md:flex-row md:items-center md:justify-between"
+                className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-blue-100 bg-[var(--card)] px-4 py-3 md:flex-row md:items-center md:justify-between"
               >
                 <div>
                   <div className="font-bold text-[var(--foreground)]">{getStaffLabel(item.staff, item.staffId)}</div>

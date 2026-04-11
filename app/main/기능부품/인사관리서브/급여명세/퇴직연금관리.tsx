@@ -123,7 +123,7 @@ export default function RetirementPensionManager({ staffs = [], selectedCo, user
           return (
             <div key={s.id} className={`flex items-center justify-between p-4 bg-[var(--card)] border rounded-[var(--radius-lg)] shadow-sm ${!s.pension || type === '미가입' ? 'border-orange-500/20' : 'border-[var(--border)]'}`}>
               <div className="flex items-center gap-3">
-                <div className={`w-2 h-12 rounded-full ${type.startsWith('DC') ? 'bg-blue-400' : type.startsWith('DB') ? 'bg-purple-400' : 'bg-gray-300'}`} />
+                <div className={`w-2 h-12 rounded-full ${type.startsWith('DC') ? 'bg-blue-400' : type.startsWith('DB') ? 'bg-purple-400' : 'bg-[var(--border)]'}`} />
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-bold text-[var(--foreground)]">{s.name}</p>

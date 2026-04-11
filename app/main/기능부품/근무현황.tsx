@@ -185,11 +185,11 @@ function getBandLabel(band: ShiftBand) {
 }
 
 function getBandBadgeClass(band: ShiftBand) {
-  if (band === 'D') return 'bg-sky-100 text-sky-700 border-sky-200';
-  if (band === 'E') return 'bg-amber-100 text-amber-700 border-amber-200';
-  if (band === 'N') return 'bg-violet-100 text-violet-700 border-violet-200';
+  if (band === 'D') return 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/20';
+  if (band === 'E') return 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20';
+  if (band === 'N') return 'bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/20';
   if (band === 'NONE') return 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)] border-[var(--border)]';
-  return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+  return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20';
 }
 
 function buildEmptyCounts(): DayShiftCounts {
@@ -709,7 +709,7 @@ export default function WorkStatus({ user }: { user?: any }) {
             activeStaffs.map((group) => (
               <div
                 key={group.shiftId}
-                className="rounded-[var(--radius-xl)] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-emerald-100/70 p-4 shadow-sm"
+                className="rounded-[var(--radius-xl)] border border-emerald-500/20 bg-emerald-500/5 p-4 shadow-sm"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -842,14 +842,14 @@ export default function WorkStatus({ user }: { user?: any }) {
                   </span>
                 ) : null}
                 {showActiveOnly && selectedDateKey === todayKey ? (
-                  <span className="rounded-[var(--radius-md)] bg-emerald-50 px-2.5 py-1 text-emerald-700">
+                  <span className="rounded-[var(--radius-md)] bg-emerald-500/10 px-2.5 py-1 text-emerald-700 dark:text-emerald-300">
                     오늘 근무중만
                   </span>
                 ) : null}
-                <span className="rounded-[var(--radius-md)] bg-sky-100 px-2.5 py-1 text-sky-700">Day {selectedDateRows.counts.D}명</span>
-                <span className="rounded-[var(--radius-md)] bg-amber-100 px-2.5 py-1 text-amber-700">Evening {selectedDateRows.counts.E}명</span>
-                <span className="rounded-[var(--radius-md)] bg-violet-100 px-2.5 py-1 text-violet-700">Night {selectedDateRows.counts.N}명</span>
-                <span className="rounded-[var(--radius-md)] bg-emerald-100 px-2.5 py-1 text-emerald-700">기타 {selectedDateRows.counts.OTHER}명</span>
+                <span className="rounded-[var(--radius-md)] bg-sky-500/15 px-2.5 py-1 text-sky-700 dark:text-sky-300">Day {selectedDateRows.counts.D}명</span>
+                <span className="rounded-[var(--radius-md)] bg-amber-500/15 px-2.5 py-1 text-amber-700 dark:text-amber-300">Evening {selectedDateRows.counts.E}명</span>
+                <span className="rounded-[var(--radius-md)] bg-violet-500/15 px-2.5 py-1 text-violet-700 dark:text-violet-300">Night {selectedDateRows.counts.N}명</span>
+                <span className="rounded-[var(--radius-md)] bg-emerald-500/15 px-2.5 py-1 text-emerald-700 dark:text-emerald-300">기타 {selectedDateRows.counts.OTHER}명</span>
                 <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2.5 py-1 text-[var(--toss-gray-3)]">총 {selectedDateRows.counts.total}명</span>
                 <button
                   type="button"
@@ -864,7 +864,7 @@ export default function WorkStatus({ user }: { user?: any }) {
 
             <div className="max-h-[calc(90vh-92px)] overflow-y-auto p-5">
               {!selectedDateRows.hasExplicitAssignments ? (
-                <div className="mb-4 rounded-[var(--radius-lg)] border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] font-medium text-amber-700">
+                <div className="mb-4 rounded-[var(--radius-lg)] border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-[12px] font-medium text-amber-700 dark:text-amber-300">
                   선택일에 등록된 근무 배정표가 없습니다.
                 </div>
               ) : null}

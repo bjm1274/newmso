@@ -58,7 +58,15 @@ export function useChatRoomNavigation({
       : [];
 
     if (previousSelectedRoomId && previousSelectedRoomId !== roomId) {
-      draftMapRef.current.set(previousSelectedRoomId, inputMsgRef.current);
+      const draft = inputMsgRef.current;
+      draftMapRef.current.set(previousSelectedRoomId, draft);
+      try {
+        if (draft) {
+          localStorage.setItem(`chat-draft-${previousSelectedRoomId}`, draft);
+        } else {
+          localStorage.removeItem(`chat-draft-${previousSelectedRoomId}`);
+        }
+      } catch { /* ignore quota errors */ }
     }
 
     pendingBottomAlignRoomIdRef.current = roomId;
@@ -73,7 +81,10 @@ export function useChatRoomNavigation({
     selectedRoomIdRef.current = roomId;
     setSelectedRoomId(roomId);
 
-    const savedDraft = (roomId ? draftMapRef.current.get(roomId) : '') || '';
+    let savedDraft = (roomId ? draftMapRef.current.get(roomId) : '') || '';
+    if (!savedDraft && roomId) {
+      try { savedDraft = localStorage.getItem(`chat-draft-${roomId}`) || ''; } catch { /* ignore */ }
+    }
     inputMsgRef.current = savedDraft;
     setInputMsg(savedDraft);
 

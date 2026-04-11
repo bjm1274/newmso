@@ -11,6 +11,7 @@ import AttendanceMain from './인사관리서브/근태기록/근태관리메인
 import LeaveManagement from './인사관리서브/휴가신청/휴가관리메인';
 import SharedCalendarView from './공유캘린더';
 import CalendarSync from './캘린더동기화';
+import RecruitmentManager from './인사관리서브/채용관리';
 import ContractMain from './인사관리서브/계약관리';
 import 문서보관함 from './인사관리서브/문서보관함';
 import EducationMain from './인사관리서브/교육관리';
@@ -45,7 +46,8 @@ type HrMenuId =
   | '자격·안전센터'
   | '계약'
   | '문서센터'
-  | '캘린더';
+  | '캘린더'
+  | '채용관리';
 
 type AttendanceAnalysisTabId =
   | '근태관리'
@@ -101,6 +103,7 @@ const HR_TABS: HrTabDef[] = [
   { id: '계약', label: '계약 관리', perm: 'hr_계약', icon: '📝', group: '문서/기타' },
   { id: '문서센터', label: '문서센터', perm: 'hr_문서보관함', icon: '🗃️', group: '문서/기타' },
   { id: '캘린더', label: '캘린더', perm: 'hr_캘린더', icon: '📅', group: '문서/기타' },
+  { id: '채용관리', label: '채용관리', perm: 'hr_채용', icon: '📢', group: '인력관리' },
 ];
 
 const ATTENDANCE_ANALYSIS_TABS: AttendanceAnalysisTabDef[] = [
@@ -973,6 +976,12 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
               <div className="shrink-0 md:w-80">
                 <CalendarSync />
               </div>
+            </div>
+          )}
+
+          {activeMenu === '채용관리' && (
+            <div className="p-3 md:p-4">
+              <RecruitmentManager user={user as Record<string, unknown>} />
             </div>
           )}
         </section>

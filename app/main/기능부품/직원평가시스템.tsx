@@ -106,7 +106,7 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
                     evaluator_id: user.id,
                     category,
                     content,
-                    score: category === '?깃낵' ? score : null,
+                    score: category === '성과' ? score : null,
                     created_at: new Date().toISOString(),
                     evaluator_name: user.name || '관리자',
                     evaluator_position: user.position || '',

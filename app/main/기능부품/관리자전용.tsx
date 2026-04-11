@@ -27,6 +27,7 @@ import NotificationAutomation from './관리자전용서브/알림자동화설�
 import SurgeryExamTemplateManager from './관리자전용서브/수술검사템플릿관리';
 import FormBuilder from './전자결재서브/양식빌더';
 import FinancialDashboard from './관리자전용서브/재무대시보드';
+import CustomDashboard from './관리자전용서브/커스텀대시보드';
 import BudgetManagement from './관리자전용서브/예산관리';
 import IntegratedReport from './관리자전용서브/통합보고서';
 import SalaryAnomalyDetector from './관리자전용서브/급여이상치감지';
@@ -216,6 +217,7 @@ export default function AdminView(props: Record<string, unknown>) {
             {analysisTab === '예산관리' && <BudgetManagement staffs={staffs} />}
             {analysisTab === '통합보고서' && <IntegratedReport staffs={staffs} />}
             {analysisTab === '법인손익' && <CompanyPnL staffs={staffs} selectedCo="전체" user={user} />}
+            {analysisTab === '커스텀대시보드' && <CustomDashboard user={user as Record<string, unknown>} />}
           </>
         )}
 

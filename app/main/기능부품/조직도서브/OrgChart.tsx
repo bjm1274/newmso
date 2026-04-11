@@ -165,8 +165,8 @@ function getPresenceMeta(attendance?: AttendanceSnapshot | null): PresenceMeta {
     return {
       state: 'checked_out',
       label: '퇴근 완료',
-      toneClass: 'border-slate-200 bg-slate-100 text-slate-600',
-      dotClass: 'bg-slate-400',
+      toneClass: 'border-[var(--border)] bg-[var(--muted)] text-[var(--toss-gray-4)]',
+      dotClass: 'bg-[var(--toss-gray-3)]',
       checkInLabel,
       checkOutLabel,
     };
@@ -1095,16 +1095,16 @@ export default function OrgChart({
                   className={`rounded-full border px-3 py-1.5 text-[11px] font-bold transition ${
                     showWorkingOnly
                       ? 'border-emerald-500 bg-emerald-500 text-white'
-                      : 'border-emerald-200 bg-white text-emerald-700 hover:border-emerald-400'
+                      : 'border-emerald-200 bg-[var(--card)] text-emerald-700 hover:border-emerald-400'
                   }`}
                 >
                   오늘 근무중만 보기
                 </button>
-                <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-3)] ring-1 ring-emerald-100">
+                <span className="rounded-full bg-[var(--card)] px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-3)] ring-1 ring-emerald-100">
                   {isLoadingAttendance ? '근무현황 갱신 중…' : '실시간 반영'}
                 </span>
                 {attendanceLastSyncAt ? (
-                  <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-3)] ring-1 ring-emerald-100">
+                  <span className="rounded-full bg-[var(--card)] px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-3)] ring-1 ring-emerald-100">
                     {attendanceLastSyncAt.toLocaleTimeString('ko-KR', {
                       hour: '2-digit',
                       minute: '2-digit',

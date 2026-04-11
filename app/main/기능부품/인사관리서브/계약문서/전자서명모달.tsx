@@ -481,7 +481,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                             확인 및 다음 단계 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                         </button>
                     ) : (
-                        <button data-testid="contract-signature-submit-button" onClick={handleSubmit} disabled={isSigEmpty || isGenerating} className={`flex-1 px-5 py-3.5 rounded-xl text-white font-black text-[13px] shadow-sm transition-all flex items-center justify-center gap-2 ${isSigEmpty || isGenerating ? 'bg-slate-300 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98]'}`}>
+                        <button data-testid="contract-signature-submit-button" onClick={handleSubmit} disabled={isSigEmpty || isGenerating} className={`flex-1 px-5 py-3.5 rounded-xl text-white font-black text-[13px] shadow-sm transition-all flex items-center justify-center gap-2 ${isSigEmpty || isGenerating ? 'bg-[var(--border)] cursor-not-allowed opacity-60' : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98]'}`}>
                             {isGenerating ? '서류 생성 중...' : '최종 서명 및 저장'}
                         </button>
                     )}

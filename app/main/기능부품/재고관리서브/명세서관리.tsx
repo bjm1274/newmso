@@ -573,7 +573,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
               </div>
             </div>
 
-            <button onClick={() => window.print()} className="w-full py-2 bg-gray-900 text-white rounded-[var(--radius-md)] font-semibold text-sm shadow-sm hover:bg-black transition-all">명세서 인쇄 및 발행</button>
+            <button onClick={() => window.print()} className="w-full py-2 bg-[var(--foreground)] text-[var(--card)] rounded-[var(--radius-md)] font-semibold text-sm shadow-sm hover:opacity-90 transition-all">명세서 인쇄 및 발행</button>
           </div>
         </div>
       )}

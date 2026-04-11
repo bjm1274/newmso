@@ -141,7 +141,7 @@ const NOTIF_TYPES_FOR_SETTINGS = [
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <button type="button" onClick={() => onChange(!checked)} aria-checked={checked} role="switch"
-      className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${checked ? 'bg-[var(--accent)]' : 'bg-gray-300 dark:bg-gray-600'}`}>
+      className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${checked ? 'bg-[var(--accent)]' : 'bg-[var(--border)]'}`}>
       <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-[var(--card)] rounded-full shadow transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
     </button>
   );
@@ -445,7 +445,7 @@ function SettingsTab({ userId }: { userId?: string | null }) {
           {showIosGuide && (
             <div
               data-testid="notification-settings-ios-guide"
-              className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-800"
+              className="rounded-2xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-xs text-sky-800 dark:text-sky-200"
             >
               <p className="font-bold">iPhone 안내</p>
               {!pushStatus?.standalone && (

@@ -7,11 +7,9 @@ export default function NotificationAutomation({ user: userRaw }: Record<string,
   const [payrollDay, setPayrollDay] = useState(25);
   const [enabled, setEnabled] = useState(true);
 
-  const userId = user?.['id'] as string | undefined;
   useEffect(() => {
-    let cancelled = false;
     const checkAndSend = async () => {
-      if (!enabled || !userId || cancelled) return;
+      if (!enabled || !user?.['id']) return;
       const today = new Date();
       const day = today.getDate();
       const todayYmd = today.toISOString().slice(0, 10);
@@ -19,7 +17,7 @@ export default function NotificationAutomation({ user: userRaw }: Record<string,
 
       const { data: staffsData } = await supabase
         .from('staff_members')
-        .select('id, name, company, annual_leave_total, annual_leave_used');
+        .select('id, name, company, annual_leave_total, annual_leave_used, hire_date, join_date, joined_at');
       const { data: admins } = await supabase
         .from('staff_members')
         .select('id')
@@ -38,47 +36,49 @@ export default function NotificationAutomation({ user: userRaw }: Record<string,
         }
       }
 
-      // 2) 연차 촉진 자동 알림 (법적 기준: 연도 종료 6개월 전 / 2개월 전)
-      // 단순화: 모든 직원의 연차 기준연도 종료일을 해당 연도 12월 31일로 보고 계산
-      // 6개월 전 = 7월 1일, 2개월 전 = 11월 1일 (정확한 월 기준)
-      const step1Date = new Date(currentYear, 6, 1); // 7월 1일
-      const step2Date = new Date(currentYear, 10, 1); // 11월 1일
-      const todayKey = todayYmd;
+      // 2) 연차 촉진 자동 알림 (근로기준법 제61조)
+      // 개인별 입사일 기반 연차 만료일에서 6개월 전(1차), 2개월 전(2차) 촉진
+      const { getStaffPromotionSchedule } = await import('@/lib/annual-leave-promotion');
+      const todayObj = new Date(`${todayYmd}T00:00:00`);
 
-      const isSameDate = (d: Date) =>
-        d.toISOString().slice(0, 10) === todayKey;
-
-      const stepToday =
-        isSameDate(step1Date) ? 1 :
-          isSameDate(step2Date) ? 2 :
-            0;
-
-      if (stepToday === 0) return;
-
-      // 이미 보낸 기록 조회
+      // 이미 보낸 기록 조회 (올해 전체)
       const { data: logs } = await supabase
         .from('annual_leave_promotion_logs')
         .select('*')
-        .eq('target_year', currentYear)
-        .eq('step', stepToday);
+        .eq('target_year', currentYear);
 
-      const sentMap = new Set(
-        (logs || []).map((l: any) => String(l.staff_id)),
+      const sentSet = new Set(
+        (logs || []).map((l: any) => `${l.staff_id}_${l.step}`),
       );
 
       for (const s of staffsData || []) {
+        const hireDate = s.hire_date || s.join_date || s.joined_at;
+        const schedule = getStaffPromotionSchedule(hireDate, todayObj);
+        if (!schedule) continue;
+
         const total = s.annual_leave_total ?? 0;
         const used = s.annual_leave_used ?? 0;
         const remain = total - used;
         if (remain <= 0) continue;
-        if (sentMap.has(String(s.id))) continue;
+
+        // 1차 촉진: 만료 6개월 전
+        const step1Key = schedule.step1Date.toISOString().slice(0, 10);
+        // 2차 촉진: 만료 2개월 전
+        const step2Key = schedule.step2Date.toISOString().slice(0, 10);
+
+        let stepToday = 0;
+        if (step1Key === todayYmd && !sentSet.has(`${s.id}_1`)) stepToday = 1;
+        else if (step2Key === todayYmd && !sentSet.has(`${s.id}_2`)) stepToday = 2;
+
+        if (stepToday === 0) continue;
 
         const title =
           stepToday === 1 ? '연차 사용 촉진 1차 안내' : '연차 사용 촉진 2차 안내';
+        const expiryLabel = schedule.expiryDate.toLocaleDateString('ko-KR');
         const body =
           stepToday === 1
-            ? `잔여 연차 ${remain}일이 남아 있습니다. 연차 사용계획을 작성해 주세요. (근로기준법 제61조 1차 촉진)`
-            : `잔여 연차 ${remain}일이 남아 있습니다. 사용하지 않을 경우 소멸될 수 있습니다. (근로기준법 제61조 2차 촉진)`;
+            ? `잔여 연차 ${remain}일이 남아 있습니다. 연차 만료일(${expiryLabel}) 전에 사용계획을 작성해 주세요. (근로기준법 제61조 1차 촉진)`
+            : `잔여 연차 ${remain}일이 남아 있습니다. 연차 만료일(${expiryLabel}) 전에 사용하지 않으면 소멸될 수 있습니다. (근로기준법 제61조 2차 촉진)`;
 
         await supabase.from('notifications').insert({
           user_id: s.id,
@@ -88,14 +88,13 @@ export default function NotificationAutomation({ user: userRaw }: Record<string,
           read_at: null,
         });
 
-        if (cancelled) return;
         await supabase.from('annual_leave_promotion_logs').insert({
           staff_id: s.id,
           company_name: s.company || null,
-          target_year: currentYear,
+          target_year: schedule.targetYear,
           step: stepToday,
           remain_days: remain,
-          meta: { sent_by: userId, today: todayYmd },
+          meta: { sent_by: user?.['id'] as string, today: todayYmd, expiry_date: expiryLabel },
         });
       }
     };
@@ -103,8 +102,8 @@ export default function NotificationAutomation({ user: userRaw }: Record<string,
     // 데모 환경에서는 관리자 화면이 열려 있는 동안만 1일 간격으로 체크
     const t = setInterval(checkAndSend, 24 * 60 * 60 * 1000);
     checkAndSend();
-    return () => { cancelled = true; clearInterval(t); };
-  }, [enabled, payrollDay, userId]);
+    return () => clearInterval(t);
+  }, [enabled, payrollDay, user?.['id']]);
 
   return (
     <div className="bg-[var(--card)] p-4 border border-[var(--border)] rounded-[var(--radius-md)] shadow-sm max-w-xl space-y-3">
@@ -117,7 +116,7 @@ export default function NotificationAutomation({ user: userRaw }: Record<string,
             type="checkbox"
             checked={enabled}
             onChange={e => setEnabled(e.target.checked)}
-            className="w-5 h-5 accent-[var(--accent)]"
+            className="w-5 h-5 accent-blue-600"
           />
           <span className="font-bold text-sm">알림 자동화 활성화</span>
         </label>
@@ -133,7 +132,7 @@ export default function NotificationAutomation({ user: userRaw }: Record<string,
             onChange={e =>
               setPayrollDay(parseInt(e.target.value, 10) || 25)
             }
-            className="w-full p-2 mt-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] font-bold"
+            className="w-full p-2 mt-1 rounded-[var(--radius-md)] border font-bold"
           />
         </div>
         <div className="rounded-[var(--radius-md)] bg-[var(--page-bg)] border border-[var(--border)] p-4 text-[11px] text-[var(--toss-gray-4)] space-y-1">
