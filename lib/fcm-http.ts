@@ -147,6 +147,12 @@ export async function sendFcmNotification(
       android: {
         priority: 'high',
         ...(collapseKey ? { collapse_key: collapseKey } : {}),
+        notification: {
+          channel_id: 'high_importance_channel',
+          default_vibrate_timings: true,
+          notification_priority: 'PRIORITY_MAX',
+          visibility: 'PUBLIC',
+        },
       },
       apns: {
         headers: {

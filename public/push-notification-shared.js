@@ -453,9 +453,10 @@ function erpBuildNotificationOptions(payload) {
     icon: ERP_PUSH_ICON_URL,
     badge: ERP_PUSH_BADGE_URL,
     tag: payload.tag,
-    requireInteraction: false,
+    requireInteraction: true,
     renotify: true,
-    vibrate: [200, 100, 200],
+    silent: false,
+    vibrate: [200, 100, 200, 100, 200],
     data: payload.data,
     actions,
   };
