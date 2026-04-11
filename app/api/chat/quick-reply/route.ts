@@ -5,9 +5,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
+import { readSessionFromRequest } from '@/lib/server-session';
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await readSessionFromRequest(req);
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const senderId = String(session.user.id || session.user.user_id || '').trim();
+    if (!senderId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await req.json();
     const { room_id, content } = body as { room_id?: string; content?: string };
 
@@ -15,36 +26,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'room_id and content are required' }, { status: 400 });
     }
 
-    // 서비스 롤 키로 DB 접근
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
-
-    // 쿠키에서 Supabase 세션 추출
-    const cookieHeader = req.headers.get('cookie') || '';
-    const tokenMatch = cookieHeader.match(/sb-[^=]+-auth-token(?:\.0)?=([^;]+)/);
-    const rawToken = tokenMatch?.[1] ?? '';
-
-    let senderId: string | null = null;
-    if (rawToken) {
-      try {
-        const decoded = decodeURIComponent(rawToken);
-        const parsed = JSON.parse(decoded);
-        const sessionObj = Array.isArray(parsed) ? parsed[0] : parsed;
-        const accessToken = sessionObj?.access_token as string | undefined;
-        if (accessToken) {
-          const { data: { user } } = await supabase.auth.getUser(accessToken);
-          senderId = user?.id ?? null;
-        }
-      } catch {
-        // 세션 파싱 실패
-      }
-    }
-
-    if (!senderId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     // 방 존재 및 멤버 확인
     const { data: room, error: roomError } = await supabase
