@@ -851,7 +851,7 @@ export default function ExcelBulkUpload({ onRefresh }: ExcelBulkUploadProps) {
           onClick={() => setMode('inventory_ecount')}
           className={`rounded-[var(--radius-md)] px-4 py-2 text-xs font-bold ${
             mode === 'inventory_ecount'
-              ? 'bg-teal-600 text-white'
+              ? 'bg-[var(--accent)] text-white'
               : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
           }`}
         >
@@ -860,7 +860,7 @@ export default function ExcelBulkUpload({ onRefresh }: ExcelBulkUploadProps) {
       </div>
 
       {isEcount && (
-        <div className="mb-4 space-y-3 rounded-[var(--radius-md)] border border-teal-100 bg-teal-50 p-3 text-[11px] text-teal-800">
+        <div className="mb-4 space-y-3 rounded-[var(--radius-md)] border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-3 text-[11px] text-[var(--foreground)]">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <label className="flex flex-col gap-1">
               <span className="font-bold text-[var(--toss-gray-4)]">등록 회사</span>
@@ -871,7 +871,7 @@ export default function ExcelBulkUpload({ onRefresh }: ExcelBulkUploadProps) {
                   setCompanyManuallySelected(true);
                   setDefaultCompany(event.target.value);
                 }}
-                className="rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-2 py-2 text-sm"
+                className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2 py-2 text-sm"
               >
                 {mergedCompanyOptions.length === 0 && <option value="SY INC.">SY INC.</option>}
                 {mergedCompanyOptions.map((companyName) => (
@@ -888,7 +888,7 @@ export default function ExcelBulkUpload({ onRefresh }: ExcelBulkUploadProps) {
                 data-testid="inventory-ecount-department-select"
                 value={defaultDepartment}
                 onChange={(event) => setDefaultDepartment(event.target.value)}
-                className="rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-2 py-2 text-sm"
+                className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2 py-2 text-sm"
               >
                 <option value="">미지정</option>
                 {departmentOptions.map((departmentName) => (
@@ -900,14 +900,14 @@ export default function ExcelBulkUpload({ onRefresh }: ExcelBulkUploadProps) {
             </label>
           </div>
 
-          <div className="rounded-[var(--radius-md)] bg-white/70 px-3 py-2 text-[11px] text-teal-900">
+          <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-[11px] text-[var(--foreground)]">
             <strong>자동 매핑 기준:</strong> 품목명, 품목코드, 자사품목코드, 규격, 단위, 공급처, 요양급여코드,
             UDI, 허가번호를 최대한 보존해서 `inventory`에 등록합니다. 수량/현재고는 품목등록표에 없어서
             `0`으로 넣습니다.
           </div>
 
           {sheetCompanyName && (
-            <p className="text-[11px] text-teal-900">
+            <p className="text-[11px] text-[var(--foreground)]">
               양식에서 감지한 회사명: <strong>{sheetCompanyName}</strong>
             </p>
           )}

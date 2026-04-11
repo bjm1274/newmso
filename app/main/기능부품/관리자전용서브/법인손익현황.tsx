@@ -59,7 +59,8 @@ export default function CompanyPnL({ staffs, selectedCo, user }: Props) {
         setPayrollData(payrollRes.data || []);
         setExpensesData(expensesRes.data || []);
         setPrevPayroll((prevPayrollRes as any).data || []);
-      } catch {
+      } catch (err) {
+        console.error('법인손익 데이터 로드 실패:', err);
         setPayrollData([]);
         setExpensesData([]);
       } finally {

@@ -36,6 +36,9 @@ export async function POST(request: Request) {
     }
 
     const supabase = createAdminSupabase();
+    const adminUserId = session.user?.id ?? session.user?.user_id ?? 'unknown';
+    const adminUserName = session.user?.name ?? session.user?.username ?? '';
+
     if (clearPassword) {
       const { error, clearedColumns } = await clearStaffPasswordWithFallback(supabase, staffId);
 
@@ -43,6 +46,16 @@ export async function POST(request: Request) {
         const message = error instanceof Error ? error.message : String(error?.message || 'Password clear failed');
         return NextResponse.json({ ok: false, error: message }, { status: 500 });
       }
+
+      // 감사 로그 기록
+      await supabase.from('audit_logs').insert({
+        action: '비밀번호초기화',
+        target_type: 'staff_members',
+        target_id: staffId,
+        user_id: adminUserId,
+        user_name: adminUserName,
+        details: { clearedColumns },
+      }).then(() => {}, () => {/* 감사 로그 실패는 무시 */});
 
       return NextResponse.json({ ok: true, cleared: true, clearedColumns });
     }
@@ -53,6 +66,16 @@ export async function POST(request: Request) {
       const message = error instanceof Error ? error.message : String(error?.message || 'Password update failed');
       return NextResponse.json({ ok: false, error: message }, { status: 500 });
     }
+
+    // 감사 로그 기록
+    await supabase.from('audit_logs').insert({
+      action: '비밀번호변경',
+      target_type: 'staff_members',
+      target_id: staffId,
+      user_id: adminUserId,
+      user_name: adminUserName,
+      details: { updatedColumn },
+    }).then(() => {}, () => {/* 감사 로그 실패는 무시 */});
 
     return NextResponse.json({ ok: true, updatedColumn });
   } catch (error) {

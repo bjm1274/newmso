@@ -191,13 +191,13 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: Record<string
                         <div className="space-y-4">
                             <div className="flex justify-between items-center">
                                 <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                    <span className="w-2 h-2 rounded-full bg-success"></span>
                                     총 {extractedItems.length}개의 품목 추출 완료
                                 </h4>
                                 <button
                                     onClick={handleRegisterAll}
                                     disabled={isLoading}
-                                    className="px-4 py-2 bg-emerald-600 text-white rounded-[var(--radius-md)] text-[11px] font-bold shadow hover:bg-emerald-700 disabled:opacity-50"
+                                    className="px-4 py-2 bg-success text-white rounded-[var(--radius-md)] text-[11px] font-bold shadow-sm hover:opacity-90 disabled:opacity-50"
                                 >
                                     위 내역으로 일괄 등록
                                 </button>

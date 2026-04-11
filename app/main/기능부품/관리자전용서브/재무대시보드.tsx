@@ -48,19 +48,19 @@ export default function FinancialDashboard() {
 
             {/* Top: Cash Flow Summary */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="p-3 bg-emerald-50 rounded-[var(--radius-lg)] border border-emerald-100">
+                <div className="p-3 bg-success/10 rounded-[var(--radius-lg)] border border-success/20">
                     <div className="flex items-center gap-2 mb-1.5">
-                        <span className="w-7 h-7 rounded-full bg-emerald-200 text-emerald-700 flex items-center justify-center font-black text-sm">↓</span>
-                        <span className="text-xs font-black text-emerald-800 uppercase">Cash In (수익/입금)</span>
+                        <span className="w-7 h-7 rounded-full bg-success/20 text-success flex items-center justify-center font-black text-sm">↓</span>
+                        <span className="text-xs font-black text-success uppercase">Cash In (수익/입금)</span>
                     </div>
-                    <p className="text-2xl font-black text-emerald-700 mt-2">₩ {(cashFlow.in).toLocaleString()}</p>
+                    <p className="text-2xl font-black text-success mt-2">₩ {(cashFlow.in).toLocaleString()}</p>
                 </div>
-                <div className="p-3 bg-red-500/10 rounded-[var(--radius-lg)] border border-red-100">
+                <div className="p-3 bg-danger/10 rounded-[var(--radius-lg)] border border-danger/20">
                     <div className="flex items-center gap-2 mb-1.5">
-                        <span className="w-7 h-7 rounded-full bg-red-200 text-red-700 flex items-center justify-center font-black text-sm">↑</span>
-                        <span className="text-xs font-black text-red-800 uppercase">Cash Out (지출/출금)</span>
+                        <span className="w-7 h-7 rounded-full bg-danger/20 text-danger flex items-center justify-center font-black text-sm">↑</span>
+                        <span className="text-xs font-black text-danger uppercase">Cash Out (지출/출금)</span>
                     </div>
-                    <p className="text-2xl font-black text-red-700 mt-2">₩ {(cashFlow.out).toLocaleString()}</p>
+                    <p className="text-2xl font-black text-danger mt-2">₩ {(cashFlow.out).toLocaleString()}</p>
                 </div>
                 <div className="p-3 bg-[var(--toss-blue-light)] rounded-[var(--radius-lg)] border border-[var(--accent)]/20">
                     <div className="flex items-center gap-2 mb-1.5">
@@ -97,25 +97,25 @@ export default function FinancialDashboard() {
                                             style={{ width: `${percent}%`, transition: 'width 1s ease-out' }}
                                         ></div>
                                     </div>
-                                    {isWarning && <p className="text-[10px] text-red-500 font-bold text-right -mt-1">예산 소진율 85% 초과 (통제 필요)</p>}
+                                    {isWarning && <p className="text-[10px] text-danger font-bold text-right -mt-1">예산 소진율 85% 초과 (통제 필요)</p>}
                                 </div>
                             );
                         })}
                     </div>
                 </div>
 
-                <div className="bg-slate-900 rounded-[var(--radius-lg)] p-4 shadow-sm text-white relative overflow-hidden flex flex-col justify-center border border-slate-700">
+                <div className="bg-[var(--foreground)] rounded-[var(--radius-lg)] p-4 shadow-sm text-[var(--card)] relative overflow-hidden flex flex-col justify-center border border-[var(--border)]">
                     <div className="absolute top-0 right-0 p-5 text-8xl opacity-10">📉</div>
-                    <h3 className="text-sm font-black text-white mb-1.5 relative z-10">AI 재무 건전성 분석</h3>
+                    <h3 className="text-sm font-black text-[var(--card)] mb-1.5 relative z-10">AI 재무 건전성 분석</h3>
                     <p className="text-[11px] font-medium text-[var(--toss-gray-3)] leading-relaxed relative z-10 italic">
                         실제 데이터를 분석 중입니다. 데이터가 충분히 쌓이면 경영진을 위한 인사이트가 자동으로 생성됩니다.
                     </p>
                     <div className="mt-3 grid grid-cols-2 gap-3 relative z-10">
-                        <div className="bg-slate-800 p-3 rounded-[var(--radius-md)] border border-slate-700">
+                        <div className="bg-[var(--card)]/10 p-3 rounded-[var(--radius-md)] border border-[var(--card)]/20">
                             <p className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-widest">런웨이 (Runway)</p>
                             <p className="text-base font-black mt-1">데이터 부족</p>
                         </div>
-                        <div className="bg-slate-800 p-3 rounded-[var(--radius-md)] border border-slate-700">
+                        <div className="bg-[var(--card)]/10 p-3 rounded-[var(--radius-md)] border border-[var(--card)]/20">
                             <p className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-widest">OpEx 런레이트</p>
                             <p className="text-base font-black mt-1 text-[var(--toss-gray-4)]">-</p>
                         </div>

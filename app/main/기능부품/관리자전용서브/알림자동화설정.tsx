@@ -7,9 +7,11 @@ export default function NotificationAutomation({ user: userRaw }: Record<string,
   const [payrollDay, setPayrollDay] = useState(25);
   const [enabled, setEnabled] = useState(true);
 
+  const userId = user?.['id'] as string | undefined;
   useEffect(() => {
+    let cancelled = false;
     const checkAndSend = async () => {
-      if (!enabled || !user?.['id']) return;
+      if (!enabled || !userId || cancelled) return;
       const today = new Date();
       const day = today.getDate();
       const todayYmd = today.toISOString().slice(0, 10);
@@ -38,10 +40,9 @@ export default function NotificationAutomation({ user: userRaw }: Record<string,
 
       // 2) 연차 촉진 자동 알림 (법적 기준: 연도 종료 6개월 전 / 2개월 전)
       // 단순화: 모든 직원의 연차 기준연도 종료일을 해당 연도 12월 31일로 보고 계산
-      const yearEnd = new Date(currentYear, 11, 31); // 12월은 index 11
-      const msPerDay = 24 * 60 * 60 * 1000;
-      const step1Date = new Date(yearEnd.getTime() - 180 * msPerDay); // 6개월 전(대략)
-      const step2Date = new Date(yearEnd.getTime() - 60 * msPerDay); // 2개월 전
+      // 6개월 전 = 7월 1일, 2개월 전 = 11월 1일 (정확한 월 기준)
+      const step1Date = new Date(currentYear, 6, 1); // 7월 1일
+      const step2Date = new Date(currentYear, 10, 1); // 11월 1일
       const todayKey = todayYmd;
 
       const isSameDate = (d: Date) =>
@@ -87,13 +88,14 @@ export default function NotificationAutomation({ user: userRaw }: Record<string,
           read_at: null,
         });
 
+        if (cancelled) return;
         await supabase.from('annual_leave_promotion_logs').insert({
           staff_id: s.id,
           company_name: s.company || null,
           target_year: currentYear,
           step: stepToday,
           remain_days: remain,
-          meta: { sent_by: user?.['id'] as string, today: todayYmd },
+          meta: { sent_by: userId, today: todayYmd },
         });
       }
     };
@@ -101,8 +103,8 @@ export default function NotificationAutomation({ user: userRaw }: Record<string,
     // 데모 환경에서는 관리자 화면이 열려 있는 동안만 1일 간격으로 체크
     const t = setInterval(checkAndSend, 24 * 60 * 60 * 1000);
     checkAndSend();
-    return () => clearInterval(t);
-  }, [enabled, payrollDay, user?.['id']]);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [enabled, payrollDay, userId]);
 
   return (
     <div className="bg-[var(--card)] p-4 border border-[var(--border)] rounded-[var(--radius-md)] shadow-sm max-w-xl space-y-3">
@@ -115,7 +117,7 @@ export default function NotificationAutomation({ user: userRaw }: Record<string,
             type="checkbox"
             checked={enabled}
             onChange={e => setEnabled(e.target.checked)}
-            className="w-5 h-5 accent-blue-600"
+            className="w-5 h-5 accent-[var(--accent)]"
           />
           <span className="font-bold text-sm">알림 자동화 활성화</span>
         </label>
@@ -131,7 +133,7 @@ export default function NotificationAutomation({ user: userRaw }: Record<string,
             onChange={e =>
               setPayrollDay(parseInt(e.target.value, 10) || 25)
             }
-            className="w-full p-2 mt-1 rounded-[var(--radius-md)] border font-bold"
+            className="w-full p-2 mt-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] font-bold"
           />
         </div>
         <div className="rounded-[var(--radius-md)] bg-[var(--page-bg)] border border-[var(--border)] p-4 text-[11px] text-[var(--toss-gray-4)] space-y-1">

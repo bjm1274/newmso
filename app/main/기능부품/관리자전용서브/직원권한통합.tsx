@@ -1,7 +1,7 @@
 ﻿'use client';
 import { toast } from '@/lib/toast';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { FEATURE_PERMISSION_GROUPS, type FeaturePermissionItem } from '@/lib/feature-permissions';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
@@ -12,30 +12,30 @@ function getToneClasses(tone: FeaturePermissionItem['tone'], active: boolean) {
   }
 
   if (tone === 'critical') {
-    return 'bg-red-500/10 border-red-500/20';
+    return 'bg-danger/10 border-danger/20';
   }
 
   if (tone === 'warning') {
-    return 'bg-amber-50 border-amber-200';
+    return 'bg-warning/10 border-warning/20';
   }
 
-  return 'bg-blue-500/10 border-blue-500/20';
+  return 'bg-[var(--accent)]/10 border-[var(--accent)]/20';
 }
 
 function getToggleClasses(tone: FeaturePermissionItem['tone'], active: boolean) {
   if (!active) {
-    return 'bg-[var(--tab-bg)] hover:bg-slate-300';
+    return 'bg-[var(--tab-bg)] hover:bg-[var(--muted)]';
   }
 
   if (tone === 'critical') {
-    return 'bg-red-500/100 ring-red-100';
+    return 'bg-danger ring-danger/20';
   }
 
   if (tone === 'warning') {
-    return 'bg-amber-500 ring-amber-100';
+    return 'bg-warning ring-warning/20';
   }
 
-  return 'bg-[var(--accent)] ring-blue-100';
+  return 'bg-[var(--accent)] ring-[var(--accent)]/20';
 }
 
 function compareKoreanLabels(a: string, b: string) {
@@ -236,26 +236,34 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     toast('비밀번호가 지정되지 않은 상태로 초기화되었습니다.');
   };
 
-  const handleRoleChange = async (staffId: string, newRole: string) => {
-    const actor = readClientAuditActor();
-    const beforeStaff = staffs.find((staff) => staff.id === staffId);
-    const { error } = await updateStaffRecord(staffId, { role: newRole });
-    if (error) {
-      toast('역할 변경 중 오류가 발생했습니다.', 'error');
-      return;
-    }
+  const [roleChanging, setRoleChanging] = useState(false);
 
-    await logAudit(
+  const handleRoleChange = async (staffId: string, newRole: string) => {
+    if (roleChanging) return;
+    setRoleChanging(true);
+    try {
+      const actor = readClientAuditActor();
+      const beforeStaff = staffs.find((staff) => staff.id === staffId);
+      const { error } = await updateStaffRecord(staffId, { role: newRole });
+      if (error) {
+        toast('역할 변경 중 오류가 발생했습니다.', 'error');
+        return;
+      }
+
+      await logAudit(
         '직원권한수정',
-      'staff_permission',
-      String(staffId),
-      {
-        staff_name: beforeStaff?.name || '-',
-        ...buildAuditDiff({ role: beforeStaff?.role || null }, { role: newRole }, ['role']),
-      },
-      actor.userId,
-      actor.userName
-    );
+        'staff_permission',
+        String(staffId),
+        {
+          staff_name: beforeStaff?.name || '-',
+          ...buildAuditDiff({ role: beforeStaff?.role || null }, { role: newRole }, ['role']),
+        },
+        actor.userId,
+        actor.userName,
+      );
+    } finally {
+      setRoleChanging(false);
+    }
   };
 
   const setPermissions = useCallback(
@@ -288,23 +296,35 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     [staffs, updateStaffRecord]
   );
 
+  const pendingRef = useRef(false);
+
   const togglePermission = async (staffId: string, permKey: string) => {
-    const staff = staffs.find((item) => item.id === staffId);
-    if (!staff) return;
-    const nextPermissions = { ...(staff.permissions || {}), [permKey]: !staff.permissions?.[permKey] };
-    await setPermissions(staffId, nextPermissions);
+    if (pendingRef.current) return;
+    pendingRef.current = true;
+    try {
+      const staff = staffs.find((item) => item.id === staffId);
+      if (!staff) return;
+      const nextPermissions = { ...(staff.permissions || {}), [permKey]: !staff.permissions?.[permKey] };
+      await setPermissions(staffId, nextPermissions);
+    } finally {
+      pendingRef.current = false;
+    }
   };
 
   const applyGroupPermission = async (staffId: string, keys: string[], enabled: boolean) => {
-    const staff = staffs.find((item) => item.id === staffId);
-    if (!staff) return;
-
-    const nextPermissions = { ...(staff.permissions || {}) };
-    keys.forEach((key) => {
-      nextPermissions[key] = enabled;
-    });
-
-    await setPermissions(staffId, nextPermissions);
+    if (pendingRef.current) return;
+    pendingRef.current = true;
+    try {
+      const staff = staffs.find((item) => item.id === staffId);
+      if (!staff) return;
+      const nextPermissions = { ...(staff.permissions || {}) };
+      keys.forEach((key) => {
+        nextPermissions[key] = enabled;
+      });
+      await setPermissions(staffId, nextPermissions);
+    } finally {
+      pendingRef.current = false;
+    }
   };
 
   const copyPermissionsToStaff = async () => {
@@ -697,7 +717,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                     value={(selectedStaff.role as string) || 'staff'}
                     onChange={(e) => handleRoleChange(selectedStaff.id as string, e.target.value)}
                     className={`w-full px-2.5 py-2 border rounded-[var(--radius-md)] text-[11px] font-bold ${
-                      selectedStaff.role === 'admin' ? 'border-red-500/20 text-red-600 bg-red-500/10' : 'border-[var(--border)]'
+                      selectedStaff.role === 'admin' ? 'border-danger/20 text-danger bg-danger/10' : 'border-[var(--border)]'
                     }`}
                   >
                     <option value="staff">일반 직원 (기본)</option>
@@ -765,7 +785,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                       {currentApprovalReferenceUsers.map((staff) => (
                         <span
                           key={`${selectedApprovalReferenceFormKey}-${staff.id}`}
-                          className="inline-flex items-center gap-1 rounded-[var(--radius-md)] border border-yellow-500/20 bg-yellow-500/10 px-2.5 py-1.5 text-[10px] font-bold text-yellow-800"
+                          className="inline-flex items-center gap-1 rounded-[var(--radius-md)] border border-[var(--accent)]/20 bg-[var(--accent)]/10 px-2.5 py-1.5 text-[10px] font-bold text-[var(--foreground)]"
                         >
                           {staff.name}
                           {staff.position ? ` ${staff.position}` : ''}
@@ -773,7 +793,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                             type="button"
                             data-testid={`staff-approval-default-recipient-remove-${staff.id}`}
                             onClick={() => void removeApprovalReferenceRecipient(staff.id)}
-                            className="text-yellow-500 hover:text-red-500"
+                            className="text-[var(--toss-gray-4)] hover:text-red-500"
                           >
                             ×
                           </button>
@@ -1009,8 +1029,8 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                   )}
                 </div>
 
-                <div className="bg-red-500/10 p-3 rounded-[var(--radius-md)] shadow-sm border border-red-500/20">
-                  <p className="mb-2 text-[13px] font-semibold text-red-600">보안 및 계정 관리</p>
+                <div className="bg-danger/10 p-3 rounded-[var(--radius-md)] shadow-sm border border-danger/20">
+                  <p className="mb-2 text-[13px] font-semibold text-danger">보안 및 계정 관리</p>
                   <button
                     type="button"
                     onClick={async () => {
@@ -1028,7 +1048,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                       if (!error) toast('강제 로그아웃 명령이 전송되었습니다.', 'success');
                       else toast('처리 중 오류가 발생했습니다.', 'error');
                     }}
-                    className="w-full py-2 bg-red-600 text-white rounded-[var(--radius-md)] text-[10px] font-bold hover:bg-red-700 transition-colors shadow-sm"
+                    className="w-full py-2 bg-danger text-white rounded-[var(--radius-md)] text-[10px] font-bold hover:bg-[var(--danger-hover)] transition-colors shadow-sm"
                   >
                     기기 전체 강제 로그아웃 (Session Kill)
                   </button>
@@ -1089,11 +1109,11 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                                 data-testid={`staff-permission-toggle-${item.key}`}
                                 aria-pressed={isActive}
                                 onClick={() => togglePermission(selectedStaff.id as string, item.key)}
-                                className={`relative h-[12px] w-[24px] shrink-0 rounded-full transition-all focus:outline-none focus:ring-2 ${getToggleClasses(item.tone, isActive)}` }
+                                className={`relative h-[18px] w-[32px] shrink-0 rounded-full transition-all focus:outline-none focus:ring-2 ${getToggleClasses(item.tone, isActive)}` }
                               >
                                 <div
-                                  className={`absolute top-0.5 h-[8px] w-[8px] rounded-full bg-[var(--card)] shadow-sm transition-all ${
-                                    isActive ? 'left-[14px]' : 'left-0.5'
+                                  className={`absolute top-[3px] h-[12px] w-[12px] rounded-full bg-[var(--card)] shadow-sm transition-all ${
+                                    isActive ? 'left-[17px]' : 'left-[3px]'
                                   }`}
                                 />
                               </button>

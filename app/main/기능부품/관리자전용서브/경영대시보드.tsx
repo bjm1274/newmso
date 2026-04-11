@@ -42,7 +42,7 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
       turnoverPrediction: 0,
       efficiencyScore: 0
     });
-  }, [staffs, inventory, approvals, leaves]);
+  }, [staffs, approvals, leaves]);
 
   const monthlyTurnover: number[] = []; // Virtual data removed
   const leaveUsageTrend: number[] = []; // Virtual data removed
@@ -55,7 +55,7 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
         </div>
         <div className="flex gap-2">
           <button className="px-4 py-2 bg-[var(--card)] border border-[var(--border)] text-[11px] font-black text-[var(--toss-gray-4)] rounded-[var(--radius-md)] shadow-sm hover:bg-[var(--tab-bg)] transition-colors">📄 리포트 출력</button>
-          <button className="px-4 py-2 bg-slate-800 text-white text-[11px] font-black rounded-[var(--radius-md)] shadow-sm hover:scale-105 transition-transform">설정 변경</button>
+          <button className="px-4 py-2 bg-[var(--accent)] text-white text-[11px] font-black rounded-[var(--radius-md)] shadow-sm hover:scale-105 transition-transform">설정 변경</button>
         </div>
       </div>
 
@@ -69,19 +69,19 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
         <div className="bg-[var(--card)] p-3 border border-[var(--border)] shadow-sm rounded-[var(--radius-xl)] relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 text-3xl opacity-10 group-hover:scale-110 transition-transform">⚠️</div>
           <p className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-widest">번아웃 의심 인원 (연차 미사용)</p>
-          <p className="text-xl font-black text-danger mt-1.5">{(metrics.burnoutCandidates ?? 0) as string}명</p>
+          <p className="text-xl font-black text-danger mt-1.5">{String(metrics.burnoutCandidates ?? 0)}명</p>
           <p className="text-[10px] font-bold text-danger mt-1.5">지적 및 독려 필요</p>
         </div>
         <div className="bg-[var(--card)] p-3 border border-[var(--border)] shadow-sm rounded-[var(--radius-xl)] relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 text-3xl opacity-10 group-hover:scale-110 transition-transform">📉</div>
           <p className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-widest">AI 예측 이직률 / 퇴사율</p>
-          <p className="text-xl font-black text-orange-500 mt-1.5">{(metrics.turnoverPrediction ?? '-') as string}%</p>
+          <p className="text-xl font-black text-warning mt-1.5">{String(metrics.turnoverPrediction ?? '-')}%</p>
           <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mt-1.5">동종 업계 평균 대비 양호</p>
         </div>
         <div className="bg-[var(--card)] p-3 border border-[var(--border)] shadow-sm rounded-[var(--radius-xl)] relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 text-3xl opacity-10 group-hover:scale-110 transition-transform">🏝️</div>
           <p className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-widest">조직 연차 사용률</p>
-          <p className="text-xl font-black text-primary mt-1.5">{(metrics.leaveUsageRate ?? '-') as string}%</p>
+          <p className="text-xl font-black text-primary mt-1.5">{String(metrics.leaveUsageRate ?? '-')}%</p>
           <div className="w-full h-1.5 bg-[var(--tab-bg)] rounded-full mt-2 overflow-hidden">
             <div className="h-full bg-primary" style={{ width: `${metrics.leaveUsageRate}%` }}></div>
           </div>
@@ -109,11 +109,11 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
                 <div className="absolute top-1/2 w-full border-t border-dashed border-[var(--border)] z-0"></div>
                 {monthlyTurnover.map((val, i) => (
                   <div key={i} className="flex-1 flex flex-col items-center gap-3 h-full z-10 group relative">
-                    <div className="absolute -top-8 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    <div className="absolute -top-8 bg-[var(--foreground)] text-[var(--card)] text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                       {val}%
                     </div>
                     <div className="w-full flex-1 flex flex-col justify-end min-h-[50px]">
-                      <div className={`w-full rounded-t-md transition-all duration-500 hover:opacity-80 ${val >= 4.0 ? 'bg-danger' : val >= 3.0 ? 'bg-orange-400' : 'bg-slate-300'}`} style={{ height: `${(val / 5) * 100}%` }}></div>
+                      <div className={`w-full rounded-t-md transition-all duration-500 hover:opacity-80 ${val >= 4.0 ? 'bg-danger' : val >= 3.0 ? 'bg-orange-400' : 'bg-[var(--muted)]'}`} style={{ height: `${(val / 5) * 100}%` }}></div>
                     </div>
                     <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">{i + 1}월</span>
                   </div>
@@ -161,12 +161,12 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
         </div>
       </div>
 
-      <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl shadow-sm flex flex-col md:flex-row items-center justify-between gap-3 relative overflow-hidden">
+      <div className="bg-[var(--foreground)] border border-[var(--border)] p-4 rounded-[var(--radius-xl)] shadow-sm flex flex-col md:flex-row items-center justify-between gap-3 relative overflow-hidden">
         <div className="absolute right-0 top-0 opacity-10 transform translate-x-1/4 -translate-y-1/4">
-          <svg width="300" height="300" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" /></svg>
+          <svg width="300" height="300" viewBox="0 0 24 24" fill="var(--card)"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" /></svg>
         </div>
         <div className="z-10 xl:w-2/3">
-          <h3 className="text-base font-black text-white mb-1.5">지표 분석 리포트 요약</h3>
+          <h3 className="text-base font-black text-[var(--card)] mb-1.5">지표 분석 리포트 요약</h3>
           <p className="text-[12px] font-medium text-[var(--toss-gray-3)] leading-relaxed italic">
             실제 인사 및 근태 데이터를 기반으로 분석 중입니다. 데이터가 쌓이면 부서별 번아웃 위험도 및 채용 전략 제안이 이곳에 표시됩니다.
           </p>

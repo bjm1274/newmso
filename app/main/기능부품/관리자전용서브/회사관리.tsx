@@ -138,6 +138,7 @@ function PolicyScopeControls({
 export default function CompanyManager({ user, staffs = [], onRefresh }: Props) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Company | null>(null);
   const [form, setForm] = useState<FormState>(createEmptyForm());
   const [msoId, setMsoId] = useState<string | null>(null);
@@ -231,10 +232,12 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
   };
 
   const handleSave = async () => {
+    if (saving) return;
     if (!form.name.trim()) {
       toast('회사명을 입력해 주세요.', 'warning');
       return;
     }
+    setSaving(true);
 
     const payload = {
       name: form.name.trim(),
@@ -247,34 +250,38 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
       memo: form.memo || null,
     };
 
-    if (editing) {
-      const { error } = await supabase.from('companies').update(payload).eq('id', editing.id);
-      if (error) {
-        console.error('companies update failed:', error);
-        toast(`회사 수정에 실패했습니다: ${error.message}`, 'error');
+    try {
+      if (editing) {
+        const { error } = await supabase.from('companies').update(payload).eq('id', editing.id);
+        if (error) {
+          console.error('companies update failed:', error);
+          toast(`회사 수정에 실패했습니다: ${error.message}`, 'error');
+          return;
+        }
+
+        toast('회사 정보를 저장했습니다.', 'success');
+        resetForm();
+        fetchCompanies();
         return;
       }
 
-      toast('회사 정보를 저장했습니다.', 'success');
+      const { error } = await supabase.from('companies').insert({
+        ...payload,
+        mso_id: form.type !== 'MSO' ? msoId : null,
+      });
+
+      if (error) {
+        console.error('companies insert failed:', error);
+        toast(`회사 등록에 실패했습니다: ${error.message}`, 'error');
+        return;
+      }
+
+      toast('회사를 등록했습니다.', 'success');
       resetForm();
       fetchCompanies();
-      return;
+    } finally {
+      setSaving(false);
     }
-
-    const { error } = await supabase.from('companies').insert({
-      ...payload,
-      mso_id: form.type !== 'MSO' ? msoId : null,
-    });
-
-    if (error) {
-      console.error('companies insert failed:', error);
-      toast(`회사 등록에 실패했습니다: ${error.message}`, 'error');
-      return;
-    }
-
-    toast('회사를 등록했습니다.', 'success');
-    resetForm();
-    fetchCompanies();
   };
 
   const handleEdit = (company: Company) => {
@@ -466,9 +473,10 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
               <button
                 data-testid="company-manager-save-button"
                 onClick={handleSave}
-                className="rounded-[var(--radius-md)] bg-[var(--accent)] px-5 py-1.5 text-sm font-bold text-white"
+                disabled={saving}
+                className="rounded-[var(--radius-md)] bg-[var(--accent)] px-5 py-1.5 text-sm font-bold text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {editing ? '저장' : '추가'}
+                {saving ? '저장 중...' : editing ? '저장' : '추가'}
               </button>
               {editing ? (
                 <button
@@ -529,7 +537,7 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
             selectedCompany={policyCompany}
             onCompanyChange={setPolicyCompany}
           />
-          <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="rounded-[var(--radius-xl)] border border-warning/20 bg-warning/10 px-4 py-3 text-sm text-[var(--foreground)]">
             연차사용촉진 자동화는 중복 생성하지 않고 관리자 메뉴의 알림자동화에서 계속 관리합니다.
           </div>
           <LeaveManagement

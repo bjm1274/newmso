@@ -1097,7 +1097,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
                           <span className="text-sm font-bold text-[var(--foreground)]">{row.name}</span>
                           <span className="text-xs text-[var(--toss-gray-3)]">{row.slug}</span>
                           {!row.is_active && (
-                            <span className="rounded-[var(--radius-md)] bg-red-500/10 px-2 py-1 text-[10px] font-semibold text-red-600">비활성</span>
+                            <span className="rounded-[var(--radius-md)] bg-danger/10 px-2 py-1 text-[10px] font-semibold text-danger">비활성</span>
                           )}
                         </div>
                         <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-[var(--toss-gray-3)]">
@@ -1115,10 +1115,10 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
                         <button type="button" onClick={() => toggleActive(row)} className="rounded-[var(--radius-lg)] bg-[var(--muted)] px-3 py-2 text-xs font-bold text-[var(--foreground)] hover:bg-[var(--toss-gray-2)]">
                           {row.is_active === false ? '활성화' : '비활성'}
                         </button>
-                        <button type="button" onClick={() => startEdit(row)} className="rounded-[var(--radius-lg)] bg-amber-100 px-3 py-2 text-xs font-bold text-amber-800">
+                        <button type="button" onClick={() => startEdit(row)} className="rounded-[var(--radius-lg)] bg-warning/15 px-3 py-2 text-xs font-bold text-warning">
                           이름/코드 수정
                         </button>
-                        <button type="button" onClick={() => handleDelete(row)} className="rounded-[var(--radius-lg)] bg-red-500/10 px-3 py-2 text-xs font-bold text-red-600">
+                        <button type="button" onClick={() => handleDelete(row)} className="rounded-[var(--radius-lg)] bg-danger/10 px-3 py-2 text-xs font-bold text-danger">
                           삭제
                         </button>
                       </div>
