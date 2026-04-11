@@ -116,6 +116,7 @@ const INVENTORY_PERMISSION_KEYS: Record<string, string> = {
   카테고리: 'inventory_카테고리',
   AS반품: 'inventory_AS반품',
   소모품통계: 'inventory_소모품통계',
+  내부서재고: 'inventory_내부서재고',
   명세서: 'inventory_거래처',
   유통기한: 'inventory_현황',
 };
@@ -188,6 +189,7 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   inventory_카테고리: ['inventory'],
   inventory_AS반품: ['inventory'],
   inventory_소모품통계: ['inventory'],
+  inventory_내부서재고: ['inventory'],
   admin_경영분석: ['admin'],
   admin_감사센터: ['admin'],
   admin_시스템마스터센터: ['admin'],

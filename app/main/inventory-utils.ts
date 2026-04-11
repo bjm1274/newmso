@@ -72,8 +72,14 @@ export function getItemUnitPrice(item: InventoryLike | null | undefined): number
   return Number(item?.unit_price ?? item?.price ?? 0);
 }
 
-function normalizeInventoryText(value: unknown) {
+export function normalizeInventoryText(value: unknown) {
   return String(value ?? '').trim().toLowerCase();
+}
+
+export const EXPIRY_SOON_MS = 30 * 24 * 60 * 60 * 1000;
+
+export function isExpirySoon(item: InventoryLike | null | undefined, threshold: number) {
+  return Boolean(item?.expiry_date) && new Date(item!.expiry_date as string).getTime() < threshold;
 }
 
 type InventoryQuantityValidationOptions = {
@@ -815,6 +821,80 @@ export async function processInventoryIssue({
   };
 }
 
+type ReverseInventoryIssueParams = {
+  sourceItemId: string;
+  destinationCompany: string;
+  destinationDept: string;
+  itemName: string;
+  quantity: number;
+  reason?: string;
+  user?: InventoryUserLike | null;
+};
+
+/**
+ * 불출 처리를 취소한다.
+ * SY INC. 재고 증가 + 수령팀 재고 감소 + 취소 로그 기록.
+ */
+export async function reverseInventoryIssue({
+  sourceItemId,
+  destinationCompany,
+  destinationDept,
+  itemName,
+  quantity,
+  reason,
+  user,
+}: ReverseInventoryIssueParams) {
+  const reverseQty = Math.max(1, Number(quantity) || 0);
+
+  // 1) SY INC. 재고 복원 (증가)
+  const { error: srcErr } = await supabase.rpc('atomic_stock_update', {
+    p_item_id: sourceItemId,
+    p_delta: reverseQty,
+    p_min_allowed: 0,
+  });
+  if (srcErr) {
+    // RPC 미등록 fallback
+    const { data: srcRow } = await supabase.from('inventory').select('quantity, stock').eq('id', sourceItemId).single();
+    const curQty = Number(srcRow?.quantity ?? srcRow?.stock ?? 0);
+    const { error } = await supabase.from('inventory').update({ quantity: curQty + reverseQty, stock: curQty + reverseQty }).eq('id', sourceItemId);
+    if (error) throw error;
+  }
+
+  // 2) 수령팀 재고 차감 (감소)
+  const { data: destRows } = await supabase
+    .from('inventory')
+    .select('id, quantity, stock, item_name, name')
+    .eq('company', destinationCompany)
+    .eq('item_name', itemName);
+
+  const destItem = (destRows || []).find((r: LooseRecord) =>
+    String(r.department || '').trim() === destinationDept.trim() ||
+    (!destinationDept && !String(r.department || '').trim()),
+  ) || (destRows || [])[0];
+
+  if (destItem) {
+    const destCurQty = Number(destItem.quantity ?? destItem.stock ?? 0);
+    const destNextQty = Math.max(0, destCurQty - reverseQty);
+    const { error } = await supabase.from('inventory').update({ quantity: destNextQty, stock: destNextQty }).eq('id', destItem.id);
+    if (error) throw error;
+  }
+
+  // 3) 취소 로그 기록
+  const logRows: Array<Record<string, unknown>> = [
+    {
+      item_id: sourceItemId,
+      inventory_id: sourceItemId,
+      type: '이관',
+      change_type: '불출취소',
+      quantity: reverseQty,
+      actor_name: user?.name,
+      company: INVENTORY_SUPPORT_COMPANY,
+      notes: `불출 취소: ${destinationCompany} ${destinationDept} → ${INVENTORY_SUPPORT_COMPANY} ${INVENTORY_SUPPORT_DEPARTMENT} (${reason || '운영자 취소'})`,
+    },
+  ];
+  await supabase.from('inventory_logs').insert(logRows);
+}
+
 type RequestInventoryReorderParams = {
   item: InventoryLike;
   user?: InventoryUserLike | null;
@@ -873,4 +953,54 @@ export async function requestInventoryReorder({
       return supabase.from('approvals').insert(legacyRows);
     },
   );
+}
+
+/**
+ * SY INC. 경영지원팀에 신규 품목을 자동 등록한다.
+ * 물품신청서에 있지만 SY INC. 재고에 없는 품목에 대해 호출.
+ * 등록 후 해당 아이템을 반환하여 requestInventoryReorder에 사용 가능.
+ */
+export async function createSupportInventoryItem(
+  workflowItem: { name: string; qty: number; category: string; dept: string; purpose: string },
+): Promise<InventoryLike | null> {
+  const itemName = String(workflowItem.name || '').trim();
+  if (!itemName) {
+    console.error('SY INC. 신규 품목 자동 등록 실패: 품목명이 비어 있습니다.');
+    return null;
+  }
+  const safeQty = Number.isFinite(workflowItem.qty) && workflowItem.qty > 0 ? workflowItem.qty : 1;
+
+  const payload: Record<string, unknown> = {
+    item_name: itemName,
+    category: workflowItem.category || '기타',
+    quantity: 0,
+    stock: 0,
+    min_quantity: safeQty,
+    min_stock: safeQty,
+    company: INVENTORY_SUPPORT_COMPANY,
+    department: INVENTORY_SUPPORT_DEPARTMENT,
+  };
+
+  try {
+    const { data, error } = await withMissingColumnsFallback<LooseRecord>(
+      (omittedColumns) => {
+        const row = { ...payload };
+        if (omittedColumns.has('department')) delete row.department;
+        return supabase
+          .from('inventory')
+          .insert([row])
+          .select(INVENTORY_SELECT_COLUMNS)
+          .single() as PromiseLike<SupabaseCompatResult<LooseRecord>>;
+      },
+      ['department'],
+    );
+    if (error) {
+      console.error('SY INC. 신규 품목 자동 등록 실패:', error);
+      return null;
+    }
+    return (data as InventoryLike) || null;
+  } catch (err) {
+    console.error('SY INC. 신규 품목 자동 등록 실패:', err);
+    return null;
+  }
 }

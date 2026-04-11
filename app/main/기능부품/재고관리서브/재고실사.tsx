@@ -295,7 +295,7 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
                         value={it.actual}
                         onChange={e => setActual(it.id, e.target.value)}
                         placeholder="실물 수량"
-                        className={`w-24 px-3 py-1.5 border rounded-[var(--radius-md)] text-sm font-bold text-center outline-none focus:ring-2 focus:ring-[var(--accent)]/20 ${hasError ? 'border-red-400 bg-red-500/10' : hasDiff ? 'border-orange-400 bg-orange-500/10' : 'border-[var(--border)] bg-[var(--card)]'}`}
+                        className={`w-20 sm:w-24 px-2 py-2.5 border rounded-[var(--radius-md)] text-sm font-bold text-center outline-none focus:ring-2 focus:ring-[var(--accent)]/20 ${hasError ? 'border-red-400 bg-red-500/10' : hasDiff ? 'border-orange-400 bg-orange-500/10' : 'border-[var(--border)] bg-[var(--card)]'}`}
                       />
                       {actualError && (
                         <p className="mt-1 text-[10px] font-semibold text-red-500">{actualError}</p>

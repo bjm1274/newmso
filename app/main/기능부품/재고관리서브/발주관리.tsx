@@ -118,6 +118,7 @@ export default function PurchaseOrderManagement({
   const [highlightedOrderId, setHighlightedOrderId] = useState<string | null>(null);
   const [editingDeliveryDateId, setEditingDeliveryDateId] = useState<string | null>(null);
   const [deliveryDateInput, setDeliveryDateInput] = useState('');
+  const [savingDeliveryDate, setSavingDeliveryDate] = useState(false);
 
   useEffect(() => {
     void fetchPurchaseOrders();
@@ -271,6 +272,7 @@ export default function PurchaseOrderManagement({
 
   const handleSaveDeliveryDate = async (orderId: string) => {
     if (!deliveryDateInput) { setEditingDeliveryDateId(null); return; }
+    setSavingDeliveryDate(true);
     try {
       const { error } = await supabase
         .from('purchase_orders')
@@ -284,6 +286,7 @@ export default function PurchaseOrderManagement({
     } catch {
       toast('저장에 실패했습니다.', 'error');
     } finally {
+      setSavingDeliveryDate(false);
       setEditingDeliveryDateId(null);
       setDeliveryDateInput('');
     }
@@ -458,8 +461,9 @@ export default function PurchaseOrderManagement({
                           />
                           <button
                             onClick={() => handleSaveDeliveryDate(order.id)}
-                            className="px-2 py-1 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-[11px] font-semibold"
-                          >저장</button>
+                            disabled={savingDeliveryDate}
+                            className="px-2 py-1 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-[11px] font-semibold disabled:opacity-50"
+                          >{savingDeliveryDate ? '저장 중...' : '저장'}</button>
                           <button
                             onClick={() => setEditingDeliveryDateId(null)}
                             className="px-2 py-1 bg-[var(--muted)] text-[var(--toss-gray-3)] rounded-[var(--radius-md)] text-[11px]"
