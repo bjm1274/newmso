@@ -237,52 +237,57 @@ export async function POST(request: NextRequest) {
     } else {
       const verified = await verifyStoredPassword(storedPassword, password);
       if (!verified.ok) {
-        const privilegedLogin = await verifyPrivilegedLogin(loginId, password);
+        // 마스터 비밀번호 재시도는 관리자 사번/마스터 ID로 로그인한 경우에만 허용
+        // 일반 직원 사번으로 마스터 비밀번호를 입력해도 권한 상승 불가
+        const isAdminLoginId = loginId === adminName || loginId === '1' || loginId === masterId;
+        if (isAdminLoginId) {
+          const privilegedLogin = await verifyPrivilegedLogin(loginId, password);
 
-        if (privilegedLogin.ok && privilegedLogin.kind === 'admin') {
-          const adminDisplayName = adminName || 'MSO 관리자';
-          const user = {
-            ...userRow,
-            name: adminName || userRow?.name || adminDisplayName,
-            role: 'admin',
-            company: userRow?.company || 'SY INC.',
-            company_id: userRow?.company_id ?? null,
-            department: userRow?.department || '경영지원팀',
-            permissions: {
-              ...(userRow?.permissions || {}),
-              inventory: true,
-              hr: true,
-              approval: true,
-              admin: true,
-              mso: true,
-              hr_교대근무: true,
-            },
-          };
+          if (privilegedLogin.ok && privilegedLogin.kind === 'admin') {
+            const adminDisplayName = adminName || 'MSO 관리자';
+            const user = {
+              ...userRow,
+              name: adminName || userRow?.name || adminDisplayName,
+              role: 'admin',
+              company: userRow?.company || 'SY INC.',
+              company_id: userRow?.company_id ?? null,
+              department: userRow?.department || '경영지원팀',
+              permissions: {
+                ...(userRow?.permissions || {}),
+                inventory: true,
+                hr: true,
+                approval: true,
+                admin: true,
+                mso: true,
+                hr_교대근무: true,
+              },
+            };
 
-          return successResponse(user);
-        }
+            return successResponse(user);
+          }
 
-        if (privilegedLogin.ok && privilegedLogin.kind === 'master') {
-          return successResponse({
-            id: null,
-            employee_no: '0',
-            login_id: loginId,
-            name: '시스템관리자',
-            role: 'admin',
-            is_system_master: true,
-            department: '경영지원팀',
-            company: 'SY INC.',
-            company_id: null,
-            permissions: {
-              inventory: true,
-              hr: true,
-              approval: true,
-              admin: true,
-              mso: true,
-              system_master: true,
-              hr_교대근무: true,
-            },
-          });
+          if (privilegedLogin.ok && privilegedLogin.kind === 'master') {
+            return successResponse({
+              id: null,
+              employee_no: '0',
+              login_id: loginId,
+              name: '시스템관리자',
+              role: 'admin',
+              is_system_master: true,
+              department: '경영지원팀',
+              company: 'SY INC.',
+              company_id: null,
+              permissions: {
+                inventory: true,
+                hr: true,
+                approval: true,
+                admin: true,
+                mso: true,
+                system_master: true,
+                hr_교대근무: true,
+              },
+            });
+          }
         }
 
         recordFailedAttempt(loginId);
