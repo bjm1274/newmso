@@ -414,7 +414,7 @@ export default function DailyClosurePage({
                             }
                             setView(view === 'list' ? 'form' : 'list');
                         }}
-                        className="px-4 py-2 text-xs font-bold rounded-xl bg-gray-900 text-white shadow-sm hover:bg-black transition-all"
+                        className="px-4 py-2 text-xs font-bold rounded-xl bg-[var(--foreground)] text-[var(--card)] shadow-sm hover:opacity-90 transition-all"
                     >
                         {view === 'list' ? '➕ 새 마감 작성' : '📋 마감 목록 보기'}
                     </button>
@@ -448,7 +448,7 @@ export default function DailyClosurePage({
                                     <p className="text-[11px] text-[var(--toss-gray-3)] mt-1">총 수납액: {c.total_amount.toLocaleString()}원</p>
                                 </div>
                                 <div className="text-right">
-                                    <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-green-100 text-green-700">마감완료</span>
+                                    <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-green-500/10 text-green-700">마감완료</span>
                                     <p data-testid={`daily-closure-author-${c.id}`} className="text-[10px] text-[var(--toss-gray-3)] mt-2">
                                         작성자: {getAuthorName(c)}
                                     </p>
@@ -616,14 +616,14 @@ export default function DailyClosurePage({
                                             />
                                         </div>
                                     </div>
-                                    <button onClick={() => removeCheck(idx)} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 transition-opacity">✕</button>
+                                    <button onClick={() => removeCheck(idx)} className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] text-red-400 opacity-60 transition-all hover:bg-red-500/10 hover:text-red-500 hover:opacity-100 md:opacity-0 md:group-hover:opacity-100" aria-label="수표 삭제">✕</button>
                                 </div>
                             ))}
                         </div>
                     </div>
 
                     {/* 요약 및 저장 */}
-                    <div className="bg-gray-900 rounded-2xl p-5 text-white shadow-sm space-y-4">
+                    <div className="bg-[var(--foreground)] rounded-2xl p-5 text-[var(--card)] shadow-sm space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-b border-white/10 pb-8">
                             <div>
                                 <p className="text-xs font-bold text-[var(--toss-gray-3)] mb-2 uppercase tracking-wider">오늘 총 수납금액</p>

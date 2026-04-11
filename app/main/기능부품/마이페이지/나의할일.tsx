@@ -104,7 +104,7 @@ function getPriorityMeta(priority: unknown) {
     case 'high':
       return { label: '높음', className: 'bg-orange-500/20 text-orange-600' };
     case 'low':
-      return { label: '낮음', className: 'bg-slate-100 text-slate-500' };
+      return { label: '낮음', className: 'bg-[var(--muted)] text-[var(--toss-gray-4)]' };
     default:
       return { label: '보통', className: 'bg-blue-500/20 text-blue-600' };
   }
@@ -302,7 +302,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
         .eq('user_id', userId);
 
       if (viewRange === 'day') {
-        query = query.lte('task_date', selectedDate);
+        query = query.eq('task_date', selectedDate);
       } else {
         query = query.gte('task_date', start).lte('task_date', end);
       }

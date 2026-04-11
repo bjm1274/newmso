@@ -2824,7 +2824,7 @@ export default function OperationCheckView({
                                 className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold ${
                                   selected
                                     ? 'border-[var(--accent)] bg-[var(--toss-blue-light)] text-[var(--accent)]'
-                                    : 'border-[var(--border)] bg-white text-[var(--foreground)] hover:border-[var(--accent)]'
+                                    : 'border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:border-[var(--accent)]'
                                 }`}
                               >
                                 {staff.name}
@@ -2853,7 +2853,7 @@ export default function OperationCheckView({
                                 className={`flex items-center gap-1 rounded-full border px-2 py-1 ${
                                   selected
                                     ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]'
-                                    : 'border-[var(--border)] bg-white'
+                                    : 'border-[var(--border)] bg-[var(--card)]'
                                 }`}
                               >
                                 <button
@@ -2889,7 +2889,7 @@ export default function OperationCheckView({
                         data-testid="op-check-ward-recipient-dropdown-button"
                         aria-haspopup="listbox"
                         aria-expanded={wardRecipientPickerOpen}
-                        className="flex w-full items-center justify-between rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 text-left text-sm font-semibold text-[var(--foreground)]"
+                        className="flex w-full items-center justify-between rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-left text-sm font-semibold text-[var(--foreground)]"
                       >
                         <span>
                           {selectedWardStaffs.length > 0
@@ -2902,7 +2902,7 @@ export default function OperationCheckView({
                       </button>
 
                       {wardRecipientPickerOpen && (
-                        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-20 rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-3 shadow-lg">
+                        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-20 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-lg">
                           <input
                             ref={wardRecipientSearchInputRef}
                             value={wardRecipientSearch}
@@ -2996,7 +2996,7 @@ export default function OperationCheckView({
                               <div
                                 key={staff.id}
                                 data-testid={`op-check-ward-selected-recipient-${staff.id}`}
-                                className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2"
+                                className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2"
                               >
                                 <div>
                                   <p className="text-sm font-semibold text-[var(--foreground)]">{staff.name}</p>
@@ -3046,7 +3046,7 @@ export default function OperationCheckView({
                           className={`rounded-full px-3 py-1.5 text-[11px] font-bold ${
                             selectedTemplate
                               ? 'bg-[var(--accent)] text-white'
-                              : 'border border-[var(--border)] bg-white text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
+                              : 'border border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
                           }`}
                         >
                           {template.label}
@@ -3828,7 +3828,7 @@ export default function OperationCheckView({
       {/* #4 청구내역 출력 모달 */}
       {printModalOpen && checkForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={(e) => { if (e.target === e.currentTarget) setPrintModalOpen(false); }}>
-          <div className="w-full max-w-2xl rounded-[var(--radius-xl)] border border-[var(--border)] bg-white shadow-lg">
+          <div className="w-full max-w-2xl rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-lg">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4 print:hidden">
               <h3 className="text-base font-bold text-gray-900">청구내역 출력</h3>
               <div className="flex gap-2">
@@ -3874,11 +3874,11 @@ export default function OperationCheckView({
                 return (
                   <table className="w-full border-collapse text-sm">
                     <thead>
-                      <tr className="bg-gray-100">
-                        <th className="border border-gray-300 px-3 py-2 text-left font-semibold">품목명</th>
-                        <th className="border border-gray-300 px-3 py-2 text-center font-semibold w-16">수량</th>
-                        <th className="border border-gray-300 px-3 py-2 text-center font-semibold w-16">단위</th>
-                        <th className="border border-gray-300 px-3 py-2 text-left font-semibold">메모</th>
+                      <tr className="bg-[var(--muted)]">
+                        <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">품목명</th>
+                        <th className="border border-[var(--border)] px-3 py-2 text-center font-semibold w-16">수량</th>
+                        <th className="border border-[var(--border)] px-3 py-2 text-center font-semibold w-16">단위</th>
+                        <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">메모</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -3957,7 +3957,7 @@ export default function OperationCheckView({
                               className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold ${
                                 selected
                                   ? 'border-[var(--accent)] bg-[var(--toss-blue-light)] text-[var(--accent)]'
-                                  : 'border-[var(--border)] bg-white text-[var(--foreground)] hover:border-[var(--accent)]'
+                                  : 'border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:border-[var(--accent)]'
                               }`}
                             >
                               {staff.name}
@@ -3984,7 +3984,7 @@ export default function OperationCheckView({
                               className={`flex items-center gap-1 rounded-full border px-2 py-1 ${
                                 selected
                                   ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]'
-                                  : 'border-[var(--border)] bg-white'
+                                  : 'border-[var(--border)] bg-[var(--card)]'
                               }`}
                             >
                               <button
@@ -4018,7 +4018,7 @@ export default function OperationCheckView({
                       type="button"
                       onClick={() => setWardRecipientPickerOpen((prev) => !prev)}
                       data-testid="op-check-ward-recipient-dropdown-button"
-                      className="flex w-full items-center justify-between rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 text-left text-sm font-semibold text-[var(--foreground)]"
+                      className="flex w-full items-center justify-between rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-left text-sm font-semibold text-[var(--foreground)]"
                     >
                       <span>
                         {selectedWardStaffs.length > 0
@@ -4031,7 +4031,7 @@ export default function OperationCheckView({
                     </button>
 
                     {wardRecipientPickerOpen && (
-                      <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-10 rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-3 shadow-lg">
+                      <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-10 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-lg">
                         <input
                           value={wardRecipientSearch}
                           onChange={(e) => setWardRecipientSearch(e.target.value)}
@@ -4122,7 +4122,7 @@ export default function OperationCheckView({
                             <div
                               key={staff.id}
                               data-testid={`op-check-ward-selected-recipient-${staff.id}`}
-                              className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2"
+                              className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2"
                             >
                               <div>
                                 <p className="text-sm font-semibold text-[var(--foreground)]">{staff.name}</p>
@@ -4172,7 +4172,7 @@ export default function OperationCheckView({
                         className={`rounded-full px-3 py-1.5 text-[11px] font-bold ${
                           selectedTemplate
                             ? 'bg-[var(--accent)] text-white'
-                            : 'border border-[var(--border)] bg-white text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
+                            : 'border border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
                         }`}
                       >
                         {template.label}

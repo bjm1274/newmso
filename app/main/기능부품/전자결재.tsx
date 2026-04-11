@@ -89,6 +89,7 @@ const BUILTIN_FORM_TYPE_DEFINITIONS = [
   { slug: 'official_document_dispatch', name: '공문발송' },
   { slug: 'generic', name: '양식신청' },
   { slug: 'attendance_fix', name: '출결정정' },
+  { slug: 'leave_promotion_notice', name: '연차촉진통보서' },
 ] as const;
 const SYSTEM_FORM_TYPE_SLUGS = new Set([...BUILTIN_FORM_TYPE_DEFINITIONS.map((item) => item.slug), 'personnel_order']);
 const DEFAULT_APPROVAL_TEMPLATE_DESIGN = {
@@ -4064,7 +4065,7 @@ window.onload = () => window.print();
                     </>
                   )}
                   {formType === '공문발송' && (
-                    <div className="rounded-[var(--radius-md)] border border-sky-200 bg-sky-50 px-4 py-3 text-[12px] font-semibold text-sky-700">
+                    <div className="rounded-[var(--radius-md)] border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-[12px] font-semibold text-sky-700 dark:text-sky-300">
                       공문 양식 입력값이 결재 제목과 본문에 자동 반영됩니다. 승인 후 발송대장으로 자동 이관됩니다.
                     </div>
                   )}
@@ -4359,7 +4360,7 @@ window.onload = () => window.print();
                             <span className={`px-1.5 py-[2px] rounded-md text-[10px] font-semibold ${itemStatus === '승인' ? 'bg-green-500/20 text-green-600' : itemStatus === '반려' ? 'bg-red-500/20 text-red-600' : 'bg-orange-500/20 text-orange-500'}`}>{itemStatus}</span>
                             <span className="px-1.5 py-[2px] bg-[var(--toss-blue-light)] rounded-md text-[10px] font-semibold text-[var(--accent)]">{itemSenderCompany}</span>
                             {isApprovalEditLockedItem(item) && (
-                              <span className="px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600">
+                              <span className="px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-[var(--muted)] text-[var(--toss-gray-4)]">
                                 수정 잠금
                               </span>
                             )}
@@ -4418,7 +4419,7 @@ window.onload = () => window.print();
                             </span>
                           )}
                           {(lockSnapshot.revision ?? 1) > 1 && (
-                            <span className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-[2px] text-slate-600">
+                            <span className="inline-flex items-center rounded-md bg-[var(--muted)] px-1.5 py-[2px] text-[var(--toss-gray-4)]">
                               Rev.{lockSnapshot.revision}
                             </span>
                           )}
@@ -4539,7 +4540,7 @@ window.onload = () => window.print();
                     {detailCcUsers.map((ccUser) => (
                       <span
                         key={ccUser.id}
-                        className="inline-flex items-center rounded-[var(--radius-md)] border border-yellow-500/20 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-yellow-800"
+                        className="inline-flex items-center rounded-[var(--radius-md)] border border-yellow-500/20 bg-[var(--card)] px-1.5 py-0.5 text-[10px] font-semibold text-yellow-800 dark:text-yellow-300"
                       >
                         {ccUser.name}{ccUser.position ? ` ${ccUser.position}` : ''}
                       </span>
@@ -4549,8 +4550,8 @@ window.onload = () => window.print();
                 {(detailLocked || detailHistory.length > 0 || detailDelegateSnapshot.delegatedToName || detailDelaySnapshot.overdue || detailDelaySnapshot.notificationCount > 0 || detailLockSnapshot.lockedAt) && (
                   <div className="mb-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/60 px-2.5 py-2 space-y-1.5">
                     {detailLocked && (
-                      <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-600">
-                        <span className="rounded bg-slate-200 px-1.5 py-0.5">수정 잠금</span>
+                      <div className="flex items-center gap-1.5 text-[10px] font-semibold text-[var(--toss-gray-4)]">
+                        <span className="rounded bg-[var(--muted)] px-1.5 py-0.5">수정 잠금</span>
                         <span className="text-[var(--toss-gray-3)]">최종 처리된 문서</span>
                       </div>
                     )}
@@ -4632,14 +4633,14 @@ window.onload = () => window.print();
               )}
               <div className="border-t border-slate-200/80 bg-white/92 px-4 py-3 md:px-6 md:py-4 safe-area-pb">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <p className="text-[11px] font-medium text-slate-500">
+                  <p className="text-[11px] font-medium text-[var(--toss-gray-3)]">
                     상세 미리보기는 출력용 문서 형식입니다. 필요할 때만 문서출력을 눌러 주세요.
                   </p>
                   <div className="flex flex-col-reverse gap-2 sm:flex-row">
                     <button
                       type="button"
                       onClick={() => setSelectedApprovalId(null)}
-                      className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-500 transition-colors hover:bg-slate-50"
+                      className="rounded-[16px] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-bold text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--muted)]"
                     >
                       닫기
                     </button>

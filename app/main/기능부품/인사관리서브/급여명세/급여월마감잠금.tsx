@@ -303,7 +303,7 @@ export default function PayrollLockPanel({
                 value={reviewComment}
                 onChange={(event) => setReviewComment(event.target.value)}
                 rows={3}
-                className="w-full rounded-[var(--radius-md)] border border-amber-200 bg-white px-3 py-2 text-sm outline-none"
+                className="w-full rounded-[var(--radius-md)] border border-amber-500/20 bg-[var(--card)] px-3 py-2 text-sm outline-none"
                 placeholder="승인 또는 반려 메모를 적어 주세요."
               />
               <div className="mt-3 flex flex-wrap justify-end gap-2">

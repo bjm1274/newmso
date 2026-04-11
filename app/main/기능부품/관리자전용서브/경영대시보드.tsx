@@ -113,7 +113,7 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
                       {val}%
                     </div>
                     <div className="w-full flex-1 flex flex-col justify-end min-h-[50px]">
-                      <div className={`w-full rounded-t-md transition-all duration-500 hover:opacity-80 ${val >= 4.0 ? 'bg-danger' : val >= 3.0 ? 'bg-orange-400' : 'bg-slate-300'}`} style={{ height: `${(val / 5) * 100}%` }}></div>
+                      <div className={`w-full rounded-t-md transition-all duration-500 hover:opacity-80 ${val >= 4.0 ? 'bg-danger' : val >= 3.0 ? 'bg-orange-400' : 'bg-[var(--border)]'}`} style={{ height: `${(val / 5) * 100}%` }}></div>
                     </div>
                     <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">{i + 1}월</span>
                   </div>

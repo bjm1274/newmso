@@ -272,7 +272,7 @@ export default function PopupManager() {
           <button
             onClick={handleAddPopup}
             disabled={saving}
-            className="w-full py-2.5 bg-gray-900 text-white text-[11px] font-semibold shadow-sm uppercase tracking-widest disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full py-2.5 bg-[var(--foreground)] text-[var(--card)] text-[11px] font-semibold shadow-sm uppercase tracking-widest disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {saving ? '업로드 중...' : '팝업 즉시 생성'}
           </button>

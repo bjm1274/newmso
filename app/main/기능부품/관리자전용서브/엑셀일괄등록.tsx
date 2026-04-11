@@ -871,7 +871,7 @@ export default function ExcelBulkUpload({ onRefresh }: ExcelBulkUploadProps) {
                   setCompanyManuallySelected(true);
                   setDefaultCompany(event.target.value);
                 }}
-                className="rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-2 py-2 text-sm"
+                className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-2 text-sm"
               >
                 {mergedCompanyOptions.length === 0 && <option value="SY INC.">SY INC.</option>}
                 {mergedCompanyOptions.map((companyName) => (
@@ -888,7 +888,7 @@ export default function ExcelBulkUpload({ onRefresh }: ExcelBulkUploadProps) {
                 data-testid="inventory-ecount-department-select"
                 value={defaultDepartment}
                 onChange={(event) => setDefaultDepartment(event.target.value)}
-                className="rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-2 py-2 text-sm"
+                className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-2 text-sm"
               >
                 <option value="">미지정</option>
                 {departmentOptions.map((departmentName) => (
@@ -900,7 +900,7 @@ export default function ExcelBulkUpload({ onRefresh }: ExcelBulkUploadProps) {
             </label>
           </div>
 
-          <div className="rounded-[var(--radius-md)] bg-white/70 px-3 py-2 text-[11px] text-teal-900">
+          <div className="rounded-[var(--radius-md)] bg-[var(--card)]/70 px-3 py-2 text-[11px] text-teal-900">
             <strong>자동 매핑 기준:</strong> 품목명, 품목코드, 자사품목코드, 규격, 단위, 공급처, 요양급여코드,
             UDI, 허가번호를 최대한 보존해서 `inventory`에 등록합니다. 수량/현재고는 품목등록표에 없어서
             `0`으로 넣습니다.

@@ -480,10 +480,10 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                 <div>
                     <h2 className="text-xl font-bold text-[var(--foreground)] flex items-center gap-2"><span>🏥</span> 퇴원심사</h2>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     {(['reviews', 'new', 'template'] as Tab[]).map(t => (
                         <button key={t} data-testid={`discharge-tab-${t}`} onClick={() => { setTab(t); if (t !== 'reviews') setSelectedReview(null); setCompareResult(null); }}
-                            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${tab === t ? 'bg-gray-900 text-white shadow-sm' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)]'}`}>
+                            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${tab === t ? 'bg-[var(--foreground)] text-[var(--card)] shadow-sm' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)]'}`}>
                             {t === 'reviews' ? '📋 심사 목록' : t === 'new' ? '➕ 새 심사' : '⚙️ 기본 항목 설정'}
                         </button>
                     ))}
@@ -764,7 +764,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                         <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm space-y-4">
                             <div className="flex justify-between items-center">
                                 <h3 className="text-sm font-bold text-[var(--foreground)]">📋 항목 템플릿 목록 ({templates.length}개)</h3>
-                                <button data-testid="discharge-template-new" onClick={startNewTemplate} className="px-4 py-2 text-xs font-bold text-white bg-gray-900 rounded-xl hover:bg-black transition-all">➕ 새 템플릿 추가</button>
+                                <button data-testid="discharge-template-new" onClick={startNewTemplate} className="px-4 py-2 text-xs font-bold text-[var(--card)] bg-[var(--foreground)] rounded-xl hover:opacity-90 transition-all">➕ 새 템플릿 추가</button>
                             </div>
                             <p className="text-xs text-[var(--toss-gray-3)] font-medium">진단명/입원사유별로 기본 항목 템플릿을 만들어 두면, 심사 시 드롭다운으로 선택할 수 있습니다.</p>
 
@@ -1019,7 +1019,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                             )}
 
                             <button data-testid="discharge-create-review" onClick={createReview} disabled={parsedNewChart.length === 0}
-                                className="w-full py-4 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-black transition-all active:scale-[0.99] disabled:opacity-40">
+                                className="w-full py-4 bg-[var(--foreground)] text-[var(--card)] text-sm font-bold rounded-xl hover:opacity-90 transition-all active:scale-[0.99] disabled:opacity-40">
                                 퇴원심사 생성하기 ({parsedNewChart.length}개 항목) {selectedTemplate ? `→ "${selectedTemplate.title}" 자동 비교` : ''}
                             </button>
                         </div>
@@ -1035,7 +1035,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                             <div className="text-center py-20 space-y-4">
                                 <div className="text-6xl opacity-30">🏥</div>
                                 <h4 className="text-lg font-bold text-[var(--foreground)]">등록된 퇴원심사가 없습니다</h4>
-                                <button onClick={() => setTab('new')} className="px-4 py-3 bg-gray-900 text-white text-xs font-bold rounded-xl">➕ 새 심사 등록</button>
+                                <button onClick={() => setTab('new')} className="px-4 py-3 bg-[var(--foreground)] text-[var(--card)] text-xs font-bold rounded-xl">➕ 새 심사 등록</button>
                             </div>
                         ) : reviews.map(r => (
                             <button key={r.id} data-testid={`discharge-review-card-${r.id}`} onClick={() => { setSelectedReview(r); setAiResult(r.ai_analysis || ''); setCompareResult(null); }}
@@ -1332,7 +1332,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                         <div className="border border-red-500/20 rounded-xl p-4 space-y-2">
                                             <h4 className="text-xs font-bold text-red-600">❌ 누락 항목 (기본값에 있지만 차트에 없음)</h4>
                                             <div className="space-y-1 max-h-[200px] overflow-y-auto custom-scrollbar">
-                                                {compareResult.missing.map((item, idx) => <div key={idx} className="text-xs text-red-700 bg-red-500/10 p-2 rounded-lg font-medium">{item}</div>)}
+                                                {compareResult.missing.map((item) => <div key={item} className="text-xs text-red-700 bg-red-500/10 p-2 rounded-lg font-medium">{item}</div>)}
                                             </div>
                                         </div>
                                     )}
@@ -1340,7 +1340,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                         <div className="border border-yellow-500/20 rounded-xl p-4 space-y-2">
                                             <h4 className="text-xs font-bold text-yellow-600">🆕 추가 항목 (차트에 있지만 기본값에 없음)</h4>
                                             <div className="space-y-1 max-h-[200px] overflow-y-auto custom-scrollbar">
-                                                {compareResult.extra.map((item, idx) => <div key={idx} className="text-xs text-yellow-700 bg-yellow-500/10 p-2 rounded-lg font-medium">{item}</div>)}
+                                                {compareResult.extra.map((item) => <div key={item} className="text-xs text-yellow-700 bg-yellow-500/10 p-2 rounded-lg font-medium">{item}</div>)}
                                             </div>
                                         </div>
                                     )}

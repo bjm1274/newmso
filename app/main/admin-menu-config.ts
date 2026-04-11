@@ -5,7 +5,8 @@ export type AdminAnalysisTabId =
   | '재무대시보드'
   | '예산관리'
   | '통합보고서'
-  | '법인손익';
+  | '법인손익'
+  | '커스텀대시보드';
 
 export type AdminOperationsTabId = '알림자동화' | '수술검사템플릿' | '팝업관리';
 
@@ -50,6 +51,7 @@ export const ADMIN_ANALYSIS_TABS: { id: AdminAnalysisTabId; label: string; icon:
   { id: '예산관리', label: '예산관리', icon: '🧮' },
   { id: '통합보고서', label: '통합보고서', icon: '🧾' },
   { id: '법인손익', label: '법인손익', icon: '📈' },
+  { id: '커스텀대시보드', label: '커스텀 대시보드', icon: '🎛️' },
 ];
 
 export const ADMIN_OPERATIONS_TABS: { id: AdminOperationsTabId; label: string; icon: string }[] = [

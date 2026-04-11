@@ -268,7 +268,7 @@ export function MessengerDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-[var(--radius-md)] p-2 text-[var(--toss-gray-3)] hover:text-black dark:hover:text-white"
+            className="rounded-[var(--radius-md)] p-2 text-[var(--toss-gray-3)] hover:text-[var(--foreground)]"
           >
             닫기
           </button>
@@ -804,7 +804,7 @@ export function MessengerDrawer({
                         onClick={() => {
                           void onRemoveRoomMember(memberId);
                         }}
-                        className="touch-manipulation min-h-[36px] rounded-md px-2 py-1 text-[10px] font-bold text-red-500 opacity-0 transition-all hover:bg-red-500/10 active:bg-red-500/10 group-hover:opacity-100 [@media(hover:none)]:opacity-100 dark:hover:bg-red-900/20"
+                        className="touch-manipulation min-h-[44px] rounded-md px-2 py-2 text-[10px] font-bold text-red-500 opacity-0 transition-all hover:bg-red-500/10 active:bg-red-500/10 group-hover:opacity-100 [@media(hover:none)]:opacity-100 dark:hover:bg-red-900/20"
                       >
                         내보내기
                       </button>
