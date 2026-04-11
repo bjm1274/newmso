@@ -1,7 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { StaffMember } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
 import {
@@ -4807,7 +4807,7 @@ export default function AutoRosterPlanner({
     });
   };
 
-  const removePreferredOffDate = (staffId: string, date: string) => {
+  const removePreferredOffDate = useCallback((staffId: string, date: string) => {
     setPreferredOffSelections((prev) => {
       const nextDates = (prev[staffId] || []).filter((item) => item !== date);
       if (nextDates.length === 0) {
@@ -4820,14 +4820,14 @@ export default function AutoRosterPlanner({
         [staffId]: nextDates,
       };
     });
-  };
+  }, []);
 
-  const clearPreferredOffForStaff = (staffId: string) => {
+  const clearPreferredOffForStaff = useCallback((staffId: string) => {
     setPreferredOffSelections((prev) => {
       const { [staffId]: _removed, ...rest } = prev;
       return rest;
     });
-  };
+  }, []);
 
   const clearAllPreferredOff = () => {
     setPreferredOffSelections({});
@@ -5903,7 +5903,7 @@ export default function AutoRosterPlanner({
     staffPlanningMeta,
   ]);
 
-  const handleManualCellClick = ({
+  const handleManualCellClick = useCallback(({
     staffId,
     date,
   }: {
@@ -5914,9 +5914,9 @@ export default function AutoRosterPlanner({
   }) => {
     if (!manualEditMode) return;
     setSelectedManualCell({ staffId, date });
-  };
+  }, [manualEditMode]);
 
-  const handleManualImpactSelect = (shiftId: string) => {
+  const handleManualImpactSelect = useCallback((shiftId: string) => {
     if (!selectedManualCellDetails) return;
 
     setManualAssignment({
@@ -5926,7 +5926,7 @@ export default function AutoRosterPlanner({
       baseShiftId: selectedManualCellDetails.cell.baseShiftId,
     });
     setSelectedManualCell(null);
-  };
+  }, [selectedManualCellDetails]);
 
   const handlePartialRegeneration = async () => {
     const startIndex = monthDates.indexOf(partialRegenerationStartDate);
@@ -6342,7 +6342,7 @@ export default function AutoRosterPlanner({
     );
   };
 
-  const jumpToRosterWarningTarget = (targetTestId: string) => {
+  const jumpToRosterWarningTarget = useCallback((targetTestId: string) => {
     if (typeof document === 'undefined') return;
     const target = document.querySelector<HTMLElement>(`[data-testid="${targetTestId}"]`);
     if (!target) return;
@@ -6352,7 +6352,7 @@ export default function AutoRosterPlanner({
     window.setTimeout(() => {
       setHighlightedRosterTarget((prev) => (prev === targetTestId ? '' : prev));
     }, 2200);
-  };
+  }, []);
 
   const renderRosterWarningReport = () => {
     if (previewRows.length === 0) return null;
@@ -6577,7 +6577,7 @@ export default function AutoRosterPlanner({
     setWizardRuleDraft((prev) => applyGenerationRuleDraftFieldUpdate(prev, field, value));
   };
 
-  const applyWizardNightBlockPreset = (
+  const applyWizardNightBlockPreset = useCallback((
     preset: (typeof WIZARD_NIGHT_BLOCK_PRESET_OPTIONS)[number]
   ) => {
     setWizardRuleDraft((prev) => ({
@@ -6585,7 +6585,7 @@ export default function AutoRosterPlanner({
       nightBlockSize: preset.nightBlockSize,
       offDaysAfterNight: preset.offDaysAfterNight,
     }));
-  };
+  }, []);
 
   const addWizardDateCoverageOverride = () => {
     setWizardRuleDraft((prev) => ({
@@ -6603,7 +6603,7 @@ export default function AutoRosterPlanner({
     }));
   };
 
-  const updateWizardDateCoverageOverride = (
+  const updateWizardDateCoverageOverride = useCallback((
     overrideId: string,
     field: 'date' | 'minDayStaff' | 'minEveningStaff' | 'minNightStaff',
     value: string | number
@@ -6624,14 +6624,14 @@ export default function AutoRosterPlanner({
         };
       }),
     }));
-  };
+  }, []);
 
-  const removeWizardDateCoverageOverride = (overrideId: string) => {
+  const removeWizardDateCoverageOverride = useCallback((overrideId: string) => {
     setWizardRuleDraft((prev) => ({
       ...prev,
       dateCoverageOverrides: (prev.dateCoverageOverrides || []).filter((entry) => entry.id !== overrideId),
     }));
-  };
+  }, []);
 
   const addWizardRoleCoverageRule = () => {
     setWizardRuleDraft((prev) => {
@@ -6653,7 +6653,7 @@ export default function AutoRosterPlanner({
     });
   };
 
-  const updateWizardRoleCoverageRule = (
+  const updateWizardRoleCoverageRule = useCallback((
     ruleId: string,
     field: 'label' | 'keywords' | 'minDayStaff' | 'minEveningStaff' | 'minNightStaff',
     value: string | number
@@ -6680,16 +6680,16 @@ export default function AutoRosterPlanner({
         };
       }),
     }));
-  };
+  }, []);
 
-  const removeWizardRoleCoverageRule = (ruleId: string) => {
+  const removeWizardRoleCoverageRule = useCallback((ruleId: string) => {
     setWizardRuleDraft((prev) => ({
       ...prev,
       roleCoverageRules: prev.roleCoverageRules.filter((rule) => rule.id !== ruleId),
     }));
-  };
+  }, []);
 
-  const updatePatternGroup = (
+  const updatePatternGroup = useCallback((
     groupId: string,
     patch: Partial<RosterPatternStaffGroup> & { matchKeywordsText?: string }
   ) => {
@@ -6711,9 +6711,9 @@ export default function AutoRosterPlanner({
         };
       }),
     }));
-  };
+  }, []);
 
-  const togglePatternGroupShift = (groupId: string, shiftId: string) => {
+  const togglePatternGroupShift = useCallback((groupId: string, shiftId: string) => {
     setPatternDraft((prev) => ({
       ...prev,
       staffGroups: prev.staffGroups.map((group) => {
@@ -6727,7 +6727,7 @@ export default function AutoRosterPlanner({
         };
       }),
     }));
-  };
+  }, []);
 
   const addPatternGroup = () => {
     setPatternDraft((prev) => ({
@@ -6746,14 +6746,14 @@ export default function AutoRosterPlanner({
     }));
   };
 
-  const removePatternGroup = (groupId: string) => {
+  const removePatternGroup = useCallback((groupId: string) => {
     setPatternDraft((prev) => ({
       ...prev,
       staffGroups: prev.staffGroups.filter((group) => group.id !== groupId),
     }));
-  };
+  }, []);
 
-  const editPatternProfile = (profile: RosterPatternProfile) => {
+  const editPatternProfile = useCallback((profile: RosterPatternProfile) => {
     setPatternDraft({
       ...profile,
       teamKeywords: [...profile.teamKeywords],
@@ -6763,7 +6763,7 @@ export default function AutoRosterPlanner({
         shiftIds: [...group.shiftIds],
       })),
     });
-  };
+  }, []);
 
   const savePatternProfile = () => {
     if (!canManageRosterPolicies) {
@@ -6832,12 +6832,12 @@ export default function AutoRosterPlanner({
     });
   };
 
-  const editGenerationRule = (rule: RosterGenerationRule) => {
+  const editGenerationRule = useCallback((rule: RosterGenerationRule) => {
     setGenerationRuleDraft({
       ...rule,
       teamKeywords: [...rule.teamKeywords],
     });
-  };
+  }, []);
 
   const saveGenerationRule = () => {
     if (!canManageRosterPolicies) {
@@ -7618,7 +7618,7 @@ export default function AutoRosterPlanner({
     }
   };
 
-  const updateConfig = (staff: StaffMember, index: number, patch: Partial<StaffConfig>) => {
+  const updateConfig = useCallback((staff: StaffMember, index: number, patch: Partial<StaffConfig>) => {
     setStaffConfigs((prev) => {
       const current =
         prev[staff.id] ||
@@ -7682,7 +7682,7 @@ export default function AutoRosterPlanner({
         },
       };
     });
-  };
+  }, [defaultShiftOrder, defaultShiftPool, monthDates.length, workingShifts]);
 
   const currentPlannerShifts = useMemo(
     () =>
@@ -7715,25 +7715,25 @@ export default function AutoRosterPlanner({
     [plannerPrimaryShiftId, plannerSecondaryShiftId, plannerTertiaryShiftId]
   );
 
-  const appendPlannerCustomPatternStep = (token: string) => {
+  const appendPlannerCustomPatternStep = useCallback((token: string) => {
     setPlannerCustomPatternSequence((prev) => [...prev, token]);
-  };
+  }, []);
 
-  const removePlannerCustomPatternStep = (index: number) => {
+  const removePlannerCustomPatternStep = useCallback((index: number) => {
     setPlannerCustomPatternSequence((prev) => prev.filter((_, stepIndex) => stepIndex !== index));
-  };
+  }, []);
 
-  const clearPlannerCustomPatternSequence = () => {
+  const clearPlannerCustomPatternSequence = useCallback(() => {
     setPlannerCustomPatternSequence([]);
-  };
+  }, []);
 
-  const setPlannerWeeklyTemplateWeekCount = (count: number) => {
+  const setPlannerWeeklyTemplateWeekCount = useCallback((count: number) => {
     setPlannerWeeklyTemplateWeeks((prev) =>
       normalizeWeeklyTemplateWeeks(prev, availablePlannerShiftIds, count)
     );
-  };
+  }, [availablePlannerShiftIds]);
 
-  const updatePlannerWeeklyTemplateWeek = (
+  const updatePlannerWeeklyTemplateWeek = useCallback((
     weekIndex: number,
     patch: Partial<WeeklyTemplateWeek>
   ) => {
@@ -7756,9 +7756,9 @@ export default function AutoRosterPlanner({
       };
       return normalizeWeeklyTemplateWeeks(next, availablePlannerShiftIds, next.length);
     });
-  };
+  }, [availablePlannerShiftIds]);
 
-  const togglePlannerWeeklyTemplateWeekday = (weekIndex: number, weekday: number) => {
+  const togglePlannerWeeklyTemplateWeekday = useCallback((weekIndex: number, weekday: number) => {
     const currentWeek = effectivePlannerWeeklyTemplateWeeks[weekIndex];
     const nextWeekdays = currentWeek?.activeWeekdays.includes(weekday)
       ? currentWeek.activeWeekdays.filter((value) => value !== weekday)
@@ -7766,22 +7766,22 @@ export default function AutoRosterPlanner({
     updatePlannerWeeklyTemplateWeek(weekIndex, {
       activeWeekdays: nextWeekdays,
     });
-  };
+  }, [effectivePlannerWeeklyTemplateWeeks, updatePlannerWeeklyTemplateWeek]);
 
-  const applyPlannerWeeklyTemplateWeekdays = (weekIndex: number, weekdays: number[]) => {
+  const applyPlannerWeeklyTemplateWeekdays = useCallback((weekIndex: number, weekdays: number[]) => {
     updatePlannerWeeklyTemplateWeek(weekIndex, {
       activeWeekdays: weekdays,
     });
-  };
+  }, [updatePlannerWeeklyTemplateWeek]);
 
-  const resetWizardRuleSelection = () => {
+  const resetWizardRuleSelection = useCallback(() => {
     setWizardPattern('');
     setWizardShiftIds([]);
     setWizardStartOffset(0);
     setWizardNightShiftCount(0);
     setWizardCustomPatternSequence([]);
     setWizardWeeklyTemplateWeeks([]);
-  };
+  }, []);
 
   const openWizard = () => {
     const nextPattern = effectivePlannerPattern || '상근';
@@ -7862,7 +7862,7 @@ export default function AutoRosterPlanner({
     setWizardOffOverrides({});
   };
 
-  const toggleIncludedDepartment = (department: string) => {
+  const toggleIncludedDepartment = useCallback((department: string) => {
     const normalizedDepartment = String(department || '').trim();
     if (!normalizedDepartment || normalizedDepartment === selectedDepartment) return;
     setIncludedDepartments((prev) =>
@@ -7870,7 +7870,7 @@ export default function AutoRosterPlanner({
         ? prev.filter((entry) => entry !== normalizedDepartment)
         : [...prev, normalizedDepartment]
     );
-  };
+  }, [selectedDepartment]);
 
   const renderRosterScopeSummary = () => {
     if (!selectedDepartment) return null;
@@ -7935,14 +7935,14 @@ export default function AutoRosterPlanner({
     );
   };
 
-  const toggleWizardStaff = (staffId: string) => {
+  const toggleWizardStaff = useCallback((staffId: string) => {
     setWizardSelectedStaffIds((prev) => {
       const next = prev.includes(staffId)
         ? prev.filter((value) => value !== staffId)
         : [...prev, staffId];
       return orderedTargetStaffIds.filter((candidateId) => next.includes(candidateId));
     });
-  };
+  }, [orderedTargetStaffIds]);
   const includeAllWizardStaff = () => {
     setWizardSelectedStaffIds(orderedTargetStaffIds);
   };
@@ -8065,13 +8065,13 @@ export default function AutoRosterPlanner({
     setWizardSelectedPresetId(normalizedPreset.id);
   };
 
-  const deleteWizardPreset = (presetId: string) => {
+  const deleteWizardPreset = useCallback((presetId: string) => {
     setSavedWizardPresets((prev) => prev.filter((preset) => preset.id !== presetId));
     if (wizardSelectedPresetId === presetId) {
       setWizardSelectedPresetId('');
       resetWizardRuleSelection();
     }
-  };
+  }, [wizardSelectedPresetId, resetWizardRuleSelection]);
 
   const savePlannerPreset = () => {
     if (!canManageRosterPolicies) {
@@ -8224,7 +8224,7 @@ export default function AutoRosterPlanner({
     toast(`"${nextName}" 자동생성 형식을 저장했습니다.`, 'success');
   };
 
-  const applyPlannerPreset = (preset: RosterWizardPreset) => {
+  const applyPlannerPreset = useCallback((preset: RosterWizardPreset) => {
     const normalizedPreset = normalizePresetRecord(preset);
     if (!normalizedPreset) return;
 
@@ -8410,9 +8410,9 @@ export default function AutoRosterPlanner({
       }));
     }
     setPlannerPairRules(normalizedPreset.pairRules || []);
-  };
+  }, [plannerShiftIds, defaultShiftOrder, defaultShiftPool, monthDates.length, targetStaffs, toast]);
 
-  const updateWizardOffOverride = (staffId: string, patch: Partial<WizardOffOverride>) => {
+  const updateWizardOffOverride = useCallback((staffId: string, patch: Partial<WizardOffOverride>) => {
     setWizardOffOverrides((prev) => {
       const current = prev[staffId] || {
         enabled: false,
@@ -8428,9 +8428,9 @@ export default function AutoRosterPlanner({
         },
       };
     });
-  };
+  }, [wizardOverrideDateOptions, wizardOverrideShiftOptions]);
 
-  const updateWizardNightRangeDraft = (
+  const updateWizardNightRangeDraft = useCallback((
     staffId: string,
     field: keyof WizardNightRangeDraft,
     value: string
@@ -8455,30 +8455,30 @@ export default function AutoRosterPlanner({
         [staffId]: next,
       };
     });
-  };
+  }, [monthDates.length]);
 
-  const updateWizardBlockPreferenceDraft = (staffId: string, value: string) => {
+  const updateWizardBlockPreferenceDraft = useCallback((staffId: string, value: string) => {
     setWizardBlockPreferenceDrafts((prev) => ({
       ...prev,
       [staffId]: normalizeStaffBlockPreference(value),
     }));
-  };
+  }, []);
 
-  const updateWizardDedicatedBandDraft = (staffId: string, value: string) => {
+  const updateWizardDedicatedBandDraft = useCallback((staffId: string, value: string) => {
     setWizardDedicatedBandDrafts((prev) => ({
       ...prev,
       [staffId]: value === 'day' || value === 'evening' || value === 'night' ? value : '',
     }));
-  };
+  }, []);
 
-  const updateWizardCoverageRoleDraft = (staffId: string, value: string) => {
+  const updateWizardCoverageRoleDraft = useCallback((staffId: string, value: string) => {
     setWizardCoverageRoleDrafts((prev) => ({
       ...prev,
       [staffId]: normalizeCoverageRoleTags(value.split(',')),
     }));
-  };
+  }, []);
 
-  const updateWizardStaffRestrictionDraft = (
+  const updateWizardStaffRestrictionDraft = useCallback((
     staffId: string,
     field: keyof StaffRestrictionDraft,
     value: string | boolean | CoverageBand[] | number[]
@@ -8499,7 +8499,7 @@ export default function AutoRosterPlanner({
         },
       };
     });
-  };
+  }, []);
 
   const addWizardPairRule = () => {
     const primaryStaffId = wizardSelectedStaffIds[0] || '';
@@ -8517,7 +8517,7 @@ export default function AutoRosterPlanner({
     ]);
   };
 
-  const updateWizardPairRule = (
+  const updateWizardPairRule = useCallback((
     ruleId: string,
     field: keyof Omit<WizardPairRule, 'id'>,
     value: string
@@ -8533,11 +8533,11 @@ export default function AutoRosterPlanner({
         } as WizardPairRule;
       })
     );
-  };
+  }, []);
 
-  const removeWizardPairRule = (ruleId: string) => {
+  const removeWizardPairRule = useCallback((ruleId: string) => {
     setWizardPairRules((prev) => prev.filter((rule) => rule.id !== ruleId));
-  };
+  }, []);
 
   const getWizardRuleValidationError = () => {
     if (!wizardSelectedPresetId) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useLayoutEffect } from 'react';
+import { useLayoutEffect, memo } from 'react';
 import type { MutableRefObject, ReactNode, RefObject } from 'react';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import type { ChatMessage, StaffMember } from '@/types';
@@ -81,7 +81,7 @@ type MessengerTimelineProps = {
   onScrollToBottom: (behavior?: ScrollBehavior) => void;
 };
 
-export function MessengerTimeline({
+function _MessengerTimeline({
   selectedRoomId,
   messages,
   combinedTimeline,
@@ -696,3 +696,5 @@ export function MessengerTimeline({
     </>
   );
 }
+
+export const MessengerTimeline = memo(_MessengerTimeline);

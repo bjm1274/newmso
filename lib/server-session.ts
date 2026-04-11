@@ -188,6 +188,8 @@ export function normalizeSessionUser(input: any): SessionUser {
   };
 }
 
+const STAFF_SESSION_COLUMNS = 'id, employee_no, name, role, department, company, company_id, position, photo_url, avatar_url, profile_photo_path, profile_photo_updated_at, email, phone, auth_user_id, is_system_master, permissions';
+
 export async function resolveLatestSessionUser(sessionUser: any): Promise<SessionUser> {
   const supabase = getAdminClient();
   const normalizedUser = normalizeSessionUser(sessionUser);
@@ -195,41 +197,31 @@ export async function resolveLatestSessionUser(sessionUser: any): Promise<Sessio
   const sessionEmployeeNo = String(normalizedUser?.employee_no ?? '').trim();
   const sessionName = String(normalizedUser?.name ?? '').trim();
 
-  if (sessionUserId) {
-    const { data, error } = await supabase
-      .from('staff_members')
-      .select('*')
-      .eq('id', sessionUserId)
-      .maybeSingle();
+  // 단일 OR 쿼리로 N+1 제거 — id/employee_no/name 중 하나로 매칭
+  const orConditions: string[] = [];
+  if (sessionUserId) orConditions.push(`id.eq.${sessionUserId}`);
+  if (sessionEmployeeNo) orConditions.push(`employee_no.eq.${sessionEmployeeNo}`);
+  if (sessionName) orConditions.push(`name.eq.${sessionName}`);
 
-    if (!error && data) {
-      return normalizeSessionUser({ ...normalizedUser, ...data });
-    }
-  }
+  if (orConditions.length === 0) return normalizedUser;
 
-  if (sessionEmployeeNo) {
-    const { data, error } = await supabase
-      .from('staff_members')
-      .select('*')
-      .eq('employee_no', sessionEmployeeNo)
-      .maybeSingle();
+  const { data, error } = await supabase
+    .from('staff_members')
+    .select(STAFF_SESSION_COLUMNS)
+    .or(orConditions.join(','))
+    .limit(10);
 
-    if (!error && data) {
-      return normalizeSessionUser({ ...normalizedUser, ...data });
-    }
-  }
+  if (error || !data || data.length === 0) return normalizedUser;
 
-  if (sessionName) {
-    const { data, error } = await supabase
-      .from('staff_members')
-      .select('*')
-      .eq('name', sessionName)
-      .limit(2);
+  // 우선순위: id > employee_no > name (단일 매칭만)
+  const byId = sessionUserId ? data.find((r: any) => String(r.id) === sessionUserId) : null;
+  if (byId) return normalizeSessionUser({ ...normalizedUser, ...byId });
 
-    if (!error && Array.isArray(data) && data.length === 1) {
-      return normalizeSessionUser({ ...normalizedUser, ...data[0] });
-    }
-  }
+  const byEmpNo = sessionEmployeeNo ? data.find((r: any) => String(r.employee_no) === sessionEmployeeNo) : null;
+  if (byEmpNo) return normalizeSessionUser({ ...normalizedUser, ...byEmpNo });
+
+  const byName = sessionName ? data.filter((r: any) => String(r.name) === sessionName) : [];
+  if (byName.length === 1) return normalizeSessionUser({ ...normalizedUser, ...byName[0] });
 
   return normalizedUser;
 }

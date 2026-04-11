@@ -2,7 +2,8 @@
 import { toast } from '@/lib/toast';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import OperationCheckView from '../OP체크';
+import dynamic from 'next/dynamic';
+const OperationCheckView = dynamic(() => import('../OP체크'), { ssr: false, loading: () => <div className="flex items-center justify-center py-8"><div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" /></div> });
 
 type Template = {
   id: string;

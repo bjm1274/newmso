@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import SignatureCanvas from 'react-signature-canvas';
 import { getOrdinaryWageTable } from '@/lib/ordinary-wage';
-import { jsPDF } from 'jspdf';
+
 import { resolveWeeklyWorkingHours, resolveWorkingDaysPerWeek } from '@/lib/payroll-working-hours';
 
 type Props = {

@@ -1,8 +1,45 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type CSSProperties, type ReactElement } from 'react';
+import { List } from 'react-window';
 import { supabase } from '@/lib/supabase';
 
 const PAGE_SIZE = 100;
+const ROW_HEIGHT = 36; // 각 행의 고정 높이 (px)
+const LIST_HEIGHT = 500; // 가상 스크롤 영역 높이 (px)
+
+// react-window v2: rowProps로 전달할 커스텀 props
+interface AuditRowProps {
+  logs: any[];
+}
+
+// react-window v2 rowComponent — index, style, ariaAttributes는 자동 주입됨
+function AuditRow({ index, style, logs }: {
+  index: number;
+  style: CSSProperties;
+  ariaAttributes: { 'aria-posinset': number; 'aria-setsize': number; role: 'listitem' };
+} & AuditRowProps): ReactElement | null {
+  const l = logs[index];
+  if (!l) return null;
+  return (
+    <div
+      style={style}
+      className="flex items-center text-xs border-b border-[var(--border)] hover:bg-[var(--muted)]"
+    >
+      <div className="w-[30%] px-2 font-mono text-[11px] whitespace-nowrap truncate">
+        {new Date(l.created_at).toLocaleString()}
+      </div>
+      <div className="w-[20%] px-2 font-bold whitespace-nowrap truncate">
+        {l.action}
+      </div>
+      <div className="w-[30%] px-2 text-[var(--toss-gray-3)] truncate">
+        {l.target_type} {l.target_id ? `#${String(l.target_id).slice(0, 8)}` : ''}
+      </div>
+      <div className="w-[20%] px-2 whitespace-nowrap truncate">
+        {l.user_name || '-'}
+      </div>
+    </div>
+  );
+}
 
 export default function AuditLogViewer() {
   const [logs, setLogs] = useState<any[]>([]);
@@ -46,34 +83,29 @@ export default function AuditLogViewer() {
           새로고침
         </button>
       </div>
-      <div className="max-h-[500px] overflow-y-auto">
+      <div>
         {loading && logs.length === 0 ? (
           <div className="p-5 text-center text-[var(--toss-gray-3)]">로딩 중...</div>
         ) : logs.length === 0 ? (
           <div className="p-5 text-center text-[var(--toss-gray-3)]">기록이 없습니다.</div>
         ) : (
-          <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[var(--muted)] text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase sticky top-0">
-              <tr>
-                <th className="p-2">시간</th>
-                <th className="p-2">작업</th>
-                <th className="p-2">대상</th>
-                <th className="p-2">사용자</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border)]">
-              {logs.map((l: any) => (
-                <tr key={l.id} className="hover:bg-[var(--muted)]">
-                  <td className="p-2 font-mono text-[11px] whitespace-nowrap">{new Date(l.created_at).toLocaleString()}</td>
-                  <td className="p-2 font-bold whitespace-nowrap">{l.action}</td>
-                  <td className="p-2 text-[var(--toss-gray-3)] max-w-[200px] truncate">{l.target_type} {l.target_id ? `#${String(l.target_id).slice(0, 8)}` : ''}</td>
-                  <td className="p-2 whitespace-nowrap">{l.user_name || '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
+          <>
+            {/* 테이블 헤더 */}
+            <div className="flex items-center bg-[var(--muted)] text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">
+              <div className="w-[30%] px-2 py-2">시간</div>
+              <div className="w-[20%] px-2 py-2">작업</div>
+              <div className="w-[30%] px-2 py-2">대상</div>
+              <div className="w-[20%] px-2 py-2">사용자</div>
+            </div>
+            {/* react-window v2 가상 스크롤 리스트 */}
+            <List
+              rowComponent={AuditRow}
+              rowCount={logs.length}
+              rowHeight={ROW_HEIGHT}
+              rowProps={{ logs }}
+              style={{ height: LIST_HEIGHT }}
+            />
+          </>
         )}
         {hasMore && logs.length > 0 && (
           <div className="p-3 text-center border-t border-[var(--border)]">

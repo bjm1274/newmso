@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, memo } from 'react';
 
 import { toast } from '@/lib/toast';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
@@ -151,7 +151,7 @@ function DrawerSectionHeader({
   );
 }
 
-export function MessengerDrawer({
+function _MessengerDrawer({
   isOpen,
   roomNotifyOn,
   currentNoticeMessage,
@@ -866,3 +866,5 @@ export function MessengerDrawer({
     </>
   );
 }
+
+export const MessengerDrawer = memo(_MessengerDrawer);

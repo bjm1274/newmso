@@ -75,7 +75,8 @@ export async function GET(request: Request) {
       .from('chat_push_jobs')
       .select(
         'id, created_at, processed_at, processing_started_at, attempt_count, next_attempt_at, dead_lettered_at',
-      );
+      )
+      .limit(5000);
 
     let queueRows = [] as QueueHealthRow[];
     let queueMigrationReady = true;

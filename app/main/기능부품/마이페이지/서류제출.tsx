@@ -2,7 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { jsPDF } from 'jspdf';
+// jsPDF: dynamic import로 전환 (번들 사이즈 최적화)
 
 type ContractRecord = {
     id: string;
@@ -135,6 +135,7 @@ export default function MyDocuments(props: MyDocumentsProps) {
                 finalBlob = blobs[0];
                 fileName = `${user!.id}_${docType}_${Date.now()}.pdf`;
             } else {
+                const { jsPDF } = await import('jspdf');
                 const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
                 const pdfWidth = pdf.internal.pageSize.getWidth();
                 const pdfHeight = pdf.internal.pageSize.getHeight();

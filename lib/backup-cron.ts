@@ -40,12 +40,24 @@ export async function runBackup(type: BackupType): Promise<BackupResult> {
 
   for (const table of tables) {
     try {
-      const { data: rows, error } = await supabase.from(table).select('*');
-      if (error) {
-        console.warn(`[backup] skip ${table}:`, error.message);
-        continue;
+      const allRows: unknown[] = [];
+      const PAGE_SIZE = 1000;
+      let offset = 0;
+      while (true) {
+        const { data: rows, error } = await supabase
+          .from(table)
+          .select('*')
+          .range(offset, offset + PAGE_SIZE - 1);
+        if (error) {
+          console.warn(`[backup] skip ${table}:`, error.message);
+          break;
+        }
+        if (!rows || rows.length === 0) break;
+        allRows.push(...rows);
+        if (rows.length < PAGE_SIZE) break;
+        offset += PAGE_SIZE;
       }
-      data[table] = rows ?? [];
+      data[table] = allRows;
     } catch (e) {
       console.warn(`[backup] skip ${table}:`, e);
     }

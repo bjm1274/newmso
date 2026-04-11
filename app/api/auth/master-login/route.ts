@@ -1,31 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isActiveStaff } from '@/lib/active-staff';
-
-// 아이디별 로그인 실패 횟수 추적 (IP가 아닌 loginId 단위 — 다른 사람에게 영향 없음)
-const loginAttempts = new Map<string, { count: number; resetAt: number }>();
-const MAX_FAILED_ATTEMPTS = 10; // 동일 아이디로 10회 연속 실패 시 차단
-const WINDOW_MS = 15 * 60 * 1000; // 15분
-
-function checkRateLimit(loginId: string): { allowed: boolean } {
-  const now = Date.now();
-  const entry = loginAttempts.get(loginId);
-  if (!entry || now > entry.resetAt) return { allowed: true };
-  return { allowed: entry.count < MAX_FAILED_ATTEMPTS };
-}
-
-function recordFailedAttempt(loginId: string) {
-  const now = Date.now();
-  const entry = loginAttempts.get(loginId);
-  if (!entry || now > entry.resetAt) {
-    loginAttempts.set(loginId, { count: 1, resetAt: now + WINDOW_MS });
-  } else {
-    entry.count++;
-  }
-}
-
-function resetAttempts(loginId: string) {
-  loginAttempts.delete(loginId);
-}
+import { checkRateLimit, recordFailedAttempt, resetAttempts } from '@/lib/rate-limit';
 import { createClient } from '@supabase/supabase-js';
 import { getAdminCredentialConfig, getRuntimeEnv, verifyPrivilegedLogin } from '@/lib/admin-credentials';
 import { createSupabaseAccessToken } from '@/lib/server-supabase-bridge';
@@ -95,7 +70,10 @@ export async function POST(request: NextRequest) {
   }
 
   // 아이디 단위로 차단 (IP 기반 X → 다른 사람에게 영향 없음)
-  if (!checkRateLimit(loginId).allowed) {
+  const MAX_FAILED_ATTEMPTS = 10; // 동일 아이디로 10회 연속 실패 시 차단
+  const WINDOW_MS = 15 * 60 * 1000; // 15분
+  const rateCheck = checkRateLimit(loginId, MAX_FAILED_ATTEMPTS, WINDOW_MS);
+  if (!rateCheck.allowed) {
     return failureResponse('비밀번호를 너무 많이 틀렸습니다. 15분 후 다시 시도해주세요.', 429);
   }
 
@@ -219,7 +197,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      return failureResponse('등록된 사번 또는 이름이 없습니다.');
+      return failureResponse('아이디 또는 비밀번호가 일치하지 않습니다.');
     }
 
     const storedPassword = pickStoredPassword(userRow);
@@ -290,8 +268,8 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        recordFailedAttempt(loginId);
-        return failureResponse('비밀번호가 일치하지 않습니다.');
+        recordFailedAttempt(loginId, WINDOW_MS);
+        return failureResponse('아이디 또는 비밀번호가 일치하지 않습니다.');
       }
 
       if (verified.needsHashUpgrade) {

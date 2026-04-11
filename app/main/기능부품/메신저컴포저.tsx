@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, type ChangeEvent, type ClipboardEvent, type KeyboardEvent, type RefObject } from 'react';
+import { useRef, useState, memo, type ChangeEvent, type ClipboardEvent, type KeyboardEvent, type RefObject } from 'react';
 import type { ChatMessage, StaffMember } from '@/types';
 import { getPendingAttachmentDisplayName } from './메신저첨부';
 import { buildMessengerImageAlt } from './메신저공통';
@@ -40,7 +40,7 @@ type MessengerComposerProps = {
   onSelectMention: (name: string) => void;
 };
 
-export function MessengerComposer({
+function _MessengerComposer({
   replyTo,
   pendingAlbumFiles,
   albumPreviewUrls,
@@ -367,3 +367,5 @@ export function MessengerComposer({
     </div>
   );
 }
+
+export const MessengerComposer = memo(_MessengerComposer);

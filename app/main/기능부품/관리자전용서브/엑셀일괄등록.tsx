@@ -1,7 +1,7 @@
 'use client';
 
 import { type ChangeEvent, useEffect, useRef, useState } from 'react';
-import * as XLSX from 'xlsx';
+// XLSX: dynamic import로 전환 (번들 사이즈 최적화)
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { toast } from '@/lib/toast';
@@ -283,9 +283,9 @@ function detectHeaderRowIndex(sheetRows: unknown[][], mode: UploadMode) {
   return bestScore >= 2 ? bestIndex : 0;
 }
 
-function parseSheetRows(workbook: XLSX.WorkBook, mode: UploadMode): ParsedSheet {
+function parseSheetRows(workbook: any, mode: UploadMode, XLSX: any): ParsedSheet {
   const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-  const matrix = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
+  const matrix: unknown[][] = XLSX.utils.sheet_to_json(worksheet, {
     header: 1,
     defval: '',
     raw: false,
@@ -293,14 +293,14 @@ function parseSheetRows(workbook: XLSX.WorkBook, mode: UploadMode): ParsedSheet 
 
   const detectedCompanyName = detectCompanyName(matrix);
   const headerRowIndex = detectHeaderRowIndex(matrix, mode);
-  const headers = (matrix[headerRowIndex] || []).map((cell, index) => {
+  const headers = (matrix[headerRowIndex] || []).map((cell: unknown, index: number) => {
     const header = normalizeText(cell);
     return header || `__column_${index}`;
   });
 
   const rows = matrix
     .slice(headerRowIndex + 1)
-    .map((values) => {
+    .map((values: unknown[]) => {
       return headers.reduce<ExcelRow>((accumulator, header, index) => {
         accumulator[header] = values[index] ?? '';
         return accumulator;
@@ -610,8 +610,9 @@ export default function ExcelBulkUpload({ onRefresh }: ExcelBulkUploadProps) {
 
     try {
       const data = await file.arrayBuffer();
+      const XLSX = await import('xlsx');
       const workbook = XLSX.read(data, { type: 'array' });
-      const parsedSheet = parseSheetRows(workbook, mode);
+      const parsedSheet = parseSheetRows(workbook, mode, XLSX);
       const effectiveDetectedCompany = resolveKnownCompanyName(parsedSheet.detectedCompanyName, companyOptions);
       const resolvedDefaultCompany =
         resolveKnownCompanyName(defaultCompany, companyOptions) ||
