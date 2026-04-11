@@ -1146,7 +1146,7 @@ function ToastCard({ notif, onClose, onAction }: { notif: ToastItem; onClose: (i
       </div>
       {/* 닫기 */}
       <button type="button" onClick={e => { e.stopPropagation(); onClose(notif.id); }}
-        className="absolute top-2.5 right-2.5 w-5 h-5 flex items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-5)] hover:bg-[var(--tab-bg)] dark:hover:bg-gray-700 transition-all text-xs">✕</button>
+        className="absolute top-2.5 right-2.5 w-5 h-5 flex items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-5)] hover:bg-[var(--muted)] transition-all text-xs">✕</button>
       {/* 7초 진행바 */}
       <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-[var(--tab-bg)] dark:bg-gray-800 rounded-b-2xl overflow-hidden">
         <div className={`h-full animate-progress-7s ${cfg.progress}`} style={{ transformOrigin: 'left center' }} />

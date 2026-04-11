@@ -389,7 +389,7 @@ function getTaskPriorityMeta(priority: GuideTaskPriority) {
     case 'high':
       return { label: '높음', className: 'bg-orange-500/15 text-orange-600' };
     case 'low':
-      return { label: '낮음', className: 'bg-slate-200 text-slate-600' };
+      return { label: '낮음', className: 'bg-[var(--muted)] text-[var(--toss-gray-4)]' };
     default:
       return { label: '보통', className: 'bg-sky-500/15 text-sky-600' };
   }
@@ -1318,7 +1318,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                     setTeamName(event.target.value);
                     setDivisionName(nextTeam?.divisionName || '');
                   }}
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
                 >
                   <option value="">팀 선택</option>
                   {companyTeams.map((team) => (
@@ -1338,7 +1338,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
                   placeholder="예: 수술팀 신규 직원 준비 가이드"
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
                 />
               </label>
 
@@ -1348,7 +1348,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                   value={divisionName}
                   onChange={(event) => setDivisionName(event.target.value)}
                   placeholder="예: 간호부"
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
                 />
               </label>
             </div>
@@ -1360,7 +1360,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                   data-testid="guide-kind-select"
                   value={kind}
                   onChange={(event) => setKind(normalizeGuideKind(event.target.value))}
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
                 >
                   <option value="education">업무자료</option>
                   <option value="handover">업무 인수인계</option>
@@ -1373,7 +1373,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                   data-testid="guide-audience-select"
                   value={audience}
                   onChange={(event) => setAudience(normalizeGuideAudience(event.target.value))}
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
                 >
                   <option value="new_hire">신규직원</option>
                   <option value="current_staff">기존직원</option>
@@ -1389,7 +1389,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                 value={keywordsInput}
                 onChange={(event) => setKeywordsInput(event.target.value)}
                 placeholder="예: 신규교육, 체크리스트, 인계포인트"
-                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
               />
             </label>
 
@@ -1401,7 +1401,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                 onChange={(event) => setDescription(event.target.value)}
                 rows={10}
                 placeholder={'1. 준비 전 확인\n- 환자, 일정, 재고 확인\n\n2. 준비물 세팅\n- 필수 기구와 소모품 준비\n\n3. 진행 순서\n- 실제 업무 순서를 단계별로 작성\n\n4. 주의사항\n- 신규 직원이 헷갈리기 쉬운 포인트 정리'}
-                className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold leading-6 outline-none focus:border-[var(--accent)]"
+                className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold leading-6 outline-none focus:border-[var(--accent)]"
               />
             </label>
 
@@ -1416,7 +1416,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                   setPendingFiles((prev) => [...prev, ...files].slice(0, 10));
                   event.currentTarget.value = '';
                 }}
-                className="block w-full rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold"
+                className="block w-full rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold"
               />
             </label>
 
@@ -1430,7 +1430,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                         key={`${attachment.url}-${index}`}
                         type="button"
                         onClick={() => setExistingAttachments((prev) => prev.filter((_, currentIndex) => currentIndex !== index))}
-                        className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-[var(--foreground)]"
+                        className="rounded-full bg-[var(--card)] px-3 py-1.5 text-xs font-bold text-[var(--foreground)]"
                       >
                         {attachment.name} ×
                       </button>
@@ -1446,7 +1446,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                         key={`${file.name}-${file.size}-${index}`}
                         type="button"
                         onClick={() => setPendingFiles((prev) => prev.filter((_, currentIndex) => currentIndex !== index))}
-                        className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-[var(--foreground)]"
+                        className="rounded-full bg-[var(--card)] px-3 py-1.5 text-xs font-bold text-[var(--foreground)]"
                       >
                         {file.name} ×
                       </button>
@@ -1509,7 +1509,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                       data-testid="guide-company-select"
                       value={companyFilter}
                       onChange={(event) => setCompanyFilter(event.target.value)}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm font-semibold outline-none focus:border-[var(--accent)]"
                     >
                       {companyOptions.map((companyName) => (
                         <option key={companyName} value={companyName}>
@@ -1526,7 +1526,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                       value={selectedTeamKey}
                       onChange={(event) => setSelectedTeamKey(event.target.value)}
                       disabled={!companyTeams.length}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold outline-none focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:bg-[var(--muted)]"
+                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm font-semibold outline-none focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:bg-[var(--muted)]"
                     >
                       <option value="">{companyTeams.length ? '팀 선택' : '등록된 팀 없음'}</option>
                       {selectedCompany?.divisions.map((division) => (
@@ -1558,7 +1558,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="제목, 팀, 키워드, 첨부파일명 검색"
-                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
               />
 
               <div className="flex flex-wrap gap-2">
@@ -1635,13 +1635,13 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                   }`}
                 >
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-[var(--accent)]">
+                    <span className="rounded-full bg-[var(--card)] px-2.5 py-1 text-[11px] font-bold text-[var(--accent)]">
                       {getGuideKindLabel(resource.kind)}
                     </span>
-                    <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-[var(--foreground)]">
+                    <span className="rounded-full bg-[var(--card)] px-2.5 py-1 text-[11px] font-bold text-[var(--foreground)]">
                       {getGuideAudienceLabel(resource.audience)}
                     </span>
-                    <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-[var(--foreground)]">
+                    <span className="rounded-full bg-[var(--card)] px-2.5 py-1 text-[11px] font-bold text-[var(--foreground)]">
                       {resource.teamName || '미지정'}
                     </span>
                   </div>
@@ -1746,7 +1746,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                             download={attachment.name}
                             target="_blank"
                             rel="noreferrer"
-                            className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-4 transition hover:border-[var(--accent)]"
+                            className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 transition hover:border-[var(--accent)]"
                           >
                             <div className="flex items-center justify-between gap-3">
                               <div className="min-w-0">
@@ -1773,7 +1773,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                                 href={attachment.url}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-white"
+                                className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)]"
                               >
                                 <img src={attachment.url} alt={attachment.name} className="h-48 w-full object-cover" />
                               </a>
@@ -1826,20 +1826,20 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                       value={taskTitle}
                       onChange={(event) => setTaskTitle(event.target.value)}
                       placeholder={`${activeTeam.teamName} 팀 할일 제목`}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
                     />
                     <input
                       data-testid="guide-task-due-date-input"
                       type="date"
                       value={taskDueDate}
                       onChange={(event) => setTaskDueDate(event.target.value)}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
                     />
                     <select
                       data-testid="guide-task-priority-select"
                       value={taskPriority}
                       onChange={(event) => setTaskPriority(normalizeGuideTaskPriority(event.target.value))}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
                     >
                       <option value="urgent">긴급</option>
                       <option value="high">높음</option>
@@ -1853,7 +1853,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                     onChange={(event) => setTaskNote(event.target.value)}
                     rows={3}
                     placeholder="팀이 같이 봐야 할 메모, 준비사항, 전달사항을 적어 주세요."
-                    className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold leading-6 outline-none focus:border-[var(--accent)]"
+                    className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold leading-6 outline-none focus:border-[var(--accent)]"
                   />
                   <div className="flex justify-end gap-2">
                     {editingTaskId ? (
@@ -1898,7 +1898,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                         key={task.id}
                         data-testid={`guide-task-card-${task.id}`}
                         className={`rounded-[var(--radius-lg)] border p-4 transition ${
-                          task.isDone ? 'border-emerald-200 bg-emerald-50/60' : 'border-[var(--border)] bg-white'
+                          task.isDone ? 'border-emerald-200 bg-emerald-50/60' : 'border-[var(--border)] bg-[var(--card)]'
                         }`}
                       >
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

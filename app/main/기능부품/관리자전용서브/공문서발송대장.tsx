@@ -40,9 +40,9 @@ type ApprovalWorkflowItem = {
 };
 
 function buildApprovalStatusClass(status: string) {
-  if (status === '승인') return 'bg-emerald-100 text-emerald-700';
+  if (status === '승인') return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300';
   if (status === '반려') return 'bg-red-500/10 text-red-600';
-  if (status === '회수') return 'bg-slate-100 text-slate-600';
+  if (status === '회수') return 'bg-[var(--muted)] text-[var(--toss-gray-4)]';
   return 'bg-orange-500/15 text-orange-700';
 }
 

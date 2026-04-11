@@ -22,6 +22,8 @@ import CategoryManager from './재고관리서브/카테고리관리';
 import ConsumableStats from './재고관리서브/소모품통계';
 import DeliveryConfirmation from './재고관리서브/납품확인서';
 import InventoryDemandForecast from './재고관리서브/재고수요예측';
+import ABCAnalysis from './재고관리서브/ABC분석';
+import PriceHistory from './재고관리서브/가격이력';
 import SupplierDocumentWorkspace from './재고관리서브/SupplierDocumentWorkspace';
 import AssetLoanSettingsAdminView from './관리자전용서브/비품대여물품설정';
 import InventoryStatusView from './재고관리서브/재고현황뷰';
@@ -41,7 +43,7 @@ import {
 import { INV_VIEW_KEY } from '@/app/main/navigation-state';
 
 
-const INVENTORY_VIEWS = ['UDI', '발주', '스캔', '등록', '현황', '이력', '자산', '비품대여설정', 'AS반품', '거래처', '재고실사', '이관', '카테고리', '소모품통계', '납품확인서', '수요예측'] as const;
+const INVENTORY_VIEWS = ['UDI', '발주', '스캔', '등록', '현황', '이력', '자산', '비품대여설정', 'AS반품', '거래처', '재고실사', '이관', '카테고리', '소모품통계', '납품확인서', '수요예측', 'ABC분석', '가격이력'] as const;
 const LEGACY_VIEWS = ['명세서', '유통기한'] as const;
 const VALID_VIEWS = [...INVENTORY_VIEWS, ...LEGACY_VIEWS];
 const EXPIRY_SOON_MS = 30 * 24 * 60 * 60 * 1000;
@@ -115,6 +117,8 @@ const INVENTORY_VIEW_META: Record<string, { title: string; description: string }
   발주: { title: '발주 관리', description: '' },
   스캔: { title: '스캔 처리', description: '' },
   수요예측: { title: '수요 예측', description: '' },
+  ABC분석: { title: 'ABC 분석', description: '' },
+  가격이력: { title: '가격 이력', description: '' },
   납품확인서: { title: '납품 확인서', description: '' },
   UDI: { title: 'UDI 관리', description: '' },
   자산: { title: '자산 QR', description: '' },
@@ -1421,6 +1425,8 @@ export default function IntegratedInventoryManagement({
           {activeView === '소모품통계' && <ConsumableStats user={user} selectedCo={selectedCo ?? ''} />}
           {activeView === '납품확인서' && <DeliveryConfirmation user={user} selectedCo={selectedCo ?? ''} />}
           {activeView === '수요예측' && <InventoryDemandForecast user={user} inventory={inventory} selectedCo={selectedCo ?? ''} />}
+          {activeView === 'ABC분석' && <ABCAnalysis user={user as Record<string, unknown>} inventory={inventory as any} />}
+          {activeView === '가격이력' && <PriceHistory user={user as Record<string, unknown>} inventory={inventory as any} />}
         </main>
       </div>
 

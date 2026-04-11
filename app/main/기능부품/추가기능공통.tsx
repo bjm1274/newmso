@@ -46,14 +46,14 @@ export function FontSizeControl() {
   };
 
   return (
-    <div className="inline-flex h-8 items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 shadow-sm">
+    <div className="inline-flex h-9 items-center gap-0.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-1.5 shadow-sm">
       <span className="mr-0.5 text-[10px] font-semibold text-[var(--toss-gray-3)]">글자</span>
       {FONT_SIZES.map((size) => (
         <button
           key={size.value}
           type="button"
           onClick={() => change(size.value)}
-          className={`rounded px-1.5 py-0.5 text-[10px] font-bold transition-all ${
+          className={`rounded-[var(--radius-md)] px-2 py-1 text-[10px] font-bold transition-all ${
             current === size.value
               ? 'bg-[var(--accent)] text-white'
               : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
@@ -141,7 +141,7 @@ export type FeatureCard = {
 };
 
 export const FEATURE_CARDS: FeatureCard[] = [
-  { id: '조직도', label: '조직도', icon: '🏢', subView: '조직도', testId: 'org-chart', accentClass: 'bg-sky-50 text-sky-600 group-hover:bg-sky-100' },
+  { id: '조직도', label: '조직도', icon: '🏢', subView: '조직도', testId: 'org-chart', accentClass: 'bg-[var(--muted)] text-sky-600 group-hover:bg-[var(--toss-blue-light)]' },
   { id: '부서별재고', label: '부서별 재고', icon: '📦', subView: '부서별재고', testId: 'department-inventory', accentClass: 'bg-[var(--muted)] group-hover:bg-[var(--toss-blue-light)]' },
   { id: '근무현황', label: '근무현황', icon: '📅', subView: '근무현황', testId: 'work-status', accentClass: 'bg-[var(--muted)] group-hover:bg-[var(--toss-blue-light)]' },
   { id: '인계노트', label: '인계노트', icon: '📝', subView: '인계노트', testId: 'handover-note', accentClass: 'bg-red-500/10 text-red-500 group-hover:bg-red-500/20' },
@@ -184,9 +184,9 @@ export function FeatureShell({
           data-testid="extra-back-button"
           type="button"
           onClick={onBack}
-          className="self-start text-[11px] font-bold text-[var(--accent)] hover:underline"
+          className="inline-flex items-center gap-1 self-start rounded-[var(--radius-md)] px-2 py-1.5 text-[12px] font-bold text-[var(--accent)] transition-colors hover:bg-[var(--muted)]"
         >
-          목록으로
+          ← 목록으로
         </button>
         {content}
       </div>

@@ -187,7 +187,7 @@ export default function ExpirationAlert() {
           </h3>
           <button
             onClick={downloadExpirationReport}
-            className="px-3 py-1.5 bg-gray-600 text-white rounded-[var(--radius-md)] text-xs font-semibold hover:bg-gray-700 transition-all"
+            className="px-3 py-1.5 bg-[var(--foreground)] text-[var(--card)] rounded-[var(--radius-md)] text-xs font-semibold hover:opacity-90 transition-all"
           >
             보고서 다운로드
           </button>

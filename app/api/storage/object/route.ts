@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     response.headers.set('X-Content-Type-Options', 'nosniff');
     return response;
   } catch (error) {
-    const message = error instanceof Error ? error.message : '?뚯씪 議고쉶 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.';
+    const message = error instanceof Error ? error.message : '스토리지 접근 중 오류가 발생했습니다.';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

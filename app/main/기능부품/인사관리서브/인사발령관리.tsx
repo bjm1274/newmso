@@ -295,7 +295,7 @@ export default function PersonnelAppointment({
             <button
               type="button"
               onClick={generateGazette}
-              className="rounded-xl bg-gray-900 px-4 py-2.5 text-[11px] font-bold text-white shadow-md transition-opacity hover:opacity-90"
+              className="rounded-xl bg-[var(--foreground)] px-4 py-2.5 text-[11px] font-bold text-[var(--card)] shadow-md transition-opacity hover:opacity-90"
             >
               관보 생성
             </button>
@@ -517,7 +517,7 @@ export default function PersonnelAppointment({
               <button
                 type="button"
                 onClick={generateGazette}
-                className="rounded-xl bg-gray-900 px-4 py-2 text-[10px] font-bold text-white"
+                className="rounded-xl bg-[var(--foreground)] px-4 py-2 text-[10px] font-bold text-[var(--card)]"
               >
                 클립보드 복사
               </button>

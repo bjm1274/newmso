@@ -316,8 +316,6 @@ export default function MyProfileCard({
 
     applyIsEditing(false);
     toast('내 정보가 바로 저장되었고 인사관리에도 즉시 반영되었습니다.', 'success');
-    return;
-    toast('내 정보가 바로 저장되었습니다. 인사관리에도 즉시 반영됩니다.', 'success');
   };
 
   const buildRequestedProfileChanges = (currentUser: ProfileCardUser) => {

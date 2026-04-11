@@ -24,7 +24,7 @@ function getToneClasses(tone: FeaturePermissionItem['tone'], active: boolean) {
 
 function getToggleClasses(tone: FeaturePermissionItem['tone'], active: boolean) {
   if (!active) {
-    return 'bg-[var(--tab-bg)] hover:bg-slate-300';
+    return 'bg-[var(--tab-bg)] hover:bg-[var(--muted)]';
   }
 
   if (tone === 'critical') {

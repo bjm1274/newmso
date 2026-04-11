@@ -139,7 +139,7 @@ function getRunStatusMeta(status: string) {
     case 'running':
       return { label: '진행 중', className: 'bg-amber-100 text-amber-700' };
     default:
-      return { label: status || '미상', className: 'bg-slate-100 text-slate-600' };
+      return { label: status || '미상', className: 'bg-[var(--muted)] text-[var(--toss-gray-4)]' };
   }
 }
 
