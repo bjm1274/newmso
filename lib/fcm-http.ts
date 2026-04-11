@@ -174,10 +174,14 @@ export async function sendFcmNotification(
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({})) as Record<string, unknown>;
-      const errorCode = String(
-        (body?.error as Record<string, unknown>)?.status || '',
-      );
-      if (errorCode === 'NOT_FOUND' || errorCode === 'INVALID_ARGUMENT') {
+      const errorObj = body?.error as Record<string, unknown> | undefined;
+      const errorStatus = String(errorObj?.status || '');
+      const errorCode = String(errorObj?.code || '');
+      // FCM v1: status=NOT_FOUND(토큰 무효), INVALID_ARGUMENT(토큰 형식 오류), code=404/400
+      if (
+        errorStatus === 'NOT_FOUND' || errorStatus === 'INVALID_ARGUMENT' ||
+        errorCode === '404' || errorCode === '400'
+      ) {
         return false; // 토큰 만료/무효
       }
       console.error('[FCM HTTP v1] send failed:', res.status, body);
