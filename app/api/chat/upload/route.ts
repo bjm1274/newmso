@@ -203,6 +203,11 @@ export async function POST(request: NextRequest) {
       return await createSignedUploadPlan(supabase, payload);
     }
 
+    const contentLength = Number(request.headers.get('content-length') || '0');
+    if (contentLength > 52_428_800) {
+      return NextResponse.json({ error: '파일 크기가 50MB를 초과합니다.' }, { status: 413 });
+    }
+
     const formData = await request.formData();
     const file = formData.get('file');
 

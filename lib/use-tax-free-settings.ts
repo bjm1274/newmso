@@ -34,7 +34,7 @@ export async function fetchTaxFreeSettings(
   const co = companyName === '전체' ? '전체' : companyName;
   const { data } = await supabase
     .from('tax_free_settings')
-    .select('*')
+    .select('meal_limit, vehicle_limit, childcare_limit, research_limit, uniform_limit, congratulations_limit, housing_limit, other_taxfree_limit')
     .eq('company_name', co)
     .eq('effective_year', year)
     .single();

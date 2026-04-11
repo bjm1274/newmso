@@ -1,51 +1,15 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { isAdminSession, readSessionFromRequest } from '@/lib/server-session';
+import { checkRateLimit, recordFailedAttempt, resetAttempts } from '@/lib/rate-limit';
 
-// 인메모리 rate limiting: IP + 세션별 시도 횟수
-const attempts = new Map<string, { count: number; lastAttempt: number }>();
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 5 * 60 * 1000; // 5분
 
 function getRateLimitKey(req: Request, userId: string) {
   const forwarded = req.headers.get('x-forwarded-for');
   const ip = forwarded?.split(',')[0]?.trim() || 'unknown';
-  return `${ip}:${userId}`;
-}
-
-function checkRateLimit(key: string): { allowed: boolean; retryAfterSec?: number } {
-  const now = Date.now();
-  const entry = attempts.get(key);
-
-  if (!entry) return { allowed: true };
-
-  if (now - entry.lastAttempt > LOCKOUT_MS) {
-    attempts.delete(key);
-    return { allowed: true };
-  }
-
-  if (entry.count >= MAX_ATTEMPTS) {
-    const retryAfterSec = Math.ceil((LOCKOUT_MS - (now - entry.lastAttempt)) / 1000);
-    return { allowed: false, retryAfterSec };
-  }
-
-  return { allowed: true };
-}
-
-function recordAttempt(key: string, success: boolean) {
-  if (success) {
-    attempts.delete(key);
-    return;
-  }
-
-  const now = Date.now();
-  const entry = attempts.get(key);
-  if (entry) {
-    entry.count += 1;
-    entry.lastAttempt = now;
-  } else {
-    attempts.set(key, { count: 1, lastAttempt: now });
-  }
+  return `unlock:${ip}:${userId}`;
 }
 
 export async function POST(req: Request) {
@@ -56,7 +20,7 @@ export async function POST(req: Request) {
 
   const userId = String(session.user?.id || session.user?.user_id || 'unknown');
   const rateLimitKey = getRateLimitKey(req, userId);
-  const rateCheck = checkRateLimit(rateLimitKey);
+  const rateCheck = checkRateLimit(rateLimitKey, MAX_ATTEMPTS, LOCKOUT_MS);
 
   if (!rateCheck.allowed) {
     return NextResponse.json(
@@ -74,7 +38,11 @@ export async function POST(req: Request) {
   }
 
   const ok = await bcrypt.compare(password, resetHash);
-  recordAttempt(rateLimitKey, ok);
+  if (ok) {
+    resetAttempts(rateLimitKey);
+  } else {
+    recordFailedAttempt(rateLimitKey, LOCKOUT_MS);
+  }
 
   return NextResponse.json({ ok });
 }

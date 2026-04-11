@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     // 활성 스케줄 조회
     const { data: schedules } = await supabase
       .from('report_schedules')
-      .select('*')
+      .select('id, report_type, company_id, recipients, enabled')
       .eq('enabled', true);
 
     if (!schedules || schedules.length === 0) {

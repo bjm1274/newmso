@@ -39,8 +39,34 @@ try {
 }
 
 // ── Web Share Target: 다른 앱에서 파일/텍스트 공유 시 처리 ──
+// 정적 자산 캐시 이름 (SW_VERSION과 연동)
+const STATIC_CACHE = 'erp-static-v1';
+const STATIC_EXTENSIONS = /\.(js|css|woff2?|ttf|png|jpg|svg|ico|webp)(\?|$)/;
+
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+
+  // Share target POST 처리
+  if (url.pathname === '/share-target' && event.request.method === 'POST') {
+    // 아래 share-target 코드로 계속
+  }
+  // 정적 자산: stale-while-revalidate (캐시 우선, 백그라운드 갱신)
+  else if (event.request.method === 'GET' && url.origin === self.location.origin && STATIC_EXTENSIONS.test(url.pathname)) {
+    event.respondWith(
+      caches.open(STATIC_CACHE).then(async (cache) => {
+        const cached = await cache.match(event.request);
+        const fetchPromise = fetch(event.request).then((response) => {
+          if (response.ok) cache.put(event.request, response.clone());
+          return response;
+        }).catch(() => cached);
+        return cached || fetchPromise;
+      })
+    );
+    return;
+  } else {
+    return;
+  }
+
   if (url.pathname !== '/share-target' || event.request.method !== 'POST') return;
 
   event.respondWith((async () => {
@@ -117,7 +143,7 @@ self.addEventListener('pushsubscriptionchange', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  const CURRENT_CACHES = ['erp-share-target-v1'];
+  const CURRENT_CACHES = ['erp-share-target-v1', 'erp-static-v1'];
   event.waitUntil(Promise.all([
     // 오래된 캐시 정리
     caches.keys().then((names) =>

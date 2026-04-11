@@ -113,9 +113,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const lat = searchParams.get('lat');
   const lon = searchParams.get('lon');
 
-  if (!lat || !lon) {
+  const latNum = Number(lat);
+  const lonNum = Number(lon);
+  if (!lat || !lon || isNaN(latNum) || isNaN(lonNum) || latNum < -90 || latNum > 90 || lonNum < -180 || lonNum > 180) {
     return NextResponse.json(
-      { error: 'lat, lon 파라미터가 필요합니다.' },
+      { error: 'lat(-90~90), lon(-180~180) 유효한 좌표가 필요합니다.' },
       { status: 400 },
     );
   }
@@ -129,7 +131,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   let weatherRes: Response;
   try {
-    weatherRes = await fetch(weatherUrl, { cache: 'no-store' });
+    weatherRes = await fetch(weatherUrl, { cache: 'no-store', signal: AbortSignal.timeout(10_000) });
     if (!weatherRes.ok) throw new Error(`weather API ${weatherRes.status}`);
   } catch (err) {
     return NextResponse.json(
@@ -153,7 +155,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       `&current=pm2_5,pm10` +
       `&timezone=Asia/Seoul`;
 
-    const aqRes = await fetch(aqUrl, { cache: 'no-store' });
+    const aqRes = await fetch(aqUrl, { cache: 'no-store', signal: AbortSignal.timeout(10_000) });
     if (aqRes.ok) {
       const aqJson = (await aqRes.json()) as AirQualityApiResponse;
       pm25 = Math.round(aqJson.current.pm2_5 ?? -1);

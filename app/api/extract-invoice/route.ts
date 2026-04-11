@@ -102,7 +102,12 @@ export async function POST(req: NextRequest) {
             throw new Error('JSON 형식을 찾을 수 없습니다.');
         }
 
-        const parsedData = JSON.parse(jsonMatch[0]);
+        let parsedData;
+        try {
+          parsedData = JSON.parse(jsonMatch[0]);
+        } catch {
+          throw new Error('JSON 파싱에 실패했습니다.');
+        }
 
         return NextResponse.json({ success: true, data: parsedData });
     } catch {
