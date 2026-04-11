@@ -134,7 +134,7 @@ export default function InventoryDemandForecast({ user, inventory, selectedCo }:
             onChange={e => setSafetyDays(Number(e.target.value))}
             min={1}
             max={30}
-            className="w-16 p-1.5 text-xs font-bold border border-[var(--border)] rounded-md bg-[var(--card)] text-center"
+            className="w-20 p-2.5 text-xs font-bold border border-[var(--border)] rounded-md bg-[var(--card)] text-center"
           />
           <span className="text-xs text-[var(--toss-gray-3)]">일</span>
         </div>
@@ -160,21 +160,21 @@ export default function InventoryDemandForecast({ user, inventory, selectedCo }:
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusColor(fc.status)}`}>{fc.status}</span>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-center">
-                  <div className="bg-[var(--card)]/60 rounded-[var(--radius-md)] p-2">
+                  <div className="bg-[var(--card)]/60 rounded-[var(--radius-md)] p-2.5">
                     <p className="text-[10px] text-[var(--toss-gray-3)]">현재 재고</p>
-                    <p className="text-sm font-bold">{fmt(getItemQuantity(fc.item))}</p>
+                    <p className="text-sm font-black tabular-nums">{fmt(getItemQuantity(fc.item))}</p>
                   </div>
-                  <div className="bg-[var(--card)]/60 rounded-[var(--radius-md)] p-2">
+                  <div className="bg-[var(--card)]/60 rounded-[var(--radius-md)] p-2.5">
                     <p className="text-[10px] text-[var(--toss-gray-3)]">일평균 소비</p>
-                    <p className="text-sm font-bold">{fc.avgDailyUsage.toFixed(2)}</p>
+                    <p className="text-sm font-black tabular-nums">{fc.avgDailyUsage.toFixed(2)}</p>
                   </div>
-                  <div className="bg-[var(--card)]/60 rounded-[var(--radius-md)] p-2">
+                  <div className={`rounded-[var(--radius-md)] p-2.5 ${fc.daysLeft < 7 ? 'bg-red-500/10 border-l-4 border-red-500' : fc.daysLeft < 14 ? 'bg-amber-500/10 border-l-4 border-amber-500' : 'bg-[var(--card)]/60'}`}>
                     <p className="text-[10px] text-[var(--toss-gray-3)]">예상 소진일</p>
-                    <p className={`text-sm font-bold ${fc.daysLeft < 7 ? 'text-red-600' : ''}`}>{fc.daysLeft >= 9999 ? '∞' : `${fc.daysLeft}일`}</p>
+                    <p className={`text-sm font-black tabular-nums ${fc.daysLeft < 7 ? 'text-red-600' : fc.daysLeft < 14 ? 'text-amber-600' : ''}`}>{fc.daysLeft >= 9999 ? '∞' : `${fc.daysLeft}일`}</p>
                   </div>
-                  <div className="bg-[var(--card)]/60 rounded-[var(--radius-md)] p-2">
+                  <div className={`rounded-[var(--radius-md)] p-2.5 ${fc.status === '긴급' ? 'bg-red-500/10 border-l-4 border-red-500' : 'bg-[var(--card)]/60'}`}>
                     <p className="text-[10px] text-[var(--toss-gray-3)]">발주 권장량</p>
-                    <p className="text-sm font-bold">{fmt(fc.orderQty)}</p>
+                    <p className={`text-sm font-black tabular-nums ${fc.status === '긴급' ? 'text-red-600' : ''}`}>{fmt(fc.orderQty)}</p>
                   </div>
                 </div>
                 {/* 최근 4주 소비 미니 바 차트 */}

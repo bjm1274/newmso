@@ -113,17 +113,17 @@ export default function ConsumableStats({ user, selectedCo }: { user: any; selec
         <div className="space-y-2">
           {grouped.slice(0, 30).map((g, i) => (
             <div key={g.label} className="flex items-center gap-3 p-3 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)]">
-              <span className="text-[10px] font-bold text-[var(--toss-gray-3)] w-6 text-center">{i + 1}</span>
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold text-[var(--foreground)]">{g.label}</span>
-                  <div className="flex items-center gap-3">
+              <span className={`text-xs font-black w-7 h-7 flex items-center justify-center rounded-full ${i < 3 ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-3)]'}`}>{i + 1}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold text-[var(--foreground)] truncate mr-2">{g.label}</span>
+                  <div className="flex items-center gap-3 shrink-0">
                     <span className="text-[10px] text-[var(--toss-gray-3)]">{g.count}건</span>
-                    <span className="text-sm font-bold text-[var(--accent)]">{g.qty.toLocaleString()}개</span>
+                    <span className="text-sm font-black tabular-nums text-[var(--accent)]">{g.qty.toLocaleString()}개</span>
                   </div>
                 </div>
-                <div className="w-full h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
-                  <div className="h-full bg-[var(--accent)] rounded-full transition-all" style={{ width: `${Math.min(100, (g.qty / maxQty) * 100)}%` }} />
+                <div className="w-full h-2.5 bg-[var(--muted)] rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent)]/60 rounded-full transition-all" style={{ width: `${Math.min(100, (g.qty / maxQty) * 100)}%` }} />
                 </div>
               </div>
             </div>

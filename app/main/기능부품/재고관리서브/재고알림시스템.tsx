@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { sendAdminNotifications } from '@/lib/notification-utils';
+import { EXPIRY_SOON_MS } from '@/app/main/inventory-utils';
 
 type InventoryAlertItem = {
   id?: string | number | null;
@@ -63,7 +64,7 @@ export function useInventoryAlertSystem(inventory: InventoryAlertItem[], user: u
     setLowStockItems(lowStock);
 
     const today = new Date();
-    const thirtyDaysLater = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const thirtyDaysLater = new Date(today.getTime() + EXPIRY_SOON_MS);
     const expiryImminent = inventory.filter((item) => {
       if (!item?.expiry_date) return false;
       const expiry = new Date(item.expiry_date);
