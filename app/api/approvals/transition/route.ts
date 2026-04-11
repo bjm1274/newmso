@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { isAdminSession, readSessionFromRequest } from '@/lib/server-session';
 import { transitionApprovals } from '@/lib/server-approval-transition';
 
-export const runtime = 'nodejs';
+
 export const dynamic = 'force-dynamic';
 
 function createAdminSupabase() {

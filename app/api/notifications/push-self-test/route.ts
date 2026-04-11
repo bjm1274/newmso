@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { readSessionFromRequest } from '@/lib/server-session';
 
-export const runtime = 'nodejs';
+
 export const dynamic = 'force-dynamic';
 
 function getAdminClient() {
@@ -64,12 +64,7 @@ export async function POST(request: NextRequest) {
   // ── 3. Web Push (VAPID) 테스트 ──
   if (vapidPrivate && vapidPublic) {
     try {
-      const { default: webpush } = await import('web-push');
-      webpush.setVapidDetails(
-        vapidSubject || 'mailto:admin@example.com',
-        vapidPublic,
-        vapidPrivate,
-      );
+      const { sendWebPushNotification } = await import('@/lib/web-push-cloudflare');
 
       const testPayload = JSON.stringify({
         title: '🔔 푸시 연결 테스트',
@@ -81,11 +76,11 @@ export async function POST(request: NextRequest) {
       for (const sub of subs as any[]) {
         if (!sub.p256dh || !sub.auth || !/^https?:\/\//i.test(String(sub.endpoint))) continue;
         try {
-          await webpush.sendNotification(
-            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          const res = await sendWebPushNotification(
+            { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth },
             testPayload,
           );
-          results.push({ method: 'webpush', endpoint: String(sub.endpoint).slice(0, 40), ok: true });
+          results.push({ method: 'webpush', endpoint: String(sub.endpoint).slice(0, 40), ok: res.ok });
         } catch (err: any) {
           results.push({ method: 'webpush', endpoint: String(sub.endpoint).slice(0, 40), ok: false, error: String(err?.message || err) });
         }
@@ -100,28 +95,20 @@ export async function POST(request: NextRequest) {
   // ── 4. FCM 테스트 ──
   if (firebaseSA) {
     try {
-      const admin = await import('firebase-admin');
-      if (admin.default.apps.length === 0) {
-        admin.default.initializeApp({
-          credential: admin.default.credential.cert(JSON.parse(firebaseSA)),
-        });
-      }
-      const messaging = admin.default.messaging();
+      const { sendFcmNotification } = await import('@/lib/fcm-http');
 
       for (const sub of subs as any[]) {
         if (!sub.fcm_token) continue;
         try {
-          await messaging.send({
-            token: sub.fcm_token,
+          const ok = await sendFcmNotification(sub.fcm_token, {
+            title: '🔔 FCM 테스트',
+            body: '[FCM] 서버→기기 FCM 연결이 정상입니다!',
             data: {
-              title: '🔔 FCM 테스트',
-              body: '[FCM] 서버→기기 FCM 연결이 정상입니다!',
               type: 'notification',
               tag: `self-test-fcm-${Date.now()}`,
             },
-            android: { priority: 'high' },
           });
-          results.push({ method: 'fcm', token: String(sub.fcm_token).slice(0, 20), ok: true });
+          results.push({ method: 'fcm', token: String(sub.fcm_token).slice(0, 20), ok });
         } catch (err: any) {
           results.push({ method: 'fcm', token: String(sub.fcm_token).slice(0, 20), ok: false, error: String(err?.message || err) });
         }

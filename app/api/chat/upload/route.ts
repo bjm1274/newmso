@@ -8,7 +8,7 @@ import {
 } from '@/lib/object-storage';
 import { readSessionFromRequest } from '@/lib/server-session';
 
-export const runtime = 'nodejs';
+
 export const dynamic = 'force-dynamic';
 
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { processDueTodoRemindersServer } from '@/lib/todo-reminder-cron';
 
-export const runtime = 'nodejs';
+
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {

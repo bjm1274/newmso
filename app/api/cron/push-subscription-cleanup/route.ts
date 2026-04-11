@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const CRON_SECRET = process.env.CRON_SECRET;
-export const runtime = 'nodejs';
+
 export const dynamic = 'force-dynamic';
 
 type PushSubscriptionRow = {

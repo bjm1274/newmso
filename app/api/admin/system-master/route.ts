@@ -1,5 +1,4 @@
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
+// fs/path 제거: Cloudflare Workers 호환을 위해 로컬 파일시스템 접근 대신 DB 조회 사용
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { readSessionFromRequest } from '@/lib/server-session';
@@ -11,7 +10,7 @@ import { processDueTodoRemindersServer } from '@/lib/todo-reminder-cron';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
 
-export const runtime = 'nodejs';
+
 export const dynamic = 'force-dynamic';
 const OPERATION_CRONS = [
   { path: '/api/cron/backup', schedule: '매일 00:00', label: '정기 전체 백업' },
@@ -58,7 +57,7 @@ type PushFailureRow = {
 type BackupSummaryRow = {
   name: string;
   created_at: string;
-  source: 'local';
+  source: 'local' | 'db';
 };
 
 type IntegrityIssue = {
@@ -351,25 +350,21 @@ async function safeRows<T>(
 
 async function listRecentBackups(limit = 8): Promise<BackupSummaryRow[]> {
   try {
-    const backupRoot = path.join(process.cwd(), 'backups');
-    const rows = await fs.readdir(backupRoot, { withFileTypes: true });
-    const collected = await Promise.all(
-      rows
-        .filter((entry) => entry.isDirectory())
-        .map(async (entry) => {
-          const fullPath = path.join(backupRoot, entry.name);
-          const stats = await fs.stat(fullPath);
-          return {
-            name: entry.name,
-            created_at: stats.mtime.toISOString(),
-            source: 'local' as const,
-          };
-        }),
-    );
+    // Cloudflare Workers 호환: 로컬 파일시스템 대신 backup_restore_runs 테이블 조회
+    const client = getAdminClient();
+    const { data, error } = await client
+      .from('backup_restore_runs')
+      .select('id, file_name, started_at')
+      .order('started_at', { ascending: false })
+      .limit(limit);
 
-    return collected
-      .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())
-      .slice(0, limit);
+    if (error || !data) return [];
+
+    return data.map((row: { id: string; file_name?: string; started_at?: string }) => ({
+      name: row.file_name || row.id,
+      created_at: row.started_at || new Date().toISOString(),
+      source: 'db' as const,
+    }));
   } catch {
     return [];
   }

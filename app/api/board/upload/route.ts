@@ -12,7 +12,7 @@ import {
   resolveLatestSessionUser,
 } from '@/lib/server-session';
 
-export const runtime = 'nodejs';
+
 export const dynamic = 'force-dynamic';
 
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;

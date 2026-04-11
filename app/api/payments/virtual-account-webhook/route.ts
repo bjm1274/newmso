@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { readAuthorizedDepositUser } from '@/lib/server-deposit-access';
 import { normalizeVirtualAccountWebhook } from '@/lib/virtual-account-deposits';
 
-export const runtime = 'nodejs';
+
 export const dynamic = 'force-dynamic';
 
 function getAdminClient() {

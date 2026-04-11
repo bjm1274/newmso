@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
-import { sendFcmBatch } from '@/lib/firebase-admin';
-import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push';
+import { sendFcmBatch } from '@/lib/fcm-http';
+import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push-cloudflare';
 
 const ROSTER_CREATOR_POSITIONS = ['\uAC04\uD638\uACFC\uC7A5', '\uAC04\uD638\uBD80\uC7A5', '\uC2E4\uC7A5'];
 const ROSTER_APPROVER_POSITIONS = ['\uCD1D\uBB34\uBD80\uC7A5', '\uC774\uC0AC'];
@@ -289,9 +289,14 @@ async function dispatchImmediateApprovalPush(
     });
 
     const webResults = await Promise.allSettled(
-      Array.from(uniqueWebSubscriptions.values()).map((subscription) =>
-        sendWebPushNotification(subscription, payloadJson),
-      ),
+      Array.from(uniqueWebSubscriptions.values())
+        .filter((s) => s.endpoint && s.p256dh && s.auth)
+        .map((subscription) =>
+          sendWebPushNotification(
+            { endpoint: subscription.endpoint!, p256dh: subscription.p256dh!, auth: subscription.auth! },
+            payloadJson,
+          ),
+        ),
     );
 
     pushSentCount += webResults.filter((result) => result.status === 'fulfilled').length;
