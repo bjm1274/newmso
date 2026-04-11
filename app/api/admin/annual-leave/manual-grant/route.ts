@@ -83,6 +83,27 @@ export async function POST(request: Request) {
 
     const supabase = getAdminClient();
 
+    // staffId 존재 여부 사전 검증
+    const staffIds = updates.map((u) => u.staffId);
+    const { data: existingStaffs, error: checkError } = await supabase
+      .from('staff_members')
+      .select('id')
+      .in('id', staffIds);
+
+    if (checkError) {
+      return NextResponse.json({ error: checkError.message }, { status: 500 });
+    }
+
+    const existingIds = new Set((existingStaffs || []).map((s: { id: string }) => s.id));
+    const missingIds = staffIds.filter((id) => !existingIds.has(id));
+    if (missingIds.length > 0) {
+      return NextResponse.json(
+        { error: `존재하지 않는 직원 ID가 포함되어 있습니다: ${missingIds.join(', ')}` },
+        { status: 400 },
+      );
+    }
+
+    let actualUpdated = 0;
     for (const update of updates) {
       const { error } = await supabase
         .from('staff_members')
@@ -95,11 +116,12 @@ export async function POST(request: Request) {
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
+      actualUpdated += 1;
     }
 
     return NextResponse.json({
       success: true,
-      updatedCount: updates.length,
+      updatedCount: actualUpdated,
       message:
         updates.length === 1
           ? '연차 수동 부여 내역이 저장되었습니다.'

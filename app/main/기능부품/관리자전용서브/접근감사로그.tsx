@@ -103,10 +103,10 @@ export default function AccessAuditLog({ user }: Props) {
     return (
       <div className="p-4 space-y-4 max-w-3xl mx-auto" data-testid="admin-audit-access">
         <h2 className="text-lg font-bold text-[var(--foreground)]">접근 권한 감사 로그</h2>
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-[var(--radius-md)]">
-          <p className="text-sm font-bold text-amber-700">access_logs 테이블이 없습니다.</p>
-          <p className="text-xs text-amber-600 mt-2">아래 SQL을 Supabase SQL Editor에서 실행하여 테이블을 생성하세요:</p>
-          <pre className="mt-3 p-3 bg-amber-100 text-xs font-mono text-amber-800 rounded overflow-x-auto whitespace-pre-wrap">{`CREATE TABLE access_logs (
+        <div className="p-4 bg-warning/10 border border-warning/20 rounded-[var(--radius-md)]">
+          <p className="text-sm font-bold text-warning">access_logs 테이블이 없습니다.</p>
+          <p className="text-xs text-[var(--foreground)] mt-2">아래 SQL을 Supabase SQL Editor에서 실행하여 테이블을 생성하세요:</p>
+          <pre className="mt-3 p-3 bg-[var(--muted)] text-xs font-mono text-[var(--foreground)] rounded-[var(--radius-md)] overflow-x-auto whitespace-pre-wrap">{`CREATE TABLE access_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id text,
   user_name text,
@@ -132,7 +132,7 @@ export default function AccessAuditLog({ user }: Props) {
       </div>
 
       {/* 필터 */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="p-2 text-xs border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)]" />
         <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="p-2 text-xs border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)]" />
         <input placeholder="직원명" value={filterUser} onChange={e => setFilterUser(e.target.value)} className="p-2 text-xs border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)]" />
@@ -181,9 +181,9 @@ export default function AccessAuditLog({ user }: Props) {
                 const suspicious = isSuspicious(log);
                 return (
                   <tr key={log.id} className={`border-t border-[var(--border)] ${suspicious ? 'bg-red-500/10' : 'hover:bg-[var(--muted)]/50'}`}>
-                    <td className={`p-2 font-bold ${suspicious ? 'text-red-600' : ''}`}>
+                    <td className={`p-2 font-bold ${suspicious ? 'text-danger' : ''}`}>
                       {new Date(log.created_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                      {suspicious && <span className="ml-1 text-[9px] bg-red-600 text-white px-1 rounded">새벽</span>}
+                      {suspicious && <span className="ml-1 text-[9px] bg-danger text-white px-1 rounded-[var(--radius-md)]">새벽</span>}
                     </td>
                     <td className="p-2 font-bold">{log.user_name || '-'}</td>
                     <td className="p-2 text-[var(--toss-gray-4)]">{log.company || '-'}</td>

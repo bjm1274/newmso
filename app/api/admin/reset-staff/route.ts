@@ -32,11 +32,12 @@ export async function POST(req: Request) {
 
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // 관리자(role='admin')는 항상 제외하고 삭제
+    // 관리자(role='admin') 및 시스템마스터(is_system_master=true)는 항상 제외하고 삭제
     const { data: toDelete, error: selectErr } = await supabase
       .from('staff_members')
       .select('id')
-      .neq('role', 'admin');
+      .neq('role', 'admin')
+      .or('is_system_master.is.null,is_system_master.eq.false');
 
     if (selectErr) {
       return NextResponse.json(

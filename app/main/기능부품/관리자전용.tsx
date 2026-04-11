@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { canAccessAdminSection, canAccessMainMenu } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import {
@@ -58,6 +58,19 @@ function InnerTabBar({
   onChange: (tabId: string) => void;
   testIdPrefix?: string;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const activeRef = useCallback(
+    (node: HTMLButtonElement | null) => {
+      if (!node) return;
+      const container = scrollRef.current;
+      if (!container) return;
+      const left = node.offsetLeft - container.offsetLeft - 8;
+      container.scrollTo({ left, behavior: 'smooth' });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeTab],
+  );
+
   return (
     <div
       className="mb-4 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm"
@@ -67,14 +80,15 @@ function InnerTabBar({
         <h3 className="text-sm font-bold text-[var(--foreground)]">{title}</h3>
         {description ? <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{description}</p> : null}
       </div>
-      <div className="no-scrollbar flex gap-1.5 overflow-x-auto">
+      <div ref={scrollRef} className="no-scrollbar flex gap-1.5 overflow-x-auto">
         {tabs.map((tab, index) => (
           <button
             key={tab.id}
             type="button"
+            ref={activeTab === tab.id ? activeRef : undefined}
             onClick={() => onChange(tab.id)}
             data-testid={testIdPrefix ? `${testIdPrefix}-${index}` : undefined}
-            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-[var(--radius-md)] px-4 py-2 text-[11px] font-bold transition-all ${
+            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-[var(--radius-md)] px-4 py-2.5 text-[11px] font-bold transition-all ${
               activeTab === tab.id
                 ? 'bg-[var(--accent)] text-white shadow-sm'
                 : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'

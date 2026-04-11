@@ -919,10 +919,11 @@ export async function GET(request: NextRequest) {
     }
 
     if (scope === 'chats') {
+      const chatLimit = Math.min(Math.max(Number(limit) || 500, 1), 1000);
       const [roomRes, messageRes] = await Promise.all([
-        supabase.from('chat_rooms').select(CHAT_ROOM_ADMIN_SELECT).order('created_at', { ascending: false }),
+        supabase.from('chat_rooms').select(CHAT_ROOM_ADMIN_SELECT).order('created_at', { ascending: false }).limit(200),
         (() => {
-          let query = supabase.from('messages').select(CHAT_MESSAGE_ADMIN_SELECT).order('created_at', { ascending: false });
+          let query = supabase.from('messages').select(CHAT_MESSAGE_ADMIN_SELECT).order('created_at', { ascending: false }).limit(chatLimit);
           if (roomId) query = query.eq('room_id', roomId);
           if (keyword) query = query.ilike('content', `%${keyword}%`);
           return query;
@@ -970,8 +971,8 @@ export async function GET(request: NextRequest) {
         loadPushSubscriptionDiagnostics(supabase),
       ]);
 
-      if (auditRes.error) return NextResponse.json({ error: auditRes.error.message }, { status: 500 });
-      if (staffIdRes.error) return NextResponse.json({ error: staffIdRes.error.message }, { status: 500 });
+      if (auditRes.error) { console.error('system-master audit query failed:', auditRes.error); return NextResponse.json({ error: '감사 로그 조회에 실패했습니다.' }, { status: 500 }); }
+      if (staffIdRes.error) { console.error('system-master staff query failed:', staffIdRes.error); return NextResponse.json({ error: '직원 데이터 조회에 실패했습니다.' }, { status: 500 }); }
 
       const validStaffIds = new Set(
         toLooseRecordArray(staffIdRes.data).map((row) => String(row.id || '')),

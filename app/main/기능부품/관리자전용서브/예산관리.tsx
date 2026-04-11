@@ -66,7 +66,8 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
   }, []);
 
   const handleAddSetting = () => {
-    if (!settingForm.dept || !settingForm.amount) return;
+    if (!settingForm.dept?.trim() || !settingForm.amount) return;
+    if (Number(settingForm.amount) <= 0) return;
     const newItem: BudgetSetting = {
       id: Date.now().toString(),
       dept: settingForm.dept,
@@ -89,7 +90,8 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
   };
 
   const handleAddExecution = () => {
-    if (!execForm.dept || !execForm.amount) return;
+    if (!execForm.dept?.trim() || !execForm.amount) return;
+    if (Number(execForm.amount) <= 0) return;
     const newExec: BudgetExecution = {
       id: Date.now().toString(),
       dept: execForm.dept,
@@ -129,14 +131,14 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
     const ratio = executed / budget;
     if (ratio >= 1) {
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-md)] text-xs font-bold bg-red-500/20 text-red-600">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-md)] text-xs font-bold bg-danger/20 text-danger">
           초과
         </span>
       );
     }
     if (ratio >= 0.9) {
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-md)] text-xs font-bold bg-orange-500/20 text-orange-600">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-md)] text-xs font-bold bg-warning/20 text-warning">
           90% 초과
         </span>
       );
@@ -387,9 +389,9 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
                     ]}
                     contentStyle={{ borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)' }}
                   />
-                  <Bar dataKey="budget" name="예산" fill="#4F8EF7" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="executed" name="집행" fill="#FF6B6B" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="remaining" name="잔액" fill="#34C759" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="budget" name="예산" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="executed" name="집행" fill="var(--danger, #FF6B6B)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="remaining" name="잔액" fill="var(--success, #34C759)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

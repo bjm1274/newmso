@@ -40,10 +40,10 @@ type ApprovalWorkflowItem = {
 };
 
 function buildApprovalStatusClass(status: string) {
-  if (status === '승인') return 'bg-emerald-100 text-emerald-700';
-  if (status === '반려') return 'bg-red-500/10 text-red-600';
-  if (status === '회수') return 'bg-slate-100 text-slate-600';
-  return 'bg-orange-500/15 text-orange-700';
+  if (status === '승인') return 'bg-success/15 text-success';
+  if (status === '반려') return 'bg-danger/10 text-danger';
+  if (status === '회수') return 'bg-[var(--muted)] text-[var(--toss-gray-4)]';
+  return 'bg-warning/15 text-warning';
 }
 
 export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenApproval }: Props) {
@@ -299,7 +299,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
       </div>
 
       {message && (
-        <div className={`rounded-xl border px-4 py-3 text-sm font-bold ${message.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-500/20 bg-red-500/10 text-red-700'}`}>
+        <div className={`rounded-[var(--radius-lg)] border px-4 py-3 text-sm font-bold ${message.type === 'success' ? 'border-success/20 bg-success/10 text-success' : 'border-danger/20 bg-danger/10 text-danger'}`}>
           {message.text}
         </div>
       )}
@@ -309,17 +309,17 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
           <p className="text-xs font-bold text-[var(--toss-gray-3)]">대장 반영 건수</p>
           <p className="mt-1 text-2xl font-extrabold text-[var(--foreground)]">{docs.length}<span className="ml-1 text-sm">건</span></p>
         </div>
-        <div className="rounded-2xl border border-orange-500/20 bg-orange-500/10 p-4">
-          <p className="text-xs font-bold text-orange-600">승인 대기</p>
-          <p className="mt-1 text-2xl font-extrabold text-orange-700">{pendingApprovals.length}<span className="ml-1 text-sm">건</span></p>
+        <div className="rounded-[var(--radius-xl)] border border-warning/20 bg-warning/10 p-4">
+          <p className="text-xs font-bold text-warning">승인 대기</p>
+          <p className="mt-1 text-2xl font-extrabold text-warning">{pendingApprovals.length}<span className="ml-1 text-sm">건</span></p>
         </div>
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-          <p className="text-xs font-bold text-emerald-500">수신 확인</p>
-          <p className="mt-1 text-2xl font-extrabold text-emerald-600">{receivedCount}<span className="ml-1 text-sm">건</span></p>
+        <div className="rounded-[var(--radius-xl)] border border-success/20 bg-success/10 p-4">
+          <p className="text-xs font-bold text-success">수신 확인</p>
+          <p className="mt-1 text-2xl font-extrabold text-success">{receivedCount}<span className="ml-1 text-sm">건</span></p>
         </div>
-        <div className="rounded-2xl border border-red-500/15 bg-red-500/5 p-4">
-          <p className="text-xs font-bold text-red-500">반려 / 미확인</p>
-          <p className="mt-1 text-2xl font-extrabold text-red-600">{rejectedApprovals.length + unreceivedCount}<span className="ml-1 text-sm">건</span></p>
+        <div className="rounded-[var(--radius-xl)] border border-danger/15 bg-danger/5 p-4">
+          <p className="text-xs font-bold text-danger">반려 / 미확인</p>
+          <p className="mt-1 text-2xl font-extrabold text-danger">{rejectedApprovals.length + unreceivedCount}<span className="ml-1 text-sm">건</span></p>
         </div>
       </div>
 
@@ -514,7 +514,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
                     <td className="px-4 py-2">
                       <button
                         onClick={() => handleToggleReceived(doc)}
-                        className={`rounded-lg px-2 py-1 text-[10px] font-extrabold transition-all ${doc.is_received ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-orange-500/20 text-orange-700 hover:bg-orange-200'}`}
+                        className={`rounded-[var(--radius-md)] px-2 py-1 text-[10px] font-extrabold transition-all ${doc.is_received ? 'bg-success/15 text-success hover:bg-success/25' : 'bg-warning/20 text-warning hover:bg-warning/30'}`}
                       >
                         {doc.is_received ? '✓ 확인' : '미확인'}
                       </button>
@@ -523,7 +523,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
                         <button onClick={() => openEdit(doc)} className="rounded-lg bg-blue-500/10 px-2 py-1 text-[10px] font-bold text-[var(--accent)] transition-colors hover:bg-blue-500/20">수정</button>
-                        <button onClick={() => handleDelete(doc.id!)} className="rounded-lg bg-red-500/10 px-2 py-1 text-[10px] font-bold text-red-500 transition-colors hover:bg-red-500/20">삭제</button>
+                        <button onClick={() => handleDelete(doc.id!)} className="rounded-[var(--radius-md)] bg-danger/10 px-2 py-1 text-[10px] font-bold text-danger transition-colors hover:bg-danger/20">삭제</button>
                       </div>
                     </td>
                   </tr>

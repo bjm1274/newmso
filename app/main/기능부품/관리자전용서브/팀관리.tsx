@@ -126,7 +126,7 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
               {div.teams.map((t) => (
                 <div key={t.id} className="flex justify-between items-center py-2 px-3 bg-[var(--muted)] rounded-[var(--radius-lg)]">
                   <span className="text-sm font-bold">{t.team_name}</span>
-                  <button onClick={() => handleDelete(t.id)} className="text-red-500 hover:text-red-700 text-xs font-semibold">삭제</button>
+                  <button onClick={() => handleDelete(t.id)} className="text-danger hover:opacity-80 text-xs font-semibold">삭제</button>
                 </div>
               ))}
               {div.teams.length === 0 && <p className="text-xs text-[var(--toss-gray-3)]">팀 없음</p>}

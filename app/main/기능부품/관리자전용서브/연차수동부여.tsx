@@ -59,6 +59,13 @@ export default function AnnualLeaveManualGrant({
   const handleSaveOne = async (staff: any) => {
     if (!canManage) return;
 
+    const total = getTotal(staff);
+    const used = getUsed(staff);
+    if (used > total) {
+      setMessage(`${staff.name}: 사용일수(${used})가 총일수(${total})보다 많습니다.`);
+      return;
+    }
+
     setSaving(true);
     setMessage('');
 
@@ -66,8 +73,8 @@ export default function AnnualLeaveManualGrant({
       const payload = await saveManualGrant([
         {
           staffId: String(staff.id),
-          total: getTotal(staff),
-          used: getUsed(staff),
+          total,
+          used,
         },
       ]);
 
@@ -82,6 +89,12 @@ export default function AnnualLeaveManualGrant({
 
   const handleSaveAll = async () => {
     if (!canManage) return;
+
+    const invalidStaff = filtered.find((staff: any) => getUsed(staff) > getTotal(staff));
+    if (invalidStaff) {
+      setMessage(`${invalidStaff.name}: 사용일수(${getUsed(invalidStaff)})가 총일수(${getTotal(invalidStaff)})보다 많습니다. 수정 후 다시 시도해주세요.`);
+      return;
+    }
 
     setSaving(true);
     setMessage('');
@@ -142,7 +155,7 @@ export default function AnnualLeaveManualGrant({
       {message && (
         <div
           className={`mb-3 rounded-[var(--radius-lg)] p-3 text-sm font-bold ${
-            message.includes('실패') ? 'bg-red-500/10 text-red-700' : 'bg-emerald-50 text-emerald-700'
+            message.includes('실패') ? 'bg-danger/10 text-danger' : 'bg-success/10 text-success'
           }`}
         >
           {message}

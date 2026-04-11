@@ -133,13 +133,13 @@ function formatDelta(delta: number | null) {
 function getRunStatusMeta(status: string) {
   switch (status) {
     case 'completed':
-      return { label: '완료', className: 'bg-emerald-100 text-emerald-700' };
+      return { label: '완료', className: 'bg-success/15 text-success' };
     case 'failed':
-      return { label: '실패', className: 'bg-red-500/20 text-red-700' };
+      return { label: '실패', className: 'bg-danger/15 text-danger' };
     case 'running':
-      return { label: '진행 중', className: 'bg-amber-100 text-amber-700' };
+      return { label: '진행 중', className: 'bg-warning/15 text-warning' };
     default:
-      return { label: status || '미상', className: 'bg-slate-100 text-slate-600' };
+      return { label: status || '미상', className: 'bg-[var(--muted)] text-[var(--toss-gray-4)]' };
   }
 }
 
@@ -678,7 +678,7 @@ export default function DataBackup({ user }: Props) {
             type="button"
             onClick={restoreData}
             disabled={!restoreFile || !restorePreview || loading || previewLoading}
-            className="rounded-[16px] bg-red-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+            className="rounded-[16px] bg-danger px-4 py-2.5 text-sm font-bold text-white transition-colors hover:opacity-90 disabled:opacity-50"
           >
             복원 실행
           </button>
@@ -729,7 +729,7 @@ export default function DataBackup({ user }: Props) {
             </div>
           </div>
         ) : restoreFile && !previewLoading ? (
-          <div className="rounded-[18px] border border-red-500/20 bg-red-500/10 px-4 py-3 text-[12px] font-semibold text-red-600">
+          <div className="rounded-[18px] border border-danger/20 bg-danger/10 px-4 py-3 text-[12px] font-semibold text-danger">
             파일을 읽지 못했습니다. 유효한 JSON 백업 파일인지 확인해 주세요.
           </div>
         ) : null}

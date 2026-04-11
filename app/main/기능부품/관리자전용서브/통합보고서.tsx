@@ -18,7 +18,7 @@ interface StaffMember {
   [key: string]: unknown;
 }
 
-const PIE_COLORS = ['#4F8EF7', '#34C759', '#FF9500', '#FF6B6B', '#AF52DE', '#5AC8FA'];
+const PIE_COLORS = ['var(--accent)', 'var(--success, #34C759)', 'var(--warning, #FF9500)', 'var(--danger, #FF6B6B)', '#AF52DE', '#5AC8FA'];
 
 export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[] }) {
   const [activeTab, setActiveTab] = useState<ReportTab>('인사현황');
@@ -147,7 +147,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
         <div className="flex items-center gap-2 print:hidden">
           <button
             onClick={handleExcelDownload}
-            className="px-4 py-2 rounded-[var(--radius-md)] bg-[#217346] text-white text-sm font-bold hover:opacity-90 transition-opacity flex items-center gap-1.5"
+            className="px-4 py-2 rounded-[var(--radius-md)] bg-success text-white text-sm font-bold hover:opacity-90 transition-opacity flex items-center gap-1.5"
           >
             <span>Excel 다운로드</span>
           </button>
@@ -180,11 +180,11 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
       {activeTab === '인사현황' && (
         <div className="space-y-4">
           {/* 요약 카드 */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { label: '전체 인원', value: `${staffs.length}명`, color: 'text-[var(--accent)]' },
-              { label: '정규직', value: `${totalRegular}명`, color: 'text-[#34C759]' },
-              { label: '계약직', value: `${totalContract}명`, color: 'text-[#FF9500]' },
+              { label: '정규직', value: `${totalRegular}명`, color: 'text-success' },
+              { label: '계약직', value: `${totalContract}명`, color: 'text-warning' },
               { label: '부서 수', value: `${hrChartData.length}개`, color: 'text-[var(--foreground)]' },
             ].map(card => (
               <div key={card.label} className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
@@ -212,7 +212,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
                       contentStyle={{ borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)' }}
                     />
                     <Bar dataKey="regular" name="정규직" stackId="a" fill="#4F8EF7" radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="contract" name="계약직" stackId="a" fill="#FF9500" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="contract" name="계약직" stackId="a" fill="var(--warning, #FF9500)" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -295,7 +295,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
             {[
               { label: '전체 인건비 합계', value: `${totalSalary.toLocaleString()}원`, color: 'text-[var(--accent)]' },
               { label: '1인 평균 급여', value: staffs.length > 0 ? `${Math.round(totalSalary / staffs.length).toLocaleString()}원` : '-', color: 'text-[var(--foreground)]' },
-              { label: '급여 데이터 인원', value: `${staffs.filter((s: StaffMember) => (s.base_salary ?? 0) > 0).length}명`, color: 'text-[#34C759]' },
+              { label: '급여 데이터 인원', value: `${staffs.filter((s: StaffMember) => (s.base_salary ?? 0) > 0).length}명`, color: 'text-success' },
             ].map(card => (
               <div key={card.label} className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
                 <div className="text-xs text-[var(--toss-gray-3)] font-bold mb-1">{card.label}</div>
@@ -373,7 +373,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
                   {
                     label: '총 재고 금액',
                     value: `${inventoryChartData.reduce((acc, r) => acc + r.totalAmount, 0).toLocaleString()}원`,
-                    color: 'text-[#34C759]'
+                    color: 'text-success'
                   },
                 ].map(card => (
                   <div key={card.label} className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
@@ -430,7 +430,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
                           formatter={(value: any) => [`${(value || 0).toLocaleString()}원`, '재고 금액']}
                           contentStyle={{ borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)' }}
                         />
-                        <Bar dataKey="totalAmount" name="재고 금액" fill="#34C759" radius={[6, 6, 0, 0]} />
+                        <Bar dataKey="totalAmount" name="재고 금액" fill="var(--success, #34C759)" radius={[6, 6, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   )}
@@ -461,7 +461,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
                             <tr key={row.category} className="hover:bg-[var(--muted)]/50 transition-colors">
                               <td className="px-4 py-2 font-bold text-[var(--foreground)]">{row.category}</td>
                               <td className="px-4 py-2 text-right text-[var(--foreground)]">{row.count}개</td>
-                              <td className="px-4 py-2 text-right font-bold text-[#34C759]">{row.totalAmount.toLocaleString()}원</td>
+                              <td className="px-4 py-2 text-right font-bold text-success">{row.totalAmount.toLocaleString()}원</td>
                             </tr>
                           ))}
                       </tbody>

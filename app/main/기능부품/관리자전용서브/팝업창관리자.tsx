@@ -33,22 +33,6 @@ export function isAllowedFile(file: File, mediaType: PopupDraft['media_type']) {
   }
 
   if (mediaType === 'video' && file.size > MAX_VIDEO_BYTES) {
-    return '파일 크기는 25MB 이하여야 합니다.';
-  }
-
-  return null;
-}
-
-function validatePopupFileSelection(file: File, mediaType: PopupDraft['media_type']) {
-  const allowedTypes = mediaType === 'video' ? VIDEO_TYPES : IMAGE_TYPES;
-
-  if (!allowedTypes.has(file.type)) {
-    return mediaType === 'video'
-      ? '동영상은 MP4 파일만 업로드할 수 있습니다.'
-      : '이미지는 JPG 또는 PNG 파일만 업로드할 수 있습니다.';
-  }
-
-  if (mediaType === 'video' && file.size > MAX_VIDEO_BYTES) {
     return '동영상 크기는 200MB 이하여야 합니다.';
   }
 
@@ -85,10 +69,14 @@ export default function PopupManager() {
   }, [previewUrl, selectedFile]);
 
   const loadPopups = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('popups')
       .select('*')
       .order('created_at', { ascending: false });
+    if (error) {
+      console.error('팝업 목록 조회 실패:', error);
+      toast('팝업 목록을 불러오지 못했습니다.', 'error');
+    }
     setPopups(data || []);
   };
 
@@ -99,7 +87,7 @@ export default function PopupManager() {
   const uploadSelectedFile = async () => {
     if (!selectedFile) return newPopup.media_url;
 
-    const fileError = validatePopupFileSelection(selectedFile, newPopup.media_type);
+    const fileError = isAllowedFile(selectedFile, newPopup.media_type);
     if (fileError) {
       throw new Error(fileError);
     }
@@ -202,7 +190,7 @@ export default function PopupManager() {
 
   return (
     <div className="space-y-4 animate-in slide-in-from-right-4 duration-500">
-      <div className="bg-[var(--card)] p-4 border border-[var(--border)] shadow-sm space-y-4">
+      <div className="bg-[var(--card)] p-4 border border-[var(--border)] rounded-[var(--radius-xl)] shadow-sm space-y-4">
         <div className="flex justify-between items-center border-b border-[var(--border-subtle)] pb-4">
           <h3 className="font-semibold text-base text-[var(--foreground)] tracking-tight">
             홈페이지 팝업 설정
@@ -212,13 +200,13 @@ export default function PopupManager() {
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
               팝업 제목
             </label>
             <input
-              className="w-full p-2 bg-[var(--muted)] border border-[var(--border)] text-xs font-bold outline-none"
+              className="w-full p-2 bg-[var(--muted)] border border-[var(--border)] rounded-[var(--radius-md)] text-xs font-bold outline-none"
               placeholder="예: 박철홍정형외과 설날 진료 안내"
               value={newPopup.title}
               onChange={(e) => setNewPopup({ ...newPopup, title: e.target.value })}
@@ -229,7 +217,7 @@ export default function PopupManager() {
               미디어 타입
             </label>
             <select
-              className="w-full p-2 bg-[var(--muted)] border border-[var(--border)] text-xs font-bold outline-none"
+              className="w-full p-2 bg-[var(--muted)] border border-[var(--border)] rounded-[var(--radius-md)] text-xs font-bold outline-none"
               value={newPopup.media_type}
               onChange={(e) => {
                 setSelectedFile(null);
@@ -262,17 +250,17 @@ export default function PopupManager() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-2 mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4">
           <button
             onClick={() => setShowPreview(true)}
-            className="w-full py-2.5 bg-orange-500/10 text-orange-600 border border-orange-100 text-[11px] font-semibold shadow-sm uppercase tracking-widest"
+            className="w-full py-2.5 bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 rounded-[var(--radius-md)] text-[11px] font-semibold shadow-sm uppercase tracking-widest"
           >
             👁️ 홈페이지 실시간 시뮬레이션
           </button>
           <button
             onClick={handleAddPopup}
             disabled={saving}
-            className="w-full py-2.5 bg-gray-900 text-white text-[11px] font-semibold shadow-sm uppercase tracking-widest disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full py-2.5 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-[11px] font-semibold shadow-sm uppercase tracking-widest disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {saving ? '업로드 중...' : '팝업 즉시 생성'}
           </button>
@@ -331,7 +319,7 @@ export default function PopupManager() {
                         onClick={() => void handleDeletePopup(popup)}
                         disabled={deletingPopupId === popup.id}
                         data-testid={`popup-delete-button-${popup.id}`}
-                        className="shrink-0 px-3 py-2 bg-red-500/10 border border-red-500/20 text-red-600 text-[11px] font-bold hover:bg-red-500/20 disabled:opacity-60 disabled:cursor-not-allowed"
+                        className="shrink-0 px-3 py-2 bg-danger/10 border border-danger/20 text-danger rounded-[var(--radius-md)] text-[11px] font-bold hover:bg-danger/20 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         {deletingPopupId === popup.id ? '삭제 중...' : '삭제'}
                       </button>
@@ -377,7 +365,7 @@ export default function PopupManager() {
               </div>
               <button
                 onClick={() => setShowPreview(false)}
-                className="px-5 py-1.5 bg-black text-white text-[11px] font-semibold"
+                className="px-5 py-1.5 bg-[var(--foreground)] text-[var(--card)] rounded-[var(--radius-md)] text-[11px] font-semibold"
               >
                 닫기 X
               </button>
@@ -389,7 +377,7 @@ export default function PopupManager() {
               />
               <div
                 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[var(--card)] shadow-sm border border-[var(--foreground)] overflow-hidden"
-                style={{ width: `${newPopup.width}px`, height: `${newPopup.height}px` }}
+                style={{ width: `${Math.min(newPopup.width, 360)}px`, maxWidth: 'calc(100vw - 40px)', height: `${newPopup.height}px`, maxHeight: 'calc(100vh - 120px)' }}
               >
                 {newPopup.media_type === 'video' ? (
                   <video
