@@ -347,6 +347,7 @@ export function AttachmentListCard({
                 src={url}
                 alt={name}
                 onLoad={() => onMediaLoad?.()}
+                onError={(e) => { const t = e.currentTarget; t.style.display = 'none'; const p = t.parentElement; if (p) { const d = document.createElement('div'); d.className = 'flex items-center justify-center w-[200px] h-[120px] rounded-[var(--radius-md)] bg-[var(--muted)] border border-[var(--border)] text-xs text-[var(--toss-gray-3)]'; d.textContent = '이미지를 불러올 수 없습니다'; p.appendChild(d); } }}
                 className="max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] object-cover cursor-zoom-in border border-[var(--border)]"
               />
             </button>

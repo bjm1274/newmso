@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
 import {
@@ -30,6 +31,7 @@ type InventoryCatalogItem = {
   min_stock: number;
   unit: SupplyRequestItemUnit;
   spec: string;
+  category: SupplyRequestCategory | '';
 };
 
 type SuppliesFormProps = {
@@ -117,6 +119,8 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
   const [monthlySuggestions, setMonthlySuggestions] = useState<SupplyRequestMonthlySuggestion[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsExpanded, setStatsExpanded] = useState(false);
+  const [sortKey, setSortKey] = useState<'category' | 'name' | null>(null);
+  const [sortAsc, setSortAsc] = useState(true);
   const requesterDepartment = useMemo(() => {
     const currentDepartment = String(user?.department || user?.team || '').trim();
     if (currentDepartment) {
@@ -142,18 +146,23 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
       const key = normalizeInventoryKey(name);
       const rowUnit = getInventoryUnit(row);
       const rowSpec = getInventorySpec(row);
+      const rowCategory = normalizeSupplyRequestCategory(row?.category);
       const current = merged.get(key) || {
         name,
         stock: 0,
         min_stock: 0,
         unit: rowUnit,
         spec: rowSpec,
+        category: rowCategory,
       };
 
       current.stock += getInventoryStock(row);
       current.min_stock = Math.max(current.min_stock, getInventoryMinStock(row));
       if (!current.spec && rowSpec) {
         current.spec = rowSpec;
+      }
+      if (!current.category && rowCategory) {
+        current.category = rowCategory;
       }
       if (current.unit !== 'BOX' && rowUnit === 'BOX') {
         current.unit = rowUnit;
@@ -303,6 +312,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
           name: value,
           currentStock: exactMatch || departmentStockByName.has(keyword) ? departmentStock ?? 0 : null,
           unit: exactMatch ? exactMatch.unit : item.unit,
+          category: exactMatch && exactMatch.category ? exactMatch.category : item.category,
           suggestions: keyword
             ? inventoryCatalog
                 .filter((entry) => {
@@ -321,6 +331,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
   };
 
   const selectItem = (index: number, selected: InventoryCatalogItem) => {
+    setActiveDropdownIndex(null);
     const itemKey = normalizeInventoryKey(selected.name);
     setItems((prev) =>
       prev.map((item, itemIndex) =>
@@ -330,6 +341,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
               name: selected.name,
               currentStock: departmentStockByName.get(itemKey) ?? 0,
               unit: selected.unit,
+              category: selected.category || item.category,
               suggestions: [],
             }
           : item,
@@ -353,6 +365,61 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
           : item,
       ),
     );
+  };
+
+  const inputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [activeDropdownIndex, setActiveDropdownIndex] = useState<number | null>(null);
+
+  const updateDropdownPosition = useCallback((index: number) => {
+    const el = inputRefs.current.get(index);
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const dropdownHeight = 240;
+    const showAbove = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
+    setDropdownPos({
+      top: showAbove ? rect.top - dropdownHeight : rect.bottom + 4,
+      left: rect.left,
+      width: rect.width,
+    });
+    setActiveDropdownIndex(index);
+  }, []);
+
+  // 바깥 클릭 시 드롭다운 닫기 + 리사이즈/스크롤 시 위치 갱신
+  useEffect(() => {
+    if (activeDropdownIndex === null) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-supply-dropdown]') || target.closest('[data-supply-input]')) return;
+      setActiveDropdownIndex(null);
+    };
+    const handleReposition = () => updateDropdownPosition(activeDropdownIndex);
+    const handleClose = () => setActiveDropdownIndex(null);
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('resize', handleReposition);
+    window.addEventListener('scroll', handleClose, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('resize', handleReposition);
+      window.removeEventListener('scroll', handleClose, true);
+    };
+  }, [activeDropdownIndex, updateDropdownPosition]);
+
+  const handleSort = (key: 'category' | 'name') => {
+    const nextAsc = sortKey === key ? !sortAsc : true;
+    setSortKey(key);
+    setSortAsc(nextAsc);
+
+    setItems((prev) => {
+      const sorted = [...prev].sort((a, b) => {
+        const av = key === 'category' ? (a.category || '기타') : a.name;
+        const bv = key === 'category' ? (b.category || '기타') : b.name;
+        const cmp = av.localeCompare(bv, 'ko');
+        return nextAsc ? cmp : -cmp;
+      });
+      return sorted;
+    });
   };
 
   const addItemRow = () => {
@@ -662,7 +729,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
           ))}
         </div>
 
-        <div className="hidden overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-sm md:block">
+        <div className="hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-sm md:block">
           <table className="w-full max-w-full table-fixed border-collapse">
             <colgroup>
               <col className="w-[14%]" />
@@ -673,8 +740,18 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
             </colgroup>
             <thead className="bg-[var(--muted)]">
               <tr className="border-b border-[var(--border)]">
-                <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">품목구분</th>
-                <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">물품명</th>
+                <th
+                  className="cursor-pointer select-none px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)] hover:text-[var(--accent)]"
+                  onClick={() => handleSort('category')}
+                >
+                  품목구분 {sortKey === 'category' ? (sortAsc ? '▲' : '▼') : ''}
+                </th>
+                <th
+                  className="cursor-pointer select-none px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)] hover:text-[var(--accent)]"
+                  onClick={() => handleSort('name')}
+                >
+                  물품명 {sortKey === 'name' ? (sortAsc ? '▲' : '▼') : ''}
+                </th>
                 <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">현재 재고</th>
                 <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">신청 수량</th>
                 <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">용도</th>
@@ -699,45 +776,64 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
                     </select>
                   </td>
                   <td className="px-2 py-1.5 align-middle">
-                    <div className="relative">
+                    <div>
                       <input
+                        data-supply-input
                         data-testid={`supplies-item-name-${index}`}
+                        ref={(el) => { if (el) inputRefs.current.set(index, el); }}
                         value={item.name}
-                        onChange={(event) => handleSearch(index, event.target.value)}
-                        onFocus={(event) => handleSearch(index, event.target.value)}
+                        onChange={(event) => {
+                          handleSearch(index, event.target.value);
+                          updateDropdownPosition(index);
+                        }}
+                        onFocus={(event) => {
+                          handleSearch(index, event.target.value);
+                          updateDropdownPosition(index);
+                        }}
+                        onBlur={() => {
+                          // 클릭 선택 가능하도록 약간의 딜레이
+                          setTimeout(() => setActiveDropdownIndex((prev) => prev === index ? null : prev), 200);
+                        }}
                         className="h-10 w-full rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-2.5 text-xs font-bold text-[var(--foreground)] outline-none transition-all focus:bg-[var(--card)] focus:ring-2 focus:ring-[var(--accent)]/20"
                         placeholder="물품명을 입력하세요"
                       />
-                      {item.suggestions.length > 0 ? (
-                        <div className="absolute left-0 top-full z-[100] mt-1 w-full overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
-                          {item.suggestions.map((suggestion, suggestionIndex) => (
+                      {activeDropdownIndex === index && item.suggestions.length > 0 && dropdownPos
+                        ? createPortal(
                             <div
-                              key={`${suggestion.name}-${suggestionIndex}`}
-                              data-testid={`supplies-item-suggestion-${index}-${suggestionIndex}`}
-                              onClick={() => selectItem(index, suggestion)}
-                              className="flex cursor-pointer items-center justify-between gap-3 border-b p-3 text-[11px] font-bold transition-colors last:border-none hover:bg-[var(--muted)]"
+                              data-supply-dropdown
+                              className="fixed z-[9999] max-h-[240px] overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-lg"
+                              style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
                             >
-                              <div className="min-w-0">
-                                <span className="block truncate text-[var(--foreground)]">{suggestion.name}</span>
-                                {suggestion.spec ? (
-                                  <span className="mt-1 block truncate text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                                    {suggestion.spec}
+                              {item.suggestions.map((suggestion, suggestionIndex) => (
+                                <div
+                                  key={`${suggestion.name}-${suggestionIndex}`}
+                                  data-testid={`supplies-item-suggestion-${index}-${suggestionIndex}`}
+                                  onMouseDown={() => selectItem(index, suggestion)}
+                                  className="flex cursor-pointer items-center justify-between gap-3 border-b p-3 text-[11px] font-bold transition-colors last:border-none hover:bg-[var(--muted)]"
+                                >
+                                  <div className="min-w-0">
+                                    <span className="block truncate text-[var(--foreground)]">{suggestion.name}</span>
+                                    {suggestion.spec ? (
+                                      <span className="mt-1 block truncate text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                                        {suggestion.spec}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  <span
+                                    className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold ${
+                                      suggestion.stock <= suggestion.min_stock
+                                        ? 'bg-red-500/20 text-red-600'
+                                        : 'bg-green-500/20 text-green-600'
+                                    }`}
+                                  >
+                                    재고 {suggestion.stock} {suggestion.unit}
                                   </span>
-                                ) : null}
-                              </div>
-                              <span
-                                className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${
-                                  suggestion.stock <= suggestion.min_stock
-                                    ? 'bg-red-500/20 text-red-600'
-                                    : 'bg-green-500/20 text-green-600'
-                                }`}
-                              >
-                                재고 {suggestion.stock} {suggestion.unit}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
+                                </div>
+                              ))}
+                            </div>,
+                            document.body,
+                          )
+                        : null}
                     </div>
                   </td>
                   <td className="px-2 py-1.5 align-middle">

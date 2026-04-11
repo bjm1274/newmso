@@ -385,13 +385,13 @@ function getGuideAudienceLabel(audience: GuideAudience) {
 function getTaskPriorityMeta(priority: GuideTaskPriority) {
   switch (priority) {
     case 'urgent':
-      return { label: '긴급', className: 'bg-rose-500/15 text-rose-600' };
+      return { label: '긴급', className: 'badge-red' };
     case 'high':
-      return { label: '높음', className: 'bg-orange-500/15 text-orange-600' };
+      return { label: '높음', className: 'badge-yellow' };
     case 'low':
-      return { label: '낮음', className: 'bg-[var(--muted)] text-[var(--toss-gray-4)]' };
+      return { label: '낮음', className: 'badge-gray' };
     default:
-      return { label: '보통', className: 'bg-sky-500/15 text-sky-600' };
+      return { label: '보통', className: 'badge-blue' };
   }
 }
 
@@ -1275,41 +1275,50 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
   const canEditSelected = canManagePost(selectedResource);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto custom-scrollbar p-4 md:p-5" data-testid="guide-library-view">
-      <header className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-        <h2 className="text-xl font-bold text-[var(--foreground)]">{GUIDE_DISPLAY_NAME}</h2>
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto custom-scrollbar p-3 md:p-4" data-testid="guide-library-view">
+      {/* 헤더 + 통계 */}
+      <header className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-base font-bold text-[var(--foreground)]">{GUIDE_DISPLAY_NAME}</h2>
+            <p className="mt-0.5 text-xs font-medium text-[var(--toss-gray-4)]">
+              {activeTeam ? `${activeCompanyLabel} · ${activeTeam.teamName}` : activeCompanyLabel}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="badge badge-blue">{activeTeamResourceCount}건 자료</span>
+            <span className="badge badge-yellow">{activeTeamHandoverCount}건 인수인계</span>
+            <span className="badge badge-gray">{activeTeamTaskCount}건 할일</span>
+          </div>
+        </div>
       </header>
 
+      {/* 게시글 작성/수정 폼 */}
       {showComposer && (
-        <section data-testid="guide-form" className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-bold text-[var(--foreground)]">{editingResourceId ? `${GUIDE_DISPLAY_NAME} 게시글 수정` : `${GUIDE_DISPLAY_NAME} 게시글 등록`}</h3>
-                <p className="mt-1 text-xs font-semibold text-[var(--toss-gray-3)]">
-                  선택한 회사와 팀 기준으로 업무자료, 첨부 문서, 업무 인수인계를 함께 등록할 수 있습니다.
-                </p>
-              </div>
+        <section data-testid="guide-form" className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+          <div className="flex flex-col gap-3">
+            <div className="section-header">
+              <h3 className="section-title">{editingResourceId ? '게시글 수정' : '게시글 등록'}</h3>
               <button
                 type="button"
                 onClick={() => {
                   resetComposer(activeTeam);
                   setShowComposer(false);
                 }}
-                className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-bold text-[var(--foreground)]"
+                className="btn-premium-secondary"
               >
                 닫기
               </button>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              <label className="space-y-2">
-                <span className="text-xs font-bold text-[var(--foreground)]">회사</span>
-                <input value={activeCompanyLabel} readOnly className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm font-semibold text-[var(--foreground)]" />
+            <div className="grid gap-3 lg:grid-cols-2">
+              <label className="space-y-1.5">
+                <span className="text-xs font-semibold text-[var(--toss-gray-5)]">회사</span>
+                <input value={activeCompanyLabel} readOnly className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-[13px] font-semibold text-[var(--foreground)]" />
               </label>
 
-              <label className="space-y-2">
-                <span className="text-xs font-bold text-[var(--foreground)]">팀</span>
+              <label className="space-y-1.5">
+                <span className="text-xs font-semibold text-[var(--toss-gray-5)]">팀</span>
                 <select
                   data-testid="guide-team-select"
                   value={teamName}
@@ -1318,7 +1327,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                     setTeamName(event.target.value);
                     setDivisionName(nextTeam?.divisionName || '');
                   }}
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
                 >
                   <option value="">팀 선택</option>
                   {companyTeams.map((team) => (
@@ -1330,83 +1339,83 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
               </label>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              <label className="space-y-2">
-                <span className="text-xs font-bold text-[var(--foreground)]">제목</span>
+            <div className="grid gap-3 lg:grid-cols-2">
+              <label className="space-y-1.5">
+                <span className="text-xs font-semibold text-[var(--toss-gray-5)]">제목</span>
                 <input
                   data-testid="guide-title-input"
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
                   placeholder="예: 수술팀 신규 직원 준비 가이드"
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
                 />
               </label>
 
-              <label className="space-y-2">
-                <span className="text-xs font-bold text-[var(--foreground)]">소속 부문</span>
+              <label className="space-y-1.5">
+                <span className="text-xs font-semibold text-[var(--toss-gray-5)]">소속 부문</span>
                 <input
                   value={divisionName}
                   onChange={(event) => setDivisionName(event.target.value)}
                   placeholder="예: 간호부"
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
                 />
               </label>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              <label className="space-y-2">
-                <span className="text-xs font-bold text-[var(--foreground)]">공유 유형</span>
+            <div className="grid gap-3 lg:grid-cols-3">
+              <label className="space-y-1.5">
+                <span className="text-xs font-semibold text-[var(--toss-gray-5)]">공유 유형</span>
                 <select
                   data-testid="guide-kind-select"
                   value={kind}
                   onChange={(event) => setKind(normalizeGuideKind(event.target.value))}
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
                 >
                   <option value="education">업무자료</option>
                   <option value="handover">업무 인수인계</option>
                 </select>
               </label>
 
-              <label className="space-y-2">
-                <span className="text-xs font-bold text-[var(--foreground)]">대상 직원</span>
+              <label className="space-y-1.5">
+                <span className="text-xs font-semibold text-[var(--toss-gray-5)]">대상 직원</span>
                 <select
                   data-testid="guide-audience-select"
                   value={audience}
                   onChange={(event) => setAudience(normalizeGuideAudience(event.target.value))}
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
                 >
                   <option value="new_hire">신규직원</option>
                   <option value="current_staff">기존직원</option>
                   <option value="all_staff">전체직원</option>
                 </select>
               </label>
+
+              <label className="space-y-1.5">
+                <span className="text-xs font-semibold text-[var(--toss-gray-5)]">검색 키워드</span>
+                <input
+                  data-testid="guide-keywords-input"
+                  value={keywordsInput}
+                  onChange={(event) => setKeywordsInput(event.target.value)}
+                  placeholder="예: 신규교육, 체크리스트"
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
+                />
+              </label>
             </div>
 
-            <label className="space-y-2">
-              <span className="text-xs font-bold text-[var(--foreground)]">검색 키워드</span>
-              <input
-                data-testid="guide-keywords-input"
-                value={keywordsInput}
-                onChange={(event) => setKeywordsInput(event.target.value)}
-                placeholder="예: 신규교육, 체크리스트, 인계포인트"
-                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
-              />
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-xs font-bold text-[var(--foreground)]">설명 / 프로세스</span>
+            <label className="space-y-1.5">
+              <span className="text-xs font-semibold text-[var(--toss-gray-5)]">설명 / 프로세스</span>
               <textarea
                 data-testid="guide-description-input"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
-                rows={10}
+                rows={6}
                 placeholder={'1. 준비 전 확인\n- 환자, 일정, 재고 확인\n\n2. 준비물 세팅\n- 필수 기구와 소모품 준비\n\n3. 진행 순서\n- 실제 업무 순서를 단계별로 작성\n\n4. 주의사항\n- 신규 직원이 헷갈리기 쉬운 포인트 정리'}
-                className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold leading-6 outline-none focus:border-[var(--accent)]"
+                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold leading-6 outline-none focus:border-[var(--accent)]"
               />
             </label>
 
-            <label className="space-y-2">
-              <span className="text-xs font-bold text-[var(--foreground)]">첨부파일</span>
+            <label className="space-y-1.5">
+              <span className="text-xs font-semibold text-[var(--toss-gray-5)]">첨부파일</span>
               <input
                 data-testid="guide-file-input"
                 type="file"
@@ -1416,21 +1425,21 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                   setPendingFiles((prev) => [...prev, ...files].slice(0, 10));
                   event.currentTarget.value = '';
                 }}
-                className="block w-full rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold"
+                className="block w-full rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold"
               />
             </label>
 
             {(existingAttachments.length > 0 || pendingFiles.length > 0) && (
               <div className="grid gap-3 lg:grid-cols-2">
-                <div className="rounded-[var(--radius-lg)] bg-[var(--muted)] p-4">
-                  <p className="text-xs font-bold text-[var(--foreground)]">저장된 첨부</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                <div className="rounded-[var(--radius-md)] bg-[var(--muted)] p-3">
+                  <p className="text-xs font-semibold text-[var(--toss-gray-5)]">저장된 첨부</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
                     {existingAttachments.map((attachment, index) => (
                       <button
                         key={`${attachment.url}-${index}`}
                         type="button"
                         onClick={() => setExistingAttachments((prev) => prev.filter((_, currentIndex) => currentIndex !== index))}
-                        className="rounded-full bg-[var(--card)] px-3 py-1.5 text-xs font-bold text-[var(--foreground)]"
+                        className="rounded-[var(--radius-sm)] bg-[var(--card)] px-2.5 py-1 text-[11px] font-semibold text-[var(--foreground)] hover:bg-[var(--danger)]/10 hover:text-[var(--danger)]"
                       >
                         {attachment.name} ×
                       </button>
@@ -1438,15 +1447,15 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                   </div>
                 </div>
 
-                <div className="rounded-[var(--radius-lg)] bg-[var(--muted)] p-4">
-                  <p className="text-xs font-bold text-[var(--foreground)]">새로 올릴 파일</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                <div className="rounded-[var(--radius-md)] bg-[var(--muted)] p-3">
+                  <p className="text-xs font-semibold text-[var(--toss-gray-5)]">새로 올릴 파일</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
                     {pendingFiles.map((file, index) => (
                       <button
                         key={`${file.name}-${file.size}-${index}`}
                         type="button"
                         onClick={() => setPendingFiles((prev) => prev.filter((_, currentIndex) => currentIndex !== index))}
-                        className="rounded-full bg-[var(--card)] px-3 py-1.5 text-xs font-bold text-[var(--foreground)]"
+                        className="rounded-[var(--radius-sm)] bg-[var(--card)] px-2.5 py-1 text-[11px] font-semibold text-[var(--foreground)] hover:bg-[var(--danger)]/10 hover:text-[var(--danger)]"
                       >
                         {file.name} ×
                       </button>
@@ -1463,7 +1472,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                   resetComposer(activeTeam);
                   setShowComposer(false);
                 }}
-                className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--foreground)]"
+                className="btn-premium-secondary"
               >
                 취소
               </button>
@@ -1472,7 +1481,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                 data-testid="guide-save"
                 disabled={savingResource}
                 onClick={() => void saveResource()}
-                className="rounded-full bg-[var(--accent)] px-5 py-2 text-sm font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-premium-primary disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {savingResource ? '저장 중...' : editingResourceId ? '수정 저장' : '게시글 등록'}
               </button>
@@ -1481,109 +1490,101 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
         </section>
       )}
 
-      <section className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
+      {/* 메인 2컬럼 레이아웃 */}
+      <section className="grid gap-3 xl:grid-cols-[300px_minmax(0,1fr)]">
+        {/* 좌측 사이드바 */}
         <div className="space-y-3">
-          <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm" data-testid="guide-team-menu">
-            <div className="space-y-4">
-              <div className="flex flex-col gap-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-bold text-[var(--foreground)]">회사 / 팀 선택</p>
-                  </div>
-                  {canWrite ? (
-                    <button
-                      type="button"
-                      data-testid="guide-open-compose"
-                      onClick={() => startCreate(activeTeam)}
-                      className="rounded-full bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm hover:opacity-95"
-                    >
-                      {activeTeam ? `+ ${activeTeam.teamName}` : '+ 게시글'}
-                    </button>
-                  ) : null}
-                </div>
-
-                <div className="grid gap-3">
-                  <label className="space-y-1.5">
-                    <span className="text-[11px] font-bold text-[var(--foreground)]">회사 선택</span>
-                    <select
-                      data-testid="guide-company-select"
-                      value={companyFilter}
-                      onChange={(event) => setCompanyFilter(event.target.value)}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm font-semibold outline-none focus:border-[var(--accent)]"
-                    >
-                      {companyOptions.map((companyName) => (
-                        <option key={companyName} value={companyName}>
-                          {companyName}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="space-y-1.5">
-                    <span className="text-[11px] font-bold text-[var(--foreground)]">팀 선택</span>
-                    <select
-                      data-testid="guide-team-filter-select"
-                      value={selectedTeamKey}
-                      onChange={(event) => setSelectedTeamKey(event.target.value)}
-                      disabled={!companyTeams.length}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm font-semibold outline-none focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:bg-[var(--muted)]"
-                    >
-                      <option value="">{companyTeams.length ? '팀 선택' : '등록된 팀 없음'}</option>
-                      {selectedCompany?.divisions.map((division) => (
-                        <optgroup key={division.name} label={division.name}>
-                          {division.teams.map((team) => (
-                            <option key={team.key} value={team.key}>
-                              {division.name} / {team.teamName}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
-                {!activeTeam ? (
-                  <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-4 py-4 text-center text-sm font-semibold text-[var(--toss-gray-3)]">
-                    조직도에 등록된 팀이 없습니다.
-                  </div>
+          {/* 회사/팀 선택 */}
+          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm" data-testid="guide-team-menu">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[13px] font-bold text-[var(--foreground)]">회사 / 팀</p>
+                {canWrite ? (
+                  <button
+                    type="button"
+                    data-testid="guide-open-compose"
+                    onClick={() => startCreate(activeTeam)}
+                    className="btn-premium-primary !py-1 !px-2.5 !text-[11px]"
+                  >
+                    {activeTeam ? `+ ${activeTeam.teamName}` : '+ 게시글'}
+                  </button>
                 ) : null}
               </div>
+
+              <div className="grid gap-2">
+                <select
+                  data-testid="guide-company-select"
+                  value={companyFilter}
+                  onChange={(event) => setCompanyFilter(event.target.value)}
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2.5 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
+                >
+                  {companyOptions.map((companyName) => (
+                    <option key={companyName} value={companyName}>
+                      {companyName}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  data-testid="guide-team-filter-select"
+                  value={selectedTeamKey}
+                  onChange={(event) => setSelectedTeamKey(event.target.value)}
+                  disabled={!companyTeams.length}
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2.5 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:bg-[var(--muted)]"
+                >
+                  <option value="">{companyTeams.length ? '팀 선택' : '등록된 팀 없음'}</option>
+                  {selectedCompany?.divisions.map((division) => (
+                    <optgroup key={division.name} label={division.name}>
+                      {division.teams.map((team) => (
+                        <option key={team.key} value={team.key}>
+                          {division.name} / {team.teamName}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+
+              {!activeTeam ? (
+                <div className="empty-state">조직도에 등록된 팀이 없습니다.</div>
+              ) : null}
             </div>
           </div>
 
-          <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-            <div className="space-y-3">
+          {/* 검색 + 필터 */}
+          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm">
+            <div className="space-y-2.5">
               <input
                 data-testid="guide-search-input"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="제목, 팀, 키워드, 첨부파일명 검색"
-                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                placeholder="제목, 팀, 키워드 검색"
+                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
               />
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {(['all', 'education', 'handover'] as const).map((value) => (
                   <button
                     key={value}
                     type="button"
                     onClick={() => setKindFilter(value)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-bold ${
-                      kindFilter === value ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--foreground)]'
+                    className={`rounded-[var(--radius-md)] px-2.5 py-1.5 text-[11px] font-bold transition-colors ${
+                      kindFilter === value ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
                     }`}
                   >
-                    {value === 'all' ? '전체 자료' : value === 'education' ? '업무자료' : '업무 인수인계'}
+                    {value === 'all' ? '전체' : value === 'education' ? '업무자료' : '인수인계'}
                   </button>
                 ))}
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {(['all', 'new_hire', 'current_staff', 'all_staff'] as const).map((value) => (
                   <button
                     key={value}
                     type="button"
                     onClick={() => setAudienceFilter(value)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-bold ${
-                      audienceFilter === value ? 'bg-[var(--foreground)] text-white' : 'bg-[var(--muted)] text-[var(--foreground)]'
+                    className={`rounded-[var(--radius-md)] px-2.5 py-1.5 text-[11px] font-bold transition-colors ${
+                      audienceFilter === value ? 'bg-[var(--foreground)] text-[var(--card)]' : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:text-[var(--foreground)]'
                     }`}
                   >
                     {value === 'all' ? '전체 대상' : getGuideAudienceLabel(value)}
@@ -1593,32 +1594,24 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
             </div>
           </div>
 
-          <div className="space-y-3">
-            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-bold text-[var(--foreground)]">
-                    {activeTeam ? `${activeTeam.teamName} 업무자료 · 인수인계 공유` : '업무자료 · 인수인계 공유'}
-                  </p>
-                  <p className="mt-1 text-xs font-semibold leading-5 text-[var(--toss-gray-3)]">
-                    선택한 팀의 게시글, 첨부 문서, 업무 인수인계를 한 번에 확인할 수 있습니다.
-                  </p>
-                </div>
-                <span className="rounded-full bg-[var(--muted)] px-3 py-1 text-xs font-bold text-[var(--foreground)]">
-                  {filteredResources.length}건
-                </span>
-              </div>
+          {/* 자료 목록 */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between px-1">
+              <p className="text-[11px] font-bold text-[var(--toss-gray-4)]">
+                {activeTeam ? `${activeTeam.teamName} 자료` : '자료 목록'}
+              </p>
+              <span className="badge badge-gray">{filteredResources.length}건</span>
             </div>
 
             {loading ? (
-              <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-8 text-center text-sm font-semibold text-[var(--toss-gray-3)]">
-                {GUIDE_DISPLAY_NAME} 화면을 불러오는 중입니다.
+              <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-6 text-center text-[13px] font-semibold text-[var(--toss-gray-4)]">
+                불러오는 중...
               </div>
             ) : filteredResources.length === 0 ? (
-              <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-8 text-center">
-                <p className="text-base font-bold text-[var(--foreground)]">등록된 업무공유 자료가 없습니다.</p>
-                <p className="mt-2 text-sm font-semibold text-[var(--toss-gray-3)]">
-                  {activeTeam ? `${activeTeam.teamName} 팀의 첫 업무자료 또는 인수인계 게시글과 파일을 등록해 보세요.` : '왼쪽에서 팀을 선택해 주세요.'}
+              <div className="empty-state">
+                <p className="text-[13px] font-bold text-[var(--foreground)]">등록된 자료가 없습니다</p>
+                <p className="mt-1 text-xs text-[var(--toss-gray-4)]">
+                  {activeTeam ? `${activeTeam.teamName} 팀의 첫 자료를 등록해 보세요.` : '팀을 선택해 주세요.'}
                 </p>
               </div>
             ) : (
@@ -1628,70 +1621,62 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                   type="button"
                   data-testid={`guide-card-${resource.id}`}
                   onClick={() => setSelectedResourceId(resource.id)}
-                  className={`w-full rounded-[var(--radius-xl)] border p-4 text-left shadow-sm transition ${
+                  className={`w-full rounded-[var(--radius-lg)] border p-3 text-left transition-colors ${
                     selectedResourceId === resource.id
-                      ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]'
+                      ? 'border-[var(--accent)] bg-[var(--accent-light)]'
                       : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]/40'
                   }`}
                 >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-[var(--card)] px-2.5 py-1 text-[11px] font-bold text-[var(--accent)]">
-                      {getGuideKindLabel(resource.kind)}
-                    </span>
-                    <span className="rounded-full bg-[var(--card)] px-2.5 py-1 text-[11px] font-bold text-[var(--foreground)]">
-                      {getGuideAudienceLabel(resource.audience)}
-                    </span>
-                    <span className="rounded-full bg-[var(--card)] px-2.5 py-1 text-[11px] font-bold text-[var(--foreground)]">
-                      {resource.teamName || '미지정'}
-                    </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="badge badge-blue">{getGuideKindLabel(resource.kind)}</span>
+                    <span className="badge badge-gray">{getGuideAudienceLabel(resource.audience)}</span>
                   </div>
-                  <p className="mt-3 text-base font-bold text-[var(--foreground)]">{resource.title}</p>
-                  <p className="mt-2 line-clamp-3 text-sm font-semibold leading-6 text-[var(--toss-gray-3)]">
+                  <p className="mt-2 text-[13px] font-bold text-[var(--foreground)]">{resource.title}</p>
+                  <p className="mt-1 line-clamp-2 text-xs font-medium leading-5 text-[var(--toss-gray-4)]">
                     {resource.description || '설명 없음'}
                   </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-semibold text-[var(--toss-gray-4)]">
                     <span>{resource.author_name || '작성자 미상'}</span>
                     <span>{formatDate(resource.updated_at || resource.created_at)}</span>
-                    <span>첨부 {resource.attachments.length}개</span>
+                    {resource.attachments.length > 0 && <span>첨부 {resource.attachments.length}</span>}
                   </div>
                 </button>
               ))
             )}
           </div>
         </div>
-        <div className="min-w-0 space-y-4">
+
+        {/* 우측 콘텐츠 영역 */}
+        <div className="min-w-0 space-y-3">
+          {/* 상세 보기 */}
           {selectedResource ? (
-            <article data-testid="guide-detail" className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-              <div className="flex flex-col gap-4 border-b border-[var(--border)] pb-5">
+            <article data-testid="guide-detail" className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
+              {/* 상단 메타 */}
+              <div className="flex flex-col gap-3 border-b border-[var(--border)] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-2">
-                    <div className="flex flex-wrap gap-2">
-                      <span className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-xs font-bold text-[var(--accent)]">
-                        {getGuideKindLabel(selectedResource.kind)}
-                      </span>
-                      <span className="rounded-full bg-[var(--muted)] px-3 py-1 text-xs font-bold text-[var(--foreground)]">
-                        {getGuideAudienceLabel(selectedResource.audience)}
-                      </span>
-                      <span className="rounded-full bg-[var(--muted)] px-3 py-1 text-xs font-bold text-[var(--foreground)]">
-                        {selectedResource.teamName || '미지정'}
-                      </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="badge badge-blue">{getGuideKindLabel(selectedResource.kind)}</span>
+                      <span className="badge badge-gray">{getGuideAudienceLabel(selectedResource.audience)}</span>
+                      <span className="badge badge-gray">{selectedResource.teamName || '미지정'}</span>
                     </div>
-                    <h3 className="text-2xl font-bold text-[var(--foreground)]">{selectedResource.title}</h3>
-                    <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-[var(--toss-gray-3)]">
+                    <h3 className="text-lg font-bold text-[var(--foreground)]">{selectedResource.title}</h3>
+                    <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-[var(--toss-gray-4)]">
                       <span>{selectedResource.author_name || '작성자 미상'}</span>
+                      <span className="text-[var(--border)]">|</span>
                       <span>{selectedResource.companyName || activeCompanyLabel || '기본 기관'}</span>
-                      <span>{selectedResource.divisionName || '기타'}</span>
+                      <span className="text-[var(--border)]">|</span>
                       <span>{formatDate(selectedResource.updated_at || selectedResource.created_at)}</span>
                     </div>
                   </div>
 
                   {canEditSelected && (
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5">
                       <button
                         type="button"
                         data-testid="guide-edit"
                         onClick={() => startEdit(selectedResource)}
-                        className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-bold text-[var(--foreground)]"
+                        className="btn-premium-secondary"
                       >
                         수정
                       </button>
@@ -1699,7 +1684,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                         type="button"
                         data-testid="guide-delete"
                         onClick={() => void deleteResource(selectedResource)}
-                        className="rounded-full bg-rose-500 px-3 py-1.5 text-xs font-bold text-white"
+                        className="btn-premium-danger"
                       >
                         삭제
                       </button>
@@ -1708,36 +1693,33 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                 </div>
 
                 {selectedResource.keywords.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {selectedResource.keywords.map((keyword) => (
-                      <span key={keyword} className="rounded-full bg-[var(--muted)] px-3 py-1 text-[11px] font-bold text-[var(--foreground)]">
-                        #{keyword}
-                      </span>
+                      <span key={keyword} className="badge badge-gray">#{keyword}</span>
                     ))}
                   </div>
                 )}
               </div>
 
-              <div className="space-y-6 py-5">
-                <section className="space-y-3">
-                  <h4 className="text-sm font-bold text-[var(--foreground)]">프로세스 설명</h4>
-                  <div className="rounded-[var(--radius-lg)] bg-[var(--muted)] p-4 text-sm font-semibold leading-7 text-[var(--foreground)] whitespace-pre-wrap">
+              {/* 본문 */}
+              <div className="space-y-4 p-4">
+                <section className="space-y-2">
+                  <h4 className="text-xs font-bold text-[var(--toss-gray-5)]">프로세스 설명</h4>
+                  <div className="rounded-[var(--radius-md)] bg-[var(--muted)] p-3 text-[13px] font-medium leading-7 text-[var(--foreground)] whitespace-pre-wrap">
                     {selectedResource.description || '설명 없음'}
                   </div>
                 </section>
 
-                <section className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <h4 className="text-sm font-bold text-[var(--foreground)]">첨부 자료</h4>
-                    <span className="text-xs font-semibold text-[var(--toss-gray-3)]">{selectedResource.attachments.length}개</span>
+                <section className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-[var(--toss-gray-5)]">첨부 자료</h4>
+                    <span className="text-[11px] font-semibold text-[var(--toss-gray-4)]">{selectedResource.attachments.length}개</span>
                   </div>
                   {selectedResource.attachments.length === 0 ? (
-                    <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
-                      첨부파일이 없습니다.
-                    </div>
+                    <div className="empty-state">첨부파일이 없습니다.</div>
                   ) : (
                     <div className="space-y-3">
-                      <div className="grid gap-3 md:grid-cols-2">
+                      <div className="grid gap-2 md:grid-cols-2">
                         {selectedResource.attachments.map((attachment, index) => (
                           <a
                             key={`${attachment.url}-${index}`}
@@ -1746,25 +1728,21 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                             download={attachment.name}
                             target="_blank"
                             rel="noreferrer"
-                            className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 transition hover:border-[var(--accent)]"
+                            className="flex items-center justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-3 transition-colors hover:border-[var(--accent)]"
                           >
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-bold text-[var(--foreground)]">{attachment.name}</p>
-                                <p className="mt-1 text-xs font-semibold text-[var(--toss-gray-3)]">
-                                  {attachment.type === 'image' ? '이미지' : attachment.type === 'video' ? '동영상' : '파일'}
-                                </p>
-                              </div>
-                              <span className="shrink-0 rounded-full bg-[var(--toss-blue-light)] px-2.5 py-1 text-[11px] font-bold text-[var(--accent)]">
-                                열기
-                              </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-[13px] font-bold text-[var(--foreground)]">{attachment.name}</p>
+                              <p className="mt-0.5 text-[11px] font-medium text-[var(--toss-gray-4)]">
+                                {attachment.type === 'image' ? '이미지' : attachment.type === 'video' ? '동영상' : '파일'}
+                              </p>
                             </div>
+                            <span className="badge badge-blue shrink-0">열기</span>
                           </a>
                         ))}
                       </div>
 
                       {selectedResource.attachments.some((attachment) => attachment.type === 'image') && (
-                        <div className="grid gap-3 md:grid-cols-2">
+                        <div className="grid gap-2 md:grid-cols-2">
                           {selectedResource.attachments
                             .filter((attachment) => attachment.type === 'image')
                             .map((attachment, index) => (
@@ -1773,9 +1751,9 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                                 href={attachment.url}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)]"
+                                className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)]"
                               >
-                                <img src={attachment.url} alt={attachment.name} className="h-48 w-full object-cover" />
+                                <img src={attachment.url} alt={attachment.name} className="h-40 w-full object-cover" />
                               </a>
                             ))}
                         </div>
@@ -1786,30 +1764,31 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
               </div>
             </article>
           ) : (
-            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-10 text-center shadow-sm">
-              <p className="text-lg font-bold text-[var(--foreground)]">보고 싶은 공유자료를 선택해 주세요.</p>
+            <div className="empty-state rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-8 shadow-sm">
+              <p className="text-[13px] font-bold text-[var(--foreground)]">보고 싶은 공유자료를 선택해 주세요</p>
             </div>
           )}
 
-          <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm" data-testid="guide-team-task-board">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          {/* 팀별 할일 */}
+          <section className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm" data-testid="guide-team-task-board">
+            <div className="flex flex-col gap-3 p-4">
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <h3 className="text-lg font-bold text-[var(--foreground)]">
-                    {activeTeam ? `${activeTeam.teamName} 팀별 할일 공유` : '팀별 할일 공유'}
+                  <h3 className="text-[13px] font-bold text-[var(--foreground)]">
+                    {activeTeam ? `${activeTeam.teamName} 팀별 할일` : '팀별 할일'}
                   </h3>
-                  <p className="mt-1 text-xs font-semibold text-[var(--toss-gray-3)]">
-                    선택한 팀에서 같이 처리해야 할 작업과 인수인계 후속 할일을 함께 관리할 수 있습니다.
+                  <p className="mt-0.5 text-[11px] font-medium text-[var(--toss-gray-4)]">
+                    팀에서 같이 처리해야 할 작업을 관리합니다.
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {(['open', 'all', 'done'] as const).map((value) => (
                     <button
                       key={value}
                       type="button"
                       onClick={() => setTaskFilter(value)}
-                      className={`rounded-full px-3 py-1.5 text-xs font-bold ${
-                        taskFilter === value ? 'bg-[var(--foreground)] text-white' : 'bg-[var(--muted)] text-[var(--foreground)]'
+                      className={`rounded-[var(--radius-md)] px-2.5 py-1.5 text-[11px] font-bold transition-colors ${
+                        taskFilter === value ? 'bg-[var(--foreground)] text-[var(--card)]' : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:text-[var(--foreground)]'
                       }`}
                     >
                       {value === 'open' ? '진행중' : value === 'done' ? '완료' : '전체'}
@@ -1818,28 +1797,29 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                 </div>
               </div>
 
+              {/* 할일 입력 폼 */}
               {canWrite && activeTeam && (
-                <div className="grid gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/40 p-4">
-                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_160px]">
+                <div className="grid gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--tab-bg)] p-3">
+                  <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_160px_140px]">
                     <input
                       data-testid="guide-task-title-input"
                       value={taskTitle}
                       onChange={(event) => setTaskTitle(event.target.value)}
                       placeholder={`${activeTeam.teamName} 팀 할일 제목`}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
                     />
                     <input
                       data-testid="guide-task-due-date-input"
                       type="date"
                       value={taskDueDate}
                       onChange={(event) => setTaskDueDate(event.target.value)}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
                     />
                     <select
                       data-testid="guide-task-priority-select"
                       value={taskPriority}
                       onChange={(event) => setTaskPriority(normalizeGuideTaskPriority(event.target.value))}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
                     >
                       <option value="urgent">긴급</option>
                       <option value="high">높음</option>
@@ -1851,16 +1831,16 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                     data-testid="guide-task-note-input"
                     value={taskNote}
                     onChange={(event) => setTaskNote(event.target.value)}
-                    rows={3}
-                    placeholder="팀이 같이 봐야 할 메모, 준비사항, 전달사항을 적어 주세요."
-                    className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold leading-6 outline-none focus:border-[var(--accent)]"
+                    rows={2}
+                    placeholder="메모, 준비사항, 전달사항"
+                    className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold leading-6 outline-none focus:border-[var(--accent)]"
                   />
-                  <div className="flex justify-end gap-2">
+                  <div className="flex justify-end gap-1.5">
                     {editingTaskId ? (
                       <button
                         type="button"
                         onClick={resetTaskComposer}
-                        className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--foreground)]"
+                        className="btn-premium-secondary"
                       >
                         취소
                       </button>
@@ -1870,7 +1850,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                       data-testid="guide-task-save"
                       disabled={savingTask}
                       onClick={() => void saveTask()}
-                      className="rounded-full bg-[var(--accent)] px-5 py-2 text-sm font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                      className="btn-premium-primary disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {savingTask ? '저장 중...' : editingTaskId ? '할일 수정' : '할일 등록'}
                     </button>
@@ -1878,68 +1858,69 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                 </div>
               )}
 
+              {/* 할일 목록 */}
               {loading ? (
-                <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/20 p-6 text-center text-sm font-semibold text-[var(--toss-gray-3)]">
-                  팀 할일을 불러오는 중입니다.
+                <div className="rounded-[var(--radius-md)] bg-[var(--muted)] p-4 text-center text-[13px] font-semibold text-[var(--toss-gray-4)]">
+                  불러오는 중...
                 </div>
               ) : activeTeamTasks.length === 0 ? (
-                <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] p-6 text-center">
-                  <p className="text-base font-bold text-[var(--foreground)]">공유된 팀 할일이 없습니다.</p>
-                  <p className="mt-2 text-sm font-semibold text-[var(--toss-gray-3)]">
-                    {activeTeam ? `${activeTeam.teamName} 팀의 오늘 할일과 공통 체크사항을 등록해 보세요.` : '왼쪽에서 팀을 선택해 주세요.'}
+                <div className="empty-state">
+                  <p className="text-[13px] font-bold text-[var(--foreground)]">공유된 팀 할일이 없습니다</p>
+                  <p className="mt-1 text-xs text-[var(--toss-gray-4)]">
+                    {activeTeam ? `${activeTeam.teamName} 팀의 할일을 등록해 보세요.` : '팀을 선택해 주세요.'}
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {activeTeamTasks.map((task) => {
                     const priorityMeta = getTaskPriorityMeta(task.priority);
                     return (
                       <div
                         key={task.id}
                         data-testid={`guide-task-card-${task.id}`}
-                        className={`rounded-[var(--radius-lg)] border p-4 transition ${
-                          task.isDone ? 'border-emerald-200 bg-emerald-50/60' : 'border-[var(--border)] bg-[var(--card)]'
+                        className={`rounded-[var(--radius-md)] border p-3 transition-colors ${
+                          task.isDone ? 'border-[var(--success)]/20 bg-[var(--success)]/5' : 'border-[var(--border)] bg-[var(--card)]'
                         }`}
                       >
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                          <div className="space-y-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${priorityMeta.className}`}>{priorityMeta.label}</span>
-                              <span className="rounded-full bg-[var(--muted)] px-2.5 py-1 text-[11px] font-bold text-[var(--foreground)]">
+                        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="min-w-0 space-y-1.5">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className={`badge ${priorityMeta.className}`}>{priorityMeta.label}</span>
+                              <span className={`badge ${task.isDone ? 'badge-green' : 'badge-gray'}`}>
                                 {task.isDone ? '완료' : '진행중'}
                               </span>
                               {task.dueDate ? (
-                                <span className="rounded-full bg-[var(--muted)] px-2.5 py-1 text-[11px] font-bold text-[var(--foreground)]">
-                                  마감 {formatDateOnly(task.dueDate)}
-                                </span>
+                                <span className="badge badge-gray">마감 {formatDateOnly(task.dueDate)}</span>
                               ) : null}
                             </div>
-                            <p className={`text-base font-bold ${task.isDone ? 'text-emerald-700 line-through' : 'text-[var(--foreground)]'}`}>{task.title}</p>
-                            <p className="text-sm font-semibold leading-6 text-[var(--toss-gray-3)] whitespace-pre-wrap">
-                              {task.note || '메모 없음'}
-                            </p>
-                            <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                            <p className={`text-[13px] font-bold ${task.isDone ? 'text-[var(--success)] line-through' : 'text-[var(--foreground)]'}`}>{task.title}</p>
+                            {task.note && (
+                              <p className="text-xs font-medium leading-5 text-[var(--toss-gray-4)] whitespace-pre-wrap">
+                                {task.note}
+                              </p>
+                            )}
+                            <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold text-[var(--toss-gray-4)]">
                               <span>{task.author_name || '작성자 미상'}</span>
                               <span>{formatDate(task.updated_at || task.created_at)}</span>
                               {task.isDone ? (
                                 <span>
-                                  {`완료자 ${task.completedByName || '확인 불가'}${task.completedAt ? ` · ${formatDate(task.completedAt)}` : ''}`}
+                                  {`완료: ${task.completedByName || '확인 불가'}${task.completedAt ? ` · ${formatDate(task.completedAt)}` : ''}`}
                                 </span>
                               ) : null}
                             </div>
                           </div>
 
-                          <div className="flex flex-wrap gap-2">
+                          <div className="flex shrink-0 flex-wrap gap-1.5">
                             {canWrite ? (
                               <button
                                 type="button"
                                 data-testid={`guide-task-toggle-${task.id}`}
                                 onClick={() => void toggleTask(task)}
-                                className={`rounded-full px-3 py-1.5 text-xs font-bold ${
-                                  task.isDone ? 'bg-[var(--foreground)] text-white' : 'bg-emerald-500 text-white'
+                                className={`rounded-[var(--radius-md)] px-2.5 py-1.5 text-[11px] font-bold text-white ${
+                                  task.isDone ? 'bg-[var(--foreground)]' : 'bg-[var(--success)]'
                                 }`}
                               >
-                                {task.isDone ? '진행으로 되돌리기' : '완료 처리'}
+                                {task.isDone ? '되돌리기' : '완료'}
                               </button>
                             ) : null}
                             {canManagePost(task) ? (
@@ -1947,14 +1928,14 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                                 <button
                                   type="button"
                                   onClick={() => startTaskEdit(task)}
-                                  className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-bold text-[var(--foreground)]"
+                                  className="btn-premium-secondary !py-1.5 !px-2.5 !text-[11px]"
                                 >
                                   수정
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => void deleteTask(task)}
-                                  className="rounded-full bg-rose-500 px-3 py-1.5 text-xs font-bold text-white"
+                                  className="btn-premium-danger !py-1.5 !px-2.5 !text-[11px]"
                                 >
                                   삭제
                                 </button>

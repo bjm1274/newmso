@@ -42,10 +42,29 @@ export async function GET(request: NextRequest) {
     if (!signedUrl) {
       return NextResponse.json({ error: 'Cloudflare R2 is not configured' }, { status: 500 });
     }
-    const response = NextResponse.redirect(signedUrl, 307);
-    response.headers.set('Cache-Control', 'private, no-store');
-    response.headers.set('X-Content-Type-Options', 'nosniff');
-    return response;
+
+    // 스트리밍 프록시: R2에서 직접 가져와서 바이트를 전달 (CORS 우회)
+    const upstream = await fetch(signedUrl);
+    if (!upstream.ok) {
+      return NextResponse.json({ error: 'Failed to fetch from storage' }, { status: upstream.status });
+    }
+
+    const contentType = upstream.headers.get('content-type') || 'application/octet-stream';
+    const contentLength = upstream.headers.get('content-length');
+
+    const headers: Record<string, string> = {
+      'Content-Type': contentType,
+      'Cache-Control': 'private, max-age=3600',
+      'X-Content-Type-Options': 'nosniff',
+    };
+    if (contentLength) headers['Content-Length'] = contentLength;
+    if (download) {
+      const ascii = fileName.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
+      const encoded = encodeURIComponent(fileName);
+      headers['Content-Disposition'] = `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+    }
+
+    return new NextResponse(upstream.body, { status: 200, headers });
   } catch (error) {
     const message = error instanceof Error ? error.message : '스토리지 접근 중 오류가 발생했습니다.';
     return NextResponse.json({ error: message }, { status: 500 });

@@ -66,7 +66,7 @@ export default function ProductRegistration({
   const fetchInventory = _fetchInventory as (() => void) | undefined;
   const [loading, setLoading] = useState(false);
   const [departments, setDepartments] = useState<string[]>([]);
-  const [companies, setCompanies] = useState<string[]>(['백정형외과', '서울한의원', 'SY INC.']);
+  const [companies, setCompanies] = useState<string[]>(['SY INC.', '박철홍정형외과', '수연의원']);
   const [productForm, setProductForm] = useState<ProductFormState>(() => createInitialProductForm(user));
 
   const inventoryCatalog = useMemo(() => {
@@ -264,7 +264,7 @@ export default function ProductRegistration({
               min={0}
               max={9999999}
               value={productForm.quantity}
-              onChange={(event) => updateForm({ quantity: Math.min(9999999, parseInt(event.target.value, 10) || 0) })}
+              onChange={(event) => updateForm({ quantity: Math.max(0, Math.min(9999999, parseInt(event.target.value, 10) || 0)) })}
               className="w-full rounded-[var(--radius-md)] bg-[var(--input-bg)] p-4 text-sm font-bold outline-none transition focus:ring-2 focus:ring-[var(--accent)]/20"
             />
           </div>
@@ -289,7 +289,7 @@ export default function ProductRegistration({
               min={0}
               max={99999999}
               value={productForm.unit_price}
-              onChange={(event) => updateForm({ unit_price: Math.min(99999999, parseInt(event.target.value, 10) || 0) })}
+              onChange={(event) => updateForm({ unit_price: Math.max(0, Math.min(99999999, parseInt(event.target.value, 10) || 0)) })}
               className="w-full rounded-[var(--radius-md)] bg-[var(--input-bg)] p-4 text-sm font-bold outline-none transition focus:ring-2 focus:ring-[var(--accent)]/20"
               placeholder="0"
             />
@@ -329,7 +329,7 @@ export default function ProductRegistration({
             <input
               type="number"
               value={productForm.min_quantity}
-              onChange={(event) => updateForm({ min_quantity: parseInt(event.target.value, 10) || 0 })}
+              onChange={(event) => updateForm({ min_quantity: Math.max(0, parseInt(event.target.value, 10) || 0) })}
               className="w-full rounded-[var(--radius-md)] bg-[var(--input-bg)] p-4 text-sm font-bold outline-none transition focus:ring-2 focus:ring-[var(--accent)]/20"
             />
           </div>

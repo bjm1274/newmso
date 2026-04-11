@@ -1,8 +1,10 @@
 'use client';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { InventoryItem } from '@/types';
 import { formatWon } from '@/lib/date-formatter';
 import { isExpirySoon } from '@/app/main/inventory-utils';
+import { supabase } from '@/lib/supabase';
+import { toast } from '@/lib/toast';
 import ExpirationAlert from './유효기간알림';
 
 // ─────────────────────────────────────────────────────
@@ -138,6 +140,68 @@ export default function InventoryStatusView({
   const [sortBy, setSortBy] = useState<'name' | 'stock' | 'expiry' | 'value'>('stock');
   const [alertDismissed, setAlertDismissed] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState('전체');
+
+  // ── 품목 수정 모달 ──
+  const [editItem, setEditItem] = useState<InventoryItem | null>(null);
+  const [editForm, setEditForm] = useState<Record<string, string>>({});
+  const [editSaving, setEditSaving] = useState(false);
+
+  const openEditModal = useCallback((item: InventoryItem) => {
+    const ex = item as Record<string, unknown>;
+    setEditItem(item);
+    setEditForm({
+      item_name: String(ex.item_name || ex.name || ''),
+      category: String(ex.category || ''),
+      unit: String(ex.unit || 'EA'),
+      quantity: String(ex.quantity ?? ex.stock ?? '0'),
+      unit_price: String(ex.unit_price || '0'),
+      min_quantity: String(ex.min_quantity ?? ex.min_stock ?? '0'),
+      company: String(ex.company || ''),
+      department: String(ex.department || ''),
+      spec: String(ex.spec || ''),
+      lot_number: String(ex.lot_number || ''),
+      expiry_date: String(ex.expiry_date || ''),
+      insurance_code: String(ex.insurance_code || ''),
+      location: String(ex.location || ''),
+    });
+  }, []);
+
+  const saveEditItem = useCallback(async () => {
+    if (!editItem) return;
+    setEditSaving(true);
+    try {
+      const { error } = await supabase.from('inventory').update({
+        item_name: editForm.item_name.trim() || undefined,
+        name: editForm.item_name.trim() || undefined,
+        category: editForm.category.trim() || null,
+        unit: editForm.unit.trim() || 'EA',
+        quantity: Math.max(0, Number(editForm.quantity) || 0),
+        stock: Math.max(0, Number(editForm.quantity) || 0),
+        unit_price: Number(editForm.unit_price) || 0,
+        min_quantity: Number(editForm.min_quantity) || 0,
+        min_stock: Number(editForm.min_quantity) || 0,
+        company: editForm.company.trim() || null,
+        department: editForm.department.trim() || null,
+        spec: editForm.spec.trim() || null,
+        lot_number: editForm.lot_number.trim() || null,
+        expiry_date: editForm.expiry_date.trim() || null,
+        insurance_code: editForm.insurance_code.trim() || null,
+        location: editForm.location.trim() || null,
+      }).eq('id', editItem.id);
+
+      if (error) {
+        toast(`수정 실패: ${error.message}`, 'error');
+      } else {
+        toast('품목 정보가 수정되었습니다.', 'success');
+        setEditItem(null);
+        onRefresh();
+      }
+    } catch (err: any) {
+      toast(`수정 실패: ${err.message}`, 'error');
+    } finally {
+      setEditSaving(false);
+    }
+  }, [editItem, editForm, onRefresh]);
   const PAGE_SIZE = 25;
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -631,6 +695,7 @@ export default function InventoryStatusView({
                         <div className="flex items-center justify-end gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                           <button onClick={() => onStockIn(item)} className="px-2.5 py-1.5 bg-[var(--accent)]/10 text-[var(--accent)] text-[10px] font-bold rounded-[var(--radius-md)] hover:bg-[var(--accent)]/20 transition-all">입고</button>
                           <button onClick={() => onStockOut(item)} className="px-2.5 py-1.5 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[10px] font-bold rounded-[var(--radius-md)] hover:bg-[var(--border)] transition-all">출고</button>
+                          <button onClick={() => openEditModal(item)} className="px-2.5 py-1.5 bg-[var(--muted)] text-[var(--foreground)] text-[10px] font-bold rounded-[var(--radius-md)] hover:bg-[var(--border)] transition-all">수정</button>
                           {isLow && (
                             <button onClick={() => onReorder(item)} className="px-2.5 py-1.5 bg-amber-500 text-white text-[10px] font-bold rounded-[var(--radius-md)] hover:bg-amber-600 transition-all">발주</button>
                           )}
@@ -741,6 +806,65 @@ export default function InventoryStatusView({
               <ExpirationAlert />
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── 품목 수정 모달 ── */}
+      {editItem && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40" onClick={() => setEditItem(null)}>
+          <div
+            className="mx-4 w-full max-w-lg rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-3">
+              <h3 className="text-sm font-bold text-[var(--foreground)]">품목 정보 수정</h3>
+              <button onClick={() => setEditItem(null)} className="text-lg text-[var(--toss-gray-3)] hover:text-[var(--foreground)]">&times;</button>
+            </div>
+            <div className="custom-scrollbar max-h-[60vh] overflow-y-auto px-5 py-4">
+              <div className="grid grid-cols-2 gap-3">
+                {([
+                  ['item_name', '물품명', 'text'],
+                  ['category', '품목구분', 'text'],
+                  ['quantity', '현재 수량', 'number'],
+                  ['unit', '단위 (EA/BOX)', 'text'],
+                  ['unit_price', '단가', 'number'],
+                  ['min_quantity', '안전재고', 'number'],
+                  ['company', '회사', 'text'],
+                  ['department', '부서', 'text'],
+                  ['spec', '규격', 'text'],
+                  ['lot_number', 'LOT번호', 'text'],
+                  ['expiry_date', '유효기간', 'date'],
+                  ['insurance_code', '보험코드', 'text'],
+                  ['location', '위치', 'text'],
+                ] as [string, string, string][]).map(([key, label, type]) => (
+                  <label key={key} className={`flex flex-col gap-1 ${key === 'item_name' ? 'col-span-2' : ''}`}>
+                    <span className="text-[10px] font-bold text-[var(--toss-gray-4)]">{label}</span>
+                    <input
+                      type={type}
+                      value={editForm[key] || ''}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, [key]: e.target.value }))}
+                      className="h-9 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-2.5 text-xs font-medium text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] px-5 py-3">
+              <button
+                onClick={() => setEditItem(null)}
+                className="rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2 text-xs font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+              >
+                취소
+              </button>
+              <button
+                onClick={saveEditItem}
+                disabled={editSaving}
+                className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-40"
+              >
+                {editSaving ? '저장 중...' : '저장'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

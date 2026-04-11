@@ -236,11 +236,18 @@ export function normalizeInventoryUnit(value: unknown): SupplyRequestItemUnit {
   return String(value || '').trim().toUpperCase() === 'BOX' ? 'BOX' : 'EA';
 }
 
+const CATEGORY_ALIAS_MAP: Record<string, SupplyRequestCategory> = {
+  약품: '의약품',
+  의료기기: '의료용품',
+  소모품: '사무용품',
+};
+
 export function normalizeSupplyRequestCategory(value: unknown): SupplyRequestCategory | '' {
   const normalized = String(value || '').trim();
-  return SUPPLY_REQUEST_CATEGORY_OPTIONS.includes(normalized as SupplyRequestCategory)
-    ? (normalized as SupplyRequestCategory)
-    : '';
+  if (SUPPLY_REQUEST_CATEGORY_OPTIONS.includes(normalized as SupplyRequestCategory)) {
+    return normalized as SupplyRequestCategory;
+  }
+  return CATEGORY_ALIAS_MAP[normalized] || '';
 }
 
 export function normalizeSupplyRequestItems(rawItems: LooseRecord[] = []) {

@@ -100,6 +100,9 @@ async function aes128EcbEncrypt(plaintext: Uint8Array): Promise<Uint8Array> {
   // Web Crypto API는 ECB 모드를 직접 지원하지 않으므로
   // CBC 모드 + zero IV로 단일 블록(16바이트) 암호화를 구현합니다.
   // ECB와 CBC는 첫 번째 블록에서 동일한 결과를 냅니다 (IV가 0일 때).
+  if (plaintext.length !== 16) {
+    throw new Error(`AES ECB 인증에는 정확히 16바이트가 필요합니다 (수신: ${plaintext.length}바이트)`);
+  }
   const key = await crypto.subtle.importKey('raw', AES_KEY, { name: 'AES-CBC' }, false, ['encrypt']);
   const iv = new Uint8Array(16); // zero IV
   const encrypted = await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, key, plaintext.buffer as ArrayBuffer);
