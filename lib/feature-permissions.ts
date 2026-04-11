@@ -33,6 +33,7 @@ export const EXTRA_FEATURE_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'extra_직원평가', label: '직원평가' },
   { key: 'extra_입금실시간조회', label: '입금 실시간 조회' },
   { key: 'extra_OP체크', label: 'OP체크' },
+  { key: 'extra_ESL', label: 'ESL 병실표시' },
 ];
 
 export const BOARD_PERMISSION_ITEMS: FeaturePermissionItem[] = [

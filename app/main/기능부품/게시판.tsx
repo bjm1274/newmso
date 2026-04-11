@@ -785,7 +785,6 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const fetchPosts = async () => {
     const requestedBoard = activeBoard;
     const fetchSeq = ++boardFetchSeqRef.current;
-    // 유저 정보가 아직 로드되지 않은 경우(인증 초기화 중) posts를 초기화하지 않음
     if (!user) return;
     if (!canAccessBoard(user, requestedBoard, 'read')) {
       setPosts([]);
@@ -796,6 +795,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       return;
     }
 
+    setLoading(true);
     const { data } = await withMissingColumnsFallback<BoardPostRow[]>(
       async (omittedColumns): Promise<QueryResult<BoardPostRow[]>> => {
         const result = await supabase
@@ -809,11 +809,13 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       [...BOARD_POST_OPTIONAL_COLUMNS]
     );
     if (fetchSeq !== boardFetchSeqRef.current) {
+      setLoading(false);
       return;
     }
 
     if (!data) {
       setPosts([]);
+      setLoading(false);
       return;
     }
 
@@ -829,6 +831,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         setPosts((data as BoardPostRow[]).map((post) => normalizeBoardPost(post)));
       }
     }
+    setLoading(false);
   };
 
   // 메인 사이드바 플라이아웃에서 선택한 게시판 반영
@@ -2505,6 +2508,19 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
               )}
 
               {(() => {
+                if (loading) {
+                  return (
+                    <div className="space-y-2">
+                      {Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4">
+                          <div className="h-4 w-1/4 bg-[var(--border)] rounded animate-pulse mb-2" />
+                          <div className="h-3 w-1/2 bg-[var(--border)] rounded animate-pulse" />
+                        </div>
+                      ))}
+                    </div>
+                  );
+                }
+
                 const { filteredPosts, eventsByDate, days, month, toKey } = scheduleCalendarData;
 
                 if (filteredPosts.length === 0) {
@@ -2588,7 +2604,19 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
           {/* 게시물 목록 (수술일정·MRI일정은 달력으로만 표시) */}
           {(activeBoard !== '수술일정' && activeBoard !== 'MRI일정') && (
             <div data-testid="board-post-list" className="space-y-2">
-              {visiblePosts.length > 0 ? (
+              {loading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-4 w-1/3 bg-[var(--border)] rounded animate-pulse" />
+                        <div className="h-3 w-16 bg-[var(--border)] rounded animate-pulse" />
+                      </div>
+                      <div className="h-3 w-1/2 bg-[var(--border)] rounded animate-pulse mt-2" />
+                    </div>
+                  ))}
+                </div>
+              ) : visiblePosts.length > 0 ? (
                 visiblePosts.map((post, idx) => {
                   const rowNumber = visiblePosts.length - idx;
                   const isSchedule = activeBoard === '수술일정' || activeBoard === 'MRI일정';

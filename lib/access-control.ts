@@ -51,6 +51,7 @@ const EXTRA_FEATURE_PERMISSION_KEYS: Record<string, string> = {
   입금실시간조회: 'extra_입금실시간조회',
   수술상담: 'extra_수술상담',
   OP체크: 'extra_OP체크',
+  ESL: 'extra_ESL',
 };
 
 const STRICT_EXTRA_FEATURE_PERMISSION_KEYS = new Set([
@@ -505,6 +506,12 @@ export function canAccessExtraFeature(
 
   if (permissionKey === 'extra_마감보고' && isAdminUser(user)) {
     return true;
+  }
+
+  if (permissionKey === 'extra_ESL') {
+    const explicitESL = getExplicitPermissionState(user, 'extra_ESL');
+    if (explicitESL !== null) return explicitESL;
+    return isAdminUser(user);
   }
 
   if (STRICT_EXTRA_FEATURE_PERMISSION_KEYS.has(permissionKey)) {
