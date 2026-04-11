@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import {
@@ -726,7 +726,7 @@ function SettingsTab({ userId }: { userId?: string | null }) {
 }
 
 // ─── 메인 컴포넌트 ───
-export default function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown>) {
+function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown>) {
   const _u = (_rawUser ?? {}) as Record<string, unknown>;
   const router = useRouter();
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -1095,3 +1095,5 @@ export default function NotificationInbox({ user: _rawUser, onRefresh }: Record<
     </div>
   );
 }
+
+export default memo(NotificationInbox);

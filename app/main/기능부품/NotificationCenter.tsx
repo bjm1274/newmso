@@ -111,11 +111,13 @@ export default function NotificationCenter({
 
     void fetchNotifications();
 
+    let shakeTimer: ReturnType<typeof setTimeout> | null = null;
     const handleNewNotification = async () => {
       const unread = await fetchNotifications();
       if (typeof unread === 'number' && unread > prevCountRef.current) {
         setBellShaking(true);
-        setTimeout(() => setBellShaking(false), 700);
+        if (shakeTimer) clearTimeout(shakeTimer);
+        shakeTimer = setTimeout(() => setBellShaking(false), 700);
       }
       prevCountRef.current = typeof unread === 'number' ? unread : prevCountRef.current;
     };
@@ -139,6 +141,7 @@ export default function NotificationCenter({
     }, 10000);
 
     return () => {
+      if (shakeTimer) clearTimeout(shakeTimer);
       window.removeEventListener('erp-new-notification', handleNewNotification);
       window.removeEventListener('erp-notification-read', handleNotificationRead);
       document.removeEventListener('mousedown', handleClickOutside);
@@ -150,7 +153,9 @@ export default function NotificationCenter({
   useEffect(() => {
     if (unreadCount > prevCountRef.current && prevCountRef.current > 0) {
       setBellShaking(true);
-      setTimeout(() => setBellShaking(false), 700);
+      const timer = setTimeout(() => setBellShaking(false), 700);
+      prevCountRef.current = unreadCount;
+      return () => clearTimeout(timer);
     }
     prevCountRef.current = unreadCount;
   }, [unreadCount]);

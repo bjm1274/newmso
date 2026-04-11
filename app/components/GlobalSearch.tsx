@@ -153,7 +153,8 @@ export default function GlobalSearch({
           const { data: myRooms } = await supabase
             .from('chat_rooms')
             .select('id')
-            .contains('members', [user.id]);
+            .contains('members', [user.id])
+            .limit(200);
 
           const roomIds = (myRooms || []).map((room: any) => room.id).filter(Boolean);
           if (roomIds.length > 0) {

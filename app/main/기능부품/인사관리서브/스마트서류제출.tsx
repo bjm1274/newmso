@@ -2,7 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { jsPDF } from 'jspdf';
+// jsPDF: dynamic import로 전환 (번들 사이즈 최적화)
 
 // Helper to sanitize filenames
 const sanitizeFileName = (fileName: string) =>
@@ -84,6 +84,7 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
                 fileName = sanitizeFileName(`${_user.name as string}_${docType}_${Date.now()}.pdf`);
             } else {
                 // Merge images into PDF
+                const { jsPDF } = await import('jspdf');
                 const doc = new jsPDF();
                 for (let i = 0; i < blobs.length; i++) {
                     if (i > 0) doc.addPage();

@@ -56,6 +56,7 @@ export default function GlobalNotificationBell({
   const [unreadCount, setUnreadCount] = useState(0);
   const [toastNotification, setToastNotification] = useState<NotificationItem | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const toastTimerRef = useRef<number | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -100,7 +101,7 @@ export default function GlobalNotificationBell({
           }
 
           setToastNotification(newNotification);
-          window.setTimeout(() => setToastNotification(null), 5000);
+          toastTimerRef.current = window.setTimeout(() => setToastNotification(null), 5000);
           void fetchList();
         }
       )
@@ -114,6 +115,7 @@ export default function GlobalNotificationBell({
       .subscribe();
 
     return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       supabase.removeChannel(channel);
     };
   }, [user?.id]);

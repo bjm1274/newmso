@@ -1,6 +1,6 @@
 ﻿'use client';
 import { toast } from '@/lib/toast';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 
 // 기능 컴포넌트 불러오기
 import AppLogo from '@/app/components/AppLogo';
@@ -93,7 +93,7 @@ type EmploymentContractRecord = {
   [key: string]: unknown;
 };
 
-export default function MyPageMain({
+function MyPageMain({
   user,
   initialMyPageTab,
   onConsumeMyPageInitialTab,
@@ -696,3 +696,5 @@ export default function MyPageMain({
     </div>
   );
 }
+
+export default memo(MyPageMain);

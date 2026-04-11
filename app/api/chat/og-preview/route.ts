@@ -113,7 +113,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(ogData);
+    return NextResponse.json(ogData, {
+      headers: { 'Cache-Control': 'public, max-age=3600, s-maxage=3600' },
+    });
   } catch {
     return NextResponse.json({ url, title: null, description: null, image: null, siteName: null });
   }

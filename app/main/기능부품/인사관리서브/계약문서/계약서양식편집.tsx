@@ -1,7 +1,8 @@
 'use client';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
+import { useCompaniesCache } from '@/lib/use-companies-cache';
 import {
   CONTRACT_TEMPLATE_VARIABLES as VARIABLES,
   DEFAULT_CONTRACT_TEMPLATE as DEFAULT_TEMPLATE,
@@ -21,7 +22,8 @@ interface TemplateEditorProps {
 }
 
 export default function ContractTemplateEditor({ selectedCo }: TemplateEditorProps) {
-  const [companies, setCompanies] = useState<string[]>([]);
+  const { companies: rawCompanies } = useCompaniesCache();
+  const companies = useMemo(() => ['전체', ...rawCompanies.map(c => c.name)], [rawCompanies]);
   const [targetCompany, setTargetCompany] = useState<string>('전체');
   const [templateContent, setTemplateContent] = useState('');
   const [sealUrl, setSealUrl] = useState('');
@@ -29,12 +31,6 @@ export default function ContractTemplateEditor({ selectedCo }: TemplateEditorPro
   const [loading, setLoading] = useState(false);
   const [activeVarCategory, setActiveVarCategory] = useState<string>('전체');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    supabase.from('companies').select('name').then(({ data }) => {
-      if (data) setCompanies(['전체', ...data.map((c: any) => c.name)]);
-    });
-  }, []);
 
   useEffect(() => {
     if (selectedCo && selectedCo !== '전체') setTargetCompany(selectedCo);

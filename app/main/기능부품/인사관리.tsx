@@ -30,7 +30,7 @@ import AttendanceIssueAnalysisSuite from './인사관리서브/근태이상통�
 import AttendanceDeductionSimulator from './인사관리서브/휴가신청/근태차감시뮬레이터';
 import AttendanceAnomalyPanel from './인사관리서브/휴가신청/근태이상탐지';
 import ContractAutoGenerator from './인사관리서브/계약서자동생성';
-import AutoRosterPlanner from './근무표자동편성';
+
 
 
 type HrWorkspaceId = '인력관리' | '근태 · 급여' | '복지 · 문서';
