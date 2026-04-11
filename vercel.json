@@ -4,6 +4,8 @@
     { "path": "/api/cron/chat-retention", "schedule": "0 17 * * *" },
     { "path": "/api/cron/chat-push-dispatch", "schedule": "0 23 * * *" },
     { "path": "/api/cron/leave-notice-announcements", "schedule": "0 8 * * *" },
-    { "path": "/api/cron/push-subscription-cleanup", "schedule": "0 3 * * *" }
+    { "path": "/api/cron/push-subscription-cleanup", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/annual-leave-expiry", "schedule": "0 1 * * *" },
+    { "path": "/api/cron/auto-report", "schedule": "0 7 1 * *" }
   ]
 }

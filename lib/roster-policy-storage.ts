@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 
-export type RosterPolicyType = 'pattern_profile' | 'generation_rule';
+export type RosterPolicyType = 'pattern_profile' | 'generation_rule' | 'shift_custom_pattern';
 
 type RosterPolicyStorageRow = {
   policy_type?: RosterPolicyType | null;

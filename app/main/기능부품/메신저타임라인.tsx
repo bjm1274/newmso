@@ -659,14 +659,14 @@ export function MessengerTimeline({
                         <button
                           type="button"
                           onClick={() => { onStartReplyToMessage(msg); }}
-                          className="touch-manipulation min-h-[32px] p-1 px-2 rounded-lg hover:bg-[var(--tab-bg)] active:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-blue-500 transition-colors"
+                          className="touch-manipulation min-h-[40px] p-1.5 px-2.5 rounded-lg hover:bg-[var(--tab-bg)] active:bg-[var(--tab-bg)] dark:hover:bg-[var(--muted)] text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-blue-500 transition-colors"
                         >
                           답장
                         </button>
                         <button
                           type="button"
                           onClick={() => { onOpenMessageActions(msg); }}
-                          className="touch-manipulation min-h-[32px] p-1 px-2 rounded-lg hover:bg-[var(--tab-bg)] active:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] transition-colors"
+                          className="touch-manipulation min-h-[40px] p-1.5 px-2.5 rounded-lg hover:bg-[var(--tab-bg)] active:bg-[var(--tab-bg)] dark:hover:bg-[var(--muted)] text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] transition-colors"
                         >
                           ···
                         </button>

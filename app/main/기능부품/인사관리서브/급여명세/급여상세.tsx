@@ -39,7 +39,7 @@ function InfoItem({
   highlight?: boolean;
 }) {
   return (
-    <div className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-white px-4 py-3">
+    <div className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3">
       <p className="text-[11px] font-bold tracking-wide text-[var(--toss-gray-3)]">{label}</p>
       <p
         className={`mt-1 text-sm font-extrabold ${
@@ -444,7 +444,7 @@ export default function SalaryDetail({
   return (
     <div
       data-testid="salary-detail-card"
-      className="mx-auto mb-4 w-full max-w-[860px] overflow-hidden rounded-[var(--radius-xl)] border bg-white shadow-sm print:mb-0 print:max-w-none print:rounded-none print:border-0 print:shadow-none"
+      className="mx-auto mb-4 w-full max-w-[860px] overflow-hidden rounded-[var(--radius-xl)] border bg-[var(--card)] shadow-sm print:mb-0 print:max-w-none print:rounded-none print:border-0 print:shadow-none"
       style={{ borderColor, background: `linear-gradient(180deg, #ffffff 0%, ${alphaColor(primaryColor, 0.03)} 100%)` }}
     >
       <style>{`
@@ -497,7 +497,7 @@ export default function SalaryDetail({
         ) : (
           <>
             <section
-              className="rounded-[var(--radius-xl)] border bg-white px-5 py-4 print:px-4 print:py-3"
+              className="rounded-[var(--radius-xl)] border bg-[var(--card)] px-5 py-4 print:px-4 print:py-3"
               style={{ borderColor: alphaColor(primaryColor, 0.18) }}
             >
               <div className="flex items-end justify-between gap-4 border-b border-[var(--border-subtle)] pb-3">
@@ -549,7 +549,7 @@ export default function SalaryDetail({
             </section>
 
             <section
-              className="rounded-[var(--radius-xl)] border bg-white px-5 py-4 print:px-4 print:py-3"
+              className="rounded-[var(--radius-xl)] border bg-[var(--card)] px-5 py-4 print:px-4 print:py-3"
               style={{ borderColor: alphaColor('#991b1b', 0.18) }}
             >
               <div className="flex items-end justify-between gap-4 border-b border-[var(--border-subtle)] pb-3">

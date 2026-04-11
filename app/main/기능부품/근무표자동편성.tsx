@@ -3960,7 +3960,7 @@ export default function AutoRosterPlanner({
   useEffect(() => {
     const validDepartments = new Set(
       departmentOptions.filter(
-        (department) => department !== '?꾩껜 遺??' && department !== selectedDepartment
+        (department) => department !== '전체 부서' && department !== selectedDepartment
       )
     );
     setIncludedDepartments((prev) => prev.filter((department) => validDepartments.has(department)));
@@ -5984,13 +5984,13 @@ export default function AutoRosterPlanner({
         const { data: approvedLeaves, error: approvedLeavesError } = await supabase
           .from('leave_requests')
           .select('staff_id, start_date, end_date')
-          .eq('status', '?뱀씤')
+          .eq('status', '승인')
           .in('staff_id', targetStaffIds)
           .lte('start_date', monthDates[monthDates.length - 1])
           .gte('end_date', monthDates[0]);
 
         if (approvedLeavesError) {
-          console.error('?뱀씤 ?닿? 遺遺??ъ깮???곗씠??濡쒕뱶 ?ㅽ뙣:', approvedLeavesError);
+          console.error('승인된 연차 데이터 로드 실패:', approvedLeavesError);
         } else {
           approvedLeaveBlockedDatesByStaff = buildBlockedDatesByStaff(
             (approvedLeaves || []) as Array<{ staff_id: string; start_date: string; end_date: string }>,
@@ -12033,8 +12033,8 @@ export default function AutoRosterPlanner({
                         coverage.status === 'warning'
                           ? 'border-red-500/20 bg-red-500/10 text-red-700'
                           : coverage.status === 'extra'
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                            : 'border-sky-200 bg-sky-50 text-sky-700';
+                            ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                            : 'border-sky-500/20 bg-sky-500/10 text-sky-700 dark:text-sky-300';
                       return (
                         <th
                           key={date}

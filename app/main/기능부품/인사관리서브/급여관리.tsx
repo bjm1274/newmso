@@ -331,8 +331,8 @@ export default function PayrollMain({
   ];
 
   const adminOnlyPayrollTabIds = new Set<string>([
-    '?듯빀?ㅼ젙',
-    '湲됱뿬怨좊룄??',
+    '통합설정',
+    '급여고도화',
   ]);
   const hiddenAdminPayrollTabIds = new Set<string>(['통합설정', '급여고도화']);
   adminOnlyPayrollTabIds.forEach((tabId) => hiddenAdminPayrollTabIds.add(tabId));

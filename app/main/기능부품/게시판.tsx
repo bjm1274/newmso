@@ -543,7 +543,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     if (!shouldUseManagedBrowserDownload()) {
       return;
     }
-    event.preventDefault();
+    event?.preventDefault();
     try {
       await triggerManagedBrowserDownload(href, fileName);
     } catch (error) {

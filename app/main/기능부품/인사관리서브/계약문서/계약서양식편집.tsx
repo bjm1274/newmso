@@ -203,7 +203,7 @@ export default function ContractTemplateEditor({ selectedCo }: TemplateEditorPro
             <span className="text-[10px] text-[var(--toss-gray-3)] font-medium">{templateContent.length.toLocaleString()}자</span>
           </div>
           <div className="flex-1 overflow-y-auto custom-scrollbar p-5">
-            <div className="bg-white shadow-md border border-slate-200 rounded-sm min-h-[900px] p-[48px] max-w-[680px] mx-auto">
+            <div className="bg-[var(--card)] shadow-md border border-slate-200 rounded-sm min-h-[900px] p-[48px] max-w-[680px] mx-auto">
               {/* 제목 */}
               <div className="text-center mb-6 pb-4 border-b-2 border-slate-800">
                 <h1 className="text-[22px] font-black tracking-[0.25em]" style={{ fontFamily: '"Noto Serif KR", Georgia, serif' }}>

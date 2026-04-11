@@ -1091,7 +1091,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                 }
               }}
               placeholder="직원 검색"
-              className="h-10 w-full sm:w-[140px] rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 text-[12px] font-semibold text-[var(--foreground)] outline-none transition focus:border-[var(--accent)] md:w-[170px]"
+              className="h-10 w-full sm:w-[140px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-semibold text-[var(--foreground)] outline-none transition focus:border-[var(--accent)] md:w-[170px]"
             />
             <button
               type="button"
@@ -1667,24 +1667,24 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                               placeholder="근무형태명 (예: 주간, 야간, 오전)"
                               value={새근무형태.name}
                               onChange={e => 새근무형태설정(v => ({ ...v, name: e.target.value }))}
-                              className="w-full p-2.5 text-xs font-bold bg-white rounded-[var(--radius-md)] border border-blue-100 outline-none"
+                              className="w-full p-2.5 text-xs font-bold bg-[var(--card)] rounded-[var(--radius-md)] border border-blue-100 outline-none"
                             />
                             <div className="grid grid-cols-2 gap-2">
                               <div>
                                 <p className="text-[10px] font-bold text-blue-600 mb-1">출근</p>
-                                <input type="time" value={새근무형태.start_time} onChange={e => 새근무형태설정(v => ({ ...v, start_time: e.target.value }))} className="w-full p-2 text-xs bg-white rounded-[var(--radius-md)] border border-blue-100 outline-none" />
+                                <input type="time" value={새근무형태.start_time} onChange={e => 새근무형태설정(v => ({ ...v, start_time: e.target.value }))} className="w-full p-2 text-xs bg-[var(--card)] rounded-[var(--radius-md)] border border-blue-100 outline-none" />
                               </div>
                               <div>
                                 <p className="text-[10px] font-bold text-blue-600 mb-1">퇴근</p>
-                                <input type="time" value={새근무형태.end_time} onChange={e => 새근무형태설정(v => ({ ...v, end_time: e.target.value }))} className="w-full p-2 text-xs bg-white rounded-[var(--radius-md)] border border-blue-100 outline-none" />
+                                <input type="time" value={새근무형태.end_time} onChange={e => 새근무형태설정(v => ({ ...v, end_time: e.target.value }))} className="w-full p-2 text-xs bg-[var(--card)] rounded-[var(--radius-md)] border border-blue-100 outline-none" />
                               </div>
                               <div>
                                 <p className="text-[10px] font-bold text-blue-600 mb-1">휴게 시작</p>
-                                <input type="time" value={새근무형태.break_start_time} onChange={e => 새근무형태설정(v => ({ ...v, break_start_time: e.target.value }))} className="w-full p-2 text-xs bg-white rounded-[var(--radius-md)] border border-blue-100 outline-none" />
+                                <input type="time" value={새근무형태.break_start_time} onChange={e => 새근무형태설정(v => ({ ...v, break_start_time: e.target.value }))} className="w-full p-2 text-xs bg-[var(--card)] rounded-[var(--radius-md)] border border-blue-100 outline-none" />
                               </div>
                               <div>
                                 <p className="text-[10px] font-bold text-blue-600 mb-1">휴게 종료</p>
-                                <input type="time" value={새근무형태.break_end_time} onChange={e => 새근무형태설정(v => ({ ...v, break_end_time: e.target.value }))} className="w-full p-2 text-xs bg-white rounded-[var(--radius-md)] border border-blue-100 outline-none" />
+                                <input type="time" value={새근무형태.break_end_time} onChange={e => 새근무형태설정(v => ({ ...v, break_end_time: e.target.value }))} className="w-full p-2 text-xs bg-[var(--card)] rounded-[var(--radius-md)] border border-blue-100 outline-none" />
                               </div>
                             </div>
                             <div className="flex gap-2 pt-1">
@@ -1711,7 +1711,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                               >
                                 저장 후 선택
                               </button>
-                              <button type="button" onClick={() => 새근무형태표시설정(false)} className="px-3 py-2 bg-white text-[11px] font-bold text-[var(--toss-gray-3)] rounded-[var(--radius-md)] border border-blue-100">
+                              <button type="button" onClick={() => 새근무형태표시설정(false)} className="px-3 py-2 bg-[var(--card)] text-[11px] font-bold text-[var(--toss-gray-3)] rounded-[var(--radius-md)] border border-blue-100">
                                 취소
                               </button>
                             </div>

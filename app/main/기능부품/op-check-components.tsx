@@ -95,7 +95,7 @@ function getScheduleAccentClass(status: string, layout: 'stack' | 'row') {
 
 function getScheduleBadgeClass(status: string) {
   if (status === '수술중') return 'bg-orange-50 text-orange-700';
-  if (status === '완료') return 'bg-emerald-50 text-emerald-700';
+  if (status === '완료') return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300';
   if (status === '준비완료') return 'bg-[var(--accent)]/10 text-[var(--accent)]';
   return 'bg-[var(--muted)] text-[var(--toss-gray-4)]';
 }
@@ -232,7 +232,7 @@ export function OpCheckScheduleList<T extends ScheduleListItem>({
                 {displayChartNo ? <span>· 차트 {displayChartNo}</span> : null}
                 {item.surgery_fasting ? (
                   <span
-                    className={`rounded-[var(--radius-md)] bg-rose-50 font-bold text-rose-600 ${
+                    className={`rounded-[var(--radius-md)] bg-rose-500/10 font-bold text-rose-600 dark:text-rose-400 ${
                       isRowLayout ? 'px-1.5 py-0.5 text-[9px]' : 'px-1.5 py-0.5 text-[10px]'
                     }`}
                   >
@@ -300,7 +300,7 @@ export function OpCheckWorkspaceHeader({
               </span>
             ) : null}
             {hiddenByFilters ? (
-              <span className="rounded-[var(--radius-md)] bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-600">
+              <span className="rounded-[var(--radius-md)] bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-bold text-rose-600">
                 필터 숨김
               </span>
             ) : null}
@@ -526,19 +526,19 @@ export function OpCheckWorkspaceMetaPanel({
 
         <div className="flex flex-wrap items-center gap-1.5">
           {surgeryFasting ? (
-            <span className="rounded-[var(--radius-md)] bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700">금식</span>
+            <span className="rounded-[var(--radius-md)] bg-rose-500/10 px-2 py-0.5 text-[11px] font-bold text-rose-700 dark:text-rose-300">금식</span>
           ) : null}
           {surgeryInpatient ? (
-            <span className="rounded-[var(--radius-md)] bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-700">입원</span>
+            <span className="rounded-[var(--radius-md)] bg-sky-500/10 px-2 py-0.5 text-[11px] font-bold text-sky-700 dark:text-sky-300">입원</span>
           ) : null}
           {surgeryGuardian ? (
-            <span className="rounded-[var(--radius-md)] bg-violet-50 px-2 py-0.5 text-[11px] font-bold text-violet-700">보호자</span>
+            <span className="rounded-[var(--radius-md)] bg-violet-500/10 px-2 py-0.5 text-[11px] font-bold text-violet-700 dark:text-violet-300">보호자</span>
           ) : null}
           {surgeryCaregiver ? (
             <span className="rounded-[var(--radius-md)] bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700">간병인</span>
           ) : null}
           {surgeryTransfusion ? (
-            <span className="rounded-[var(--radius-md)] bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">수혈</span>
+            <span className="rounded-[var(--radius-md)] bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:text-amber-300">수혈</span>
           ) : null}
           <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2 py-0.5 text-[11px] font-medium text-[var(--toss-gray-3)]">
             템플릿 {appliedTemplateCount}개
@@ -568,7 +568,7 @@ export function OpCheckWorkspaceMetaPanel({
               </span>
             ) : null}
             {deductingInventory ? (
-              <span className="rounded-[var(--radius-md)] bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">재고 차감 중...</span>
+              <span className="rounded-[var(--radius-md)] bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">재고 차감 중...</span>
             ) : null}
           </div>
         ) : null}

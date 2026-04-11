@@ -125,7 +125,7 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
       </div>
 
       {!effectiveDept && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-[var(--radius-lg)] text-sm text-amber-800">
+        <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-[var(--radius-lg)] text-sm text-amber-800 dark:text-amber-300">
           부서가 지정되지 않은 경우 위에서 조회 부서를 선택하면 해당 부서의 물품·장비를 볼 수 있습니다.
         </div>
       )}

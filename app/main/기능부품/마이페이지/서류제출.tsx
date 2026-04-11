@@ -223,16 +223,16 @@ export default function MyDocuments(props: MyDocumentsProps) {
                             {latestContract?.contract_type || '근로계약 전자서명 대기 없음'}
                         </h3>
                         <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-[var(--toss-gray-3)]">
-                            <span className="rounded-full bg-white px-2 py-1 font-semibold">
+                            <span className="rounded-full bg-[var(--card)] px-2 py-1 font-semibold">
                                 상태 {pendingContract ? '서명대기' : latestContract?.status || '미등록'}
                             </span>
                             {latestContract?.requested_at ? (
-                                <span className="rounded-full bg-white px-2 py-1 font-semibold">
+                                <span className="rounded-full bg-[var(--card)] px-2 py-1 font-semibold">
                                     요청일 {formatDate(latestContract.requested_at)}
                                 </span>
                             ) : null}
                             {latestContract?.signed_at ? (
-                                <span className="rounded-full bg-white px-2 py-1 font-semibold">
+                                <span className="rounded-full bg-[var(--card)] px-2 py-1 font-semibold">
                                     서명일 {formatDate(latestContract.signed_at)}
                                 </span>
                             ) : null}
@@ -261,7 +261,7 @@ export default function MyDocuments(props: MyDocumentsProps) {
                                 type="button"
                                 data-testid="contract-document-view-button"
                                 onClick={() => openRepositoryDocument(latestContractDocument)}
-                                className="rounded-full border border-violet-200 bg-white px-4 py-2 text-[11px] font-black text-violet-700 hover:bg-violet-50"
+                                className="rounded-full border border-violet-200 bg-[var(--card)] px-4 py-2 text-[11px] font-black text-violet-700 hover:bg-violet-50"
                             >
                                 서명본 보기
                             </button>

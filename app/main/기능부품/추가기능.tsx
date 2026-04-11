@@ -259,8 +259,9 @@ export default function ExtraFeatures({
         type="button"
         data-testid={`extra-favorite-${card.testId}`}
         onClick={(event) => toggleFavorite(card.id, event)}
-        className="shrink-0 text-lg leading-none transition-transform hover:scale-110"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] text-lg leading-none transition-all hover:scale-110 hover:bg-[var(--muted)]"
         title={favorites.includes(card.id) ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+        aria-label={favorites.includes(card.id) ? '즐겨찾기 해제' : '즐겨찾기 추가'}
       >
         {favorites.includes(card.id) ? '★' : '☆'}
       </button>
@@ -318,7 +319,7 @@ export default function ExtraFeatures({
                     key={card.id}
                     type="button"
                     onClick={() => handleFeatureClick(card.id, card.subView)}
-                    className="flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-[12px] font-medium text-[var(--foreground)] transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--toss-blue-light)]/50"
+                    className="flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[12px] font-medium text-[var(--foreground)] transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--toss-blue-light)]/50"
                   >
                     <span>{card.icon}</span>
                     <span>{card.label}</span>
