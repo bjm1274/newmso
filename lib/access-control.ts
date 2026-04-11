@@ -51,7 +51,7 @@ const EXTRA_FEATURE_PERMISSION_KEYS: Record<string, string> = {
   입금실시간조회: 'extra_입금실시간조회',
   수술상담: 'extra_수술상담',
   OP체크: 'extra_OP체크',
-  ESL: 'extra_ESL',
+  ESL관리: 'extra_ESL관리',
 };
 
 const STRICT_EXTRA_FEATURE_PERMISSION_KEYS = new Set([
