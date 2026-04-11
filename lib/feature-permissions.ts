@@ -20,7 +20,7 @@ export const MAIN_MENU_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'menu_전자결재', label: '전자결재' },
   { key: 'menu_인사관리', label: '인사관리' },
   { key: 'menu_재고관리', label: '재고관리' },
-  { key: 'menu_관리자', label: '관리자', hint: '민감 기능은 세부 권한과 계정 역할을 함께 확인합니다.', tone: 'warning' },
+  { key: 'menu_관리자', label: '관리자', hint: '민감 기능은 세부 권한과 계정 역할을 함께 확인합니다.' },
 ];
 
 export const EXTRA_FEATURE_PERMISSION_ITEMS: FeaturePermissionItem[] = [
@@ -33,7 +33,7 @@ export const EXTRA_FEATURE_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'extra_직원평가', label: '직원평가' },
   { key: 'extra_입금실시간조회', label: '입금 실시간 조회' },
   { key: 'extra_OP체크', label: 'OP체크' },
-  { key: 'extra_ESL', label: 'ESL 병실표시' },
+  { key: 'extra_ESL관리', label: 'ESL 관리' },
 ];
 
 export const BOARD_PERMISSION_ITEMS: FeaturePermissionItem[] = [
@@ -100,11 +100,11 @@ export const INVENTORY_PERMISSION_ITEMS: FeaturePermissionItem[] = [
 export const ADMIN_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'admin_경영분석', label: '경영분석' },
   { key: 'admin_감사센터', label: '감사센터' },
-  { key: 'admin_시스템마스터센터', label: '시스템마스터센터', hint: '시스템 마스터 계정이 추가로 필요할 수 있습니다.', tone: 'warning' },
+  { key: 'admin_시스템마스터센터', label: '시스템마스터센터', hint: '시스템 마스터 계정이 추가로 필요할 수 있습니다.' },
   { key: 'admin_엑셀등록', label: '엑셀등록' },
   { key: 'admin_알림자동화', label: '알림자동화' },
   { key: 'admin_회사관리', label: '회사관리' },
-  { key: 'admin_직원권한', label: '직원권한', tone: 'warning' },
+  { key: 'admin_직원권한', label: '직원권한' },
   { key: 'admin_수술검사템플릿', label: '수술검사템플릿' },
   { key: 'admin_팝업관리', label: '팝업관리' },
   { key: 'admin_데이터백업', label: '데이터백업' },
