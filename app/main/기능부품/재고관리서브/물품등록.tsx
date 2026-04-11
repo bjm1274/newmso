@@ -261,8 +261,10 @@ export default function ProductRegistration({
             <input
               data-testid="inventory-registration-quantity"
               type="number"
+              min={0}
+              max={9999999}
               value={productForm.quantity}
-              onChange={(event) => updateForm({ quantity: parseInt(event.target.value, 10) || 0 })}
+              onChange={(event) => updateForm({ quantity: Math.min(9999999, parseInt(event.target.value, 10) || 0) })}
               className="w-full rounded-[var(--radius-md)] bg-[var(--input-bg)] p-4 text-sm font-bold outline-none transition focus:ring-2 focus:ring-[var(--accent)]/20"
             />
           </div>
@@ -284,8 +286,10 @@ export default function ProductRegistration({
             <label className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">단가 (원)</label>
             <input
               type="number"
+              min={0}
+              max={99999999}
               value={productForm.unit_price}
-              onChange={(event) => updateForm({ unit_price: parseInt(event.target.value, 10) || 0 })}
+              onChange={(event) => updateForm({ unit_price: Math.min(99999999, parseInt(event.target.value, 10) || 0) })}
               className="w-full rounded-[var(--radius-md)] bg-[var(--input-bg)] p-4 text-sm font-bold outline-none transition focus:ring-2 focus:ring-[var(--accent)]/20"
               placeholder="0"
             />

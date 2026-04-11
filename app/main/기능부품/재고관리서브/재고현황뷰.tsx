@@ -1,7 +1,8 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { InventoryItem } from '@/types';
 import { formatWon } from '@/lib/date-formatter';
+import { isExpirySoon } from '@/app/main/inventory-utils';
 import ExpirationAlert from './유효기간알림';
 
 // ─────────────────────────────────────────────────────
@@ -51,6 +52,7 @@ export type InventoryStatusViewProps = {
   workflowActionKey: string | null;
   highlightedApprovalId: string | null;
   onSupplyIssue: (approval: ApprovalRecord, item: WorkflowItem) => void;
+  onSupplyIssueCancel: (approval: ApprovalRecord, item: WorkflowItem) => void;
   onSupplyOrder: (approval: ApprovalRecord, item: WorkflowItem) => void;
   onSupplyOrderCancel: (approval: ApprovalRecord, item: WorkflowItem) => void;
   onOpenLinkedOrder: (approvalId: string, requestIndex: number) => void;
@@ -60,6 +62,14 @@ export type InventoryStatusViewProps = {
   expiryThreshold: number;
   // navigation
   openView: (v: string) => void;
+  // batch
+  batchMode: boolean;
+  setBatchMode: (v: boolean) => void;
+  batchSelectedIds: string[];
+  toggleBatchItem: (id: string) => void;
+  toggleBatchAll: (allIds: string[]) => void;
+  onBatchStockIn: () => void;
+  onBatchStockOut: () => void;
 };
 
 // ─────────────────────────────────────────────────────
@@ -72,12 +82,6 @@ function qty(item: InventoryItem): number {
 function minQty(item: InventoryItem): number {
   const ex = item as Record<string, unknown>;
   return Number(ex.min_quantity ?? ex.min_stock ?? ex.minimum_quantity ?? item.min_quantity ?? 0);
-}
-function isExpirySoon(item: InventoryItem, threshold: number) {
-  const ex = item as Record<string, unknown>;
-  const d = ex.expiry_date || (item as InventoryItem & { expiry_date?: string }).expiry_date;
-  if (!d) return false;
-  return new Date(String(d)).getTime() < threshold;
 }
 function name(item: InventoryItem): string {
   return String((item as Record<string, unknown>).item_name || item.name || '');
@@ -92,9 +96,9 @@ const fmt = (v: number) => formatWon(v);
 // ─────────────────────────────────────────────────────
 function StatPill({ label, value, color }: { label: string; value: string | number; color: string }) {
   return (
-    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius-md)] border ${color}`}>
-      <span className="text-xs font-bold">{value}</span>
-      <span className="text-[10px] font-semibold opacity-70">{label}</span>
+    <div className={`flex items-center gap-2.5 px-3.5 py-2 rounded-[var(--radius-md)] border ${color}`}>
+      <span className="text-sm font-black tabular-nums">{value}</span>
+      <span className="text-[9px] font-semibold opacity-60">{label}</span>
     </div>
   );
 }
@@ -104,8 +108,8 @@ function StockBar({ current, min }: { current: number; min: number }) {
   const pct = Math.min(100, Math.round((current / Math.max(min * 2, 1)) * 100));
   const color = current <= min ? 'bg-red-500' : current <= min * 1.5 ? 'bg-amber-400' : 'bg-emerald-500';
   return (
-    <div className="mt-1 h-1 w-full rounded-full bg-[var(--border)]">
-      <div className={`h-1 rounded-full ${color} transition-all`} style={{ width: `${pct}%` }} />
+    <div className="mt-1.5 h-1.5 w-full rounded-full bg-[var(--border)]">
+      <div className={`h-1.5 rounded-full ${color} transition-all`} style={{ width: `${pct}%` }} />
     </div>
   );
 }
@@ -123,18 +127,30 @@ export default function InventoryStatusView({
   onStockIn, onStockOut, onReorder, onDelete,
   isOpsUser, pendingApprovals, completedApprovals,
   workflowActionKey, highlightedApprovalId,
-  onSupplyIssue, onSupplyOrder, onSupplyOrderCancel, onOpenLinkedOrder,
+  onSupplyIssue, onSupplyIssueCancel, onSupplyOrder, onSupplyOrderCancel, onOpenLinkedOrder,
   showExpiryCenter, setShowExpiryCenter, expiryThreshold,
   openView,
+  batchMode, setBatchMode, batchSelectedIds, toggleBatchItem, toggleBatchAll,
+  onBatchStockIn, onBatchStockOut,
 }: InventoryStatusViewProps) {
   const [showCompleted, setShowCompleted] = useState(false);
   const [expandedApprovalId, setExpandedApprovalId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'name' | 'stock' | 'expiry' | 'value'>('stock');
   const [alertDismissed, setAlertDismissed] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState('전체');
+  const PAGE_SIZE = 25;
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // Sort
+  // 카테고리 목록 동적 추출
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    filteredInventory.forEach((i) => { const c = (i.category || '').trim(); if (c) set.add(c); });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'ko'));
+  }, [filteredInventory]);
+
+  // 카테고리 필터 적용 후 정렬
   const sorted = useMemo(() => {
-    const list = [...filteredInventory];
+    let list = categoryFilter === '전체' ? [...filteredInventory] : filteredInventory.filter((i) => (i.category || '').trim() === categoryFilter);
     if (sortBy === 'name') list.sort((a, b) => name(a).localeCompare(name(b), 'ko'));
     else if (sortBy === 'stock') list.sort((a, b) => {
       const aUrgent = qty(a) <= minQty(a);
@@ -158,6 +174,16 @@ export default function InventoryStatusView({
     return list;
   }, [filteredInventory, sortBy]);
 
+  // 페이지네이션 - 필터/정렬 변경 시 1페이지로 리셋
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedItems = useMemo(
+    () => sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [sorted, safePage],
+  );
+  // 필터·정렬 변경 시 1페이지로 리셋
+  useEffect(() => { setCurrentPage(1); }, [statusFilter, viewCompany, selectedDept, searchKeyword, sortBy, categoryFilter]);
+
   const hasAlert = urgentItems.length > 0 && !alertDismissed;
   const hasPending = isOpsUser && pendingApprovals.length > 0;
   const STATUS_FILTERS: StatusFilter[] = ['전체', '재고부족', '유통기한임박', '정상'];
@@ -167,28 +193,29 @@ export default function InventoryStatusView({
 
       {/* ── 1. 컨트롤 바 ──────────────────────────────── */}
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] px-4 py-3 space-y-3">
-        {/* 검색 + 셀렉트 */}
-        <div className="flex flex-wrap gap-2 items-center">
-          <div className="relative flex-1 min-w-[180px]">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--toss-gray-3)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
-            </svg>
-            <input
-              type="text"
-              value={searchKeyword}
-              onChange={(e) => setSearchKeyword(e.target.value)}
-              placeholder="품목명, LOT, 시리얼, 분류 검색..."
-              className="w-full pl-9 pr-3 py-2 text-xs rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/40 text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]"
-            />
-            {searchKeyword && (
-              <button onClick={() => setSearchKeyword('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--toss-gray-3)] hover:text-[var(--foreground)] text-sm leading-none">×</button>
-            )}
-          </div>
+        {/* 검색 */}
+        <div className="relative w-full">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--toss-gray-3)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
+          </svg>
+          <input
+            type="text"
+            value={searchKeyword}
+            onChange={(e) => setSearchKeyword(e.target.value)}
+            placeholder="품목명, LOT, 시리얼, 분류 검색..."
+            className="w-full pl-9 pr-8 py-2.5 text-xs rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/40 text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]"
+          />
+          {searchKeyword && (
+            <button onClick={() => setSearchKeyword('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--toss-gray-3)] hover:text-[var(--foreground)] text-sm leading-none">×</button>
+          )}
+        </div>
 
+        {/* 필터 셀렉트 */}
+        <div className="flex flex-wrap gap-2 items-center">
           <select
             value={viewCompany}
             onChange={(e) => { setViewCompany(e.target.value); setSelectedDept('전체'); }}
-            className="px-3 py-2 text-xs rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] font-semibold min-w-[110px] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+            className="flex-1 min-w-0 px-3 py-2.5 text-xs rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
           >
             <option value="전체">전체 회사</option>
             {companiesInInventory.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -198,16 +225,26 @@ export default function InventoryStatusView({
             <select
               value={selectedDept}
               onChange={(e) => setSelectedDept(e.target.value)}
-              className="px-3 py-2 text-xs rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] font-semibold min-w-[100px] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+              className="flex-1 min-w-0 px-3 py-2.5 text-xs rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
             >
               <option value="전체">전체 부서</option>
               {departmentsByViewCompany.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
           )}
 
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="flex-1 min-w-0 px-3 py-2.5 text-xs rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+          >
+            <option value="전체">전체 분류</option>
+            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+
           <button
             onClick={onRefresh}
-            className="p-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-4)] hover:bg-[var(--muted)] transition-all"
+            aria-label="새로고침"
+            className="p-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-4)] hover:bg-[var(--muted)] transition-all"
             title="새로고침"
           >
             <svg className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -219,29 +256,30 @@ export default function InventoryStatusView({
         {/* 상태 필터 + 요약 stats */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex gap-1.5 flex-wrap">
-            {STATUS_FILTERS.map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setStatusFilter(f)}
-                className={`px-3 py-1.5 rounded-[var(--radius-md)] text-[11px] font-bold transition-all ${
-                  statusFilter === f
-                    ? f === '재고부족' ? 'bg-red-500 text-white'
-                    : f === '유통기한임박' ? 'bg-amber-500 text-white'
-                    : f === '정상' ? 'bg-emerald-500 text-white'
-                    : 'bg-[var(--accent)] text-white'
-                    : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--border)]'
-                }`}
-              >
-                {f === '유통기한임박' ? '기한임박' : f}
-                {f === '재고부족' && lowStockCount > 0 && (
-                  <span className={`ml-1.5 text-[10px] ${statusFilter === f ? 'opacity-80' : 'text-red-500'}`}>{lowStockCount}</span>
-                )}
-                {f === '유통기한임박' && expiryCount > 0 && (
-                  <span className={`ml-1.5 text-[10px] ${statusFilter === f ? 'opacity-80' : 'text-amber-500'}`}>{expiryCount}</span>
-                )}
-              </button>
-            ))}
+            {STATUS_FILTERS.map((f) => {
+              const count = f === '재고부족' ? lowStockCount : f === '유통기한임박' ? expiryCount : f === '정상' ? (filteredInventory.length - lowStockCount - expiryCount) : filteredInventory.length;
+              const activeColor = f === '재고부족' ? 'bg-red-500 text-white shadow-sm shadow-red-200'
+                : f === '유통기한임박' ? 'bg-amber-500 text-white shadow-sm shadow-amber-200'
+                : f === '정상' ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-200'
+                : 'bg-[var(--accent)] text-white shadow-sm';
+              return (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setStatusFilter(f)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] text-[11px] font-bold transition-all ${
+                    statusFilter === f ? activeColor : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--border)]'
+                  }`}
+                >
+                  {f === '유통기한임박' ? '기한임박' : f}
+                  {(f !== '전체' || count > 0) && (
+                    <span className={`text-[10px] font-black ${statusFilter === f ? 'opacity-80' : f === '재고부족' ? 'text-red-500' : f === '유통기한임박' ? 'text-amber-500' : ''}`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           <div className="flex flex-wrap gap-1.5">
@@ -362,7 +400,7 @@ export default function InventoryStatusView({
                               {!issued && !ordered && wItem.recommended_action === 'issue' && (
                                 <button disabled={busy} onClick={() => onSupplyIssue(approval, wItem)}
                                   className="px-3 py-1.5 bg-[var(--accent)] text-white text-[11px] font-bold rounded-[var(--radius-md)] disabled:opacity-50">
-                                  {busy ? '...' : '불출'}
+                                  {busy ? '...' : '최종불출'}
                                 </button>
                               )}
                               {!issued && !ordered && wItem.recommended_action === 'order' && (
@@ -371,7 +409,12 @@ export default function InventoryStatusView({
                                   {busy ? '...' : '발주'}
                                 </button>
                               )}
-                              {issued && <span className="px-2 py-1.5 bg-emerald-500/10 text-emerald-600 text-[10px] font-bold rounded-[var(--radius-md)]">불출완료</span>}
+                              {issued && (
+                                <>
+                                  <span className="px-2 py-1.5 bg-emerald-500/10 text-emerald-600 text-[10px] font-bold rounded-[var(--radius-md)]">최종불출 완료</span>
+                                  <button disabled={busy} onClick={() => onSupplyIssueCancel(approval, wItem)} className="px-2 py-1.5 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[10px] font-bold rounded-[var(--radius-md)] border border-[var(--border)] disabled:opacity-50">취소</button>
+                                </>
+                              )}
                               {ordered && (
                                 <>
                                   <span className="px-2 py-1.5 bg-amber-500/10 text-amber-600 text-[10px] font-bold rounded-[var(--radius-md)]">발주처리</span>
@@ -442,9 +485,18 @@ export default function InventoryStatusView({
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] overflow-hidden">
         {/* 테이블 헤더 */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--muted)]/30">
-          <span className="text-xs font-bold text-[var(--foreground)]">
-            품목 목록 <span className="text-[var(--toss-gray-3)] font-normal">{filteredInventory.length}건</span>
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-[var(--foreground)]">
+              품목 목록 <span className="text-[var(--toss-gray-3)] font-normal">{filteredInventory.length}건</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => { setBatchMode(!batchMode); if (batchMode) { toggleBatchAll([]); } }}
+              className={`px-2.5 py-1 rounded-[var(--radius-md)] text-[10px] font-bold transition-all ${batchMode ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--border)]'}`}
+            >
+              {batchMode ? '일괄 해제' : '일괄 입출고'}
+            </button>
+          </div>
           <div className="flex items-center gap-1">
             <span className="text-[10px] text-[var(--toss-gray-3)] mr-1">정렬</span>
             {([['name', '이름'], ['stock', '재고순'], ['expiry', '기한순'], ['value', '금액순']] as const).map(([k, l]) => (
@@ -461,11 +513,22 @@ export default function InventoryStatusView({
         </div>
 
         {loading ? (
-          <div className="py-16 text-center text-xs text-[var(--toss-gray-3)] font-semibold">데이터 동기화 중...</div>
+          <div className="p-4 space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-3">
+                <div className="w-1 h-10 rounded-full bg-[var(--border)] animate-pulse" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 w-1/3 bg-[var(--border)] rounded animate-pulse" />
+                  <div className="h-2 w-1/5 bg-[var(--border)] rounded animate-pulse" />
+                </div>
+                <div className="h-4 w-10 bg-[var(--border)] rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
         ) : sorted.length === 0 ? (
           <div className="py-16 text-center">
             <p className="text-sm font-bold text-[var(--toss-gray-3)]">조건에 맞는 품목이 없습니다</p>
-            <button onClick={() => { setSearchKeyword(''); setStatusFilter('전체'); setViewCompany('전체'); setSelectedDept('전체'); }}
+            <button onClick={() => { setSearchKeyword(''); setStatusFilter('전체'); setViewCompany('전체'); setSelectedDept('전체'); setCategoryFilter('전체'); }}
               className="mt-3 px-4 py-2 text-xs font-bold text-[var(--accent)] hover:bg-[var(--accent)]/5 rounded-[var(--radius-md)] transition-all">
               필터 초기화
             </button>
@@ -475,6 +538,11 @@ export default function InventoryStatusView({
             <table className="w-full text-left min-w-[800px]">
               <thead>
                 <tr className="border-b border-[var(--border)] text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wide">
+                  {batchMode && (
+                    <th className="px-3 py-2.5 w-8">
+                      <input type="checkbox" checked={batchSelectedIds.length === pagedItems.length && pagedItems.length > 0} onChange={() => toggleBatchAll(pagedItems.map((i) => i.id))} className="w-4 h-4 accent-[var(--accent)]" />
+                    </th>
+                  )}
                   <th className="w-1" />
                   <th className="px-4 py-2.5">품목</th>
                   <th className="px-4 py-2.5">회사 / 부서</th>
@@ -485,7 +553,7 @@ export default function InventoryStatusView({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
-                {sorted.map((item) => {
+                {pagedItems.map((item) => {
                   const q = qty(item);
                   const mq = minQty(item);
                   const isLow = q <= mq;
@@ -501,7 +569,13 @@ export default function InventoryStatusView({
                   const statusColor = isOos ? 'bg-red-500' : isLow ? 'bg-red-400' : isExpiry ? 'bg-amber-400' : 'bg-emerald-400';
 
                   return (
-                    <tr key={item.id} className="group hover:bg-[var(--muted)]/30 transition-colors">
+                    <tr key={item.id} className={`group hover:bg-[var(--muted)]/30 transition-colors ${batchMode && batchSelectedIds.includes(item.id) ? 'bg-[var(--accent)]/5' : ''}`}>
+                      {/* 배치 체크박스 */}
+                      {batchMode && (
+                        <td className="px-3 py-3">
+                          <input type="checkbox" checked={batchSelectedIds.includes(item.id)} onChange={() => toggleBatchItem(item.id)} className="w-4 h-4 accent-[var(--accent)]" />
+                        </td>
+                      )}
                       {/* 상태 표시선 */}
                       <td className="pl-3 pr-0 py-3">
                         <div className={`w-1 h-10 rounded-full ${statusColor}`} />
@@ -534,12 +608,13 @@ export default function InventoryStatusView({
                       {/* 유효기간 */}
                       <td className="px-4 py-3 text-center">
                         {expiryDate ? (
-                          <>
-                            <p className={`text-[11px] font-semibold ${isExpiry ? 'text-amber-600' : 'text-[var(--toss-gray-4)]'}`}>
+                          isExpiry ? (
+                            <span className="inline-block text-[11px] font-bold text-amber-700 bg-amber-500/10 px-2 py-1 rounded-[var(--radius-md)]">
                               {expiryDate}
-                            </p>
-                            {isExpiry && <p className="text-[9px] text-amber-500 font-bold mt-0.5">임박</p>}
-                          </>
+                            </span>
+                          ) : (
+                            <p className="text-[11px] font-semibold text-[var(--toss-gray-4)]">{expiryDate}</p>
+                          )
                         ) : (
                           <span className="text-[10px] text-[var(--toss-gray-3)]">-</span>
                         )}
@@ -551,9 +626,9 @@ export default function InventoryStatusView({
                         {price > 0 && <p className="text-[9px] text-[var(--toss-gray-3)] mt-0.5">{fmt(price * q)}</p>}
                       </td>
 
-                      {/* 액션 버튼 */}
+                      {/* 액션 버튼: 모바일=항상 표시, 데스크탑=hover 표시 */}
                       <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-end gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                           <button onClick={() => onStockIn(item)} className="px-2.5 py-1.5 bg-[var(--accent)]/10 text-[var(--accent)] text-[10px] font-bold rounded-[var(--radius-md)] hover:bg-[var(--accent)]/20 transition-all">입고</button>
                           <button onClick={() => onStockOut(item)} className="px-2.5 py-1.5 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[10px] font-bold rounded-[var(--radius-md)] hover:bg-[var(--border)] transition-all">출고</button>
                           {isLow && (
@@ -561,8 +636,8 @@ export default function InventoryStatusView({
                           )}
                           <button onClick={() => onDelete(item)} className="px-2.5 py-1.5 bg-red-500/10 text-red-500 text-[10px] font-bold rounded-[var(--radius-md)] hover:bg-red-500/20 transition-all">삭제</button>
                         </div>
-                        {/* 항상 보이는 상태 뱃지 */}
-                        <div className="flex justify-end group-hover:hidden">
+                        {/* 상태 뱃지: 데스크탑에서만 hover시 숨김 */}
+                        <div className="flex justify-end mt-1 md:mt-0 md:group-hover:hidden">
                           {isOos ? (
                             <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full">품절</span>
                           ) : isLow ? (
@@ -581,6 +656,68 @@ export default function InventoryStatusView({
             </table>
           </div>
         )}
+
+        {/* 일괄 입출고 액션바 */}
+        {batchMode && batchSelectedIds.length > 0 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border)] bg-[var(--accent)]/5">
+            <span className="text-xs font-bold text-[var(--accent)]">{batchSelectedIds.length}건 선택됨</span>
+            <div className="flex gap-2">
+              <button onClick={onBatchStockIn} className="px-4 py-2 bg-[var(--accent)] text-white text-[11px] font-bold rounded-[var(--radius-md)] hover:opacity-90 transition-all">선택 일괄 입고</button>
+              <button onClick={onBatchStockOut} className="px-4 py-2 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[11px] font-bold rounded-[var(--radius-md)] hover:bg-[var(--border)] transition-all">선택 일괄 출고</button>
+            </div>
+          </div>
+        )}
+
+        {/* 페이지네이션 */}
+        {sorted.length > PAGE_SIZE && (() => {
+          // 페이지 번호 범위 계산 (최대 5개)
+          const maxVisible = 5;
+          let startPage = Math.max(1, safePage - Math.floor(maxVisible / 2));
+          const endPage = Math.min(totalPages, startPage + maxVisible - 1);
+          if (endPage - startPage + 1 < maxVisible) startPage = Math.max(1, endPage - maxVisible + 1);
+          const pages = Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
+
+          return (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border)]">
+            <span className="text-[11px] text-[var(--toss-gray-3)]">
+              {(safePage - 1) * PAGE_SIZE + 1}-{Math.min(safePage * PAGE_SIZE, sorted.length)} / {sorted.length}건
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={safePage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="px-2 py-1.5 text-[10px] font-bold rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--border)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                이전
+              </button>
+              {pages.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setCurrentPage(p)}
+                  className={`hidden sm:inline-flex w-7 h-7 items-center justify-center text-[10px] font-bold rounded-[var(--radius-md)] transition-all ${
+                    p === safePage ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--border)]'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+              <span className="sm:hidden text-[11px] font-semibold text-[var(--foreground)] px-2">
+                {safePage} / {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={safePage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="px-2 py-1.5 text-[10px] font-bold rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--border)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                다음
+              </button>
+            </div>
+          </div>
+          );
+        })()}
       </div>
 
       {/* ── 5. 유효기간 센터 (접이식) ─────────────────── */}
