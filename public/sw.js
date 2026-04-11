@@ -117,7 +117,16 @@ self.addEventListener('pushsubscriptionchange', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
+  const CURRENT_CACHES = ['erp-share-target-v1'];
   event.waitUntil(Promise.all([
+    // 오래된 캐시 정리
+    caches.keys().then((names) =>
+      Promise.all(
+        names
+          .filter((name) => !CURRENT_CACHES.includes(name))
+          .map((name) => caches.delete(name))
+      )
+    ),
     // 모든 탭을 즉시 이 SW가 제어하도록 claim
     self.clients.claim(),
     self.__erpPushShared.flushRetryQueue(),
