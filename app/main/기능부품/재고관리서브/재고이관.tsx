@@ -3,9 +3,11 @@ import { toast } from '@/lib/toast';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import type { StaffMember, InventoryItem } from '@/types';
 import {
   getItemName,
   getItemQuantity,
+  normalizeInventoryText,
   validateInventoryQuantity,
   validateInventoryTransfer,
 } from '@/app/main/inventory-utils';
@@ -18,13 +20,9 @@ const EMPTY_TRANSFER_FORM = {
   reason: '',
 };
 
-function normalizeInventoryText(value: unknown) {
-  return String(value ?? '').trim().toLowerCase();
-}
-
 function findDestinationInventoryItem(
-  inventory: any[],
-  selectedItem: any,
+  inventory: InventoryItem[],
+  selectedItem: InventoryItem | null,
   toCompany: string,
   toDept: string,
 ) {
@@ -56,11 +54,11 @@ export default function InventoryTransfer({
   inventory = [],
   fetchInventory,
 }: {
-  user: any;
-  inventory: any[];
+  user?: StaffMember;
+  inventory: InventoryItem[];
   fetchInventory: () => void | Promise<void>;
 }) {
-  const [transfers, setTransfers] = useState<any[]>([]);
+  const [transfers, setTransfers] = useState<Record<string, unknown>[]>([]);
   const [form, setForm] = useState(EMPTY_TRANSFER_FORM);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'request' | 'history'>('request');
@@ -394,7 +392,7 @@ export default function InventoryTransfer({
       const { error: logError } = await withMissingColumnsFallback(
         (omittedColumns) => {
           const nextRows = logRows.map((row) => {
-            const nextRow = { ...row };
+            const nextRow: Record<string, unknown> = { ...row };
             if (omittedColumns.has('serial_number')) {
               delete nextRow.serial_number;
             }
@@ -463,7 +461,7 @@ export default function InventoryTransfer({
                 data-testid="inventory-transfer-item-select"
                 value={form.item_id}
                 onChange={(event) => setForm((prev) => ({ ...prev, item_id: event.target.value }))}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
+                className="w-full px-3 py-2.5 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
               >
                 <option value="">물품 선택</option>
                 {inventory.map((item) => (
@@ -489,7 +487,7 @@ export default function InventoryTransfer({
                     quantity: event.target.value === '' ? 0 : Number(event.target.value),
                   }))
                 }
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
+                className="w-full px-3 py-2.5 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
               />
               {selectedItem && (
                 <p className="text-[10px] text-[var(--toss-gray-3)] mt-0.5">현재 재고: {maxQty}개</p>
@@ -509,7 +507,7 @@ export default function InventoryTransfer({
                 data-testid="inventory-transfer-to-company-select"
                 value={form.to_company}
                 onChange={(event) => setForm((prev) => ({ ...prev, to_company: event.target.value }))}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
+                className="w-full px-3 py-2.5 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
               >
                 <option value="">선택</option>
                 {companyOptions.map((company) => (
@@ -528,7 +526,7 @@ export default function InventoryTransfer({
                 list="inventory-transfer-departments"
                 onChange={(event) => setForm((prev) => ({ ...prev, to_dept: event.target.value }))}
                 placeholder="예: 원무팀"
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
+                className="w-full px-3 py-2.5 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
               />
               <datalist id="inventory-transfer-departments">
                 {destinationDepartments.map((department) => (
@@ -544,7 +542,7 @@ export default function InventoryTransfer({
                 value={form.reason}
                 onChange={(event) => setForm((prev) => ({ ...prev, reason: event.target.value }))}
                 placeholder="예: 부서 재배치"
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
+                className="w-full px-3 py-2.5 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
               />
             </div>
           </div>
@@ -577,9 +575,9 @@ export default function InventoryTransfer({
           )}
 
           {shouldShowValidation && validationMessage && (
-            <p data-testid="inventory-transfer-error" className="text-xs font-semibold text-red-500">
-              {validationMessage}
-            </p>
+            <div data-testid="inventory-transfer-error" className="flex items-start gap-2 bg-red-500/5 border-l-4 border-red-500 px-4 py-3 rounded-[var(--radius-md)]">
+              <p className="text-xs font-bold text-red-600">{validationMessage}</p>
+            </div>
           )}
 
           <button
@@ -599,20 +597,20 @@ export default function InventoryTransfer({
           {transfers.length === 0 ? (
             <div className="text-center py-10 text-[var(--toss-gray-3)] font-bold text-sm">이관 이력이 없습니다.</div>
           ) : transfers.map((transfer) => (
-            <div key={transfer.id} className="flex items-center justify-between p-3 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)]">
+            <div key={String(transfer.id ?? '')} className="flex items-center justify-between p-3 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)]">
               <div>
-                <p className="text-sm font-bold text-[var(--foreground)]">{transfer.item_name}</p>
+                <p className="text-sm font-bold text-[var(--foreground)]">{String(transfer.item_name ?? '')}</p>
                 <p className="text-[10px] text-[var(--toss-gray-3)]">
-                  {transfer.from_company} {transfer.from_department} → {transfer.to_company} {transfer.to_department} · {transfer.quantity}개 · {transfer.transferred_by}
+                  {String(transfer.from_company ?? '')} {String(transfer.from_department ?? '')} → {String(transfer.to_company ?? '')} {String(transfer.to_department ?? '')} · {String(transfer.quantity ?? '')}개 · {String(transfer.transferred_by ?? '')}
                 </p>
-                {transfer.serial_number && (
-                  <p className="text-[10px] text-[var(--toss-gray-3)]">시리얼: {transfer.serial_number}</p>
+                {Boolean(transfer.serial_number) && (
+                  <p className="text-[10px] text-[var(--toss-gray-3)]">시리얼: {String(transfer.serial_number)}</p>
                 )}
-                {transfer.reason && <p className="text-[10px] text-[var(--toss-gray-3)]">사유: {transfer.reason}</p>}
+                {Boolean(transfer.reason) && <p className="text-[10px] text-[var(--toss-gray-3)]">사유: {String(transfer.reason)}</p>}
               </div>
               <div className="text-right">
-                <span className="px-2 py-0.5 rounded-[var(--radius-md)] text-[9px] font-bold bg-green-100 text-green-700">{transfer.status || '완료'}</span>
-                <p className="text-[9px] text-[var(--toss-gray-3)] mt-0.5">{transfer.created_at?.slice(0, 10)}</p>
+                <span className="px-2 py-0.5 rounded-[var(--radius-md)] text-[9px] font-bold bg-green-100 text-green-700">{String(transfer.status || '완료')}</span>
+                <p className="text-[9px] text-[var(--toss-gray-3)] mt-0.5">{String(transfer.created_at ?? '').slice(0, 10)}</p>
               </div>
             </div>
           ))}
