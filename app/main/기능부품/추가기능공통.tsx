@@ -75,6 +75,7 @@ const loadStaffEvaluationView = () => import('./직원평가시스템');
 const loadRealtimeDepositView = () => import('./입금실시간조회');
 const loadSurgeryConsultationView = () => import('./수술상담');
 const loadOperationCheckView = () => import('./OP체크');
+const loadEslManagerView = () => import('./ESL관리');
 const loadOrgChartView = () => import('./조직도서브/OrgChart');
 
 const DepartmentInventoryView = dynamic(loadDepartmentInventoryView, {
@@ -113,6 +114,10 @@ const OperationCheckView = dynamic(loadOperationCheckView, {
   ssr: false,
   loading: () => <SubviewLoading label="OP체크" />,
 });
+const EslManagerView = dynamic(loadEslManagerView, {
+  ssr: false,
+  loading: () => <SubviewLoading label="ESL 관리" />,
+});
 const OrgChart = dynamic(loadOrgChartView, {
   ssr: false,
   loading: () => <SubviewLoading label="조직도" />,
@@ -129,6 +134,7 @@ export const EXTRA_FEATURE_LOADERS: Record<string, () => Promise<unknown>> = {
   입금실시간조회: loadRealtimeDepositView,
   수술상담: loadSurgeryConsultationView,
   OP체크: loadOperationCheckView,
+  ESL관리: loadEslManagerView,
 };
 
 export type FeatureCard = {
@@ -151,6 +157,7 @@ export const FEATURE_CARDS: FeatureCard[] = [
   { id: '입금실시간조회', label: '입금 실시간 조회', icon: '🏦', subView: '입금실시간조회', testId: 'realtime-deposit', accentClass: 'bg-[var(--muted)] group-hover:bg-[var(--toss-blue-light)]' },
   { id: '수술상담', label: '수술상담 AI 분석', icon: '🎙️', subView: '수술상담', testId: 'surgery-consultation', accentClass: 'bg-[var(--muted)] group-hover:bg-[var(--toss-blue-light)]' },
   { id: 'OP체크', label: 'OP체크', icon: '🩺', subView: 'OP체크', testId: 'op-check', accentClass: 'bg-[var(--muted)] group-hover:bg-[var(--toss-blue-light)]' },
+  { id: 'ESL관리', label: 'ESL 관리', icon: '🏷️', subView: 'ESL관리', testId: 'esl-manager', accentClass: 'bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20' },
 ];
 
 export const EXTERNAL_LINKS = [
@@ -304,6 +311,14 @@ export function ExtraFeatureSubview({
           selectedCo={selectedCo}
           selectedCompanyId={selectedCompanyId}
         />
+      </FeatureShell>
+    );
+  }
+
+  if (subView === 'ESL관리') {
+    return (
+      <FeatureShell onBack={onBack} boxed>
+        <EslManagerView user={user || {}} />
       </FeatureShell>
     );
   }
