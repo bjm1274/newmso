@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import * as XLSX from 'xlsx';
+// XLSX: dynamic import로 전환 (번들 사이즈 최적화)
 import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
 
@@ -67,7 +67,7 @@ export default function PayrollExport({ checkedIds = [], selectedCo, yearMonth: 
     };
   }, [yearMonth, selectedCo, _checkedIds.join(',')]);
 
-  const exportExcel = () => {
+  const exportExcel = async () => {
     const rows = records.map((record: any) => ({
       사번: record.staff_members?.employee_no || '',
       성명: record.staff_members?.name || '',
@@ -85,6 +85,7 @@ export default function PayrollExport({ checkedIds = [], selectedCo, yearMonth: 
       선지급: record.advance_pay || 0,
       정산상태: record.status || '',
     }));
+    const XLSX = await import('xlsx');
     const worksheet = XLSX.utils.json_to_sheet(rows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, '급여대장');

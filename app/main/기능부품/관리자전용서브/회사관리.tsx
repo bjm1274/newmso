@@ -12,7 +12,8 @@ import AttendanceDeductionRules from './근태차감규칙설정';
 import LeaveManagement from '../인사관리서브/휴가신청/휴가관리메인';
 import IntegratedHRSettings from '../인사관리서브/인사통합설정';
 import PayrollAdvancedCenter from '../인사관리서브/급여명세/급여고도화센터';
-import AutoRosterPlanner from '../근무표자동편성';
+import dynamic from 'next/dynamic';
+const AutoRosterPlanner = dynamic(() => import('../근무표자동편성'), { ssr: false, loading: () => <div className="flex items-center justify-center py-8"><div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" /></div> });
 import DocumentRepository from '../인사관리서브/문서보관함';
 import ContractMain from '../인사관리서브/계약관리';
 

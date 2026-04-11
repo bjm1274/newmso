@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from 'recharts';
-import * as XLSX from 'xlsx';
+// XLSX: dynamic import로 전환 (번들 사이즈 최적화)
 
 type ReportTab = '인사현황' | '급여요약' | '재고현황';
 
@@ -92,7 +92,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
   }));
 
   // ── Excel 다운로드 ──
-  const handleExcelDownload = () => {
+  const handleExcelDownload = async () => {
     let sheetData: unknown[][] = [];
     let sheetName = '';
 
@@ -120,6 +120,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
       ];
     }
 
+    const XLSX = await import('xlsx');
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(sheetData);
     XLSX.utils.book_append_sheet(wb, ws, sheetName);

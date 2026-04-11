@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import React, { type ReactNode, useEffect, useMemo, useState } from 'react';
 
 type ProfilePhotoThumbnailProps = {
   src?: string | null;
@@ -26,7 +26,7 @@ function resolveAltText(name?: string | null, alt?: string) {
   return trimmedName ? `${trimmedName} 프로필 사진` : '프로필 사진';
 }
 
-export default function ProfilePhotoThumbnail({
+function ProfilePhotoThumbnail({
   src,
   alt,
   name,
@@ -143,3 +143,5 @@ export default function ProfilePhotoThumbnail({
     </>
   );
 }
+
+export default React.memo(ProfilePhotoThumbnail);

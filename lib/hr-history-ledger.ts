@@ -109,7 +109,7 @@ export async function fetchHrHistoryLedger(staffId: string) {
         'personnel_appointments',
         supabase
           .from('personnel_appointments')
-          .select('*')
+          .select('id, order_type, effective_date, created_at, status, staff_id, new_department, new_position, new_role, previous_department, previous_position, previous_role')
           .eq('staff_id', staffId)
           .order('effective_date', { ascending: false })
           .limit(20),
@@ -118,7 +118,7 @@ export async function fetchHrHistoryLedger(staffId: string) {
         'employment_contracts',
         supabase
           .from('employment_contracts')
-          .select('*')
+          .select('id, contract_type, start_date, end_date, created_at, staff_id')
           .eq('staff_id', staffId)
           .order('created_at', { ascending: false })
           .limit(20),
@@ -127,7 +127,7 @@ export async function fetchHrHistoryLedger(staffId: string) {
         'salary_change_history',
         supabase
           .from('salary_change_history')
-          .select('*')
+          .select('id, effective_date, created_at, staff_id, previous_salary, new_salary, reason')
           .eq('staff_id', staffId)
           .order('effective_date', { ascending: false })
           .limit(20),
@@ -136,7 +136,7 @@ export async function fetchHrHistoryLedger(staffId: string) {
         'work_type_change_history',
         supabase
           .from('work_type_change_history')
-          .select('*')
+          .select('id, changed_date, created_at, staff_id, previous_type, new_type, reason')
           .eq('staff_id', staffId)
           .order('changed_date', { ascending: false })
           .limit(20),
@@ -145,7 +145,7 @@ export async function fetchHrHistoryLedger(staffId: string) {
         'leave_requests',
         supabase
           .from('leave_requests')
-          .select('*')
+          .select('id, leave_type, start_date, end_date, days, used_days, created_at, staff_id, status')
           .eq('staff_id', staffId)
           .order('created_at', { ascending: false })
           .limit(20),
@@ -154,7 +154,7 @@ export async function fetchHrHistoryLedger(staffId: string) {
         'audit_logs',
         supabase
           .from('audit_logs')
-          .select('*')
+          .select('id, action, created_at, target_id, actor_name, details')
           .eq('target_id', staffId)
           .order('created_at', { ascending: false })
           .limit(20),

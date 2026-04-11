@@ -1,5 +1,6 @@
 'use client';
 import { toast } from '@/lib/toast';
+import Image from 'next/image';
 import { useDeferredValue, useState, useEffect, useMemo, useRef, useCallback, type MouseEvent as ReactMouseEvent } from 'react';
 import { canAccessBoard, isAdminUser, isPrivilegedUser } from '@/lib/access-control';
 import { getStaffLikeId, resolveStaffLike } from '@/lib/staff-identity';
@@ -801,7 +802,8 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
           .from('board_posts')
           .select(buildSelectColumns(BOARD_POST_REQUIRED_SELECT_COLUMNS, BOARD_POST_OPTIONAL_COLUMNS, omittedColumns))
           .eq('board_type', requestedBoard)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .limit(500);
         return result as unknown as QueryResult<BoardPostRow[]>;
       },
       [...BOARD_POST_OPTIONAL_COLUMNS]
@@ -2310,10 +2312,13 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                 {/* 왼쪽: 생성된 전신 이미지 + 부위 클릭 (이미지와 동일 비율 박스 안에서 좌표 고정) */}
                 <div className="flex-1 flex items-center justify-center min-h-[280px] md:min-h-[400px] max-h-[50vh] md:max-h-[640px] bg-[#020617] rounded-[var(--radius-xl)] border border-slate-800 overflow-hidden p-2">
                   <div className="relative w-full max-w-[280px] md:max-w-[400px] aspect-[2/3] max-h-[45vh] md:max-h-[600px] shrink-0 -translate-y-6">
-                    <img
+                    <Image
                       src="/human-body-mri.png"
                       alt="사람 전신 모형"
+                      width={400}
+                      height={600}
                       className="w-full h-full object-contain object-center pointer-events-none select-none"
+                      priority={false}
                     />
                     {/* 부위 클릭 영역: 아래 좌표는 위 이미지(2:3 비율)에 맞춰 고정됨 */}
                     <div className="absolute inset-0">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import React, { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { toNotificationText, getInitials } from '@/lib/notification-utils';
 
 type ChatDetail = {
@@ -28,7 +28,7 @@ const DISPLAY_MS = 6000;
 
 const toBannerText = (value: unknown, fallback = '') => toNotificationText(value, fallback, true);
 
-export default function ChatAlertBanner(props: {
+function ChatAlertBanner(props: {
   onOpenChat: (roomId: string) => void;
   onOpenMessage?: (roomId: string, messageId: string) => void;
   onOpenApproval?: () => void;
@@ -256,3 +256,5 @@ export default function ChatAlertBanner(props: {
     </div>
   );
 }
+
+export default React.memo(ChatAlertBanner);

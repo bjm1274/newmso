@@ -32,6 +32,7 @@ async function callGemini(prompt: string): Promise<string> {
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
         }),
+        signal: AbortSignal.timeout(30_000),
       });
 
       const data = await res.json();

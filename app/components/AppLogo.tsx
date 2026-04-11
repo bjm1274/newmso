@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 
 /** 로그인·마이페이지·사이드바 등에서 동일하게 쓰는 SY 로고 (사각형) */
 const LOGO_SRC = '/sy-logo.png';
@@ -21,9 +22,11 @@ export default function AppLogo({
       style={{ width: size, height: size, borderRadius: 0 }}
     >
       {!failed ? (
-        <img
+        <Image
           src={LOGO_SRC}
           alt="SY INC."
+          width={size}
+          height={size}
           className="w-full h-full object-contain"
           onError={() => setFailed(true)}
         />

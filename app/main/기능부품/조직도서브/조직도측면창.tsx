@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { canAccessMainMenu } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
@@ -95,7 +95,7 @@ type SidebarUser = {
   [key: string]: unknown;
 };
 
-export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; mainMenu?: string; onMenuChange: (menuId: string) => void }) {
+function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; mainMenu?: string; onMenuChange: (menuId: string) => void }) {
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const normalizedUser = useMemo(
     () => normalizeStaffLike((user ?? {}) as Record<string, unknown>) as SidebarUser,
@@ -391,3 +391,5 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
     </>
   );
 }
+
+export default React.memo(Sidebar);

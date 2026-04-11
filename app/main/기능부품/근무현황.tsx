@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, memo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { isActiveStaff } from '@/lib/active-staff';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
@@ -200,7 +200,7 @@ function cloneCounts(source: DayShiftCounts) {
   return { total: source.total, D: source.D, E: source.E, N: source.N, OTHER: source.OTHER };
 }
 
-export default function WorkStatus({ user }: { user?: any }) {
+function WorkStatus({ user }: { user?: any }) {
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [workShifts, setWorkShifts] = useState<WorkShiftRow[]>([]);
   const [staffs, setStaffs] = useState<StaffRow[]>([]);
@@ -932,3 +932,5 @@ export default function WorkStatus({ user }: { user?: any }) {
     </div>
   );
 }
+
+export default memo(WorkStatus);

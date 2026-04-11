@@ -33,6 +33,9 @@ import NotificationSystem from './기능부품/알림시스템';
 import ChatAlertBanner from './기능부품/채팅알림배너';
 import PermissionPromptModal from './기능부품/권한요청모달';
 import OfflineStatusBanner from '@/app/components/OfflineStatusBanner';
+import { NavigationProvider } from './contexts/NavigationContext';
+import { CompanyProvider } from './contexts/CompanyContext';
+import { AppDataProvider } from './contexts/AppDataContext';
 import type { ErpUser, ERPData, StaffMember } from '@/types';
 
 function canAccessAdminSubMenu(user: ErpUser | null, subMenuId: string) {
@@ -1093,6 +1096,9 @@ function MainPageContent() {
             <div className="w-10 h-10 border-2 border-[var(--accent)] rounded-full border-t-transparent animate-spin" />
           </div>
         )}
+        <NavigationProvider value={{ mainMenu, setMainMenu, subView, setSubView: setSubView as (v: string | null) => void }}>
+        <CompanyProvider value={{ selectedCo, setSelectedCo: handleSelectedCoChange as (v: string | null) => void, companies: companies as unknown as { id: string; name: string; type: string }[], selectedCompanyId, setSelectedCompanyId: handleSelectedCompanyIdChange as (v: string | null) => void }}>
+        <AppDataProvider value={{ user, data, onRefresh: handleRefresh }}>
         <MainContent
           key={`main-content-${menuResetVersion}`}
           user={user}
@@ -1132,6 +1138,9 @@ function MainPageContent() {
             setInitialOpenMessageId(messageId);
           }}
         />
+        </AppDataProvider>
+        </CompanyProvider>
+        </NavigationProvider>
       </div>
     </div>
   );

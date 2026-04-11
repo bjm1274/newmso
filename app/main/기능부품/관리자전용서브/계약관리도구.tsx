@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useCompaniesCache } from '@/lib/use-companies-cache';
 import {
   CONTRACT_TEMPLATE_VARIABLES,
   DEFAULT_CONTRACT_TEMPLATE,
@@ -12,18 +13,12 @@ import {
 
 export default function ContractManager() {
   const [selectedCo, setSelectedCo] = useState('박철홍정형외과');
-  const [companies, setCompanies] = useState<any[]>([]);
+  const { companies } = useCompaniesCache();
   const [template, setTemplate] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sealUrl, setSealUrl] = useState<string | null>(null);
   const [uploadingSeal, setUploadingSeal] = useState(false);
-
-  useEffect(() => {
-    supabase.from('companies').select('*').order('name').then(({ data }) => {
-      if (data) setCompanies(data);
-    });
-  }, []);
 
   useEffect(() => {
     const fetchTemplate = async () => {
