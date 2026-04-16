@@ -5,28 +5,49 @@ import {
   calculateHourlyRateFromMonthlySalary,
   getMonthlyWorkingHours,
   resolveWeeklyWorkingHours,
-  resolveWorkingDaysPerWeek,
 } from '@/lib/payroll-working-hours';
 import {
   hasInlineContractReceiptSection,
   upgradeLegacyContractTemplate,
 } from '@/lib/contract-template-defaults';
+import { fillEmploymentContractTemplate } from '@/lib/contract-template-render';
+import {
+  getShiftBandGroupRows,
+  getWeeklyRotationShiftIds,
+  isShiftBandGroupRow,
+  orderShiftsByIds,
+  withWeeklyRotationShifts,
+} from '@/lib/contract-shift-rotation';
 
 type Props = {
   staff?: any;
   contract?: any;
+  templateOverride?: string;
+  sealUrlOverride?: string | null;
+  showToolbar?: boolean;
 };
 
-export default function ContractPreview({ staff, contract }: Props) {
+export default function ContractPreview({
+  staff,
+  contract,
+  templateOverride,
+  sealUrlOverride,
+  showToolbar = true,
+}: Props) {
   const [text, setText] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [company, setCompany] = useState<Record<string, unknown> | null>(null);
   const [shift, setShift] = useState<Record<string, unknown> | null>(null);
+  const [templateSource, setTemplateSource] = useState<string | null>(null);
+  const hasTemplateOverride = templateOverride !== undefined;
 
   useEffect(() => {
     const load = async () => {
       if (!staff) {
         setText('');
+        setTemplateSource(null);
+        setCompany(null);
+        setShift(null);
         return;
       }
       setLoading(true);
@@ -34,14 +55,28 @@ export default function ContractPreview({ staff, contract }: Props) {
         const companyName = staff.company || '전체';
 
         let shiftData: any = null;
-        const shiftId = contract?.shift_id ?? staff.shift_id;
-        if (shiftId) {
-          const { data: sData } = await supabase
+        const shiftIds = getWeeklyRotationShiftIds(staff, contract?.shift_id ?? staff.shift_id);
+        if (shiftIds.length > 0) {
+          const { data: shiftRows } = await supabase
             .from('work_shifts')
             .select('*')
-            .eq('id', shiftId)
-            .maybeSingle();
-          shiftData = sData;
+            .in('id', shiftIds);
+          let orderedShiftRows = orderShiftsByIds(shiftRows, shiftIds);
+          if (orderedShiftRows.length === 1 && isShiftBandGroupRow(orderedShiftRows[0])) {
+            const seedShift = orderedShiftRows[0];
+            const seedCompanyName = String(seedShift.company_name || seedShift.company || '');
+            const seedShiftType = String(seedShift.shift_type || '');
+            let siblingQuery = supabase
+              .from('work_shifts')
+              .select('*')
+              .eq('is_active', true);
+            if (seedCompanyName) siblingQuery = siblingQuery.eq('company_name', seedCompanyName);
+            if (seedShiftType) siblingQuery = siblingQuery.eq('shift_type', seedShiftType);
+            const { data: siblingRows } = await siblingQuery;
+            const groupedRows = getShiftBandGroupRows(seedShift, siblingRows);
+            if (groupedRows.length > 1) orderedShiftRows = groupedRows;
+          }
+          shiftData = withWeeklyRotationShifts(orderedShiftRows);
         }
         setShift(shiftData);
 
@@ -55,34 +90,70 @@ export default function ContractPreview({ staff, contract }: Props) {
           companyInfo = companyRow;
         }
 
-        const { data: tmpl } = await supabase
-          .from('contract_templates')
-          .select('template_content, seal_url')
-          .eq('company_name', companyName)
-          .maybeSingle();
-
-        setCompany({ ...companyInfo, seal_url: tmpl?.seal_url });
-
-        let templateText = tmpl?.template_content || '';
-        if (!templateText) {
-          const { data: fallback } = await supabase
+        let tmpl: { template_content?: string | null; seal_url?: string | null } | null = null;
+        if (companyName) {
+          const { data } = await supabase
             .from('contract_templates')
-            .select('template_content')
-            .eq('company_name', '전체')
+            .select('template_content, seal_url')
+            .eq('company_name', companyName)
             .maybeSingle();
-          templateText = fallback?.template_content || '';
+          tmpl = data;
         }
 
-        setText(fillContractTemplate(upgradeLegacyContractTemplate(templateText), staff, contract, shiftData, companyInfo));
+        const resolvedSealUrl =
+          sealUrlOverride !== undefined ? sealUrlOverride : tmpl?.seal_url;
+        setCompany({ ...companyInfo, seal_url: resolvedSealUrl });
+
+        let templateText = '';
+        if (!hasTemplateOverride) {
+          templateText = tmpl?.template_content || '';
+          if (!templateText) {
+            const { data: fallback } = await supabase
+              .from('contract_templates')
+              .select('template_content')
+              .eq('company_name', '전체')
+              .maybeSingle();
+            templateText = fallback?.template_content || '';
+          }
+        }
+        setTemplateSource(templateText);
       } catch (e) {
         console.warn('ContractPreview load error', e);
         setText('');
+        setTemplateSource(null);
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, [staff?.id, staff?.company, contract?.id]);
+  }, [staff?.id, staff?.company, staff?.shift_id, contract?.id, contract?.shift_id, hasTemplateOverride, sealUrlOverride]);
+
+  useEffect(() => {
+    if (!staff) {
+      setText('');
+      return;
+    }
+
+    if (!hasTemplateOverride && templateSource === null) {
+      return;
+    }
+
+    const nextTemplate = hasTemplateOverride ? templateOverride || '' : templateSource;
+    if (hasTemplateOverride && !(nextTemplate ?? '').trim()) {
+      setText('');
+      return;
+    }
+
+    setText(
+      fillEmploymentContractTemplate(
+        upgradeLegacyContractTemplate(nextTemplate),
+        staff,
+        contract,
+        shift,
+        company,
+      ),
+    );
+  }, [staff, contract, shift, company, templateSource, templateOverride, hasTemplateOverride]);
 
   if (!staff) {
     return (
@@ -99,125 +170,7 @@ export default function ContractPreview({ staff, contract }: Props) {
     shift: any,
     company: any,
   ) {
-    if (!template) return '';
-
-    const formatDate = (value?: string | null) => {
-      if (!value) return '';
-      const d = new Date(value);
-      if (Number.isNaN(d.getTime())) return value;
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${y}년 ${m}월 ${day}일`;
-    };
-
-    const formatWon = (n?: number | null) => {
-      if (!n || Number.isNaN(n)) return '';
-      try {
-        return n.toLocaleString('ko-KR');
-      } catch {
-        return String(n);
-      }
-    };
-
-    const parseBirthFromResident = (resident?: string | null) => {
-      if (!resident) return '';
-      const raw = resident.replace(/[^0-9]/g, '');
-      if (raw.length < 7) return '';
-      const yy = raw.slice(0, 2);
-      const mm = raw.slice(2, 4);
-      const dd = raw.slice(4, 6);
-      const genderCode = raw[6];
-      const century =
-        genderCode === '1' || genderCode === '2' || genderCode === '5' || genderCode === '6'
-          ? '19'
-          : '20';
-      const year = `${century}${yy}`;
-      return `${year}년 ${mm}월 ${dd}일`;
-    };
-
-    const salarySource = contract || user || {};
-
-    const weeklyWorkHours = resolveWeeklyWorkingHours(salarySource, resolveWeeklyWorkingHours(user, 40));
-    const workingDaysPerWeek = resolveWorkingDaysPerWeek(salarySource, resolveWorkingDaysPerWeek(user, 5));
-
-    const vars: Record<string, string> = {
-      employee_name: user?.name || '',
-      employee_no: String(user?.employee_no ?? ''),
-      company_name: company?.name || user?.company || '',
-      company_ceo: company?.ceo_name || '',
-      ceo_name: company?.ceo_name || '',
-      company_business_no: company?.business_no || '',
-      business_no: company?.business_no || '',
-      company_address: company?.address || '',
-      company_phone: company?.phone || '',
-      department: user?.department || '',
-      position: user?.position || '',
-      join_date: formatDate(user?.joined_at || salarySource?.join_date),
-      license_name: user?.license || '',
-      license_no: user?.permissions?.license_no || '',
-      license_date: formatDate(user?.permissions?.license_date || ''),
-      phone: user?.phone || '',
-      address: user?.address || '',
-      birth_date: parseBirthFromResident(user?.resident_no),
-      base_salary: formatWon(salarySource.base_salary),
-      position_allowance: formatWon(salarySource.position_allowance),
-      meal_allowance: formatWon(salarySource.meal_allowance),
-      vehicle_allowance: formatWon(salarySource.vehicle_allowance),
-      childcare_allowance: formatWon(salarySource.childcare_allowance),
-      research_allowance: formatWon(salarySource.research_allowance),
-      other_taxfree: formatWon(salarySource.other_taxfree),
-      shift_name: shift?.name || '',
-      shift_start: shift?.start_time ? String(shift.start_time).slice(0, 5) : (contract?.shift_start_time || '').slice(0, 5),
-      shift_end: shift?.end_time ? String(shift.end_time).slice(0, 5) : (contract?.shift_end_time || '').slice(0, 5),
-      break_start: shift?.break_start_time ? String(shift.break_start_time).slice(0, 5) : (contract?.break_start_time || '').slice(0, 5),
-      break_end: shift?.break_end_time ? String(shift.break_end_time).slice(0, 5) : (contract?.break_end_time || '').slice(0, 5),
-      working_hours_per_week: String(weeklyWorkHours),
-      working_days_per_week: String(workingDaysPerWeek),
-      contract_type: user?.employment_type || salarySource.contract_type || user?.고용형태 || '정규직',
-      probation_months: String(contract?.probation_months ?? user?.probation_months ?? '3'),
-      probation_percent: String(contract?.probation_percent || '90'),
-      payment_day: String(contract?.payment_day || '7'),
-      contract_start: formatDate(contract?.contract_start_date || user?.joined_at || salarySource?.join_date),
-      contract_end: contract?.contract_end_date ? formatDate(contract.contract_end_date) : '정년도달시',
-      conditions_applied_at: formatDate(contract?.conditions_applied_at || salarySource?.effective_date),
-      resident_no: user?.resident_no ? user.resident_no.replace(/(\d{6})-?(\d{7})/, '$1-$2') : '',
-      today: formatDate(new Date().toISOString()),
-    };
-
-    // 임금 합계 변수는 renderSalaryTable과 동일 로직으로 계산
-    const salaryItems = [
-      Number(salarySource.base_salary || 0),
-      Number(salarySource.position_allowance || user?.position_allowance || 0),
-      Number(salarySource.meal_allowance || user?.meal_allowance || 0),
-      Number(salarySource.vehicle_allowance || user?.vehicle_allowance || 0),
-      Number(salarySource.childcare_allowance || user?.childcare_allowance || 0),
-      Number(salarySource.research_allowance || user?.research_allowance || 0),
-      Number(salarySource.other_taxfree || user?.other_taxfree || 0),
-    ];
-    const totalMonthlyWage = salaryItems.reduce((s, n) => s + n, 0);
-    const wph = weeklyWorkHours;
-    const mwh = getMonthlyWorkingHours(wph);
-    const hwage = calculateHourlyRateFromMonthlySalary(totalMonthlyWage, wph);
-    vars.total_monthly = formatWon(totalMonthlyWage);
-    vars.annual_salary = formatWon(totalMonthlyWage * 12);
-    vars.hourly_wage = formatWon(hwage);
-    vars.monthly_work_hours = String(mwh);
-
-    let result = template;
-
-    // [수습 기간] 태그 제거 (본문에서 자체적으로 다루므로 별도 태그 불필요)
-    result = result.replace(/\[\s*수습\s*기간\s*\]/g, '');
-
-    // 변수 치환
-    Object.entries(vars).forEach(([key, value]) => {
-      const token = `{{${key}}}`;
-      if (result.includes(token)) {
-        result = result.split(token).join(value || '');
-      }
-    });
-
-    return result;
+    return fillEmploymentContractTemplate(template, user, contract, shift, company);
   }
 
   /** 계약서 텍스트를 조 단위 섹션으로 파싱 */
@@ -352,20 +305,19 @@ export default function ContractPreview({ staff, contract }: Props) {
       }
 
       // 서명란: "사용자: ___(인/서명)" 패턴
-      if (/사용자\s*[:：]/.test(trimmed) && /인.서명/.test(trimmed)) {
+      if (/사용자\s*[:：].*\(인\/서명\).*근로자\s*[:：].*\(인\/서명\)/.test(trimmed)) {
         result.push(
           <div key={i} className="mt-4 mb-2 flex items-center gap-6 py-2 px-3 bg-slate-50 border border-slate-200 rounded-lg">
-            {trimmed.split(/\s{2,}|근로자\s*[:：]/).map((part, pi) => {
-              const label = pi === 0 ? '사용자' : '근로자';
-              const isFirst = pi === 0;
-              return (
-                <div key={pi} className="flex items-center gap-2 flex-1">
-                  <span className={`text-[10.5px] font-black shrink-0 ${isFirst ? 'text-slate-600' : 'text-blue-700'}`}>{label}</span>
-                  <div className={`flex-1 border-b-2 ${isFirst ? 'border-slate-400' : 'border-blue-400'} min-w-[80px]`} />
-                  <span className="text-[10px] text-slate-400 shrink-0">(인/서명)</span>
-                </div>
-              );
-            })}
+            {[
+              { label: '사용자', accentClass: 'text-slate-600', borderClass: 'border-slate-400' },
+              { label: '근로자', accentClass: 'text-blue-700', borderClass: 'border-blue-400' },
+            ].map(({ label, accentClass, borderClass }) => (
+              <div key={label} className="flex items-center gap-2 flex-1">
+                <span className={`text-[10.5px] font-black shrink-0 ${accentClass}`}>{label}</span>
+                <div className={`flex-1 border-b-2 ${borderClass} min-w-[80px]`} />
+                <span className="text-[10px] text-slate-400 shrink-0">(인/서명)</span>
+              </div>
+            ))}
           </div>
         );
         continue;
@@ -482,30 +434,32 @@ export default function ContractPreview({ staff, contract }: Props) {
   return (
     <div className="flex flex-col h-[900px] overflow-y-auto rounded-2xl border border-[var(--border)] relative custom-scrollbar bg-slate-100 print:bg-white print:border-none print:h-auto print:overflow-visible">
       {/* 상단 툴바 */}
-      <div className="sticky top-0 z-20 flex items-center justify-between px-4 py-2.5 bg-white/90 backdrop-blur-md border-b border-slate-200 print:hidden">
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-          <span className="text-[13px] font-bold text-slate-800">{staff.name}</span>
-          <span className="text-[11px] text-slate-400">근로계약서</span>
+      {showToolbar && (
+        <div className="sticky top-0 z-20 flex items-center justify-between px-4 py-2.5 bg-white/90 backdrop-blur-md border-b border-slate-200 print:hidden">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+            <span className="text-[13px] font-bold text-slate-800">{staff.name}</span>
+            <span className="text-[11px] text-slate-400">근로계약서</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {contract?.status && (
+              <span className={`px-2.5 py-1 text-[10px] font-black rounded-full ${
+                contract.status === '서명완료'
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-amber-100 text-amber-700'
+              }`}>
+                {contract.status}
+              </span>
+            )}
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-[var(--muted)] transition-colors"
+            >
+              <span>🖨️</span> 인쇄
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {contract?.status && (
-            <span className={`px-2.5 py-1 text-[10px] font-black rounded-full ${
-              contract.status === '서명완료'
-                ? 'bg-emerald-100 text-emerald-700'
-                : 'bg-amber-100 text-amber-700'
-            }`}>
-              {contract.status}
-            </span>
-          )}
-          <button
-            onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-[var(--muted)] transition-colors"
-          >
-            <span>🖨️</span> 인쇄
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* A4 용지 */}
       <div className="flex-1 p-6 flex justify-center">
@@ -561,7 +515,7 @@ export default function ContractPreview({ staff, contract }: Props) {
                   <div className="divide-y divide-slate-100">
                     {[
                       { label: '성 명', value: staff.name },
-                      { label: '생년월일', value: staff.resident_no ? staff.resident_no.slice(0, 6) : '-' },
+                      { label: '생년월일', value: staff.resident_no ? String(staff.resident_no).slice(0, 6) : '-' },
                       { label: '주 소', value: staff.address || '-' },
                       { label: '연 락 처', value: staff.phone || '-' },
                       { label: '부서/직위', value: [staff.department, staff.position].filter(Boolean).join(' · ') || '-' },

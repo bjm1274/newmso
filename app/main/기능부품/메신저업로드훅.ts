@@ -14,7 +14,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import { buildUploadRequestFileName } from './메신저첨부';
-import type { SendMessageOptions } from './메신저메시지서비스';
+import type { SendMessageOptions } from './메신저전송훅';
 import {
   CHAT_ATTACHMENT_RETRY_EVENT,
   clearFailedAttachmentRetryQueue,
@@ -24,8 +24,7 @@ import {
   type AttachmentRetryQueueEntry,
 } from './메신저첨부재시도큐';
 
-const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
-const MAX_VIDEO_SIZE_BYTES = 200 * 1024 * 1024;
+import { CHAT_MAX_FILE_SIZE_BYTES as MAX_FILE_SIZE_BYTES, CHAT_MAX_VIDEO_SIZE_BYTES as MAX_VIDEO_SIZE_BYTES } from '@/lib/chat-upload-constants';
 
 type ShareTarget = {
   id: string;
@@ -220,25 +219,37 @@ export function useChatUploads({
           return fallbackPayload;
         };
 
-        const response = await fetch('/api/chat/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fileName: uploadFileName,
-            mimeType: file.type || 'application/octet-stream',
-            fileSize: file.size,
-          }),
-        });
-        const payload = (await response.json().catch(() => null)) as {
-          provider?: 'supabase' | 'r2';
-          bucket?: string;
-          path?: string;
-          token?: string;
-          signedUrl?: string;
-          url?: string;
-          headers?: Record<string, string>;
-          error?: string;
-        } | null;
+        const fetchUploadPlan = async () => {
+          const res = await fetch('/api/chat/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fileName: uploadFileName,
+              mimeType: file.type || 'application/octet-stream',
+              fileSize: file.size,
+            }),
+          });
+          return { res, payload: (await res.json().catch(() => null)) as {
+            provider?: 'supabase' | 'r2';
+            bucket?: string;
+            path?: string;
+            token?: string;
+            signedUrl?: string;
+            url?: string;
+            headers?: Record<string, string>;
+            error?: string;
+          } | null };
+        };
+
+        let { res: response, payload } = await fetchUploadPlan();
+
+        // 401이면 세션 갱신 후 한 번 재시도
+        if (response.status === 401) {
+          const refreshRes = await fetch('/api/auth/session', { method: 'GET', credentials: 'same-origin' });
+          if (refreshRes.ok) {
+            ({ res: response, payload } = await fetchUploadPlan());
+          }
+        }
 
         if (!response.ok || !payload?.path || !payload?.signedUrl || !payload?.provider) {
           throw new Error(payload?.error || `파일 업로드 준비에 실패했습니다. (HTTP ${response.status})`);

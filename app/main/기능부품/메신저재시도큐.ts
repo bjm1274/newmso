@@ -3,6 +3,7 @@
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import type { ChatMessage, StaffMember } from '@/types';
 import type { MessageRetryPayload } from './메신저유틸';
+import { sortByCreatedAt, limitToMaxSize } from './메신저재시도큐공통';
 
 const RETRY_DELAYS_MS = [5000, 15000, 30000, 60000] as const;
 const MAX_QUEUE_SIZE = 50;
@@ -83,13 +84,9 @@ function readQueueEntries(actorId: string | null | undefined): PersistedChatRetr
     const raw = window.localStorage.getItem(getRetryQueueStorageKey(actorId));
     const parsed = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map(normalizeRetryEntry)
-      .filter((entry): entry is PersistedChatRetryEntry => Boolean(entry))
-      .sort(
-        (left, right) =>
-          new Date(left.createdAt || 0).getTime() - new Date(right.createdAt || 0).getTime(),
-      );
+    return sortByCreatedAt(
+      parsed.map(normalizeRetryEntry).filter((entry): entry is PersistedChatRetryEntry => Boolean(entry)),
+    );
   } catch {
     return [];
   }
@@ -100,7 +97,7 @@ function writeQueueEntries(actorId: string | null | undefined, entries: Persiste
   try {
     window.localStorage.setItem(
       getRetryQueueStorageKey(actorId),
-      JSON.stringify(entries.slice(-MAX_QUEUE_SIZE)),
+      JSON.stringify(limitToMaxSize(entries, MAX_QUEUE_SIZE)),
     );
   } catch {
     // ignore storage failures
@@ -144,13 +141,10 @@ export function upsertFailedChatRetryEntry(
     nextAutoRetryAt: buildNextAutoRetryAt(attemptCount),
   };
 
-  const nextEntries = [
+  const nextEntries = sortByCreatedAt([
     ...existingEntries.filter((entry) => entry.id !== normalizedId),
     nextEntry,
-  ].sort(
-    (left, right) =>
-      new Date(left.createdAt || 0).getTime() - new Date(right.createdAt || 0).getTime(),
-  );
+  ]);
   writeQueueEntries(normalizedActorId, nextEntries);
   return nextEntries;
 }
