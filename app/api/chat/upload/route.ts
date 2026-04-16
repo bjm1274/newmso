@@ -9,10 +9,10 @@ import {
 import { readSessionFromRequest } from '@/lib/server-session';
 
 
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
-const MAX_VIDEO_SIZE_BYTES = 200 * 1024 * 1024;
+import { CHAT_MAX_FILE_SIZE_BYTES as MAX_FILE_SIZE_BYTES, CHAT_MAX_VIDEO_SIZE_BYTES as MAX_VIDEO_SIZE_BYTES } from '@/lib/chat-upload-constants';
 const CHAT_BUCKET_CANDIDATES = ['pchos-files', 'board-attachments'] as const;
 
 type UploadPlanRequest = {

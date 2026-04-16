@@ -1,10 +1,86 @@
 'use client';
 
-import { useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { bindPageRefresh } from '@/lib/realtime-maintenance';
 import { supabase } from '@/lib/supabase';
+import { toast } from '@/lib/toast';
 import type { ChatMessage, ChatRoom } from '@/types';
-import type { ChatRealtimeState } from './메신저실시간훅';
+import { bindMockChatMessageInsert } from './메신저테스트이벤트';
+import { getConversationRoomIdsByRoomId } from './메신저유틸';
+
+// ─── 실시간 연결 상태 (메신저실시간훅에서 통합) ─────────────────────────────
+export type ChatRealtimeState = 'idle' | 'connecting' | 'connected' | 'reconnecting';
+
+export function useRoomNotificationSetting({
+  selectedRoomId,
+  effectiveChatUserId,
+  userId,
+}: {
+  selectedRoomId: string | null;
+  effectiveChatUserId: string | null | undefined;
+  userId: string | null | undefined;
+}) {
+  const [roomNotifyOn, setRoomNotifyOn] = useState(true);
+  const roomNotifyRef = useRef(true);
+
+  useEffect(() => {
+    roomNotifyRef.current = roomNotifyOn;
+  }, [roomNotifyOn]);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!(effectiveChatUserId || userId) || !selectedRoomId) {
+        setRoomNotifyOn(true);
+        return;
+      }
+      const { data, error } = await supabase
+        .from('room_notification_settings')
+        .select('notifications_enabled')
+        .eq('user_id', effectiveChatUserId || userId)
+        .eq('room_id', selectedRoomId)
+        .maybeSingle();
+      if (error) { setRoomNotifyOn(true); return; }
+      setRoomNotifyOn(data?.notifications_enabled !== false);
+    };
+    void load();
+  }, [effectiveChatUserId, selectedRoomId, userId]);
+
+  const toggleRoomNotify = useCallback(async () => {
+    if (!(effectiveChatUserId || userId) || !selectedRoomId) return;
+    const previousValue = roomNotifyRef.current;
+    const nextValue = !previousValue;
+    setRoomNotifyOn(nextValue);
+    roomNotifyRef.current = nextValue;
+    try {
+      const { error } = await supabase.from('room_notification_settings').upsert(
+        { user_id: effectiveChatUserId || userId, room_id: selectedRoomId, notifications_enabled: nextValue },
+        { onConflict: 'user_id,room_id' },
+      );
+      if (error) throw error;
+    } catch {
+      setRoomNotifyOn(previousValue);
+      roomNotifyRef.current = previousValue;
+      toast('채팅방 알림 설정을 저장하지 못했습니다.', 'error');
+    }
+  }, [effectiveChatUserId, selectedRoomId, userId]);
+
+  return { roomNotifyOn, roomNotifyRef, setRoomNotifyOn, toggleRoomNotify };
+}
+
+export function useRealtimeConnectionMeta(
+  selectedRoomId: string | null,
+  globalRealtimeState: ChatRealtimeState,
+  roomRealtimeState: ChatRealtimeState,
+) {
+  return useMemo(() => {
+    const state = selectedRoomId ? roomRealtimeState : globalRealtimeState;
+    if (state === 'connected') return { label: '실시간 연결됨', dotClassName: 'bg-emerald-500', textClassName: 'text-emerald-500' };
+    if (state === 'reconnecting') return { label: '실시간 재연결 중', dotClassName: 'bg-amber-500', textClassName: 'text-amber-500' };
+    if (state === 'connecting') return { label: '실시간 연결 중', dotClassName: 'bg-sky-500', textClassName: 'text-sky-500' };
+    return { label: '실시간 대기 중', dotClassName: 'bg-[var(--toss-gray-4)]', textClassName: 'text-[var(--toss-gray-4)]' };
+  }, [globalRealtimeState, roomRealtimeState, selectedRoomId]);
+}
+// ────────────────────────────────────────────────────────────────────────────
 
 type PresenceInfo = {
   userId: string;
@@ -211,6 +287,14 @@ export function useChatRealtimeSubscriptions({
     }
 
     let disposed = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const triggerDebouncedFetch = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        if (!disposed) void fetchDataLatestRef.current();
+      }, 300);
+    };
+
     setRoomRealtimeState((prev) => (prev === 'connected' ? prev : 'connecting'));
     void fetchDataLatestRef.current();
 
@@ -220,9 +304,9 @@ export function useChatRealtimeSubscriptions({
         if (!row?.id) return;
         void handleIncomingRealtimeMessageRef.current(row);
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, () => fetchDataLatestRef.current())
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, () => fetchDataLatestRef.current())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, () => fetchDataLatestRef.current())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, triggerDebouncedFetch)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, triggerDebouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, triggerDebouncedFetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_read_cursors' }, (payload: Record<string, unknown>) => {
         const updatedRow =
           (payload.new as Record<string, unknown> | null) ||
@@ -235,14 +319,14 @@ export function useChatRealtimeSubscriptions({
           const updatedUserId = updatedRow?.user_id;
           // 내 자신의 커서 변경은 무시 (이미 setRoomUnreadCounts로 처리됨)
           if (updatedUserId && String(updatedUserId) === String(effectiveChatUserId || '')) return;
-          void fetchDataLatestRef.current();
+          triggerDebouncedFetch();
         }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, () => fetchDataLatestRef.current())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_bookmarks', filter: `user_id=eq.${effectiveTodoUserId || userId}` }, () => fetchDataLatestRef.current())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pinned_messages' }, () => fetchDataLatestRef.current())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'polls' }, () => fetchDataLatestRef.current())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, () => fetchDataLatestRef.current())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, triggerDebouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_bookmarks', filter: `user_id=eq.${effectiveTodoUserId || userId}` }, triggerDebouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pinned_messages' }, triggerDebouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'polls' }, triggerDebouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, triggerDebouncedFetch)
       .subscribe((status: string) => {
         if (disposed) return;
         if (status === 'SUBSCRIBED') {
@@ -261,6 +345,7 @@ export function useChatRealtimeSubscriptions({
 
     return () => {
       disposed = true;
+      if (timeoutId) clearTimeout(timeoutId);
       supabase.removeChannel(channel);
     };
   }, [
@@ -376,19 +461,15 @@ export function useChatRealtimeSubscriptions({
   }, [chatRoomsRef, fetchDataRef, isRoomInSelectedConversation, syncChannelRef, updateUnreadForRooms]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const handleMockRealtimeInsert = (event: Event) => {
-      const detail = (event as CustomEvent<{ rows?: ChatMessage[]; row?: ChatMessage }>).detail;
+    const unbindMockInsert = bindMockChatMessageInsert((detail) => {
       const rows = Array.isArray(detail?.rows) ? detail.rows : detail?.row ? [detail.row] : [];
       rows.forEach((row) => {
         if (!row?.id) return;
         void handleIncomingRealtimeMessage(row);
       });
-    };
-
-    window.addEventListener('erp-mock-chat-message-insert', handleMockRealtimeInsert as EventListener);
+    });
     return () => {
-      window.removeEventListener('erp-mock-chat-message-insert', handleMockRealtimeInsert as EventListener);
+      unbindMockInsert();
     };
   }, [handleIncomingRealtimeMessage]);
 
@@ -407,11 +488,15 @@ export function useChatRealtimeSubscriptions({
       const knownRoom = chatRoomsRef.current.some((room: ChatRoom) => String(room.id) === roomId);
       const previewText = String(detail?.body || '').trim();
       if (knownRoom && previewText) {
+        const conversationRoomIds = getConversationRoomIdsByRoomId(roomId, chatRoomsRef.current);
+        const targetConversationRoomIds = Array.from(
+          new Set([...(conversationRoomIds.length > 0 ? conversationRoomIds : [roomId]), roomId].filter(Boolean)),
+        );
         setChatRooms((prev) => {
-          if (!prev.some((room: ChatRoom) => String(room.id) === roomId)) return prev;
+          if (!prev.some((room: ChatRoom) => targetConversationRoomIds.includes(String(room.id)))) return prev;
           return sortChatRoomsWithNoticeFirst(
             prev.map((room: ChatRoom) =>
-              String(room.id) === roomId
+              targetConversationRoomIds.includes(String(room.id))
                 ? {
                     ...room,
                     last_message: previewText || room.last_message,

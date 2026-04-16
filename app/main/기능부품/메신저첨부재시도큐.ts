@@ -1,5 +1,7 @@
 'use client';
 
+import { buildRetryQueueId, sortByCreatedAt } from './메신저재시도큐공통';
+
 export const CHAT_ATTACHMENT_RETRY_EVENT = 'erp-chat-attachment-retry-changed';
 
 const DB_NAME = 'erp-chat-attachment-retries';
@@ -85,11 +87,7 @@ function withStore<T>(
   );
 }
 
-function buildQueueId() {
-  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
+const buildQueueId = buildRetryQueueId;
 
 function toFile(record: AttachmentRetryRecord) {
   return new File([record.fileBlob], record.fileName, {
@@ -144,9 +142,7 @@ export async function readFailedAttachmentRetryQueue(actorId: string | null | un
 
   return withStore('readonly', async (store) => {
     const all = await getAllRecords(store);
-    return all
-      .filter((entry) => entry.actorId === normalizedActorId)
-      .sort((left, right) => new Date(left.createdAt || 0).getTime() - new Date(right.createdAt || 0).getTime())
+    return sortByCreatedAt(all.filter((entry) => entry.actorId === normalizedActorId))
       .map((entry) => ({
         ...entry,
         file: toFile(entry),
@@ -172,9 +168,7 @@ export async function queueFailedAttachmentRetryEntry(
 
   await withStore('readwrite', async (store) => {
     const all = await getAllRecords(store);
-    const sameActor = all
-      .filter((entry) => entry.actorId === normalizedActorId)
-      .sort((left, right) => new Date(left.createdAt || 0).getTime() - new Date(right.createdAt || 0).getTime());
+    const sameActor = sortByCreatedAt(all.filter((entry) => entry.actorId === normalizedActorId));
     const overflow = Math.max(0, sameActor.length + 1 - MAX_ENTRIES_PER_ACTOR);
     for (const entry of sameActor.slice(0, overflow)) {
       store.delete(entry.id);

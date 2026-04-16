@@ -2,14 +2,15 @@
 import { toast } from '@/lib/toast';
 import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import {
+  isRelationMarkedMissing,
+  rememberMissingRelation,
+  withMissingColumnsFallback,
+} from '@/lib/supabase-compat';
 import { upsertRoomReadCursors } from '@/lib/chat-read-cursors';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
 import {
-  buildChatMessageSelect,
-  CHAT_MESSAGE_OPTIONAL_COLUMNS,
-  CHAT_MESSAGE_SELECT,
   CHAT_ROOM_SELECT,
   POLL_SELECT,
 } from '@/lib/chat-query-columns';
@@ -22,21 +23,22 @@ import {
 } from './메신저첨부';
 import { ChatAttachmentPreviewModal, useChatAttachmentPreview } from './메신저첨부미리보기';
 import { MessengerComposer } from './메신저컴포저';
+import { selectChatMessagesWithFallback } from './메신저데이터유틸';
 import { MessengerDrawer } from './메신저드로어';
+import { bindMockNotificationInsert } from './메신저테스트이벤트';
 import { MessengerMessageActions, ReactionDetailModal } from './메신저액션';
 import { useChatMessageActions } from './메신저액션훅';
 import { useChatGlobalSearch } from './메신저검색훅';
-import { useChatSearchNavigation } from './메신저검색이동훅';
 import { renderMessageContent } from './메신저메시지렌더';
-import { insertChatMessageWithFallback } from './메신저메시지서비스';
-import { useChatMessageWorkflow } from './메신저메시지워크플로훅';
+import { useChatMessageWorkflow } from './메신저메시지액션워크플로훅';
 import { useChatRoomManagement } from './메신저방관리훅';
 import { useChatRoomDataSync } from './메신저방데이터훅';
 import { useChatSidebarState } from './메신저사이드바훅';
 import { useChatMessageSending } from './메신저전송훅';
+import { useScheduledNoticeDispatcher } from './메신저예약공지훅';
 import { useChatRoomPreferences } from './메신저방환경설정훅';
 import { useChatRealtimeSubscriptions } from './메신저구독훅';
-import { useChatWorkflowDrafts } from './메신저워크플로훅';
+import { useChatWorkflowDrafts } from './메신저입력워크플로훅';
 import {
   useChatGroupedStaffs,
   useChatMediaPreviewState,
@@ -51,15 +53,20 @@ import {
   useThreadSummaries,
   type MediaFilter,
 } from './메신저파생훅';
-import { ChatRealtimeState, useRealtimeConnectionMeta, useRoomNotificationSetting } from './메신저실시간훅';
+import { ChatRealtimeState, useRealtimeConnectionMeta, useRoomNotificationSetting } from './메신저구독훅';
 import { useChatRoomNavigation } from './메신저방전환훅';
 import { useChatMessageEditing, useChatMobileBackLayer, useReadStatusModal } from './메신저상태훅';
 import { useChatUploads } from './메신저업로드훅';
-import { GlobalSearchModal, MediaArchivePanel } from './메신저패널';
+import { MediaArchivePanel } from './메신저미디어아카이브';
+import { GlobalSearchModal } from './메신저전역검색';
 import { MessengerSidebar, type MessengerMentionInboxItem, type MessengerThreadInboxItem } from './메신저사이드바';
 import { MessengerAvatar } from './메신저공통';
-import { AddMemberModal, ForwardMessageModal, GroupChatModal } from './메신저모달';
-import { MessageEditHistoryModal, MessageEditModal, PollComposerModal, ReadStatusModal, SlashCommandModal, ThreadPanel } from './메신저오버레이';
+import { GroupChatModal } from './메신저그룹생성모달';
+import { AddMemberModal, ForwardMessageModal } from './메신저멤버관리모달';
+import { MessageEditModal, MessageEditHistoryModal } from './메신저수정모달';
+import { ThreadPanel } from './메신저스레드패널';
+import { PollComposerModal, SlashCommandModal } from './메신저투표모달';
+import { ReadStatusModal } from './메신저읽음모달';
 import MessengerOperationsCenter from './메신저운영센터';
 import {
   buildRetryQueueMessage,
@@ -106,25 +113,9 @@ import {
   type MessageRetryPayload,
   type RoomPreference,
 } from './메신저유틸';
-import {
-  CHAT_NOTICE_SCHEDULE_EVENT,
-  getDueScheduledNoticeJobs,
-  getDueScheduledNoticeReminderStages,
-  markScheduledNoticeSent,
-  recordScheduledNoticeReminder,
-} from './메신저공지스케줄';
 import type { StaffMember, ChatRoom, ChatMessage } from '@/types';
 
 type ReactionUsersByMessage = Record<string, Record<string, StaffMember[]>>;
-
-async function selectChatMessagesWithFallback<TData>(
-  execute: (selectClause: string) => PromiseLike<{ data: TData | null; error: unknown }>,
-) {
-  return withMissingColumnsFallback<TData>(
-    (omittedColumns) => execute(buildChatMessageSelect(omittedColumns)),
-    [...CHAT_MESSAGE_OPTIONAL_COLUMNS],
-  );
-}
 
 type PresenceInfo = {
   userId: string;
@@ -145,8 +136,10 @@ interface ChatViewProps {
   staffs?: StaffMember[];
   chatListResetToken?: number;
   initialOpenChatRoomId?: string | null;
+  initialOpenChatRequestToken?: number;
   initialOpenMessageId?: string | null;
   onConsumeOpenChatRoomId?: () => void;
+  onOpenBoardPost?: (boardType: string, postId: string) => void;
   shareTarget?: { id: string; fileCount: number; text: string | null; url: string | null; title: string | null } | null;
   onConsumeShareTarget?: () => void;
 }
@@ -156,8 +149,10 @@ export default function ChatView({
   staffs = [],
   chatListResetToken,
   initialOpenChatRoomId,
+  initialOpenChatRequestToken,
   initialOpenMessageId,
   onConsumeOpenChatRoomId,
+  onOpenBoardPost,
   shareTarget,
   onConsumeShareTarget,
 }: ChatViewProps) {
@@ -165,6 +160,9 @@ export default function ChatView({
   const pendingScrollMsgIdRef = useRef<string | null>(null);
   const pendingThreadRootIdRef = useRef<string | null>(null);
   const pendingBottomAlignRoomIdRef = useRef<string | null>(null);
+  const readyBottomAlignRoomIdRef = useRef<string | null>(null);
+  // useLayoutEffect가 스크롤을 처리했을 때 useEffect의 중복 스크롤을 방지하는 플래그
+  const layoutScrollHandledRef = useRef(false);
   const fetchDataRequestSeqRef = useRef(0);
   const selfChatCreationInFlightRef = useRef(false);
   const [omniSearch, setOmniSearch] = useState('');
@@ -182,18 +180,6 @@ export default function ChatView({
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const msgRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const scrollToMessage = (messageId: string) => {
-    const el = msgRefs.current[messageId];
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      const origClass = el.className;
-      el.classList.add('bg-[var(--toss-blue-light)]', 'rounded-xl', 'transition-colors', 'duration-500');
-      setTimeout(() => {
-        el.className = origClass;
-      }, 2000);
-    }
-  };
-
   const lastReadAtRef = useRef<string | null>(null);
   const isFocusedRef = useRef(true);
 
@@ -203,6 +189,8 @@ export default function ChatView({
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [loadingRoomId, setLoadingRoomId] = useState<string | null>(null);
+  const [timelineRoomId, setTimelineRoomId] = useState<string | null>(null);
   const [readCounts, setReadCounts] = useState<Record<string, number>>({});
   const [roomReadCursorMap, setRoomReadCursorMap] = useState<Record<string, string>>({});
   const [roomUnreadCounts, setRoomUnreadCounts] = useState<Record<string, number>>({});
@@ -245,6 +233,10 @@ export default function ChatView({
   const fetchDataRef = useRef<(() => Promise<void>) | null>(null);
   const globalRealtimeRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const roomRealtimeRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingBottomAlignReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingMessageScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingBottomAlignHoldUntilRef = useRef(0);
+  const suppressBottomAlignmentUntilRef = useRef(0);
   /** 방별 입력 draft 저장소 */
   const draftMapRef = useRef<Map<string, string>>(new Map());
   /** setRoom 바깥에서도 최신 입력값을 읽기 위한 ref */
@@ -411,9 +403,29 @@ export default function ChatView({
     let active = true;
     const loadChatDirectory = async () => {
       try {
-        const { data, error } = await supabase
-          .from('staff_members')
-          .select('id, name, company, department, position, presence_status, last_seen_at, status, permissions');
+        const { data, error } = await withMissingColumnsFallback<StaffMember[]>(
+          (omittedColumns) => {
+            const selectColumns = [
+              'id',
+              'name',
+              'company',
+              'department',
+              'position',
+              'status',
+              ...(omittedColumns.has('presence_status') ? [] : ['presence_status']),
+              ...(omittedColumns.has('last_seen_at') ? [] : ['last_seen_at']),
+              ...(omittedColumns.has('permissions') ? [] : ['permissions']),
+            ];
+            return supabase
+              .from('staff_members')
+              .select(selectColumns.join(', ')) as PromiseLike<{
+                data: StaffMember[] | null;
+                error: unknown;
+              }>;
+          },
+          ['presence_status', 'last_seen_at', 'permissions'],
+          { cacheKey: 'chat:staff-directory' },
+        );
         if (error) throw error;
         if (active) {
           setChatDirectoryStaffs(Array.isArray(data) ? data.map(( staff: StaffMember) => normalizeProfileUser(staff)) : []);
@@ -503,22 +515,32 @@ export default function ChatView({
     roomReadCursorMap,
     getEffectiveRoomMemberIds,
   });
-  const handleRoomChangeCleanup = useCallback(() => {
-    setMessages([]);
-    setReadCounts({});
-    setRoomReadCursorMap({});
+  const handleRoomChangeCleanup = useCallback((mode: 'full' | 'room-switch' = 'full') => {
+    if (mode === 'full') {
+      setMessages([]);
+      setTimelineRoomId(null);
+      setReadCounts({});
+      setRoomReadCursorMap({});
+      setReactions({});
+      setReactionUsersByMessage({});
+      setPolls([]);
+      setPollVotes({});
+      setPinnedIds([]);
+      setPersistedPinnedMessages([]);
+      setBookmarkedIds(new Set());
+    }
     setActiveActionMsg(null);
     setThreadRoot(null);
     closeEditingMessageRef.current();
     closeEditHistoryRef.current();
     setReplyTo(null);
-    setReactions({});
-    setReactionUsersByMessage({});
-    setPolls([]);
-    setPollVotes({});
-    setPinnedIds([]);
-    setPersistedPinnedMessages([]);
-    setBookmarkedIds(new Set());
+    if (typingClearRef.current) {
+      clearTimeout(typingClearRef.current);
+      typingClearRef.current = null;
+    }
+    Object.values(typingPeersTimeoutRef.current).forEach((timer) => clearTimeout(timer));
+    typingPeersTimeoutRef.current = {};
+    setTypingUsers({});
     closeReadStatusModal();
     setReactionDetailTarget(null);
     setDeliveryStates((prev) => {
@@ -529,6 +551,80 @@ export default function ChatView({
       return next;
     });
   }, [closeReadStatusModal]);
+  const clearPendingBottomAlignReleaseTimer = useCallback(() => {
+    if (!pendingBottomAlignReleaseTimerRef.current) return;
+    clearTimeout(pendingBottomAlignReleaseTimerRef.current);
+    pendingBottomAlignReleaseTimerRef.current = null;
+  }, []);
+  const clearPendingMessageScrollTimer = useCallback(() => {
+    if (!pendingMessageScrollTimerRef.current) return;
+    clearTimeout(pendingMessageScrollTimerRef.current);
+    pendingMessageScrollTimerRef.current = null;
+  }, []);
+  const schedulePendingBottomAlignRelease = useCallback((roomId: string | null) => {
+    clearPendingBottomAlignReleaseTimer();
+
+    const normalizedRoomId = String(roomId || '').trim();
+    if (!normalizedRoomId) {
+      pendingBottomAlignHoldUntilRef.current = 0;
+      return;
+    }
+
+    const remainingMs = pendingBottomAlignHoldUntilRef.current - Date.now();
+    if (remainingMs <= 0) {
+      if (String(pendingBottomAlignRoomIdRef.current || '') === normalizedRoomId) {
+        pendingBottomAlignRoomIdRef.current = null;
+      }
+      return;
+    }
+
+    pendingBottomAlignReleaseTimerRef.current = setTimeout(() => {
+      pendingBottomAlignReleaseTimerRef.current = null;
+      if (String(pendingBottomAlignRoomIdRef.current || '') === normalizedRoomId) {
+        pendingBottomAlignRoomIdRef.current = null;
+      }
+    }, remainingMs);
+  }, [clearPendingBottomAlignReleaseTimer]);
+  const requestBottomAlignmentHold = useCallback((roomId: string | null, holdMs = 900) => {
+    const normalizedRoomId = String(roomId || '').trim();
+    const previousRoomId = String(pendingBottomAlignRoomIdRef.current || '').trim();
+    pendingBottomAlignRoomIdRef.current = normalizedRoomId || null;
+
+    if (!normalizedRoomId) {
+      pendingBottomAlignHoldUntilRef.current = 0;
+      clearPendingBottomAlignReleaseTimer();
+      return;
+    }
+
+    const nextHoldUntil = Date.now() + Math.max(holdMs, 0);
+    pendingBottomAlignHoldUntilRef.current =
+      previousRoomId === normalizedRoomId
+        ? Math.max(pendingBottomAlignHoldUntilRef.current, nextHoldUntil)
+        : nextHoldUntil;
+    isNearBottomRef.current = true;
+    setShowScrollToLatest(false);
+    schedulePendingBottomAlignRelease(normalizedRoomId);
+  }, [clearPendingBottomAlignReleaseTimer, schedulePendingBottomAlignRelease]);
+  const scrollToMessage = useCallback((messageId: string) => {
+    const normalizedMessageId = String(messageId || '').trim();
+    if (!normalizedMessageId) return;
+
+    suppressBottomAlignmentUntilRef.current = Date.now() + 2200;
+    pendingBottomAlignRoomIdRef.current = null;
+    pendingBottomAlignHoldUntilRef.current = 0;
+    clearPendingBottomAlignReleaseTimer();
+    isNearBottomRef.current = false;
+
+    const el = msgRefs.current[normalizedMessageId];
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const origClass = el.className;
+      el.classList.add('bg-[var(--toss-blue-light)]', 'rounded-xl', 'transition-colors', 'duration-500');
+      setTimeout(() => {
+        el.className = origClass;
+      }, 2000);
+    }
+  }, [clearPendingBottomAlignReleaseTimer]);
   const persistRoomReadCursors = useCallback(async (
     roomIds: Array<string | null | undefined>,
     readAt?: string | null,
@@ -551,6 +647,7 @@ export default function ChatView({
     chatRoomsRef,
     inputMsgRef,
     draftMapRef,
+    requestBottomAlignmentHold,
     pendingBottomAlignRoomIdRef,
     isNearBottomRef,
     lastTimelineTailRef,
@@ -559,8 +656,10 @@ export default function ChatView({
     effectiveChatUserId,
     setSelectedRoomId,
     setInputMsg,
+    setLoadingRoomId,
     setShowScrollToLatest,
     setRoomUnreadCounts,
+    loadingRoomId,
     persistRoomReadCursors,
     markConversationNotificationsAsRead: (roomIds, readAt) =>
       markConversationNotificationsAsReadRef.current(roomIds, readAt),
@@ -569,6 +668,35 @@ export default function ChatView({
     onRoomChangeCleanup: handleRoomChangeCleanup,
   });
   setRoomRef.current = setRoom;
+
+  const tryScrollToLoadedMessage = useCallback((roomId: string, messageId?: string | null) => {
+    const normalizedRoomId = String(roomId || '').trim();
+    const normalizedMessageId = String(messageId || '').trim();
+    if (!normalizedRoomId || !normalizedMessageId) return false;
+    if (String(selectedRoomIdRef.current || '') !== normalizedRoomId) return false;
+    if (!messages.some((message) => String(message.id) === normalizedMessageId)) return false;
+
+    pendingScrollMsgIdRef.current = null;
+    clearPendingMessageScrollTimer();
+    pendingMessageScrollTimerRef.current = setTimeout(() => {
+      pendingMessageScrollTimerRef.current = null;
+      scrollToMessage(normalizedMessageId);
+    }, 120);
+    return true;
+  }, [clearPendingMessageScrollTimer, messages, scrollToMessage]);
+
+  const openRoomAtMessage = useCallback((roomId: string, messageId?: string | null) => {
+    const normalizedRoomId = String(roomId || '').trim();
+    const normalizedMessageId = String(messageId || '').trim();
+    if (!normalizedRoomId) return;
+    if (normalizedMessageId) {
+      pendingScrollMsgIdRef.current = normalizedMessageId;
+    }
+    if (tryScrollToLoadedMessage(normalizedRoomId, normalizedMessageId)) {
+      return;
+    }
+    setRoom(normalizedRoomId);
+  }, [setRoom, tryScrollToLoadedMessage]);
 
   const repairDirectRooms = useCallback(async (rooms: ChatRoom[]) => {
     const sourceRooms = Array.isArray(rooms) ? rooms : [];
@@ -904,10 +1032,10 @@ export default function ChatView({
     };
 
     window.addEventListener('erp-notification-read', reloadMentionInbox);
-    window.addEventListener('erp-mock-notification-insert', reloadMentionInbox as EventListener);
+    const unbindMockNotificationInsert = bindMockNotificationInsert(reloadMentionInbox);
     return () => {
       window.removeEventListener('erp-notification-read', reloadMentionInbox);
-      window.removeEventListener('erp-mock-notification-insert', reloadMentionInbox as EventListener);
+      unbindMockNotificationInsert();
     };
   }, [loadMentionInbox, loadThreadInbox]);
 
@@ -1012,12 +1140,13 @@ export default function ChatView({
       setPinnedRoomOrder([]);
     }
     // 2) DB에서 최신 설정 로드 (chat_room_prefs 테이블이 없으면 graceful skip)
-    if (roomPrefsUserId) {
+    if (roomPrefsUserId && !isRelationMarkedMissing('chat_room_prefs')) {
       void supabase
         .from('chat_room_prefs')
         .select('room_id, pinned, hidden')
         .eq('user_id', roomPrefsUserId)
         .then(({ data, error }) => {
+          if (rememberMissingRelation(error, 'chat_room_prefs')) return;
           if (error || !Array.isArray(data) || data.length === 0) return;
           const dbPrefs: Record<string, RoomPreference> = {};
           data.forEach((row: Record<string, unknown>) => {
@@ -1175,15 +1304,17 @@ export default function ChatView({
     effectiveChatUserId,
     effectiveTodoUserId,
     userId: user?.id,
+    requestBottomAlignmentHold,
     setRoom,
     resolveStaffProfile,
     getEffectiveRoomMemberIds,
     isRoomAccessibleToCurrentUser,
     repairDirectRooms,
-    selectChatMessagesWithFallback,
     setChatRooms,
     setRoomUnreadCounts,
     setMessages,
+    setLoadingRoomId,
+    setTimelineRoomId,
     setRoomReadCursorMap,
     setReadCounts,
     setBookmarkedIds,
@@ -1283,7 +1414,9 @@ export default function ChatView({
     });
 
     if (isCurrentRoom) {
-      pendingBottomAlignRoomIdRef.current = currentConversationRoomId;
+      if (isNearBottomRef.current || isOwnMessage) {
+        requestBottomAlignmentHold(currentConversationRoomId, isOwnMessage ? 1200 : 900);
+      }
       setMessages((prev) => {
         if (prev.some((message: ChatMessage) => String(message.id) === String(row.id))) return prev;
         const newMsg = {
@@ -1357,6 +1490,7 @@ export default function ChatView({
     isRoomAccessibleToCurrentUser,
     markConversationNotificationsAsRead,
     persistRoomReadCursors,
+    requestBottomAlignmentHold,
     updateUnreadForRooms,
     user?.id,
     isRoomInSelectedConversation,
@@ -1368,7 +1502,7 @@ export default function ChatView({
 
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
-        const { data } = await selectChatMessagesWithFallback<ChatMessage>((selectClause) =>
+        const { data } = await selectChatMessagesWithFallback<ChatMessage>(({ selectClause }) =>
           supabase
             .from('messages')
             .select(selectClause)
@@ -1494,6 +1628,8 @@ export default function ChatView({
       pendingBottomAlignRoomIdRef.current = null;
       isNearBottomRef.current = true;
       setShowScrollToLatest(false);
+      setLoadingRoomId(null);
+      setTimelineRoomId(null);
       setSelectedRoomId(null);
       return;
     }
@@ -1503,17 +1639,20 @@ export default function ChatView({
         pendingBottomAlignRoomIdRef.current = saved;
         isNearBottomRef.current = true;
         setShowScrollToLatest(false);
+        setLoadingRoomId(saved);
         setSelectedRoomId(saved);
       } else {
         pendingBottomAlignRoomIdRef.current = shouldRestoreSavedRoomOnMount ? NOTICE_ROOM_ID : null;
         isNearBottomRef.current = true;
         setShowScrollToLatest(false);
+        setLoadingRoomId(shouldRestoreSavedRoomOnMount ? NOTICE_ROOM_ID : null);
         setSelectedRoomId(shouldRestoreSavedRoomOnMount ? NOTICE_ROOM_ID : null);
       }
     } catch {
       pendingBottomAlignRoomIdRef.current = shouldRestoreSavedRoomOnMount ? NOTICE_ROOM_ID : null;
       isNearBottomRef.current = true;
       setShowScrollToLatest(false);
+      setLoadingRoomId(shouldRestoreSavedRoomOnMount ? NOTICE_ROOM_ID : null);
       setSelectedRoomId(shouldRestoreSavedRoomOnMount ? NOTICE_ROOM_ID : null);
     }
   }, []);
@@ -1550,13 +1689,22 @@ export default function ChatView({
 
   useEffect(() => {
     if (initialOpenChatRoomId) {
-      setRoom(initialOpenChatRoomId);
-      if (initialOpenMessageId) {
-        pendingScrollMsgIdRef.current = initialOpenMessageId;
-      }
+      openRoomAtMessage(initialOpenChatRoomId, initialOpenMessageId);
       onConsumeOpenChatRoomId?.();
     }
-  }, [initialOpenChatRoomId, initialOpenMessageId]);
+  }, [initialOpenChatRequestToken, initialOpenChatRoomId, initialOpenMessageId, onConsumeOpenChatRoomId, openRoomAtMessage]);
+
+  useEffect(() => {
+    if (!selectedRoomId) {
+      suppressBottomAlignmentUntilRef.current = 0;
+      return;
+    }
+
+    const pendingTargetMessageId = String(pendingScrollMsgIdRef.current || '').trim();
+    if (!pendingTargetMessageId) {
+      suppressBottomAlignmentUntilRef.current = 0;
+    }
+  }, [selectedRoomId]);
 
   useEffect(() => {
     if (!chatListResetToken) return;
@@ -1568,6 +1716,8 @@ export default function ChatView({
     pendingBottomAlignRoomIdRef.current = null;
     isNearBottomRef.current = true;
     setShowScrollToLatest(false);
+    setLoadingRoomId(null);
+    setTimelineRoomId(null);
     setViewMode('chat');
     setShowDrawer(false);
     setRoom(null);
@@ -1577,19 +1727,23 @@ export default function ChatView({
   useEffect(() => {
     const targetMsgId = pendingScrollMsgIdRef.current;
     if (targetMsgId && messages.length > 0) {
-      if (messages.some(m => m.id === targetMsgId)) {
-        setTimeout(() => {
+      if (messages.some((message) => String(message.id) === String(targetMsgId))) {
+        clearPendingMessageScrollTimer();
+        pendingMessageScrollTimerRef.current = setTimeout(() => {
+          pendingMessageScrollTimerRef.current = null;
           scrollToMessage(targetMsgId);
           pendingScrollMsgIdRef.current = null;
         }, 500);
       }
     }
-  }, [messages]);
+  }, [clearPendingMessageScrollTimer, messages, scrollToMessage]);
 
   // fetchDataRef가 항상 최신 fetchData를 가리키게 유지
   useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
   useEffect(() => {
     return () => {
+      clearPendingMessageScrollTimer();
+      clearPendingBottomAlignReleaseTimer();
       if (globalRealtimeRetryTimerRef.current) {
         clearTimeout(globalRealtimeRetryTimerRef.current);
         globalRealtimeRetryTimerRef.current = null;
@@ -1599,7 +1753,7 @@ export default function ChatView({
         roomRealtimeRetryTimerRef.current = null;
       }
     };
-  }, []);
+  }, [clearPendingBottomAlignReleaseTimer, clearPendingMessageScrollTimer]);
 
   useEffect(() => {
     const loadRooms = async () => {
@@ -1702,29 +1856,111 @@ export default function ChatView({
     return () => { window.removeEventListener('focus', onFocus); window.removeEventListener('blur', onBlur); };
   }, []);
 
+  const isSelectedRoomTimelineReady = useMemo(() => {
+    if (!selectedRoomId) return false;
+    if (String(loadingRoomId || '') === String(selectedRoomId)) return false;
+    return String(timelineRoomId || '') === String(selectedRoomId);
+  }, [loadingRoomId, selectedRoomId, timelineRoomId]);
+
   useEffect(() => {
-    if (!selectedRoomId || messages.length === 0) return;
+    if (selectedRoomId && isSelectedRoomTimelineReady) return;
+    readyBottomAlignRoomIdRef.current = null;
+  }, [isSelectedRoomTimelineReady, selectedRoomId]);
+
+  useLayoutEffect(() => {
+    if (!selectedRoomId || messages.length === 0 || !isSelectedRoomTimelineReady) return;
+    const normalizedSelectedRoomId = String(selectedRoomId);
+    const pendingTargetMessageId = String(pendingScrollMsgIdRef.current || '').trim();
+    if (
+      pendingTargetMessageId &&
+      messages.some((message) => String(message.id) === pendingTargetMessageId)
+    ) {
+      readyBottomAlignRoomIdRef.current = normalizedSelectedRoomId;
+      pendingBottomAlignRoomIdRef.current = null;
+      pendingBottomAlignHoldUntilRef.current = 0;
+      clearPendingBottomAlignReleaseTimer();
+      isNearBottomRef.current = false;
+      layoutScrollHandledRef.current = true;
+      return;
+    }
+    const isPendingBottomAlignActive =
+      String(pendingBottomAlignRoomIdRef.current || '') === normalizedSelectedRoomId;
+    const justBecameReady = readyBottomAlignRoomIdRef.current !== normalizedSelectedRoomId;
+    if (!isPendingBottomAlignActive && !justBecameReady) return;
+
+    const listEl = messageListRef.current;
+    if (!listEl) return;
+
+    readyBottomAlignRoomIdRef.current = normalizedSelectedRoomId;
+    listEl.scrollTop = Math.max(0, listEl.scrollHeight - listEl.clientHeight);
+    isNearBottomRef.current = true;
+    setShowScrollToLatest(false);
+    pendingBottomAlignRoomIdRef.current = null;
+    pendingBottomAlignHoldUntilRef.current = 0;
+    clearPendingBottomAlignReleaseTimer();
+    // useEffect의 중복 스크롤 애니메이션을 막기 위해 처리 완료 표시
+    layoutScrollHandledRef.current = true;
+  }, [clearPendingBottomAlignReleaseTimer, isNearBottomRef, isSelectedRoomTimelineReady, messageListRef, messages, pendingBottomAlignRoomIdRef, selectedRoomId, setShowScrollToLatest]);
+
+  useEffect(() => {
+    if (!selectedRoomId || messages.length === 0 || !isSelectedRoomTimelineReady) return;
     const lastMessage = messages[messages.length - 1];
+    const lastMessageRoomId = String(lastMessage?.room_id || '');
+    const isLastMessageInSelectedRoom = isRoomInSelectedConversation(lastMessageRoomId);
+    if (!isLastMessageInSelectedRoom && !String(lastMessage?.id || '').startsWith('temp-')) return;
+
     const tailSignature = `${messages.length}:${String(lastMessage?.id || '')}:${String(lastMessage?.created_at || '')}`;
     const tailChanged = lastTimelineTailRef.current !== tailSignature;
     lastTimelineTailRef.current = tailSignature;
+
+    // 메시지 목록 끝이 바뀌지 않은 리렌더(예: setShowScrollToLatest 등 다른 상태 변화로 인한
+    // 재렌더)에서는 스크롤을 건드리지 않는다. 콘텐츠 높이 변화(이미지 로딩 등)는
+    // ResizeObserver가 별도로 처리한다.
+    if (!tailChanged) {
+      layoutScrollHandledRef.current = false;
+      return;
+    }
+
+    // useLayoutEffect가 이미 방 전환 스크롤을 처리했으면 중복 스크롤 생략
+    if (layoutScrollHandledRef.current) {
+      layoutScrollHandledRef.current = false;
+      return;
+    }
+
+    const isPending = String(pendingBottomAlignRoomIdRef.current || '') === String(selectedRoomId);
+    if (isPending) {
+      return;
+    }
+
     const isOwnNewestMessage = String(lastMessage?.sender_id) === String(effectiveChatUserId || user?.id || '');
     const shouldStick =
       isNearBottomRef.current ||
       String(lastMessage?.id || '').startsWith('temp-') ||
       (tailChanged && isOwnNewestMessage);
     if (shouldStick) {
-      // 채팅방 전환 중(pendingBottomAlignRoomIdRef 활성)이면 즉시 이동, 아니면 부드럽게
-      const isRoomSwitch = !!pendingBottomAlignRoomIdRef.current;
-      requestAnimationFrame(() => scrollToBottom(
-        (!pendingBottomAlignRoomIdRef.current && isOwnNewestMessage)
-          ? 'smooth'
-          : 'auto'
-      ));
+      const behavior = isOwnNewestMessage ? 'smooth' as const : 'auto' as const;
+      const capturedRoomId = selectedRoomId;
+      requestAnimationFrame(() => {
+        if (String(selectedRoomIdRef.current || '') !== String(capturedRoomId)) return;
+        scrollToBottom(behavior);
+      });
     } else {
+      if (String(pendingBottomAlignRoomIdRef.current || '') === String(selectedRoomId)) {
+        pendingBottomAlignRoomIdRef.current = null;
+      }
       setShowScrollToLatest(true);
     }
-  }, [messages, selectedRoomId, scrollToBottom, effectiveChatUserId, user?.id]);
+  }, [effectiveChatUserId, isRoomInSelectedConversation, isSelectedRoomTimelineReady, messages, scrollToBottom, selectedRoomId, user?.id]);
+
+  const shouldKeepBottomAligned = useCallback(() => {
+    const activeRoomId = String(selectedRoomIdRef.current || selectedRoomId || '');
+    if (!activeRoomId || !isSelectedRoomTimelineReady) return false;
+    if (suppressBottomAlignmentUntilRef.current > Date.now()) return false;
+    return (
+      isNearBottomRef.current ||
+      String(pendingBottomAlignRoomIdRef.current || '') === activeRoomId
+    );
+  }, [isSelectedRoomTimelineReady, selectedRoomId]);
 
   const pinnedMessages = useMemo(
     () => messages.filter((m) => pinnedIds.includes(String(m.id))),
@@ -1855,6 +2091,42 @@ export default function ChatView({
     roomUnreadCounts,
   });
   const {
+    handleLeaveRoom,
+    removeRoomMember,
+    handleLeaveRoomFromDrawer,
+    handleSaveRoomName,
+    handleStartEditingRoomName,
+    handleCancelEditingRoomName,
+    createGroupChat,
+    openDirectChat,
+    handleSubmitAddMembers,
+  } = useChatRoomManagement({
+    addMemberSelectingIds,
+    closeAddMemberModal,
+    closeGroupModal,
+    effectiveChatUserId,
+    fetchData,
+    groupName,
+    repairDirectRooms,
+    resolveRoomMemberProfile,
+    resolveStaffProfile,
+    roomNameDraft,
+    selectedMembers,
+    selectedRoom,
+    setAddMemberSelectingIds,
+    setChatRooms,
+    setEditingRoomName,
+    setGroupName,
+    setRoom,
+    setRoomNameDraft,
+    setRoomUnreadCounts,
+    setSelectedMembers,
+    setShowDrawer,
+    setViewMode,
+    triggerChatPush,
+    user,
+  });
+  const {
     showGlobalSearch,
     globalSearchQuery,
     setGlobalSearchQuery,
@@ -1870,6 +2142,10 @@ export default function ChatView({
     savedSearches,
     closeGlobalSearch,
     openGlobalSearch,
+    transientHighlightQuery,
+    openGroupFromGlobalSearch,
+    openRoomFromGlobalSearch,
+    openMemberFromGlobalSearch,
     handleGlobalSearch,
     saveCurrentSearch,
     removeSavedSearch,
@@ -1878,6 +2154,13 @@ export default function ChatView({
     allKnownStaffs,
     effectiveChatUserId,
     resolveStaffProfile,
+    setShowGroupModal,
+    selectedRoomIdRef,
+    pendingScrollMsgIdRef,
+    messages,
+    scrollToMessage,
+    setRoom,
+    openDirectChat,
     visibleRooms,
     visibleRoomIds,
     roomLabelMap,
@@ -1994,67 +2277,6 @@ export default function ChatView({
     [followedThreadIds, resolveStaffProfile, selectedRoomId, selectedRoomLabel, threadOverviews],
   );
   const threadMessages = useThreadMessages(threadRoot, messages);
-  const {
-    handleLeaveRoom,
-    removeRoomMember,
-    handleLeaveRoomFromDrawer,
-    handleSaveRoomName,
-    handleStartEditingRoomName,
-    handleCancelEditingRoomName,
-    createGroupChat,
-    openDirectChat,
-    handleSubmitAddMembers,
-  } = useChatRoomManagement({
-    addMemberSelectingIds,
-    closeAddMemberModal,
-    closeGroupModal,
-    effectiveChatUserId,
-    fetchData,
-    groupName,
-    repairDirectRooms,
-    resolveRoomMemberProfile,
-    resolveStaffProfile,
-    roomNameDraft,
-    selectedMembers,
-    selectedRoom,
-    setAddMemberSelectingIds,
-    setChatRooms,
-    setEditingRoomName,
-    setGroupName,
-    setRoom,
-    setRoomNameDraft,
-    setRoomUnreadCounts,
-    setSelectedMembers,
-    setShowDrawer,
-    setViewMode,
-    triggerChatPush,
-    user,
-  });
-  const {
-    transientHighlightQuery,
-    openGroupFromGlobalSearch,
-    openRoomFromGlobalSearch,
-    openMemberFromGlobalSearch,
-  } = useChatSearchNavigation({
-    globalSearchQuery,
-    closeGlobalSearch,
-    setShowGroupModal,
-    selectedRoomIdRef,
-    pendingScrollMsgIdRef,
-    messages,
-    scrollToMessage,
-    setRoom,
-    openDirectChat,
-  });
-  const openRoomAtMessage = useCallback((roomId: string, messageId?: string | null) => {
-    const normalizedRoomId = String(roomId || '').trim();
-    const normalizedMessageId = String(messageId || '').trim();
-    if (!normalizedRoomId) return;
-    if (normalizedMessageId) {
-      pendingScrollMsgIdRef.current = normalizedMessageId;
-    }
-    setRoom(normalizedRoomId);
-  }, [setRoom]);
   const openThreadShortcutItem = useCallback(
     (item: Pick<MessengerThreadInboxItem, 'roomId' | 'messageId' | 'threadRootId'>) => {
       pendingThreadRootIdRef.current = item.threadRootId;
@@ -2337,132 +2559,15 @@ export default function ChatView({
     }
   }, [currentNoticeMessage, noticeReadStats.unreadMembers, selectedRoom, selectedRoomLabel]);
 
-  useEffect(() => {
-    if (!roomPrefsUserId || !canManageNoticeOps || typeof window === 'undefined') return;
-
-    const processScheduledNotices = async () => {
-      const dueJobs = getDueScheduledNoticeJobs(roomPrefsUserId);
-      for (const job of dueJobs) {
-        const { data: inserted, error } = await insertChatMessageWithFallback<Pick<ChatMessage, 'id' | 'room_id'>>(
-          {
-            room_id: NOTICE_ROOM_ID,
-            sender_id: roomPrefsUserId,
-            content: job.content,
-            file_url: null,
-            file_name: null,
-          },
-          'id, room_id',
-        );
-
-        if (error || !inserted?.id) {
-          console.error('scheduled notice dispatch failed', error);
-          continue;
-        }
-
-        markScheduledNoticeSent(roomPrefsUserId, job.id, String(inserted.id));
-        void triggerChatPush(String(inserted.room_id || NOTICE_ROOM_ID), String(inserted.id));
-        await fetchDataRef.current?.();
-      }
-
-      const dueReminderStages = getDueScheduledNoticeReminderStages(roomPrefsUserId);
-      if (dueReminderStages.length === 0) return;
-
-      const activeAudience = allKnownStaffs.filter(
-        (staff) =>
-          isActiveNoticeMember(staff) &&
-          String(staff.id || '') &&
-          String(staff.id || '') !== String(user?.id || ''),
-      );
-      if (activeAudience.length === 0) return;
-
-      for (const { job, offsetMinutes } of dueReminderStages) {
-        const messageId = String(job.sentMessageId || '').trim();
-        if (!messageId) continue;
-
-        const [{ data: messageRow }, { data: readCursors }] = await Promise.all([
-          supabase
-            .from('messages')
-            .select('id, created_at, content, file_name, file_url')
-            .eq('id', messageId)
-            .maybeSingle(),
-          supabase
-            .from('room_read_cursors')
-            .select('user_id, last_read_at')
-            .eq('room_id', NOTICE_ROOM_ID)
-            .in('user_id', activeAudience.map((staff) => String(staff.id))),
-        ]);
-
-        if (!messageRow?.created_at) {
-          recordScheduledNoticeReminder(roomPrefsUserId, job.id, offsetMinutes, 0);
-          continue;
-        }
-
-        const cursorMap = new Map<string, string>();
-        (readCursors || []).forEach((cursor: Record<string, unknown>) => {
-          const userId = String(cursor.user_id || '').trim();
-          const lastReadAt = String(cursor.last_read_at || '').trim();
-          if (userId && lastReadAt) cursorMap.set(userId, lastReadAt);
-        });
-
-        const unreadMembers = activeAudience.filter(
-          (member) => !isMessageReadByCursor(String(messageRow.created_at || ''), cursorMap.get(String(member.id)) || null),
-        );
-
-        if (unreadMembers.length > 0) {
-          const previewText = getMessageDisplayText(
-            messageRow.content,
-            (messageRow as ChatMessage).file_name,
-            (messageRow as ChatMessage).file_url,
-            '예약 공지',
-          ).replace(/\s+/g, ' ').trim();
-
-          const payload = unreadMembers.map((member) => ({
-            user_id: member.id,
-            type: 'message',
-            title: `예약 공지 리마인드 (+${offsetMinutes}분)`,
-            body: previewText
-              ? `${previewText.slice(0, 80)}${previewText.length > 80 ? '...' : ''}`
-              : '예약 공지를 확인해 주세요.',
-            read_at: null,
-            metadata: buildChatNotificationMetadata({
-              roomId: NOTICE_ROOM_ID,
-              messageId,
-              notificationType: 'message',
-              extra: {
-                reminder_kind: 'scheduled_notice_auto',
-                reminder_offset_minutes: offsetMinutes,
-                room_name: NOTICE_ROOM_NAME,
-              },
-            }),
-          }));
-
-          const { error } = await supabase.from('notifications').insert(payload);
-          if (error) {
-            console.error('scheduled notice reminder failed', error);
-            continue;
-          }
-        }
-
-        recordScheduledNoticeReminder(roomPrefsUserId, job.id, offsetMinutes, unreadMembers.length);
-      }
-    };
-
-    void processScheduledNotices();
-    const intervalId = window.setInterval(() => {
-      void processScheduledNotices();
-    }, 30000);
-    const refreshScheduledNotices = () => {
-      void processScheduledNotices();
-    };
-    window.addEventListener(CHAT_NOTICE_SCHEDULE_EVENT, refreshScheduledNotices as EventListener);
-    window.addEventListener('focus', refreshScheduledNotices);
-
-    return () => {
-      window.clearInterval(intervalId);
-      window.removeEventListener(CHAT_NOTICE_SCHEDULE_EVENT, refreshScheduledNotices as EventListener);
-      window.removeEventListener('focus', refreshScheduledNotices);
-    };
-  }, [allKnownStaffs, canManageNoticeOps, roomPrefsUserId, triggerChatPush, user?.id]);
+  useScheduledNoticeDispatcher({
+    allKnownStaffs,
+    canManageNoticeOps,
+    currentUserId: user?.id,
+    fetchDataRef,
+    fetchMessageByIdWithRetry,
+    roomPrefsUserId,
+    triggerChatPush,
+  });
 
   const mentionCandidates = useChatMentionCandidates({
     showMentionList,
@@ -2619,6 +2724,13 @@ export default function ChatView({
       toast('메시지 링크 복사에 실패했습니다.', 'error');
     }
   }, []);
+  const handleManualRoomListClick = useCallback((roomId: string) => {
+    clearPendingMessageScrollTimer();
+    pendingScrollMsgIdRef.current = null;
+    pendingThreadRootIdRef.current = null;
+    suppressBottomAlignmentUntilRef.current = 0;
+    handleRoomListClick(roomId);
+  }, [clearPendingMessageScrollTimer, handleRoomListClick]);
 
   return (
     <div data-testid="chat-view" className="flex flex-1 min-h-0 overflow-hidden relative font-sans bg-[var(--background)] md:h-[100dvh] md:max-h-[100dvh] md:bg-[var(--card)]">
@@ -2633,19 +2745,18 @@ export default function ChatView({
           groupedStaffs={groupedStaffs}
           expandedDepts={expandedDepts}
           onViewModeChange={setViewMode}
-          onOpenGroupModal={() => setShowGroupModal(true)}
           onOpenGlobalSearch={openGlobalSearch}
           onToggleHiddenRooms={() => setShowHiddenRooms((prev) => !prev)}
-          onRoomClick={handleRoomListClick}
+          onRoomClick={handleManualRoomListClick}
           onOpenAttentionThreadItem={handleOpenAttentionThreadItem}
           onOpenMentionItem={handleOpenMentionInboxItem}
           onOpenThreadItem={handleOpenThreadInboxItem}
           onToggleRoomPinned={toggleRoomPinned}
-        onMovePinnedRoom={movePinnedRoom}
-        onToggleRoomHidden={toggleRoomHidden}
-        onToggleDept={toggleDept}
-        onOpenDirectChat={openDirectChat}
-      />
+          onMovePinnedRoom={movePinnedRoom}
+          onToggleRoomHidden={toggleRoomHidden}
+          onToggleDept={toggleDept}
+          onOpenDirectChat={openDirectChat}
+        />
 
       <main className={`${!selectedRoomId ? 'hidden md:flex' : 'flex'} flex-1 min-h-0 flex-col overflow-hidden bg-[var(--muted)] relative`}>
         {selectedRoomId && selectedRoom && (
@@ -2720,6 +2831,7 @@ export default function ChatView({
 
         <MessengerTimeline
           selectedRoomId={selectedRoomId}
+          isLoadingMessages={Boolean(selectedRoomId && loadingRoomId === selectedRoomId)}
           messages={messages}
           combinedTimeline={combinedTimeline as MessengerTimelineItem[]}
             pollVotes={pollVotes}
@@ -2731,10 +2843,9 @@ export default function ChatView({
             effectiveChatUserId={effectiveChatUserId}
             activeMessageHighlightQuery={activeMessageHighlightQuery}
             wardQuickReplySendingMessageId={wardQuickReplySendingMessageId}
-            messageRefs={msgRefs}
+          messageRefs={msgRefs}
           messageListRef={messageListRef}
           scrollRef={scrollRef}
-          showScrollToLatest={showScrollToLatest}
           resolveStaffProfile={resolveStaffProfile}
           onScrollToMessage={scrollToMessage}
           onMessageListScroll={updateScrollPositionState}
@@ -2742,6 +2853,7 @@ export default function ChatView({
             onOpenAttachmentPreviewForMessage={openAttachmentPreviewForMessage}
             onStartReplyToMessage={startReplyToMessage}
             onOpenThread={openTrackedThreadPanel}
+            onOpenBoardPost={onOpenBoardPost}
             onOpenMessageActions={openMessageActions}
             onMarkMessageRead={markMessageRead}
             renderMessageContent={renderMessageContent}
@@ -2751,6 +2863,7 @@ export default function ChatView({
           onSendWardQuickReply={sendWardQuickReply}
           onRetryFailedMessage={retryFailedMessage}
           onScrollToBottom={scrollToBottom}
+          shouldKeepBottomAligned={shouldKeepBottomAligned}
         />
 
         {selectedRoomId && selectedRoom ? (
@@ -2792,6 +2905,7 @@ export default function ChatView({
               canWriteNotice={canWriteNotice}
               composerRef={composerRef}
               inputMsg={inputMsg}
+              showScrollToLatest={showScrollToLatest}
               showMentionList={showMentionList}
               mentionCandidates={mentionCandidates}
               onCloseReply={() => setReplyTo(null)}
@@ -2810,6 +2924,7 @@ export default function ChatView({
               onComposerChange={handleComposerChange}
               onComposerPaste={handleComposerPaste}
               onSendMessage={handleSendMessage}
+              onScrollToLatest={() => scrollToBottom('smooth')}
               onSelectMention={handleSelectMention}
             />
           </>
