@@ -3,16 +3,22 @@ import { toast } from '@/lib/toast';
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import SignatureCanvas from 'react-signature-canvas';
-import { getOrdinaryWageTable } from '@/lib/ordinary-wage';
-
-import { resolveWeeklyWorkingHours, resolveWorkingDaysPerWeek } from '@/lib/payroll-working-hours';
+import { upgradeLegacyContractTemplate } from '@/lib/contract-template-defaults';
+import { fillEmploymentContractTemplate } from '@/lib/contract-template-render';
+import {
+    getShiftBandGroupRows,
+    getWeeklyRotationShiftIds,
+    isShiftBandGroupRow,
+    orderShiftsByIds,
+    withWeeklyRotationShifts,
+} from '@/lib/contract-shift-rotation';
 
 type Props = {
     contract: any;
     user: any;
     templateText?: string;
     onClose: () => void;
-    onSuccess: (signatureData: string, contractText: string) => void;
+    onSuccess: (signatureData: string, contractText: string) => Promise<void> | void;
 };
 
 const REQUIRED_AGREEMENTS = [
@@ -29,132 +35,142 @@ export default function ContractSignatureModal({ contract, user, templateText, o
     const [step, setStep] = useState<number>(1);
     const [agreements, setAgreements] = useState<Record<string, boolean>>({});
     const sigCanvas = useRef<SignatureCanvas>(null);
+    const submitLockRef = useRef(false);
     const [isSigEmpty, setIsSigEmpty] = useState(true);
     const [company, setCompany] = useState<Record<string, unknown> | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
 
     const [localTemplateText, setLocalTemplateText] = useState<string>('');
+    const [isTemplateLoading, setIsTemplateLoading] = useState(false);
+    const hasTemplateOverride = templateText !== undefined;
 
     useEffect(() => {
-        if (templateText) {
-            setLocalTemplateText(templateText);
-            return;
-        }
+        let isMounted = true;
+
+        const buildResolvedTemplateText = async (
+            rawTemplateText: string,
+            shiftData: Record<string, unknown> | null,
+            companyData: Record<string, unknown> | null,
+            sealUrl: string | null,
+        ) => {
+            const nextCompany =
+                companyData || sealUrl
+                    ? { ...(companyData ?? {}), ...(sealUrl ? { seal_url: sealUrl } : {}) }
+                    : null;
+
+            return fillEmploymentContractTemplate(
+                upgradeLegacyContractTemplate(rawTemplateText),
+                user,
+                contract,
+                shiftData,
+                nextCompany,
+            );
+        };
 
         const fetchTemplateAndCompany = async () => {
-            if (!contract) return;
+            if (!contract || !user) {
+                setLocalTemplateText('');
+                setCompany(null);
+                return;
+            }
+
+            setIsTemplateLoading(true);
+            setLocalTemplateText('');
             try {
-                const targetCompany = contract?.company_name || user?.company;
+                const targetCompany = String(user?.company || contract?.company_name || '전체');
+                let companyData: Record<string, unknown> | null = null;
+                let sealUrl: string | null = null;
+                let shiftData: Record<string, unknown> | null = null;
+                let resolvedTemplateText = hasTemplateOverride ? (templateText || '') : '';
 
-                const [tplRes, compRes] = await Promise.all([
-                    supabase.from('contract_templates')
-                        .select('template_content, seal_url')
-                        .eq('company_name', targetCompany)
-                        .maybeSingle(),
-                    supabase.from('companies').select('*').eq('name', targetCompany).maybeSingle()
-                ]);
-
-                if (tplRes.data?.template_content) {
-                    const template = tplRes.data.template_content;
-                    const companyData = compRes.data;
-                    setCompany({ ...companyData, seal_url: tplRes.data?.seal_url });
-
-                    const formatDate = (ds: any) => (!ds ? '' : ds.split('T')[0]);
-                    const formatWon = (val: any) => {
-                        const num = Number(val);
-                        return isNaN(num) || num === 0 ? '' : num.toLocaleString();
-                    };
-                    const parseBirthFromResident = (rn: string) => {
-                        if (!rn || rn.length < 6) return '';
-                        const genderCode = rn.length >= 7 ? rn.charAt(6) : '1';
-                        const yearPrefix = ['1', '2', '5', '6'].includes(genderCode) ? '19' : '20';
-                        const yy = rn.substring(0, 2);
-                        const mm = rn.substring(2, 4);
-                        const dd = rn.substring(4, 6);
-                        return `${yearPrefix}${yy}년 ${mm}월 ${dd}일`;
-                    };
-
-                    // 계약서(contract)에 데이터가 없으면 직원(user) 등록 시 입력한 상세 값을 사용
-                    const vars: Record<string, any> = {
-                        staff_name: user?.name || '',
-                        employee_name: user?.name || '',
-                        company_name: targetCompany || '',
-                        company_ceo: companyData?.ceo_name || '',
-                        company_business_no: companyData?.business_no || '',
-                        business_no: companyData?.business_no || '',
-                        company_address: companyData?.address || '',
-                        address_company: companyData?.address || '',
-                        company_phone: companyData?.phone || '',
-                        phone_company: companyData?.phone || '',
-                        department: user?.department || '',
-                        position: user?.position || '',
-                        join_date: formatDate(contract?.join_date || user?.joined_at || user?.join_date),
-                        phone: user?.phone || '',
-                        address: user?.address || '',
-                        birth_date: parseBirthFromResident(user?.resident_no),
-                        license_name: user?.license || '',
-                        license_no: user?.permissions?.license_no || '',
-                        license_date: formatDate(user?.permissions?.license_date || ''),
-                        base_salary: formatWon(contract?.base_salary || user?.base_salary),
-                        position_allowance: formatWon(contract?.position_allowance || user?.position_allowance),
-                        meal_allowance: formatWon(contract?.meal_allowance || user?.meal_allowance),
-                        vehicle_allowance: formatWon(contract?.vehicle_allowance || user?.vehicle_allowance),
-                        childcare_allowance: formatWon(contract?.childcare_allowance || user?.childcare_allowance),
-                        research_allowance: formatWon(contract?.research_allowance || user?.research_allowance),
-                        other_taxfree: formatWon(contract?.other_taxfree || user?.other_taxfree),
-                        shift_start: (contract?.shift_start_time || user?.shift_start_time) ? String(contract?.shift_start_time || user?.shift_start_time).slice(0, 5) : '',
-                        shift_end: (contract?.shift_end_time || user?.shift_end_time) ? String(contract?.shift_end_time || user?.shift_end_time).slice(0, 5) : '',
-                        break_start: (contract?.break_start_time || user?.break_start_time) ? String(contract?.break_start_time || user?.break_start_time).slice(0, 5) : '',
-                        break_end: (contract?.break_end_time || user?.break_end_time) ? String(contract?.break_end_time || user?.break_end_time).slice(0, 5) : '',
-                        payment_day: String(contract?.payment_day || '7'),
-                        today: formatDate(new Date().toISOString()),
-                        weekly_work_hours: String(resolveWeeklyWorkingHours(contract, resolveWeeklyWorkingHours(user, 40))),
-                        work_days_per_week: String(resolveWorkingDaysPerWeek(contract, resolveWorkingDaysPerWeek(user, 5))),
-                        contract_start: formatDate(contract?.contract_start_date || user?.joined_at || user?.join_date),
-                        contract_end: contract?.contract_end_date ? formatDate(contract.contract_end_date) : '정년도달시',
-                        conditions_applied_at: formatDate(contract?.conditions_applied_at || contract?.effective_date || user?.effective_date),
-                        shift_time_range: `${String(contract?.shift_start_time || user?.shift_start_time || '09:00').slice(0, 5)} ~ ${String(contract?.shift_end_time || user?.shift_end_time || '18:00').slice(0, 5)}`,
-                        break_time_range: `${String(contract?.break_start_time || user?.break_start_time || '12:00').slice(0, 5)} ~ ${String(contract?.break_end_time || user?.break_end_time || '13:00').slice(0, 5)}`,
-                        shift_time: (contract?.shift_start_time || user?.shift_start_time) ? `${String(contract?.shift_start_time || user?.shift_start_time).slice(0, 5)} ~ ${String(contract?.shift_end_time || user?.shift_end_time).slice(0, 5)}` : '',
-                    };
-
-                    let result = template;
-
-                    // [수습 기간] 태그 제거 (본문에서 자체 처리)
-                    result = result.replace(/\[\s*수습\s*기간\s*\]/g, '');
-
-                    Object.entries(vars).forEach(([key, value]) => {
-                        const token = `{{${key}}}`;
-                        if (result.includes(token)) {
-                            result = result.split(token).join(value || '');
-                        }
-                    });
-
-                    const companyLineValues: Record<string, string | undefined> = {
-                        회사명: vars.company_name,
-                        대표자: vars.company_ceo,
-                        사업자등록번호: vars.company_business_no,
-                        주소: vars.company_address,
-                        전화번호: vars.company_phone,
-                    };
-                    Object.entries(companyLineValues).forEach(([label, value]) => {
-                        if (!value) return;
-                        const re = new RegExp(`(${label}\\s*:\\s*)([_\\s]*)`, 'g');
-                        result = result.replace(re, `$1${value}`);
-                    });
-
-                    setLocalTemplateText(result);
+                const shiftIds = getWeeklyRotationShiftIds(user, contract?.shift_id ?? user?.shift_id);
+                if (shiftIds.length > 0) {
+                    const { data: shiftRows } = await supabase
+                        .from('work_shifts')
+                        .select('*')
+                        .in('id', shiftIds);
+                    let orderedShiftRows = orderShiftsByIds(shiftRows, shiftIds);
+                    if (orderedShiftRows.length === 1 && isShiftBandGroupRow(orderedShiftRows[0])) {
+                        const seedShift = orderedShiftRows[0];
+                        const seedCompanyName = String(seedShift.company_name || seedShift.company || '');
+                        const seedShiftType = String(seedShift.shift_type || '');
+                        let siblingQuery = supabase
+                            .from('work_shifts')
+                            .select('*')
+                            .eq('is_active', true);
+                        if (seedCompanyName) siblingQuery = siblingQuery.eq('company_name', seedCompanyName);
+                        if (seedShiftType) siblingQuery = siblingQuery.eq('shift_type', seedShiftType);
+                        const { data: siblingRows } = await siblingQuery;
+                        const groupedRows = getShiftBandGroupRows(seedShift, siblingRows);
+                        if (groupedRows.length > 1) orderedShiftRows = groupedRows;
+                    }
+                    shiftData = withWeeklyRotationShifts(orderedShiftRows);
                 }
 
+                if (targetCompany && targetCompany !== '전체') {
+                    const { data: companyRow } = await supabase
+                        .from('companies')
+                        .select('*')
+                        .eq('name', targetCompany)
+                        .maybeSingle();
+                    companyData = companyRow;
+                }
+
+                if (!hasTemplateOverride) {
+                    const { data: companyTemplateRow } = await supabase
+                        .from('contract_templates')
+                        .select('template_content, seal_url')
+                        .eq('company_name', targetCompany)
+                        .maybeSingle();
+
+                    resolvedTemplateText = companyTemplateRow?.template_content || '';
+                    sealUrl = companyTemplateRow?.seal_url || null;
+
+                    if (!resolvedTemplateText && targetCompany !== '전체') {
+                        const { data: fallbackTemplateRow } = await supabase
+                            .from('contract_templates')
+                            .select('template_content, seal_url')
+                            .eq('company_name', '전체')
+                            .maybeSingle();
+                        resolvedTemplateText = fallbackTemplateRow?.template_content || '';
+                        sealUrl = sealUrl || fallbackTemplateRow?.seal_url || null;
+                    }
+                }
+
+                const nextCompany =
+                    companyData || sealUrl
+                        ? { ...(companyData ?? {}), ...(sealUrl ? { seal_url: sealUrl } : {}) }
+                        : null;
+                const result = await buildResolvedTemplateText(
+                    resolvedTemplateText,
+                    shiftData,
+                    companyData,
+                    sealUrl,
+                );
+
+                if (!isMounted) return;
+                setCompany(nextCompany);
+                setLocalTemplateText(result);
             } catch (err) {
                 console.warn('Error applying template for modal:', err);
+                if (!isMounted) return;
+                setCompany(null);
+                setLocalTemplateText('');
+            } finally {
+                if (isMounted) {
+                    setIsTemplateLoading(false);
+                }
             }
         };
 
-        fetchTemplateAndCompany();
-    }, [contract, user, templateText]);
+        void fetchTemplateAndCompany();
+        return () => {
+            isMounted = false;
+        };
+    }, [contract, user, templateText, hasTemplateOverride]);
 
     const allAgreed = REQUIRED_AGREEMENTS.every(item => agreements[item.id]);
+    const isTemplateReady = localTemplateText.trim().length > 0;
 
     const handleNext = () => {
         if (step === 1) setStep(2);
@@ -172,11 +188,46 @@ export default function ContractSignatureModal({ contract, user, templateText, o
         setIsSigEmpty(true);
     };
 
+    const openContractPrintPreview = (fullContractHTML: string) => {
+        try {
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) return;
+
+            const styles = `
+                    @media print {
+                        body { margin: 0; padding: 0; }
+                        .contract-page, [style*="page-break-before: always"] { 
+                            page-break-before: always; 
+                        }
+                    }
+                    body { font-family: 'Noto Sans KR', sans-serif; line-height: 1.6; }
+                    img { max-width: 100%; height: auto; }
+                    .contract-wrapper { padding: 20px; }
+                `;
+
+            printWindow.document.write(`<html><head><title>계약서_통합본_${user?.name}</title><style>${styles}</style></head><body>${fullContractHTML}</body></html>`);
+            printWindow.document.close();
+
+            window.setTimeout(() => {
+                try {
+                    printWindow.print();
+                    printWindow.close();
+                } catch (error) {
+                    console.warn('Contract print preview failed:', error);
+                }
+            }, 500);
+        } catch (error) {
+            console.warn('Contract print preview failed:', error);
+        }
+    };
+
     const handleSubmit = async () => {
+        if (submitLockRef.current || isGenerating) return;
         if (isSigEmpty || sigCanvas.current?.isEmpty()) {
             return toast('서명을 완료해 주세요.', 'success');
         }
 
+        submitLockRef.current = true;
         setIsGenerating(true);
         try {
             const signatureData = sigCanvas.current?.getTrimmedCanvas().toDataURL('image/png');
@@ -242,33 +293,13 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                 </div>
             `;
 
-            // 2. 통합 PDF 저장/인쇄 기능 기동
-            const printWindow = window.open('', '_blank');
-            if (printWindow) {
-                const styles = `
-                    @media print {
-                        body { margin: 0; padding: 0; }
-                        .contract-page, [style*="page-break-before: always"] { 
-                            page-break-before: always; 
-                        }
-                    }
-                    body { font-family: 'Noto Sans KR', sans-serif; line-height: 1.6; }
-                    img { max-width: 100%; height: auto; }
-                    .contract-wrapper { padding: 20px; }
-                `;
-                printWindow.document.write(`<html><head><title>계약서_통합본_${user?.name}</title><style>${styles}</style></head><body>${fullContractHTML}</body></html>`);
-                printWindow.document.close();
-                setTimeout(() => {
-                    printWindow.print();
-                    printWindow.close();
-                }, 500);
-            }
-
-            onSuccess(signatureData, fullContractHTML);
+            await Promise.resolve(onSuccess(signatureData, fullContractHTML));
+            openContractPrintPreview(fullContractHTML);
         } catch (error) {
             console.error(error);
-            toast("서류 생성 중 오류가 발생했습니다.", 'error');
+            toast(error instanceof Error ? error.message : "서류 생성 중 오류가 발생했습니다.", 'error');
         } finally {
+            submitLockRef.current = false;
             setIsGenerating(false);
         }
     };
@@ -300,8 +331,23 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                             </div>
 
                             <div className="bg-[var(--card)] p-4 md:p-5 border border-[var(--border)] max-h-[55vh] overflow-y-auto custom-scrollbar shadow-inner rounded-2xl" style={{ fontFamily: 'Noto Sans KR, sans-serif' }}>
-                                {(() => {
+                                {isTemplateLoading ? (
+                                    <div className="min-h-[280px] flex flex-col items-center justify-center gap-3 text-center">
+                                        <div className="w-8 h-8 rounded-full border-2 border-blue-200 border-t-blue-600 animate-spin" />
+                                        <p className="text-[13px] font-bold text-[var(--foreground)]">계약서 내용을 불러오는 중입니다.</p>
+                                        <p className="text-[11px] text-[var(--toss-gray-4)]">잠시만 기다려 주세요.</p>
+                                    </div>
+                                ) : (() => {
                                     let raw = localTemplateText;
+                                    if (!raw.trim()) {
+                                        return (
+                                            <div className="min-h-[280px] flex items-center justify-center text-center">
+                                                <p className="text-[13px] font-semibold text-[var(--toss-gray-4)]">
+                                                    표시할 계약서 내용을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.
+                                                </p>
+                                            </div>
+                                        );
+                                    }
                                     // ASCII 표 장식 제거 (단, 임금 구성항목 등 주요 라벨은 보존)
                                     raw = raw.replace(/[┌┬┐├┼┤└┴┘─│]+/g, '');
 
@@ -477,7 +523,15 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                     )}
 
                     {step < 4 ? (
-                        <button data-testid="contract-signature-next-button" onClick={handleNext} className="flex-1 px-5 py-3.5 rounded-xl bg-[var(--accent)] text-white font-black text-[13px] shadow-md hover:bg-blue-600 transition-all flex items-center justify-center gap-2">
+                        <button
+                            data-testid="contract-signature-next-button"
+                            onClick={handleNext}
+                            disabled={step === 1 && (!isTemplateReady || isTemplateLoading)}
+                            className={`flex-1 px-5 py-3.5 rounded-xl text-white font-black text-[13px] shadow-md transition-all flex items-center justify-center gap-2 ${step === 1 && (!isTemplateReady || isTemplateLoading)
+                                ? 'bg-[var(--border)] cursor-not-allowed opacity-60'
+                                : 'bg-[var(--accent)] hover:bg-blue-600'
+                                }`}
+                        >
                             확인 및 다음 단계 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                         </button>
                     ) : (
