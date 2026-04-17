@@ -52,3 +52,10 @@ tmp_zhsunyco_*
 
 .open-next/
 *.bak
+
+tmp*/
+.codex-temp/
+.tmp_pydeps/
+tmp/
+.claude/worktrees/
+*.tmp
