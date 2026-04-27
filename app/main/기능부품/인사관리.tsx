@@ -5,33 +5,41 @@ import { HR_COMPANY_KEY, HR_STATUS_KEY, HR_TAB_KEY, HR_WORKSPACE_KEY } from '@/a
 import { canAccessHrSection, canAccessMainMenu, isAdminUser } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import 구성원관리 from './인사관리서브/구성원현황';
-import CertificateGenerator from './인사관리서브/증명서발급';
-import PayrollMain from './인사관리서브/급여관리';
-import AttendanceMain from './인사관리서브/근태기록/근태관리메인';
-import LeaveManagement from './인사관리서브/휴가신청/휴가관리메인';
-import SharedCalendarView from './공유캘린더';
-import CalendarSync from './캘린더동기화';
-import RecruitmentManager from './인사관리서브/채용관리';
-import ContractMain from './인사관리서브/계약관리';
-import 문서보관함 from './인사관리서브/문서보관함';
-import EducationMain from './인사관리서브/교육관리';
-import ShiftCalendar from './인사관리서브/시프트캘린더';
-import DocumentScanner from './인사관리서브/스마트서류제출';
-import OffboardingView from './인사관리서브/오프보딩';
-import HealthCheckupManagement from './인사관리서브/건강검진관리';
-import CongratulationsCondolences from './인사관리서브/경조사관리';
-import PersonnelAppointment from './인사관리서브/인사발령관리';
-import RewardDisciplineManagement from './인사관리서브/포상징계관리';
-import LicenseManager from './인사관리서브/면허자격증관리';
-import MedicalDeviceInspection from './인사관리서브/의료기기점검';
-import IncidentReport from './인사관리서브/사고보고서';
-import WorkTypeChangeHistory from './인사관리서브/근무형태변경이력';
-import AttendanceIssueAnalysisSuite from './인사관리서브/근태이상통합분석';
-import AttendanceDeductionSimulator from './인사관리서브/휴가신청/근태차감시뮬레이터';
-import AttendanceAnomalyPanel from './인사관리서브/휴가신청/근태이상탐지';
-import ContractAutoGenerator from './인사관리서브/계약서자동생성';
+import dynamic from 'next/dynamic';
 
+// ── 서브뷰 lazy 로드 (인사관리 번들 최소화, 구성원 뷰만 정적) ──
+const HrSubViewLoading = () => (
+  <div className="flex items-center justify-center py-20">
+    <div className="w-8 h-8 border-2 border-[var(--accent)] rounded-full border-t-transparent animate-spin" />
+  </div>
+);
 
+const CertificateGenerator = dynamic(() => import('./인사관리서브/증명서발급'), { ssr: false, loading: HrSubViewLoading });
+const PayrollMain = dynamic(() => import('./인사관리서브/급여관리'), { ssr: false, loading: HrSubViewLoading });
+const AttendanceMain = dynamic(() => import('./인사관리서브/근태기록/근태관리메인'), { ssr: false, loading: HrSubViewLoading });
+const LeaveManagement = dynamic(() => import('./인사관리서브/휴가신청/휴가관리메인'), { ssr: false, loading: HrSubViewLoading });
+const SharedCalendarView = dynamic(() => import('./공유캘린더'), { ssr: false, loading: HrSubViewLoading });
+const CalendarSync = dynamic(() => import('./캘린더동기화'), { ssr: false, loading: HrSubViewLoading });
+const RecruitmentManager = dynamic(() => import('./인사관리서브/채용관리'), { ssr: false, loading: HrSubViewLoading });
+const ContractMain = dynamic(() => import('./인사관리서브/계약관리'), { ssr: false, loading: HrSubViewLoading });
+const 문서보관함 = dynamic(() => import('./인사관리서브/문서보관함'), { ssr: false, loading: HrSubViewLoading });
+const EducationMain = dynamic(() => import('./인사관리서브/교육관리'), { ssr: false, loading: HrSubViewLoading });
+const ShiftCalendar = dynamic(() => import('./인사관리서브/시프트캘린더'), { ssr: false, loading: HrSubViewLoading });
+const DocumentScanner = dynamic(() => import('./인사관리서브/스마트서류제출'), { ssr: false, loading: HrSubViewLoading });
+const OffboardingView = dynamic(() => import('./인사관리서브/오프보딩'), { ssr: false, loading: HrSubViewLoading });
+const HealthCheckupManagement = dynamic(() => import('./인사관리서브/건강검진관리'), { ssr: false, loading: HrSubViewLoading });
+const CongratulationsCondolences = dynamic(() => import('./인사관리서브/경조사관리'), { ssr: false, loading: HrSubViewLoading });
+const PersonnelAppointment = dynamic(() => import('./인사관리서브/인사발령관리'), { ssr: false, loading: HrSubViewLoading });
+const RewardDisciplineManagement = dynamic(() => import('./인사관리서브/포상징계관리'), { ssr: false, loading: HrSubViewLoading });
+const LicenseManager = dynamic(() => import('./인사관리서브/면허자격증관리'), { ssr: false, loading: HrSubViewLoading });
+const MedicalDeviceInspection = dynamic(() => import('./인사관리서브/의료기기점검'), { ssr: false, loading: HrSubViewLoading });
+const IncidentReport = dynamic(() => import('./인사관리서브/사고보고서'), { ssr: false, loading: HrSubViewLoading });
+const WorkTypeChangeHistory = dynamic(() => import('./인사관리서브/근무형태변경이력'), { ssr: false, loading: HrSubViewLoading });
+const AttendanceIssueAnalysisSuite = dynamic(() => import('./인사관리서브/근태이상통합분석'), { ssr: false, loading: HrSubViewLoading });
+const AttendanceDeductionSimulator = dynamic(() => import('./인사관리서브/휴가신청/근태차감시뮬레이터'), { ssr: false, loading: HrSubViewLoading });
+const AttendanceAnomalyPanel = dynamic(() => import('./인사관리서브/휴가신청/근태이상탐지'), { ssr: false, loading: HrSubViewLoading });
+const ContractAutoGenerator = dynamic(() => import('./인사관리서브/계약서자동생성'), { ssr: false, loading: HrSubViewLoading });
+const NurseSchedule = dynamic(() => import('./인사관리서브/간호근무표'), { ssr: false, loading: HrSubViewLoading });
 
 type HrWorkspaceId = '인력관리' | '근태 · 급여' | '복지 · 문서';
 type StaffStatus = '재직' | '퇴사';
@@ -54,7 +62,8 @@ type AttendanceAnalysisTabId =
   | '근태이상분석'
   | '근태차감시뮬레이터'
   | '근태이상탐지'
-  | '근무형태이력';
+  | '근무형태이력'
+  | '간호근무표';
 
 type PersonnelSuiteTabId = '인사발령' | '포상/징계';
 type LifecycleSuiteTabId = '교육' | '오프보딩';
@@ -112,6 +121,7 @@ const ATTENDANCE_ANALYSIS_TABS: AttendanceAnalysisTabDef[] = [
   { id: '근태차감시뮬레이터', label: '근태 차감 시뮬레이터', perm: 'hr_근태', icon: '🧮' },
   { id: '근태이상탐지', label: '근태 이상 탐지', perm: 'hr_근태', icon: '🚨' },
   { id: '근무형태이력', label: '근무형태이력', perm: 'hr_근무형태', icon: '🔁' },
+  { id: '간호근무표', label: '근무표 자동편성', perm: 'hr_근무표생성', icon: '🗓️' },
 ];
 
 const PERSONNEL_SUITE_TABS = [
@@ -141,7 +151,6 @@ const CONTRACT_UTILITY_TABS = [
   { id: '기본', label: '계약 현황', icon: '📝' },
   { id: '계약서생성기', label: '계약서 자동생성', icon: '🧾' },
 ] as const;
-
 
 const LEAVE_SUITE_MENU_MAP: Record<string, LeaveSuiteTabId> = {
   '연차/휴가': '연차/휴가 신청내역',
@@ -193,7 +202,6 @@ const CONTRACT_UTILITY_MENU_MAP: Record<string, ContractEmbeddedTabId> = {
   계약서생성기: '계약서생성기',
 };
 
-
 const ATTENDANCE_ANALYSIS_MENU_MAP: Record<string, AttendanceAnalysisTabId> = {
   지각조퇴분석: '근태이상분석',
   근태이상분석: '근태이상분석',
@@ -204,6 +212,10 @@ const ATTENDANCE_ANALYSIS_MENU_MAP: Record<string, AttendanceAnalysisTabId> = {
   근태이상탐지: '근태이상탐지',
   근무형태이력: '근무형태이력',
   조기퇴근감지: '근태이상분석',
+  근무표자동편성: '간호근무표',
+  '근무표 자동편성': '간호근무표',
+  간호근무표: '간호근무표',
+  교대근무: '간호근무표',
 };
 
 const PERSONNEL_SUITE_MENU_MAP: Record<string, PersonnelSuiteTabId> = {
@@ -269,7 +281,6 @@ function getPayrollMainInitialTab(menuId?: string | null): string {
 function getContractInitialTab(menuId?: string | null): ContractEmbeddedTabId {
   return CONTRACT_UTILITY_MENU_MAP[menuId || ''] || '기본';
 }
-
 
 function getLeaveSuiteInitialTab(menuId?: string | null): LeaveSuiteTabId {
   return LEAVE_SUITE_MENU_MAP[menuId || ''] || '연차/휴가 신청내역';
@@ -515,10 +526,9 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
     let isActive = true;
 
     const fetchAllStaffsForHr = async () => {
-      const { data, error } = await supabase
-        .from('staff_members')
-        .select('*')
-        .order('employee_no', { ascending: true });
+      // page.tsx에서 이미 전체 staff를 로드하므로 props 재활용
+      const data = (staffs as any[]) || [];
+      const error = null;
 
       if (error) {
         console.error('인사관리 전체 직원 목록 조회 실패:', error);
@@ -870,10 +880,12 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                 {activeAttendanceTab === '근무형태이력' && (
                   <WorkTypeChangeHistory staffs={인사직원목록} selectedCo={선택사업체} user={user} />
                 )}
+                {activeAttendanceTab === '간호근무표' && (
+                  <NurseSchedule staffs={인사직원목록} selectedCo={선택사업체} user={user} />
+                )}
               </div>
             </div>
           )}
-
 
           {activeMenu === '연차/휴가' && (
             <div className="flex h-full flex-col overflow-hidden">

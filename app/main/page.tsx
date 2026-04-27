@@ -1,12 +1,12 @@
-﻿'use client';
+'use client';
 import { toast } from '@/lib/toast';
 import { Suspense, startTransition, useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 import { setSelectedCompanyId as persistSelectedCompanyId, getSelectedCompanyId } from '@/lib/useCompany';
 import { normalizeProfileUser } from '@/lib/profile-photo';
+import { getStoredSessionLoginAt, isForceLogoutAfterLogin, normalizeSessionLoginAt } from '@/lib/session-force-logout';
 import {
   canAccessAdminSection,
   canAccessApprovalSection,
@@ -105,6 +105,7 @@ function MainPageContent() {
   const [chatListResetToken, setChatListResetToken] = useState(0);
   const [initialOpenChatRoomId, setInitialOpenChatRoomId] = useState<string | null>(null);
   const [initialOpenMessageId, setInitialOpenMessageId] = useState<string | null>(null);
+  const [initialOpenChatRequestToken, setInitialOpenChatRequestToken] = useState(0);
   const [shareTarget, setShareTarget] = useState<{ id: string; fileCount: number; text: string | null; url: string | null; title: string | null } | null>(null);
   const [initialOpenPostId, setInitialOpenPostId] = useState<string | null>(null);
   const [initialApprovalIntent, setInitialApprovalIntent] = useState<any>(null);
@@ -118,7 +119,7 @@ function MainPageContent() {
     surgeries: [],
     mris: []
   });
-  const [loginAt] = useState<string>(new Date().toISOString());
+  const [loginAt, setLoginAt] = useState<string>(() => getStoredSessionLoginAt());
   const isMsoUser = user?.company === 'SY INC.' || user?.permissions?.mso === true;
   const companyById = useMemo(
     () => new Map(companies.map((company) => [company.id, company])),
@@ -273,10 +274,6 @@ function MainPageContent() {
         };
       }
 
-      if (menuId === '관리자' && subViewId === '조직도') {
-        return { menuId: '관리자', subViewId: '회사관리' };
-      }
-
       if (menuId === '관리자' && subViewId === '비품대여설정') {
         return { menuId: '재고관리', subViewId: '비품대여설정' };
       }
@@ -303,6 +300,7 @@ function MainPageContent() {
     try {
       localStorage.removeItem(STORAGE_KEYS.USER);
       localStorage.removeItem(STORAGE_KEYS.LOGIN_AT);
+      persistSelectedCompanyId(null);
       persistSupabaseAccessToken(null);
       void supabase.realtime.setAuth(null);
     } catch {
@@ -395,12 +393,23 @@ function MainPageContent() {
           return;
         }
 
+        const sessionLoginAt = normalizeSessionLoginAt(payload?.issuedAt, getStoredSessionLoginAt());
+        if (!ignore) setLoginAt(sessionLoginAt);
+
+        if (isForceLogoutAfterLogin(sessionUser.force_logout_at, sessionLoginAt)) {
+          toast('관리자에 의해 강제 로그아웃 되었습니다. 다시 로그인해 주세요.');
+          await clearClientSession();
+          router.replace('/');
+          return;
+        }
+
         if (!ignore) {
           persistClientUser(sessionUser);
         }
 
         try {
           localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(sessionUser));
+          localStorage.setItem(STORAGE_KEYS.LOGIN_AT, sessionLoginAt);
           persistSupabaseAccessToken(payload?.supabaseAccessToken ?? null);
           void supabase.realtime.setAuth(payload?.supabaseAccessToken ?? null);
         } catch {
@@ -447,13 +456,17 @@ function MainPageContent() {
           }
         }
 
-        if (sessionUser.company !== 'SY INC.' && !sessionUser.permissions?.mso) {
-          if (!ignore) setSelectedCo(sessionUser.company);
-        } else if (savedCo && !ignore) {
-          setSelectedCo(savedCo);
-        }
-
-        if (sessionUser?.company === 'SY INC.' || sessionUser?.permissions?.mso) {
+        const canSelectCompany = sessionUser.company === 'SY INC.' || sessionUser.permissions?.mso;
+        if (!canSelectCompany) {
+          persistSelectedCompanyId(null);
+          if (!ignore) {
+            setSelectedCo(sessionUser.company);
+            setSelectedCompanyIdState(null);
+          }
+        } else {
+          if (savedCo && !ignore) {
+            setSelectedCo(savedCo);
+          }
           supabase
             .from('companies')
             .select('id, name, type')
@@ -475,11 +488,7 @@ function MainPageContent() {
               if (!ignore) setCompanies(sorted);
             });
           const savedId = getSelectedCompanyId();
-          if (savedId && !ignore) setSelectedCompanyIdState(savedId);
-        }
-
-        if (!ignore) {
-          setSelectedCompanyIdState(getSelectedCompanyId());
+          if (!ignore) setSelectedCompanyIdState(savedId);
         }
       } catch {
         await clearClientSession();
@@ -530,7 +539,7 @@ function MainPageContent() {
         }
 
         const forceLogoutAt = payload.new.force_logout_at;
-        if (forceLogoutAt && new Date(forceLogoutAt).getTime() > new Date(loginAt).getTime()) {
+        if (isForceLogoutAfterLogin(forceLogoutAt, loginAt)) {
           toast('관리자에 의해 강제 로그아웃 되었습니다. 다시 로그인해 주세요.');
           void clearClientSession();
           window.location.href = '/';
@@ -580,17 +589,36 @@ function MainPageContent() {
           return;
         }
         const payload = await response.json();
-        if (payload?.supabaseAccessToken) {
-          persistSupabaseAccessToken(payload.supabaseAccessToken);
-          void supabase.realtime.setAuth(payload.supabaseAccessToken);
+        if (!payload?.authenticated || !payload?.user) {
+          await clearClientSession();
+          router.replace('/');
+          return;
         }
+
+        const refreshedLoginAt = normalizeSessionLoginAt(payload?.issuedAt, loginAt);
+        setLoginAt(refreshedLoginAt);
+        try {
+          localStorage.setItem(STORAGE_KEYS.LOGIN_AT, refreshedLoginAt);
+        } catch {
+          // ignore
+        }
+
+        if (isForceLogoutAfterLogin(payload.user.force_logout_at, refreshedLoginAt)) {
+          toast('관리자에 의해 강제 로그아웃 되었습니다. 다시 로그인해 주세요.');
+          await clearClientSession();
+          router.replace('/');
+          return;
+        }
+
+        persistSupabaseAccessToken(payload?.supabaseAccessToken ?? null);
+        void supabase.realtime.setAuth(payload?.supabaseAccessToken ?? null);
       } catch {
         // 갱신 실패 시 무시 (다음 주기에 재시도)
       }
     };
     const interval = setInterval(refreshSession, 30 * 60 * 1000); // 30분마다
     return () => clearInterval(interval);
-  }, [user, clearClientSession, router]);
+  }, [user, clearClientSession, loginAt, router]);
 
   // Web Share Target: 다른 앱에서 공유하기로 파일/텍스트 수신
   useEffect(() => {
@@ -614,6 +642,7 @@ function MainPageContent() {
       setMainMenu('채팅');
       if (roomId) setInitialOpenChatRoomId(roomId);
       if (msgId) setInitialOpenMessageId(msgId);
+      setInitialOpenChatRequestToken((value) => value + 1);
       clearNavigationQuery();
     }
   }, [clearNavigationQuery, navigationIntent.openChatRoom, navigationIntent.openMessage]);
@@ -652,7 +681,8 @@ function MainPageContent() {
           ...(resolvedSubView ? { viewMode: resolvedSubView } : {}),
         });
       }
-      if (targetMenu === '내정보' && openMyPageTab) {
+      if (openMyPageTab) {
+        setMainMenu('내정보');
         setInitialMyPageTab(openMyPageTab);
       }
       if (targetMenu === '재고관리' || openInventoryView || openInventoryApproval) {
@@ -730,8 +760,8 @@ function MainPageContent() {
 
   useEffect(() => {
     if (!user) return;
-    fetchERPData(user, selectedCompanyId);
-  }, [user, selectedCompanyId, selectedCo]);
+    fetchERPData(user);
+  }, [user]);
 
   useEffect(() => {
     if (!isMsoUser) return;
@@ -760,37 +790,30 @@ function MainPageContent() {
     }
   }, [mainMenu, subView, selectedCo, user]);
 
-  const fetchERPData = useCallback(async (currentUser?: ErpUser | null, companyIdFilter?: string | null) => {
+  const fetchERPData = useCallback(async (currentUser?: ErpUser | null) => {
     setLoading(true);
     const u = currentUser ?? user;
     try {
-      const { data: staffData } = await withMissingColumnFallback(
-        async () => {
-          return supabase
-            .from('staff_members')
-            .select('*')
-            .order('employee_no', { ascending: true });
-        },
-        async () => {
-          return supabase
-            .from('staff_members')
-            .select('*')
-            .order('employee_no', { ascending: true });
-        }
-      );
+      const [
+        { data: staffData, error: staffError },
+        { data: postData, error: postError },
+      ] = await Promise.all([
+        supabase
+          .from('staff_members')
+          .select('*')
+          .order('employee_no', { ascending: true }),
+        supabase
+          .from('board_posts')
+          .select('*')
+          .order('created_at', { ascending: false }),
+      ]);
+
+      if (staffError) throw staffError;
+      if (postError) throw postError;
 
       const normalizedStaffData = Array.isArray(staffData)
         ? staffData.map((staff: StaffMember) => normalizeProfileUser(staff))
         : [];
-
-      const { data: postData } = await withMissingColumnFallback(
-        async () => {
-          return supabase.from('board_posts').select('*').order('created_at', { ascending: false });
-        },
-        async () => {
-          return supabase.from('board_posts').select('*').order('created_at', { ascending: false });
-        }
-      );
 
       // 현재 사용자의 변경된 정보(팀/부서 등)가 있으면 세션 동기화
       if (normalizedStaffData.length > 0 && u?.id) {
@@ -828,27 +851,31 @@ function MainPageContent() {
 
   // 현재 메인 메뉴에 해당하는 서브메뉴 목록
   const isSystemMaster = hasSystemMasterPermission(user);
-  const currentSubMenus = (mainMenu === '인사관리' ? [] : (SUB_MENUS[mainMenu] || []))
-    .filter((subMenu) => {
-      if (mainMenu === '게시판') {
-        return canAccessBoard(user, subMenu.id, 'read');
-      }
+  const currentSubMenus = useMemo(
+    () =>
+      (mainMenu === '인사관리' ? [] : (SUB_MENUS[mainMenu] || []))
+        .filter((subMenu) => {
+          if (mainMenu === '게시판') {
+            return canAccessBoard(user, subMenu.id, 'read');
+          }
 
-      if (mainMenu === '전자결재') {
-        return canAccessApprovalSection(user, subMenu.id);
-      }
+          if (mainMenu === '전자결재') {
+            return canAccessApprovalSection(user, subMenu.id);
+          }
 
-      if (mainMenu === '재고관리') {
-        return canAccessInventorySection(user, subMenu.id);
-      }
+          if (mainMenu === '재고관리') {
+            return canAccessInventorySection(user, subMenu.id);
+          }
 
-      if (mainMenu === '관리자') {
-        if (subMenu.id === '시스템마스터센터' && !isSystemMaster) return false;
-        return canAccessAdminSubMenu(user, subMenu.id);
-      }
+          if (mainMenu === '관리자') {
+            if (subMenu.id === '시스템마스터센터' && !isSystemMaster) return false;
+            return canAccessAdminSubMenu(user, subMenu.id);
+          }
 
-      return true;
-    });
+          return true;
+        }),
+    [isSystemMaster, mainMenu, user],
+  );
   const selectableSubMenus = useMemo(
     () => currentSubMenus.filter((subMenu) => !subMenu.hidden),
     [currentSubMenus]
@@ -979,8 +1006,64 @@ function MainPageContent() {
   }, []);
 
   const handleRefresh = useCallback(() => {
-    void fetchERPData(user, selectedCompanyId);
-  }, [fetchERPData, selectedCompanyId, user]);
+    void fetchERPData(user);
+  }, [fetchERPData, user]);
+
+  // ── 안정 콜백: NotificationSystem / ChatAlertBanner re-render 방지 ──
+  const handleOpenChatRoom = useCallback((roomId: string) => {
+    setMainMenu('채팅');
+    setInitialOpenChatRoomId(roomId);
+    setInitialOpenMessageId(null);
+    setInitialOpenChatRequestToken((value) => value + 1);
+  }, []);
+
+  const handleOpenChatMessage = useCallback((roomId: string, messageId: string) => {
+    setMainMenu('채팅');
+    setInitialOpenChatRoomId(roomId);
+    setInitialOpenMessageId(messageId);
+    setInitialOpenChatRequestToken((value) => value + 1);
+  }, []);
+
+  const handleOpenAdmin = useCallback((nextSubView?: string) => {
+    setMainMenu('관리자');
+    setSubView(nextSubView || '감사센터');
+  }, []);
+
+  const handleOpenInventory = useCallback((intent: { view?: string | null; approvalId?: string | null } | undefined) => {
+    setMainMenu('재고관리');
+    setSubView(intent?.view || '현황');
+    setInitialInventoryWorkflowApprovalId(intent?.approvalId || null);
+  }, []);
+
+  const handleOpenBoard = useCallback((boardId?: string) => {
+    setMainMenu('게시판');
+    if (boardId) setInitialBoardView(boardId);
+  }, []);
+
+  const handleOpenPost = useCallback((boardId: string, postId: string) => {
+    setMainMenu('게시판');
+    if (boardId) setInitialBoardView(boardId);
+    setInitialOpenPostId(postId);
+  }, []);
+
+  const navigationContextValue = useMemo(
+    () => ({ mainMenu, setMainMenu, subView, setSubView: setSubView as (v: string | null) => void }),
+    [mainMenu, subView],
+  );
+  const companyContextValue = useMemo(
+    () => ({
+      selectedCo,
+      setSelectedCo: handleSelectedCoChange as (v: string | null) => void,
+      companies: companies as unknown as { id: string; name: string; type: string }[],
+      selectedCompanyId,
+      setSelectedCompanyId: handleSelectedCompanyIdChange as (v: string | null) => void,
+    }),
+    [companies, handleSelectedCoChange, handleSelectedCompanyIdChange, selectedCo, selectedCompanyId],
+  );
+  const appDataContextValue = useMemo(
+    () => ({ user, data, onRefresh: handleRefresh }),
+    [data, handleRefresh, user],
+  );
 
   // user 없으면 로그인 페이지로 리다이렉트 (초기 로드 시)
   if (!user) {
@@ -1026,7 +1109,7 @@ function MainPageContent() {
                       key={sub.id}
                       onClick={() => handleSubViewChange(sub.id)}
                       data-testid={buildSubMenuTestId(mainMenu, sub.id)}
-                      className={`touch-manipulation flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-2 md:py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all duration-150 whitespace-nowrap md:flex md:items-center md:gap-1.5 ${displayedSubView === sub.id
+                      className={`touch-manipulation flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-2.5 md:py-1.5 min-h-[36px] md:min-h-0 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all duration-150 whitespace-nowrap md:flex md:items-center md:gap-1.5 ${displayedSubView === sub.id
                         ? 'bg-[var(--accent)] text-white shadow-sm'
                         : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] active:bg-[var(--muted)] active:text-[var(--foreground)]'
                       }`}
@@ -1044,7 +1127,7 @@ function MainPageContent() {
                 key={sub.id}
                 onClick={() => handleSubViewChange(sub.id)}
                 data-testid={buildSubMenuTestId(mainMenu, sub.id)}
-                className={`touch-manipulation flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-2 md:py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all duration-150 whitespace-nowrap md:flex md:items-center md:gap-1.5 ${displayedSubView === sub.id
+                className={`touch-manipulation flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-2.5 md:py-1.5 min-h-[36px] md:min-h-0 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all duration-150 whitespace-nowrap md:flex md:items-center md:gap-1.5 ${displayedSubView === sub.id
                   ? 'bg-[var(--accent)] text-white shadow-sm'
                   : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] active:bg-[var(--muted)] active:text-[var(--foreground)]'
                 }`}
@@ -1062,30 +1145,19 @@ function MainPageContent() {
         <PermissionPromptModal />
         {/* 채팅·전자결재·연차촉진·출퇴근 실시간 알림 통합 배너 (웹·모바일 즉시 표시) */}
         <ChatAlertBanner
-          onOpenChat={(roomId) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); }}
-          onOpenMessage={(roomId, messageId) => {
-            setMainMenu('채팅');
-            setInitialOpenChatRoomId(roomId);
-            setInitialOpenMessageId(messageId);
-          }}
+          onOpenChat={handleOpenChatRoom}
+          onOpenMessage={handleOpenChatMessage}
         />
         {/* 전역 알림 및 푸시 처리 (채팅 탭을 열지 않아도 작동) */}
         <NotificationSystem
           user={user as Parameters<typeof NotificationSystem>[0]['user']}
-          onOpenChatRoom={(roomId: string) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); }}
-          onOpenMessage={(roomId: string, messageId: string) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); setInitialOpenMessageId(messageId); }}
+          onOpenChatRoom={handleOpenChatRoom}
+          onOpenMessage={handleOpenChatMessage}
           onOpenApproval={handleOpenApproval}
-          onOpenAdmin={(nextSubView?: string) => {
-            setMainMenu('관리자');
-            setSubView(nextSubView || '감사센터');
-          }}
-          onOpenInventory={(intent: { view?: string | null; approvalId?: string | null } | undefined) => {
-            setMainMenu('재고관리');
-            setSubView(intent?.view || '현황');
-            setInitialInventoryWorkflowApprovalId(intent?.approvalId || null);
-          }}
-          onOpenBoard={(boardId?: string) => { setMainMenu('게시판'); if (boardId) setInitialBoardView(boardId); }}
-          onOpenPost={(boardId: string, postId: string) => { setMainMenu('게시판'); if (boardId) setInitialBoardView(boardId); setInitialOpenPostId(postId); }}
+          onOpenAdmin={handleOpenAdmin}
+          onOpenInventory={handleOpenInventory}
+          onOpenBoard={handleOpenBoard}
+          onOpenPost={handleOpenPost}
         />
 
         {loading && !hasLoadedInitialData && (
@@ -1096,9 +1168,9 @@ function MainPageContent() {
             <div className="w-10 h-10 border-2 border-[var(--accent)] rounded-full border-t-transparent animate-spin" />
           </div>
         )}
-        <NavigationProvider value={{ mainMenu, setMainMenu, subView, setSubView: setSubView as (v: string | null) => void }}>
-        <CompanyProvider value={{ selectedCo, setSelectedCo: handleSelectedCoChange as (v: string | null) => void, companies: companies as unknown as { id: string; name: string; type: string }[], selectedCompanyId, setSelectedCompanyId: handleSelectedCompanyIdChange as (v: string | null) => void }}>
-        <AppDataProvider value={{ user, data, onRefresh: handleRefresh }}>
+        <NavigationProvider value={navigationContextValue}>
+        <CompanyProvider value={companyContextValue}>
+        <AppDataProvider value={appDataContextValue}>
         <MainContent
           key={`main-content-${menuResetVersion}`}
           user={user}
@@ -1119,6 +1191,7 @@ function MainPageContent() {
           onConsumeOpenPostId={() => setInitialOpenPostId(null)}
           chatListResetToken={chatListResetToken}
           initialOpenChatRoomId={initialOpenChatRoomId}
+          initialOpenChatRequestToken={initialOpenChatRequestToken}
           initialOpenMessageId={initialOpenMessageId}
           onConsumeOpenChatRoomId={() => {
             setInitialOpenChatRoomId(null);
@@ -1136,6 +1209,12 @@ function MainPageContent() {
             setMainMenu('채팅');
             setInitialOpenChatRoomId(roomId);
             setInitialOpenMessageId(messageId);
+            setInitialOpenChatRequestToken((value) => value + 1);
+          }}
+          onOpenBoardPost={(boardId, postId) => {
+            setMainMenu('게시판');
+            if (boardId) setInitialBoardView(boardId);
+            setInitialOpenPostId(postId);
           }}
         />
         </AppDataProvider>
