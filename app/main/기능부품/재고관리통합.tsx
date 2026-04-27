@@ -15,24 +15,34 @@ import {
   type IntegratedInventoryProps, type InventoryStatusFilter, type SupplierWorkspaceTab, type RegistrationMode,
 } from './재고관리서브/types';
 
-// ── 서브 컴포넌트 임포트 ──
-import UDIManagement from './재고관리서브/UDI관리';
-import PurchaseOrderManagement from './재고관리서브/발주관리';
-import ScanModule from './재고관리서브/스캔모듈완성';
-import ProductRegistration from './재고관리서브/물품등록';
-import ExcelBulkUpload from './관리자전용서브/엑셀일괄등록';
-import InvoiceAutoExtraction from './관리자전용서브/명세서자동추출';
-import QRAssetManager from './재고관리서브/자산QR관리';
-import ASReturnManagement from './재고관리서브/AS반품관리';
-import InventoryCount from './재고관리서브/재고실사';
-import InventoryTransfer from './재고관리서브/재고이관';
-import CategoryManager from './재고관리서브/카테고리관리';
-import ConsumableStats from './재고관리서브/소모품통계';
-import DepartmentConsumption from './재고관리서브/부서소모기록';
-import DeliveryConfirmation from './재고관리서브/납품확인서';
-import InventoryDemandForecast from './재고관리서브/재고수요예측';
-import SupplierDocumentWorkspace from './재고관리서브/SupplierDocumentWorkspace';
-import AssetLoanSettingsAdminView from './관리자전용서브/비품대여물품설정';
+import dynamic from 'next/dynamic';
+
+// ── 서브뷰 lazy 로드 (재고관리 번들 최소화, 현황 뷰만 정적) ──
+const InvSubViewLoading = () => (
+  <div className="flex items-center justify-center py-20">
+    <div className="w-8 h-8 border-2 border-[var(--accent)] rounded-full border-t-transparent animate-spin" />
+  </div>
+);
+
+const UDIManagement = dynamic(() => import('./재고관리서브/UDI관리'), { ssr: false, loading: InvSubViewLoading });
+const PurchaseOrderManagement = dynamic(() => import('./재고관리서브/발주관리'), { ssr: false, loading: InvSubViewLoading });
+const ScanModule = dynamic(() => import('./재고관리서브/스캔모듈완성'), { ssr: false, loading: InvSubViewLoading });
+const ProductRegistration = dynamic(() => import('./재고관리서브/물품등록'), { ssr: false, loading: InvSubViewLoading });
+const ExcelBulkUpload = dynamic(() => import('./관리자전용서브/엑셀일괄등록'), { ssr: false, loading: InvSubViewLoading });
+const InvoiceAutoExtraction = dynamic(() => import('./관리자전용서브/명세서자동추출'), { ssr: false, loading: InvSubViewLoading });
+const QRAssetManager = dynamic(() => import('./재고관리서브/자산QR관리'), { ssr: false, loading: InvSubViewLoading });
+const ASReturnManagement = dynamic(() => import('./재고관리서브/AS반품관리'), { ssr: false, loading: InvSubViewLoading });
+const InventoryCount = dynamic(() => import('./재고관리서브/재고실사'), { ssr: false, loading: InvSubViewLoading });
+const InventoryTransfer = dynamic(() => import('./재고관리서브/재고이관'), { ssr: false, loading: InvSubViewLoading });
+const CategoryManager = dynamic(() => import('./재고관리서브/카테고리관리'), { ssr: false, loading: InvSubViewLoading });
+const ConsumableStats = dynamic(() => import('./재고관리서브/소모품통계'), { ssr: false, loading: InvSubViewLoading });
+const InventoryClosingManagement = dynamic(() => import('./재고관리서브/재고월마감'), { ssr: false, loading: InvSubViewLoading });
+const DepartmentConsumption = dynamic(() => import('./재고관리서브/부서소모기록'), { ssr: false, loading: InvSubViewLoading });
+const DeliveryConfirmation = dynamic(() => import('./재고관리서브/납품확인서'), { ssr: false, loading: InvSubViewLoading });
+const InventoryDemandForecast = dynamic(() => import('./재고관리서브/재고수요예측'), { ssr: false, loading: InvSubViewLoading });
+const SupplierDocumentWorkspace = dynamic(() => import('./재고관리서브/SupplierDocumentWorkspace'), { ssr: false, loading: InvSubViewLoading });
+const AssetLoanSettingsAdminView = dynamic(() => import('./관리자전용서브/비품대여물품설정'), { ssr: false, loading: InvSubViewLoading });
+
 import InventoryStatusView from './재고관리서브/재고현황뷰';
 
 // ── 뷰 해석 (레거시 뷰 → 현재 뷰 매핑) ──
@@ -146,10 +156,14 @@ export default function IntegratedInventoryManagement({
     onViewChange?.(activeView);
   }, [activeView, onViewChange]);
 
-  useEffect(() => { data.fetchSuppliers(); }, [data.fetchSuppliers]);
+  useEffect(() => { void data.fetchSuppliers(); }, [data.fetchSuppliers]);
 
   useEffect(() => {
-    activeView === '현황' ? data.fetchInventory('전체') : data.fetchInventory(selectedCo);
+    if (activeView === '현황') {
+      void data.fetchInventory('전체');
+      return;
+    }
+    void data.fetchInventory(selectedCo);
   }, [activeView, selectedCo, data.fetchInventory]);
 
   useEffect(() => {
@@ -247,7 +261,7 @@ export default function IntegratedInventoryManagement({
                 ) : (
                   <table className="min-w-[860px] w-full text-left text-xs">
                     <thead className="bg-[var(--muted)]/50 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">
-                      <tr><th className="px-4 py-3">일시</th><th className="px-4 py-3">유형</th><th className="px-4 py-3">수량</th><th className="px-4 py-3">변동</th><th className="px-4 py-3">처리자</th><th className="px-4 py-3">회사/시리얼</th></tr>
+                      <tr><th className="px-4 py-3">일시</th><th className="px-4 py-3">유형</th><th className="px-4 py-3">수량</th><th className="px-4 py-3">변동</th><th className="px-4 py-3">처리자</th><th className="px-4 py-3">회사/추적정보</th></tr>
                     </thead>
                     <tbody>
                       {data.logs.map((log) => {
@@ -255,6 +269,9 @@ export default function IntegratedInventoryManagement({
                         const at = log.created_at ? new Date(String(log.created_at)).toLocaleString('ko-KR') : '-';
                         const ct = String(log.change_type || log.type || '');
                         const sn = String(log.serial_number || '').trim();
+                        const lot = String(log.lot_number || '').trim();
+                        const location = String(log.location || '').trim();
+                        const unitPrice = Number(log.unit_price || 0);
                         return (
                           <tr key={id} className="border-t border-[var(--border)]">
                             <td className="px-4 py-3 font-mono text-[11px] text-[var(--toss-gray-4)]">{at}</td>
@@ -262,7 +279,15 @@ export default function IntegratedInventoryManagement({
                             <td className="px-4 py-3 font-bold text-[var(--foreground)]">{String(log.quantity ?? '-')}</td>
                             <td className="px-4 py-3 text-[var(--toss-gray-3)]">{log.prev_quantity !== undefined && log.prev_quantity !== null ? `${String(log.prev_quantity)} → ${String(log.next_quantity ?? '')}` : '-'}</td>
                             <td className="px-4 py-3 text-[var(--foreground)]">{String(log.actor_name || '') || '-'}</td>
-                            <td className="px-4 py-3 text-[var(--toss-gray-4)]"><p>{String(log.company || '') || '-'}</p>{sn && <p className="mt-1 text-[10px] font-semibold text-emerald-600">S/N: {sn}</p>}</td>
+                            <td className="px-4 py-3 text-[var(--toss-gray-4)]">
+                              <p>{String(log.company || '') || '-'}</p>
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {sn && <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600">S/N {sn}</span>}
+                                {lot && <span className="rounded bg-[var(--muted)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--toss-gray-4)]">LOT {lot}</span>}
+                                {location && <span className="rounded bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-sky-600">{location}</span>}
+                                {unitPrice > 0 && <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">{unitPrice.toLocaleString('ko-KR')}원</span>}
+                              </div>
+                            </td>
                           </tr>
                         );
                       })}
@@ -278,8 +303,8 @@ export default function IntegratedInventoryManagement({
           {activeView === '등록' && (
             <div className="space-y-4">
               <div className="flex gap-2 mb-2">
-                {([['form', '✏️ 일반 등록', 'bg-[var(--accent)] text-white shadow-sm'], ['excel', '📊 엑셀 일괄 등록', 'bg-emerald-600 text-white shadow-md'], ['auto_extract', '📄 입고 자동추출 (AI)', 'bg-purple-600 text-white shadow-md']] as const).map(([mode, label, activeClass]) => (
-                  <button key={mode} type="button" onClick={() => setRegistrationMode(mode)} className={`flex-1 px-4 py-3 rounded-[var(--radius-md)] text-[11px] font-semibold transition-all ${registrationMode === mode ? activeClass : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>{label}</button>
+                {([['form', '✏️ 일반 등록', '일반 입력 모드', 'bg-[var(--accent)] text-white shadow-sm'], ['excel', '📊 엑셀 일괄 등록', '엑셀 업로드 모드', 'bg-emerald-600 text-white shadow-md'], ['auto_extract', '📄 입고 자동추출 (AI)', 'AI 추출 모드', 'bg-purple-600 text-white shadow-md']] as const).map(([mode, label, ariaLabel, activeClass]) => (
+                  <button key={mode} type="button" aria-label={ariaLabel} onClick={() => setRegistrationMode(mode)} className={`flex-1 px-4 py-3 rounded-[var(--radius-md)] text-[11px] font-semibold transition-all ${registrationMode === mode ? activeClass : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>{label}</button>
                 ))}
               </div>
               {registrationMode === 'form' ? <ProductRegistration user={user} inventory={data.inventory} suppliers={data.suppliers} fetchInventory={data.fetchInventory} fetchSuppliers={data.fetchSuppliers} />
@@ -294,7 +319,8 @@ export default function IntegratedInventoryManagement({
           {activeView === '재고실사' && <InventoryCount user={user} inventory={data.inventory} fetchInventory={() => data.fetchInventory(selectedCo)} />}
           {activeView === '이관' && <InventoryTransfer user={user} inventory={data.inventory} fetchInventory={() => data.fetchInventory(selectedCo)} />}
           {activeView === '카테고리' && <CategoryManager user={user} />}
-          {activeView === '소모품통계' && <ConsumableStats user={user} selectedCo={selectedCo ?? ''} />}
+          {activeView === '소모품통계' && <ConsumableStats user={user} selectedCo={selectedCo ?? ''} inventory={data.inventory} />}
+          {activeView === '월마감' && <InventoryClosingManagement user={user} selectedCo={selectedCo ?? ''} inventory={data.inventory} />}
           {activeView === '납품확인서' && <DeliveryConfirmation user={user} selectedCo={selectedCo ?? ''} />}
           {activeView === '수요예측' && <InventoryDemandForecast user={user} inventory={data.inventory} selectedCo={selectedCo ?? ''} />}
           {activeView === '내부서재고' && <DepartmentConsumption user={user} inventory={data.inventory} fetchInventory={() => data.fetchInventory(selectedCo)} />}
@@ -314,9 +340,35 @@ export default function IntegratedInventoryManagement({
                 <input data-testid="inventory-stock-amount-input" type="number" min={1} max={stockModal.stockModal.type === 'out' ? (stockModal.stockModal.item.quantity ?? Number((stockModal.stockModal.item as Record<string, unknown>).stock ?? 0)) : 99999} value={stockModal.stockAmount} onChange={(e) => stockModal.setStockAmount(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] text-sm font-semibold" />
               </div>
               {stockModal.stockModal.type === 'in' && (
-                <div>
-                  <label className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1 block">시리얼 번호 (선택)</label>
-                  <input value={stockModal.stockSerialInput} onChange={(e) => stockModal.setStockSerialInput(e.target.value)} className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] text-sm font-semibold" placeholder="SERIAL-0000" />
+                <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/30 p-3">
+                  <p className="mb-3 text-[11px] font-black uppercase tracking-widest text-[var(--foreground)]">입고 추적정보</p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <label className="space-y-1">
+                      <span className="block text-[10px] font-bold text-[var(--toss-gray-3)]">시리얼 번호</span>
+                      <input value={stockModal.stockSerialInput} onChange={(e) => stockModal.setStockSerialInput(e.target.value)} className="w-full px-3 py-2.5 rounded-[var(--radius-md)] border border-[var(--border)] text-xs font-semibold" placeholder="SERIAL-0000" />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="block text-[10px] font-bold text-[var(--toss-gray-3)]">LOT 번호</span>
+                      <input value={stockModal.stockLotInput} onChange={(e) => stockModal.setStockLotInput(e.target.value)} className="w-full px-3 py-2.5 rounded-[var(--radius-md)] border border-[var(--border)] text-xs font-semibold" placeholder="LOT-0000" />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="block text-[10px] font-bold text-[var(--toss-gray-3)]">유효기간</span>
+                      <input type="date" value={stockModal.stockExpiryInput} onChange={(e) => stockModal.setStockExpiryInput(e.target.value)} className="w-full px-3 py-2.5 rounded-[var(--radius-md)] border border-[var(--border)] text-xs font-semibold" />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="block text-[10px] font-bold text-[var(--toss-gray-3)]">창고/위치</span>
+                      <input value={stockModal.stockLocationInput} onChange={(e) => stockModal.setStockLocationInput(e.target.value)} className="w-full px-3 py-2.5 rounded-[var(--radius-md)] border border-[var(--border)] text-xs font-semibold" placeholder="본원창고 A-01" />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="block text-[10px] font-bold text-[var(--toss-gray-3)]">입고 단가</span>
+                      <input type="number" min={0} value={stockModal.stockUnitPriceInput} onChange={(e) => stockModal.setStockUnitPriceInput(e.target.value)} className="w-full px-3 py-2.5 rounded-[var(--radius-md)] border border-[var(--border)] text-xs font-semibold" placeholder="0" />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="block text-[10px] font-bold text-[var(--toss-gray-3)]">공급업체</span>
+                      <input value={stockModal.stockSupplierInput} onChange={(e) => stockModal.setStockSupplierInput(e.target.value)} className="w-full px-3 py-2.5 rounded-[var(--radius-md)] border border-[var(--border)] text-xs font-semibold" placeholder="거래처명" />
+                    </label>
+                  </div>
+                  <p className="mt-2 text-[9px] font-semibold text-[var(--toss-gray-3)]">입력한 LOT/Serial/위치/단가는 품목 마스터와 입출고 이력, 단가 이력에 함께 기록됩니다.</p>
                 </div>
               )}
               <div className="flex flex-col sm:flex-row gap-2">

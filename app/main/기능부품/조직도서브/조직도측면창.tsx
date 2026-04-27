@@ -1,12 +1,15 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { canAccessMainMenu } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
+import type { ChatRoom } from '@/types';
+import { fetchChatUnreadCountsByRoom } from '@/app/main/기능부품/메신저데이터유틸';
 import { ADMIN_SIDEBAR_ITEMS } from '../../admin-menu-config';
 import { CHAT_ACTIVE_ROOM_KEY } from '@/app/main/navigation-state';
-import NotificationCenter from '../NotificationCenter';
+import NotificationCenter from '../알림센터';
+import { prefetchMenuModule } from './조직도본문';
 
 import {
   getConversationRoomIdSet,
@@ -42,6 +45,8 @@ export const SUB_MENUS: Record<string, SubMenuItem[]> = {
     { id: '카테고리', label: '카테고리', group: '설정', icon: '🗂️' },
     { id: 'AS반품', label: 'AS반품', group: '설정', icon: '↩️' },
     { id: '소모품통계', label: '소모품통계', group: '설정', icon: '📉' },
+    { id: '월마감', label: '월마감', group: '설정', icon: '🔒' },
+    { id: '내부서재고', label: '내 부서 재고', group: '조회', icon: '🏬' },
   ],
   게시판: [
     { id: '공지사항', label: '공지사항', icon: '📢' },
@@ -97,6 +102,9 @@ type SidebarUser = {
 
 function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; mainMenu?: string; onMenuChange: (menuId: string) => void }) {
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const visibleChatRoomsRef = useRef<ChatRoom[]>([]);
+  const unreadRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recentNotificationKeysRef = useRef<Map<string, number>>(new Map());
   const normalizedUser = useMemo(
     () => normalizeStaffLike((user ?? {}) as Record<string, unknown>) as SidebarUser,
     [user]
@@ -107,6 +115,7 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
   });
   const effectiveUser = (resolvedUser || normalizedUser) as SidebarUser;
   const effectiveUserId = getStaffLikeId(effectiveUser as Record<string, unknown>);
+  const [isDesktopViewport, setIsDesktopViewport] = useState<boolean | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -134,6 +143,31 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
       cancelled = true;
     };
   }, [normalizedUser?.id, normalizedUser?.name, normalizedUser?.employee_no, normalizedUser?.auth_user_id]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia('(min-width: 768px)');
+    const syncViewport = () => {
+      setIsDesktopViewport(mediaQuery.matches);
+    };
+
+    syncViewport();
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', syncViewport);
+      return () => {
+        mediaQuery.removeEventListener('change', syncViewport);
+      };
+    }
+
+    mediaQuery.addListener(syncViewport);
+    return () => {
+      mediaQuery.removeListener(syncViewport);
+    };
+  }, []);
 
   const visibleMenus = useMemo(
     () => MAIN_MENUS.filter((menu) => canAccessMainMenu(effectiveUser, menu.id)),
@@ -171,8 +205,16 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
     }
   }, []);
 
+  const clearScheduledUnreadRefresh = useCallback(() => {
+    if (unreadRefreshTimerRef.current) {
+      clearTimeout(unreadRefreshTimerRef.current);
+      unreadRefreshTimerRef.current = null;
+    }
+  }, []);
+
   const fetchChatUnreadCount = useCallback(async () => {
     if (!effectiveUserId) {
+      visibleChatRoomsRef.current = [];
       setChatUnreadCount(0);
       return;
     }
@@ -184,56 +226,34 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
 
       if (roomsError) throw roomsError;
 
-      const myRooms = (rooms || []).filter((room: any) => {
+      const myRooms = ((rooms || []) as ChatRoom[]).filter((room) => {
         if (room.id === NOTICE_ROOM_ID) return true;
-        return Array.isArray(room.members) && room.members.some((id: string) => String(id) === effectiveUserId);
+        return Array.isArray(room.members) && room.members.some((id) => String(id) === effectiveUserId);
       });
 
       const hiddenRoomIds = readHiddenRoomIds();
-      const visibleRooms = myRooms.filter((room: any) => !hiddenRoomIds.has(String(room.id)));
+      const visibleRooms = myRooms.filter((room) => !hiddenRoomIds.has(String(room.id)));
+      visibleChatRoomsRef.current = visibleRooms;
 
       if (visibleRooms.length === 0) {
         setChatUnreadCount(0);
         return;
       }
 
-      const openConversationRoomIds = readOpenConversationRoomIds(visibleRooms);
-      const roomIds = visibleRooms.map((room: any) => room.id);
-      const { data: cursors, error: cursorError } = await supabase
-        .from('room_read_cursors')
-        .select('room_id, last_read_at')
-        .eq('user_id', effectiveUserId)
-        .in('room_id', roomIds);
-
-      if (cursorError) throw cursorError;
-
-      const cursorMap: Record<string, string | null> = {};
-      (cursors || []).forEach((cursor: any) => {
-        cursorMap[cursor.room_id] = cursor.last_read_at;
+      const activeRoomId =
+        typeof window !== 'undefined'
+          ? window.sessionStorage.getItem(CHAT_ACTIVE_ROOM_KEY)
+          : null;
+      const counts = await fetchChatUnreadCountsByRoom(supabase, {
+        rooms: visibleRooms,
+        userId: effectiveUserId,
+        activeRoomId,
+        chunkSize: 8,
       });
-
-      let totalUnread = 0;
-      for (const roomId of roomIds) {
-        if (openConversationRoomIds.has(String(roomId))) {
-          continue;
-        }
-
-        let query = supabase
-          .from('messages')
-          .select('id', { count: 'exact', head: true })
-          .eq('room_id', roomId)
-          .neq('sender_id', effectiveUserId)
-          .eq('is_deleted', false);
-
-        const lastReadAt = cursorMap[roomId];
-        if (lastReadAt) {
-          query = query.gt('created_at', lastReadAt);
-        }
-
-        const { count, error: countError } = await query;
-        if (countError) throw countError;
-        totalUnread += count || 0;
-      }
+      const totalUnread = Object.values(counts).reduce(
+        (sum, count) => sum + (Number(count) || 0),
+        0,
+      );
 
       setChatUnreadCount(totalUnread);
     } catch (error) {
@@ -250,45 +270,113 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
       console.error('메인 메뉴 채팅 안읽음 계산 실패:', error);
       setChatUnreadCount(0);
     }
-  }, [effectiveUserId, readHiddenRoomIds, readOpenConversationRoomIds]);
+  }, [effectiveUserId, readHiddenRoomIds]);
+
+  const scheduleUnreadRefresh = useCallback((delayMs = 0) => {
+    clearScheduledUnreadRefresh();
+    if (delayMs <= 0) {
+      void fetchChatUnreadCount();
+      return;
+    }
+
+    unreadRefreshTimerRef.current = setTimeout(() => {
+      unreadRefreshTimerRef.current = null;
+      void fetchChatUnreadCount();
+    }, delayMs);
+  }, [clearScheduledUnreadRefresh, fetchChatUnreadCount]);
 
   useEffect(() => {
-    void fetchChatUnreadCount();
-  }, [fetchChatUnreadCount]);
+    scheduleUnreadRefresh();
+    return () => {
+      clearScheduledUnreadRefresh();
+    };
+  }, [clearScheduledUnreadRefresh, scheduleUnreadRefresh]);
 
   useEffect(() => {
     if (!effectiveUserId) return;
 
     const handleChatSync = () => {
-      void fetchChatUnreadCount();
+      scheduleUnreadRefresh();
     };
 
-    const channel = supabase
-      .channel(`sidebar-chat-unread-${effectiveUserId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
-        void fetchChatUnreadCount();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'room_read_cursors' }, () => {
-        void fetchChatUnreadCount();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, () => {
-        void fetchChatUnreadCount();
-      })
-      .subscribe();
+    const handleChatNotification = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        room_id?: string;
+        message_id?: string;
+        body?: string;
+        data?: Record<string, unknown>;
+      }>).detail;
+      const roomId = String(detail?.room_id || detail?.data?.room_id || '').trim();
+
+      if (!roomId) {
+        scheduleUnreadRefresh();
+        return;
+      }
+
+      if (readHiddenRoomIds().has(roomId)) {
+        scheduleUnreadRefresh(200);
+        return;
+      }
+
+      const openConversationRoomIds = readOpenConversationRoomIds(visibleChatRoomsRef.current);
+      if (openConversationRoomIds.has(roomId)) {
+        scheduleUnreadRefresh(200);
+        return;
+      }
+
+      const now = Date.now();
+      recentNotificationKeysRef.current.forEach((timestamp, key) => {
+        if (now - timestamp > 10_000) {
+          recentNotificationKeysRef.current.delete(key);
+        }
+      });
+
+      const optimisticKey = String(
+        detail?.message_id ||
+        detail?.data?.message_id ||
+        detail?.data?.id ||
+        `${roomId}:${String(detail?.body || '').trim()}`
+      ).trim();
+
+      if (optimisticKey && recentNotificationKeysRef.current.has(optimisticKey)) {
+        scheduleUnreadRefresh(200);
+        return;
+      }
+
+      if (optimisticKey) {
+        recentNotificationKeysRef.current.set(optimisticKey, now);
+      }
+
+      setChatUnreadCount((prev) => Math.max(1, prev + 1));
+      scheduleUnreadRefresh(400);
+    };
+
+    // realtime 채널 대신 60초 fallback polling으로 대체 (채팅 내부 구독과 이중 방지)
+    const pollTimer = window.setInterval(() => {
+      if (document.hidden) return; // 비활성 탭이면 폴링 스킵
+      scheduleUnreadRefresh(0);
+    }, 60_000);
 
     if (typeof window !== 'undefined') {
       window.addEventListener('erp-chat-sync', handleChatSync);
+      window.addEventListener('erp-chat-notification', handleChatNotification as EventListener);
       document.addEventListener('visibilitychange', handleChatSync);
     }
 
     return () => {
-      supabase.removeChannel(channel);
+      window.clearInterval(pollTimer);
       if (typeof window !== 'undefined') {
         window.removeEventListener('erp-chat-sync', handleChatSync);
+        window.removeEventListener('erp-chat-notification', handleChatNotification as EventListener);
         document.removeEventListener('visibilitychange', handleChatSync);
       }
     };
-  }, [effectiveUserId, fetchChatUnreadCount]);
+  }, [
+    effectiveUserId,
+    readHiddenRoomIds,
+    readOpenConversationRoomIds,
+    scheduleUnreadRefresh,
+  ]);
 
   const handleMenuClick = useCallback((menuId: string) => {
     if (menuId === '내정보' && typeof window !== 'undefined') {
@@ -302,6 +390,9 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
     onMenuChange(menuId);
   }, [onMenuChange]);
 
+  const shouldRenderDesktopNotificationCenter = Boolean(effectiveUserId) && isDesktopViewport !== false;
+  const shouldRenderMobileNotificationCenter = Boolean(effectiveUserId) && isDesktopViewport === false;
+
   return (
     <>
       {/* 데스크탑 사이드바 */}
@@ -310,7 +401,9 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
         data-testid="desktop-sidebar"
       >
         <div className="mb-2 flex w-full shrink-0 flex-col items-center px-1.5">
-          {effectiveUserId && <NotificationCenter user={effectiveUser} onOpenMenu={onMenuChange} />}
+          {shouldRenderDesktopNotificationCenter && (
+            <NotificationCenter user={effectiveUser} onOpenMenu={onMenuChange} />
+          )}
         </div>
 
         <div className="no-scrollbar flex w-full flex-1 flex-col gap-0.5 overflow-y-auto px-1.5">
@@ -322,6 +415,8 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
                 type="button"
                 data-testid={menu.testId}
                 onClick={() => handleMenuClick(menu.id)}
+                onMouseEnter={() => prefetchMenuModule(menu.id)}
+                onFocus={() => prefetchMenuModule(menu.id)}
                 className={`relative flex w-full flex-col items-center justify-center rounded-[var(--radius-md)] py-2 transition-all duration-150 ${
                   isActive
                     ? 'bg-[var(--accent)] text-white'
@@ -348,7 +443,7 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
 
       {/* 모바일 하단 탭바 */}
       <div
-        className="safe-area-pb fixed bottom-0 left-0 right-0 z-[100] border-t border-[var(--border)] bg-[var(--card)] px-1.5 py-1 md:hidden"
+        className="mobile-bottom-tabbar safe-area-pb fixed bottom-0 left-0 right-0 z-[100] border-t border-[var(--border)] bg-[var(--card)] px-1.5 py-1 md:hidden"
         style={{ boxShadow: '0 -1px 0 var(--border)' }}
       >
         <nav className="flex items-stretch gap-1" data-testid="mobile-tabbar">
@@ -381,7 +476,7 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
               );
             })}
           </div>
-          {effectiveUserId && (
+          {shouldRenderMobileNotificationCenter && (
             <div className="flex min-h-[56px] w-[56px] flex-none items-center justify-center rounded-[var(--radius-md)]">
               <NotificationCenter user={effectiveUser} onOpenMenu={onMenuChange} />
             </div>

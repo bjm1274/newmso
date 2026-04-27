@@ -15,9 +15,34 @@ const loadChatView = () => import('../메신저');
 const loadBoardView = () => import('../게시판');
 const loadApprovalView = () => import('../전자결재');
 const loadHRView = () => import('../인사관리');
-const loadInventoryView = () => import('../재고관리_통합완성');
+const loadInventoryView = () => import('../재고관리통합');
 const loadAdminView = () => import('../관리자전용');
 const loadExtraFeaturesView = () => import('../추가기능');
+
+/**
+ * 사이드바 호버/포커스 시 해당 메뉴 번들을 on-demand prefetch.
+ * 이미 로드된 모듈은 중복 실행하지 않는다.
+ */
+const MENU_LOADER_MAP: Record<string, () => Promise<unknown>> = {
+  내정보: loadMyPageView,
+  알림: loadNotificationInboxView,
+  조직도: loadOrgChartView,
+  채팅: loadChatView,
+  게시판: loadBoardView,
+  전자결재: loadApprovalView,
+  인사관리: loadHRView,
+  재고관리: loadInventoryView,
+  관리자: loadAdminView,
+  추가기능: loadExtraFeaturesView,
+};
+
+export function prefetchMenuModule(menuId: string) {
+  if (prefetchedMainMenuModules.has(menuId)) return;
+  const loader = MENU_LOADER_MAP[menuId];
+  if (!loader) return;
+  prefetchedMainMenuModules.add(menuId);
+  void loader();
+}
 
 const OrgChart = dynamic(loadOrgChartView, {
   ssr: false,
@@ -77,6 +102,7 @@ interface MainContentProps {
   initialBoard?: string | null;
   chatListResetToken?: number;
   initialOpenChatRoomId?: string | null;
+  initialOpenChatRequestToken?: number;
   onConsumeOpenChatRoomId?: () => void;
   initialOpenMessageId?: string | null;
   initialOpenPostId?: string | null;
@@ -88,6 +114,7 @@ interface MainContentProps {
   onConsumeInitialInventoryWorkflowApprovalId?: () => void;
   setMainMenu?: (v: string) => void;
   onOpenChatMessage?: (roomId: string, messageId: string) => void;
+  onOpenBoardPost?: (boardId: string, postId: string) => void;
   shareTarget?: { id: string; fileCount: number; text: string | null; url: string | null; title: string | null } | null;
   onConsumeShareTarget?: () => void;
 }
@@ -122,6 +149,7 @@ export default function MainContent({
   onConsumeMyPageInitialTab,
   chatListResetToken,
   initialOpenChatRoomId,
+  initialOpenChatRequestToken,
   onConsumeOpenChatRoomId,
   initialOpenMessageId,
   initialOpenPostId,
@@ -133,6 +161,7 @@ export default function MainContent({
   onConsumeInitialInventoryWorkflowApprovalId,
   setMainMenu,
   onOpenChatMessage,
+  onOpenBoardPost,
   shareTarget,
   onConsumeShareTarget,
 }: MainContentProps) {
@@ -141,33 +170,12 @@ export default function MainContent({
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    // 핵심 3개만 idle prefetch — 나머지는 사이드바 호버 시 on-demand prefetch
     const loaderEntries: Array<[string, () => Promise<unknown>]> = [
       ['내정보', loadMyPageView],
       ['알림', loadNotificationInboxView],
       ['조직도', loadOrgChartView],
-      ['채팅', loadChatView],
-      ['게시판', loadBoardView],
     ];
-
-    if (normalizeMainMenuForUser(user, '전자결재') === '전자결재') {
-      loaderEntries.push(['전자결재', loadApprovalView]);
-    }
-
-    if (normalizeMainMenuForUser(user, '인사관리') === '인사관리') {
-      loaderEntries.push(['인사관리', loadHRView]);
-    }
-
-    if (normalizeMainMenuForUser(user, '재고관리') === '재고관리') {
-      loaderEntries.push(['재고관리', loadInventoryView]);
-    }
-
-    if (normalizeMainMenuForUser(user, '추가기능') === '추가기능') {
-      loaderEntries.push(['추가기능', loadExtraFeaturesView]);
-    }
-
-    if (normalizeMainMenuForUser(user, '관리자') === '관리자') {
-      loaderEntries.push(['관리자', loadAdminView]);
-    }
 
     const pendingLoaders = loaderEntries.filter(([key]) => !prefetchedMainMenuModules.has(key));
     if (pendingLoaders.length === 0) return;
@@ -241,7 +249,7 @@ export default function MainContent({
   }, [user]);
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--page-bg)] pb-[88px] md:pb-0">
+    <div className="main-content-mobile-shell relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--page-bg)] pb-[88px] md:pb-0">
       {mainMenu === '내정보' && (
         <div className="w-full min-h-0 flex-1 overflow-x-hidden" data-testid="mypage-view">
           <MyPage
@@ -283,10 +291,12 @@ export default function MainContent({
             staffs={data.staffs}
             chatListResetToken={chatListResetToken}
             initialOpenChatRoomId={initialOpenChatRoomId}
+            initialOpenChatRequestToken={initialOpenChatRequestToken}
             initialOpenMessageId={initialOpenMessageId}
             onConsumeOpenChatRoomId={onConsumeOpenChatRoomId}
             shareTarget={shareTarget}
             onConsumeShareTarget={onConsumeShareTarget}
+            onOpenBoardPost={onOpenBoardPost}
           />
         </div>
       )}
@@ -295,11 +305,11 @@ export default function MainContent({
         <div className="min-h-0 flex-1 overflow-x-hidden">
           <BoardView
             user={user}
-            subView={subView || '공지사항'}
+            subView={subView || '怨듭??ы빆'}
             setSubView={setSubView}
             selectedCo={selectedCo}
             selectedCompanyId={selectedCompanyId}
-            initialBoard={subView || '공지사항'}
+            initialBoard={subView || '怨듭??ы빆'}
             initialPostId={initialOpenPostId}
             onConsumePostId={onConsumeOpenPostId}
             surgeries={data.surgeries}
@@ -397,7 +407,7 @@ export default function MainContent({
                 onClick={() => setAnnualLeaveNotice(null)}
                 className="flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] transition-colors text-base"
               >
-                ×
+                횞
               </button>
             </div>
             <div className="rounded-[var(--radius-md)] border border-[#FFE4A0] bg-[#FFF8E6] p-3">
@@ -412,7 +422,7 @@ export default function MainContent({
               onClick={() => setAnnualLeaveNotice(null)}
               className="w-full rounded-[var(--radius-md)] bg-[var(--accent)] py-2.5 text-[13px] font-semibold text-white transition-all duration-150 hover:bg-[var(--accent-hover)] active:scale-[0.98]"
             >
-              확인했습니다
+              ?뺤씤?덉뒿?덈떎
             </button>
           </div>
         </div>
@@ -420,3 +430,4 @@ export default function MainContent({
     </div>
   );
 }
+

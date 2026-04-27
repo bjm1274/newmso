@@ -15,26 +15,35 @@ import {
   type AdminOuterTabId,
 } from '../admin-menu-config';
 
-import StaffPermissionManager from './관리자전용서브/직원권한통합';
-import PopupManager from './관리자전용서브/팝업창관리자';
-import DataReseter from './관리자전용서브/데이터초기화';
-import DataBackup from './관리자전용서브/데이터백업';
-import AuditLogViewer from './관리자전용서브/감사로그뷰어';
-import BusinessDashboard from './관리자전용서브/경영대시보드';
-import CompanyManager from './관리자전용서브/회사관리';
-import ExcelBulkUpload from './관리자전용서브/엑셀일괄등록';
-import NotificationAutomation from './관리자전용서브/알림자동화설정';
-import SurgeryExamTemplateManager from './관리자전용서브/수술검사템플릿관리';
-import FormBuilder from './전자결재서브/양식빌더';
-import FinancialDashboard from './관리자전용서브/재무대시보드';
-import CustomDashboard from './관리자전용서브/커스텀대시보드';
-import BudgetManagement from './관리자전용서브/예산관리';
-import IntegratedReport from './관리자전용서브/통합보고서';
-import SalaryAnomalyDetector from './관리자전용서브/급여이상치감지';
-import AccessAuditLog from './관리자전용서브/접근감사로그';
-import CompanyPnL from './관리자전용서브/법인손익현황';
-import SystemMasterCenter from './관리자전용서브/시스템마스터센터';
+import dynamic from 'next/dynamic';
 import { hasSystemMasterPermission } from '@/lib/system-master';
+
+// ── 서브뷰 lazy 로드 (관리자 메뉴 번들 최소화) ──
+const AdminSubViewLoading = () => (
+  <div className="flex items-center justify-center py-20">
+    <div className="w-8 h-8 border-2 border-[var(--accent)] rounded-full border-t-transparent animate-spin" />
+  </div>
+);
+
+const StaffPermissionManager = dynamic(() => import('./관리자전용서브/직원권한통합'), { ssr: false, loading: AdminSubViewLoading });
+const PopupManager = dynamic(() => import('./관리자전용서브/팝업창관리자'), { ssr: false, loading: AdminSubViewLoading });
+const DataReseter = dynamic(() => import('./관리자전용서브/데이터초기화'), { ssr: false, loading: AdminSubViewLoading });
+const DataBackup = dynamic(() => import('./관리자전용서브/데이터백업'), { ssr: false, loading: AdminSubViewLoading });
+const AuditLogViewer = dynamic(() => import('./관리자전용서브/감사로그뷰어'), { ssr: false, loading: AdminSubViewLoading });
+const BusinessDashboard = dynamic(() => import('./관리자전용서브/경영대시보드'), { ssr: false, loading: AdminSubViewLoading });
+const CompanyManager = dynamic(() => import('./관리자전용서브/회사관리'), { ssr: false, loading: AdminSubViewLoading });
+const ExcelBulkUpload = dynamic(() => import('./관리자전용서브/엑셀일괄등록'), { ssr: false, loading: AdminSubViewLoading });
+const NotificationAutomation = dynamic(() => import('./관리자전용서브/알림자동화설정'), { ssr: false, loading: AdminSubViewLoading });
+const SurgeryExamTemplateManager = dynamic(() => import('./관리자전용서브/수술검사템플릿관리'), { ssr: false, loading: AdminSubViewLoading });
+const FormBuilder = dynamic(() => import('./전자결재서브/양식빌더'), { ssr: false, loading: AdminSubViewLoading });
+const FinancialDashboard = dynamic(() => import('./관리자전용서브/재무대시보드'), { ssr: false, loading: AdminSubViewLoading });
+const CustomDashboard = dynamic(() => import('./관리자전용서브/커스텀대시보드'), { ssr: false, loading: AdminSubViewLoading });
+const BudgetManagement = dynamic(() => import('./관리자전용서브/예산관리'), { ssr: false, loading: AdminSubViewLoading });
+const IntegratedReport = dynamic(() => import('./관리자전용서브/통합보고서'), { ssr: false, loading: AdminSubViewLoading });
+const SalaryAnomalyDetector = dynamic(() => import('./관리자전용서브/급여이상치감지'), { ssr: false, loading: AdminSubViewLoading });
+const AccessAuditLog = dynamic(() => import('./관리자전용서브/접근감사로그'), { ssr: false, loading: AdminSubViewLoading });
+const CompanyPnL = dynamic(() => import('./관리자전용서브/법인손익현황'), { ssr: false, loading: AdminSubViewLoading });
+const SystemMasterCenter = dynamic(() => import('./관리자전용서브/시스템마스터센터'), { ssr: false, loading: AdminSubViewLoading });
 
 function canAccessAdminTab(user: any, tabId: AdminOuterTabId) {
   if (!canAccessMainMenu(user, '관리자')) {
@@ -68,7 +77,6 @@ function InnerTabBar({
       const left = node.offsetLeft - container.offsetLeft - 8;
       container.scrollTo({ left, behavior: 'smooth' });
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [activeTab],
   );
 
@@ -173,16 +181,19 @@ export default function AdminView(props: Record<string, unknown>) {
 
   useEffect(() => {
     if (!visibleAdminTabs.includes('경영분석')) return;
+    if (activeTab !== '경영분석' || analysisTab !== '경영대시보드') return;
 
     const fetchInventory = async () => {
-      const { data } = await supabase.from('inventory').select('*');
+      const { data } = await supabase
+        .from('inventory')
+        .select('id, item_name, name, quantity, min_quantity, company, department');
       setInventory(data || []);
     };
 
     fetchInventory().catch((error) => {
       console.error('관리자 재고 조회 실패:', error);
     });
-  }, [visibleAdminTabs]);
+  }, [activeTab, analysisTab, visibleAdminTabs]);
 
   if (!hasAdminMenuAccess || visibleAdminTabs.length === 0) {
     return (
