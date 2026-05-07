@@ -201,3 +201,15 @@ export async function sendAdminNotifications(
 
   return notifications.length;
 }
+
+export async function insertNotificationsOrThrow(
+  notifications: Record<string, unknown> | Record<string, unknown>[],
+) {
+  const { data, error } = await supabase
+    .from('notifications')
+    .insert(notifications)
+    .select();
+
+  if (error) throw error;
+  return data;
+}

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { StaffMember } from '@/types';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
 import { supabase } from '@/lib/supabase';
-import { isActiveChatMember, isMessageReadByCursor, NOTICE_ROOM_ID } from './메신저유틸';
+import { isActiveChatMember, isMessageReadByCursor, NOTICE_ROOM_ID, NOTICE_ROOM_NAME } from './메신저유틸';
 import {
   CHAT_NOTICE_SCHEDULE_EVENT,
   cancelScheduledNoticeJob,
@@ -374,7 +374,7 @@ export default function MessengerOperationsCenter({
           notificationType: 'message',
           extra: {
             reminder_kind: 'notice_ops',
-            room_name: '공지메시지',
+            room_name: NOTICE_ROOM_NAME,
           },
         }),
       }));
@@ -573,7 +573,7 @@ export default function MessengerOperationsCenter({
                 <div className="mt-4 space-y-3">
                   {noticeRows.length === 0 ? (
                     <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-5 text-sm font-semibold text-[var(--toss-gray-3)]">
-                      공지메시지 채널에 분석할 메시지가 없습니다.
+                      {NOTICE_ROOM_NAME} 채널에 분석할 메시지가 없습니다.
                     </div>
                   ) : (
                     noticeRows.slice(0, 12).map((row) => (

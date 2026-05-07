@@ -285,3 +285,27 @@ export function getDueScheduledNoticeReminderStages(
   });
 }
 
+export function getNextScheduledNoticeRunAt(
+  actorId: string | null | undefined,
+  now = Date.now(),
+) {
+  const timestamps = readJobs(actorId).flatMap((job) => {
+    if (job.status === 'scheduled') {
+      const sendAt = new Date(job.sendAt || 0).getTime();
+      return Number.isFinite(sendAt) ? [sendAt] : [];
+    }
+
+    if (job.status !== 'sent' || !job.sentAt || !job.sentMessageId) return [];
+    const sentAt = new Date(job.sentAt || 0).getTime();
+    if (!Number.isFinite(sentAt)) return [];
+
+    return job.reminderMinutes
+      .filter((offsetMinutes) => !job.reminderLog.some((entry) => entry.offsetMinutes === offsetMinutes))
+      .map((offsetMinutes) => sentAt + offsetMinutes * 60 * 1000)
+      .filter((timestamp) => Number.isFinite(timestamp));
+  });
+
+  if (timestamps.length === 0) return null;
+  return Math.min(...timestamps.map((timestamp) => Math.max(timestamp, now)));
+}
+

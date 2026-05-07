@@ -103,8 +103,10 @@ type UseChatRealtimeSubscriptionsParams = {
   typingPeersTimeoutRef: MutableRefObject<Record<string, ReturnType<typeof setTimeout>>>;
   syncChannelRef: MutableRefObject<BroadcastChannel | null>;
   chatRoomsRef: MutableRefObject<ChatRoom[]>;
+  visibleMessageIdsRef?: MutableRefObject<Set<string>>;
+  visiblePollIdsRef?: MutableRefObject<Set<string>>;
   selectedRoomIdRef: MutableRefObject<string | null>;
-  fetchDataRef: MutableRefObject<(() => Promise<void>) | null>;
+  fetchDataRef: MutableRefObject<((options?: { force?: boolean }) => Promise<void>) | null>;
   globalRealtimeRetryTimerRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
   roomRealtimeRetryTimerRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
   setPresenceMap: Dispatch<SetStateAction<Record<string, PresenceInfo>>>;
@@ -112,8 +114,13 @@ type UseChatRealtimeSubscriptionsParams = {
   setRoomRealtimeState: Dispatch<SetStateAction<ChatRealtimeState>>;
   setTypingUsers: Dispatch<SetStateAction<Record<string, string>>>;
   setChatRooms: Dispatch<SetStateAction<ChatRoom[]>>;
-  fetchData: () => Promise<void>;
+  fetchData: (options?: { force?: boolean }) => Promise<void>;
   updateUnreadForRooms: (rooms: ChatRoom[]) => void | Promise<void>;
+  applyReadCursorFromRealtime?: (row: Record<string, unknown> | null | undefined) => void;
+  refreshVisibleMessageReactions?: () => Promise<void>;
+  refreshVisibleMessageBookmarks?: () => Promise<void>;
+  refreshRoomPinnedMessages?: () => Promise<void>;
+  refreshRoomPolls?: () => Promise<void>;
   handleIncomingRealtimeMessage: (row: ChatMessage) => Promise<void>;
   scheduleRealtimeReconnect: (scope: 'global' | 'room') => void;
   isRoomInSelectedConversation: (roomId: string | null | undefined, rooms?: ChatRoom[]) => boolean;
@@ -136,6 +143,8 @@ export function useChatRealtimeSubscriptions({
   typingPeersTimeoutRef,
   syncChannelRef,
   chatRoomsRef,
+  visibleMessageIdsRef,
+  visiblePollIdsRef,
   selectedRoomIdRef,
   fetchDataRef,
   globalRealtimeRetryTimerRef,
@@ -147,6 +156,11 @@ export function useChatRealtimeSubscriptions({
   setChatRooms,
   fetchData,
   updateUnreadForRooms,
+  applyReadCursorFromRealtime,
+  refreshVisibleMessageReactions,
+  refreshVisibleMessageBookmarks,
+  refreshRoomPinnedMessages,
+  refreshRoomPolls,
   handleIncomingRealtimeMessage,
   scheduleRealtimeReconnect,
   isRoomInSelectedConversation,
@@ -312,6 +326,7 @@ export function useChatRealtimeSubscriptions({
           (payload.new as Record<string, unknown> | null) ||
           (payload.old as Record<string, unknown> | null) ||
           null;
+        applyReadCursorFromRealtime?.(updatedRow);
         const updatedRoomId = String(updatedRow?.room_id || '').trim();
         if (!updatedRoomId) return;
         // 현재 열린 대화방의 커서 변경(타인)은 fetchData로 읽음수 즉시 갱신
@@ -322,11 +337,76 @@ export function useChatRealtimeSubscriptions({
           triggerDebouncedFetch();
         }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, triggerDebouncedFetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_bookmarks', filter: `user_id=eq.${effectiveTodoUserId || userId}` }, triggerDebouncedFetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pinned_messages' }, triggerDebouncedFetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'polls' }, triggerDebouncedFetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, triggerDebouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, (payload: Record<string, unknown>) => {
+        const row =
+          (payload.new as Record<string, unknown> | null) ||
+          (payload.old as Record<string, unknown> | null) ||
+          null;
+        const messageId = String(row?.message_id || '').trim();
+        if (!messageId || !visibleMessageIdsRef || visibleMessageIdsRef.current.has(messageId)) {
+          if (refreshVisibleMessageReactions) {
+            void refreshVisibleMessageReactions();
+          } else {
+            triggerDebouncedFetch();
+          }
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_bookmarks', filter: `user_id=eq.${effectiveTodoUserId || userId}` }, (payload: Record<string, unknown>) => {
+        const row =
+          (payload.new as Record<string, unknown> | null) ||
+          (payload.old as Record<string, unknown> | null) ||
+          null;
+        const messageId = String(row?.message_id || '').trim();
+        if (!messageId || !visibleMessageIdsRef || visibleMessageIdsRef.current.has(messageId)) {
+          if (refreshVisibleMessageBookmarks) {
+            void refreshVisibleMessageBookmarks();
+          } else {
+            triggerDebouncedFetch();
+          }
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pinned_messages' }, (payload: Record<string, unknown>) => {
+        const row =
+          (payload.new as Record<string, unknown> | null) ||
+          (payload.old as Record<string, unknown> | null) ||
+          null;
+        const roomId = String(row?.room_id || selectedRoomId || '').trim();
+        if (!roomId || isRoomInSelectedConversationRef.current(roomId, chatRoomsRef.current)) {
+          if (refreshRoomPinnedMessages) {
+            void refreshRoomPinnedMessages();
+          } else {
+            triggerDebouncedFetch();
+          }
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'polls' }, (payload: Record<string, unknown>) => {
+        const row =
+          (payload.new as Record<string, unknown> | null) ||
+          (payload.old as Record<string, unknown> | null) ||
+          null;
+        const roomId = String(row?.room_id || selectedRoomId || '').trim();
+        if (!roomId || isRoomInSelectedConversationRef.current(roomId, chatRoomsRef.current)) {
+          if (refreshRoomPolls) {
+            void refreshRoomPolls();
+          } else {
+            triggerDebouncedFetch();
+          }
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, (payload: Record<string, unknown>) => {
+        const row =
+          (payload.new as Record<string, unknown> | null) ||
+          (payload.old as Record<string, unknown> | null) ||
+          null;
+        const pollId = String(row?.poll_id || row?.id || '').trim();
+        if (!pollId || !visiblePollIdsRef || visiblePollIdsRef.current.has(pollId)) {
+          if (refreshRoomPolls) {
+            void refreshRoomPolls();
+          } else {
+            triggerDebouncedFetch();
+          }
+        }
+      })
       .subscribe((status: string) => {
         if (disposed) return;
         if (status === 'SUBSCRIBED') {
@@ -357,6 +437,13 @@ export function useChatRealtimeSubscriptions({
     effectiveChatUserId,
     setRoomRealtimeState,
     chatRoomsRef,
+    visibleMessageIdsRef,
+    visiblePollIdsRef,
+    applyReadCursorFromRealtime,
+    refreshVisibleMessageReactions,
+    refreshVisibleMessageBookmarks,
+    refreshRoomPinnedMessages,
+    refreshRoomPolls,
   ]);
 
   useEffect(() => {

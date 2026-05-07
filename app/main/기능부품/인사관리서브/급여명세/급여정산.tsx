@@ -1,7 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
-import { useEffect, useState } from 'react';
+import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
@@ -20,6 +20,10 @@ import {
 } from '@/lib/use-tax-insurance-rates';
 import { buildPayrollVerificationReport } from '@/lib/payroll-governance';
 import { NP_INCOME_CEILING, NP_INCOME_FLOOR } from '@/lib/tax-free-limits';
+import {
+  calculateHourlyRateFromMonthlySalary,
+  resolveWeeklyWorkingHours,
+} from '@/lib/payroll-working-hours';
 
 interface SettlementEntry {
   base_salary: number;
@@ -102,6 +106,206 @@ const EMPTY_TAXABLE_ALLOWANCE_BREAKDOWN: TaxableAllowanceBreakdown = {
   annual_leave_pay: 0,
   manual_extra_allowance: 0,
 };
+
+const PAYROLL_TIME_STEP_MINUTES = 10;
+const HOLD_TO_UNIT_INPUT_MS = 450;
+
+function parsePayrollWonInput(value: unknown) {
+  const numeric = Number(String(value ?? '').replace(/[^\d.-]/g, ''));
+  return Number.isFinite(numeric) ? Math.max(0, Math.round(numeric)) : 0;
+}
+
+function getRegularHourlyRate(staff: StaffMember, data: Partial<SettlementEntry>) {
+  const fixedMonthlyPay = [
+    data.base_salary,
+    data.extra_allowance,
+    data.meal_allowance,
+    data.night_duty_allowance,
+    data.vehicle_allowance,
+    data.childcare_allowance,
+    data.research_allowance,
+    data.other_taxfree,
+  ].reduce<number>((sum, value) => sum + parsePayrollWonInput(value), 0);
+
+  return calculateHourlyRateFromMonthlySalary(
+    fixedMonthlyPay,
+    resolveWeeklyWorkingHours(staff, 40),
+    'ceil',
+  );
+}
+
+function TenMinuteUnitAmountField({
+  label,
+  value,
+  hourlyRate,
+  onChange,
+  dataTestId,
+  labelClassName,
+  inputClassName,
+  allowManualAmountInput = false,
+}: {
+  label: string;
+  value: number;
+  hourlyRate: number;
+  onChange: (nextValue: number) => void;
+  dataTestId: string;
+  labelClassName: string;
+  inputClassName: string;
+  allowManualAmountInput?: boolean;
+}) {
+  const amount = parsePayrollWonInput(value);
+  const quickInputRef = useRef<HTMLInputElement>(null);
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openedByHoldRef = useRef(false);
+  const [unitInputOpen, setUnitInputOpen] = useState(false);
+  const [unitInputValue, setUnitInputValue] = useState('');
+  const stepAmount = Math.round(parsePayrollWonInput(hourlyRate) * (PAYROLL_TIME_STEP_MINUTES / 60));
+  const stepLabel = `${PAYROLL_TIME_STEP_MINUTES}분`;
+
+  const clearHoldTimer = () => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+  };
+  const getUnitCountText = () => {
+    if (amount <= 0 || stepAmount <= 0) return '';
+    return String(Math.round(amount / stepAmount));
+  };
+  const openUnitInput = () => {
+    openedByHoldRef.current = true;
+    setUnitInputValue(getUnitCountText());
+    setUnitInputOpen(true);
+    window.setTimeout(() => {
+      quickInputRef.current?.focus();
+      quickInputRef.current?.select();
+    }, 0);
+  };
+  const startHoldToUnitInput = () => {
+    clearHoldTimer();
+    openedByHoldRef.current = false;
+    holdTimerRef.current = setTimeout(openUnitInput, HOLD_TO_UNIT_INPUT_MS);
+  };
+  const applyStep = (direction: -1 | 1) => {
+    if (openedByHoldRef.current) {
+      openedByHoldRef.current = false;
+      return;
+    }
+    onChange(Math.max(0, amount + stepAmount * direction));
+  };
+  const handleAmountChange = (event: ChangeEvent<HTMLInputElement>) => {
+    onChange(parsePayrollWonInput(event.target.value));
+  };
+  const handleUnitInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setUnitInputValue(event.target.value.replace(/[^\d]/g, ''));
+  };
+  const applyUnitInput = () => {
+    const unitCount = parsePayrollWonInput(unitInputValue);
+    onChange(unitCount * stepAmount);
+    setUnitInputOpen(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+    };
+  }, []);
+
+  return (
+    <div className="relative space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <label className={`text-[10px] font-bold ml-1 ${labelClassName}`}>{label}</label>
+        <span className="text-[9px] font-bold text-[var(--toss-gray-3)]">
+          {stepLabel} 단위 1 = {stepAmount.toLocaleString()}원
+        </span>
+      </div>
+      <div className="flex h-8 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--card)]">
+        <button
+          type="button"
+          data-testid={`${dataTestId}-decrease`}
+          onPointerDown={startHoldToUnitInput}
+          onPointerUp={clearHoldTimer}
+          onPointerLeave={clearHoldTimer}
+          onPointerCancel={clearHoldTimer}
+          onClick={() => applyStep(-1)}
+          disabled={stepAmount <= 0 || amount <= 0}
+          className="w-9 shrink-0 border-r border-[var(--border)] text-sm font-black text-[var(--toss-gray-4)] disabled:opacity-40"
+          aria-label={`${label} ${stepLabel} 차감`}
+        >
+          -
+        </button>
+        <input
+          data-testid={dataTestId}
+          type="text"
+          inputMode="numeric"
+          value={amount.toLocaleString()}
+          readOnly={!allowManualAmountInput}
+          onChange={allowManualAmountInput ? handleAmountChange : undefined}
+          className={`min-w-0 flex-1 border-0 bg-transparent px-3 text-xs font-bold outline-none ${inputClassName}`}
+        />
+        <button
+          type="button"
+          data-testid={`${dataTestId}-increase`}
+          onPointerDown={startHoldToUnitInput}
+          onPointerUp={clearHoldTimer}
+          onPointerLeave={clearHoldTimer}
+          onPointerCancel={clearHoldTimer}
+          onClick={() => applyStep(1)}
+          disabled={stepAmount <= 0}
+          className="w-9 shrink-0 border-l border-[var(--border)] text-sm font-black text-[var(--accent)] disabled:opacity-40"
+          aria-label={`${label} ${stepLabel} 추가`}
+        >
+          +
+        </button>
+      </div>
+      {unitInputOpen && (
+        <div
+          data-testid={`${dataTestId}-quick-input-panel`}
+          className="absolute left-0 right-0 top-full z-30 mt-1 rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 shadow-lg"
+        >
+          <label className="mb-1 block text-[10px] font-bold text-[var(--toss-gray-4)]">
+            {label} {stepLabel} 단위 입력
+          </label>
+          <div className="flex gap-2">
+            <input
+              ref={quickInputRef}
+              data-testid={`${dataTestId}-quick-input`}
+              type="text"
+              inputMode="numeric"
+              value={unitInputValue}
+              onChange={handleUnitInputChange}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') applyUnitInput();
+                if (event.key === 'Escape') setUnitInputOpen(false);
+              }}
+              placeholder="개수"
+              className="min-w-0 flex-1 rounded-md border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+            />
+            <button
+              type="button"
+              data-testid={`${dataTestId}-quick-apply`}
+              onClick={applyUnitInput}
+              className="rounded-md bg-[var(--accent)] px-3 py-2 text-xs font-bold text-white"
+            >
+              적용
+            </button>
+            <button
+              type="button"
+              data-testid={`${dataTestId}-quick-close`}
+              onClick={() => setUnitInputOpen(false)}
+              className="rounded-md border border-[var(--border)] px-3 py-2 text-xs font-bold text-[var(--toss-gray-4)]"
+            >
+              닫기
+            </button>
+          </div>
+          <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+            1 = {stepLabel} = {stepAmount.toLocaleString()}원
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function getTaxableAllowanceBreakdownTotal(value?: Partial<TaxableAllowanceBreakdown> | null) {
   if (!value) return 0;
@@ -1049,6 +1253,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                 const hasAdvanceDeduction = advancePay > 0;
                 const res = calculateSalary(staffId);
                 const expectedNet = getAdvanceAdjustedNet(Number(res?.net || 0), advancePay);
+                const hourlyRate = getRegularHourlyRate(s, data);
                 return (
                   <div key={s.id} data-testid={`salary-settlement-card-${s.id}`} className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] shadow-sm space-y-4 hover:border-[var(--accent)] transition-all">
                     <div className="flex justify-between items-center border-b border-[var(--muted)] pb-3">
@@ -1086,18 +1291,34 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                         <label className="text-[10px] font-bold text-[var(--accent)] ml-1">수당 합계(고정포함)</label>
                         <input type="text" value={Number(data.extra_allowance).toLocaleString()} onChange={(e) => updateData(s.id, 'extra_allowance', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-[var(--border)] rounded-lg text-xs font-bold focus:ring-2 focus:ring-[var(--accent)]/20 outline-none" />
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-[var(--toss-gray-4)] ml-1">야간/당직 (비과세)</label>
-                        <input type="text" value={Number(data.night_duty_allowance).toLocaleString()} onChange={(e) => updateData(s.id, 'night_duty_allowance', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-[var(--border)] rounded-lg text-xs font-bold outline-none" />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-[var(--toss-gray-4)] ml-1">연장/상여</label>
-                        <input type="text" value={(Number(data.overtime_pay) + Number(data.bonus)).toLocaleString()} onChange={(e) => updateData(s.id, 'overtime_pay', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-[var(--border)] rounded-lg text-xs font-bold outline-none" />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-orange-600 ml-1">근태/기타차감</label>
-                        <input type="text" value={Number(data.attendance_deduction).toLocaleString()} readOnly className="w-full h-8 px-3 border border-orange-500/20 bg-orange-500/10/30 rounded-lg text-xs font-bold text-orange-700 outline-none" />
-                      </div>
+                      <TenMinuteUnitAmountField
+                        label="야간/당직 (비과세)"
+                        value={Number(data.night_duty_allowance) || 0}
+                        hourlyRate={hourlyRate}
+                        onChange={(nextValue) => updateData(s.id, 'night_duty_allowance', nextValue)}
+                        dataTestId={`salary-settlement-night-duty-${s.id}`}
+                        labelClassName="text-[var(--toss-gray-4)]"
+                        inputClassName="text-[var(--foreground)]"
+                      />
+                      <TenMinuteUnitAmountField
+                        label="연장/상여"
+                        value={Number(data.overtime_pay) + Number(data.bonus)}
+                        hourlyRate={hourlyRate}
+                        onChange={(nextValue) => updateData(s.id, 'overtime_pay', nextValue)}
+                        dataTestId={`salary-settlement-overtime-total-${s.id}`}
+                        labelClassName="text-[var(--toss-gray-4)]"
+                        inputClassName="text-[var(--foreground)]"
+                        allowManualAmountInput
+                      />
+                      <TenMinuteUnitAmountField
+                        label="근태/기타차감"
+                        value={Number(data.attendance_deduction) || 0}
+                        hourlyRate={hourlyRate}
+                        onChange={(nextValue) => updateData(s.id, 'attendance_deduction', nextValue)}
+                        dataTestId={`salary-settlement-attendance-deduction-${s.id}`}
+                        labelClassName="text-orange-600"
+                        inputClassName="text-orange-700"
+                      />
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-amber-600 ml-1">선지급(차감)</label>
                         <input data-testid={`salary-settlement-advance-pay-${s.id}`} type="text" value={Number(data.advance_pay).toLocaleString()} onChange={(e) => updateData(s.id, 'advance_pay', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-amber-200 bg-amber-50/30 rounded-lg text-xs font-bold text-amber-700 outline-none" />

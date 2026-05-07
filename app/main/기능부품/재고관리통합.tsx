@@ -3,11 +3,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { canAccessInventorySection } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
-import { useInventoryAlertSystem, InventoryAlertBadge } from './재고관리서브/재고알림시스템';
 import { useInventoryData } from '@/app/main/hooks/useInventoryData';
 import { useInventoryFilters } from '@/app/main/hooks/useInventoryFilters';
 import { useSupplyWorkflow } from '@/app/main/hooks/useSupplyWorkflow';
 import { useStockModal } from '@/app/main/hooks/useStockModal';
+import { PageHeader } from '@/app/components/PageHeader';
 import { INV_VIEW_KEY } from '@/app/main/navigation-state';
 import { INVENTORY_SUPPORT_COMPANY, INVENTORY_SUPPORT_DEPARTMENT } from '@/app/main/inventory-utils';
 import {
@@ -52,6 +52,11 @@ function resolveInventoryView(view?: string | null): {
   supplierTab?: SupplierWorkspaceTab;
   showExpiryCenter?: boolean;
 } {
+  if (view === '재고현황') return { view: '현황' };
+  if (view === '입출고관리') return { view: '등록' };
+  if (view === '구매/발주') return { view: '발주' };
+  if (view === '품목/자산') return { view: '자산' };
+  if (view === '분석/마감') return { view: '월마감' };
   if (view === '명세서') return { view: '거래처', supplierTab: 'documents' };
   if (view === '거래처') return { view: '거래처', supplierTab: 'suppliers' };
   if (view === '유통기한') return { view: '현황', statusFilter: '유통기한임박', showExpiryCenter: true };
@@ -88,7 +93,6 @@ export default function IntegratedInventoryManagement({
 
   // ── 데이터 훅 ──
   const data = useInventoryData({ isMsoUser, selectedCo, selectedCompanyId, userCompany: user?.company, userCompanyId: user?.company_id });
-  const { lowStockItems, expiryImminentItems } = useInventoryAlertSystem(data.inventory, user);
 
   // ── 필터 훅 (applyResolvedView보다 먼저 호출해야 setStatusFilter를 사용 가능) ──
   const filters = useInventoryFilters({ inventory: data.inventory, logs: data.logs, depts, activeView });
@@ -206,18 +210,9 @@ export default function IntegratedInventoryManagement({
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-x-hidden app-page" data-testid="inventory-view">
-      <InventoryAlertBadge lowCount={lowStockItems.length} expiryCount={expiryImminentItems.length} />
+      <PageHeader title={currentViewMeta.title} />
       <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
-        <main className="flex-1 p-4 md:p-5 bg-[var(--page-bg)] overflow-y-auto custom-scrollbar">
-          <section className="mb-4 md:mb-5">
-            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] px-5 py-4 shadow-sm">
-              <div className="flex flex-col gap-1">
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">재고관리</p>
-                <h2 className="text-2xl font-black tracking-tight text-[var(--foreground)]">{currentViewMeta.title}</h2>
-              </div>
-            </div>
-          </section>
-
+        <main className="flex-1 bg-[var(--page-bg)] p-3 md:p-4 overflow-y-auto custom-scrollbar">
           {/* ── 뷰 라우팅 ── */}
           {activeView === '현황' && (
             <InventoryStatusView

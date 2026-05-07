@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useEffect, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
+import { MenuIcon } from './조직도서브/조직도측면창';
 
 function SubviewLoading({ label }: { label: string }) {
   return (
@@ -46,22 +47,79 @@ export function FontSizeControl() {
   };
 
   return (
-    <div className="inline-flex h-9 items-center gap-0.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-1.5 shadow-sm">
-      <span className="mr-0.5 text-[10px] font-semibold text-[var(--toss-gray-3)]">글자</span>
-      {FONT_SIZES.map((size) => (
-        <button
-          key={size.value}
-          type="button"
-          onClick={() => change(size.value)}
-          className={`rounded-[var(--radius-md)] px-2 py-1 text-[10px] font-bold transition-all ${
-            current === size.value
-              ? 'bg-[var(--accent)] text-white'
-              : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
-          }`}
-        >
-          {size.label}
-        </button>
-      ))}
+    <div className="inline-flex h-8 shrink-0 items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 shadow-sm">
+      <span className="shrink-0 text-[10px] font-semibold text-[var(--toss-gray-3)]">글자</span>
+      <select
+        value={current}
+        onChange={(event) => change(Number(event.target.value))}
+        aria-label="글자 크기 선택"
+        className="no-style h-6 min-w-[52px] cursor-pointer rounded-[var(--radius-md)] border-0 bg-transparent px-1 py-0 text-[11px] font-bold leading-none text-[var(--foreground)] outline-none focus:ring-1 focus:ring-[var(--accent)]"
+      >
+        {FONT_SIZES.map((size) => (
+          <option key={size.value} value={size.value}>
+            {size.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+const FONT_FAMILIES = [
+  { label: '기본', value: 'pretendard', family: "'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" },
+  { label: '맑은고딕', value: 'malgun', family: "'Malgun Gothic', '맑은 고딕', -apple-system, BlinkMacSystemFont, sans-serif" },
+  { label: 'Nanum', value: 'nanum', family: "'Nanum Gothic', sans-serif", googleFont: 'https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&display=swap' },
+  { label: 'Noto', value: 'noto', family: "'Noto Sans KR', sans-serif", googleFont: 'https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap' },
+];
+const FONT_FAMILY_KEY = 'erp-font-family';
+
+function loadGoogleFont(href: string) {
+  if (typeof document === 'undefined' || document.querySelector(`link[href="${href}"]`)) return;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = href;
+  document.head.appendChild(link);
+}
+
+function applyFontFamily(value: string) {
+  const font = FONT_FAMILIES.find((item) => item.value === value) || FONT_FAMILIES[0];
+  if (font.googleFont) loadGoogleFont(font.googleFont);
+  document.documentElement.style.setProperty('--font-sans', font.family);
+}
+
+export function FontFamilyControl() {
+  const [current, setCurrent] = useState(() => {
+    if (typeof window === 'undefined') return 'pretendard';
+    return localStorage.getItem(FONT_FAMILY_KEY) || 'pretendard';
+  });
+
+  useEffect(() => {
+    applyFontFamily(current);
+  }, [current]);
+
+  const selectedFont = FONT_FAMILIES.find((item) => item.value === current) || FONT_FAMILIES[0];
+
+  return (
+    <div className="inline-flex h-8 shrink-0 items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 shadow-sm">
+      <span className="shrink-0 text-[10px] font-semibold text-[var(--toss-gray-3)]">서체</span>
+      <select
+        value={current}
+        onChange={(event) => {
+          const next = event.target.value;
+          setCurrent(next);
+          localStorage.setItem(FONT_FAMILY_KEY, next);
+          applyFontFamily(next);
+        }}
+        aria-label="폰트 선택"
+        style={{ fontFamily: selectedFont.family }}
+        className="no-style h-6 min-w-[52px] cursor-pointer rounded-[var(--radius-md)] border-0 bg-transparent px-1 py-0 text-[11px] font-bold leading-none text-[var(--foreground)] outline-none focus:ring-1 focus:ring-[var(--accent)]"
+      >
+        {FONT_FAMILIES.map((font) => (
+          <option key={font.value} value={font.value} style={{ fontFamily: font.family }}>
+            {font.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -147,22 +205,22 @@ export type FeatureCard = {
 };
 
 export const FEATURE_CARDS: FeatureCard[] = [
-  { id: '조직도', label: '조직도', icon: '🏢', subView: '조직도', testId: 'org-chart', accentClass: 'bg-[var(--muted)] text-sky-600 group-hover:bg-[var(--toss-blue-light)]' },
-  { id: '부서별재고', label: '부서별 재고', icon: '📦', subView: '부서별재고', testId: 'department-inventory', accentClass: 'bg-[var(--muted)] group-hover:bg-[var(--toss-blue-light)]' },
-  { id: '근무현황', label: '근무현황', icon: '📅', subView: '근무현황', testId: 'work-status', accentClass: 'bg-[var(--muted)] group-hover:bg-[var(--toss-blue-light)]' },
-  { id: '인계노트', label: '인계노트', icon: '📝', subView: '인계노트', testId: 'handover-note', accentClass: 'bg-red-500/10 text-red-500 group-hover:bg-red-500/20' },
-  { id: '퇴원심사', label: '퇴원심사', icon: '🏥', subView: '퇴원심사', testId: 'discharge-review', accentClass: 'bg-purple-500/10 text-purple-500 group-hover:bg-purple-500/20' },
-  { id: '마감보고', label: '마감보고', icon: '💰', subView: '마감보고', testId: 'closing-report', accentClass: 'bg-[var(--muted)] group-hover:bg-[var(--toss-blue-light)]' },
-  { id: '직원평가', label: '직원평가', icon: '✍️', subView: '직원평가', testId: 'staff-evaluation', accentClass: 'bg-[var(--muted)] group-hover:bg-[var(--toss-blue-light)]' },
-  { id: '입금실시간조회', label: '입금 실시간 조회', icon: '🏦', subView: '입금실시간조회', testId: 'realtime-deposit', accentClass: 'bg-[var(--muted)] group-hover:bg-[var(--toss-blue-light)]' },
-  { id: '수술상담', label: '수술상담 AI 분석', icon: '🎙️', subView: '수술상담', testId: 'surgery-consultation', accentClass: 'bg-[var(--muted)] group-hover:bg-[var(--toss-blue-light)]' },
-  { id: 'OP체크', label: 'OP체크', icon: '🩺', subView: 'OP체크', testId: 'op-check', accentClass: 'bg-[var(--muted)] group-hover:bg-[var(--toss-blue-light)]' },
-  { id: 'ESL관리', label: 'ESL 관리', icon: '🏷️', subView: 'ESL관리', testId: 'esl-manager', accentClass: 'bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20' },
+  { id: '조직도', label: '조직도', icon: 'Building2', subView: '조직도', testId: 'org-chart', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
+  { id: '부서별재고', label: '부서별 재고', icon: 'Package', subView: '부서별재고', testId: 'department-inventory', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
+  { id: '근무현황', label: '근무현황', icon: 'CalendarDays', subView: '근무현황', testId: 'work-status', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
+  { id: '인계노트', label: '인계노트', icon: 'FileCheck2', subView: '인계노트', testId: 'handover-note', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
+  { id: '퇴원심사', label: '퇴원심사', icon: 'Building2', subView: '퇴원심사', testId: 'discharge-review', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
+  { id: '마감보고', label: '마감보고', icon: 'Banknote', subView: '마감보고', testId: 'closing-report', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
+  { id: '직원평가', label: '직원평가', icon: 'SquarePen', subView: '직원평가', testId: 'staff-evaluation', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
+  { id: '입금실시간조회', label: '입금 실시간 조회', icon: 'Landmark', subView: '입금실시간조회', testId: 'realtime-deposit', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
+  { id: '수술상담', label: '수술상담 분석', icon: 'Mic', subView: '수술상담', testId: 'surgery-consultation', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
+  { id: 'OP체크', label: 'OP체크', icon: 'Stethoscope', subView: 'OP체크', testId: 'op-check', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
+  { id: 'ESL관리', label: 'ESL 관리', icon: 'Tag', subView: 'ESL관리', testId: 'esl-manager', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
 ];
 
 export const EXTERNAL_LINKS = [
-  { id: 'km-park', label: '주차관제', url: 'http://kmp0001103.iptime.org/login?redirectTo=undefined', icon: '🅿️' },
-  { id: 'webfax', label: '웹팩스', url: 'https://webfax.uplus.co.kr/m', icon: '📠' },
+  { id: 'km-park', label: '주차관제', url: 'http://kmp0001103.iptime.org/login?redirectTo=undefined', icon: 'CircleParking' },
+  { id: 'webfax', label: '웹팩스', url: 'https://webfax.uplus.co.kr/m', icon: 'Printer' },
 ];
 
 export function FeatureShell({
@@ -193,7 +251,8 @@ export function FeatureShell({
           onClick={onBack}
           className="inline-flex items-center gap-1 self-start rounded-[var(--radius-md)] px-2 py-1.5 text-[12px] font-bold text-[var(--accent)] transition-colors hover:bg-[var(--muted)]"
         >
-          ← 목록으로
+          <MenuIcon name="arrow-left" className="h-3.5 w-3.5" />
+          목록으로
         </button>
         {content}
       </div>

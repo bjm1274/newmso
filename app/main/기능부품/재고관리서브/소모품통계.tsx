@@ -14,7 +14,15 @@ type LogRow = {
   inventory?: { item_name?: string; category?: string };
 };
 
-export default function ConsumableStats({ user, selectedCo }: { user: any; selectedCo: string }) {
+export default function ConsumableStats({
+  user,
+  selectedCo,
+  inventory: _inventory,
+}: {
+  user: any;
+  selectedCo: string;
+  inventory?: any[];
+}) {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<'7일' | '30일' | '90일' | '전체'>('30일');

@@ -46,41 +46,41 @@ export type AdminEntryState = {
 };
 
 export const ADMIN_ANALYSIS_TABS: { id: AdminAnalysisTabId; label: string; icon: string }[] = [
-  { id: '경영대시보드', label: '경영대시보드', icon: '📊' },
-  { id: '재무대시보드', label: '재무대시보드', icon: '💸' },
-  { id: '예산관리', label: '예산관리', icon: '🧮' },
-  { id: '통합보고서', label: '통합보고서', icon: '🧾' },
-  { id: '법인손익', label: '법인손익', icon: '📈' },
-  { id: '커스텀대시보드', label: '커스텀 대시보드', icon: '🎛️' },
+  { id: '경영대시보드', label: '경영대시보드', icon: 'analytics' },
+  { id: '재무대시보드', label: '재무대시보드', icon: 'purchase' },
+  { id: '예산관리', label: '예산관리', icon: 'calculator' },
+  { id: '통합보고서', label: '통합보고서', icon: 'document' },
+  { id: '법인손익', label: '법인손익', icon: 'analytics' },
+  { id: '커스텀대시보드', label: '커스텀 대시보드', icon: 'settings' },
 ];
 
 export const ADMIN_OPERATIONS_TABS: { id: AdminOperationsTabId; label: string; icon: string }[] = [
-  { id: '알림자동화', label: '알림 자동화', icon: '🔔' },
-  { id: '수술검사템플릿', label: '수술 / 검사 템플릿', icon: '🧪' },
-  { id: '팝업관리', label: '팝업 관리', icon: '🪟' },
+  { id: '알림자동화', label: '알림 자동화', icon: 'bell' },
+  { id: '수술검사템플릿', label: '수술 / 검사 템플릿', icon: 'scan' },
+  { id: '팝업관리', label: '팝업 관리', icon: 'document' },
 ];
 
 export const ADMIN_AUDIT_TABS: { id: AdminAuditTabId; label: string; icon: string }[] = [
-  { id: '접근감사로그', label: '접근감사로그', icon: '🔐' },
-  { id: '감사로그', label: '감사로그', icon: '🧾' },
-  { id: '급여이상치', label: '급여 이상치', icon: '⚠️' },
+  { id: '접근감사로그', label: '접근감사로그', icon: 'admin' },
+  { id: '감사로그', label: '감사로그', icon: 'document' },
+  { id: '급여이상치', label: '급여 이상치', icon: 'alert' },
 ];
 
 export const ADMIN_SIDEBAR_ITEMS: AdminSidebarItem[] = [
-  { id: '경영분석', label: '경영 분석', group: '경영 분석', icon: '📈' },
-  { id: '회사관리', label: '회사 / 조직', group: '조직 / 권한', icon: '🏢' },
-  { id: '직원권한', label: '직원 권한', group: '조직 / 권한', icon: '🔐' },
-  { id: '운영설정', label: '운영 설정', group: '시스템 설정', icon: '⚙️' },
-  { id: '문서양식', label: '문서 양식', group: '시스템 설정', icon: '📄' },
-  { id: '엑셀등록', label: '엑셀 일괄 등록', group: '데이터 관리', icon: '📥' },
-  { id: '데이터백업', label: '백업 / 복원', group: '데이터 관리', icon: '💾' },
-  { id: '데이터초기화', label: '데이터 초기화', group: '데이터 관리', icon: '♻️' },
-  { id: '감사센터', label: '감사 센터', group: '감사 센터', icon: '🔍' },
-  { id: '시스템마스터센터', label: '시스템마스터센터', group: '시스템 마스터', icon: '🛡️' },
-  { id: '알림자동화', label: '알림 자동화', group: '시스템 설정', icon: '🔔', hidden: true },
-  { id: '수술검사템플릿', label: '수술 / 검사 템플릿', group: '시스템 설정', icon: '🧪', hidden: true },
-  { id: '팝업관리', label: '팝업 관리', group: '시스템 설정', icon: '🪟', hidden: true },
-  { id: '급여이상치', label: '급여 이상치 감지', group: '감사 센터', icon: '⚠️', hidden: true },
+  { id: '경영분석', label: '경영 분석', group: '경영 분석', icon: 'analytics' },
+  { id: '회사관리', label: '회사 / 조직', group: '조직 / 권한', icon: 'server' },
+  { id: '직원권한', label: '직원 권한', group: '조직 / 권한', icon: 'admin' },
+  { id: '운영설정', label: '운영 설정', group: '시스템 설정', icon: 'settings' },
+  { id: '문서양식', label: '문서 양식', group: '시스템 설정', icon: 'document' },
+  { id: '엑셀등록', label: '엑셀 일괄 등록', group: '데이터 관리', icon: 'send' },
+  { id: '데이터백업', label: '백업 / 복원', group: '데이터 관리', icon: 'save' },
+  { id: '데이터초기화', label: '데이터 초기화', group: '데이터 관리', icon: 'refresh' },
+  { id: '감사센터', label: '감사 센터', group: '감사 센터', icon: 'search' },
+  { id: '시스템마스터센터', label: '시스템마스터센터', group: '시스템 마스터', icon: 'admin' },
+  { id: '알림자동화', label: '알림 자동화', group: '시스템 설정', icon: 'bell', hidden: true },
+  { id: '수술검사템플릿', label: '수술 / 검사 템플릿', group: '시스템 설정', icon: 'scan', hidden: true },
+  { id: '팝업관리', label: '팝업 관리', group: '시스템 설정', icon: 'document', hidden: true },
+  { id: '급여이상치', label: '급여 이상치 감지', group: '감사 센터', icon: 'alert', hidden: true },
 ];
 
 export const ADMIN_OUTER_TABS: AdminOuterTabId[] = ADMIN_SIDEBAR_ITEMS.filter((item) => !item.hidden).map(

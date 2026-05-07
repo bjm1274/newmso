@@ -29,6 +29,7 @@ export type RosterGenerationRule = {
   generationStyle: RosterGenerationStyle;
   avoidDayAfterNight: boolean;
   avoidDayAfterEvening: boolean;
+  avoidEveningAfterNight: boolean;
   maxConsecutiveEveningShifts: number;
   offDaysAfterNight: number;
   nightBlockSize: number;
@@ -173,6 +174,7 @@ function normalizeRule(rule: RosterGenerationRule): RosterGenerationRule {
       `${String(rule.id || 'date-rule')}-override`
     ),
     maxConsecutiveEveningShifts: clampInteger(rule.maxConsecutiveEveningShifts, 0, 7, 0),
+    avoidEveningAfterNight: rule.avoidEveningAfterNight === true,
     offDaysAfterNight: clampInteger(rule.offDaysAfterNight, 0, 5, 1),
     nightBlockSize: clampInteger(rule.nightBlockSize, 1, 5, 2),
     minRotationNightCount,
@@ -211,6 +213,7 @@ export function buildDefaultGenerationRule(companyName = '', companyId: string |
     generationStyle: 'balanced',
     avoidDayAfterNight: true,
     avoidDayAfterEvening: false,
+    avoidEveningAfterNight: false,
     maxConsecutiveEveningShifts: 0,
     offDaysAfterNight: 1,
     nightBlockSize: 2,
@@ -283,6 +286,7 @@ export function normalizeGenerationRule(record: unknown): RosterGenerationRule |
         : 'balanced',
     avoidDayAfterNight: source.avoidDayAfterNight !== false,
     avoidDayAfterEvening: source.avoidDayAfterEvening === true,
+    avoidEveningAfterNight: source.avoidEveningAfterNight === true,
     maxConsecutiveEveningShifts: clampInteger(source.maxConsecutiveEveningShifts, 0, 7, 0),
     offDaysAfterNight: clampInteger(source.offDaysAfterNight, 0, 5, 1),
     nightBlockSize: clampInteger(source.nightBlockSize, 1, 5, 2),

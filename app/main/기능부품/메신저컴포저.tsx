@@ -19,6 +19,8 @@ type MessengerComposerProps = {
   canWriteNotice: boolean;
   composerRef: RefObject<HTMLTextAreaElement | null>;
   inputMsg: string;
+  showScrollToLatest?: boolean;
+  onScrollToLatest?: () => void;
   showMentionList: boolean;
   mentionCandidates: StaffMember[];
   onCloseReply: () => void;

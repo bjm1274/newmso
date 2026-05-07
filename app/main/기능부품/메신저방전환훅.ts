@@ -11,16 +11,20 @@ type UseChatRoomNavigationParams = {
   chatRoomsRef: MutableRefObject<ChatRoom[]>;
   inputMsgRef: MutableRefObject<string>;
   draftMapRef: MutableRefObject<Map<string, string>>;
+  requestBottomAlignmentHold?: (roomId: string | null, holdMs?: number) => void;
   pendingBottomAlignRoomIdRef: MutableRefObject<string | null>;
   isNearBottomRef: MutableRefObject<boolean>;
   lastTimelineTailRef: MutableRefObject<string>;
+  optimisticUnreadFloorRef?: MutableRefObject<Record<string, { count: number; lastMessageAt: string | null }>>;
   messageListRef: RefObject<HTMLDivElement | null>;
   scrollRef: RefObject<HTMLDivElement | null>;
   effectiveChatUserId: string | null | undefined;
   setSelectedRoomId: Dispatch<SetStateAction<string | null>>;
   setInputMsg: Dispatch<SetStateAction<string>>;
+  setLoadingRoomId?: Dispatch<SetStateAction<string | null>>;
   setShowScrollToLatest: Dispatch<SetStateAction<boolean>>;
   setRoomUnreadCounts: Dispatch<SetStateAction<Record<string, number>>>;
+  loadingRoomId?: string | null;
   persistRoomReadCursors: (
     roomIds: Array<string | null | undefined>,
     readAt?: string | null,
@@ -36,16 +40,20 @@ export function useChatRoomNavigation({
   chatRoomsRef,
   inputMsgRef,
   draftMapRef,
+  requestBottomAlignmentHold,
   pendingBottomAlignRoomIdRef,
   isNearBottomRef,
   lastTimelineTailRef,
+  optimisticUnreadFloorRef,
   messageListRef,
   scrollRef,
   effectiveChatUserId,
   setSelectedRoomId,
   setInputMsg,
+  setLoadingRoomId,
   setShowScrollToLatest,
   setRoomUnreadCounts,
+  loadingRoomId,
   persistRoomReadCursors,
   markConversationNotificationsAsRead,
   broadcastChatSync,
@@ -69,9 +77,18 @@ export function useChatRoomNavigation({
       } catch { /* ignore quota errors */ }
     }
 
-    pendingBottomAlignRoomIdRef.current = roomId;
+    if (requestBottomAlignmentHold) {
+      requestBottomAlignmentHold(roomId);
+    } else {
+      pendingBottomAlignRoomIdRef.current = roomId;
+    }
     isNearBottomRef.current = true;
     setShowScrollToLatest(false);
+    if (roomId && loadingRoomId !== roomId) {
+      setLoadingRoomId?.(roomId);
+    } else if (!roomId) {
+      setLoadingRoomId?.(null);
+    }
 
     if (previousSelectedRoomId !== roomId) {
       lastTimelineTailRef.current = '';
@@ -102,6 +119,19 @@ export function useChatRoomNavigation({
         });
         return changed ? next : prev;
       });
+
+      if (optimisticUnreadFloorRef) {
+        let floorChanged = false;
+        const nextOptimisticFloor = { ...optimisticUnreadFloorRef.current };
+        targetRoomIds.forEach((targetRoomId) => {
+          if (!(targetRoomId in nextOptimisticFloor)) return;
+          delete nextOptimisticFloor[targetRoomId];
+          floorChanged = true;
+        });
+        if (floorChanged) {
+          optimisticUnreadFloorRef.current = nextOptimisticFloor;
+        }
+      }
 
       void (async () => {
         try {
@@ -139,12 +169,16 @@ export function useChatRoomNavigation({
     inputMsgRef,
     isNearBottomRef,
     lastTimelineTailRef,
+    loadingRoomId,
     markConversationNotificationsAsRead,
     onRoomChangeCleanup,
+    optimisticUnreadFloorRef,
     pendingBottomAlignRoomIdRef,
     persistRoomReadCursors,
+    requestBottomAlignmentHold,
     selectedRoomIdRef,
     setInputMsg,
+    setLoadingRoomId,
     setRoomUnreadCounts,
     setSelectedRoomId,
     setShowScrollToLatest,
