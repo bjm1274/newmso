@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { HR_COMPANY_KEY, HR_STATUS_KEY, HR_TAB_KEY, HR_WORKSPACE_KEY } from '@/app/main/navigation-state';
 import { canAccessHrSection, canAccessMainMenu, isAdminUser } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
-import 구성원관리 from './인사관리서브/구성원현황/index';
+import 구성원관리 from './인사관리서브/구성원현황';
 import { MenuIcon } from './조직도서브/조직도측면창';
 import dynamic from 'next/dynamic';
 

@@ -10,7 +10,7 @@ const prefetchedMainMenuModules = new Set<string>();
 
 const loadOrgChartView = () => import('./OrgChart');
 const loadMyPageView = () => import('../마이페이지');
-const loadNotificationInboxView = () => import('../알림인박스/index');
+const loadNotificationInboxView = () => import('../알림인박스');
 const loadChatView = () => import('../메신저');
 const loadBoardView = () => import('../게시판');
 const loadApprovalView = () => import('../전자결재');
