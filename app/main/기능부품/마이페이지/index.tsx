@@ -4,7 +4,7 @@ import { useState, useEffect, memo, useMemo } from 'react';
 
 // 기능 컴포넌트 불러오기
 import MyTodoList from './나의할일';
-import CommuteRecord from './출퇴근기록';
+import CommuteRecord from './출퇴근기록/index';
 import MyDocuments from './서류제출';
 import {
   buildProfileSummary,
@@ -13,7 +13,7 @@ import {
   TabButton,
 } from './마이페이지공통섹션';
 import AnnualLeaveUsagePanel from './연차휴가내역';
-import NotificationInbox from '../알림인박스';
+import NotificationInbox from '../알림인박스/index';
 import ContractSignatureModal from '../인사관리서브/계약문서/전자서명모달';
 import { supabase } from '@/lib/supabase';
 import { isActiveStaff } from '@/lib/active-staff';
