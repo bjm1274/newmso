@@ -7,9 +7,12 @@ import {
   Copy,
   Eye,
   Forward,
+  History,
+  Link,
   Megaphone,
   MessageSquareReply,
   MoreHorizontal,
+  Pencil,
   Send,
   SmilePlus,
   Trash2,
@@ -61,7 +64,7 @@ function extractBoardLinkMeta(content: unknown): BoardLinkMeta | null {
   try { const parsed = JSON.parse(raw.slice(start + BOARD_META_PREFIX.length, end).trim()) as { type?: string | null; board_type?: string | null; post_id?: string | null; }; const metaType = String(parsed?.type || '').trim(); const boardType = String(parsed?.board_type || '').trim(); const postId = String(parsed?.post_id || '').trim(); if (!boardType || !postId || (metaType && metaType !== 'board_post_link')) return null; return { boardType, postId }; }
   catch { return null; }
 }
-type MessengerTimelineGroupProps = { messages: ChatMessage[]; combinedTimeline: MessengerTimelineItem[]; pollVotes: Record<string, Record<number, number>>; reactions: Record<string, Record<string, number>>; readCounts: Record<string, number>; deliveryStates: Record<string, DeliveryState>; threadSummaries: Record<string, ThreadSummary>; activeActionMessageId: string | null; pinnedIds: string[]; bookmarkedIds: Set<string>; roomMembers: StaffMember[]; effectiveChatUserId: string; activeMessageHighlightQuery: string; wardQuickReplySendingMessageId: string | null; messageRefs: MutableRefObject<Record<string, HTMLDivElement | null>>; resolveStaffProfile: (staffId: string | null | undefined, fallbackName?: string | null) => StaffMember | null; onScrollToMessage: (messageId: string) => void; onVote: (pollId: string, optionIndex: number) => void; onOpenAttachmentPreviewForMessage: (message: ChatMessage) => void; onStartReplyToMessage: (message: ChatMessage) => void; onOpenThread: (message: ChatMessage) => void; onOpenMessageActions: (message: ChatMessage) => void; onCloseMessageActions: () => void; onToggleReaction: (message: ChatMessage, emoji: string) => void | Promise<void>; onAddTask: (message: ChatMessage) => void | Promise<void>; onTogglePin: (message: ChatMessage) => void | Promise<void>; onToggleBookmark: (message: ChatMessage) => void | Promise<void>; onForwardMessage: (message: ChatMessage) => void; onForwardToSelf: (message: ChatMessage) => void | Promise<void>; onDeleteMessage: (message: ChatMessage) => void | Promise<void>; onMarkMessageRead: (message: ChatMessage) => void; renderMessageContent: (content: string, isMine?: boolean, highlightQuery?: string) => ReactNode; onOpenAttachmentPreview: (url: string, name: string, kind: AttachmentPreviewKind) => void; onOpenReactionDetail: (message: ChatMessage, emoji: string) => void; onLoadReadStatus: (message: ChatMessage) => void; onSendWardQuickReply: (message: ChatMessage, replyText: string) => void | Promise<void>; onRetryFailedMessage: (messageId: string) => void; onMediaLoad?: () => void; onOpenBoardPost?: (boardType: string, postId: string) => void; onOpenDateJump?: (dateKey: string) => void; };
+type MessengerTimelineGroupProps = { messages: ChatMessage[]; combinedTimeline: MessengerTimelineItem[]; pollVotes: Record<string, Record<number, number>>; reactions: Record<string, Record<string, number>>; readCounts: Record<string, number>; deliveryStates: Record<string, DeliveryState>; threadSummaries: Record<string, ThreadSummary>; activeActionMessageId: string | null; pinnedIds: string[]; bookmarkedIds: Set<string>; roomMembers: StaffMember[]; effectiveChatUserId: string; activeMessageHighlightQuery: string; wardQuickReplySendingMessageId: string | null; messageRefs: MutableRefObject<Record<string, HTMLDivElement | null>>; resolveStaffProfile: (staffId: string | null | undefined, fallbackName?: string | null) => StaffMember | null; onScrollToMessage: (messageId: string) => void; onVote: (pollId: string, optionIndex: number) => void; onOpenAttachmentPreviewForMessage: (message: ChatMessage) => void; onStartReplyToMessage: (message: ChatMessage) => void; onOpenThread: (message: ChatMessage) => void; onOpenMessageActions: (message: ChatMessage) => void; onCloseMessageActions: () => void; onToggleReaction: (message: ChatMessage, emoji: string) => void | Promise<void>; onAddTask: (message: ChatMessage) => void | Promise<void>; onTogglePin: (message: ChatMessage) => void | Promise<void>; onToggleBookmark: (message: ChatMessage) => void | Promise<void>; onForwardMessage: (message: ChatMessage) => void; onForwardToSelf: (message: ChatMessage) => void | Promise<void>; onDeleteMessage: (message: ChatMessage) => void | Promise<void>; onStartEdit?: (message: ChatMessage) => void; onOpenEditHistory?: (message: ChatMessage) => void | Promise<void>; onCopyMessageLink?: (message: ChatMessage) => void | Promise<void>; onMarkMessageRead: (message: ChatMessage) => void; renderMessageContent: (content: string, isMine?: boolean, highlightQuery?: string) => ReactNode; onOpenAttachmentPreview: (url: string, name: string, kind: AttachmentPreviewKind) => void; onOpenReactionDetail: (message: ChatMessage, emoji: string) => void; onLoadReadStatus: (message: ChatMessage) => void; onSendWardQuickReply: (message: ChatMessage, replyText: string) => void | Promise<void>; onRetryFailedMessage: (messageId: string) => void; onMediaLoad?: () => void; onOpenBoardPost?: (boardType: string, postId: string) => void; onOpenDateJump?: (dateKey: string) => void; };
 const formatTimelineDateLabel = (value?: string | null) =>
   new Date(value || 0).toLocaleDateString('ko-KR', {
     year: 'numeric',
@@ -79,7 +82,7 @@ const formatTimelineDateKey = (value?: string | null) => {
   return `${year}-${month}-${day}`;
 };
 
-export function MessengerTimelineGroup({ messages, combinedTimeline, pollVotes, reactions, readCounts, deliveryStates, threadSummaries, activeActionMessageId, pinnedIds, bookmarkedIds, roomMembers, effectiveChatUserId, activeMessageHighlightQuery, wardQuickReplySendingMessageId, messageRefs, resolveStaffProfile, onScrollToMessage, onVote, onOpenAttachmentPreviewForMessage, onStartReplyToMessage, onOpenThread, onOpenMessageActions, onCloseMessageActions, onToggleReaction, onAddTask, onTogglePin, onToggleBookmark, onForwardMessage, onForwardToSelf, onDeleteMessage, onMarkMessageRead, renderMessageContent, onOpenAttachmentPreview, onOpenReactionDetail, onLoadReadStatus, onSendWardQuickReply, onRetryFailedMessage, onMediaLoad, onOpenBoardPost, onOpenDateJump, }: MessengerTimelineGroupProps) {
+export function MessengerTimelineGroup({ messages, combinedTimeline, pollVotes, reactions, readCounts, deliveryStates, threadSummaries, activeActionMessageId, pinnedIds, bookmarkedIds, roomMembers, effectiveChatUserId, activeMessageHighlightQuery, wardQuickReplySendingMessageId, messageRefs, resolveStaffProfile, onScrollToMessage, onVote, onOpenAttachmentPreviewForMessage, onStartReplyToMessage, onOpenThread, onOpenMessageActions, onCloseMessageActions, onToggleReaction, onAddTask, onTogglePin, onToggleBookmark, onForwardMessage, onForwardToSelf, onDeleteMessage, onStartEdit = () => {}, onOpenEditHistory = () => {}, onCopyMessageLink = () => {}, onMarkMessageRead, renderMessageContent, onOpenAttachmentPreview, onOpenReactionDetail, onLoadReadStatus, onSendWardQuickReply, onRetryFailedMessage, onMediaLoad, onOpenBoardPost, onOpenDateJump, }: MessengerTimelineGroupProps) {
   const [openInlinePanel, setOpenInlinePanel] = useState<InlineActionPanel>(null);
 
   const renderDateDivider = (dateLabel: string, dateKey: string) => (
@@ -609,6 +612,7 @@ export function MessengerTimelineGroup({ messages, combinedTimeline, pollVotes, 
                             onClick={(event) => event.stopPropagation()}>
                             <button
                               type="button"
+                              data-testid={isActionActive ? 'chat-message-action-emoji' : undefined}
                               title="이모지 반응"
                               aria-label="이모지 반응"
                               onClick={() => {
@@ -648,6 +652,7 @@ export function MessengerTimelineGroup({ messages, combinedTimeline, pollVotes, 
                             </button>
                             <button
                               type="button"
+                              data-testid={isActionActive ? 'chat-message-action-copy-text' : undefined}
                               title="복사"
                               aria-label="복사"
                               onClick={() => {
@@ -660,6 +665,7 @@ export function MessengerTimelineGroup({ messages, combinedTimeline, pollVotes, 
                             </button>
                             <button
                               type="button"
+                              data-testid={isActionActive ? 'chat-message-action-reply' : undefined}
                               title="답장"
                               aria-label="답장"
                               onClick={() => {
@@ -671,6 +677,7 @@ export function MessengerTimelineGroup({ messages, combinedTimeline, pollVotes, 
                             </button>
                             <button
                               type="button"
+                              data-testid={isActionActive ? 'chat-message-action-forward' : undefined}
                               title="전달"
                               aria-label="전달"
                               onClick={() => {
@@ -682,6 +689,7 @@ export function MessengerTimelineGroup({ messages, combinedTimeline, pollVotes, 
                             </button>
                             <button
                               type="button"
+                              data-testid={isActionActive ? 'chat-message-action-forward-self' : undefined}
                               title="나에게 전달"
                               aria-label="나에게 전달"
                               onClick={() => {
@@ -693,6 +701,7 @@ export function MessengerTimelineGroup({ messages, combinedTimeline, pollVotes, 
                             </button>
                             <button
                               type="button"
+                              data-testid={isActionActive ? 'chat-message-action-more' : undefined}
                               title="더보기"
                               aria-label="더보기"
                               onClick={() => {
@@ -738,8 +747,37 @@ export function MessengerTimelineGroup({ messages, combinedTimeline, pollVotes, 
                               data-testid={`chat-message-more-panel-${msg.id}`}
                               className={`mt-1 flex w-[190px] max-w-[calc(100vw-4rem)] flex-col gap-1 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-1.5 shadow-sm ${isMine ? 'self-end' : 'self-start'}`}
                               onClick={(event) => event.stopPropagation()}>
+                              {isMine && (
+                                <>
+                                  <button
+                                    type="button"
+                                    data-testid="chat-message-action-edit"
+                                    title="메시지 수정"
+                                    onClick={() => {
+                                      setOpenInlinePanel(null);
+                                      onStartEdit(msg);
+                                    }}
+                                    className="flex h-9 items-center gap-2 rounded-[var(--radius-md)] px-2.5 text-left text-[12px] font-bold text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]">
+                                    <Pencil className="h-4 w-4 text-[var(--toss-gray-4)]" aria-hidden="true" />
+                                    <span>메시지 수정</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    data-testid="chat-message-action-edit-history"
+                                    title="수정 기록"
+                                    onClick={() => {
+                                      setOpenInlinePanel(null);
+                                      void onOpenEditHistory(msg);
+                                    }}
+                                    className="flex h-9 items-center gap-2 rounded-[var(--radius-md)] px-2.5 text-left text-[12px] font-bold text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]">
+                                    <History className="h-4 w-4 text-[var(--toss-gray-4)]" aria-hidden="true" />
+                                    <span>수정 기록</span>
+                                  </button>
+                                </>
+                              )}
                               <button
                                 type="button"
+                                data-testid="chat-message-action-read-status"
                                 title="읽음 확인"
                                 onClick={() => {
                                   setOpenInlinePanel(null);
@@ -752,6 +790,32 @@ export function MessengerTimelineGroup({ messages, combinedTimeline, pollVotes, 
                               </button>
                               <button
                                 type="button"
+                                data-testid="chat-message-action-thread"
+                                title="이 메시지 스레드 보기"
+                                onClick={() => {
+                                  setOpenInlinePanel(null);
+                                  onOpenThread(msg);
+                                  onCloseMessageActions();
+                                }}
+                                className="flex h-9 items-center gap-2 rounded-[var(--radius-md)] px-2.5 text-left text-[12px] font-bold text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]">
+                                <MessageSquareReply className="h-4 w-4 text-[var(--toss-gray-4)]" aria-hidden="true" />
+                                <span>스레드 보기</span>
+                              </button>
+                              <button
+                                type="button"
+                                data-testid="chat-message-action-copy-link"
+                                title="메시지 링크 복사"
+                                onClick={() => {
+                                  setOpenInlinePanel(null);
+                                  void onCopyMessageLink(msg);
+                                }}
+                                className="flex h-9 items-center gap-2 rounded-[var(--radius-md)] px-2.5 text-left text-[12px] font-bold text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]">
+                                <Link className="h-4 w-4 text-[var(--toss-gray-4)]" aria-hidden="true" />
+                                <span>링크 복사</span>
+                              </button>
+                              <button
+                                type="button"
+                                data-testid="chat-message-action-bookmark"
                                 title={isBookmarkedMessage ? '북마크 해제' : '중요 메시지 북마크'}
                                 onClick={() => {
                                   setOpenInlinePanel(null);
@@ -764,6 +828,7 @@ export function MessengerTimelineGroup({ messages, combinedTimeline, pollVotes, 
                               {canDeleteMessage && (
                                 <button
                                   type="button"
+                                  data-testid="chat-message-action-delete"
                                   title="메시지 삭제"
                                   onClick={() => {
                                     setOpenInlinePanel(null);

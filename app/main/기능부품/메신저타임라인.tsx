@@ -85,6 +85,9 @@ type MessengerTimelineProps = {
   onForwardMessage?: (message: ChatMessage) => void;
   onForwardToSelf?: (message: ChatMessage) => void | Promise<void>;
   onDeleteMessage?: (message: ChatMessage) => void | Promise<void>;
+  onStartEdit?: (message: ChatMessage) => void;
+  onOpenEditHistory?: (message: ChatMessage) => void | Promise<void>;
+  onCopyMessageLink?: (message: ChatMessage) => void | Promise<void>;
   onMarkMessageRead: (message: ChatMessage) => void;
   renderMessageContent: (content: string, isMine?: boolean, highlightQuery?: string) => ReactNode;
   onOpenAttachmentPreview: (url: string, name: string, kind: AttachmentPreviewKind) => void;
@@ -136,6 +139,9 @@ function MessengerTimelineComponent({
   onForwardMessage = () => {},
   onForwardToSelf = () => {},
   onDeleteMessage = () => {},
+  onStartEdit = () => {},
+  onOpenEditHistory = () => {},
+  onCopyMessageLink = () => {},
   onMarkMessageRead,
   renderMessageContent,
   onOpenAttachmentPreview,
@@ -243,6 +249,9 @@ function MessengerTimelineComponent({
             onForwardMessage={onForwardMessage}
             onForwardToSelf={onForwardToSelf}
             onDeleteMessage={onDeleteMessage}
+            onStartEdit={onStartEdit}
+            onOpenEditHistory={onOpenEditHistory}
+            onCopyMessageLink={onCopyMessageLink}
             onMarkMessageRead={onMarkMessageRead}
             renderMessageContent={renderMessageContent}
             onOpenAttachmentPreview={onOpenAttachmentPreview}
