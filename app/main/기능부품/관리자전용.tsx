@@ -44,7 +44,7 @@ const IntegratedReport = dynamic(() => import('./관리자전용서브/통합보
 const SalaryAnomalyDetector = dynamic(() => import('./관리자전용서브/급여이상치감지'), { ssr: false, loading: AdminSubViewLoading });
 const AccessAuditLog = dynamic(() => import('./관리자전용서브/접근감사로그'), { ssr: false, loading: AdminSubViewLoading });
 const CompanyPnL = dynamic(() => import('./관리자전용서브/법인손익현황'), { ssr: false, loading: AdminSubViewLoading });
-const SystemMasterCenter = dynamic(() => import('./관리자전용서브/시스템마스터센터'), { ssr: false, loading: AdminSubViewLoading });
+const SystemMasterCenter = dynamic(() => import('./관리자전용서브/시스템마스터센터/index'), { ssr: false, loading: AdminSubViewLoading });
 
 function canAccessAdminTab(user: any, tabId: AdminOuterTabId) {
   if (!canAccessMainMenu(user, '관리자')) {

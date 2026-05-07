@@ -126,7 +126,7 @@ export function FontFamilyControl() {
 
 const loadDepartmentInventoryView = () => import('./재고관리서브/부서별물품장비현황');
 const loadWorkStatusView = () => import('./근무현황');
-const loadHandoverNotesView = () => import('./인계노트');
+const loadHandoverNotesView = () => import('./인계노트/index');
 const loadDischargeReviewView = () => import('./퇴원심사');
 const loadClosingReportView = () => import('./마감보고');
 const loadStaffEvaluationView = () => import('./직원평가시스템');
