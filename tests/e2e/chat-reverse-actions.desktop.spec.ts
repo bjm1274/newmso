@@ -162,6 +162,7 @@ test('chat reverse actions can unpin, vote, remove a participant, and edit/delet
   await page.getByTestId('chat-room-drawer').locator('button').first().click();
 
   await page.getByTestId('chat-message-msg-edit').click();
+  await page.getByTestId('chat-message-action-more').click();
   await page.getByTestId('chat-message-action-edit').click();
   await expect(page.getByTestId('chat-message-actions-panel')).toHaveCount(0);
   await page.getByTestId('chat-message-edit-input').fill('수정 후 메시지');
@@ -169,6 +170,7 @@ test('chat reverse actions can unpin, vote, remove a participant, and edit/delet
   await expect(page.getByText('수정 후 메시지')).toBeVisible();
 
   await page.getByTestId('chat-message-msg-edit').click();
+  await page.getByTestId('chat-message-action-more').click();
   await page.getByTestId('chat-message-action-delete').click();
   await expect(page.getByTestId('chat-message-msg-edit')).toHaveCount(0);
 
@@ -238,6 +240,7 @@ test('chat room list shows deleted placeholder after removing the latest message
   await expect(page.getByTestId('chat-room-room-delete-preview')).toContainText('삭제 대상 메시지');
 
   await page.getByTestId('chat-message-msg-delete-preview').click();
+  await page.getByTestId('chat-message-action-more').click();
   await page.getByTestId('chat-message-action-delete').click();
   await expect(page.getByTestId('chat-room-room-delete-preview')).toContainText('삭제된 메시지입니다.');
 

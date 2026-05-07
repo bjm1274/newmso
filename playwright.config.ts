@@ -17,7 +17,7 @@ export default defineConfig({
     serviceWorkers: 'block',
   },
   webServer: {
-    command: 'npm run dev -- --hostname 127.0.0.1 --port 3000',
+    command: 'npm run dev -- --webpack --hostname 127.0.0.1 --port 3000',
     url: 'http://127.0.0.1:3000',
     reuseExistingServer: true,
     timeout: 120_000,
