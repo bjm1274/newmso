@@ -7,8 +7,6 @@ import {
   Copy,
   Eye,
   Forward,
-  History,
-  Link,
   Megaphone,
   MessageSquareReply,
   MoreHorizontal,
@@ -35,6 +33,7 @@ const BOARD_META_PREFIX = '[[BOARD_META]]';
 const BOARD_META_SUFFIX = '[[/BOARD_META]]';
 const INLINE_REACTIONS = ['👍', '👏', '❤️', '😂', '🙏', '🎉', '🔥', '✅'];
 const inlineIconButtonClass = 'touch-manipulation relative flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-4)] shadow-sm transition-colors hover:border-[var(--accent)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--accent)] active:scale-95';
+const inlineMoreItemClass = 'flex h-11 w-full items-center gap-3 rounded-[var(--radius-md)] px-3 text-left text-[13px] font-bold text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]';
 
 async function copyMessageText(message: ChatMessage) {
   const text =
@@ -604,7 +603,7 @@ export function MessengerTimelineGroup({ messages, combinedTimeline, pollVotes, 
                           <div
                             data-chat-active-action-scope={isActionActive ? 'true' : undefined}
                             data-testid={isActionActive ? 'chat-message-actions-panel' : `chat-message-inline-actions-${msg.id}`}
-                            className={`flex max-w-full items-center gap-1 overflow-x-auto overflow-y-hidden transition-all ${isMine ? 'flex-row-reverse self-end' : 'self-start'} ${
+                            className={`flex max-w-full items-center gap-1.5 overflow-x-auto overflow-y-hidden transition-all ${isMine ? 'self-end' : 'self-start'} ${
                               isActionActive
                                 ? 'mt-1 max-h-12 opacity-100 pointer-events-auto'
                                 : 'max-h-0 opacity-0 pointer-events-none [@media(hover:hover)]:group-hover:mt-1 [@media(hover:hover)]:group-hover:max-h-12 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-hover:pointer-events-auto'
@@ -745,10 +744,36 @@ export function MessengerTimelineGroup({ messages, combinedTimeline, pollVotes, 
                             <div
                               data-chat-active-action-scope={isActionActive ? 'true' : undefined}
                               data-testid={`chat-message-more-panel-${msg.id}`}
-                              className={`mt-1 flex w-[190px] max-w-[calc(100vw-4rem)] flex-col gap-1 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-1.5 shadow-sm ${isMine ? 'self-end' : 'self-start'}`}
+                              className={`mt-1.5 flex w-[190px] max-w-[calc(100vw-4rem)] flex-col gap-1 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-2 shadow-sm ${isMine ? 'self-end' : 'self-start'}`}
                               onClick={(event) => event.stopPropagation()}>
+                              <button
+                                type="button"
+                                data-testid="chat-message-action-read-status"
+                                title="읽음 확인"
+                                onClick={() => {
+                                  setOpenInlinePanel(null);
+                                  onLoadReadStatus(msg);
+                                  onCloseMessageActions();
+                                }}
+                                className={inlineMoreItemClass}>
+                                <Eye className="h-4 w-4 text-[var(--toss-gray-4)]" aria-hidden="true" />
+                                <span>읽음 확인</span>
+                              </button>
+                              <button
+                                type="button"
+                                data-testid="chat-message-action-bookmark"
+                                title={isBookmarkedMessage ? '북마크 해제' : '중요 메시지 북마크'}
+                                onClick={() => {
+                                  setOpenInlinePanel(null);
+                                  void onToggleBookmark(msg);
+                                }}
+                                className={inlineMoreItemClass}>
+                                <Bookmark className={`h-4 w-4 ${isBookmarkedMessage ? 'fill-[var(--accent)] text-[var(--accent)]' : 'text-[var(--toss-gray-4)]'}`} aria-hidden="true" />
+                                <span>{isBookmarkedMessage ? '북마크 해제' : '중요 메시지 북마크'}</span>
+                              </button>
                               {isMine && (
                                 <>
+                                  <div className="my-1 h-px bg-[var(--border)]" />
                                   <button
                                     type="button"
                                     data-testid="chat-message-action-edit"
@@ -757,7 +782,7 @@ export function MessengerTimelineGroup({ messages, combinedTimeline, pollVotes, 
                                       setOpenInlinePanel(null);
                                       onStartEdit(msg);
                                     }}
-                                    className="flex h-9 items-center gap-2 rounded-[var(--radius-md)] px-2.5 text-left text-[12px] font-bold text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]">
+                                    className={inlineMoreItemClass}>
                                     <Pencil className="h-4 w-4 text-[var(--toss-gray-4)]" aria-hidden="true" />
                                     <span>메시지 수정</span>
                                   </button>
@@ -769,62 +794,12 @@ export function MessengerTimelineGroup({ messages, combinedTimeline, pollVotes, 
                                       setOpenInlinePanel(null);
                                       void onOpenEditHistory(msg);
                                     }}
-                                    className="flex h-9 items-center gap-2 rounded-[var(--radius-md)] px-2.5 text-left text-[12px] font-bold text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]">
-                                    <History className="h-4 w-4 text-[var(--toss-gray-4)]" aria-hidden="true" />
+                                    className={inlineMoreItemClass}>
+                                    <ClipboardList className="h-4 w-4 text-[var(--toss-gray-4)]" aria-hidden="true" />
                                     <span>수정 기록</span>
                                   </button>
                                 </>
                               )}
-                              <button
-                                type="button"
-                                data-testid="chat-message-action-read-status"
-                                title="읽음 확인"
-                                onClick={() => {
-                                  setOpenInlinePanel(null);
-                                  onLoadReadStatus(msg);
-                                  onCloseMessageActions();
-                                }}
-                                className="flex h-9 items-center gap-2 rounded-[var(--radius-md)] px-2.5 text-left text-[12px] font-bold text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]">
-                                <Eye className="h-4 w-4 text-[var(--toss-gray-4)]" aria-hidden="true" />
-                                <span>읽음 확인</span>
-                              </button>
-                              <button
-                                type="button"
-                                data-testid="chat-message-action-thread"
-                                title="이 메시지 스레드 보기"
-                                onClick={() => {
-                                  setOpenInlinePanel(null);
-                                  onOpenThread(msg);
-                                  onCloseMessageActions();
-                                }}
-                                className="flex h-9 items-center gap-2 rounded-[var(--radius-md)] px-2.5 text-left text-[12px] font-bold text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]">
-                                <MessageSquareReply className="h-4 w-4 text-[var(--toss-gray-4)]" aria-hidden="true" />
-                                <span>스레드 보기</span>
-                              </button>
-                              <button
-                                type="button"
-                                data-testid="chat-message-action-copy-link"
-                                title="메시지 링크 복사"
-                                onClick={() => {
-                                  setOpenInlinePanel(null);
-                                  void onCopyMessageLink(msg);
-                                }}
-                                className="flex h-9 items-center gap-2 rounded-[var(--radius-md)] px-2.5 text-left text-[12px] font-bold text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]">
-                                <Link className="h-4 w-4 text-[var(--toss-gray-4)]" aria-hidden="true" />
-                                <span>링크 복사</span>
-                              </button>
-                              <button
-                                type="button"
-                                data-testid="chat-message-action-bookmark"
-                                title={isBookmarkedMessage ? '북마크 해제' : '중요 메시지 북마크'}
-                                onClick={() => {
-                                  setOpenInlinePanel(null);
-                                  void onToggleBookmark(msg);
-                                }}
-                                className="flex h-9 items-center gap-2 rounded-[var(--radius-md)] px-2.5 text-left text-[12px] font-bold text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]">
-                                <Bookmark className={`h-4 w-4 ${isBookmarkedMessage ? 'fill-[var(--accent)] text-[var(--accent)]' : 'text-[var(--toss-gray-4)]'}`} aria-hidden="true" />
-                                <span>{isBookmarkedMessage ? '북마크 해제' : '중요 메시지 북마크'}</span>
-                              </button>
                               {canDeleteMessage && (
                                 <button
                                   type="button"
@@ -834,7 +809,7 @@ export function MessengerTimelineGroup({ messages, combinedTimeline, pollVotes, 
                                     setOpenInlinePanel(null);
                                     void onDeleteMessage(msg);
                                   }}
-                                  className="flex h-9 items-center gap-2 rounded-[var(--radius-md)] px-2.5 text-left text-[12px] font-bold text-red-600 transition-colors hover:bg-red-500/10">
+                                  className={`${inlineMoreItemClass} text-red-600 hover:bg-red-500/10`}>
                                   <Trash2 className="h-4 w-4" aria-hidden="true" />
                                   <span>메시지 삭제</span>
                                 </button>
