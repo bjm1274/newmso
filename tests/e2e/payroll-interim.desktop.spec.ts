@@ -5,6 +5,10 @@ test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
 });
 
+function parseWon(text: string | null | undefined) {
+  return Number(String(text || '').replace(/[^\d-]/g, '')) || 0;
+}
+
 test('interim settlement prorates vehicle and fixed allowances and stores deductions', async ({ page }) => {
   await page.addInitScript(() => {
     window.confirm = () => true;
@@ -68,6 +72,14 @@ test('interim settlement prorates vehicle and fixed allowances and stores deduct
 
   await page.getByTestId('interim-settlement-date-input').fill('2026-01-10');
   await page.getByTestId('interim-settlement-staff-select').selectOption(interimStaff.id);
+  await expect(page.getByText(/10분 단위 1 =/)).toHaveCount(5);
+  await page.getByTestId('interim-adjustment-night-duty-increase').click({ delay: 500 });
+  await expect(page.getByTestId('interim-adjustment-night-duty-quick-input-panel')).toBeVisible();
+  await page.getByTestId('interim-adjustment-night-duty-quick-input').fill('1');
+  await page.getByTestId('interim-adjustment-night-duty-quick-apply').click();
+  expect(parseWon(await page.getByTestId('interim-adjustment-night-duty').inputValue())).toBeGreaterThan(1);
+  await page.getByRole('button', { name: '초기화' }).click();
+  await expect(page.getByTestId('interim-adjustment-night-duty')).toHaveValue('0');
 
   const saveRequestPromise = page.waitForRequest(
     (request) => request.url().includes('/payroll_records') && request.method() === 'POST'

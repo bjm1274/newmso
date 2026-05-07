@@ -17,7 +17,7 @@ type ApprovalLike = LooseRecord & {
   meta_data?: LooseRecord | null;
 };
 
-const INVENTORY_SELECT_COLUMNS = [
+export const INVENTORY_SELECT_COLUMNS = [
   'id',
   'item_name',
   'name',
@@ -488,7 +488,7 @@ export async function fetchSupportInventoryRows(client: SupabaseClient = supabas
   };
 }
 
-function findDestinationInventoryItem(
+export function findDestinationInventoryItem(
   inventoryRows: InventoryLike[],
   selectedItem: InventoryLike | null | undefined,
   toCompany: string,

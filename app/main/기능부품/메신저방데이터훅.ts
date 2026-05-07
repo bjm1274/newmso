@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { CHAT_ROOM_SELECT, POLL_SELECT } from '@/lib/chat-query-columns';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 import { getDeletedMessagePreviewText, getMessageDisplayText } from './메신저첨부';
+import { selectChatMessagesWithFallback as defaultSelectChatMessagesWithFallback } from './메신저데이터유틸';
 import {
   compareStaffMembers,
   getConversationRoomIdSet,
@@ -27,7 +28,10 @@ type RoomSummary = {
 };
 
 type SelectChatMessagesWithFallback = <TData>(
-  execute: (selectClause: string) => PromiseLike<{ data: TData | null; error: unknown }>,
+  execute: (params: {
+    omittedColumns: ReadonlySet<string>;
+    selectClause: string;
+  }) => PromiseLike<{ data: TData | null; error: unknown }>,
 ) => Promise<{ data: TData | null; error: unknown }>;
 
 type UseChatRoomDataSyncParams = {
@@ -40,15 +44,18 @@ type UseChatRoomDataSyncParams = {
   effectiveChatUserId: string | null | undefined;
   effectiveTodoUserId: string | null | undefined;
   userId: string | null | undefined;
+  requestBottomAlignmentHold?: (roomId: string | null, holdMs?: number) => void;
   setRoom: (roomId: string | null) => void;
   resolveStaffProfile: (staffId: string | null | undefined, fallbackName?: string | null) => StaffMember | null;
   getEffectiveRoomMemberIds: (room: ChatRoom | null | undefined) => string[];
   isRoomAccessibleToCurrentUser: (room: ChatRoom | null | undefined) => boolean;
   repairDirectRooms: (rooms: ChatRoom[]) => Promise<ChatRoom[]>;
-  selectChatMessagesWithFallback: SelectChatMessagesWithFallback;
+  selectChatMessagesWithFallback?: SelectChatMessagesWithFallback;
   setChatRooms: Dispatch<SetStateAction<ChatRoom[]>>;
   setRoomUnreadCounts: Dispatch<SetStateAction<Record<string, number>>>;
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
+  setLoadingRoomId?: Dispatch<SetStateAction<string | null>>;
+  setTimelineRoomId?: Dispatch<SetStateAction<string | null>>;
   setRoomReadCursorMap: Dispatch<SetStateAction<Record<string, string>>>;
   setReadCounts: Dispatch<SetStateAction<Record<string, number>>>;
   setBookmarkedIds: Dispatch<SetStateAction<Set<string>>>;
@@ -70,15 +77,18 @@ export function useChatRoomDataSync({
   effectiveChatUserId,
   effectiveTodoUserId,
   userId,
+  requestBottomAlignmentHold,
   setRoom,
   resolveStaffProfile,
   getEffectiveRoomMemberIds,
   isRoomAccessibleToCurrentUser,
   repairDirectRooms,
-  selectChatMessagesWithFallback,
+  selectChatMessagesWithFallback: selectChatMessagesWithFallbackOverride,
   setChatRooms,
   setRoomUnreadCounts,
   setMessages,
+  setLoadingRoomId,
+  setTimelineRoomId,
   setRoomReadCursorMap,
   setReadCounts,
   setBookmarkedIds,
@@ -89,6 +99,9 @@ export function useChatRoomDataSync({
   setPolls,
   setPollVotes,
 }: UseChatRoomDataSyncParams) {
+  const selectMessagesWithFallback =
+    selectChatMessagesWithFallbackOverride || defaultSelectChatMessagesWithFallback;
+
   const updateUnreadForRooms = useCallback(
     async (rooms: ChatRoom[]) => {
       if (!effectiveChatUserId || !rooms?.length) return;
@@ -357,8 +370,8 @@ export function useChatRoomDataSync({
       ),
     );
 
-    const { data: msgs, error: messagesError } = await selectChatMessagesWithFallback<ChatMessage[]>(
-      (selectClause) =>
+    const { data: msgs, error: messagesError } = await selectMessagesWithFallback<ChatMessage[]>(
+      ({ selectClause }) =>
         supabase
           .from('messages')
           .select(selectClause)
@@ -539,8 +552,8 @@ export function useChatRoomDataSync({
 
         const missingPinnedIds = nextPinnedIds.filter((messageId) => !pinnedLookup.has(messageId));
         if (missingPinnedIds.length > 0) {
-          const { data: pinnedRows, error: pinnedRowsError } = await selectChatMessagesWithFallback<ChatMessage[]>(
-            (selectClause) =>
+          const { data: pinnedRows, error: pinnedRowsError } = await selectMessagesWithFallback<ChatMessage[]>(
+            ({ selectClause }) =>
               supabase
                 .from('messages')
                 .select(selectClause)
@@ -683,6 +696,14 @@ export function useChatRoomDataSync({
         pendingBottomAlignRoomIdRef.current = null;
       }
     }
+
+    setLoadingRoomId?.((currentRoomId) =>
+      String(currentRoomId || '') === roomIdForFetch ? null : currentRoomId,
+    );
+    setTimelineRoomId?.(roomIdForFetch);
+    if (pendingBottomAlignRoomIdRef.current === roomIdForFetch) {
+      requestBottomAlignmentHold?.(roomIdForFetch);
+    }
   }, [
     applyRoomSummaryToState,
     buildRoomSummaryFromMessages,
@@ -694,12 +715,14 @@ export function useChatRoomDataSync({
     pendingBottomAlignRoomIdRef,
     persistRoomSummary,
     repairDirectRooms,
+    requestBottomAlignmentHold,
     resolveStaffProfile,
-    selectChatMessagesWithFallback,
+    selectMessagesWithFallback,
     selectedRoomId,
     selectedRoomIdRef,
     setBookmarkedIds,
     setChatRooms,
+    setLoadingRoomId,
     setMessages,
     setPinnedIds,
     setPersistedPinnedMessages,
@@ -711,6 +734,7 @@ export function useChatRoomDataSync({
     setRoom,
     setRoomReadCursorMap,
     setRoomUnreadCounts,
+    setTimelineRoomId,
     syncChatRoomsState,
   ]);
 

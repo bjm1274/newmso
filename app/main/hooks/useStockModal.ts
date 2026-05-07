@@ -27,6 +27,11 @@ export function useStockModal({
   const [stockModal, setStockModal] = useState<StockModalState>(null);
   const [stockAmount, setStockAmount] = useState(1);
   const [stockSerialInput, setStockSerialInput] = useState('');
+  const [stockLotInput, setStockLotInput] = useState('');
+  const [stockExpiryInput, setStockExpiryInput] = useState('');
+  const [stockLocationInput, setStockLocationInput] = useState('');
+  const [stockUnitPriceInput, setStockUnitPriceInput] = useState('');
+  const [stockSupplierInput, setStockSupplierInput] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
 
   // ── 일괄 입출고 ──
@@ -36,8 +41,22 @@ export function useStockModal({
   const [batchAmount, setBatchAmount] = useState(1);
 
   useEffect(() => {
-    if (!stockModal) { setStockSerialInput(''); return; }
-    setStockSerialInput(String((stockModal.item as Record<string, unknown>).serial_number || '').trim());
+    if (!stockModal) {
+      setStockSerialInput('');
+      setStockLotInput('');
+      setStockExpiryInput('');
+      setStockLocationInput('');
+      setStockUnitPriceInput('');
+      setStockSupplierInput('');
+      return;
+    }
+    const item = stockModal.item as Record<string, unknown>;
+    setStockSerialInput(String(item.serial_number || '').trim());
+    setStockLotInput(String(item.lot_number || '').trim());
+    setStockExpiryInput(String(item.expiry_date || '').slice(0, 10));
+    setStockLocationInput(String(item.location || '').trim());
+    setStockUnitPriceInput(item.unit_price === undefined || item.unit_price === null ? '' : String(item.unit_price));
+    setStockSupplierInput(String(item.supplier_name || item.supplier || '').trim());
   }, [stockModal]);
 
   const openStockIn = useCallback((item: InventoryItem) => {
@@ -50,11 +69,31 @@ export function useStockModal({
     setStockAmount(1);
   }, []);
 
-  const handleStockUpdate = useCallback(async (item: InventoryItem, type: 'in' | 'out', amount: number, targetCompany: string, targetDept: string, serialNumber?: string) => {
+  const handleStockUpdate = useCallback(async (
+    item: InventoryItem,
+    type: 'in' | 'out',
+    amount: number,
+    targetCompany: string,
+    targetDept: string,
+    serialNumber?: string,
+    tracking?: {
+      lotNumber?: string;
+      expiryDate?: string;
+      location?: string;
+      unitPrice?: string;
+      supplier?: string;
+    },
+  ) => {
     if (amount <= 0) return toast('수량은 0보다 커야 합니다.');
     setIsUpdating(true);
     const delta = type === 'in' ? amount : -amount;
     const effectiveSerialNumber = String((type === 'in' ? serialNumber : (item as Record<string, unknown>).serial_number) || '').trim() || null;
+    const effectiveLotNumber = String((type === 'in' ? tracking?.lotNumber : (item as Record<string, unknown>).lot_number) || '').trim() || null;
+    const effectiveExpiryDate = String((type === 'in' ? tracking?.expiryDate : (item as Record<string, unknown>).expiry_date) || '').trim() || null;
+    const effectiveLocation = String((type === 'in' ? tracking?.location : (item as Record<string, unknown>).location) || '').trim() || null;
+    const parsedUnitPrice = Number(String(type === 'in' ? tracking?.unitPrice : (item as Record<string, unknown>).unit_price || '').replace(/,/g, ''));
+    const effectiveUnitPrice = Number.isFinite(parsedUnitPrice) && parsedUnitPrice > 0 ? Math.round(parsedUnitPrice) : null;
+    const effectiveSupplier = String((type === 'in' ? tracking?.supplier : ((item as Record<string, unknown>).supplier_name || (item as Record<string, unknown>).supplier)) || '').trim() || null;
     try {
       const { data: rpcResult, error: rpcError } = await supabase.rpc('atomic_stock_update', { p_item_id: item.id, p_delta: delta, p_min_allowed: 0 });
       let prevQty: number;
@@ -75,12 +114,28 @@ export function useStockModal({
         nextQty = row?.next_qty ?? 0;
       }
 
-      if (type === 'in' && effectiveSerialNumber) {
-        const { error: serialErr } = await withMissingColumnsFallback(
-          (omitted) => omitted.has('serial_number') ? Promise.resolve({ data: null, error: null }) : supabase.from('inventory').update({ serial_number: effectiveSerialNumber }).eq('id', item.id),
-          ['serial_number'],
+      if (type === 'in') {
+        const inventoryPatch: Record<string, unknown> = {
+          serial_number: effectiveSerialNumber,
+          lot_number: effectiveLotNumber,
+          expiry_date: effectiveExpiryDate,
+          location: effectiveLocation,
+          unit_price: effectiveUnitPrice,
+          supplier_name: effectiveSupplier,
+          supplier: effectiveSupplier,
+        };
+        const { error: trackingErr } = await withMissingColumnsFallback(
+          (omitted) => {
+            const next = { ...inventoryPatch };
+            ['serial_number', 'lot_number', 'expiry_date', 'location', 'unit_price', 'supplier_name', 'supplier'].forEach((column) => {
+              if (omitted.has(column)) delete next[column];
+            });
+            if (Object.keys(next).length === 0) return Promise.resolve({ data: null, error: null });
+            return supabase.from('inventory').update(next).eq('id', item.id);
+          },
+          ['serial_number', 'lot_number', 'expiry_date', 'location', 'unit_price', 'supplier_name', 'supplier'],
         );
-        if (serialErr) throw serialErr;
+        if (trackingErr) throw trackingErr;
       }
 
       const logRows: Record<string, unknown>[] = [{
@@ -88,6 +143,12 @@ export function useStockModal({
         type: type === 'in' ? '입고' : '출고', change_type: type === 'in' ? '입고' : '출고',
         quantity: amount, prev_quantity: prevQty, next_quantity: nextQty,
         serial_number: effectiveSerialNumber,
+        lot_number: effectiveLotNumber,
+        expiry_date: effectiveExpiryDate,
+        location: effectiveLocation,
+        unit_price: effectiveUnitPrice,
+        supplier_name: effectiveSupplier,
+        supplier: effectiveSupplier,
         actor_name: targetDept && targetDept !== '전체' ? `${user?.name} (${targetDept})` : user?.name,
         company: targetCompany || item.company,
       }];
@@ -100,11 +161,17 @@ export function useStockModal({
             const next = { ...r };
             if (omitted.has('company_id')) delete next.company_id;
             if (omitted.has('serial_number')) delete next.serial_number;
+            if (omitted.has('lot_number')) delete next.lot_number;
+            if (omitted.has('expiry_date')) delete next.expiry_date;
+            if (omitted.has('location')) delete next.location;
+            if (omitted.has('unit_price')) delete next.unit_price;
+            if (omitted.has('supplier_name')) delete next.supplier_name;
+            if (omitted.has('supplier')) delete next.supplier;
             return next;
           });
           return supabase.from('inventory_logs').insert(rows);
         },
-        ['company_id', 'serial_number'],
+        ['company_id', 'serial_number', 'lot_number', 'expiry_date', 'location', 'unit_price', 'supplier_name', 'supplier'],
       );
       await Promise.all([refreshCurrentInventory(), fetchLogs()]);
       toast(`${type === 'in' ? '입고' : '출고'} 처리가 완료되었습니다.`, 'success');
@@ -119,11 +186,32 @@ export function useStockModal({
 
   const executeStockUpdate = useCallback(() => {
     if (!stockModal) return;
-    handleStockUpdate(stockModal.item, stockModal.type, stockAmount, stockModal.targetCompany, stockModal.targetDept, stockSerialInput);
+    handleStockUpdate(stockModal.item, stockModal.type, stockAmount, stockModal.targetCompany, stockModal.targetDept, stockSerialInput, {
+      lotNumber: stockLotInput,
+      expiryDate: stockExpiryInput,
+      location: stockLocationInput,
+      unitPrice: stockUnitPriceInput,
+      supplier: stockSupplierInput,
+    });
     setStockModal(null);
     setStockAmount(1);
     setStockSerialInput('');
-  }, [handleStockUpdate, stockAmount, stockModal, stockSerialInput]);
+    setStockLotInput('');
+    setStockExpiryInput('');
+    setStockLocationInput('');
+    setStockUnitPriceInput('');
+    setStockSupplierInput('');
+  }, [
+    handleStockUpdate,
+    stockAmount,
+    stockExpiryInput,
+    stockLocationInput,
+    stockLotInput,
+    stockModal,
+    stockSerialInput,
+    stockSupplierInput,
+    stockUnitPriceInput,
+  ]);
 
   const handleAutoApprovalRequest = useCallback(async (item: InventoryItem) => {
     const quantity = getItemQuantity(item);
@@ -181,6 +269,11 @@ export function useStockModal({
     stockModal, setStockModal,
     stockAmount, setStockAmount,
     stockSerialInput, setStockSerialInput,
+    stockLotInput, setStockLotInput,
+    stockExpiryInput, setStockExpiryInput,
+    stockLocationInput, setStockLocationInput,
+    stockUnitPriceInput, setStockUnitPriceInput,
+    stockSupplierInput, setStockSupplierInput,
     isUpdating,
     openStockIn,
     openStockOut,

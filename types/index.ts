@@ -108,6 +108,18 @@ export interface AttachmentItem {
   type?: string;
 }
 
+export interface UploadPlanResponse {
+  success: true;
+  provider: 'supabase' | 'r2' | string;
+  bucket: string;
+  path: string;
+  signedUrl: string;
+  fileName: string;
+  url: string;
+  token?: string;
+  headers?: Record<string, string>;
+}
+
 // ─────────────────────────────────────────────
 // 할 일(Task)
 // ─────────────────────────────────────────────

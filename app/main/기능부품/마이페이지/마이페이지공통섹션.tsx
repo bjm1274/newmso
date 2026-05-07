@@ -7,6 +7,7 @@ import MyCertificates from './증명서관리';
 import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { supabase } from '@/lib/supabase';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
+import { LucideIcon } from '../조직도서브/조직도측면창';
 
 export type ProfileSummary = {
   id: string | null;
@@ -70,7 +71,7 @@ export function ProfileHeaderSummary({
             onClick={onToggleSecret}
             className="rounded-[var(--radius-md)] border border-transparent bg-[var(--muted)] px-3 py-2 text-[11px] font-bold text-[var(--toss-gray-3)] transition-all hover:border-[var(--toss-blue-light)] hover:text-[var(--accent)]"
           >
-            {showSecret ? '민감 정보 숨기기' : '보안 정보 보기'}
+            {showSecret ? '민감 정보 숨기기' : '민감 정보 확인'}
           </button>
           <button
             type="button"
@@ -82,7 +83,7 @@ export function ProfileHeaderSummary({
                 : 'border-[var(--toss-blue-light)] bg-[var(--toss-blue-light)] text-[var(--accent)] hover:bg-[var(--toss-blue-light)]'
             }`}
           >
-            {isEditing ? '수정 취소' : '내 정보 수정'}
+            {isEditing ? '수정 취소' : '정보 수정'}
           </button>
         </div>
       </div>
@@ -220,7 +221,7 @@ export function TabButton({
         ${isActive ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'}
       `}
     >
-      <span className="text-[13px]">{icon}</span>
+      <LucideIcon name={icon} size={14} />
       <span>{label}</span>
     </button>
   );
@@ -247,7 +248,7 @@ export function QuickFavoriteButton({
         ${active ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)]'}
       `}
     >
-      <span>{icon}</span>
+      <LucideIcon name={icon} size={13} />
       <span>{label}</span>
       {onRemove && (
         <span
@@ -255,9 +256,9 @@ export function QuickFavoriteButton({
             event.stopPropagation();
             onRemove();
           }}
-          className="ml-1 text-[11px] text-[var(--toss-gray-3)] hover:text-red-500"
+          className="ml-1 inline-flex text-[11px] text-[var(--toss-gray-3)] hover:text-red-500"
         >
-          ✕
+          <LucideIcon name="X" size={12} />
         </span>
       )}
     </button>

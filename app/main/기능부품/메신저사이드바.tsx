@@ -2,6 +2,7 @@
 
 import { MessengerAvatar } from './메신저공통';
 import { getGroupChatRoomBadgeText } from './메신저유틸';
+import { MenuIcon } from './조직도서브/조직도측면창';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import type { ChatRoom, StaffMember } from '@/types';
 
@@ -233,9 +234,9 @@ export function MessengerSidebar({
                       {isNoticeChannel ? (
                         <div
                           data-testid={`chat-room-icon-${roomId}`}
-                          className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/20 text-[13px] leading-none text-blue-600"
+                          className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent-light)] text-[var(--accent)]"
                         >
-                          📢
+                          <MenuIcon name="bell" className="h-4 w-4" />
                         </div>
                       ) : isGroupRoom ? (
                         <div
@@ -262,9 +263,9 @@ export function MessengerSidebar({
                       ) : (
                         <div
                           data-testid={`chat-room-icon-${roomId}`}
-                          className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--tab-bg)] text-[13px] leading-none text-[var(--toss-gray-4)] dark:bg-zinc-800"
+                          className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--tab-bg)] text-[var(--toss-gray-4)] dark:bg-zinc-800"
                         >
-                          💬
+                          <MenuIcon name="chat" className="h-4 w-4" />
                         </div>
                       )}
                       <div

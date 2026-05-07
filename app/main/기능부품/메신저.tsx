@@ -23,6 +23,7 @@ import {
 } from './메신저첨부';
 import { ChatAttachmentPreviewModal, useChatAttachmentPreview } from './메신저첨부미리보기';
 import { MessengerComposer } from './메신저컴포저';
+import { MenuIcon } from './조직도서브/조직도측면창';
 import { selectChatMessagesWithFallback } from './메신저데이터유틸';
 import { MessengerDrawer } from './메신저드로어';
 import { bindMockNotificationInsert } from './메신저테스트이벤트';
@@ -130,7 +131,9 @@ type DeliveryState = {
   error?: string | null;
 };
 
-interface ChatViewProps {
+export type ChatViewController = Record<string, any>;
+
+export interface ChatViewProps {
   user: StaffMember | null;
   onRefresh?: () => void;
   staffs?: StaffMember[];
@@ -143,7 +146,7 @@ interface ChatViewProps {
   shareTarget?: { id: string; fileCount: number; text: string | null; url: string | null; title: string | null } | null;
   onConsumeShareTarget?: () => void;
 }
-export default function ChatView({
+function ChatView({
   user,
   onRefresh,
   staffs = [],
@@ -1642,18 +1645,18 @@ export default function ChatView({
         setLoadingRoomId(saved);
         setSelectedRoomId(saved);
       } else {
-        pendingBottomAlignRoomIdRef.current = shouldRestoreSavedRoomOnMount ? NOTICE_ROOM_ID : null;
+        pendingBottomAlignRoomIdRef.current = null;
         isNearBottomRef.current = true;
         setShowScrollToLatest(false);
-        setLoadingRoomId(shouldRestoreSavedRoomOnMount ? NOTICE_ROOM_ID : null);
-        setSelectedRoomId(shouldRestoreSavedRoomOnMount ? NOTICE_ROOM_ID : null);
+        setLoadingRoomId(null);
+        setSelectedRoomId(null);
       }
     } catch {
-      pendingBottomAlignRoomIdRef.current = shouldRestoreSavedRoomOnMount ? NOTICE_ROOM_ID : null;
+      pendingBottomAlignRoomIdRef.current = null;
       isNearBottomRef.current = true;
       setShowScrollToLatest(false);
-      setLoadingRoomId(shouldRestoreSavedRoomOnMount ? NOTICE_ROOM_ID : null);
-      setSelectedRoomId(shouldRestoreSavedRoomOnMount ? NOTICE_ROOM_ID : null);
+      setLoadingRoomId(null);
+      setSelectedRoomId(null);
     }
   }, []);
 
@@ -2745,6 +2748,7 @@ export default function ChatView({
           groupedStaffs={groupedStaffs}
           expandedDepts={expandedDepts}
           onViewModeChange={setViewMode}
+          onOpenGroupModal={() => setShowGroupModal(true)}
           onOpenGlobalSearch={openGlobalSearch}
           onToggleHiddenRooms={() => setShowHiddenRooms((prev) => !prev)}
           onRoomClick={handleManualRoomListClick}
@@ -2765,8 +2769,8 @@ export default function ChatView({
               <button onClick={() => setRoom(null)} className="md:hidden text-[var(--toss-gray-3)]">뒤로</button>
               <div data-testid="chat-room-header-avatar" className="flex h-9 w-9 shrink-0 items-center justify-center">
                 {selectedRoom.id === NOTICE_ROOM_ID ? (
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/20 text-lg text-blue-600">
-                    📢
+                  <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--accent-light)] text-[var(--accent)]">
+                    <MenuIcon name="bell" className="h-5 w-5" />
                   </div>
                 ) : selectedPeer ? (
                   <MessengerAvatar
@@ -2776,8 +2780,8 @@ export default function ChatView({
                     decorative
                   />
                 ) : (
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--tab-bg)] text-lg text-[var(--toss-gray-4)] dark:bg-zinc-800">
-                    💬
+                  <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--tab-bg)] text-[var(--toss-gray-4)] dark:bg-zinc-800">
+                    <MenuIcon name="chat" className="h-5 w-5" />
                   </div>
                 )}
               </div>
@@ -3189,3 +3193,6 @@ export default function ChatView({
     </div>
   );
 }
+
+export { ChatView as useChatViewController };
+export default ChatView;

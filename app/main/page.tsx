@@ -26,7 +26,7 @@ import {
   resetPersistedMenuState,
 } from './navigation-state';
 
-import Sidebar, { SUB_MENUS } from './기능부품/조직도서브/조직도측면창';
+import Sidebar, { MenuIcon, SUB_MENUS } from './기능부품/조직도서브/조직도측면창';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import MainContent from './기능부품/조직도서브/조직도본문';
 import NotificationSystem from './기능부품/알림시스템';
@@ -217,6 +217,17 @@ function MainPageContent() {
         candidateUser?.permissions?.mso === true ||
         candidateUser?.role === 'admin' ||
         candidateUser?.permissions?.menu_관리자 === true;
+      const inventoryViewAliases: Record<string, string> = {
+        재고현황: '현황',
+        입출고관리: '등록',
+        '구매/발주': '발주',
+        '품목/자산': '자산',
+        '분석/마감': '월마감',
+      };
+
+      if (menuId === '재고관리' && subViewId && inventoryViewAliases[subViewId]) {
+        return { menuId: '재고관리', subViewId: inventoryViewAliases[subViewId] };
+      }
 
       if (menuId === '인사관리' && subViewId === '조직도') {
         return canOpenAdmin
@@ -889,20 +900,23 @@ function MainPageContent() {
   );
   const displayedSubView = getDisplayedSubView(mainMenu, subView);
   const subgroupLabels: Record<string, string> = {
-    '재고 대시보드': '📊 재고 대시보드',
-    '입출고 운영': '📦 입출고 운영',
-    '문서 · 자산': '🧾 문서 · 자산',
-    '기준 정보': '🗂️ 기준 정보',
-    '경영 분석': '📊 경영 분석',
-    '조직 / 권한': '🔐 조직 / 권한',
-    '시스템 설정': '⚙️ 시스템 설정',
-    '데이터 관리': '🗂️ 데이터 관리',
-    '감사 센터': '🔍 감사 센터',
-    '시스템 마스터': '🛡️ 시스템 마스터',
-    인력관리: '👥 인력관리',
-    '근태/급여': '💰 근태 · 급여',
-    '복무/복지': '🏥 복무 · 복지',
-    '문서/기타': '📂 문서 · 기타',
+    운영: '운영',
+    기준: '· 기준',
+    마감: '· 마감',
+    '재고 대시보드': '재고 대시보드',
+    '입출고 운영': '입출고 운영',
+    '문서 · 자산': '문서 · 자산',
+    '기준 정보': '기준 정보',
+    '경영 분석': '경영 분석',
+    '조직 / 권한': '/ 권한',
+    '시스템 설정': '설정',
+    '데이터 관리': '관리',
+    '감사 센터': '센터',
+    '시스템 마스터': '시스템 마스터',
+    인력관리: '인력관리',
+    '근태/급여': '근태 · 급여',
+    '복무/복지': '복무 · 복지',
+    '문서/기타': '문서 · 기타',
   };
 
   // 메인 메뉴가 바뀌었는데 현재 subView가 해당 메뉴의 서브메뉴에 없다면, 첫 번째 서브메뉴로 보정
@@ -1081,7 +1095,7 @@ function MainPageContent() {
 
   return (
     <div
-      className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[var(--background)] md:flex-row"
+      className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[var(--page-bg)] md:flex-row"
       data-testid="main-shell"
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[80] p-2 md:p-3">
@@ -1094,27 +1108,32 @@ function MainPageContent() {
       />
 
       {selectableSubMenus.length > 0 && (
-        <aside className="no-scrollbar scroll-smooth snap-x snap-mandatory flex w-full shrink-0 flex-row gap-0.5 overflow-x-auto border-b border-[var(--border)] bg-[var(--card)] px-2 py-1.5 md:sticky md:top-0 md:max-h-[100dvh] md:w-[var(--submenu-width)] md:flex-col md:snap-none md:overflow-x-visible md:overflow-y-auto md:border-r md:border-b-0 md:px-2 md:py-3 md:gap-0.5">
+        <aside className="app-subnav no-scrollbar scroll-smooth snap-x snap-mandatory flex w-full shrink-0 flex-col overflow-x-auto border-b md:sticky md:top-0 md:max-h-[100dvh] md:w-[var(--submenu-width)] md:snap-none md:overflow-x-visible md:overflow-y-auto md:border-r md:border-b-0">
+          <div className="hidden px-4 pt-4 md:block">
+              <h2 className="app-subnav-title">{mainMenu}</h2>
+              <div className="mt-4 h-px bg-[var(--border)]" />
+            </div>
+          <div className="flex flex-row gap-0.5 px-2 py-1.5 md:flex-col md:px-2 md:py-3">
           {(() => {
             if (mainMenu === '관리자' || mainMenu === '재고관리') {
               const groups = currentSubMenuGroups;
 
               return groups.map(groupName => (
-                <div key={groupName!} className="flex flex-row md:flex-col gap-0.5 mb-0 md:mb-2 shrink-0">
-                  <div className="hidden md:block px-2 pt-2 pb-0.5 text-[9px] font-bold text-[var(--zinc-400)] uppercase tracking-widest select-none">
-                    {(subgroupLabels[groupName!] || groupName)?.replace(/^[^\s]+ /, '')}
+                <div key={groupName!} className="flex shrink-0 flex-row gap-0.5 md:mb-5 md:flex-col">
+                  <div className="app-subnav-group-label hidden px-2 pb-1 select-none md:block">
+                    {subgroupLabels[groupName!] || groupName}
                   </div>
                   {selectableSubMenus.filter(s => s.group === groupName).map(sub => (
                     <button
                       key={sub.id}
                       onClick={() => handleSubViewChange(sub.id)}
                       data-testid={buildSubMenuTestId(mainMenu, sub.id)}
-                      className={`touch-manipulation flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-2.5 md:py-1.5 min-h-[36px] md:min-h-0 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all duration-150 whitespace-nowrap md:flex md:items-center md:gap-1.5 ${displayedSubView === sub.id
-                        ? 'bg-[var(--accent)] text-white shadow-sm'
-                        : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] active:bg-[var(--muted)] active:text-[var(--foreground)]'
-                      }`}
+                      aria-current={displayedSubView === sub.id ? 'page' : undefined}
+                      className={`app-subnav-item touch-manipulation flex-none px-3 py-2.5 text-center text-[12px] font-semibold tracking-normal whitespace-nowrap md:flex md:min-h-[32px] md:w-full md:items-center md:gap-2 md:px-3 md:py-2 md:text-left ${displayedSubView === sub.id ? 'is-active' : ''}`}
                     >
-                      <span className="hidden md:inline text-[12px] shrink-0" style={{ opacity: displayedSubView === sub.id ? 1 : 0.65 }}>{sub.icon || '·'}</span>
+                      <span className="hidden shrink-0 md:inline-flex" style={{ opacity: displayedSubView === sub.id ? 1 : 0.65 }}>
+                        <MenuIcon name={sub.icon} className="h-[14px] w-[14px]" />
+                      </span>
                       <span className="truncate">{sub.label}</span>
                     </button>
                   ))}
@@ -1127,16 +1146,17 @@ function MainPageContent() {
                 key={sub.id}
                 onClick={() => handleSubViewChange(sub.id)}
                 data-testid={buildSubMenuTestId(mainMenu, sub.id)}
-                className={`touch-manipulation flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-2.5 md:py-1.5 min-h-[36px] md:min-h-0 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all duration-150 whitespace-nowrap md:flex md:items-center md:gap-1.5 ${displayedSubView === sub.id
-                  ? 'bg-[var(--accent)] text-white shadow-sm'
-                  : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] active:bg-[var(--muted)] active:text-[var(--foreground)]'
-                }`}
+                aria-current={displayedSubView === sub.id ? 'page' : undefined}
+                className={`app-subnav-item touch-manipulation flex-none px-3 py-2.5 text-center text-[12px] font-semibold tracking-normal whitespace-nowrap md:flex md:min-h-[32px] md:w-full md:items-center md:gap-2 md:px-3 md:py-2 md:text-left ${displayedSubView === sub.id ? 'is-active' : ''}`}
               >
-                <span className="hidden md:inline text-[12px] shrink-0" style={{ opacity: displayedSubView === sub.id ? 1 : 0.65 }}>{sub.icon || '·'}</span>
+                <span className="hidden shrink-0 md:inline-flex" style={{ opacity: displayedSubView === sub.id ? 1 : 0.65 }}>
+                  <MenuIcon name={sub.icon} className="h-[14px] w-[14px]" />
+                </span>
                 <span className="truncate">{sub.label}</span>
               </button>
             ));
           })()}
+          </div>
         </aside>
       )}
 

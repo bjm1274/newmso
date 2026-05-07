@@ -17,6 +17,7 @@ import {
 
 import dynamic from 'next/dynamic';
 import { hasSystemMasterPermission } from '@/lib/system-master';
+import { MenuIcon } from './조직도서브/조직도측면창';
 
 // ── 서브뷰 lazy 로드 (관리자 메뉴 번들 최소화) ──
 const AdminSubViewLoading = () => (
@@ -103,7 +104,7 @@ function InnerTabBar({
                 : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
             }`}
           >
-            <span className="shrink-0">{tab.icon}</span>
+            <MenuIcon name={tab.icon} className="h-3.5 w-3.5 shrink-0" />
             <span className="whitespace-nowrap break-keep">{tab.label}</span>
           </button>
         ))}
@@ -212,7 +213,7 @@ export default function AdminView(props: Record<string, unknown>) {
       className="relative flex min-h-0 flex-1 flex-col bg-[var(--page-bg)] animate-in fade-in duration-500"
       data-testid="admin-view"
     >
-      <main className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto bg-[var(--muted)]/30 p-3 pb-20 md:p-4">
+      <main className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 pb-20 md:p-4">
         {activeTab === '경영분석' && (
           <>
             <InnerTabBar

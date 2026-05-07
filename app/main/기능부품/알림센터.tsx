@@ -28,6 +28,24 @@ const TYPE_CFG: Record<string, { icon: string; color: string; label: string }> =
 
 const getTypeCfg = (type: string) => TYPE_CFG[type] || TYPE_CFG.default;
 
+function BellIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+      <path d="M10 21h4" />
+    </svg>
+  );
+}
+
 
 export default function NotificationCenter({
   user,
@@ -250,17 +268,17 @@ export default function NotificationCenter({
           if (!isOpen) void fetchNotifications();
           if (!isOpen) sound.playSystem();
         }}
-        className="relative p-2.5 rounded-[var(--radius-lg)] hover:bg-[var(--muted)] transition-colors duration-150 touch-manipulation"
+        className="relative flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] text-[var(--zinc-400)] transition-colors duration-150 hover:bg-[var(--muted)] hover:text-[var(--foreground)] touch-manipulation"
         aria-label="알림"
       >
         <span
-          className={`text-[22px] block leading-none ${bellShaking ? 'animate-bell-shake' : ''}`}
+          className={`block leading-none ${bellShaking ? 'animate-bell-shake' : ''}`}
           style={{ transformOrigin: 'top center' }}
         >
-          🔔
+          <BellIcon className="h-[22px] w-[22px]" />
         </span>
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 min-w-[17px] h-[17px] px-1 flex items-center justify-center bg-red-500/100 text-white text-[9px] font-black rounded-full border-[2px] border-[var(--card)] leading-none">
+          <span className="absolute right-1 top-1 min-w-[8px] h-[8px] rounded-full bg-red-500/100 text-[0px] leading-none">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}

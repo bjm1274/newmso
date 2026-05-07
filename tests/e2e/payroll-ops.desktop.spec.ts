@@ -88,7 +88,16 @@ test('regular payroll settlement stores dependent deductions in the finalized re
   await expect(page.getByTestId('salary-settlement-view')).toBeVisible();
   await page.getByTestId(`salary-settlement-staff-${payrollStaff.id}`).click();
   await page.getByTestId('salary-settlement-next-button').click();
-  await expect(page.getByTestId(`salary-settlement-card-${payrollStaff.id}`)).toBeVisible();
+  const settlementCard = page.getByTestId(`salary-settlement-card-${payrollStaff.id}`);
+  await expect(settlementCard).toBeVisible();
+  await expect(settlementCard.getByText(/10분 단위 1 =/)).toHaveCount(3);
+
+  await page.getByTestId(`salary-settlement-night-duty-${payrollStaff.id}-increase`).click({ delay: 500 });
+  await expect(page.getByTestId(`salary-settlement-night-duty-${payrollStaff.id}-quick-input-panel`)).toBeVisible();
+  await page.getByTestId(`salary-settlement-night-duty-${payrollStaff.id}-quick-input`).fill('1');
+  await page.getByTestId(`salary-settlement-night-duty-${payrollStaff.id}-quick-apply`).click();
+  const oneTenMinuteUnit = parseWon(await page.getByTestId(`salary-settlement-night-duty-${payrollStaff.id}`).inputValue());
+  expect(oneTenMinuteUnit).toBeGreaterThan(1);
 
   await page.getByTestId(`salary-settlement-dependent-count-${payrollStaff.id}`).fill('2');
   await page.getByTestId(`salary-settlement-custom-deduction-${payrollStaff.id}`).fill('10000');

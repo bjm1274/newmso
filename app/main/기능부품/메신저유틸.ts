@@ -3,7 +3,7 @@ import type { ChatRoom, StaffMember } from '@/types';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
 export { NOTICE_ROOM_ID };
-export const NOTICE_ROOM_NAME = '공지메시지';
+export const NOTICE_ROOM_NAME = '공지사항';
 export const SELF_ROOM_NAME = '나와의 채팅';
 export const CAN_WRITE_NOTICE_POSITIONS = ['대표', '부장', '팀장', '실장', '병원장', '이사', '본부장', '총무부장', '진료부장', '간호부장'];
 export const MOBILE_CHAT_MEDIA_QUERY = '(max-width: 767px), (hover: none) and (pointer: coarse)';
@@ -463,7 +463,7 @@ export function getKoreanTodayString() {
 
 export function getRoomDisplayName(room: ChatRoom | null | undefined, staffs: StaffMember[], currentUserId: string | null | undefined): string {
   if (!room) return '채팅방';
-  if (room.id === NOTICE_ROOM_ID) return NOTICE_ROOM_NAME;
+  if (room.id === NOTICE_ROOM_ID) return room.name || NOTICE_ROOM_NAME;
   if (isSelfChatRoom(room, currentUserId)) return SELF_ROOM_NAME;
 
   const members = normalizeMemberIds(room.members);

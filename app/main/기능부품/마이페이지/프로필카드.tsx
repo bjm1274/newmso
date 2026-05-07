@@ -463,7 +463,7 @@ export default function MyProfileCard({
         onClick={() => { if (showSecret) applyShowSecret(false); else verifyPasswordAndRun(() => applyShowSecret(true)); }}
         className="rounded-[var(--radius-md)] border border-transparent bg-[var(--muted)] px-3 py-1.5 text-[11px] font-bold text-[var(--toss-gray-3)] transition-all hover:border-[var(--toss-blue-light)] hover:text-[var(--accent)]"
       >
-        {showSecret ? '민감 정보 숨기기' : '보안 정보 보기'}
+        {showSecret ? '민감 정보 숨기기' : '민감 정보 확인'}
       </button>
       <button
         type="button"
@@ -474,7 +474,7 @@ export default function MyProfileCard({
           : 'bg-[var(--toss-blue-light)] text-[var(--accent)] border-[var(--toss-blue-light)] hover:bg-[var(--toss-blue-light)]'
           }`}
       >
-        {isEditing ? '수정 취소' : '내 정보 수정'}
+        {isEditing ? '수정 취소' : '정보 수정'}
       </button>
     </>
   );
@@ -664,7 +664,7 @@ export default function MyProfileCard({
           className="w-full sm:w-auto py-2.5 rounded-[var(--radius-lg)] bg-[var(--accent)] text-white text-[11px] sm:text-[12px] font-semibold hover:bg-[var(--accent)] transition-all shadow-sm flex items-center justify-center gap-2"
         >
           <span className="text-sm">🚪</span>
-          <span className="tracking-tight">시스템 안전 로그아웃</span>
+          <span className="tracking-tight">로그아웃</span>
         </button>
       </div>
     </div>

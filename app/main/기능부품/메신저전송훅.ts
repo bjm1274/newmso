@@ -18,6 +18,8 @@ import {
   upsertFailedChatRetryEntry,
 } from './메신저재시도큐';
 
+export type { SendMessageOptions } from './메신저메시지서비스';
+
 type DeliveryStateLike = {
   status: 'sending' | 'failed' | 'sent';
   retryPayload?: MessageRetryPayload;

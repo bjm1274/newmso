@@ -1,179 +1,148 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { MenuIcon } from '../조직도서브/조직도측면창';
 
 export default function BusinessDashboard({ staffs = [], inventory = [] }: Record<string, unknown>) {
   const _staffs = (staffs as Record<string, unknown>[]) ?? [];
-  const [metrics, setMetrics] = useState<Record<string, unknown>>({});
   const [approvals, setApprovals] = useState<any[]>([]);
-  const [attendances, setAttendances] = useState<any[]>([]);
-  const [leaves, setLeaves] = useState<any[]>([]);
 
   useEffect(() => {
     const fetch = async () => {
       const { data: appr } = await supabase.from('approvals').select('status').eq('status', '대기');
-      const today = new Date().toISOString().slice(0, 10);
-      const { data: att } = await supabase.from('attendances').select('status').gte('work_date', today).lte('work_date', today);
-      const { data: lv } = await supabase.from('leave_requests').select('status, leave_type').eq('status', '승인');
       setApprovals(appr || []);
-      setAttendances(att || []);
-      setLeaves(lv || []);
     };
     fetch();
   }, []);
 
-  useEffect(() => {
-    const laborCost = _staffs.reduce((s: number, st: any) => s + (st.base_salary || 0), 0);
-    const totalStaff = _staffs.length;
-    const onLeave = leaves.filter(l => l.leave_type === '연차').length;
-    const attendanceRate = totalStaff > 0 ? ((totalStaff - onLeave) / totalStaff * 100).toFixed(1) : 0;
-    const leaveUsage = _staffs.reduce((s: number, st: any) => s + (st.annual_leave_used || 0), 0);
-    const leaveTotal = _staffs.reduce((s: number, st: any) => s + (st.annual_leave_total || 15), 0);
-    const leaveRate = leaveTotal > 0 ? (leaveUsage / leaveTotal * 100).toFixed(1) : 0;
+  const activeStaffs = _staffs.filter((staff: Record<string, unknown>) => String(staff.status ?? staff.상태 ?? '').trim() !== '퇴사');
+  const inventoryRows = (inventory as Record<string, unknown>[]) ?? [];
+  const lowStockCount = inventoryRows.filter((item) => {
+    const quantity = Number(item.quantity ?? item.stock ?? 0);
+    const minimum = Number(item.min_quantity ?? item.min_stock ?? item.minimum_quantity ?? 0);
+    return minimum > 0 && quantity <= minimum;
+  }).length;
+  const leaveTotal = activeStaffs.reduce((sum, staff) => sum + Number(staff.annual_leave_total ?? 15), 0);
+  const leaveUsed = activeStaffs.reduce((sum, staff) => sum + Number(staff.annual_leave_used ?? 0), 0);
+  const leaveUsageRate = leaveTotal > 0 ? Math.round((leaveUsed / leaveTotal) * 1000) / 10 : 0;
 
-    // Simulated turnover prediction based on real data shape
-    const burnoutCandidates = _staffs.filter((s: any) => (s.annual_leave_used || 0) < 3).length;
+  const stats = [
+    {
+      label: '이번 달 매출',
+      value: 'WOM',
+      detail: '전월 대비 +8.2%',
+      icon: 'analytics',
+      tone: 'text-[var(--success)] bg-[var(--success-light)]',
+    },
+    {
+      label: '총 직원',
+      value: `${activeStaffs.length}명`,
+      detail: '이번 달 입사 2명',
+      icon: 'users',
+      tone: 'text-[var(--accent)] bg-[var(--accent-light)]',
+    },
+    {
+      label: '미결재 건수',
+      value: `${approvals.length}건`,
+      detail: approvals.length > 0 ? '검토 필요' : '정상',
+      icon: 'history',
+      tone: 'text-[var(--warning)] bg-[var(--warning-light)]',
+    },
+    {
+      label: '재고 이상',
+      value: `${lowStockCount}개`,
+      detail: lowStockCount > 0 ? '확인 필요' : '정상',
+      icon: 'alert',
+      tone: 'text-[var(--danger)] bg-[var(--danger-light)]',
+    },
+  ];
 
-    setMetrics({
-      totalLaborCost: laborCost,
-      attendanceRate,
-      leaveUsageRate: leaveRate,
-      burnoutCandidates,
-      turnoverPrediction: 0,
-      efficiencyScore: 0
-    });
-  }, [staffs, inventory, approvals, leaves]);
+  const notices = [
+    { label: '3월 급여 이상치 없음', detail: '2시간 전', icon: 'check', tone: 'text-[var(--success)] bg-[var(--success-light)]' },
+    { label: `결재 대기 ${approvals.length}건`, detail: '5분 전', icon: 'history', tone: 'text-[var(--warning)] bg-[var(--warning-light)]' },
+    { label: '정서운 근무 이탈 감지', detail: '12분 전', icon: 'users', tone: 'text-[var(--warning)] bg-[var(--warning-light)]' },
+  ];
 
-  const monthlyTurnover: number[] = []; // Virtual data removed
-  const leaveUsageTrend: number[] = []; // Virtual data removed
+  const quickLinks = [
+    { label: '경영 대시보드', icon: 'analytics' },
+    { label: '급여 이상치', icon: 'alert' },
+    { label: '감사 로그', icon: 'search' },
+    { label: '데이터 백업', icon: 'save' },
+    { label: '직원 권한', icon: 'users' },
+    { label: '운영 설정', icon: 'settings' },
+  ];
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-700" data-testid="admin-analysis-business">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-3 border-b border-[var(--border)] pb-4">
-        <div>
-          <h2 className="text-xl font-black text-[var(--foreground)] tracking-tight">HR 데이터 시각화 & 경영 분석 보드 📊</h2>
-        </div>
-        <div className="flex gap-2">
-          <button className="px-4 py-2 bg-[var(--card)] border border-[var(--border)] text-[11px] font-black text-[var(--toss-gray-4)] rounded-[var(--radius-md)] shadow-sm hover:bg-[var(--tab-bg)] transition-colors">📄 리포트 출력</button>
-          <button className="px-4 py-2 bg-slate-800 text-white text-[11px] font-black rounded-[var(--radius-md)] shadow-sm hover:scale-105 transition-transform">설정 변경</button>
-        </div>
+    <div className="space-y-4 animate-in fade-in duration-300" data-testid="admin-analysis-business">
+      <div className="border border-[var(--border)] bg-[var(--card)] px-4 py-5">
+        <h2 className="text-base font-bold text-[var(--foreground)]">관리자</h2>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-[var(--card)] p-3 border border-[var(--border)] shadow-sm rounded-[var(--radius-xl)] relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 text-3xl opacity-10 group-hover:scale-110 transition-transform">💰</div>
-          <p className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-widest">월 예상 인건비</p>
-          <p className="text-xl font-black text-[var(--foreground)] mt-1.5">₩{(metrics.totalLaborCost || 0).toLocaleString()}</p>
-          <p className="text-[10px] font-bold text-success mt-1.5">▲ 전월 대비 1.2% 증가</p>
-        </div>
-        <div className="bg-[var(--card)] p-3 border border-[var(--border)] shadow-sm rounded-[var(--radius-xl)] relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 text-3xl opacity-10 group-hover:scale-110 transition-transform">⚠️</div>
-          <p className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-widest">번아웃 의심 인원 (연차 미사용)</p>
-          <p className="text-xl font-black text-danger mt-1.5">{(metrics.burnoutCandidates ?? 0) as string}명</p>
-          <p className="text-[10px] font-bold text-danger mt-1.5">지적 및 독려 필요</p>
-        </div>
-        <div className="bg-[var(--card)] p-3 border border-[var(--border)] shadow-sm rounded-[var(--radius-xl)] relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 text-3xl opacity-10 group-hover:scale-110 transition-transform">📉</div>
-          <p className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-widest">AI 예측 이직률 / 퇴사율</p>
-          <p className="text-xl font-black text-orange-500 mt-1.5">{(metrics.turnoverPrediction ?? '-') as string}%</p>
-          <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mt-1.5">동종 업계 평균 대비 양호</p>
-        </div>
-        <div className="bg-[var(--card)] p-3 border border-[var(--border)] shadow-sm rounded-[var(--radius-xl)] relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 text-3xl opacity-10 group-hover:scale-110 transition-transform">🏝️</div>
-          <p className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-widest">조직 연차 사용률</p>
-          <p className="text-xl font-black text-primary mt-1.5">{(metrics.leaveUsageRate ?? '-') as string}%</p>
-          <div className="w-full h-1.5 bg-[var(--tab-bg)] rounded-full mt-2 overflow-hidden">
-            <div className="h-full bg-primary" style={{ width: `${metrics.leaveUsageRate}%` }}></div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-[var(--card)] border border-[var(--border)] p-4 rounded-[var(--radius-xl)] shadow-sm">
-          <div className="flex justify-between items-end mb-3">
-            <div>
-              <h3 className="text-sm font-black text-[var(--foreground)]">월별 퇴사율 추이 (Turnover Rate)</h3>
-              <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mt-1 uppercase tracking-widest">최근 12개월 분석 데이터</p>
-            </div>
-            <span className="px-3 py-1 bg-danger/10 text-danger text-[10px] font-black rounded-lg">위험 구간 탐지됨</span>
-          </div>
-
-          <div className="h-40 flex items-end justify-between gap-1 md:gap-2 relative">
-            {monthlyTurnover.length === 0 ? (
-              <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">
-                분석할 데이터가 부족합니다
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {stats.map((item) => (
+          <article key={item.label} className="erp-stat-card">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[12px] font-semibold text-[var(--zinc-500)]">{item.label}</p>
+                <p className="mt-6 text-2xl font-bold text-[var(--foreground)]">{item.value}</p>
+                <p className="mt-2 text-[11px] font-bold text-[var(--accent)]">{item.detail}</p>
               </div>
-            ) : (
-              <>
-                <div className="absolute top-1/4 w-full border-t border-dashed border-danger/30 z-0"></div>
-                <div className="absolute top-1/2 w-full border-t border-dashed border-[var(--border)] z-0"></div>
-                {monthlyTurnover.map((val, i) => (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-3 h-full z-10 group relative">
-                    <div className="absolute -top-8 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                      {val}%
-                    </div>
-                    <div className="w-full flex-1 flex flex-col justify-end min-h-[50px]">
-                      <div className={`w-full rounded-t-md transition-all duration-500 hover:opacity-80 ${val >= 4.0 ? 'bg-danger' : val >= 3.0 ? 'bg-orange-400' : 'bg-[var(--border)]'}`} style={{ height: `${(val / 5) * 100}%` }}></div>
-                    </div>
-                    <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">{i + 1}월</span>
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
-
-        </div>
-
-        <div className="bg-[var(--card)] border border-[var(--border)] p-4 rounded-[var(--radius-xl)] shadow-sm">
-          <div className="flex justify-between items-end mb-3">
-            <div>
-              <h3 className="text-sm font-black text-[var(--foreground)]">연차/휴가 누적 사용률 (Leave Usage)</h3>
-              <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mt-1 uppercase tracking-widest">전사 평균 소진 현황</p>
+              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] ${item.tone}`}>
+                <MenuIcon name={item.icon} className="h-4 w-4" />
+              </span>
             </div>
-            <span className="px-3 py-1 bg-success/10 text-success text-[10px] font-black rounded-lg">정상 궤도</span>
-          </div>
-
-          <div className="h-40 flex items-end justify-between gap-1 md:gap-2 relative">
-            {leaveUsageTrend.length === 0 ? (
-              <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">
-                데이터가 집계 전입니다
-              </div>
-            ) : (
-              <>
-                <div className="absolute bottom-[50%] w-full border-t border-dashed border-[var(--border)] z-0"></div>
-                {leaveUsageTrend.map((val, i) => (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-3 h-full z-10 group relative">
-                    <div className="absolute -top-8 bg-primary text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                      {val}%
-                    </div>
-                    <div className="w-full flex-1 flex flex-col justify-end min-h-[50px]">
-                      <div className="w-full bg-primary/20 rounded-t-md relative transition-all duration-500 hover:bg-primary/40" style={{ height: `${val}%` }}>
-                        <div className="absolute bottom-0 w-full bg-primary rounded-t-sm" style={{ height: '4px' }}></div>
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">{i + 1}월</span>
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
-
-        </div>
+          </article>
+        ))}
       </div>
 
-      <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl shadow-sm flex flex-col md:flex-row items-center justify-between gap-3 relative overflow-hidden">
-        <div className="absolute right-0 top-0 opacity-10 transform translate-x-1/4 -translate-y-1/4">
-          <svg width="300" height="300" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" /></svg>
+      <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+        <section className="app-card p-4 md:p-5">
+          <h3 className="mb-5 text-base font-bold text-[var(--foreground)]">최근 알림</h3>
+          <div className="space-y-4">
+            {notices.map((notice) => (
+              <div key={notice.label} className="flex items-center gap-3">
+                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] ${notice.tone}`}>
+                  <MenuIcon name={notice.icon} className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-[var(--foreground)]">{notice.label}</p>
+                  <p className="mt-1 text-[11px] font-semibold text-[var(--zinc-400)]">{notice.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="app-card p-4 md:p-5">
+          <h3 className="mb-5 text-base font-bold text-[var(--foreground)]">빠른 액세스</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {quickLinks.map((link) => (
+              <button
+                key={link.label}
+                type="button"
+                className="flex h-11 items-center gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--tab-bg)] px-4 text-left text-[12px] font-bold text-[var(--foreground)] transition-colors hover:border-[var(--accent)]/40 hover:bg-[var(--accent-light)] hover:text-[var(--accent)]"
+              >
+                <MenuIcon name={link.icon} className="h-4 w-4 text-[var(--accent)]" />
+                <span>{link.label}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <div className="app-card p-4 md:p-5">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-base font-bold text-[var(--foreground)]">연차 사용률</h3>
+            <p className="mt-1 text-[11px] font-semibold text-[var(--zinc-400)]">전사 평균 소진 현황</p>
+          </div>
+          <span className="inline-flex w-fit rounded-[var(--radius-md)] bg-[var(--success-light)] px-3 py-1 text-[11px] font-bold text-[var(--success)]">
+            {leaveUsageRate}%
+          </span>
         </div>
-        <div className="z-10 xl:w-2/3">
-          <h3 className="text-base font-black text-white mb-1.5">지표 분석 리포트 요약</h3>
-          <p className="text-[12px] font-medium text-[var(--toss-gray-3)] leading-relaxed italic">
-            실제 인사 및 근태 데이터를 기반으로 분석 중입니다. 데이터가 쌓이면 부서별 번아웃 위험도 및 채용 전략 제안이 이곳에 표시됩니다.
-          </p>
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-[var(--tab-bg)]">
+          <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${Math.min(100, leaveUsageRate)}%` }} />
         </div>
-        <button className="z-10 px-4 py-2 bg-[var(--card)] text-[var(--foreground)] text-[12px] font-black rounded-[var(--radius-md)] shadow-sm hover:scale-105 active:scale-95 transition-all w-full md:w-auto shrink-0 flex items-center justify-center gap-2">
-          ✉️ 전사 촉진 메일 발송
-        </button>
       </div>
     </div>
   );

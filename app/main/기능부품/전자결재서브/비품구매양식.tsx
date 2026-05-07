@@ -15,7 +15,7 @@ import {
   type SupplyRequestMonthlySuggestion,
 } from '@/app/main/inventory-utils';
 
-type SupplyRow = {
+export type SupplyRow = {
   name: string;
   qty: number;
   unit: SupplyRequestItemUnit;
@@ -25,7 +25,7 @@ type SupplyRow = {
   suggestions: InventoryCatalogItem[];
 };
 
-type InventoryCatalogItem = {
+export type InventoryCatalogItem = {
   name: string;
   stock: number;
   min_stock: number;

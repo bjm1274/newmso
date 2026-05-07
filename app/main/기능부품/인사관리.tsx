@@ -5,6 +5,7 @@ import { HR_COMPANY_KEY, HR_STATUS_KEY, HR_TAB_KEY, HR_WORKSPACE_KEY } from '@/a
 import { canAccessHrSection, canAccessMainMenu, isAdminUser } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import 구성원관리 from './인사관리서브/구성원현황';
+import { MenuIcon } from './조직도서브/조직도측면창';
 import dynamic from 'next/dynamic';
 
 // ── 서브뷰 lazy 로드 (인사관리 번들 최소화, 구성원 뷰만 정적) ──
@@ -88,68 +89,68 @@ type AttendanceAnalysisTabDef = {
 };
 
 const HR_WORKSPACES: { id: HrWorkspaceId; label: string; icon: string; groups: HrTabDef['group'][] }[] = [
-  { id: '인력관리', label: '인력관리', icon: '👥', groups: ['인력관리'] },
-  { id: '근태 · 급여', label: '근태 · 급여', icon: '💰', groups: ['근태/급여'] },
-  { id: '복지 · 문서', label: '복지 · 문서', icon: '📂', groups: ['복무/복지', '문서/기타'] },
+  { id: '인력관리', label: '인력관리', icon: 'users', groups: ['인력관리'] },
+  { id: '근태 · 급여', label: '근태 · 급여', icon: 'calculator', groups: ['근태/급여'] },
+  { id: '복지 · 문서', label: '복지 · 문서', icon: 'folder', groups: ['복무/복지', '문서/기타'] },
 ];
 
 const HR_GROUP_LABELS: Record<HrTabDef['group'], string> = {
-  인력관리: '👥 인력관리',
-  '근태/급여': '💰 근태 · 급여',
-  '복무/복지': '🏥 복무 · 복지',
-  '문서/기타': '📂 문서 · 기타',
+  인력관리: '인력관리',
+  '근태/급여': '· 근태/급여',
+  '복무/복지': '· 복무/복지',
+  '문서/기타': '· 문서/기타',
 };
 
 const HR_TABS: HrTabDef[] = [
-  { id: '구성원', label: '구성원', perm: 'hr_구성원', icon: '👥', group: '인력관리' },
-  { id: '인사변동', label: '인사변동', perm: 'hr_인사발령', icon: '🗂️', group: '인력관리' },
-  { id: '입퇴사·교육센터', label: '입퇴사·교육센터', perm: 'hr_교육', icon: '🧭', group: '인력관리' },
-  { id: '근태', label: '근태', perm: 'hr_근태', icon: '⏰', group: '근태/급여' },
-  { id: '연차/휴가', label: '연차 / 휴가', perm: 'hr_연차휴가', icon: '🌴', group: '근태/급여' },
-  { id: '급여', label: '급여', perm: 'hr_급여', icon: '💰', group: '근태/급여' },
-  { id: '경조사', label: '경조사 지원', perm: 'hr_경조사', icon: '🎊', group: '복무/복지' },
-  { id: '자격·안전센터', label: '자격·안전센터', perm: 'hr_건강검진', icon: '🛡️', group: '복무/복지' },
-  { id: '계약', label: '계약 관리', perm: 'hr_계약', icon: '📝', group: '문서/기타' },
-  { id: '문서센터', label: '문서센터', perm: 'hr_문서보관함', icon: '🗃️', group: '문서/기타' },
-  { id: '캘린더', label: '캘린더', perm: 'hr_캘린더', icon: '📅', group: '문서/기타' },
-  { id: '채용관리', label: '채용관리', perm: 'hr_채용', icon: '📢', group: '인력관리' },
+  { id: '구성원', label: '구성원', perm: 'hr_구성원', icon: 'users', group: '인력관리' },
+  { id: '인사변동', label: '인사변동', perm: 'hr_인사발령', icon: 'briefcase', group: '인력관리' },
+  { id: '입퇴사·교육센터', label: '입퇴사·교육센터', perm: 'hr_교육', icon: 'compass', group: '인력관리' },
+  { id: '근태', label: '근태', perm: 'hr_근태', icon: 'history', group: '근태/급여' },
+  { id: '연차/휴가', label: '연차 / 휴가', perm: 'hr_연차휴가', icon: 'calendar', group: '근태/급여' },
+  { id: '급여', label: '급여', perm: 'hr_급여', icon: 'calculator', group: '근태/급여' },
+  { id: '경조사', label: '경조사 지원', perm: 'hr_경조사', icon: 'bell', group: '복무/복지' },
+  { id: '자격·안전센터', label: '자격·안전센터', perm: 'hr_건강검진', icon: 'admin', group: '복무/복지' },
+  { id: '계약', label: '계약 관리', perm: 'hr_계약', icon: 'document', group: '문서/기타' },
+  { id: '문서센터', label: '문서센터', perm: 'hr_문서보관함', icon: 'folder', group: '문서/기타' },
+  { id: '캘린더', label: '캘린더', perm: 'hr_캘린더', icon: 'calendar', group: '문서/기타' },
+  { id: '채용관리', label: '채용관리', perm: 'hr_채용', icon: 'bell', group: '인력관리' },
 ];
 
 const ATTENDANCE_ANALYSIS_TABS: AttendanceAnalysisTabDef[] = [
-  { id: '근태관리', label: '근태 현황', perm: 'hr_근태', icon: '⏰' },
-  { id: '근태이상분석', label: '지각·조퇴·조기퇴근', perm: 'hr_근태', icon: '📊' },
-  { id: '근태차감시뮬레이터', label: '근태 차감 시뮬레이터', perm: 'hr_근태', icon: '🧮' },
-  { id: '근태이상탐지', label: '근태 이상 탐지', perm: 'hr_근태', icon: '🚨' },
-  { id: '근무형태이력', label: '근무형태이력', perm: 'hr_근무형태', icon: '🔁' },
-  { id: '간호근무표', label: '근무표 자동편성', perm: 'hr_근무표생성', icon: '🗓️' },
+  { id: '근태관리', label: '근태 현황', perm: 'hr_근태', icon: 'history' },
+  { id: '근태이상분석', label: '지각·조퇴·조기퇴근', perm: 'hr_근태', icon: 'analytics' },
+  { id: '근태차감시뮬레이터', label: '근태 차감 시뮬레이터', perm: 'hr_근태', icon: 'calculator' },
+  { id: '근태이상탐지', label: '근태 이상 탐지', perm: 'hr_근태', icon: 'alert' },
+  { id: '근무형태이력', label: '근무형태이력', perm: 'hr_근무형태', icon: 'refresh' },
+  { id: '간호근무표', label: '근무표 자동편성', perm: 'hr_근무표생성', icon: 'calendar' },
 ];
 
 const PERSONNEL_SUITE_TABS = [
-  { id: '인사발령', label: '인사발령', perm: 'hr_인사발령', icon: '📋' },
-  { id: '포상/징계', label: '포상 · 징계', perm: 'hr_포상징계', icon: '🏅' },
+  { id: '인사발령', label: '인사발령', perm: 'hr_인사발령', icon: 'clipboard' },
+  { id: '포상/징계', label: '포상 · 징계', perm: 'hr_포상징계', icon: 'tag' },
 ] as const;
 
 const LIFECYCLE_SUITE_TABS = [
-  { id: '교육', label: '교육', perm: 'hr_교육', icon: '📚' },
-  { id: '오프보딩', label: '오프보딩', perm: 'hr_오프보딩', icon: '🚪' },
+  { id: '교육', label: '교육', perm: 'hr_교육', icon: 'document' },
+  { id: '오프보딩', label: '오프보딩', perm: 'hr_오프보딩', icon: 'return' },
 ] as const;
 
 const COMPLIANCE_SUITE_TABS = [
-  { id: '건강검진', label: '건강검진', perm: 'hr_건강검진', icon: '🩺' },
-  { id: '면허/자격증', label: '면허 · 자격증', perm: 'hr_면허자격증', icon: '📜' },
-  { id: '의료기기점검', label: '의료기기점검', perm: 'hr_의료기기점검', icon: '🔧' },
-  { id: '사고보고서', label: '사고보고서', perm: 'hr_사고보고서', icon: '🚨' },
+  { id: '건강검진', label: '건강검진', perm: 'hr_건강검진', icon: 'check' },
+  { id: '면허/자격증', label: '면허 · 자격증', perm: 'hr_면허자격증', icon: 'document' },
+  { id: '의료기기점검', label: '의료기기점검', perm: 'hr_의료기기점검', icon: 'settings' },
+  { id: '사고보고서', label: '사고보고서', perm: 'hr_사고보고서', icon: 'alert' },
 ] as const;
 
 const DOCUMENT_CENTER_TABS = [
-  { id: '문서보관함', label: '문서보관함', perm: 'hr_문서보관함', icon: '📁' },
-  { id: '증명서', label: '증명서 발급', perm: 'hr_증명서', icon: '📄' },
-  { id: '서류제출', label: '서류 제출', perm: 'hr_서류제출', icon: '📤' },
+  { id: '문서보관함', label: '문서보관함', perm: 'hr_문서보관함', icon: 'folder' },
+  { id: '증명서', label: '증명서 발급', perm: 'hr_증명서', icon: 'document' },
+  { id: '서류제출', label: '서류 제출', perm: 'hr_서류제출', icon: 'send' },
 ] as const;
 
 const CONTRACT_UTILITY_TABS = [
-  { id: '기본', label: '계약 현황', icon: '📝' },
-  { id: '계약서생성기', label: '계약서 자동생성', icon: '🧾' },
+  { id: '기본', label: '계약 현황', icon: 'document' },
+  { id: '계약서생성기', label: '계약서 자동생성', icon: 'wand' },
 ] as const;
 
 const LEAVE_SUITE_MENU_MAP: Record<string, LeaveSuiteTabId> = {
@@ -439,7 +440,7 @@ function SectionTabBar({
                 : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)]'
             }`}
           >
-            <span className="shrink-0 text-[12px]">{tab.icon}</span>
+            <MenuIcon name={tab.icon} className="h-[14px] w-[14px] shrink-0" />
             <span className="whitespace-nowrap break-keep">{tab.label}</span>
           </button>
         ))}
@@ -480,15 +481,11 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
   const visibleHrTabs = HR_TABS.filter((tab) => canAccessHrTab(user, tab));
   const visibleHrTabIds = visibleHrTabs.map((tab) => tab.id);
   const activeMenu = visibleHrTabs.some((tab) => tab.id === 현재메뉴) ? 현재메뉴 : (visibleHrTabs[0]?.id || '구성원');
-  const availableWorkspaces = HR_WORKSPACES.filter((workspace) =>
-    visibleHrTabs.some((tab) => workspace.groups.includes(tab.group))
-  );
-  const activeWorkspace = availableWorkspaces.some((workspace) => workspace.id === 선택워크스페이스)
-    ? 선택워크스페이스
-    : (availableWorkspaces[0]?.id || '인력관리');
+  const activeWorkspace = normalizeWorkspaceId(선택워크스페이스) || getWorkspaceForHrMenu(activeMenu);
   const activeWorkspaceConfig = HR_WORKSPACES.find((workspace) => workspace.id === activeWorkspace) || HR_WORKSPACES[0];
-  const workspaceTabs = visibleHrTabs.filter((tab) => activeWorkspaceConfig.groups.includes(tab.group));
-  const visibleAttendanceTabs = ATTENDANCE_ANALYSIS_TABS.filter((tab) => canAccessHrSection(user, tab.perm));
+  const activeWorkspaceGroups = activeWorkspaceConfig.groups;
+  const visibleWorkspaceTabs = visibleHrTabs.filter((tab) => activeWorkspaceGroups.includes(tab.group));
+  const visibleHrGroups = Array.from(new Set(visibleWorkspaceTabs.map((tab) => tab.group)));
   const visiblePersonnelTabs = PERSONNEL_SUITE_TABS.filter((tab) => canAccessHrSection(user, tab.perm));
   const visibleLifecycleTabs = LIFECYCLE_SUITE_TABS.filter((tab) => canAccessHrSection(user, tab.perm));
   const visibleComplianceTabs = COMPLIANCE_SUITE_TABS.filter((tab) => canAccessHrSection(user, tab.perm));
@@ -571,20 +568,18 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
     휴가내부탭설정(getLeaveSuiteInitialTab(requestedMenu));
   };
 
-  const handleWorkspaceChange = (workspaceId: HrWorkspaceId) => {
-    워크스페이스설정(workspaceId);
-    const workspaceConfig = HR_WORKSPACES.find((workspace) => workspace.id === workspaceId);
-    if (!workspaceConfig) return;
-    if (!workspaceConfig.groups.some((group) => visibleHrTabs.some((tab) => tab.id === activeMenu && tab.group === group))) {
-      const nextTab = visibleHrTabs.find((tab) => workspaceConfig.groups.includes(tab.group));
-      if (nextTab) {
-        메뉴설정(nextTab.id);
-      }
-    }
-  };
-
   const handleMenuSelect = (menuId: HrMenuId) => {
     적용입장메뉴(menuId);
+  };
+
+  const handleWorkspaceSelect = (workspaceId: HrWorkspaceId) => {
+    const workspace = HR_WORKSPACES.find((item) => item.id === workspaceId);
+    if (!workspace) return;
+    워크스페이스설정(workspaceId);
+    const firstTab = visibleHrTabs.find((tab) => workspace.groups.includes(tab.group));
+    if (firstTab) {
+      적용입장메뉴(firstTab.id);
+    }
   };
 
   useEffect(() => {
@@ -630,15 +625,12 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
   }, [activeMenu, visibleHrTabIdsKey]);
 
   useEffect(() => {
-    if (workspaceTabs.some((tab) => tab.id === activeMenu)) {
-      return;
+    if (visibleWorkspaceTabs.some((tab) => tab.id === activeMenu)) return;
+    const fallbackTab = visibleWorkspaceTabs[0];
+    if (fallbackTab) {
+      메뉴설정(fallbackTab.id);
     }
-
-    const fallbackTab = workspaceTabs[0]?.id;
-    if (fallbackTab && fallbackTab !== activeMenu) {
-      메뉴설정(fallbackTab);
-    }
-  }, [activeMenu, workspaceTabs]);
+  }, [activeMenu, visibleWorkspaceTabs]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -676,73 +668,63 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
   return (
     <div className="app-page flex h-full min-h-0 flex-col overflow-x-hidden md:flex-row">
       {/* ── 사이드바 ── */}
-      <aside className="flex h-auto w-full shrink-0 flex-col overflow-hidden border-b border-[var(--border)] bg-[var(--card)] md:sticky md:top-0 md:h-[100dvh] md:max-h-[100dvh] md:w-48 md:border-b-0 md:border-r">
-
-        {/* 데스크탑 전용 헤더 */}
-        <div className="hidden shrink-0 border-b border-[var(--border)] px-4 py-3.5 md:block">
-          <p className="text-[13px] font-bold text-[var(--foreground)]">인사관리</p>
-          <p className="mt-0.5 text-[10px] text-[var(--toss-gray-3)]">
-            {인사직원목록.length > 0 ? `${인사직원목록.length}명 등록됨` : '직원 정보 관리'}
-          </p>
+      <aside className="app-subnav no-scrollbar scroll-smooth snap-x snap-mandatory flex h-auto w-full shrink-0 flex-col overflow-x-auto border-b md:sticky md:top-0 md:h-[100dvh] md:max-h-[100dvh] md:w-[var(--submenu-width)] md:snap-none md:overflow-x-visible md:overflow-y-auto md:border-b-0 md:border-r">
+        <div className="hidden px-4 pt-4 md:block">
+          <h2 className="app-subnav-title">인사관리</h2>
+          <p className="mt-2 text-[11px] font-semibold text-[var(--zinc-400)]">{인사직원목록.length}명 등록됨</p>
+          <div className="mt-4 h-px bg-[var(--border)]" />
         </div>
 
-        {/* 워크스페이스 탭 */}
-        <div className="shrink-0 border-b border-[var(--border)] px-2 py-2 md:px-3 md:py-2.5">
-          <p className="mb-1.5 hidden px-1 text-[9px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)] md:block">
-            업무 공간
-          </p>
-          <div className="flex gap-1 md:flex-col md:gap-1">
-            {availableWorkspaces.map((workspace) => (
-              <button
-                key={workspace.id}
-                type="button"
-                onClick={() => handleWorkspaceChange(workspace.id)}
-                data-testid={`hr-workspace-${workspace.id}`}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-md)] px-2 py-2 text-[11px] font-bold transition-all md:w-full md:flex-none md:justify-start md:px-3 md:py-2 ${
-                  activeWorkspace === workspace.id
-                    ? 'bg-[var(--accent)] text-white shadow-sm'
-                    : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
-                }`}
-              >
-                <span className="shrink-0 text-[13px] md:text-sm">{workspace.icon}</span>
-                <span className="truncate whitespace-nowrap break-keep text-[10px] md:text-[11px]">{workspace.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 메뉴 탭 */}
         <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
-          {/* 모바일: 가로 스크롤 chip */}
-          <div className="no-scrollbar flex gap-1.5 overflow-x-auto px-2 py-2 md:hidden">
-            {workspaceTabs.map(({ id, label, icon }) => (
+          <div className="no-scrollbar flex gap-0.5 overflow-x-auto px-2 py-1.5 md:hidden">
+            {visibleHrTabs.map(({ id, label, icon }) => (
               <button
                 key={id}
                 type="button"
                 onClick={() => handleMenuSelect(id)}
                 data-testid={`hr-menu-${id}`}
-                className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-3 py-1.5 text-[11px] font-semibold transition-all ${
+                className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[var(--radius-md)] px-3 py-2.5 text-[12px] font-semibold tracking-normal transition-all ${
                   activeMenu === id
                     ? 'bg-[var(--accent)] text-white shadow-sm'
-                    : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
+                    : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
                 }`}
               >
-                <span className="text-[10px]">{icon}</span>
+                <MenuIcon name={icon} className="h-[14px] w-[14px] shrink-0" />
                 <span>{label}</span>
               </button>
             ))}
           </div>
 
-          {/* 데스크탑: 그룹 목록 */}
-          <div className="hidden px-2 py-1 md:block">
-            {activeWorkspaceConfig.groups.map((group, index) => {
-              const groupTabs = workspaceTabs.filter((tab) => tab.group === group);
+          <div className="hidden px-2 py-3 md:block">
+            <div className="mb-5 flex flex-col gap-0.5">
+              <p className="app-subnav-group-label px-2 pb-1 select-none">업무 공간</p>
+              {HR_WORKSPACES.map((workspace) => {
+                const isActive = activeWorkspace === workspace.id;
+                const disabled = !visibleHrTabs.some((tab) => workspace.groups.includes(tab.group));
+                return (
+                  <button
+                    key={workspace.id}
+                    type="button"
+                    onClick={() => handleWorkspaceSelect(workspace.id)}
+                    disabled={disabled}
+                    className={`app-subnav-item flex min-h-[32px] w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-semibold tracking-normal disabled:cursor-not-allowed disabled:opacity-40 ${isActive ? 'is-active' : ''}`}
+                  >
+                    <span className="inline-flex shrink-0" style={{ opacity: isActive ? 1 : 0.65 }}>
+                      <MenuIcon name={workspace.icon} className="h-[14px] w-[14px]" />
+                    </span>
+                    <span className="truncate">{workspace.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {visibleHrGroups.map((group) => {
+              const groupTabs = visibleWorkspaceTabs.filter((tab) => tab.group === group);
               if (groupTabs.length === 0) return null;
 
               return (
-                <div key={group} className={index > 0 ? 'mt-2 border-t border-[var(--border)] pt-2' : 'pt-1'}>
-                  <p className="mb-1 px-1 text-[9px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">
-                    {HR_GROUP_LABELS[group]?.replace(/^[^\s]+ /, '')}
+                <div key={group} className="mb-5 flex flex-col gap-0.5">
+                  <p className="app-subnav-group-label px-2 pb-1 select-none">
+                    {HR_GROUP_LABELS[group] || group}
                   </p>
                   {groupTabs.map(({ id, label, icon }) => (
                     <button
@@ -750,13 +732,12 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                       type="button"
                       onClick={() => handleMenuSelect(id)}
                       data-testid={`hr-menu-${id}`}
-                      className={`flex w-full items-center gap-2 rounded-[var(--radius-md)] px-3 py-2 text-left text-[11px] font-semibold transition-all ${
-                        activeMenu === id
-                          ? 'bg-[var(--accent)] text-white shadow-sm'
-                          : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
-                      }`}
+                      aria-current={activeMenu === id ? 'page' : undefined}
+                      className={`app-subnav-item flex min-h-[32px] w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-semibold tracking-normal ${activeMenu === id ? 'is-active' : ''}`}
                     >
-                      <span className="shrink-0 text-[12px]">{icon}</span>
+                      <span className="inline-flex shrink-0" style={{ opacity: activeMenu === id ? 1 : 0.65 }}>
+                        <MenuIcon name={icon} className="h-[14px] w-[14px]" />
+                      </span>
                       <span className="truncate">{label}</span>
                     </button>
                   ))}
@@ -766,9 +747,8 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
           </div>
         </div>
 
-        {/* 필터 */}
-        <div className="shrink-0 border-t border-[var(--border)] px-2 py-2 md:sticky md:bottom-0 md:z-10 md:px-3">
-          <div className="flex gap-1.5 md:flex-col md:gap-2">
+        <div className="shrink-0 border-t border-[var(--border)] px-2 py-2 md:sticky md:bottom-0 md:z-10 md:bg-[var(--card)] md:px-3">
+          <div className="flex gap-1.5 md:flex-col md:gap-1.5">
             <select
               data-testid="hr-company-select"
               value={선택사업체}
@@ -861,11 +841,6 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
 
           {activeMenu === '근태' && (
             <div className="flex h-full flex-col">
-              <SectionTabBar
-                tabs={visibleAttendanceTabs}
-                activeTab={activeAttendanceTab}
-                onChange={(tabId) => 근태분석탭설정(tabId as AttendanceAnalysisTabId)}
-              />
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {activeAttendanceTab === '근태관리' && <AttendanceMain staffs={인사직원목록} selectedCo={선택사업체} user={user} />}
                 {activeAttendanceTab === '근태이상분석' && (

@@ -258,6 +258,7 @@ export default function MainContent({
             onConsumeMyPageInitialTab={onConsumeMyPageInitialTab}
             onOpenApproval={onOpenApproval}
             setMainMenu={setMainMenu}
+            setSubView={setSubView}
             onOpenChatMessage={onOpenChatMessage}
             selectedCo={selectedCo}
             selectedCompanyId={selectedCompanyId}
@@ -305,11 +306,11 @@ export default function MainContent({
         <div className="min-h-0 flex-1 overflow-x-hidden">
           <BoardView
             user={user}
-            subView={subView || '怨듭??ы빆'}
+            subView={subView || '공지사항'}
             setSubView={setSubView}
             selectedCo={selectedCo}
             selectedCompanyId={selectedCompanyId}
-            initialBoard={subView || '怨듭??ы빆'}
+            initialBoard={subView || '공지사항'}
             initialPostId={initialOpenPostId}
             onConsumePostId={onConsumeOpenPostId}
             surgeries={data.surgeries}
@@ -407,7 +408,7 @@ export default function MainContent({
                 onClick={() => setAnnualLeaveNotice(null)}
                 className="flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] transition-colors text-base"
               >
-                횞
+                ×
               </button>
             </div>
             <div className="rounded-[var(--radius-md)] border border-[#FFE4A0] bg-[#FFF8E6] p-3">
@@ -422,7 +423,7 @@ export default function MainContent({
               onClick={() => setAnnualLeaveNotice(null)}
               className="w-full rounded-[var(--radius-md)] bg-[var(--accent)] py-2.5 text-[13px] font-semibold text-white transition-all duration-150 hover:bg-[var(--accent-hover)] active:scale-[0.98]"
             >
-              ?뺤씤?덉뒿?덈떎
+              확인했습니다
             </button>
           </div>
         </div>

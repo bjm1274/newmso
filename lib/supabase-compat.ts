@@ -3,6 +3,56 @@ type SupabaseResult<T> = {
   error: any;
 };
 
+const missingRelations = new Set<string>();
+const missingColumnFallbackCache = new Map<string, Set<string>>();
+
+function normalizeRelationName(relationName: string): string {
+  return relationName.trim().toLowerCase();
+}
+
+function hasMissingRelationSignal(message: string): boolean {
+  return (
+    (message.includes('relation') && message.includes('does not exist')) ||
+    message.includes('could not find the table') ||
+    message.includes('schema cache')
+  );
+}
+
+export function isMissingRelationError(error: any, relationName?: string): boolean {
+  if (!error) return false;
+
+  const code = String(error?.code || '').trim();
+  const haystack = [error?.message, error?.details, error?.hint]
+    .map((value) => String(value || '').toLowerCase())
+    .join(' ');
+
+  if (relationName) {
+    const target = normalizeRelationName(relationName);
+    return (
+      code === '42P01' ||
+      code === 'PGRST205' ||
+      (hasMissingRelationSignal(haystack) &&
+        (haystack.includes(target) || haystack.includes(`public.${target}`)))
+    );
+  }
+
+  return (
+    code === '42P01' ||
+    code === 'PGRST205' ||
+    hasMissingRelationSignal(haystack)
+  );
+}
+
+export function rememberMissingRelation(error: any, relationName: string): boolean {
+  if (!isMissingRelationError(error, relationName)) return false;
+  missingRelations.add(normalizeRelationName(relationName));
+  return true;
+}
+
+export function isRelationMarkedMissing(relationName: string): boolean {
+  return missingRelations.has(normalizeRelationName(relationName));
+}
+
 export function isMissingColumnError(error: any, columnName = 'company_id'): boolean {
   if (!error) return false;
   const message = String(error?.message || '').toLowerCase();
@@ -35,8 +85,11 @@ export async function withMissingColumnFallback<T>(
 export async function withMissingColumnsFallback<T>(
   execute: (omittedColumns: ReadonlySet<string>) => PromiseLike<SupabaseResult<T>>,
   columnNames: string[],
+  options?: { cacheKey?: string },
 ): Promise<SupabaseResult<T>> {
-  const omittedColumns = new Set<string>();
+  const omittedColumns = new Set<string>(
+    options?.cacheKey ? missingColumnFallbackCache.get(options.cacheKey) ?? [] : []
+  );
   let result = await execute(omittedColumns);
 
   while (result.error) {
@@ -50,6 +103,9 @@ export async function withMissingColumnsFallback<T>(
     }
 
     omittedColumns.add(missingColumn);
+    if (options?.cacheKey) {
+      missingColumnFallbackCache.set(options.cacheKey, new Set(omittedColumns));
+    }
     result = await execute(omittedColumns);
   }
 

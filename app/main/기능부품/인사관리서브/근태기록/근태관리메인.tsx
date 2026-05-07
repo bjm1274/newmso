@@ -8,6 +8,7 @@ import { filterRosterShiftsForDepartment } from '@/lib/roster-shift-team-filter'
 import SmartDatePicker from '../../공통/SmartDatePicker';
 import SmartMonthPicker from '../../공통/SmartMonthPicker';
 import NurseSchedule from '../간호근무표';
+import { MenuIcon } from '../../조직도서브/조직도측면창';
 
 type StaffMember = {
   id: string;
@@ -1570,8 +1571,8 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
           <div className="flex-1 w-full">
             <div className="flex items-center gap-3 mb-4 block w-full">
-              <div className="w-10 h-10 rounded-xl bg-[var(--accent)] flex items-center justify-center text-white font-bold text-lg shadow-sm shrink-0">
-                🕒
+              <div className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--accent)] flex items-center justify-center text-white shadow-sm shrink-0">
+                <MenuIcon name="history" className="h-5 w-5" />
               </div>
               <div>
                 <h2 className="text-xl font-bold text-foreground">
@@ -1582,19 +1583,19 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
 
             <div className="flex items-center gap-1 bg-[var(--tab-bg)]/80 dark:bg-zinc-800/80 p-1 rounded-[var(--radius-lg)] w-fit border border-[var(--border)]/50 dark:border-zinc-700/50 overflow-x-auto custom-scrollbar">
               {[
-                { id: 'dashboard', label: '대시보드', icon: '📊' },
-                ...((canCreateRoster || canApproveRoster) ? [{ id: 'schedule', label: '근무표 생성', icon: '📝' }] : []),
-                { id: 'calendar', label: '근태 달력', icon: '🗓️' }
+                { id: 'dashboard', label: '대시보드', icon: 'analytics' },
+                ...((canCreateRoster || canApproveRoster) ? [{ id: 'schedule', label: '근무표 생성', icon: 'edit' }] : []),
+                { id: 'calendar', label: '근태 달력', icon: 'calendar' }
               ].map(mode => (
                 <button
                   key={mode.id}
                   onClick={() => handleAttendanceViewChange(mode.id as 'dashboard' | 'daily' | 'monthly' | 'calendar' | 'schedule')}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-[var(--radius-md)] text-[12px] font-bold transition-all whitespace-nowrap ${mainViewButtonKey === mode.id
-                    ? 'bg-[var(--card)] dark:bg-zinc-700 text-foreground shadow-sm ring-1 ring-zinc-900/5 dark:ring-white/10'
+                    ? 'bg-[var(--accent)] text-white shadow-sm'
                     : 'text-[var(--toss-gray-4)] hover:text-foreground hover:bg-[var(--card)]/50 dark:hover:bg-zinc-700/50'
                     }`}
                 >
-                  <span className="text-sm">{mode.icon}</span>
+                  <MenuIcon name={mode.icon} className="h-4 w-4 shrink-0" />
                   {mode.label}
                 </button>
               ))}
@@ -1607,7 +1608,7 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
               onClick={() => setBulkEditOpen(true)}
               className="flex items-center gap-2 px-3 py-2.5 rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--card)] dark:bg-zinc-800 text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] border border-[var(--border)] dark:border-zinc-700 shadow-sm hover:border-blue-400 hover:text-blue-600 transition-colors whitespace-nowrap focus:outline-none"
             >
-              <span className="text-sm">⚡</span> 상태 일괄 수정
+              <MenuIcon name="alert" className="h-4 w-4 shrink-0" /> 상태 일괄 수정
             </button>
 
             <div className="flex items-center bg-[var(--card)] dark:bg-zinc-800 border border-[var(--border)] dark:border-zinc-700 rounded-[var(--radius-md)] p-1 shadow-sm shrink-0 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">

@@ -6,6 +6,7 @@ import { isExpirySoon } from '@/app/main/inventory-utils';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import ExpirationAlert from './유효기간알림';
+import { MenuIcon } from '../조직도서브/조직도측면창';
 
 // ─────────────────────────────────────────────────────
 // Types
@@ -105,13 +106,33 @@ function StatPill({ label, value, color }: { label: string; value: string | numb
   );
 }
 
-function StockBar({ current, min }: { current: number; min: number }) {
-  if (min === 0) return null;
-  const pct = Math.min(100, Math.round((current / Math.max(min * 2, 1)) * 100));
-  const color = current <= min ? 'bg-red-500' : current <= min * 1.5 ? 'bg-amber-400' : 'bg-emerald-500';
+function InventoryMetricCard({
+  label,
+  value,
+  icon,
+  tone = 'blue',
+}: {
+  label: string;
+  value: string;
+  icon: string;
+  tone?: 'blue' | 'red' | 'green';
+}) {
+  const toneClass =
+    tone === 'red'
+      ? 'bg-red-50 text-red-500'
+      : tone === 'green'
+        ? 'bg-emerald-50 text-emerald-500'
+        : 'bg-blue-50 text-[var(--accent)]';
+
   return (
-    <div className="mt-1.5 h-1.5 w-full rounded-full bg-[var(--border)]">
-      <div className={`h-1.5 rounded-full ${color} transition-all`} style={{ width: `${pct}%` }} />
+    <div className="erp-stat-card flex items-start justify-between gap-4">
+      <div className="space-y-4">
+        <p className="text-[12px] font-semibold text-[var(--zinc-500)]">{label}</p>
+        <p className="text-[26px] font-black leading-none tracking-normal text-[var(--foreground)]">{value}</p>
+      </div>
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] ${toneClass}`}>
+        <MenuIcon name={icon} className="h-4 w-4" />
+      </span>
     </div>
   );
 }
@@ -126,7 +147,7 @@ export default function InventoryStatusView({
   searchKeyword, setSearchKeyword, statusFilter, setStatusFilter,
   companiesInInventory, departmentsByViewCompany,
   loading, onRefresh,
-  onStockIn, onStockOut, onReorder, onDelete,
+  onReorder,
   isOpsUser, pendingApprovals, completedApprovals,
   workflowActionKey, highlightedApprovalId,
   onSupplyIssue, onSupplyIssueCancel, onSupplyOrder, onSupplyOrderCancel, onOpenLinkedOrder,
@@ -214,7 +235,7 @@ export default function InventoryStatusView({
 
   // 카테고리 필터 적용 후 정렬
   const sorted = useMemo(() => {
-    let list = categoryFilter === '전체' ? [...filteredInventory] : filteredInventory.filter((i) => (i.category || '').trim() === categoryFilter);
+    const list = categoryFilter === '전체' ? [...filteredInventory] : filteredInventory.filter((i) => (i.category || '').trim() === categoryFilter);
     if (sortBy === 'name') list.sort((a, b) => name(a).localeCompare(name(b), 'ko'));
     else if (sortBy === 'stock') list.sort((a, b) => {
       const aUrgent = qty(a) <= minQty(a);
@@ -236,7 +257,7 @@ export default function InventoryStatusView({
       return bv - av;
     });
     return list;
-  }, [filteredInventory, sortBy]);
+  }, [categoryFilter, filteredInventory, sortBy]);
 
   // 페이지네이션 - 필터/정렬 변경 시 1페이지로 리셋
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
@@ -254,9 +275,35 @@ export default function InventoryStatusView({
 
   return (
     <div className="space-y-3">
+      <div className="erp-panel p-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="inline-flex min-h-10 items-center gap-2 rounded-[var(--radius-md)] bg-[var(--accent)] px-5 text-[12px] font-bold text-white shadow-sm"
+          >
+            <MenuIcon name="inventory-status" className="h-4 w-4" />
+            전체 현황
+          </button>
+          <button
+            type="button"
+            onClick={() => openView('내부서재고')}
+            className="inline-flex min-h-10 items-center gap-2 rounded-[var(--radius-md)] px-4 text-[12px] font-bold text-[var(--zinc-600)] transition-colors hover:bg-[var(--nav-hover)] hover:text-[var(--foreground)]"
+          >
+            <MenuIcon name="inventory" className="h-4 w-4" />
+            부서별 재고
+          </button>
+        </div>
+      </div>
+
+      <div className="erp-stat-grid">
+        <InventoryMetricCard label="총 품목" value={`${filteredInventory.length.toLocaleString('ko-KR')}개`} icon="inventory" />
+        <InventoryMetricCard label="부족 품목" value={`${lowStockCount.toLocaleString('ko-KR')}개`} icon="alert" tone="red" />
+        <InventoryMetricCard label="이번 달 입고" value="0건" icon="send" tone="green" />
+        <InventoryMetricCard label="이번 달 출고" value="0건" icon="download" />
+      </div>
 
       {/* ── 1. 컨트롤 바 ──────────────────────────────── */}
-      <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] px-4 py-3 space-y-3">
+      <div className="hidden">
         {/* 검색 */}
         <div className="relative w-full">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--toss-gray-3)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -357,7 +404,7 @@ export default function InventoryStatusView({
 
       {/* ── 2. 긴급 알림 배너 ─────────────────────────── */}
       {hasAlert && (
-        <div className="bg-red-500/8 border border-red-200 rounded-[var(--radius-xl)] px-4 py-3">
+        <div className="hidden">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex items-center gap-2">
@@ -396,7 +443,7 @@ export default function InventoryStatusView({
 
       {/* ── 3. 공급신청 워크플로우 (ops only) ─────────── */}
       {hasPending && (
-        <div className="bg-[var(--card)] border border-[var(--accent)]/30 rounded-[var(--radius-xl)] overflow-hidden">
+        <div className="hidden">
           <button
             type="button"
             className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-[var(--muted)]/30 transition-all"
@@ -503,7 +550,7 @@ export default function InventoryStatusView({
 
       {/* 처리완료 히스토리 (접이식) */}
       {isOpsUser && completedApprovals.length > 0 && (
-        <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] overflow-hidden">
+        <div className="hidden">
           <button
             type="button"
             className="w-full flex items-center justify-between px-5 py-3 hover:bg-[var(--muted)]/30 transition-all"
@@ -546,9 +593,9 @@ export default function InventoryStatusView({
       )}
 
       {/* ── 4. 재고 테이블 ────────────────────────────── */}
-      <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] overflow-hidden">
+      <div className="erp-table-card">
         {/* 테이블 헤더 */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--muted)]/30">
+        <div className="hidden">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-[var(--foreground)]">
               품목 목록 <span className="text-[var(--toss-gray-3)] font-normal">{filteredInventory.length}건</span>
@@ -599,24 +646,25 @@ export default function InventoryStatusView({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left min-w-[800px]">
+            <table className="erp-table min-w-[900px]">
               <thead>
-                <tr className="border-b border-[var(--border)] text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wide">
+                <tr>
                   {batchMode && (
-                    <th className="px-3 py-2.5 w-8">
+                    <th className="w-8">
                       <input type="checkbox" checked={batchSelectedIds.length === pagedItems.length && pagedItems.length > 0} onChange={() => toggleBatchAll(pagedItems.map((i) => i.id))} className="w-4 h-4 accent-[var(--accent)]" />
                     </th>
                   )}
-                  <th className="w-1" />
-                  <th className="px-4 py-2.5">품목</th>
-                  <th className="px-4 py-2.5">회사 / 부서</th>
-                  <th className="px-4 py-2.5 text-center">재고</th>
-                  <th className="px-4 py-2.5 text-center">유효기간</th>
-                  <th className="px-4 py-2.5 text-right">단가 / 총액</th>
-                  <th className="px-4 py-2.5 text-right">관리</th>
+                  <th>품목명</th>
+                  <th>카테고리</th>
+                  <th>회사</th>
+                  <th className="text-center">현재 재고</th>
+                  <th>단위</th>
+                  <th className="text-center">최소 재고</th>
+                  <th>상태</th>
+                  <th className="text-right">관리</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--border)]">
+              <tbody>
                 {pagedItems.map((item) => {
                   const q = qty(item);
                   const mq = minQty(item);
@@ -627,90 +675,66 @@ export default function InventoryStatusView({
                   const lot = itemEx.lot_number ? String(itemEx.lot_number) : null;
                   const sn = itemEx.serial_number ? String(itemEx.serial_number) : null;
                   const isUdi = Boolean(itemEx.is_udi);
-                  const price = Number(itemEx.unit_price || 0);
                   const expiryDate = itemEx.expiry_date ? String(itemEx.expiry_date) : null;
 
-                  const statusColor = isOos ? 'bg-red-500' : isLow ? 'bg-red-400' : isExpiry ? 'bg-amber-400' : 'bg-emerald-400';
+                  const unit = String(itemEx.unit || '개');
 
                   return (
-                    <tr key={item.id} className={`group hover:bg-[var(--muted)]/30 transition-colors ${batchMode && batchSelectedIds.includes(item.id) ? 'bg-[var(--accent)]/5' : ''}`}>
+                    <tr key={item.id} className={`group ${batchMode && batchSelectedIds.includes(item.id) ? 'bg-[var(--accent)]/5' : ''}`}>
                       {/* 배치 체크박스 */}
                       {batchMode && (
-                        <td className="px-3 py-3">
+                        <td>
                           <input type="checkbox" checked={batchSelectedIds.includes(item.id)} onChange={() => toggleBatchItem(item.id)} className="w-4 h-4 accent-[var(--accent)]" />
                         </td>
                       )}
-                      {/* 상태 표시선 */}
-                      <td className="pl-3 pr-0 py-3">
-                        <div className={`w-1 h-10 rounded-full ${statusColor}`} />
-                      </td>
 
                       {/* 품목명 */}
-                      <td className="px-4 py-3">
-                        <p className="text-xs font-semibold text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors">{name(item)}</p>
+                      <td>
+                        <p className="font-bold text-[var(--foreground)]">{name(item)}</p>
                         <div className="flex gap-1 mt-1 flex-wrap">
-                          <span className="text-[9px] text-[var(--toss-gray-3)]">{item.category || '미분류'}</span>
                           {lot && <span className="text-[9px] font-semibold bg-[var(--muted)] text-[var(--toss-gray-4)] px-1.5 py-0.5 rounded">LOT: {lot}</span>}
                           {sn && <span className="text-[9px] font-semibold bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded">S/N: {sn}</span>}
                           {isUdi && <span className="text-[9px] font-bold bg-purple-500/10 text-purple-600 px-1.5 py-0.5 rounded uppercase">UDI</span>}
                         </div>
                       </td>
 
-                      {/* 회사/부서 */}
-                      <td className="px-4 py-3">
-                        <p className="text-[11px] font-semibold text-[var(--accent)]">{item.company || '-'}</p>
-                        <p className="text-[10px] text-[var(--toss-gray-3)]">{dept(item) || '부서 미지정'}</p>
+                      <td>
+                        <span className="erp-chip">{item.category || '미분류'}</span>
                       </td>
 
-                      {/* 재고 */}
-                      <td className="px-4 py-3 text-center">
-                        <p className={`text-sm font-black leading-none ${isOos ? 'text-red-500' : isLow ? 'text-red-500' : 'text-[var(--foreground)]'}`}>{q}</p>
-                        <p className="text-[9px] text-[var(--toss-gray-3)] mt-0.5">안전 {mq}</p>
-                        <StockBar current={q} min={mq} />
+                      <td>
+                        <p className="font-semibold text-[var(--zinc-600)]">{item.company || '-'}</p>
+                        {dept(item) && <p className="text-[10px] text-[var(--zinc-400)]">{dept(item)}</p>}
                       </td>
 
-                      {/* 유효기간 */}
-                      <td className="px-4 py-3 text-center">
-                        {expiryDate ? (
-                          isExpiry ? (
-                            <span className="inline-block text-[11px] font-bold text-amber-700 bg-amber-500/10 px-2 py-1 rounded-[var(--radius-md)]">
-                              {expiryDate}
-                            </span>
-                          ) : (
-                            <p className="text-[11px] font-semibold text-[var(--toss-gray-4)]">{expiryDate}</p>
-                          )
+                      <td className="text-center">
+                        <span className={`font-black ${isOos || isLow ? 'text-red-500' : 'text-[var(--foreground)]'}`}>{q}</span>
+                      </td>
+
+                      <td>
+                        <span className="font-semibold text-[var(--foreground)]">{unit}</span>
+                      </td>
+
+                      <td className="text-center">
+                        <span className="font-semibold text-[var(--foreground)]">{mq}</span>
+                      </td>
+
+                      <td>
+                        {isOos || isLow ? (
+                          <span className="erp-status erp-status-red">{isOos ? '품절' : '부족'}</span>
+                        ) : isExpiry ? (
+                          <span className="erp-status erp-status-yellow">임박</span>
                         ) : (
-                          <span className="text-[10px] text-[var(--toss-gray-3)]">-</span>
+                          <span className="erp-status erp-status-green">정상</span>
                         )}
+                        {expiryDate && <p className="mt-1 text-[10px] text-[var(--zinc-400)]">{expiryDate}</p>}
                       </td>
 
-                      {/* 단가/총액 */}
-                      <td className="px-4 py-3 text-right">
-                        <p className="text-[11px] font-semibold text-[var(--toss-gray-4)]">{price > 0 ? fmt(price) : '-'}</p>
-                        {price > 0 && <p className="text-[9px] text-[var(--toss-gray-3)] mt-0.5">{fmt(price * q)}</p>}
-                      </td>
-
-                      {/* 액션 버튼: 모바일=항상 표시, 데스크탑=hover 표시 */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => onStockIn(item)} className="px-2.5 py-1.5 bg-[var(--accent)]/10 text-[var(--accent)] text-[10px] font-bold rounded-[var(--radius-md)] hover:bg-[var(--accent)]/20 transition-all">입고</button>
-                          <button onClick={() => onStockOut(item)} className="px-2.5 py-1.5 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[10px] font-bold rounded-[var(--radius-md)] hover:bg-[var(--border)] transition-all">출고</button>
-                          <button onClick={() => openEditModal(item)} className="px-2.5 py-1.5 bg-[var(--muted)] text-[var(--foreground)] text-[10px] font-bold rounded-[var(--radius-md)] hover:bg-[var(--border)] transition-all">수정</button>
-                          {isLow && (
-                            <button onClick={() => onReorder(item)} className="px-2.5 py-1.5 bg-amber-500 text-white text-[10px] font-bold rounded-[var(--radius-md)] hover:bg-amber-600 transition-all">발주</button>
-                          )}
-                          <button onClick={() => onDelete(item)} className="px-2.5 py-1.5 bg-red-500/10 text-red-500 text-[10px] font-bold rounded-[var(--radius-md)] hover:bg-red-500/20 transition-all">삭제</button>
-                        </div>
-                        {/* 상태 뱃지: 데스크탑에서만 hover시 숨김 */}
-                        <div className="flex justify-end mt-1 md:mt-0 md:group-hover:hidden">
-                          {isOos ? (
-                            <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full">품절</span>
-                          ) : isLow ? (
-                            <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full">부족</span>
-                          ) : isExpiry ? (
-                            <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full">임박</span>
-                          ) : (
-                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">정상</span>
+                      <td className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button onClick={() => openEditModal(item)} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] shadow-sm hover:bg-[var(--muted)]">상세</button>
+                          {(isLow || isOos) && (
+                            <button onClick={() => onReorder(item)} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] shadow-sm hover:bg-[var(--muted)]">발주</button>
                           )}
                         </div>
                       </td>
@@ -787,7 +811,7 @@ export default function InventoryStatusView({
 
       {/* ── 5. 유효기간 센터 (접이식) ─────────────────── */}
       {expiryCount > 0 && (
-        <div className="bg-[var(--card)] border border-amber-200 rounded-[var(--radius-xl)] overflow-hidden">
+        <div className="hidden">
           <button
             type="button"
             className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-amber-500/5 transition-all"

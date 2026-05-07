@@ -5,15 +5,18 @@ import { startTransition, useCallback, useEffect, useMemo, useState, type MouseE
 import ThemeToggle from '@/app/components/ThemeToggle';
 import GlobalSearch from '@/app/components/GlobalSearch';
 import { canAccessExtraFeature } from '@/lib/access-control';
+import { isActiveStaff } from '@/lib/active-staff';
 
 import {
   EXTERNAL_LINKS,
   EXTRA_FEATURE_LOADERS,
   ExtraFeatureSubview,
   FEATURE_CARDS,
+  FontFamilyControl,
   FontSizeControl,
   type FeatureCard,
 } from './추가기능공통';
+import { LucideIcon } from './조직도서브/조직도측면창';
 
 const prefetchedExtraFeatureModules = new Set<string>();
 const MAX_RECENT = 5;
@@ -41,17 +44,24 @@ export default function ExtraFeatures({
   const [orgChartCompany, setOrgChartCompany] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [recentFeatures, setRecentFeatures] = useState<string[]>([]);
+  const userStorageSuffix = useMemo(() => {
+    const userId = String(user?.id || user?.auth_user_id || user?.employee_no || user?.name || '').trim();
+    return userId || 'anonymous';
+  }, [user?.auth_user_id, user?.employee_no, user?.id, user?.name]);
+  const favoritesStorageKey = `${LS_FAVORITES}:${userStorageSuffix}`;
+  const recentStorageKey = `${LS_RECENT}:${userStorageSuffix}`;
+  const activeStaffs = useMemo(() => staffs.filter((staff) => isActiveStaff(staff)), [staffs]);
 
   useEffect(() => {
     try {
-      const storedFav = localStorage.getItem(LS_FAVORITES);
-      const storedRecent = localStorage.getItem(LS_RECENT);
+      const storedFav = localStorage.getItem(favoritesStorageKey) || localStorage.getItem(LS_FAVORITES);
+      const storedRecent = localStorage.getItem(recentStorageKey) || localStorage.getItem(LS_RECENT);
       if (storedFav) setFavorites(JSON.parse(storedFav));
       if (storedRecent) setRecentFeatures(JSON.parse(storedRecent));
     } catch {
       // ignore local storage failures
     }
-  }, []);
+  }, [favoritesStorageKey, recentStorageKey]);
 
   const activeSubViewCard = useMemo(
     () => FEATURE_CARDS.find((card) => card.subView === subView) || null,
@@ -72,19 +82,19 @@ export default function ExtraFeatures({
 
   const persistRecent = useCallback((next: string[]) => {
     try {
-      localStorage.setItem(LS_RECENT, JSON.stringify(next));
+      localStorage.setItem(recentStorageKey, JSON.stringify(next));
     } catch {
       // ignore local storage failures
     }
-  }, []);
+  }, [recentStorageKey]);
 
   const persistFavorites = useCallback((next: string[]) => {
     try {
-      localStorage.setItem(LS_FAVORITES, JSON.stringify(next));
+      localStorage.setItem(favoritesStorageKey, JSON.stringify(next));
     } catch {
       // ignore local storage failures
     }
-  }, []);
+  }, [favoritesStorageKey]);
 
   const toggleFavorite = useCallback((id: string, event: MouseEvent) => {
     event.stopPropagation();
@@ -204,17 +214,18 @@ export default function ExtraFeatures({
   );
 
   const compactToolbar = (
-    <div className="flex items-center gap-2">
+    <div className="flex shrink-0 flex-wrap items-center gap-2">
+      <FontFamilyControl />
       <FontSizeControl />
-      <div className="inline-flex h-8 items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 shadow-sm">
-        <span className="text-[10px] font-semibold text-[var(--toss-gray-3)]">모드</span>
+      <div className="inline-flex h-8 shrink-0 items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 shadow-sm">
+        <span className="shrink-0 text-[10px] font-semibold text-[var(--toss-gray-3)]">모드</span>
         <ThemeToggle compact />
       </div>
       {onSearchSelect ? (
-        <div className="inline-flex h-8 items-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-1 shadow-sm">
+        <div className="inline-flex h-8 shrink-0 items-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-1 shadow-sm">
           <GlobalSearch
             user={user}
-            staffs={staffs}
+            staffs={activeStaffs}
             posts={posts}
             onSelect={(type, id) => {
               if (type === 'handover') {
@@ -239,31 +250,33 @@ export default function ExtraFeatures({
     <div
       key={card.id}
       data-testid={`extra-card-shell-${card.testId}`}
-      className="group relative flex items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/50"
+      className="group relative flex h-[110px] flex-col items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--toss-blue-light)]/35"
     >
       <button
         type="button"
         data-testid={`extra-card-${card.testId}`}
         onClick={() => handleFeatureClick(card.id, card.subView)}
-        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        className="flex h-full w-full flex-col items-center justify-center text-center"
       >
-        <div className={`flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] text-xl transition-colors ${card.accentClass}`}>
-          {card.icon}
+        <div className={`mb-3 flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] transition-colors ${card.accentClass}`}>
+          <LucideIcon name={card.icon} size={22} strokeWidth={1.9} />
         </div>
-        <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-[var(--foreground)]">{card.label}</h3>
-        </div>
-        <span className="mr-1 text-[var(--toss-gray-3)] group-hover:text-[var(--accent)]">→</span>
+        <h3 className="text-[13px] font-bold text-[var(--foreground)]">{card.label}</h3>
       </button>
       <button
         type="button"
         data-testid={`extra-favorite-${card.testId}`}
         onClick={(event) => toggleFavorite(card.id, event)}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] text-lg leading-none transition-all hover:scale-110 hover:bg-[var(--muted)]"
+        className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] opacity-0 transition-all hover:bg-[var(--muted)] hover:text-[var(--accent)] group-hover:opacity-100"
         title={favorites.includes(card.id) ? '즐겨찾기 해제' : '즐겨찾기 추가'}
         aria-label={favorites.includes(card.id) ? '즐겨찾기 해제' : '즐겨찾기 추가'}
       >
-        {favorites.includes(card.id) ? '★' : '☆'}
+        <LucideIcon
+          name="Star"
+          size={17}
+          fill={favorites.includes(card.id) ? 'currentColor' : 'none'}
+          className={favorites.includes(card.id) ? 'text-[var(--accent)]' : undefined}
+        />
       </button>
     </div>
   ), [favorites, handleFeatureClick, toggleFavorite]);
@@ -274,7 +287,7 @@ export default function ExtraFeatures({
         subView={resolvedSubView}
         onBack={handleBack}
         user={user || null}
-        staffs={staffs}
+        staffs={activeStaffs}
         selectedCo={selectedCo}
         selectedCompanyId={selectedCompanyId}
         orgChartCompany={orgChartCompany}
@@ -285,26 +298,30 @@ export default function ExtraFeatures({
 
   if (visibleCards.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-[var(--muted)] p-4 text-center">
-        <div className="mb-4 text-6xl">🔒</div>
-        <h2 className="text-xl font-bold text-[var(--foreground)]">추가기능 접근 권한이 없습니다.</h2>
-        <p className="mt-2 text-sm font-semibold text-[var(--toss-gray-3)]">
-          메인 메뉴 권한과 추가기능 세부 권한을 확인해 주세요.
-        </p>
+      <div className="flex h-full flex-col bg-[var(--muted)] p-4">
+        <div className="mb-3 flex justify-end">{compactToolbar}</div>
+        <div className="flex flex-1 flex-col items-center justify-center text-center">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--toss-blue-light)] text-[var(--accent)]">
+            <LucideIcon name="Lock" size={24} />
+          </div>
+          <h2 className="text-xl font-bold text-[var(--foreground)]">추가기능 접근 권한이 없습니다.</h2>
+        </div>
       </div>
     );
   }
 
   return (
-    <div data-testid="extra-features-list" className="custom-scrollbar flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4">
-      <div className="mx-auto w-full max-w-5xl">
-        <h2 className="mb-1 text-lg font-bold text-[var(--foreground)]">추가 기능</h2>
+    <div data-testid="extra-features-list" className="custom-scrollbar flex-1 overflow-y-auto bg-[var(--page-bg)] px-5 py-5 md:px-6">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-[15px] font-bold text-[var(--foreground)]">추가 기능</h2>
+        {compactToolbar}
+      </div>
 
-        <div className="space-y-3">
+      <div className="w-full space-y-6">
           {favoriteCards.length > 0 ? (
             <div>
-              <p className="mb-2 px-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">즐겨찾기</p>
-              <div className="grid gap-3 md:grid-cols-2">
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">즐겨찾기</p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
                 {favoriteCards.map(renderCard)}
               </div>
             </div>
@@ -312,27 +329,18 @@ export default function ExtraFeatures({
 
           {recentCards.length > 0 ? (
             <div>
-              <p className="mb-2 px-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">최근 방문</p>
-              <div className="flex flex-wrap items-center gap-2">
-                {recentCards.map((card) => (
-                  <button
-                    key={card.id}
-                    type="button"
-                    onClick={() => handleFeatureClick(card.id, card.subView)}
-                    className="flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[12px] font-medium text-[var(--foreground)] transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--toss-blue-light)]/50"
-                  >
-                    <span>{card.icon}</span>
-                    <span>{card.label}</span>
-                  </button>
-                ))}
-                <div className="md:ml-auto">{compactToolbar}</div>
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">최근 사용</p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+                {recentCards.map(renderCard)}
               </div>
             </div>
-          ) : (
-            <div className="mb-1 flex justify-end">{compactToolbar}</div>
-          )}
+          ) : null}
 
-          <div className="grid gap-3 md:grid-cols-2">
+          <div>
+            {(favoriteCards.length > 0 || recentCards.length > 0) && (
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">전체</p>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
             {normalCards.map(renderCard)}
 
             {EXTERNAL_LINKS.map((item) => (
@@ -341,19 +349,16 @@ export default function ExtraFeatures({
                 href={item.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group flex items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/50"
+                className="group flex h-[110px] flex-col items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 text-center shadow-sm transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/50"
               >
-                <div className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--muted)] text-xl transition-colors group-hover:bg-[var(--toss-blue-light)]">
-                  {item.icon}
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--accent)] transition-colors group-hover:bg-[var(--toss-blue-light)]">
+                  <LucideIcon name={item.icon} size={20} strokeWidth={1.8} />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-sm font-semibold text-[var(--foreground)]">{item.label}</h3>
-                </div>
-                <span className="text-[var(--toss-gray-3)] group-hover:text-[var(--accent)]">→</span>
+                <h3 className="text-[13px] font-bold text-[var(--foreground)]">{item.label}</h3>
               </a>
             ))}
+            </div>
           </div>
-        </div>
       </div>
     </div>
   );

@@ -1814,9 +1814,9 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                   <button
                     data-testid="board-toggle-new-post"
                     onClick={() => setShowNewPost(!showNewPost)}
-                    className="px-4 md:px-4 py-2.5 md:py-3 bg-[var(--accent)] text-white rounded-full text-[11px] md:text-xs font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
+                    className="px-4 md:px-4 py-2.5 md:py-3 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-[11px] md:text-xs font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
                   >
-                    {showNewPost ? '✕ 취소' : '+ 새 게시물'}
+                    {showNewPost ? '취소' : '+ 새 게시물'}
                   </button>
                 </div>
               )}

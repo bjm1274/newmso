@@ -29,66 +29,518 @@ type SubMenuItem = {
 
 export const SUB_MENUS: Record<string, SubMenuItem[]> = {
   재고관리: [
-    { id: '현황', label: '현황', group: '조회', icon: '📊' },
-    { id: '이력', label: '이력', group: '조회', icon: '🕘' },
-    { id: '수요예측', label: '수요예측', group: '조회', icon: '🔮' },
-    { id: '등록', label: '등록', group: '입출고', icon: '📝' },
-    { id: '스캔', label: '스캔', group: '입출고', icon: '📷' },
-    { id: '발주', label: '발주', group: '발주문서', icon: '📦' },
-    { id: '재고실사', label: '재고실사', group: '입출고', icon: '🔎' },
-    { id: '이관', label: '이관', group: '입출고', icon: '🔄' },
-    { id: '납품확인서', label: '납품확인서', group: '발주문서', icon: '📋' },
-    { id: 'UDI', label: 'UDI', group: '발주문서', icon: '🏷️' },
-    { id: '자산', label: '자산', group: '설정', icon: '🔖' },
-    { id: '비품대여설정', label: '비품대여 설정', group: '설정', icon: '🧰' },
-    { id: '거래처', label: '거래처 / 명세서', group: '설정', icon: '🏭' },
-    { id: '카테고리', label: '카테고리', group: '설정', icon: '🗂️' },
-    { id: 'AS반품', label: 'AS반품', group: '설정', icon: '↩️' },
-    { id: '소모품통계', label: '소모품통계', group: '설정', icon: '📉' },
-    { id: '월마감', label: '월마감', group: '설정', icon: '🔒' },
-    { id: '내부서재고', label: '내 부서 재고', group: '조회', icon: '🏬' },
+    { id: '현황', label: '재고현황', group: '운영', icon: 'inventory-status' },
+    { id: '등록', label: '입출고관리', group: '운영', icon: 'inventory-flow' },
+    { id: '발주', label: '구매/발주', group: '기준', icon: 'purchase' },
+    { id: '자산', label: '품목/자산', group: '기준', icon: 'asset' },
+    { id: '월마감', label: '분석/마감', group: '마감', icon: 'analytics' },
+    { id: '이력', label: '이력', group: '운영', icon: 'history', hidden: true },
+    { id: '수요예측', label: '수요예측', group: '운영', icon: 'analytics', hidden: true },
+    { id: '스캔', label: '스캔', group: '운영', icon: 'scan', hidden: true },
+    { id: '재고실사', label: '재고실사', group: '운영', icon: 'search', hidden: true },
+    { id: '이관', label: '이관', group: '운영', icon: 'transfer', hidden: true },
+    { id: '납품확인서', label: '납품확인서', group: '기준', icon: 'document', hidden: true },
+    { id: 'UDI', label: 'UDI', group: '기준', icon: 'tag', hidden: true },
+    { id: '비품대여설정', label: '비품대여 설정', group: '기준', icon: 'briefcase', hidden: true },
+    { id: '거래처', label: '거래처 / 명세서', group: '기준', icon: 'supplier', hidden: true },
+    { id: '카테고리', label: '카테고리', group: '기준', icon: 'folder', hidden: true },
+    { id: 'AS반품', label: 'AS반품', group: '기준', icon: 'return', hidden: true },
+    { id: '소모품통계', label: '소모품통계', group: '마감', icon: 'analytics', hidden: true },
+    { id: '내부서재고', label: '내 부서 재고', group: '운영', icon: 'inventory-status', hidden: true },
   ],
   게시판: [
-    { id: '공지사항', label: '공지사항', icon: '📢' },
-    { id: '자유게시판', label: '자유게시판', icon: '📝' },
-    { id: '경조사', label: '경조사', icon: '🎊' },
-    { id: '수술일정', label: '수술일정', icon: '🏥' },
-    { id: 'MRI일정', label: 'MRI일정', icon: '🧠' },
-    { id: '업무가이드', label: '업무공유', icon: '📚' },
+    { id: '공지사항', label: '공지사항', icon: 'bell' },
+    { id: '자유게시판', label: '자유게시판', icon: 'document' },
+    { id: '경조사', label: '경조사', icon: 'tag' },
+    { id: '수술일정', label: '수술일정', icon: 'calendar' },
+    { id: 'MRI일정', label: 'MRI일정', icon: 'scan' },
+    { id: '업무가이드', label: '업무공유', icon: 'folder' },
   ],
   전자결재: [
-    { id: '기안함', label: '기안함', icon: '📝' },
-    { id: '결재함', label: '결재함', icon: '✅' },
-    { id: '참조 문서함', label: '참조 문서함', icon: '📎' },
-    { id: '작성하기', label: '작성하기', icon: '✍️' },
+    { id: '기안함', label: '기안함', icon: 'document' },
+    { id: '결재함', label: '결재함', icon: 'check' },
+    { id: '참조 문서함', label: '참조 문서함', icon: 'paperclip' },
+    { id: '작성하기', label: '작성하기', icon: 'edit' },
   ],
   인사관리: [
-    { id: '구성원', label: '구성원', group: '인력관리', icon: '👥' },
-    { id: '인사변동', label: '인사변동', group: '인력관리', icon: '🗂️' },
-    { id: '입퇴사·교육센터', label: '입퇴사·교육센터', group: '인력관리', icon: '🧭' },
-    { id: '근태', label: '근태', group: '근태/급여', icon: '⏰' },
-    { id: '교대근무', label: '교대근무', group: '근태/급여', icon: '🔄' },
-    { id: '연차/휴가', label: '연차/휴가', group: '근태/급여', icon: '🌴' },
-    { id: '급여', label: '급여', group: '근태/급여', icon: '💰' },
-    { id: '경조사', label: '경조사', group: '복무/복지', icon: '🎊' },
-    { id: '자격·안전센터', label: '자격·안전센터', group: '복무/복지', icon: '🛡️' },
-    { id: '계약', label: '계약', group: '문서/기타', icon: '📝' },
-    { id: '문서센터', label: '문서센터', group: '문서/기타', icon: '🗃️' },
-    { id: '캘린더', label: '캘린더', group: '문서/기타', icon: '📅' },
+    { id: '구성원', label: '구성원', group: '인력관리', icon: 'users' },
+    { id: '인사변동', label: '인사변동', group: '인력관리', icon: 'briefcase' },
+    { id: '입퇴사·교육센터', label: '입퇴사·교육센터', group: '인력관리', icon: 'compass' },
+    { id: '근태', label: '근태', group: '근태/급여', icon: 'history' },
+    { id: '교대근무', label: '교대근무', group: '근태/급여', icon: 'refresh' },
+    { id: '연차/휴가', label: '연차/휴가', group: '근태/급여', icon: 'calendar' },
+    { id: '급여', label: '급여', group: '근태/급여', icon: 'calculator' },
+    { id: '경조사', label: '경조사', group: '복무/복지', icon: 'bell' },
+    { id: '자격·안전센터', label: '자격·안전센터', group: '복무/복지', icon: 'admin' },
+    { id: '계약', label: '계약', group: '문서/기타', icon: 'document' },
+    { id: '문서센터', label: '문서센터', group: '문서/기타', icon: 'folder' },
+    { id: '캘린더', label: '캘린더', group: '문서/기타', icon: 'calendar' },
   ],
   관리자: ADMIN_SIDEBAR_ITEMS,
 };
 
 const MAIN_MENUS = [
-  { id: '내정보', icon: '👤', label: '내정보', testId: 'sidebar-menu-home' },
-  { id: '추가기능', icon: '➕', label: '추가기능', testId: 'sidebar-menu-extra' },
-  { id: '채팅', icon: '💬', label: '채팅', testId: 'sidebar-menu-chat' },
-  { id: '게시판', icon: '📋', label: '게시판', testId: 'sidebar-menu-board' },
-  { id: '전자결재', icon: '✍️', label: '전자결재', testId: 'sidebar-menu-approval' },
-  { id: '인사관리', icon: '👥', label: '인사관리', testId: 'sidebar-menu-hr' },
-  { id: '재고관리', icon: '📦', label: '재고관리', testId: 'sidebar-menu-inventory' },
-  { id: '관리자', icon: '⚙️', label: '관리자', testId: 'sidebar-menu-admin' },
+  { id: '내정보', icon: 'user', label: '내정보', testId: 'sidebar-menu-home' },
+  { id: '추가기능', icon: 'plus', label: '추가기능', testId: 'sidebar-menu-extra' },
+  { id: '채팅', icon: 'chat', label: '채팅', testId: 'sidebar-menu-chat' },
+  { id: '게시판', icon: 'board', label: '게시판', testId: 'sidebar-menu-board' },
+  { id: '전자결재', icon: 'approval', label: '전자결재', testId: 'sidebar-menu-approval' },
+  { id: '인사관리', icon: 'hr', label: '인사관리', testId: 'sidebar-menu-hr' },
+  { id: '재고관리', icon: 'inventory', label: '재고관리', testId: 'sidebar-menu-inventory' },
+  { id: '관리자', icon: 'admin', label: '관리자', testId: 'sidebar-menu-admin' },
 ];
+
+const ICON_PATHS: Record<string, React.ReactNode> = {
+  user: (
+    <>
+      <path d="M20 21a8 8 0 0 0-16 0" />
+      <circle cx="12" cy="7" r="4" />
+    </>
+  ),
+  users: (
+    <>
+      <path d="M16 21a6 6 0 0 0-12 0" />
+      <circle cx="10" cy="8" r="4" />
+      <path d="M22 21a5 5 0 0 0-5-5" />
+      <path d="M17 4a4 4 0 0 1 0 8" />
+    </>
+  ),
+  plus: <path d="M12 5v14M5 12h14" />,
+  chat: <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />,
+  board: (
+    <>
+      <rect x="4" y="4" width="6" height="6" rx="1.5" />
+      <rect x="14" y="4" width="6" height="6" rx="1.5" />
+      <rect x="4" y="14" width="6" height="6" rx="1.5" />
+      <rect x="14" y="14" width="6" height="6" rx="1.5" />
+    </>
+  ),
+  approval: (
+    <>
+      <path d="M7 3h7l4 4v14H7z" />
+      <path d="M14 3v5h5" />
+      <path d="m9 15 2 2 4-5" />
+    </>
+  ),
+  hr: (
+    <>
+      <path d="M7 20V7a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v13" />
+      <path d="M5 20h14" />
+      <path d="M9 5V3h6v2" />
+    </>
+  ),
+  inventory: (
+    <>
+      <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z" />
+      <path d="m4 7.5 8 4.5 8-4.5" />
+      <path d="M12 12v9" />
+    </>
+  ),
+  admin: (
+    <>
+      <path d="M12 3 19 6v5c0 4.5-2.8 8.2-7 10-4.2-1.8-7-5.5-7-10V6z" />
+      <path d="M9.5 12.5 11 14l3.5-4" />
+    </>
+  ),
+  settings: (
+    <>
+      <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+      <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.04.04a2.1 2.1 0 0 1-2.97 2.97l-.04-.04a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.08 1.65V21.3a2.1 2.1 0 0 1-4.2 0v-.06a1.8 1.8 0 0 0-1.08-1.65 1.8 1.8 0 0 0-1.98.36l-.04.04a2.1 2.1 0 0 1-2.97-2.97l.04-.04A1.8 1.8 0 0 0 4.6 15a1.8 1.8 0 0 0-1.65-1.08H2.9a2.1 2.1 0 0 1 0-4.2h.06A1.8 1.8 0 0 0 4.6 8.64a1.8 1.8 0 0 0-.36-1.98l-.04-.04a2.1 2.1 0 0 1 2.97-2.97l.04.04a1.8 1.8 0 0 0 1.98.36A1.8 1.8 0 0 0 10.27 2.4V2.34a2.1 2.1 0 0 1 4.2 0v.06a1.8 1.8 0 0 0 1.08 1.65 1.8 1.8 0 0 0 1.98-.36l.04-.04a2.1 2.1 0 0 1 2.97 2.97l-.04.04a1.8 1.8 0 0 0-.36 1.98 1.8 1.8 0 0 0 1.65 1.08h.06a2.1 2.1 0 0 1 0 4.2h-.06A1.8 1.8 0 0 0 19.4 15Z" />
+    </>
+  ),
+  compass: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m15 9-2 5-5 2 2-5z" />
+    </>
+  ),
+  bell: (
+    <>
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+      <path d="M10 21h4" />
+    </>
+  ),
+  'inventory-status': (
+    <>
+      <path d="M4 20V8" />
+      <path d="M10 20V4" />
+      <path d="M16 20v-9" />
+      <path d="M3 20h18" />
+    </>
+  ),
+  'inventory-flow': (
+    <>
+      <path d="M7 7h11l-3-3" />
+      <path d="M17 17H6l3 3" />
+      <path d="M18 7 15 10" />
+      <path d="M6 17l3-3" />
+    </>
+  ),
+  purchase: (
+    <>
+      <path d="M7 8h14l-2 8H8z" />
+      <path d="M7 8 6 4H3" />
+      <circle cx="9" cy="20" r="1" />
+      <circle cx="18" cy="20" r="1" />
+    </>
+  ),
+  asset: (
+    <>
+      <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z" />
+      <path d="m4 7.5 8 4.5 8-4.5" />
+    </>
+  ),
+  analytics: (
+    <>
+      <path d="M4 19V5" />
+      <path d="M4 19h16" />
+      <path d="m7 15 4-4 3 3 5-7" />
+    </>
+  ),
+  history: (
+    <>
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <path d="M3 4v5h5" />
+      <path d="M12 7v5l3 2" />
+    </>
+  ),
+  scan: (
+    <>
+      <path d="M4 7V5a1 1 0 0 1 1-1h2" />
+      <path d="M17 4h2a1 1 0 0 1 1 1v2" />
+      <path d="M20 17v2a1 1 0 0 1-1 1h-2" />
+      <path d="M7 20H5a1 1 0 0 1-1-1v-2" />
+      <path d="M7 12h10" />
+    </>
+  ),
+  search: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </>
+  ),
+  transfer: (
+    <>
+      <path d="M16 3h5v5" />
+      <path d="M21 3 14 10" />
+      <path d="M8 21H3v-5" />
+      <path d="m3 21 7-7" />
+    </>
+  ),
+  document: (
+    <>
+      <path d="M7 3h7l4 4v14H7z" />
+      <path d="M14 3v5h5" />
+      <path d="M9 13h6M9 17h5" />
+    </>
+  ),
+  tag: (
+    <>
+      <path d="M20 13 13 20 4 11V4h7z" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+    </>
+  ),
+  briefcase: (
+    <>
+      <path d="M10 6V5a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v1" />
+      <rect x="4" y="6" width="16" height="13" rx="2" />
+      <path d="M4 11h16" />
+    </>
+  ),
+  supplier: (
+    <>
+      <path d="M4 20V8l5 3V8l5 3V6h6v14z" />
+      <path d="M7 16h2M12 16h2M17 16h1" />
+    </>
+  ),
+  folder: (
+    <>
+      <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    </>
+  ),
+  return: (
+    <>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10a6 6 0 1 1 0 12h-2" />
+    </>
+  ),
+  x: (
+    <>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </>
+  ),
+  check: <path d="m20 6-11 11-5-5" />,
+  'arrow-left': (
+    <>
+      <path d="m12 19-7-7 7-7" />
+      <path d="M19 12H5" />
+    </>
+  ),
+  'arrow-right': (
+    <>
+      <path d="M5 12h14" />
+      <path d="m12 5 7 7-7 7" />
+    </>
+  ),
+  download: (
+    <>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="M7 10l5 5 5-5" />
+      <path d="M12 15V3" />
+    </>
+  ),
+  save: (
+    <>
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
+      <path d="M17 21v-8H7v8" />
+      <path d="M7 3v5h8" />
+    </>
+  ),
+  edit: (
+    <>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
+    </>
+  ),
+  send: (
+    <>
+      <path d="m22 2-7 20-4-9-9-4Z" />
+      <path d="M22 2 11 13" />
+    </>
+  ),
+  refresh: (
+    <>
+      <path d="M21 12a9 9 0 0 1-15.5 6.3L3 16" />
+      <path d="M3 21v-5h5" />
+      <path d="M3 12A9 9 0 0 1 18.5 5.7L21 8" />
+      <path d="M21 3v5h-5" />
+    </>
+  ),
+  loader: <path d="M21 12a9 9 0 1 1-6.2-8.56" />,
+  calendar: (
+    <>
+      <path d="M8 2v4" />
+      <path d="M16 2v4" />
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01" />
+    </>
+  ),
+  'calendar-clock': (
+    <>
+      <path d="M8 2v4" />
+      <path d="M16 2v4" />
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M12 14v3l2 1" />
+    </>
+  ),
+  inbox: (
+    <>
+      <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+      <path d="m5.5 5.1-3.3 12A2 2 0 0 0 4.1 20h15.8a2 2 0 0 0 1.9-2.9l-3.3-12A2 2 0 0 0 16.6 4H7.4a2 2 0 0 0-1.9 1.1Z" />
+    </>
+  ),
+  alert: (
+    <>
+      <path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z" />
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
+    </>
+  ),
+  server: (
+    <>
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1" />
+    </>
+  ),
+  moon: <path d="M12 3a6 6 0 1 0 9 9 9 9 0 1 1-9-9Z" />,
+  wand: (
+    <>
+      <path d="m15 4 5 5" />
+      <path d="M13 6 3 16l5 5L18 11" />
+      <path d="M6 2v4M4 4h4M20 16v4M18 18h4" />
+    </>
+  ),
+  eraser: (
+    <>
+      <path d="m7 21-4-4 11-11a2.8 2.8 0 0 1 4 0l3 3a2.8 2.8 0 0 1 0 4l-8 8Z" />
+      <path d="M22 21H7" />
+      <path d="m5 15 5 5" />
+    </>
+  ),
+  calculator: (
+    <>
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <path d="M8 6h8M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01" />
+    </>
+  ),
+  clipboard: (
+    <>
+      <rect x="8" y="2" width="8" height="4" rx="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <path d="M8 12h8M8 16h5" />
+    </>
+  ),
+  menu: <path d="M4 6h16M4 12h16M4 18h16" />,
+  more: <path d="M12 12h.01M19 12h.01M5 12h.01" />,
+  paperclip: <path d="m21.4 11.6-8.5 8.5a6 6 0 0 1-8.5-8.5l8.5-8.5a4 4 0 0 1 5.7 5.7l-8.5 8.5a2 2 0 0 1-2.8-2.8l8.1-8.1" />,
+  trash: (
+    <>
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6l-1 14H6L5 6" />
+      <path d="M10 11v5M14 11v5" />
+    </>
+  ),
+  video: (
+    <>
+      <path d="M4 6h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4z" />
+      <path d="m16 10 5-3v10l-5-3" />
+    </>
+  ),
+};
+
+export function MenuIcon({ name, className = 'h-5 w-5' }: { name?: string; className?: string }) {
+  if (!name || !ICON_PATHS[name]) {
+    return <span className={className}>{name || '·'}</span>;
+  }
+
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {ICON_PATHS[name]}
+    </svg>
+  );
+}
+
+type LucideIconProps = Omit<React.SVGProps<SVGSVGElement>, 'name'> & {
+  name: string;
+  size?: number | string;
+  strokeWidth?: number | string;
+};
+
+const LUCIDE_ICON_ALIASES: Record<string, string> = {
+  AlertTriangle: 'alert',
+  ArrowLeft: 'arrow-left',
+  ArrowRight: 'arrow-right',
+  Banknote: 'purchase',
+  Bell: 'bell',
+  Bookmark: 'tag',
+  BookOpen: 'document',
+  Box: 'inventory',
+  Building2: 'server',
+  Calculator: 'calculator',
+  Calendar: 'calendar',
+  CalendarClock: 'calendar-clock',
+  CalendarDays: 'calendar',
+  Check: 'check',
+  CheckSquare: 'check',
+  ChevronLeft: 'arrow-left',
+  CircleParking: 'tag',
+  ClipboardCheck: 'clipboard',
+  ClipboardList: 'clipboard',
+  Clock: 'history',
+  Clock3: 'history',
+  Copy: 'document',
+  Download: 'download',
+  Eraser: 'eraser',
+  Eye: 'search',
+  FileBarChart: 'analytics',
+  FileCheck2: 'document',
+  FileClock: 'document',
+  FilePenLine: 'document',
+  FileText: 'document',
+  FileWarning: 'alert',
+  FolderOpen: 'folder',
+  Forward: 'arrow-right',
+  History: 'history',
+  Hourglass: 'loader',
+  Inbox: 'inbox',
+  LoaderCircle: 'loader',
+  Landmark: 'server',
+  Lock: 'admin',
+  LockKeyhole: 'admin',
+  LogOut: 'return',
+  Megaphone: 'bell',
+  Menu: 'menu',
+  MessageSquare: 'chat',
+  MessageSquareReply: 'chat',
+  Mic: 'video',
+  Moon: 'moon',
+  MoreHorizontal: 'more',
+  Package: 'inventory',
+  Paperclip: 'paperclip',
+  Pin: 'tag',
+  Plus: 'plus',
+  Printer: 'document',
+  Receipt: 'document',
+  RefreshCw: 'refresh',
+  Save: 'save',
+  Search: 'search',
+  Send: 'send',
+  Server: 'server',
+  Settings: 'admin',
+  ShieldCheck: 'admin',
+  SmilePlus: 'plus',
+  SquarePen: 'document',
+  Star: 'tag',
+  Stethoscope: 'scan',
+  Tag: 'tag',
+  Tags: 'tag',
+  Trash2: 'trash',
+  TriangleAlert: 'alert',
+  User: 'user',
+  Users: 'users',
+  Upload: 'send',
+  Video: 'video',
+  Wand2: 'wand',
+  X: 'x',
+};
+
+export function LucideIcon({
+  name,
+  size = 16,
+  strokeWidth = 2,
+  className,
+  ...props
+}: LucideIconProps) {
+  const iconName = LUCIDE_ICON_ALIASES[name] || name;
+  const iconPath = ICON_PATHS[iconName] || (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9 9h6v6H9z" />
+    </>
+  );
+
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      focusable="false"
+      height={size}
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={strokeWidth}
+      viewBox="0 0 24 24"
+      width={size}
+      {...props}
+    >
+      {iconPath}
+    </svg>
+  );
+}
 
 type SidebarUser = {
   id?: string | null;
@@ -392,21 +844,31 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
 
   const shouldRenderDesktopNotificationCenter = Boolean(effectiveUserId) && isDesktopViewport !== false;
   const shouldRenderMobileNotificationCenter = Boolean(effectiveUserId) && isDesktopViewport === false;
+  const userInitial = String(effectiveUser?.name || normalizedUser?.name || 'SY').trim().slice(0, 1).toUpperCase() || 'S';
 
   return (
     <>
       {/* 데스크탑 사이드바 */}
       <aside
-        className="sticky top-0 z-[240] hidden h-[100dvh] w-[var(--sidebar-width)] shrink-0 flex-col items-center border-r border-[var(--border)] bg-[var(--sidebar-bg)] py-3 md:flex"
+        className="app-shell-sidebar sticky top-0 z-[240] hidden h-[100dvh] w-[var(--sidebar-width)] shrink-0 flex-col items-center py-3 md:flex"
         data-testid="desktop-sidebar"
       >
-        <div className="mb-2 flex w-full shrink-0 flex-col items-center px-1.5">
+        <div className="flex w-full shrink-0 flex-col items-center px-2">
+          <button
+            type="button"
+            onClick={() => handleMenuClick('내정보')}
+            className="app-shell-logo mb-5 flex h-11 w-11 items-center justify-center text-sm font-black transition-transform active:scale-95"
+            aria-label="내정보"
+          >
+            SY
+          </button>
           {shouldRenderDesktopNotificationCenter && (
-            <NotificationCenter user={effectiveUser} onOpenMenu={onMenuChange} />
-          )}
+              <NotificationCenter user={effectiveUser} onOpenMenu={onMenuChange} />
+            )}
+          <div className="app-shell-divider my-4" />
         </div>
 
-        <div className="no-scrollbar flex w-full flex-1 flex-col gap-0.5 overflow-y-auto px-1.5">
+        <div className="no-scrollbar flex w-full flex-1 flex-col items-center gap-2 overflow-y-auto px-2">
           {visibleMenus.map((menu) => {
             const isActive = mainMenu === menu.id;
             return (
@@ -417,14 +879,12 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
                 onClick={() => handleMenuClick(menu.id)}
                 onMouseEnter={() => prefetchMenuModule(menu.id)}
                 onFocus={() => prefetchMenuModule(menu.id)}
-                className={`relative flex w-full flex-col items-center justify-center rounded-[var(--radius-md)] py-2 transition-all duration-150 ${
-                  isActive
-                    ? 'bg-[var(--accent)] text-white'
-                    : 'text-[var(--toss-gray-3)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
+                className={`app-shell-menu-item relative flex min-h-[58px] w-14 flex-col items-center justify-center px-1.5 py-2 ${
+                  isActive ? 'is-active' : ''
                 }`}
               >
-                <span className="relative text-[17px] leading-none">
-                  {menu.icon}
+                <span className="relative leading-none">
+                  <MenuIcon name={menu.icon} className="h-[22px] w-[22px]" />
                   {menu.id === '채팅' && chatUnreadCount > 0 && (
                     <span
                       data-testid="sidebar-menu-chat-badge"
@@ -434,10 +894,23 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
                     </span>
                   )}
                 </span>
-                <span className="mt-1 text-[10px] font-semibold">{menu.label}</span>
+                <span className="mt-1.5 text-[10px] font-semibold leading-none tracking-normal">{menu.label}</span>
               </button>
             );
           })}
+        </div>
+
+        <div className="flex w-full shrink-0 flex-col items-center px-2 pt-3">
+          <div className="app-shell-divider mb-3" />
+          <button
+            type="button"
+            onClick={() => handleMenuClick('내정보')}
+            className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent-light)] text-[11px] font-black text-[var(--accent)] transition-colors hover:bg-[var(--nav-active-subtle)]"
+            aria-label="내정보 바로가기"
+            title={String(effectiveUser?.name || '내정보')}
+          >
+            {userInitial}
+          </button>
         </div>
       </aside>
 
@@ -460,8 +933,8 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
                     isActive ? 'text-[var(--accent)]' : 'text-[var(--toss-gray-3)]'
                   }`}
                 >
-                  <span className="relative text-[22px] leading-none">
-                    {menu.icon}
+                  <span className="relative leading-none">
+                    <MenuIcon name={menu.icon} className="h-[22px] w-[22px]" />
                     {menu.id === '채팅' && chatUnreadCount > 0 && (
                       <span
                         data-testid="sidebar-menu-chat-badge-mobile"
