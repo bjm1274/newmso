@@ -140,6 +140,7 @@ export type MockFixtures = {
   notifications?: any[];
   emailQueue?: any[];
   taxReports?: any[];
+  todos?: any[];
   chatRooms?: any[];
   messages?: any[];
   pinnedMessages?: any[];
@@ -398,6 +399,7 @@ function buildFixtures(overrides: MockFixtures = {}) {
     notifications: overrides.notifications ?? [],
     emailQueue: overrides.emailQueue ?? [],
     taxReports: overrides.taxReports ?? [],
+    todos: overrides.todos ?? [],
     chatRooms:
       overrides.chatRooms ??
       [
@@ -723,6 +725,7 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   let notifications = [...fixtures.notifications];
   let emailQueue = [...fixtures.emailQueue];
   let taxReports = [...fixtures.taxReports];
+  let todos = [...fixtures.todos];
   let staffMembers = [...fixtures.staffMembers];
   let approvals = [...fixtures.approvals];
   let messages = [...fixtures.messages];
@@ -1408,6 +1411,41 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
           'content-range': `0-0/${unreadCount}`,
         },
       });
+    }
+
+    if (path.includes('/todos')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(todos, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `todo-${todos.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          is_complete: payload.is_complete ?? false,
+          ...payload,
+        }));
+        todos = [...inserted, ...todos];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'PATCH') {
+        const body = request.postDataJSON();
+        const { nextRows, updatedRows } = patchRowsMatchingFilters(todos, url, body);
+        todos = nextRows;
+        return json(route, wantsObject ? updatedRows[0] ?? null : updatedRows);
+      }
+
+      if (method === 'DELETE') {
+        const deleting = applyQueryFilters(todos, url);
+        const deleteIds = new Set(deleting.map((row: any) => String(row.id)));
+        todos = todos.filter((row: any) => !deleteIds.has(String(row.id)));
+        return json(route, wantsObject ? deleting[0] ?? null : deleting);
+      }
+
+      return json(route, todos);
     }
 
     if (path.includes('/staff_members')) {

@@ -26,6 +26,11 @@ function trackRuntimeErrors(page: Page) {
   return errors;
 }
 
+async function openMyPage(page: Page) {
+  await page.goto(`/main?open_menu=${encodeURIComponent('내정보')}`);
+  await expect(page.getByTestId('mypage-view')).toBeVisible();
+}
+
 const peerOne = {
   ...fakeUser,
   id: 'chat-peer-1',
@@ -46,6 +51,89 @@ const peerTwo = {
 
 test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
+});
+
+test('todo chat link restores a missing source room from the source message', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const sourceMessageText = '방 정보 없이 저장된 채팅 할일';
+  const actualRoom = {
+    id: 'room-message-only-source',
+    name: '운영팀 채팅방',
+    type: 'group',
+    members: [fakeUser.id, peerOne.id],
+    created_at: '2026-05-08T09:00:00.000Z',
+    last_message_at: '2026-05-08T10:00:00.000Z',
+    last_message_preview: sourceMessageText,
+    created_by: fakeUser.id,
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [fakeUser, peerOne],
+    todos: [
+      {
+        id: 'todo-message-only-source',
+        user_id: fakeUser.id,
+        content: `[채팅] ${sourceMessageText}`,
+        is_complete: false,
+        task_date: '2026-05-08',
+        created_at: '2026-05-08T09:05:00.000Z',
+        source_message_id: 'msg-message-only-source',
+        source_room_id: null,
+      },
+    ],
+    chatRooms: [
+      {
+        id: '00000000-0000-0000-0000-000000000000',
+        name: '공지메시지',
+        type: 'notice',
+        members: [fakeUser.id],
+        created_at: '2026-05-08T00:00:00.000Z',
+        last_message_at: '2026-05-08T00:00:00.000Z',
+      },
+      actualRoom,
+    ],
+    messages: [
+      {
+        id: 'msg-message-only-source',
+        room_id: actualRoom.id,
+        sender_id: peerOne.id,
+        content: sourceMessageText,
+        created_at: '2026-05-08T10:00:00.000Z',
+        is_deleted: false,
+        staff: { name: peerOne.name, photo_url: null, position: peerOne.position },
+        chat_rooms: actualRoom,
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '내정보',
+      erp_mypage_tab: 'todo',
+    },
+  });
+
+  await openMyPage(page);
+  await page.getByRole('button', { name: '할일' }).click();
+  await expect(page.getByTestId('mypage-todo-tab')).toBeVisible();
+  await expect(page.getByText(`[채팅] ${sourceMessageText}`)).toBeVisible();
+
+  await page.getByTestId('todo-open-chat-todo-message-only-source').click();
+
+  await expect(page.getByTestId('chat-view')).toBeVisible();
+  await expect(page.getByTestId('chat-message-msg-message-only-source')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId('chat-message-msg-message-only-source')).toContainText(sourceMessageText);
+  await expect
+    .poll(async () =>
+      page.evaluate(async () => {
+        const result = await fetch('/rest/v1/todos?id=eq.todo-message-only-source&select=source_room_id');
+        const rows = await result.json();
+        return rows?.[0]?.source_room_id;
+      }),
+    )
+    .toBe(actualRoom.id);
+
+  expect(runtimeErrors).toEqual([]);
 });
 
 test('chat deep actions can pin a notice, create a poll, and save added participants', async ({

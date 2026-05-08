@@ -66,6 +66,56 @@ test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
 });
 
+test('mypage todo list follows registration order instead of date or priority', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await installMutableDateMock(page, '2026-05-08T10:00:00+09:00');
+  await mockSupabase(page, {
+    todos: [
+      {
+        id: 'todo-registered-first',
+        user_id: fakeUser.id,
+        content: '첫번째로 등록한 할일',
+        is_complete: false,
+        task_date: '2026-05-08',
+        created_at: '2026-05-08T09:00:00.000Z',
+        priority: 'low',
+      },
+      {
+        id: 'todo-registered-second',
+        user_id: fakeUser.id,
+        content: '두번째로 등록한 할일',
+        is_complete: false,
+        task_date: '2026-05-04',
+        created_at: '2026-05-08T09:10:00.000Z',
+        priority: 'urgent',
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '내정보',
+      erp_mypage_tab: 'todo',
+    },
+  });
+
+  await openMyPage(page);
+  await page.getByRole('button', { name: '할일' }).click();
+  await expect(page.getByTestId('mypage-todo-tab')).toBeVisible();
+  await page.getByRole('button', { name: '주간' }).click();
+
+  const firstTodo = page.getByText('첫번째로 등록한 할일', { exact: true });
+  const secondTodo = page.getByText('두번째로 등록한 할일', { exact: true });
+  await expect(firstTodo).toBeVisible();
+  await expect(secondTodo).toBeVisible();
+
+  const firstBox = await firstTodo.boundingBox();
+  const secondBox = await secondTodo.boundingBox();
+  expect(firstBox?.y ?? 0).toBeLessThan(secondBox?.y ?? 0);
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('mypage commute can check in and out with geolocation permission', async ({ page }) => {
   const runtimeErrors = trackRuntimeErrors(page);
 
