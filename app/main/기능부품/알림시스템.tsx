@@ -1188,6 +1188,10 @@ export default function NotificationSystem({
   const mountedAtRef = useRef(new Date().toISOString());
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const chatPushFlushInFlightRef = useRef(false);
+  const todoReminderDispatchRef = useRef<{ lastAt: number; inFlight: Promise<void> | null }>({
+    lastAt: 0,
+    inFlight: null,
+  });
   const onActionRef = useRef<(n: ToastItem) => void>(() => { });
   const tabIdRef = useRef(
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -1675,11 +1679,19 @@ export default function NotificationSystem({
         created_at: new Date().toISOString(),
       };
 
-      const { data: inserted, error } = await supabase
-        .from('notifications')
-        .insert([insertPayload])
-        .select()
-        .single();
+      const writeQuery = deterministicId
+        ? supabase
+            .from('notifications')
+            .upsert([insertPayload], { onConflict: 'id', ignoreDuplicates: true })
+            .select()
+            .maybeSingle()
+        : supabase
+            .from('notifications')
+            .insert([insertPayload])
+            .select()
+            .single();
+
+      const { data: inserted, error } = await writeQuery;
 
       if (!error) return inserted;
 
@@ -1716,7 +1728,7 @@ export default function NotificationSystem({
       void syncBadge();
     };
 
-    const processDueTodoReminders = async () => {
+    const runDueTodoReminderDispatch = async () => {
       try {
         const response = await fetch('/api/todos/reminders/dispatch', {
           method: 'POST',
@@ -1823,6 +1835,20 @@ export default function NotificationSystem({
       }
     };
 
+    const processDueTodoReminders = async () => {
+      const now = Date.now();
+      if (todoReminderDispatchRef.current.inFlight) {
+        return todoReminderDispatchRef.current.inFlight;
+      }
+      if (now - todoReminderDispatchRef.current.lastAt < 15_000) return;
+
+      todoReminderDispatchRef.current.lastAt = now;
+      todoReminderDispatchRef.current.inFlight = runDueTodoReminderDispatch().finally(() => {
+        todoReminderDispatchRef.current.inFlight = null;
+      });
+      return todoReminderDispatchRef.current.inFlight;
+    };
+
     const queuePayrollAnomalyAlert = async () => {
       if (!canAccessAdminSection(user, '급여이상치')) {
         return;
@@ -1866,6 +1892,8 @@ export default function NotificationSystem({
       }
     };
 
+    let notificationRealtimeReady = false;
+
     const nTableChannel = supabase.channel(`noti-db-${uid}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` }, (payload: Record<string, unknown>) => {
         emitIncomingNotification(payload.new as Record<string, unknown>);
@@ -1873,9 +1901,12 @@ export default function NotificationSystem({
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` }, () => syncBadge())
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
+          notificationRealtimeReady = true;
           void fetchUnreadNotificationsSince(mountedAt);
           void processDueTodoReminders();
           void queuePayrollAnomalyAlert();
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          notificationRealtimeReady = false;
         }
       });
 
@@ -2048,15 +2079,17 @@ export default function NotificationSystem({
     void processDueTodoReminders();
 
     let quickCatchupPolledAt = mountedAt;
-    const unbindQuickCatchup = bindPageRefresh(() => {
+    const quickCatchupTimer = window.setTimeout(() => {
+      if (notificationRealtimeReady) return;
       const since = quickCatchupPolledAt;
       quickCatchupPolledAt = new Date().toISOString();
       void fetchUnreadNotificationsSince(since);
-    }, { intervalMs: 10_000 });
+    }, 10_000);
 
     // fallbackPoll: Realtime 누락 보완용. 마지막 폴링 이후 생성된 것만 조회하여 이중 알림 방지
     let lastPolledAt = mountedAt;
     const unbindFallbackPoll = bindPageRefresh(() => {
+      if (notificationRealtimeReady) return;
       const since = lastPolledAt;
       lastPolledAt = new Date().toISOString();
       void fetchUnreadNotificationsSince(since);
@@ -2069,8 +2102,9 @@ export default function NotificationSystem({
     const unbindHealthcheck = bindChannelHealthcheck(channels, 30_000);
 
     return () => {
+      notificationRealtimeReady = false;
       unbindHealthcheck();
-      unbindQuickCatchup();
+      window.clearTimeout(quickCatchupTimer);
       unbindFallbackPoll();
       unbindTodoReminderPoll();
       channels.forEach(ch => supabase.removeChannel(ch));

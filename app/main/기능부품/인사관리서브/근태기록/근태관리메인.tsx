@@ -602,7 +602,12 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
   const userPosition = String(user?.position || '');
   const userRole = String(user?.role || '');
   const userCompany = String(user?.company || '');
-  const canCreateRoster = ROSTER_CREATOR_POSITIONS.includes(userPosition) || ['admin', 'master'].includes(userRole) || ['최고관리자', '시스템관리자', '대표', '관리자'].includes(userPosition);
+  const userPermissions = ((user as Record<string, any> | null)?.permissions || {}) as Record<string, any>;
+  const explicitRosterCreatePermission = Object.prototype.hasOwnProperty.call(userPermissions, 'hr_근무표생성')
+    ? userPermissions.hr_근무표생성 === true
+    : null;
+  const canCreateRosterByPosition = ROSTER_CREATOR_POSITIONS.includes(userPosition) || ['admin', 'master'].includes(userRole) || ['최고관리자', '시스템관리자', '대표', '관리자'].includes(userPosition);
+  const canCreateRoster = explicitRosterCreatePermission ?? canCreateRosterByPosition;
   const canApproveRoster = ROSTER_APPROVER_POSITIONS.includes(userPosition) || (ROSTER_APPROVER_COMPANIES.includes(userCompany) && userPosition === '이사') || ['admin', 'master'].includes(userRole) || ['최고관리자', '시스템관리자'].includes(userPosition);
 
   useEffect(() => {

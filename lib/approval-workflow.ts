@@ -1,4 +1,4 @@
-import { asRecord, asNullableString } from './data-normalizer';
+import { asRecord, asNullableString, asNumber } from './data-normalizer';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -155,8 +155,8 @@ export function getApprovalEditHistory(metaData: unknown): ApprovalHistoryEntry[
 
 export function getApprovalRevision(metaData: unknown) {
   const meta = asMetaData(metaData);
-  const revision = Number(meta.revision);
-  return Number.isFinite(revision) && revision > 0 ? revision : 1;
+  const revision = asNumber(meta.revision);
+  return revision !== null && revision > 0 ? revision : 1;
 }
 
 export function appendApprovalHistory(
@@ -211,20 +211,20 @@ export function isApprovalOverdue(item: Record<string, unknown>, thresholdHours 
 }
 
 export function parseApprovalDelayHours(value: unknown, fallback = 24) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return fallback;
+  const numeric = asNumber(value);
+  if (numeric === null) return fallback;
   return Math.min(168, Math.max(1, Math.round(numeric)));
 }
 
 export function parseApprovalDelayRepeatHours(value: unknown, fallback = 24) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return fallback;
+  const numeric = asNumber(value);
+  if (numeric === null) return fallback;
   return Math.min(168, Math.max(1, Math.round(numeric)));
 }
 
 export function parseApprovalDelayMaxNotifications(value: unknown, fallback = 3) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return fallback;
+  const numeric = asNumber(value);
+  if (numeric === null) return fallback;
   return Math.min(10, Math.max(1, Math.round(numeric)));
 }
 
@@ -237,8 +237,8 @@ export function parseApprovalDocNumberDateMode(
 }
 
 export function parseApprovalDocNumberSequencePadding(value: unknown, fallback = 3) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return fallback;
+  const numeric = asNumber(value);
+  if (numeric === null) return fallback;
   return Math.min(6, Math.max(2, Math.round(numeric)));
 }
 
@@ -308,7 +308,7 @@ export function shouldSendDelayNotification(
 
   const storedApproverId = String(tracker.current_approver_id || '');
   const lastNotifiedAt = String(tracker.last_notified_at || '');
-  const notificationCount = Math.max(0, Number(tracker.count) || 0);
+  const notificationCount = Math.max(0, asNumber(tracker.count) ?? 0);
   if (storedApproverId !== String(currentApproverId)) return true;
   if (notificationCount >= parseApprovalDelayMaxNotifications(maxNotifications)) return false;
   if (!lastNotifiedAt) return true;
@@ -327,7 +327,7 @@ export function markDelayNotification(
 ) {
   const meta = asMetaData(metaData);
   const tracker = meta.delay_notification as JsonRecord | undefined;
-  const count = Math.max(0, Number(tracker?.count) || 0) + 1;
+  const count = Math.max(0, asNumber(tracker?.count) ?? 0) + 1;
   return {
     ...meta,
     delay_notification: {

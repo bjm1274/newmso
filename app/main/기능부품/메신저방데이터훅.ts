@@ -77,7 +77,7 @@ export function useChatRoomDataSync({
   effectiveChatUserId,
   effectiveTodoUserId,
   userId,
-  requestBottomAlignmentHold: _requestBottomAlignmentHold,
+  requestBottomAlignmentHold,
   setRoom,
   resolveStaffProfile,
   getEffectiveRoomMemberIds,
@@ -87,8 +87,8 @@ export function useChatRoomDataSync({
   setChatRooms,
   setRoomUnreadCounts,
   setMessages,
-  setLoadingRoomId: _setLoadingRoomId,
-  setTimelineRoomId: _setTimelineRoomId,
+  setLoadingRoomId,
+  setTimelineRoomId,
   setRoomReadCursorMap,
   setReadCounts,
   setBookmarkedIds,
@@ -311,6 +311,12 @@ export function useChatRoomDataSync({
     const roomIdForFetch = String(selectedRoomId);
     const requestSeq = fetchDataRequestSeqRef.current + 1;
     fetchDataRequestSeqRef.current = requestSeq;
+    const shouldPreserveBottomAlignment =
+      String(pendingBottomAlignRoomIdRef.current || '') === roomIdForFetch;
+    if (shouldPreserveBottomAlignment) {
+      setLoadingRoomId?.(roomIdForFetch);
+      requestBottomAlignmentHold?.(roomIdForFetch, 2400);
+    }
     const isCurrentRequest = () =>
       fetchDataRequestSeqRef.current === requestSeq &&
       String(selectedRoomIdRef.current || '') === roomIdForFetch;
@@ -339,6 +345,7 @@ export function useChatRoomDataSync({
       } else if (!fallbackRoomId) {
         setRoom(null);
       }
+      setLoadingRoomId?.(null);
       return;
     }
 
@@ -379,6 +386,7 @@ export function useChatRoomDataSync({
           }>,
     );
     if (messagesError) {
+      setLoadingRoomId?.(null);
       console.error('채팅 메시지 조회 실패:', messagesError);
       return;
     }
@@ -401,6 +409,8 @@ export function useChatRoomDataSync({
         );
       });
     }
+    setTimelineRoomId?.(roomIdForFetch);
+    setLoadingRoomId?.(null);
 
     const messageIds = loadedMessages.map((message: ChatMessage) => String(message.id || '')).filter(Boolean);
     const roomMemberIds = getEffectiveRoomMemberIds(selectedRoomRecord);
@@ -703,6 +713,7 @@ export function useChatRoomDataSync({
     isRoomAccessibleToCurrentUser,
     pendingBottomAlignRoomIdRef,
     persistRoomSummary,
+    requestBottomAlignmentHold,
     repairDirectRooms,
     resolveStaffProfile,
     selectChatMessagesWithFallback,
@@ -710,6 +721,7 @@ export function useChatRoomDataSync({
     selectedRoomIdRef,
     setBookmarkedIds,
     setChatRooms,
+    setLoadingRoomId,
     setMessages,
     setPinnedIds,
     setPersistedPinnedMessages,
@@ -721,6 +733,7 @@ export function useChatRoomDataSync({
     setRoom,
     setRoomReadCursorMap,
     setRoomUnreadCounts,
+    setTimelineRoomId,
     syncChatRoomsState,
   ]);
 

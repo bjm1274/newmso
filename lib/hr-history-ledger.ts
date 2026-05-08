@@ -71,17 +71,30 @@ function formatSalaryDescription(record: Record<string, unknown>) {
   const beforeValue = asNumber(record.before_value);
   const afterValue = asNumber(record.after_value);
   const changeType = asTrimmedString(record.change_type) || '급여';
+  const reason = asTrimmedString(record.reason);
   const labels: Record<string, string> = {
     base_salary: '기본급',
     meal: '식대',
+    meal_allowance: '식대',
+    night_duty_allowance: '야간/당직수당',
     vehicle: '차량지원',
+    vehicle_allowance: '차량지원',
     childcare: '보육수당',
+    childcare_allowance: '보육수당',
     research: '연구활동비',
+    research_allowance: '연구활동비',
     position_allowance: '직책수당',
+    overtime_allowance: '연장근로수당',
+    night_work_allowance: '야간근로수당',
+    holiday_work_allowance: '휴일근로수당',
+    annual_leave_pay: '연차휴가수당',
     other: '기타수당',
+    other_taxfree: '기타 비과세',
   };
 
-  return `${labels[changeType] || changeType} ${formatWon(beforeValue ?? 0)} -> ${formatWon(afterValue ?? 0)}`;
+  const pieces = [`${labels[changeType] || changeType} ${formatWon(beforeValue ?? 0)} -> ${formatWon(afterValue ?? 0)}`];
+  if (reason) pieces.push(`사유: ${reason}`);
+  return pieces.join(' · ');
 }
 
 function formatWorkTypeDescription(record: Record<string, unknown>) {
@@ -127,7 +140,7 @@ export async function fetchHrHistoryLedger(staffId: string) {
         'salary_change_history',
         supabase
           .from('salary_change_history')
-          .select('id, effective_date, created_at, staff_id, change_type, before_value, after_value')
+          .select('id, effective_date, created_at, staff_id, change_type, before_value, after_value, reason')
           .eq('staff_id', staffId)
           .order('effective_date', { ascending: false })
           .limit(20),

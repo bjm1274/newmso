@@ -51,6 +51,7 @@ export const DEFAULT_TAX_INSURANCE_RATES: TaxInsuranceRates = {
 };
 
 function toFiniteNumber(value: any): number | null {
+  if (typeof value === 'boolean' || value === null || value === undefined || value === '') return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
@@ -206,12 +207,14 @@ export function resolveIncomeTaxBracket(rates?: Partial<TaxInsuranceRates> | nul
 }
 
 export function normalizeWithholdingRatePercent(value: number | string | null | undefined): 80 | 100 | 120 {
+  if (typeof value === 'boolean') return 80;
   const parsed = Number(value);
   if (parsed === 80 || parsed === 100 || parsed === 120) return parsed;
   return 80;
 }
 
 export function calculateQualifyingChildTaxCredit(value: number | string | null | undefined): number {
+  if (typeof value === 'boolean') return 0;
   const childCount = Math.max(0, Math.floor(Number(value) || 0));
   if (childCount <= 0) return 0;
   if (childCount === 1) return 12_500;

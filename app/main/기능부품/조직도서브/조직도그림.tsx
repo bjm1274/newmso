@@ -61,7 +61,7 @@ const DEFAULT_DEPT_STYLE = { gradient: 'from-slate-700 to-slate-600', color: '#6
 
 function toSafeText(value: unknown, fallback = '') {
   if (typeof value === 'string') return value.trim() || fallback;
-  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+  if (typeof value === 'number' || typeof value === 'bigint') {
     return String(value).trim() || fallback;
   }
   return fallback;

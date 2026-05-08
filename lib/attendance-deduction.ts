@@ -59,6 +59,7 @@ function getRecordedWorkDays(attendances: AttendanceRecord[]) {
 
 /** 지각/조퇴 분수를 10분 단위 내림으로 반환 (기본 10분, 최소 10분) */
 function resolveMinuteAmount(value: number | null | undefined) {
+  if (typeof value === 'boolean') return 10;
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return 10;
   return Math.max(10, Math.floor(parsed / 10) * 10);

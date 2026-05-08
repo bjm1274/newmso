@@ -47,6 +47,15 @@ type DeliveryState = {
   error?: string | null;
 };
 
+const formatTimelineDateKey = (value?: string | null) => {
+  const date = new Date(value || 0);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 type MessengerTimelineProps = {
   selectedRoomId: string | null;
   isLoadingMessages?: boolean;
@@ -131,12 +140,16 @@ function MessengerTimelineComponent({
   onSendWardQuickReply,
   onRetryFailedMessage,
   onScrollToBottom,
+  shouldKeepBottomAligned,
+  onMediaLoad,
+  onOpenDateJump,
 }: MessengerTimelineProps) {
   useLayoutEffect(() => {
     if (!selectedRoomId) return;
 
     const listElement = messageListRef.current;
     if (!listElement) return;
+    if (shouldKeepBottomAligned && !shouldKeepBottomAligned()) return;
 
     const alignToBottom = () => {
       listElement.scrollTop = Math.max(0, listElement.scrollHeight - listElement.clientHeight);
@@ -145,18 +158,26 @@ function MessengerTimelineComponent({
     // 즉시 + 한 번의 rAF(페인트 후) 초기 스크롤
     alignToBottom();
     const frameId = window.requestAnimationFrame(alignToBottom);
+    const nudgeTimerIds = [
+      window.setTimeout(alignToBottom, 80),
+      window.setTimeout(alignToBottom, 240),
+    ];
 
     // 방 전환 직후엔 콘텐츠가 없을 수 있으므로, ResizeObserver에서
     // 콘텐츠가 처음 채워질 때도 하단 정렬 (pendingAlign 플래그로 제어)
     let pendingAlign = true;
 
     const observer = new ResizeObserver(() => {
+      if (shouldKeepBottomAligned && !shouldKeepBottomAligned()) {
+        pendingAlign = false;
+        return;
+      }
       const dist = listElement.scrollHeight - listElement.scrollTop - listElement.clientHeight;
       if (pendingAlign) {
         // 방 전환 후 첫 콘텐츠 렌더 → 무조건 하단 정렬
         alignToBottom();
         if (dist <= 2) pendingAlign = false; // 정착 완료
-      } else if (dist < 80) {
+      } else if (dist > 0 && dist < 32) {
         // 이미지 로드 등으로 인한 높이 변화 → 하단 근처면 정렬
         alignToBottom();
       }
@@ -168,9 +189,28 @@ function MessengerTimelineComponent({
     return () => {
       pendingAlign = false;
       window.cancelAnimationFrame(frameId);
+      nudgeTimerIds.forEach((timerId) => window.clearTimeout(timerId));
       observer.disconnect();
     };
-  }, [messageListRef, selectedRoomId]);
+  }, [messageListRef, selectedRoomId, shouldKeepBottomAligned]);
+
+  const renderDateDivider = (dateLabel: string, dateKey: string) => (
+    <div data-testid="chat-date-divider" className="my-0.5 flex items-center justify-center gap-1 md:my-1 md:gap-2">
+      <div className="flex-1 h-px bg-[var(--border)]" />
+      <button
+        type="button"
+        onClick={() => {
+          if (dateKey) onOpenDateJump?.(dateKey);
+        }}
+        className="shrink-0 rounded-full bg-[var(--muted)] px-2.5 py-0.5 text-[10px] font-semibold text-[var(--toss-gray-3)] transition-colors hover:bg-[var(--toss-blue-light)] hover:text-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
+        title="날짜로 이동"
+        aria-label={`${dateLabel} 날짜로 이동`}
+      >
+        {dateLabel}
+      </button>
+      <div className="flex-1 h-px bg-[var(--border)]" />
+    </div>
+  );
 
   return (
     <>
@@ -237,10 +277,14 @@ function MessengerTimelineComponent({
                 const senderName = (albumItem.staff as { name?: string } | null)?.name || albumItem.sender_name || '알 수 없음';
                 const created = new Date(albumItem.created_at || 0);
                 const dateLabel = created.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+                const dateKey = formatTimelineDateKey(albumItem.created_at);
                 const showDateDivider = dateLabel !== lastDateLabel;
                 if (showDateDivider) lastDateLabel = dateLabel;
                 lastSenderId = String(albumItem.sender_id);
                 const count = albumMsgs.length;
+                const albumMessageIds = albumMsgs
+                  .map((message) => String(message.id || '').trim())
+                  .filter(Boolean);
                 const gridCols = count === 1 ? 'grid-cols-1' : count <= 4 ? 'grid-cols-2' : 'grid-cols-3';
                 const timeStr = created.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
                 const albumReplyTarget =
@@ -252,15 +296,17 @@ function MessengerTimelineComponent({
                 return (
                   <div
                     data-testid={`chat-album-${albumItem.album_id || albumItem.id}`}
+                    ref={(element) => {
+                      messageRefs.current[String(albumItem.id)] = element;
+                      albumMessageIds.forEach((messageId) => {
+                        messageRefs.current[messageId] = element;
+                      });
+                    }}
                     key={`album-${albumItem.album_id || albumItem.id}`}
                     className={showDateDivider ? 'mt-0.5 md:mt-1' : 'mt-[2px]'}
                   >
                     {showDateDivider && (
-                      <div data-testid="chat-date-divider" className="my-0.5 flex items-center justify-center gap-1 md:my-1 md:gap-2">
-                        <div className="flex-1 h-px bg-[var(--border)]" />
-                        <span className="px-2.5 py-0.5 rounded-full bg-[var(--muted)] text-[10px] font-semibold text-[var(--toss-gray-3)] shrink-0">{dateLabel}</span>
-                        <div className="flex-1 h-px bg-[var(--border)]" />
-                      </div>
+                      renderDateDivider(dateLabel, dateKey)
                     )}
                     <div className={`flex items-end gap-2 ${isMineAlbum ? 'flex-row-reverse' : 'flex-row'}`}>
                       {!isMineAlbum && (
@@ -371,6 +417,7 @@ function MessengerTimelineComponent({
                 day: 'numeric',
                 weekday: 'short',
               });
+              const dateKey = formatTimelineDateKey(msg.created_at);
               const showDateDivider = dateLabel !== lastDateLabel;
               if (showDateDivider) lastDateLabel = dateLabel;
               const isSystemInvite = typeof msg.content === 'string' && msg.content.startsWith('[초대]');
@@ -417,13 +464,7 @@ function MessengerTimelineComponent({
               return (
                 <div key={msg.id} data-testid={`chat-message-row-${msg.id}`} className={isContinuous ? 'mt-[2px]' : 'mt-0.5 md:mt-1'}>
                   {showDateDivider && (
-                    <div data-testid="chat-date-divider" className="my-0.5 flex items-center justify-center gap-1 md:my-1 md:gap-2">
-                      <div className="flex-1 h-px bg-[var(--border)]" />
-                      <span className="px-2.5 py-0.5 rounded-full bg-[var(--muted)] text-[10px] font-semibold text-[var(--toss-gray-3)] shrink-0">
-                        {dateLabel}
-                      </span>
-                      <div className="flex-1 h-px bg-[var(--border)]" />
-                    </div>
+                    renderDateDivider(dateLabel, dateKey)
                   )}
                   {isSystemInvite ? (
                     <div className="flex justify-center my-1">
@@ -539,6 +580,7 @@ function MessengerTimelineComponent({
                                     onPreview={() => onOpenAttachmentPreview(fileUrl, attachmentName, attachmentKind)}
                                     layout="bubble"
                                     tone={isMine ? 'accent' : 'default'}
+                                    onMediaLoad={onMediaLoad}
                                   />
                                 </div>
                               );
@@ -731,9 +773,11 @@ function MessengerTimelineComponent({
           <button
             type="button"
             onClick={() => onScrollToBottom('smooth')}
-            className="px-3 py-2 rounded-[var(--radius-md)] bg-[var(--card)] border border-[var(--border)] shadow-sm text-[11px] font-bold text-[var(--foreground)]"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--card)] text-lg font-bold text-[var(--accent)] shadow-sm transition-colors hover:bg-[var(--toss-blue-light)]"
+            aria-label="최신 메시지로 이동"
+            title="최신 메시지로 이동"
           >
-            최신 메시지
+            ↓
           </button>
         </div>
       )}

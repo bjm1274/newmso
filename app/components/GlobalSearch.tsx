@@ -121,6 +121,47 @@ export default function GlobalSearch({
       const likeTerm = `%${normalized}%`;
 
       try {
+        const [postsByTitleResult, postsByContentResult] = await Promise.all([
+          supabase
+            .from('board_posts')
+            .select('id, title, content, board_type')
+            .ilike('title', likeTerm)
+            .order('created_at', { ascending: false })
+            .limit(5),
+          supabase
+            .from('board_posts')
+            .select('id, title, content, board_type')
+            .ilike('content', likeTerm)
+            .order('created_at', { ascending: false })
+            .limit(5),
+        ]);
+
+        const seenPostIds = new Set(
+          nextResults
+            .filter((result) => result.type === 'post')
+            .map((result) => String(result.id))
+        );
+        const postMap = new Map<string, any>();
+        [
+          ...(postsByTitleResult.data || []),
+          ...(postsByContentResult.data || []),
+        ].forEach((post: any) => {
+          const id = String(post?.id || '');
+          if (!id || seenPostIds.has(id)) return;
+          postMap.set(id, post);
+        });
+        Array.from(postMap.values())
+          .slice(0, Math.max(0, 5 - seenPostIds.size))
+          .forEach((post: any) => {
+            nextResults.push({
+              type: 'post',
+              id: String(post.id),
+              title: post.title || '?쒕ぉ ?놁쓬',
+              subtitle: String(post.content || '').slice(0, 80),
+              meta: post.board_type || '',
+            });
+          });
+
         const { data: approvalsByTitle } = await supabase
           .from('approvals')
           .select('id, title, type, status, sender_name')

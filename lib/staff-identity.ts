@@ -2,6 +2,14 @@ import { normalizeProfileUser } from '@/lib/profile-photo';
 import { supabase } from '@/lib/supabase';
 
 type UserLikeRecord = Record<string, unknown>;
+type CachedIdentityLookup = {
+  expiresAt: number;
+  row: UserLikeRecord | null;
+};
+
+const STAFF_IDENTITY_CACHE_MS = 30_000;
+const staffIdentityCache = new Map<string, CachedIdentityLookup>();
+const staffIdentityInFlight = new Map<string, Promise<UserLikeRecord | null>>();
 
 function cleanString(value: unknown) {
   if (typeof value === 'string') {
@@ -30,7 +38,15 @@ export function getStaffLikeId(input: UserLikeRecord | null | undefined) {
   return isUuidLike(id) ? id : '';
 }
 
-async function tryResolveByColumn(base: UserLikeRecord, column: string, value: string) {
+function buildIdentityCacheKey(input: UserLikeRecord) {
+  return [
+    cleanString(input?.employee_no),
+    cleanString(input?.auth_user_id),
+    cleanString(input?.name),
+  ].join('|');
+}
+
+async function tryResolveByColumn(column: string, value: string) {
   if (!value) return null;
   const { data, error } = await supabase
     .from('staff_members')
@@ -39,10 +55,21 @@ async function tryResolveByColumn(base: UserLikeRecord, column: string, value: s
     .maybeSingle();
 
   if (error || !data) return null;
-  return normalizeProfileUser({
-    ...base,
-    ...data,
-  }) as UserLikeRecord;
+  return data as UserLikeRecord;
+}
+
+async function resolveStaffRowByIdentity(normalized: UserLikeRecord) {
+  const employeeNo = cleanString(normalized?.employee_no);
+  const authUserId = cleanString(normalized?.auth_user_id);
+  const name = cleanString(normalized?.name);
+
+  const lookups = await Promise.all([
+    tryResolveByColumn('employee_no', employeeNo),
+    tryResolveByColumn('auth_user_id', authUserId),
+    tryResolveByColumn('name', name),
+  ]);
+
+  return lookups.find(Boolean) || null;
 }
 
 export async function resolveStaffLike(input: UserLikeRecord | null | undefined) {
@@ -50,18 +77,31 @@ export async function resolveStaffLike(input: UserLikeRecord | null | undefined)
   const directId = getStaffLikeId(normalized);
   if (directId) return normalized as UserLikeRecord;
 
-  const employeeNo = cleanString(normalized?.employee_no);
-  const authUserId = cleanString(normalized?.auth_user_id);
-  const name = cleanString(normalized?.name);
+  const cacheKey = buildIdentityCacheKey(normalized as UserLikeRecord);
+  if (!cacheKey.replace(/\|/g, '')) return normalized as UserLikeRecord;
 
-  const byEmployeeNo = await tryResolveByColumn(normalized as UserLikeRecord, 'employee_no', employeeNo);
-  if (byEmployeeNo) return byEmployeeNo;
+  const cached = staffIdentityCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.row
+      ? normalizeProfileUser({ ...normalized, ...cached.row }) as UserLikeRecord
+      : normalized as UserLikeRecord;
+  }
 
-  const byAuthUserId = await tryResolveByColumn(normalized as UserLikeRecord, 'auth_user_id', authUserId);
-  if (byAuthUserId) return byAuthUserId;
+  let inFlight = staffIdentityInFlight.get(cacheKey);
+  if (!inFlight) {
+    inFlight = resolveStaffRowByIdentity(normalized as UserLikeRecord).finally(() => {
+      staffIdentityInFlight.delete(cacheKey);
+    });
+    staffIdentityInFlight.set(cacheKey, inFlight);
+  }
 
-  const byName = await tryResolveByColumn(normalized as UserLikeRecord, 'name', name);
-  if (byName) return byName;
+  const row = await inFlight;
+  staffIdentityCache.set(cacheKey, {
+    expiresAt: Date.now() + STAFF_IDENTITY_CACHE_MS,
+    row,
+  });
 
-  return normalized as UserLikeRecord;
+  return row
+    ? normalizeProfileUser({ ...normalized, ...row }) as UserLikeRecord
+    : normalized as UserLikeRecord;
 }

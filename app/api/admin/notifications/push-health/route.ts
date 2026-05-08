@@ -5,19 +5,10 @@ import {
   isSystemMasterSession,
   readSessionFromRequest,
 } from '@/lib/server-session';
+import { collectChatPushQueueHealth } from '@/lib/chat-push-health';
 
 
 export const dynamic = 'force-dynamic';
-
-type QueueHealthRow = {
-  id: string;
-  created_at: string | null;
-  processed_at?: string | null;
-  processing_started_at?: string | null;
-  attempt_count?: number | null;
-  next_attempt_at?: string | null;
-  dead_lettered_at?: string | null;
-};
 
 type PushSubscriptionRow = {
   id: string;
@@ -34,13 +25,6 @@ function createAdminClient() {
   }
 
   return createClient(supabaseUrl, serviceKey);
-}
-
-function isMissingColumnError(error: any, columnName: string) {
-  if (!error) return false;
-  const code = String(error?.code || '');
-  const message = String(error?.message || error?.details || '').toLowerCase();
-  return code === '42703' && message.includes(columnName.toLowerCase());
 }
 
 function groupDuplicateEndpoints(rows: PushSubscriptionRow[]) {
@@ -71,37 +55,7 @@ export async function GET(request: Request) {
 
     const supabase = createAdminClient();
 
-    const queueRes = await supabase
-      .from('chat_push_jobs')
-      .select(
-        'id, created_at, processed_at, processing_started_at, attempt_count, next_attempt_at, dead_lettered_at',
-      )
-      .limit(5000);
-
-    let queueRows = [] as QueueHealthRow[];
-    let queueMigrationReady = true;
-
-    if (queueRes.error) {
-      if (
-        isMissingColumnError(queueRes.error, 'next_attempt_at') ||
-        isMissingColumnError(queueRes.error, 'dead_lettered_at')
-      ) {
-        const fallbackQueueRes = await supabase
-          .from('chat_push_jobs')
-          .select('id, created_at, processed_at, processing_started_at, attempt_count');
-
-        if (fallbackQueueRes.error) {
-          throw fallbackQueueRes.error;
-        }
-
-        queueMigrationReady = false;
-        queueRows = (fallbackQueueRes.data || []) as QueueHealthRow[];
-      } else {
-        throw queueRes.error;
-      }
-    } else {
-      queueRows = (queueRes.data || []) as QueueHealthRow[];
-    }
+    const queueSummary = await collectChatPushQueueHealth(supabase);
 
     const [subscriptionRes, staffRes] = await Promise.all([
       supabase.from('push_subscriptions').select('id, staff_id, endpoint'),
@@ -122,48 +76,6 @@ export async function GET(request: Request) {
     );
     const duplicateEndpointInfo = groupDuplicateEndpoints(subscriptionRows);
 
-    const now = Date.now();
-    const queueSummary = queueRows.reduce(
-      (acc, row) => {
-        const processedAt = row.processed_at ? Date.parse(String(row.processed_at)) : NaN;
-        const nextAttemptAt = row.next_attempt_at ? Date.parse(String(row.next_attempt_at)) : NaN;
-        const deadLettered = Boolean(row.dead_lettered_at);
-        const isProcessed = Number.isFinite(processedAt);
-
-        if (!isProcessed) {
-          acc.pending += 1;
-          if (!acc.oldestPendingAt || String(row.created_at || '') < acc.oldestPendingAt) {
-            acc.oldestPendingAt = String(row.created_at || '');
-          }
-        }
-
-        if (deadLettered) {
-          acc.deadLettered += 1;
-        } else if (!isProcessed) {
-          if (row.attempt_count && row.attempt_count > 0) {
-            acc.retrying += 1;
-          }
-          if (!queueMigrationReady || !Number.isFinite(nextAttemptAt) || nextAttemptAt <= now) {
-            acc.ready += 1;
-          }
-        }
-
-        if (row.processing_started_at) {
-          acc.inFlight += 1;
-        }
-
-        return acc;
-      },
-      {
-        pending: 0,
-        ready: 0,
-        retrying: 0,
-        deadLettered: 0,
-        inFlight: 0,
-        oldestPendingAt: '',
-      },
-    );
-
     const nullStaffSubscriptions = subscriptionRows.filter(
       (row) => !String(row.staff_id || '').trim(),
     ).length;
@@ -175,8 +87,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       queue: {
-        migrationReady: queueMigrationReady,
-        total: queueRows.length,
+        migrationReady: queueSummary.migrationReady,
+        total: queueSummary.total,
         pending: queueSummary.pending,
         ready: queueSummary.ready,
         retrying: queueSummary.retrying,

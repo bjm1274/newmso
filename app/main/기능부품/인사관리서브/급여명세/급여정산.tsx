@@ -45,6 +45,7 @@ interface SettlementEntry {
   child_count_8_20: number;
   withholding_rate_percent: 80 | 100 | 120;
   advance_pay: number;
+  salary_change_proration?: SalaryChangeProrationSummary[];
   saved_status?: string;
   taxable_allowance_breakdown: TaxableAllowanceBreakdown;
 }
@@ -79,6 +80,46 @@ interface SavedPayrollRecord {
   record_type?: string | null;
 }
 
+type SalaryAmountField =
+  | 'base_salary'
+  | 'meal_allowance'
+  | 'night_duty_allowance'
+  | 'vehicle_allowance'
+  | 'childcare_allowance'
+  | 'research_allowance'
+  | 'other_taxfree'
+  | keyof TaxableAllowanceBreakdown;
+
+type SalaryChangeHistoryRow = {
+  id?: string;
+  staff_id: string;
+  change_type: string;
+  before_value: number | null;
+  after_value: number | null;
+  effective_date: string;
+  reason?: string | null;
+  created_at?: string | null;
+};
+
+type SalaryChangeProrationSegment = {
+  period_start: string;
+  period_end: string;
+  days: number;
+  monthly_amount: number;
+  prorated_amount: number;
+};
+
+type SalaryChangeProrationSummary = {
+  field: SalaryAmountField;
+  label: string;
+  effective_dates: string[];
+  before_value: number;
+  after_value: number;
+  reason: string;
+  amount: number;
+  segments: SalaryChangeProrationSegment[];
+};
+
 const PAYROLL_RECORD_OPTIONAL_COLUMNS = [
   'meal_allowance',
   'night_duty_allowance',
@@ -109,6 +150,43 @@ const EMPTY_TAXABLE_ALLOWANCE_BREAKDOWN: TaxableAllowanceBreakdown = {
 
 const PAYROLL_TIME_STEP_MINUTES = 10;
 const HOLD_TO_UNIT_INPUT_MS = 450;
+const PAYROLL_DAY_MS = 24 * 60 * 60 * 1000;
+
+const SALARY_CHANGE_FIELD_BY_TYPE: Record<string, SalaryAmountField> = {
+  base_salary: 'base_salary',
+  meal: 'meal_allowance',
+  meal_allowance: 'meal_allowance',
+  night_duty_allowance: 'night_duty_allowance',
+  vehicle: 'vehicle_allowance',
+  vehicle_allowance: 'vehicle_allowance',
+  childcare: 'childcare_allowance',
+  childcare_allowance: 'childcare_allowance',
+  research: 'research_allowance',
+  research_allowance: 'research_allowance',
+  other: 'other_taxfree',
+  other_taxfree: 'other_taxfree',
+  position_allowance: 'position_allowance',
+  overtime_allowance: 'overtime_allowance',
+  night_work_allowance: 'night_work_allowance',
+  holiday_work_allowance: 'holiday_work_allowance',
+  annual_leave_pay: 'annual_leave_pay',
+};
+
+const SALARY_CHANGE_FIELD_LABELS: Record<SalaryAmountField, string> = {
+  base_salary: '기본급',
+  meal_allowance: '식대',
+  night_duty_allowance: '야간/당직수당',
+  vehicle_allowance: '자가운전보조금',
+  childcare_allowance: '보육수당',
+  research_allowance: '연구활동비',
+  other_taxfree: '기타 비과세',
+  position_allowance: '직책수당',
+  overtime_allowance: '연장근로수당',
+  night_work_allowance: '야간근로수당',
+  holiday_work_allowance: '휴일근로수당',
+  annual_leave_pay: '연차휴가수당',
+  manual_extra_allowance: '기타 과세수당',
+};
 
 function parsePayrollWonInput(value: unknown) {
   const numeric = Number(String(value ?? '').replace(/[^\d.-]/g, ''));
@@ -344,6 +422,265 @@ function normalizeTaxableAllowanceBreakdown(value: unknown): TaxableAllowanceBre
   };
 }
 
+function parsePayrollDate(value: unknown): Date | null {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+
+  const rawText = String(value ?? '').trim();
+  const text = rawText.slice(0, 10);
+  const compactText = rawText.replace(/[^0-9]/g, '');
+  const match =
+    /^(\d{4})[-./](\d{1,2})[-./](\d{1,2})$/.exec(text) ||
+    (/^\d{8}$/.test(compactText) ? /^(\d{4})(\d{2})(\d{2})$/.exec(compactText) : null);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return null;
+  }
+  return date;
+}
+
+function formatPayrollDateKey(date: Date | null) {
+  if (!date) return '';
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+function getPayrollMonthBounds(yearMonth: string) {
+  const match = /^(\d{4})-(\d{2})$/.exec(String(yearMonth || '').trim());
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const lastDay = new Date(year, month, 0).getDate();
+  return {
+    start: new Date(year, month - 1, 1),
+    end: new Date(year, month - 1, lastDay),
+    lastDay,
+  };
+}
+
+function shiftPayrollDate(date: Date, days: number) {
+  const next = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function maxPayrollDate(a: Date, b: Date) {
+  return a.getTime() >= b.getTime() ? a : b;
+}
+
+function minPayrollDate(a: Date, b: Date) {
+  return a.getTime() <= b.getTime() ? a : b;
+}
+
+function getInclusivePayrollDays(start: Date, end: Date) {
+  return Math.floor((end.getTime() - start.getTime()) / PAYROLL_DAY_MS) + 1;
+}
+
+function getSalaryChangeField(changeType: unknown): SalaryAmountField | null {
+  return SALARY_CHANGE_FIELD_BY_TYPE[String(changeType || '').trim()] || null;
+}
+
+function normalizeNonNegativePayrollAmount(value: unknown) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? Math.max(0, amount) : 0;
+}
+
+function getSalaryChangesForField(
+  changes: SalaryChangeHistoryRow[] | undefined,
+  field: SalaryAmountField,
+  yearMonth: string,
+) {
+  const bounds = getPayrollMonthBounds(yearMonth);
+  if (!bounds) return [];
+
+  return (changes || [])
+    .map((change) => ({
+      change,
+      field: getSalaryChangeField(change.change_type),
+      effectiveDate: parsePayrollDate(change.effective_date),
+    }))
+    .filter(
+      (entry): entry is {
+        change: SalaryChangeHistoryRow;
+        field: SalaryAmountField;
+        effectiveDate: Date;
+      } => {
+        if (entry.field !== field || !entry.effectiveDate) return false;
+        return (
+          entry.effectiveDate.getTime() >= bounds.start.getTime() &&
+          entry.effectiveDate.getTime() <= bounds.end.getTime()
+        );
+      },
+    )
+    .sort((a, b) => a.effectiveDate.getTime() - b.effectiveDate.getTime());
+}
+
+function calculateSalaryAmountWithChanges({
+  fallback,
+  field,
+  yearMonth,
+  salaryChanges,
+}: {
+  fallback: unknown;
+  field: SalaryAmountField;
+  yearMonth: string;
+  salaryChanges?: SalaryChangeHistoryRow[];
+}) {
+  const bounds = getPayrollMonthBounds(yearMonth);
+  const defaultAmount = Math.round(normalizeNonNegativePayrollAmount(fallback));
+  if (!bounds) return { amount: defaultAmount, summary: null as SalaryChangeProrationSummary | null };
+
+  const orderedChanges = getSalaryChangesForField(salaryChanges, field, yearMonth);
+  if (orderedChanges.length === 0) {
+    return { amount: defaultAmount, summary: null as SalaryChangeProrationSummary | null };
+  }
+
+  let rawTotal = 0;
+  const segments: SalaryChangeProrationSegment[] = [];
+  const addSegment = (start: Date, end: Date, monthlyAmount: unknown) => {
+    const periodStart = maxPayrollDate(start, bounds.start);
+    const periodEnd = minPayrollDate(end, bounds.end);
+    if (periodStart.getTime() > periodEnd.getTime()) return;
+
+    const days = getInclusivePayrollDays(periodStart, periodEnd);
+    const normalizedMonthlyAmount = Math.round(normalizeNonNegativePayrollAmount(monthlyAmount));
+    const rawProratedAmount = (normalizedMonthlyAmount * days) / bounds.lastDay;
+    const proratedAmount = Math.floor(rawProratedAmount);
+    rawTotal += rawProratedAmount;
+    segments.push({
+      period_start: formatPayrollDateKey(periodStart),
+      period_end: formatPayrollDateKey(periodEnd),
+      days,
+      monthly_amount: normalizedMonthlyAmount,
+      prorated_amount: proratedAmount,
+    });
+  };
+
+  const firstChange = orderedChanges[0];
+  addSegment(bounds.start, shiftPayrollDate(firstChange.effectiveDate, -1), firstChange.change.before_value ?? fallback);
+  orderedChanges.forEach((entry, index) => {
+    const nextChange = orderedChanges[index + 1];
+    addSegment(
+      entry.effectiveDate,
+      nextChange ? shiftPayrollDate(nextChange.effectiveDate, -1) : bounds.end,
+      entry.change.after_value ?? fallback,
+    );
+  });
+
+  if (segments.length === 0) {
+    return { amount: defaultAmount, summary: null as SalaryChangeProrationSummary | null };
+  }
+
+  const amount = Math.floor(rawTotal);
+  const reason = orderedChanges
+    .map(({ change }) => String(change.reason || '').trim())
+    .filter(Boolean)
+    .join(' / ');
+
+  return {
+    amount,
+    summary: {
+      field,
+      label: SALARY_CHANGE_FIELD_LABELS[field] || String(field),
+      effective_dates: [...new Set(orderedChanges.map(({ change }) => String(change.effective_date).slice(0, 10)))],
+      before_value: Math.round(normalizeNonNegativePayrollAmount(firstChange.change.before_value ?? fallback)),
+      after_value: Math.round(
+        normalizeNonNegativePayrollAmount(orderedChanges[orderedChanges.length - 1].change.after_value ?? fallback),
+      ),
+      reason: reason || '사유 미입력',
+      amount,
+      segments,
+    },
+  };
+}
+
+function resolveSavedOrCalculatedAmount({
+  savedValue,
+  fallback,
+  calculation,
+}: {
+  savedValue: unknown;
+  fallback: unknown;
+  calculation: ReturnType<typeof calculateSalaryAmountWithChanges>;
+}) {
+  if (savedValue !== null && savedValue !== undefined) {
+    const normalizedSavedValue = Math.round(normalizeNonNegativePayrollAmount(savedValue));
+    const refreshCandidates = [
+      normalizeNonNegativePayrollAmount(fallback),
+      calculation.summary?.before_value,
+      calculation.summary?.after_value,
+    ]
+      .filter((value): value is number => typeof value === 'number')
+      .map((value) => Math.round(value));
+
+    if (
+      normalizedSavedValue !== Math.round(calculation.amount) &&
+      refreshCandidates.some((value) => normalizedSavedValue === value)
+    ) {
+      return calculation.amount;
+    }
+    return Number(savedValue) || 0;
+  }
+
+  return calculation.amount;
+}
+
+function resolveSalaryAmountForSettlement({
+  savedValue,
+  fallback,
+  field,
+  yearMonth,
+  salaryChanges,
+}: {
+  savedValue: unknown;
+  fallback: unknown;
+  field: SalaryAmountField;
+  yearMonth: string;
+  salaryChanges?: SalaryChangeHistoryRow[];
+}) {
+  const calculation = calculateSalaryAmountWithChanges({ fallback, field, yearMonth, salaryChanges });
+  const amount = resolveSavedOrCalculatedAmount({ savedValue, fallback, calculation });
+  return {
+    amount,
+    summary: calculation.summary ? { ...calculation.summary, amount } : null,
+  };
+}
+
+async function fetchSalaryChangeHistoryForMonth(yearMonth: string, staffIds: string[]) {
+  const bounds = getPayrollMonthBounds(yearMonth);
+  if (!bounds || staffIds.length === 0) return {};
+
+  const { data, error } = await supabase
+    .from('salary_change_history')
+    .select('id, staff_id, change_type, before_value, after_value, effective_date, reason, created_at')
+    .in('staff_id', staffIds)
+    .gte('effective_date', formatPayrollDateKey(bounds.start))
+    .lte('effective_date', formatPayrollDateKey(bounds.end))
+    .order('effective_date', { ascending: true });
+
+  if (error) throw error;
+
+  return ((data || []) as SalaryChangeHistoryRow[]).reduce<Record<string, SalaryChangeHistoryRow[]>>(
+    (acc, row) => {
+      const staffId = String(row.staff_id);
+      if (!acc[staffId]) acc[staffId] = [];
+      acc[staffId].push(row);
+      return acc;
+    },
+    {},
+  );
+}
+
 export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { staffs: StaffMember[]; selectedCo: string; onRefresh?: () => void }) {
   const [step, setStep] = useState(1);
   const [yearMonth, setYearMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -353,6 +690,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
   const [taxFreeLimits, setTaxFreeLimits] = useState<TaxFreeSettings>(DEFAULT_SETTINGS);
   const [taxInsuranceRates, setTaxInsuranceRates] = useState<TaxInsuranceRates>(DEFAULT_TAX_INSURANCE_RATES);
   const [savedRecordsByStaff, setSavedRecordsByStaff] = useState<Record<string, SavedPayrollRecord>>({});
+  const [salaryChangesByStaff, setSalaryChangesByStaff] = useState<Record<string, SalaryChangeHistoryRow[]>>({});
 
   useEffect(() => {
     let ok = true;
@@ -444,16 +782,77 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     staff: StaffMember,
     attendanceDeduction: number,
     attendanceDetail: Record<string, unknown>,
+    salaryChangeMap: Record<string, SalaryChangeHistoryRow[]> = salaryChangesByStaff,
   ): SettlementEntry => {
     const savedRecord = savedRecordsByStaff[String(staff.id)];
+    const staffSalaryChanges = salaryChangeMap[String(staff.id)] || [];
     const savedDeductionDetail = getSavedDeductionDetail(savedRecord);
-    const defaultBreakdown = getStaffTaxableAllowanceBreakdown(staff);
+    const salaryChangeProration: SalaryChangeProrationSummary[] = [];
+    const resolveAmount = (field: SalaryAmountField, savedValue: unknown, fallback: unknown) => {
+      const result = resolveSalaryAmountForSettlement({
+        savedValue,
+        fallback,
+        field,
+        yearMonth,
+        salaryChanges: staffSalaryChanges,
+      });
+      if (result.summary) salaryChangeProration.push(result.summary);
+      return result.amount;
+    };
+
+    const baseSalary = resolveAmount('base_salary', savedRecord?.base_salary, staff.base_salary);
+    const mealAllowance = resolveAmount('meal_allowance', savedRecord?.meal_allowance, staff.meal_allowance);
+    const nightDutyAllowance = resolveAmount(
+      'night_duty_allowance',
+      savedRecord?.night_duty_allowance,
+      staff.night_duty_allowance,
+    );
+    const vehicleAllowance = resolveAmount('vehicle_allowance', savedRecord?.vehicle_allowance, staff.vehicle_allowance);
+    const childcareAllowance = resolveAmount('childcare_allowance', savedRecord?.childcare_allowance, staff.childcare_allowance);
+    const researchAllowance = resolveAmount('research_allowance', savedRecord?.research_allowance, staff.research_allowance);
+    const otherTaxfree = resolveAmount('other_taxfree', savedRecord?.other_taxfree, staff.other_taxfree);
+
+    const staffBreakdown = getStaffTaxableAllowanceBreakdown(staff);
+    const changeAwareBreakdown: TaxableAllowanceBreakdown = { ...EMPTY_TAXABLE_ALLOWANCE_BREAKDOWN };
+    const taxableChangeFields: Array<Exclude<keyof TaxableAllowanceBreakdown, 'manual_extra_allowance'>> = [
+      'position_allowance',
+      'overtime_allowance',
+      'night_work_allowance',
+      'holiday_work_allowance',
+      'annual_leave_pay',
+    ];
+    taxableChangeFields.forEach((field) => {
+      const result = resolveSalaryAmountForSettlement({
+        savedValue: undefined,
+        fallback: staffBreakdown[field],
+        field,
+        yearMonth,
+        salaryChanges: staffSalaryChanges,
+      });
+      changeAwareBreakdown[field] = result.amount;
+      if (result.summary) salaryChangeProration.push(result.summary);
+    });
     const savedBreakdown = normalizeTaxableAllowanceBreakdown(savedDeductionDetail.taxable_allowance_breakdown);
-    const nextBreakdown = getTaxableAllowanceBreakdownTotal(savedBreakdown) > 0
-      ? savedBreakdown
-      : defaultBreakdown;
-    const defaultExtraAllowance = getTaxableAllowanceBreakdownTotal(defaultBreakdown);
-    const persistedExtraAllowance = Number(savedRecord?.extra_allowance ?? defaultExtraAllowance) || 0;
+    const hasSavedBreakdown = getTaxableAllowanceBreakdownTotal(savedBreakdown) > 0;
+    const savedLooksLikeCurrentBreakdown = taxableChangeFields.every(
+      (field) => Math.round(Number(savedBreakdown[field] || 0)) === Math.round(Number(staffBreakdown[field] || 0)),
+    );
+    const nextBreakdown =
+      hasSavedBreakdown && !(salaryChangeProration.length > 0 && savedLooksLikeCurrentBreakdown)
+        ? savedBreakdown
+        : changeAwareBreakdown;
+    const defaultExtraAllowance = getTaxableAllowanceBreakdownTotal(staffBreakdown);
+    const calculatedExtraAllowance = getTaxableAllowanceBreakdownTotal(changeAwareBreakdown);
+    const savedExtraAllowance = savedRecord?.extra_allowance;
+    let persistedExtraAllowance = Number(savedExtraAllowance ?? calculatedExtraAllowance) || 0;
+    if (
+      savedExtraAllowance !== null &&
+      savedExtraAllowance !== undefined &&
+      Math.round(Number(savedExtraAllowance) || 0) === Math.round(defaultExtraAllowance) &&
+      Math.round(calculatedExtraAllowance) !== Math.round(defaultExtraAllowance)
+    ) {
+      persistedExtraAllowance = calculatedExtraAllowance;
+    }
     const fixedAllowanceBase =
       Number(nextBreakdown.position_allowance || 0) +
       Number(nextBreakdown.overtime_allowance || 0) +
@@ -464,13 +863,13 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     nextBreakdown.manual_extra_allowance = Math.max(0, persistedExtraAllowance - fixedAllowanceBase);
 
     return {
-      base_salary: Number(savedRecord?.base_salary ?? staff.base_salary ?? 0) || 0,
-      meal_allowance: Number(savedRecord?.meal_allowance ?? staff.meal_allowance ?? 0) || 0,
-      night_duty_allowance: Number(savedRecord?.night_duty_allowance ?? staff.night_duty_allowance ?? 0) || 0,
-      vehicle_allowance: Number(savedRecord?.vehicle_allowance ?? staff.vehicle_allowance ?? 0) || 0,
-      childcare_allowance: Number(savedRecord?.childcare_allowance ?? staff.childcare_allowance ?? 0) || 0,
-      research_allowance: Number(savedRecord?.research_allowance ?? staff.research_allowance ?? 0) || 0,
-      other_taxfree: Number(savedRecord?.other_taxfree ?? staff.other_taxfree ?? 0) || 0,
+      base_salary: baseSalary,
+      meal_allowance: mealAllowance,
+      night_duty_allowance: nightDutyAllowance,
+      vehicle_allowance: vehicleAllowance,
+      childcare_allowance: childcareAllowance,
+      research_allowance: researchAllowance,
+      other_taxfree: otherTaxfree,
       extra_allowance: persistedExtraAllowance,
       overtime_pay: Number(savedRecord?.overtime_pay ?? 0) || 0,
       bonus: Number(savedRecord?.bonus ?? 0) || 0,
@@ -507,6 +906,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
           80) as number | string | null | undefined,
       ),
       advance_pay: Number(savedRecord?.advance_pay ?? 0) || 0,
+      salary_change_proration: salaryChangeProration,
       saved_status: String(savedRecord?.status || ''),
       taxable_allowance_breakdown: nextBreakdown,
     };
@@ -525,10 +925,20 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     }
 
     try {
-      const staffIds = selectedStaffs.map((s: StaffMember) => s.id);
+      const staffIds = selectedStaffs.map((s: StaffMember) => String(s.id));
       const [year, month] = yearMonth.split('-').map((value) => Number(value));
       const lastDay = new Date(year, month, 0).getDate();
       const [startDate, endDate] = [`${yearMonth}-01`, `${yearMonth}-${String(lastDay).padStart(2, '0')}`];
+      let latestSalaryChangesByStaff: Record<string, SalaryChangeHistoryRow[]> = {};
+
+      try {
+        latestSalaryChangesByStaff = await fetchSalaryChangeHistoryForMonth(yearMonth, staffIds);
+        setSalaryChangesByStaff(latestSalaryChangesByStaff);
+      } catch (salaryChangeError) {
+        console.error('salary change history load failed:', salaryChangeError);
+        setSalaryChangesByStaff({});
+        toast('급여 변경 이력 조회에 실패해 현재 등록 금액 기준으로 정산합니다.', 'warning');
+      }
 
       const { data: attendances, error: attendanceError } = await supabase
         .from('attendances')
@@ -613,7 +1023,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       if (fallbackRuleError) throw fallbackRuleError;
       const r = rule || fallbackRule;
 
-      const initialData: any = {};
+      const initialData: Record<string, SettlementEntry> = {};
       const attendanceMinuteMap = new Map(
         attendanceRecordRows.map((row) => [
           `${row.staff_id}_${String(row.work_date || '').slice(0, 10)}`,
@@ -646,7 +1056,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
             : undefined,
           { scheduledWorkDays: scheduledWorkDaysByStaff[s.id] }
         );
-        initialData[s.id] = buildSettlementEntry(s, total, detail);
+        initialData[s.id] = buildSettlementEntry(s, total, detail, latestSalaryChangesByStaff);
       });
       setSettlementData(initialData);
       setStep(2);
@@ -815,6 +1225,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       apply_tax: data.apply_tax,
       apply_insurance: data.apply_insurance,
       taxable_allowance_breakdown: data.taxable_allowance_breakdown,
+      salary_change_proration: data.salary_change_proration || [],
       tax_estimated: data.apply_tax && !hasExactWithholdingTable,
       missing_monthly_withholding_table: data.apply_tax && !hasExactWithholdingTable,
     };
@@ -848,6 +1259,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
           apply_tax: data?.apply_tax !== false,
           apply_insurance: data?.apply_insurance !== false,
           taxable_allowance_breakdown: data?.taxable_allowance_breakdown || EMPTY_TAXABLE_ALLOWANCE_BREAKDOWN,
+          salary_change_proration: data?.salary_change_proration || [],
           advance_pay_deduction: advancePay,
           net_pay_before_advance: Math.round(Number(calc?.net || 0)),
         };
@@ -1237,11 +1649,22 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                 const advancePay = Number(data?.advance_pay) || 0;
                 const hasAdvanceDeduction = advancePay > 0;
                 const res = calculateSalary(staffId);
+                const deductionTotal = Math.round(Number(res?.deduction || 0));
+                const deductionDetail = (res?.deductionDetail || {}) as Record<string, unknown>;
+                const deductionBreakdownItems = [
+                  { label: '국민연금', value: Number(deductionDetail.national_pension || 0) },
+                  { label: '건강보험', value: Number(deductionDetail.health_insurance || 0) },
+                  { label: '장기요양', value: Number(deductionDetail.long_term_care || 0) },
+                  { label: '고용보험', value: Number(deductionDetail.employment_insurance || 0) },
+                  { label: '소득세', value: Number(deductionDetail.income_tax || 0) },
+                  { label: '지방소득세', value: Number(deductionDetail.local_tax || 0) },
+                  { label: '기타 공제', value: Number(deductionDetail.custom_deduction || 0) },
+                ].filter((item) => item.value > 0);
                 const expectedNet = getAdvanceAdjustedNet(Number(res?.net || 0), advancePay);
                 const hourlyRate = getRegularHourlyRate(s, data);
                 return (
                   <div key={s.id} data-testid={`salary-settlement-card-${s.id}`} className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] shadow-sm space-y-4 hover:border-[var(--accent)] transition-all">
-                    <div className="flex justify-between items-center border-b border-[var(--muted)] pb-3">
+                    <div className="flex flex-col gap-3 border-b border-[var(--muted)] pb-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-[var(--toss-blue-light)] flex items-center justify-center text-xs font-bold text-[var(--accent)]">{s.name[0]}</div>
                         <div>
@@ -1261,11 +1684,30 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                         </div>
                         {hasAdvanceDeduction && <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded">선지급 차감</span>}
                       </div>
-                      <div className="text-right">
-                        <p className="text-[10px] text-[var(--toss-gray-3)] font-bold">합계 예상 실지급액</p>
-                        <p data-testid={`salary-settlement-expected-net-${s.id}`} className="text-lg font-black text-[var(--accent)]">₩ {expectedNet.toLocaleString()}</p>
+                      <div className="grid w-full grid-cols-2 gap-5 text-right sm:w-auto">
+                        <div>
+                          <p className="text-[10px] text-[var(--toss-gray-3)] font-bold">공제 합계</p>
+                          <p data-testid={`salary-settlement-total-deduction-${s.id}`} className="text-base font-black text-red-600">₩ {deductionTotal.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-[var(--toss-gray-3)] font-bold">합계 예상 실지급액</p>
+                          <p data-testid={`salary-settlement-expected-net-${s.id}`} className="text-lg font-black text-[var(--accent)]">₩ {expectedNet.toLocaleString()}</p>
+                        </div>
                       </div>
                     </div>
+
+                    {(data.salary_change_proration || []).length > 0 && (
+                      <div className="rounded-[var(--radius-md)] border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-800">
+                        <span>급여 변동 일할 계산: </span>
+                        {(data.salary_change_proration || [])
+                          .slice(0, 3)
+                          .map((item) => `${item.label} ${item.effective_dates.join(', ')} · ₩${item.amount.toLocaleString()}`)
+                          .join(' / ')}
+                        {(data.salary_change_proration || []).length > 3
+                          ? ` 외 ${(data.salary_change_proration || []).length - 3}건`
+                          : ''}
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
                       <div className="space-y-1">
@@ -1356,14 +1798,29 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                         />
                       </div>
                       <div className="col-span-2 flex items-center justify-between bg-[var(--muted)] px-4 py-2 rounded-xl mt-1">
-                        <div className="flex gap-4">
+                        <div className="flex flex-wrap gap-x-4 gap-y-1">
                           <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">과세: ₩{res.taxable.toLocaleString()}</span>
                           <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">비과세: ₩{res.taxfree.toLocaleString()}</span>
+                          <span className="text-[10px] font-bold text-red-600 uppercase">공제합계: ₩{deductionTotal.toLocaleString()}</span>
                           <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">자동 근태차감: ₩{Number(data.attendance_deduction || 0).toLocaleString()}</span>
                         </div>
                         <div className="flex gap-2">
                           {data.attendance_deduction > 0 && (
                             <button onClick={() => updateData(s.id, 'attendance_deduction', 0)} className="text-[9px] font-bold text-emerald-600 bg-[var(--card)] px-2 py-0.5 rounded shadow-sm border border-emerald-100">근태차감 면제</button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="col-span-2 lg:col-span-4 rounded-xl border border-red-100 bg-red-50/50 px-4 py-2">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                          <span className="text-[10px] font-black text-red-700 uppercase">공제 내역</span>
+                          {deductionBreakdownItems.length > 0 ? (
+                            deductionBreakdownItems.map((item) => (
+                              <span key={item.label} className="text-[10px] font-bold text-red-700">
+                                {item.label} ₩{item.value.toLocaleString()}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-[10px] font-bold text-red-700">공제 없음</span>
                           )}
                         </div>
                       </div>

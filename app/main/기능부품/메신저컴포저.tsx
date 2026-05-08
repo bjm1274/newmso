@@ -14,7 +14,6 @@ type MessengerComposerProps = {
   pendingAttachmentFiles: File[];
   failedAttachmentRetryEntries: AttachmentRetryQueueEntry[];
   fileUploading: boolean;
-  typingNoticeText: string;
   selectedRoomId: string | null;
   canWriteNotice: boolean;
   composerRef: RefObject<HTMLTextAreaElement | null>;
@@ -49,7 +48,6 @@ function MessengerComposerImpl({
   pendingAttachmentFiles,
   failedAttachmentRetryEntries,
   fileUploading,
-  typingNoticeText,
   selectedRoomId,
   canWriteNotice,
   composerRef,
@@ -102,7 +100,7 @@ function MessengerComposerImpl({
   return (
     <div
       data-testid="chat-upload-dropzone"
-      className={`relative z-10 shrink-0 bg-[var(--card)] px-1 py-0.5 pb-[calc(env(safe-area-inset-bottom)+4px)] md:px-2.5 md:py-1.5 md:pb-1.5 transition-all ${isDragging ? 'border-t-2 border-[var(--accent)] border-dashed bg-blue-500/10 dark:bg-blue-900/20' : 'border-t border-[var(--border)]'}`}
+      className={`relative z-10 shrink-0 bg-[var(--card)] px-1 py-0.5 pb-[calc(env(safe-area-inset-bottom)+2px)] md:px-2 md:py-1 md:pb-1 transition-all ${isDragging ? 'border-t-2 border-[var(--accent)] border-dashed bg-blue-500/10 dark:bg-blue-900/20' : 'border-t border-[var(--border)]'}`}
       onDragOver={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -287,13 +285,9 @@ function MessengerComposerImpl({
         </div>
       )}
 
-      <div aria-live="polite" className="mb-0.5 min-h-[8px] px-1 text-[10px] font-medium">
-        {typingNoticeText ? <span className="text-blue-500">{typingNoticeText}</span> : null}
-      </div>
-
-      <div className={`flex items-end gap-1 rounded-[var(--radius-lg)] border px-1 py-1 md:gap-2 md:px-2.5 md:py-2 transition-all ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
-        ? 'bg-[var(--muted)] border-[var(--border)] opacity-80 pointer-events-none'
-        : 'bg-[var(--muted)] border-[var(--border)] focus-within:bg-[var(--card)] focus-within:ring-2 focus-within:ring-[var(--accent)]/50'
+      <div className={`flex items-end gap-1 px-1 py-0 md:gap-1.5 md:px-1.5 transition-all ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
+        ? 'opacity-60 pointer-events-none'
+        : ''
         }`}>
         <input
           data-testid="chat-file-input"
@@ -318,7 +312,7 @@ function MessengerComposerImpl({
           disabled={fileUploading}
           aria-label="사진 또는 파일 첨부"
           title="사진/파일 첨부"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] transition-colors hover:text-[var(--accent)] disabled:opacity-50 md:h-8 md:w-8"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] transition-colors hover:text-[var(--accent)] disabled:opacity-50"
         >
           {fileUploading ? <span className="animate-pulse text-xs">...</span> : <span className="text-[11px] font-bold md:text-xs">첨부</span>}
         </button>
@@ -327,8 +321,7 @@ function MessengerComposerImpl({
             ref={composerRef}
             data-testid="chat-message-input"
             rows={1}
-            className="block min-h-[28px] w-full min-w-0 resize-none bg-transparent px-1 py-0.5 text-[16px] font-bold leading-5 outline-none md:min-h-[22px] md:px-2 md:py-1 md:text-sm md:leading-5"
-            style={{ fontSize: '16px' }}
+            className="block min-h-[24px] w-full min-w-0 resize-none bg-transparent px-1 py-0 text-[16px] font-semibold leading-5 outline-none md:min-h-[20px] md:px-1.5 md:text-xs md:leading-5"
             placeholder={selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice ? '부서장 이상만 공지 작성 가능' : '메시지를 입력하세요... (@이름 멘션 가능)'}
             value={inputMsg}
             onChange={(event) => {
@@ -361,7 +354,7 @@ function MessengerComposerImpl({
         <button
           data-testid="chat-send-button"
           onClick={() => void onSendMessage()}
-          className="flex h-7 min-w-[52px] shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)] px-2 text-[12px] font-bold text-white shadow-sm transition-all hover:scale-105 active:scale-95 md:h-8 md:min-w-[56px] md:px-3 md:text-sm"
+          className="flex h-7 min-w-[46px] shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)] px-2 text-[12px] font-bold text-white shadow-sm transition-all hover:scale-105 active:scale-95 md:min-w-[50px] md:text-xs"
         >
           전송
         </button>

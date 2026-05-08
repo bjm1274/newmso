@@ -14,6 +14,17 @@ resolveWorkingDaysPerWeek,
 } from '@/lib/payroll-working-hours';
 import { getPayrollStaffAge,isNationalPensionAgeEligible } from '@/lib/payroll-insurance-settings';
 import { buildProfilePhotoUrlFromPath,getProfilePhotoUrl } from '@/lib/profile-photo';
+import {
+cleanOptionalText,
+getStaffContractEndDate,
+getStaffEmploymentType,
+getStaffExtension,
+getStaffLicenseDate,
+getStaffLicenseNo,
+getStaffLicenseNote,
+getStaffProbationMonths,
+toIntegerOrFallback,
+} from '@/lib/staff-meta';
 import { supabase } from '@/lib/supabase';
 import { isMissingColumnError,withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { getMinimumWageByYear,MONTHLY_STANDARD_HOURS } from '@/lib/tax-free-limits';
@@ -214,14 +225,6 @@ function buildEssProfileDisplayChanges(
       },
     ];
   });
-}
-
-function toIntegerOrFallback(value: unknown, fallback = 0) {
-  if (typeof value === 'boolean' || value === null || value === undefined || value === '') {
-    return fallback;
-  }
-  const numeric = Number(String(value).replace(/,/g, '').trim());
-  return Number.isFinite(numeric) ? Math.round(numeric) : fallback;
 }
 
 interface StaffListManagerProps {
@@ -609,20 +612,21 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
     return { photoUrl, filePath, uploadedAt };
   };
 
-  const 직원고용형태 = (직원: StaffMember): string => (직원?.permissions?.employment_type as string) || '정규직';
+  const 직원고용형태 = (직원: StaffMember): string => getStaffEmploymentType(직원);
   const 직원면허요약 = (직원: StaffMember) => {
-    const parts = [직원?.license, 직원?.permissions?.license_no, 직원?.permissions?.license_note]
-      .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    const parts = [직원?.license, getStaffLicenseNo(직원), getStaffLicenseNote(직원)]
+      .map((value) => cleanOptionalText(value))
       .filter(Boolean);
     return parts.length ? parts.join(' · ') : '-';
   };
   const 직원연락요약 = (직원: StaffMember) => {
+    const extension = getStaffExtension(직원);
     const parts = [
       직원?.phone,
       직원?.email,
-      직원?.permissions?.extension ? `내선 ${직원.permissions.extension}` : '',
+      extension ? `내선 ${extension}` : '',
     ]
-      .map((value) => (typeof value === 'string' ? value.trim() : ''))
+      .map((value) => cleanOptionalText(value))
       .filter(Boolean);
     return parts.length ? parts.join(' · ') : '-';
   };
@@ -952,7 +956,7 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
     선택된직원ID설정(직원.id);
     프로필사진파일설정(null);
     프로필사진미리보기설정(getProfilePhotoUrl(직원));
-    const extensionValue = 직원.extension || 직원.permissions?.extension || '';
+    const extensionValue = getStaffExtension(직원);
     const ins = (직원.permissions?.insurance as Record<string, unknown>) || { national: true, health: true, employment: true, injury: true };
     const 직원근무형태IDs = getWeeklyRotationShiftIds(직원, 직원.shift_id);
     신규직원설정({
@@ -960,9 +964,9 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
       팀: 직원.department ?? '', 직함: 직원.position || '', 입사일: (직원.joined_at as string) || (직원.join_date as string) || '',
       퇴사일: (직원.resigned_at as string) || '', 주민번호: (직원.resident_no as string) || '', 이메일: 직원.email || '',
       주소: 직원.address || '', 면허사항: (직원.license as string) || '',
-      면허번호: (직원.permissions?.license_no as string) || '',
-      취득일자: (직원.permissions?.license_date as string) || '',
-      면허기타내용: (직원.permissions?.license_note as string) || '',
+      면허번호: getStaffLicenseNo(직원),
+      취득일자: getStaffLicenseDate(직원),
+      면허기타내용: getStaffLicenseNote(직원),
       계좌정보: 직원.bank_account || '',
       임금정보: (직원.salary_info as string) || '', 상태: 직원.status || '재직',
       연차총개수: typeof 직원.annual_leave_total === 'number' ? 직원.annual_leave_total : 0,
@@ -977,9 +981,9 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
       holiday_work_allowance: (직원.holiday_work_allowance as number) ?? 0, annual_leave_pay: (직원.annual_leave_pay as number) ?? 0,
       salary_change_effective_date: new Date().toISOString().slice(0, 10),
       salary_change_reason: '',
-      고용형태: (직원.permissions?.employment_type as string) || '정규직',
-      계약종료일: (직원.permissions?.contract_end_date as string) || '',
-      probation_months: toIntegerOrFallback(직원.permissions?.probation_months, 0),
+      고용형태: getStaffEmploymentType(직원),
+      계약종료일: getStaffContractEndDate(직원),
+      probation_months: getStaffProbationMonths(직원, 0),
       ins_national: ins.national !== false,
       ins_health: ins.health !== false,
       ins_employment: ins.employment !== false,

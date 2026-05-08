@@ -4,6 +4,8 @@ import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Company, CompanyType } from '@/lib/company';
+import { buildSelectClause } from '@/lib/query-columns-utils';
+import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import TeamManager from './팀관리';
 import ContractManager from './계약관리도구';
 import CorporateCardTransactions from '../인사관리서브/법인카드사용내역';
@@ -17,8 +19,23 @@ const AutoRosterPlanner = dynamic(() => import('../근무표자동편성'), { ss
 import DocumentRepository from '../인사관리서브/문서보관함';
 import ContractMain from '../인사관리서브/계약관리';
 
-const COMPANY_SELECT =
-  'id, name, type, mso_id, is_active, ceo_name, business_no, address, phone, memo, created_at';
+const COMPANY_COLUMNS = [
+  'id',
+  'name',
+  'type',
+  'mso_id',
+  'is_active',
+  'ceo_name',
+  'business_no',
+  'address',
+  'phone',
+  'payment_day',
+  'memo',
+  'created_at',
+] as const;
+const COMPANY_OPTIONAL_COLUMNS = ['payment_day'];
+const buildCompanySelect = (omittedColumns: ReadonlySet<string> = new Set()) =>
+  buildSelectClause(COMPANY_COLUMNS, omittedColumns);
 
 type Props = {
   user?: Record<string, unknown> | null;
@@ -45,6 +62,7 @@ type FormState = {
   business_no: string;
   address: string;
   phone: string;
+  payment_day: string;
   memo: string;
 };
 
@@ -80,8 +98,15 @@ function createEmptyForm(): FormState {
     business_no: '',
     address: '',
     phone: '',
+    payment_day: '7',
     memo: '',
   };
+}
+
+function normalizePaymentDay(value: unknown) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 7;
+  return Math.min(31, Math.max(1, Math.round(numeric)));
 }
 
 function PolicyScopeControls({
@@ -167,11 +192,16 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
   const fetchCompanies = async () => {
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from('companies')
-      .select(COMPANY_SELECT)
-      .order('type', { ascending: false })
-      .order('name');
+    const { data, error } = await withMissingColumnsFallback(
+      (omittedColumns) =>
+        supabase
+          .from('companies')
+          .select(buildCompanySelect(omittedColumns))
+          .order('type', { ascending: false })
+          .order('name'),
+      COMPANY_OPTIONAL_COLUMNS,
+      { cacheKey: 'company-manager-companies' },
+    );
 
     if (error) {
       console.error('companies fetch failed:', error);
@@ -195,11 +225,16 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
         return;
       }
 
-      const { data: seededData, error: seededError } = await supabase
-        .from('companies')
-        .select(COMPANY_SELECT)
-        .order('type', { ascending: false })
-        .order('name');
+      const { data: seededData, error: seededError } = await withMissingColumnsFallback(
+        (omittedColumns) =>
+          supabase
+            .from('companies')
+            .select(buildCompanySelect(omittedColumns))
+            .order('type', { ascending: false })
+            .order('name'),
+        COMPANY_OPTIONAL_COLUMNS,
+        { cacheKey: 'company-manager-companies' },
+      );
 
       if (seededError) {
         console.error('companies refetch failed:', seededError);
@@ -208,14 +243,16 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
         return;
       }
 
-      setCompanies((seededData || []) as Company[]);
-      setMsoId((seededData || []).find((company) => company.type === 'MSO')?.id || null);
+      const seededCompanies = (seededData || []) as unknown as Company[];
+      setCompanies(seededCompanies);
+      setMsoId(seededCompanies.find((company) => company.type === 'MSO')?.id || null);
       setLoading(false);
       return;
     }
 
-    setCompanies((data || []) as Company[]);
-    setMsoId((data || []).find((company) => company.type === 'MSO')?.id || null);
+    const companyRows = (data || []) as unknown as Company[];
+    setCompanies(companyRows);
+    setMsoId(companyRows.find((company) => company.type === 'MSO')?.id || null);
     setLoading(false);
   };
 
@@ -248,6 +285,7 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
       business_no: form.business_no || null,
       address: form.address || null,
       phone: form.phone || null,
+      payment_day: normalizePaymentDay(form.payment_day),
       memo: form.memo || null,
     };
 
@@ -255,6 +293,10 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
       if (editing) {
         const { error } = await supabase.from('companies').update(payload).eq('id', editing.id);
         if (error) {
+          if (isMissingColumnError(error, 'payment_day')) {
+            toast('급여일 저장 컬럼이 아직 DB에 적용되지 않았습니다. 마이그레이션을 먼저 적용해 주세요.', 'error');
+            return;
+          }
           console.error('companies update failed:', error);
           toast(`회사 수정에 실패했습니다: ${error.message}`, 'error');
           return;
@@ -272,6 +314,10 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
       });
 
       if (error) {
+        if (isMissingColumnError(error, 'payment_day')) {
+          toast('급여일 저장 컬럼이 아직 DB에 적용되지 않았습니다. 마이그레이션을 먼저 적용해 주세요.', 'error');
+          return;
+        }
         console.error('companies insert failed:', error);
         toast(`회사 등록에 실패했습니다: ${error.message}`, 'error');
         return;
@@ -294,6 +340,7 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
       business_no: company.business_no || '',
       address: company.address || '',
       phone: company.phone || '',
+      payment_day: String(company.payment_day || 7),
       memo: company.memo || '',
     });
   };
@@ -346,6 +393,7 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
                   <tr>
                     <th className="px-4 py-2 text-left font-bold text-[var(--toss-gray-4)]">회사명</th>
                     <th className="px-4 py-2 text-left font-bold text-[var(--toss-gray-4)]">유형</th>
+                    <th className="px-4 py-2 text-left font-bold text-[var(--toss-gray-4)]">급여일</th>
                     <th className="px-4 py-2 text-left font-bold text-[var(--toss-gray-4)]">상태</th>
                     <th className="px-4 py-2 text-right font-bold text-[var(--toss-gray-4)]">관리</th>
                   </tr>
@@ -371,6 +419,9 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
                               ? '병원'
                               : '클리닉'}
                         </span>
+                      </td>
+                      <td className="px-4 py-2 text-xs font-bold text-[var(--foreground)]">
+                        매월 {company.payment_day || 7}일
                       </td>
                       <td className="px-4 py-2">{company.is_active ? '활성' : '비활성'}</td>
                       <td className="px-4 py-2 text-right">
@@ -458,6 +509,18 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
                   onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
                   className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
                   placeholder="예: 061-000-0000"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-[var(--toss-gray-3)]">급여일</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={form.payment_day}
+                  onChange={(event) => setForm((prev) => ({ ...prev, payment_day: event.target.value }))}
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
+                  placeholder="예: 7"
                 />
               </div>
               <div>

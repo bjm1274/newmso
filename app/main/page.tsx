@@ -805,22 +805,12 @@ function MainPageContent() {
     setLoading(true);
     const u = currentUser ?? user;
     try {
-      const [
-        { data: staffData, error: staffError },
-        { data: postData, error: postError },
-      ] = await Promise.all([
-        supabase
-          .from('staff_members')
-          .select('*')
-          .order('employee_no', { ascending: true }),
-        supabase
-          .from('board_posts')
-          .select('*')
-          .order('created_at', { ascending: false }),
-      ]);
+      const { data: staffData, error: staffError } = await supabase
+        .from('staff_members')
+        .select('*')
+        .order('employee_no', { ascending: true });
 
       if (staffError) throw staffError;
-      if (postError) throw postError;
 
       const normalizedStaffData = Array.isArray(staffData)
         ? staffData.map((staff: StaffMember) => normalizeProfileUser(staff))
@@ -847,7 +837,7 @@ function MainPageContent() {
       setData({
         staffs: normalizedStaffData,
         depts: uniqueDepts || [],
-        posts: postData || [],
+        posts: [],
         tasks: [],
         surgeries: [],
         mris: []

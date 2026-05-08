@@ -37,7 +37,7 @@ const PROFILE_CARD_UPDATE_SELECT = 'id, email, phone, address, bank_account, ban
 
 function toSafeText(value: unknown, fallback = '') {
   if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+  if (typeof value === 'number' || typeof value === 'bigint') {
     return String(value);
   }
   return fallback;
@@ -387,8 +387,8 @@ export default function MyProfileCard({
         phone: currentUser.phone || null,
         address: currentUser.address || null,
         bank_account: currentUser.bank_account || null,
-        bank_name: currentUser.bank_name || currentUser?.permissions?.bank_name || null,
-        extension: currentUser.extension || currentUser?.permissions?.extension || null,
+        bank_name: toSafeText(currentUser.bank_name) || toSafeText(currentUser?.permissions?.bank_name) || null,
+        extension: toSafeText(currentUser.extension) || toSafeText(currentUser?.permissions?.extension) || null,
         permissions:
           currentUser?.permissions && typeof currentUser.permissions === 'object' && !Array.isArray(currentUser.permissions)
             ? currentUser.permissions
@@ -773,15 +773,15 @@ function summarizeProfileRequestFields(details: unknown) {
   for (const [key, label] of labels.entries()) {
     const beforeValue =
       key === 'extension'
-        ? originalData.extension ?? originalPermissions.extension ?? null
+        ? toSafeText(originalData.extension) || toSafeText(originalPermissions.extension) || null
         : key === 'bank_name'
-          ? originalData.bank_name ?? originalPermissions.bank_name ?? null
+          ? toSafeText(originalData.bank_name) || toSafeText(originalPermissions.bank_name) || null
           : originalData[key] ?? null;
     const afterValue =
       key === 'extension'
-        ? requestedChanges.extension ?? requestedPermissions.extension ?? null
+        ? toSafeText(requestedChanges.extension) || toSafeText(requestedPermissions.extension) || null
         : key === 'bank_name'
-          ? requestedChanges.bank_name ?? requestedPermissions.bank_name ?? null
+          ? toSafeText(requestedChanges.bank_name) || toSafeText(requestedPermissions.bank_name) || null
           : requestedChanges[key] ?? null;
     if (String(beforeValue ?? '') !== String(afterValue ?? '')) {
       changed.add(label);

@@ -39,6 +39,7 @@ export const CONTRACT_TEMPLATE_VARIABLES: ContractTemplateVariable[] = [
   { key: '{{research_allowance}}', desc: '연구활동비', category: '임금' },
   { key: '{{other_taxfree}}', desc: '기타 비과세', category: '임금' },
   { key: '{{total_monthly}}', desc: '월 급여 합계', category: '임금' },
+  { key: '{{total_salary}}', desc: '월 급여 합계', category: '임금' },
   { key: '{{annual_salary}}', desc: '연봉', category: '임금' },
   { key: '{{hourly_wage}}', desc: '통상임금 시급', category: '임금' },
   { key: '{{monthly_work_hours}}', desc: '월 소정근로시간', category: '임금' },
@@ -51,6 +52,7 @@ export const CONTRACT_TEMPLATE_VARIABLES: ContractTemplateVariable[] = [
   { key: '{{break_start}}', desc: '휴게 시작', category: '근무' },
   { key: '{{break_end}}', desc: '휴게 종료', category: '근무' },
   { key: '{{payment_day}}', desc: '급여 지급일', category: '근무' },
+  { key: '{{payday}}', desc: '급여 지급일', category: '근무' },
 ];
 
 const CONTRACT_TEMPLATE_BASE_UP_TO_ARTICLE_9 = `제1조 [담당업무 및 근무장소]

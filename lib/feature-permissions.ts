@@ -64,6 +64,7 @@ export const HR_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'hr_교육', label: '교육' },
   { key: 'hr_오프보딩', label: '오프보딩' },
   { key: 'hr_근태', label: '근태' },
+  { key: 'hr_근무표생성', label: '근무표 생성' },
   { key: 'hr_연차휴가', label: '연차 / 휴가' },
   { key: 'hr_급여', label: '급여' },
   { key: 'hr_건강검진', label: '건강검진' },
@@ -114,12 +115,12 @@ export const ADMIN_PERMISSION_ITEMS: FeaturePermissionItem[] = [
 ];
 
 export const STAFF_META_PERMISSION_ITEMS: FeaturePermissionItem[] = [
-  { key: 'license_no', label: '면허번호 사용', hint: '인사 상세/증명서 등에 사용' },
-  { key: 'license_date', label: '면허 취득일 사용' },
-  { key: 'employment_type', label: '고용형태 사용' },
-  { key: 'contract_end_date', label: '계약 종료일 사용' },
-  { key: 'probation_months', label: '수습기간 사용' },
-  { key: 'extension', label: '내선번호 사용' },
+  { key: 'staff_meta_license_no', label: '면허번호 사용', hint: '인사 상세/증명서 등에 사용' },
+  { key: 'staff_meta_license_date', label: '면허 취득일 사용' },
+  { key: 'staff_meta_employment_type', label: '고용형태 사용' },
+  { key: 'staff_meta_contract_end_date', label: '계약 종료일 사용' },
+  { key: 'staff_meta_probation_months', label: '수습기간 사용' },
+  { key: 'staff_meta_extension', label: '내선번호 사용' },
 ];
 
 export const FEATURE_PERMISSION_GROUPS: FeaturePermissionGroup[] = [

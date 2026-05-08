@@ -17,6 +17,7 @@ export interface Company {
   business_no?: string | null;
   address?: string | null;
   phone?: string | null;
+  payment_day?: number | null;
   memo?: string | null;
   created_at?: string;
 }

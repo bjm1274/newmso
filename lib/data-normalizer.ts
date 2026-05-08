@@ -21,6 +21,9 @@ export function asTrimmedString(value: unknown): string {
 
 /** 문자열/숫자를 number로 파싱. 콤마 제거 후 변환. 유효하지 않으면 null. */
 export function asNumber(value: unknown): number | null {
+  if (typeof value === 'boolean' || value === null || value === undefined || value === '') {
+    return null;
+  }
   const normalized =
     typeof value === 'string' ? Number(value.replace(/,/g, '')) : Number(value);
   return Number.isFinite(normalized) ? normalized : null;

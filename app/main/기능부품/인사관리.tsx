@@ -394,7 +394,11 @@ function normalizeDocumentCenterTabForUser(user: any, requestedTab: DocumentCent
 
 function canAccessHrTab(user: any, tab: HrTabDef) {
   if (tab.id === '근태') {
-    return canAccessHrSection(user, 'hr_근태') || canAccessHrSection(user, 'hr_연차휴가');
+    return (
+      canAccessHrSection(user, 'hr_근태') ||
+      canAccessHrSection(user, 'hr_연차휴가') ||
+      canAccessHrSection(user, 'hr_근무표생성')
+    );
   }
   if (tab.id === '인사변동') {
     return canAccessHrSection(user, 'hr_인사발령') || canAccessHrSection(user, 'hr_포상징계');

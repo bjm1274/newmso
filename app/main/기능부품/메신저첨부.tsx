@@ -1,6 +1,10 @@
 'use client';
 
-import { useState, type MouseEvent as ReactMouseEvent } from 'react';
+import {
+  useEffect,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
 import { toast } from '@/lib/toast';
 import {
   buildStorageDownloadUrl,
@@ -9,6 +13,7 @@ import {
   triggerManagedBrowserDownload,
 } from '@/lib/object-storage-url';
 import type { ChatMessage } from '@/types';
+import { Paperclip, Video } from './lucide-shim';
 
 export type AttachmentPreviewKind = 'image' | 'video' | 'file';
 
@@ -28,6 +33,7 @@ export function DeferredAttachmentImage({
   alt,
   wrapperClassName = '',
   placeholderClassName = '',
+  fallbackClassName = '',
   className = '',
   onLoad,
 }: {
@@ -35,23 +41,44 @@ export function DeferredAttachmentImage({
   alt: string;
   wrapperClassName?: string;
   placeholderClassName?: string;
+  fallbackClassName?: string;
   className?: string;
   onLoad?: () => void;
 }) {
   const [loaded, setLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  useEffect(() => {
+    setLoaded(false);
+    setLoadFailed(false);
+  }, [src]);
 
   return (
     <div className={`relative overflow-hidden ${wrapperClassName}`}>
-      {!loaded ? <div className={placeholderClassName} /> : null}
-      <img
-        src={src}
-        alt={alt}
-        className={`${className} ${loaded ? 'opacity-100' : 'absolute inset-0 opacity-0'}`}
-        onLoad={() => {
-          setLoaded(true);
-          onLoad?.();
-        }}
-      />
+      {loadFailed ? (
+        <div
+          className={`flex h-full w-full items-center justify-center bg-[var(--muted)] px-3 text-center text-xs text-[var(--toss-gray-3)] ${fallbackClassName || 'min-h-[96px]'}`}
+        >
+          이미지를 불러올 수 없습니다
+        </div>
+      ) : (
+        <>
+          {!loaded ? <div className={placeholderClassName} /> : null}
+          <img
+            src={src}
+            alt={alt}
+            className={`${className} ${loaded ? 'opacity-100' : 'absolute inset-0 opacity-0'}`}
+            onLoad={() => {
+              setLoaded(true);
+              onLoad?.();
+            }}
+            onError={() => {
+              setLoadFailed(true);
+              onLoad?.();
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }
@@ -376,12 +403,14 @@ export function AttachmentListCard({
               onClick={onPreview}
               aria-label={`${name || '첨부 이미지'} 미리보기`}
             >
-              <img
+              <DeferredAttachmentImage
                 src={url}
                 alt={name}
                 onLoad={() => onMediaLoad?.()}
-                onError={(e) => { const t = e.currentTarget; t.style.display = 'none'; const p = t.parentElement; if (p) { const d = document.createElement('div'); d.className = 'flex items-center justify-center w-[200px] h-[120px] rounded-[var(--radius-md)] bg-[var(--muted)] border border-[var(--border)] text-xs text-[var(--toss-gray-3)]'; d.textContent = '이미지를 불러올 수 없습니다'; p.appendChild(d); } }}
-                className="max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] object-cover cursor-zoom-in border border-[var(--border)]"
+                wrapperClassName="max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]"
+                placeholderClassName="h-[120px] w-[200px] max-w-full animate-pulse bg-[var(--muted)]"
+                fallbackClassName="h-[120px] w-[200px] max-w-full rounded-[var(--radius-md)] border border-[var(--border)]"
+                className="block max-h-[200px] max-w-full object-cover cursor-zoom-in"
               />
             </button>
             <div className="absolute inset-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity bg-black/40 flex items-center justify-center rounded-[var(--radius-md)] pointer-events-none px-2">
@@ -434,7 +463,9 @@ export function AttachmentListCard({
         } ${className}`}
       >
         <div className="flex items-start gap-3">
-          <div className="text-3xl">📎</div>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] text-[var(--accent)]">
+            <Paperclip size={20} strokeWidth={2} aria-hidden="true" />
+          </div>
           <div className="flex-1 min-w-0 pt-0.5">
             <p className="font-bold text-[12px] truncate mb-1 text-[var(--foreground)]">{name}</p>
             {summary ? (
@@ -489,11 +520,21 @@ export function AttachmentListCard({
           }`}
         >
           {kind === 'image' ? (
-            <img src={url} alt={name} className="w-full h-full object-cover" />
+            <DeferredAttachmentImage
+              src={url}
+              alt={name}
+              wrapperClassName="h-full w-full"
+              placeholderClassName="h-full w-full animate-pulse bg-[var(--muted)]"
+              fallbackClassName="h-full min-h-0 text-[9px] leading-tight"
+              className="h-full w-full object-cover"
+              onLoad={() => onMediaLoad?.()}
+            />
           ) : kind === 'video' ? (
-            <div className="w-full h-full flex items-center justify-center text-white text-lg">🎬</div>
+            <div className="w-full h-full flex items-center justify-center text-white">
+              <Video size={22} strokeWidth={2} aria-hidden="true" />
+            </div>
           ) : (
-            <span>📎</span>
+            <Paperclip size={20} strokeWidth={2} aria-hidden="true" />
           )}
         </button>
         <div className="min-w-0 flex-1">

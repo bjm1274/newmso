@@ -26,7 +26,7 @@ function asRecord(value: unknown): Record<string, any> {
 }
 
 function cleanFiniteNumber(value: unknown): number | null {
-  if (value === null || typeof value === 'undefined' || value === '') return null;
+  if (typeof value === 'boolean' || value === null || typeof value === 'undefined' || value === '') return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }

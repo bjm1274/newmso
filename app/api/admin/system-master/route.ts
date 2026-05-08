@@ -5,6 +5,7 @@ import { readSessionFromRequest } from '@/lib/server-session';
 import { isNamedSystemMasterAccount } from '@/lib/system-master';
 import { runBackup } from '@/lib/backup-cron';
 import { processPendingChatPushJobs } from '@/lib/chat-push-dispatch';
+import { collectChatPushQueueHealth } from '@/lib/chat-push-health';
 import { selectSystemMasterStaffRows } from '@/lib/system-master-staff-query';
 import { processDueTodoRemindersServer } from '@/lib/todo-reminder-cron';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
@@ -30,16 +31,6 @@ type PushSubscriptionRow = {
   device_id?: string | null;
   fcm_token?: string | null;
   created_at?: string | null;
-};
-
-type QueueHealthRow = {
-  id: string;
-  created_at: string | null;
-  processed_at?: string | null;
-  processing_started_at?: string | null;
-  attempt_count?: number | null;
-  next_attempt_at?: string | null;
-  dead_lettered_at?: string | null;
 };
 
 type PushFailureRow = {
@@ -309,6 +300,7 @@ function isMissingColumnError(error: QueryErrorLike, columnName: string) {
   return (
     (code === '42703' || !code) &&
     (
+      message.includes(needle) ||
       message.includes(`column ${needle}`) ||
       message.includes(`"${needle}"`) ||
       message.includes(`'${needle}'`) ||
@@ -488,6 +480,28 @@ async function loadRecentPushFailures(supabase: ReturnType<typeof getAdminClient
     return [] as PushFailureRow[];
   }
 
+  if (
+    isMissingColumnError(failureRes.error, 'processing_started_at') ||
+    isMissingColumnError(failureRes.error, 'next_attempt_at') ||
+    isMissingColumnError(failureRes.error, 'dead_lettered_at')
+  ) {
+    const fallbackRes = await supabase
+      .from('chat_push_jobs')
+      .select('id, room_id, message_id, attempt_count, last_error, created_at')
+      .not('last_error', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(8);
+
+    if (fallbackRes.error) {
+      if (isMissingColumnError(fallbackRes.error, 'last_error')) {
+        return [] as PushFailureRow[];
+      }
+      throw fallbackRes.error;
+    }
+
+    return (fallbackRes.data || []) as PushFailureRow[];
+  }
+
   throw failureRes.error;
 }
 
@@ -513,80 +527,6 @@ function buildPushFailureSummary(rows: PushFailureRow[]) {
   return Array.from(counters.entries())
     .map(([error, count]) => ({ error, count }))
     .sort((left, right) => right.count - left.count);
-}
-
-async function collectPushQueueHealth(supabase: ReturnType<typeof getAdminClient>) {
-  const queueRes = await supabase
-    .from('chat_push_jobs')
-    .select('id, created_at, processed_at, processing_started_at, attempt_count, next_attempt_at, dead_lettered_at');
-
-  let queueRows: QueueHealthRow[] = [];
-  let queueMigrationReady = true;
-
-  if (queueRes.error) {
-    if (
-      isMissingColumnError(queueRes.error, 'next_attempt_at') ||
-      isMissingColumnError(queueRes.error, 'dead_lettered_at')
-    ) {
-      const fallbackQueueRes = await supabase
-        .from('chat_push_jobs')
-        .select('id, created_at, processed_at, processing_started_at, attempt_count');
-
-      if (fallbackQueueRes.error) {
-        throw fallbackQueueRes.error;
-      }
-
-      queueMigrationReady = false;
-      queueRows = (fallbackQueueRes.data || []) as QueueHealthRow[];
-    } else {
-      throw queueRes.error;
-    }
-  } else {
-    queueRows = (queueRes.data || []) as QueueHealthRow[];
-  }
-
-  const now = Date.now();
-  return queueRows.reduce(
-    (acc, row) => {
-      const processedAt = row.processed_at ? Date.parse(String(row.processed_at)) : Number.NaN;
-      const nextAttemptAt = row.next_attempt_at ? Date.parse(String(row.next_attempt_at)) : Number.NaN;
-      const isProcessed = Number.isFinite(processedAt);
-
-      acc.total += 1;
-      if (!isProcessed) {
-        acc.pending += 1;
-        if (!acc.oldestPendingAt || String(row.created_at || '') < acc.oldestPendingAt) {
-          acc.oldestPendingAt = String(row.created_at || '');
-        }
-      }
-
-      if (row.dead_lettered_at) {
-        acc.deadLettered += 1;
-      } else if (!isProcessed && (!queueMigrationReady || !Number.isFinite(nextAttemptAt) || nextAttemptAt <= now)) {
-        acc.ready += 1;
-      }
-
-      if (!isProcessed && Number(row.attempt_count || 0) > 0) {
-        acc.retrying += 1;
-      }
-
-      if (row.processing_started_at) {
-        acc.inFlight += 1;
-      }
-
-      return acc;
-    },
-    {
-      migrationReady: queueMigrationReady,
-      total: 0,
-      pending: 0,
-      ready: 0,
-      retrying: 0,
-      deadLettered: 0,
-      inFlight: 0,
-      oldestPendingAt: '',
-    },
-  );
 }
 
 function pickPreferredSubscription(rows: PushSubscriptionRow[]) {
@@ -954,7 +894,7 @@ export async function GET(request: NextRequest) {
         supabase.from('audit_logs').select(AUDIT_LOG_SELECT).order('created_at', { ascending: false }).limit(400),
         supabase.from('staff_members').select('id'),
         listRecentBackups(10),
-        collectPushQueueHealth(supabase),
+        collectChatPushQueueHealth(supabase),
         safeRows(() => supabase.from('backup_restore_runs').select('id,file_name,status,total_tables,total_rows,requested_by_name,started_at,finished_at,result_summary').order('started_at', { ascending: false }).limit(10), 'backup_restore_runs'),
         safeHeadCount(() => supabase.from('todos').select('id', { count: 'exact', head: true }).eq('is_complete', false).not('reminder_at', 'is', null).lte('reminder_at', new Date().toISOString()), 'todos'),
         safeHeadCount(() => supabase.from('todos').select('id', { count: 'exact', head: true }).eq('is_complete', false).neq('repeat_type', 'none'), 'todos'),

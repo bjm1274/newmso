@@ -105,7 +105,7 @@ let orgTeamsPromise: Promise<OrgTeamIndex> | null = null;
 
 function normalizeText(value: unknown) {
   if (typeof value === 'string') return value.trim();
-  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+  if (typeof value === 'number' || typeof value === 'bigint') {
     return String(value).trim();
   }
   return '';

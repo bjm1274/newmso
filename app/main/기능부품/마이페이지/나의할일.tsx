@@ -31,7 +31,16 @@ type TodoRow = {
   [key: string]: unknown;
 };
 
-const OPTIONAL_TODO_COLUMNS = ['priority', 'reminder_at', 'repeat_type', 'assignee_kind', 'repeat_parent_id', 'repeat_generated_from_id'] as const;
+const OPTIONAL_TODO_COLUMNS = [
+  'priority',
+  'reminder_at',
+  'repeat_type',
+  'assignee_kind',
+  'repeat_parent_id',
+  'repeat_generated_from_id',
+  'source_message_id',
+  'source_room_id',
+] as const;
 const PRIORITY_OPTIONS: Array<{ value: TodoPriority; label: string }> = [
   { value: 'urgent', label: '긴급' },
   { value: 'high', label: '높음' },
@@ -80,21 +89,6 @@ function getDateRange(viewRange: TodoViewRange, selectedDate: string) {
     start: `${year}-${month}-01`,
     end: `${year}-${month}-${String(lastDay).padStart(2, '0')}`,
   };
-}
-
-function priorityRank(value: unknown) {
-  switch (String(value || '').trim()) {
-    case 'urgent':
-      return 4;
-    case 'high':
-      return 3;
-    case 'medium':
-      return 2;
-    case 'low':
-      return 1;
-    default:
-      return 0;
-  }
 }
 
 function getPriorityMeta(priority: unknown) {
@@ -194,6 +188,42 @@ function getRepeatParentId(task: TodoRow) {
   return raw || null;
 }
 
+async function resolveTodoChatSource(task: TodoRow) {
+  const sourceRoomId = String(task.source_room_id || '').trim();
+  const sourceMessageId = String(task.source_message_id || '').trim();
+  if (!sourceRoomId && !sourceMessageId) return null;
+
+  if (!sourceMessageId) {
+    return {
+      roomId: sourceRoomId,
+      messageId: '',
+    };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('id, room_id')
+      .eq('id', sourceMessageId)
+      .limit(1);
+
+    if (error) throw error;
+
+    const sourceMessage = Array.isArray(data) ? data[0] : null;
+    const resolvedRoomId = String(sourceMessage?.room_id || '').trim();
+    return {
+      roomId: resolvedRoomId || sourceRoomId,
+      messageId: String(sourceMessage?.id || sourceMessageId).trim(),
+    };
+  } catch {
+    if (!sourceRoomId) return null;
+    return {
+      roomId: sourceRoomId,
+      messageId: sourceMessageId,
+    };
+  }
+}
+
 function normalizeTodoPayload(
   payload: Record<string, unknown>,
   omittedColumns: ReadonlySet<string>
@@ -208,18 +238,10 @@ function sortTasks(rows: TodoRow[]) {
     const completeDiff = Number(Boolean(left.is_complete)) - Number(Boolean(right.is_complete));
     if (completeDiff !== 0) return completeDiff;
 
-    const leftDate = String(left.task_date || '');
-    const rightDate = String(right.task_date || '');
-    if (leftDate !== rightDate) return leftDate.localeCompare(rightDate);
+    const createdDiff = String(left.created_at || '').localeCompare(String(right.created_at || ''));
+    if (createdDiff !== 0) return createdDiff;
 
-    const priorityDiff = priorityRank(right.priority) - priorityRank(left.priority);
-    if (priorityDiff !== 0) return priorityDiff;
-
-    const leftReminder = String(left.reminder_at || '');
-    const rightReminder = String(right.reminder_at || '');
-    if (leftReminder !== rightReminder) return leftReminder.localeCompare(rightReminder);
-
-    return String(right.created_at || '').localeCompare(String(left.created_at || ''));
+    return String(left.id || '').localeCompare(String(right.id || ''));
   });
 }
 
@@ -506,6 +528,27 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
     }
   };
 
+  const handleOpenChatSource = async (task: TodoRow) => {
+    if (!onChatNavigate) return;
+
+    const resolvedSource = await resolveTodoChatSource(task);
+    if (!resolvedSource?.roomId) {
+      toast('연결된 채팅 메시지를 찾을 수 없습니다.', 'warning');
+      return;
+    }
+
+    if (String(task.source_room_id || '').trim() !== resolvedSource.roomId) {
+      void (async () => {
+        await supabase
+          .from('todos')
+          .update({ source_room_id: resolvedSource.roomId })
+          .eq('id', task.id);
+      })();
+    }
+
+    onChatNavigate(resolvedSource.roomId, resolvedSource.messageId);
+  };
+
   const filteredTasks = useMemo(
     () =>
       tasks.filter((task) =>
@@ -705,7 +748,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
                     task={task}
                     onToggle={toggleTask}
                     onDelete={deleteTask}
-                    onChatNavigate={onChatNavigate}
+                    onChatNavigate={handleOpenChatSource}
                   />
                 ))
               ) : (
@@ -725,7 +768,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
                     task={task}
                     onToggle={toggleTask}
                     onDelete={deleteTask}
-                    onChatNavigate={onChatNavigate}
+                    onChatNavigate={handleOpenChatSource}
                   />
                 ))}
               </section>
@@ -758,9 +801,9 @@ function TodoItem({
   task: TodoRow;
   onToggle: (id: string | number, currentStatus: boolean) => void;
   onDelete: (id: string | number) => void;
-  onChatNavigate?: (roomId: string, messageId: string) => void;
+  onChatNavigate?: (task: TodoRow) => void;
 }) {
-  const isChatSource = Boolean(task.source_message_id && task.source_room_id);
+  const isChatSource = Boolean(task.source_message_id || task.source_room_id);
   const priorityMeta = getPriorityMeta(task.priority);
   const reminderLabel = formatReminder(task.reminder_at);
   const repeatLabel = getRepeatLabel(task.repeat_type);
@@ -797,7 +840,8 @@ function TodoItem({
       {isChatSource && onChatNavigate ? (
         <button
           type="button"
-          onClick={() => onChatNavigate(task.source_room_id as string, task.source_message_id as string)}
+          data-testid={`todo-open-chat-${task.id}`}
+          onClick={() => onChatNavigate(task)}
           className="shrink-0 rounded-md bg-[var(--toss-blue-light)] px-2 py-1 text-[11px] font-semibold text-[var(--accent)] transition-all hover:bg-[var(--accent)] hover:text-white"
           title="채팅 메시지로 이동"
         >

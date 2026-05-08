@@ -20,6 +20,8 @@ import {
   sortChatRoomsWithNoticeFirst,
 } from './메신저유틸';
 
+const UUID_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 type UseChatRealtimeBridgeParams = {
   userId: string | null | undefined;
   userName: string | null | undefined;
@@ -166,7 +168,7 @@ export function useChatRealtimeBridge({
 
   const fetchMessageByIdWithRetry = useCallback(async (messageId: string, attempts = 3) => {
     const targetMessageId = String(messageId || '').trim();
-    if (!targetMessageId) return null;
+    if (!targetMessageId || !UUID_ID_PATTERN.test(targetMessageId)) return null;
 
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
