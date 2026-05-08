@@ -220,7 +220,6 @@ export function MessengerConversationPanel({ controller }: MessengerConversation
         noticeRecipientCount={c.noticeReadStats.recipientCount}
         noticeReminderBusy={c.noticeReminderBusy}
         threadOverviews={c.threadOverviews}
-        followedThreadIds={c.followedThreadIds ?? new Set()}
         roomNotificationMode={c.roomNotifyOn ? c.selectedRoomNotificationMode : 'mute'}
         roomNotificationKeyword={c.selectedRoomNotificationKeyword}
         sharedMediaPreviewMessages={c.sharedMediaPreviewMessages}
@@ -242,7 +241,6 @@ export function MessengerConversationPanel({ controller }: MessengerConversation
         onPreviewMessage={c.openAttachmentPreviewForMessage}
         onReplyMessage={c.startReplyToMessage}
         onOpenThread={c.handleOpenThreadFromDrawer}
-        onToggleThreadFollow={c.toggleThreadFollow ?? (() => undefined)}
         onScrollToMessage={c.scrollToMessage}
         onJumpToNoticeMessage={c.handleJumpToNoticeMessage}
         onOpenNoticeReadStatus={c.openCurrentNoticeReadStatus}

@@ -538,27 +538,12 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
         .lte('work_date', endDate);
       if (attendanceError) throw attendanceError;
 
-      let attendanceRecordRows: Array<{
+      const attendanceRecordRows: Array<{
         staff_id: string;
         work_date: string;
         late_minutes?: number | null;
         early_leave_minutes?: number | null;
       }> = [];
-
-      try {
-        const { data, error } = await supabase
-          .from('attendance_records')
-          .select('staff_id, work_date, late_minutes, early_leave_minutes')
-          .in('staff_id', staffIds)
-          .gte('work_date', startDate)
-          .lte('work_date', endDate);
-
-        if (!error && Array.isArray(data)) {
-          attendanceRecordRows = data;
-        }
-      } catch {
-        // Some environments do not expose attendance_records yet.
-      }
 
       const scheduledWorkDaysByStaff: Record<string, number> = {};
       try {

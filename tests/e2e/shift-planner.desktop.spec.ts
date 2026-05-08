@@ -29,25 +29,7 @@ async function installFixedDate(page: Page, initialIso = '2026-03-01T09:00:00+09
 }
 
 async function openShiftPlanner(page: Page) {
-  await installFixedDate(page);
-  await page.goto(
-    `/main?${new URLSearchParams({ open_menu: '인사관리', open_subview: '교대근무' }).toString()}`
-  );
-  const suiteBar = page.getByTestId('shift-suite-bar');
-  if (!(await suiteBar.isVisible().catch(() => false))) {
-    const hrMenuButton = page.getByRole('button', { name: /인사관리/ }).first();
-    if (await hrMenuButton.isVisible().catch(() => false)) {
-      await hrMenuButton.click();
-    }
-
-    const plannerButton = page.getByRole('button', { name: '교대근무' }).first();
-    await expect(plannerButton).toBeVisible();
-    await plannerButton.click();
-  }
-
-  await expect(suiteBar).toBeVisible();
-  await page.getByTestId('shift-suite-1').click();
-  await expect(page.getByTestId('roster-pattern-planner')).toBeVisible();
+  await openAdminRosterPolicy(page, 'planner');
 }
 
 async function openAdminRosterPolicy(page: Page, tab: 'planner' | 'rules' | 'patterns') {
@@ -532,9 +514,9 @@ test('saved ward pattern mixes day-fixed, night-fixed, and rotating staff in one
     user: rosterAdminUser,
     localStorage: {
       erp_last_menu: '인사관리',
-      erp_last_subview: '교대근무',
-      erp_hr_tab: '교대근무',
-      erp_hr_workspace: '근태 및 급여',
+      erp_last_subview: '근태',
+      erp_hr_tab: '근태',
+      erp_hr_workspace: '근태 · 급여',
     },
   });
 
@@ -817,9 +799,9 @@ test('ward generation clearly marks staff shortage when minimum D/E/N exceeds av
     user: rosterAdminUser,
     localStorage: {
       erp_last_menu: '인사관리',
-      erp_last_subview: '교대근무',
-      erp_hr_tab: '교대근무',
-      erp_hr_workspace: '근태 및 급여',
+      erp_last_subview: '근태',
+      erp_hr_tab: '근태',
+      erp_hr_workspace: '근태 · 급여',
     },
   });
 

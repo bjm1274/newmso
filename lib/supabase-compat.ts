@@ -4,7 +4,6 @@ type SupabaseResult<T> = {
 };
 
 const missingRelations = new Set<string>();
-const missingColumnFallbackCache = new Map<string, Set<string>>();
 
 function normalizeRelationName(relationName: string): string {
   return relationName.trim().toLowerCase();
@@ -85,11 +84,9 @@ export async function withMissingColumnFallback<T>(
 export async function withMissingColumnsFallback<T>(
   execute: (omittedColumns: ReadonlySet<string>) => PromiseLike<SupabaseResult<T>>,
   columnNames: string[],
-  options?: { cacheKey?: string },
+  _options?: { cacheKey?: string },
 ): Promise<SupabaseResult<T>> {
-  const omittedColumns = new Set<string>(
-    options?.cacheKey ? missingColumnFallbackCache.get(options.cacheKey) ?? [] : []
-  );
+  const omittedColumns = new Set<string>();
   let result = await execute(omittedColumns);
 
   while (result.error) {
@@ -103,9 +100,6 @@ export async function withMissingColumnsFallback<T>(
     }
 
     omittedColumns.add(missingColumn);
-    if (options?.cacheKey) {
-      missingColumnFallbackCache.set(options.cacheKey, new Set(omittedColumns));
-    }
     result = await execute(omittedColumns);
   }
 

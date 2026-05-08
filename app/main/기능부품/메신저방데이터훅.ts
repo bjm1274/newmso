@@ -4,8 +4,8 @@ import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction 
 import { supabase } from '@/lib/supabase';
 import { CHAT_ROOM_SELECT, POLL_SELECT } from '@/lib/chat-query-columns';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
-import { getDeletedMessagePreviewText, getMessageDisplayText } from './메신저첨부';
 import { selectChatMessagesWithFallback as defaultSelectChatMessagesWithFallback } from './메신저데이터유틸';
+import { getDeletedMessagePreviewText, getMessageDisplayText } from './메신저첨부';
 import {
   compareStaffMembers,
   getConversationRoomIdSet,
@@ -28,11 +28,11 @@ type RoomSummary = {
 };
 
 type SelectChatMessagesWithFallback = <TData>(
-  execute: (params: {
-    omittedColumns: ReadonlySet<string>;
-    selectClause: string;
-  }) => PromiseLike<{ data: TData | null; error: unknown }>,
+  execute: (selectClause: string) => PromiseLike<{ data: TData | null; error: unknown }>,
 ) => Promise<{ data: TData | null; error: unknown }>;
+
+const defaultLegacySelectChatMessagesWithFallback: SelectChatMessagesWithFallback = (execute) =>
+  defaultSelectChatMessagesWithFallback(({ selectClause }) => execute(selectClause));
 
 type UseChatRoomDataSyncParams = {
   selectedRoomId: string | null;
@@ -77,18 +77,18 @@ export function useChatRoomDataSync({
   effectiveChatUserId,
   effectiveTodoUserId,
   userId,
-  requestBottomAlignmentHold,
+  requestBottomAlignmentHold: _requestBottomAlignmentHold,
   setRoom,
   resolveStaffProfile,
   getEffectiveRoomMemberIds,
   isRoomAccessibleToCurrentUser,
   repairDirectRooms,
-  selectChatMessagesWithFallback: selectChatMessagesWithFallbackOverride,
+  selectChatMessagesWithFallback = defaultLegacySelectChatMessagesWithFallback,
   setChatRooms,
   setRoomUnreadCounts,
   setMessages,
-  setLoadingRoomId,
-  setTimelineRoomId,
+  setLoadingRoomId: _setLoadingRoomId,
+  setTimelineRoomId: _setTimelineRoomId,
   setRoomReadCursorMap,
   setReadCounts,
   setBookmarkedIds,
@@ -99,9 +99,6 @@ export function useChatRoomDataSync({
   setPolls,
   setPollVotes,
 }: UseChatRoomDataSyncParams) {
-  const selectMessagesWithFallback =
-    selectChatMessagesWithFallbackOverride || defaultSelectChatMessagesWithFallback;
-
   const updateUnreadForRooms = useCallback(
     async (rooms: ChatRoom[]) => {
       if (!effectiveChatUserId || !rooms?.length) return;
@@ -370,8 +367,8 @@ export function useChatRoomDataSync({
       ),
     );
 
-    const { data: msgs, error: messagesError } = await selectMessagesWithFallback<ChatMessage[]>(
-      ({ selectClause }) =>
+    const { data: msgs, error: messagesError } = await selectChatMessagesWithFallback<ChatMessage[]>(
+      (selectClause) =>
         supabase
           .from('messages')
           .select(selectClause)
@@ -552,8 +549,8 @@ export function useChatRoomDataSync({
 
         const missingPinnedIds = nextPinnedIds.filter((messageId) => !pinnedLookup.has(messageId));
         if (missingPinnedIds.length > 0) {
-          const { data: pinnedRows, error: pinnedRowsError } = await selectMessagesWithFallback<ChatMessage[]>(
-            ({ selectClause }) =>
+          const { data: pinnedRows, error: pinnedRowsError } = await selectChatMessagesWithFallback<ChatMessage[]>(
+            (selectClause) =>
               supabase
                 .from('messages')
                 .select(selectClause)
@@ -696,14 +693,6 @@ export function useChatRoomDataSync({
         pendingBottomAlignRoomIdRef.current = null;
       }
     }
-
-    setLoadingRoomId?.((currentRoomId) =>
-      String(currentRoomId || '') === roomIdForFetch ? null : currentRoomId,
-    );
-    setTimelineRoomId?.(roomIdForFetch);
-    if (pendingBottomAlignRoomIdRef.current === roomIdForFetch) {
-      requestBottomAlignmentHold?.(roomIdForFetch);
-    }
   }, [
     applyRoomSummaryToState,
     buildRoomSummaryFromMessages,
@@ -715,14 +704,12 @@ export function useChatRoomDataSync({
     pendingBottomAlignRoomIdRef,
     persistRoomSummary,
     repairDirectRooms,
-    requestBottomAlignmentHold,
     resolveStaffProfile,
-    selectMessagesWithFallback,
+    selectChatMessagesWithFallback,
     selectedRoomId,
     selectedRoomIdRef,
     setBookmarkedIds,
     setChatRooms,
-    setLoadingRoomId,
     setMessages,
     setPinnedIds,
     setPersistedPinnedMessages,
@@ -734,7 +721,6 @@ export function useChatRoomDataSync({
     setRoom,
     setRoomReadCursorMap,
     setRoomUnreadCounts,
-    setTimelineRoomId,
     syncChatRoomsState,
   ]);
 

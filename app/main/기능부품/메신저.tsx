@@ -27,7 +27,7 @@ import { MenuIcon } from './조직도서브/조직도측면창';
 import { selectChatMessagesWithFallback } from './메신저데이터유틸';
 import { MessengerDrawer } from './메신저드로어';
 import { bindMockNotificationInsert } from './메신저테스트이벤트';
-import { ReactionDetailModal } from './메신저액션';
+import { MessengerMessageActions, ReactionDetailModal } from './메신저액션';
 import { useChatMessageActions } from './메신저액션훅';
 import { useChatGlobalSearch } from './메신저검색훅';
 import { renderMessageContent } from './메신저메시지렌더';
@@ -131,9 +131,7 @@ type DeliveryState = {
   error?: string | null;
 };
 
-export type ChatViewController = Record<string, any>;
-
-export interface ChatViewProps {
+interface ChatViewProps {
   user: StaffMember | null;
   onRefresh?: () => void;
   staffs?: StaffMember[];
@@ -146,7 +144,7 @@ export interface ChatViewProps {
   shareTarget?: { id: string; fileCount: number; text: string | null; url: string | null; title: string | null } | null;
   onConsumeShareTarget?: () => void;
 }
-function ChatView({
+export default function ChatView({
   user,
   onRefresh,
   staffs = [],
@@ -233,7 +231,7 @@ function ChatView({
   const markConversationNotificationsAsReadRef = useRef<(roomIds: string[], readAt: string) => Promise<unknown>>(async () => undefined);
   const broadcastChatSyncRef = useRef<(action: string, roomId?: string | null) => void>(() => {});
   const initialRoomRestoreSyncedRef = useRef(false);
-  const fetchDataRef = useRef<(() => Promise<void>) | null>(null);
+  const fetchDataRef = useRef<((options?: { force?: boolean }) => Promise<void>) | null>(null);
   const globalRealtimeRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const roomRealtimeRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingBottomAlignReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -503,10 +501,6 @@ function ChatView({
   const selectedRoom = useMemo(
     () => chatRooms.find((room: ChatRoom) => room.id === selectedRoomId && isRoomAccessibleToCurrentUser(room)) || null,
     [chatRooms, isRoomAccessibleToCurrentUser, selectedRoomId]
-  );
-  const selfChatRoom = useMemo(
-    () => chatRooms.find((room: ChatRoom) => isSelfChatRoom(room, effectiveChatUserId || user?.id)) || null,
-    [chatRooms, effectiveChatUserId, user?.id],
   );
 
   const {
@@ -1386,7 +1380,7 @@ function ChatView({
 
   const handleIncomingRealtimeMessage = useCallback(async (row: ChatMessage) => {
     if (!row?.id || !row.room_id) return;
-    if (!claimIncomingRealtimeMessage(row.id)) return;
+    const alreadyHandledRecently = !claimIncomingRealtimeMessage(row.id);
 
     const roomId = String(row.room_id);
     const currentRooms = chatRoomsRef.current;
@@ -1397,6 +1391,7 @@ function ChatView({
     const currentConversationRoomId = String(selectedRoomIdRef.current || roomId);
     const isCurrentRoom = isRoomInSelectedConversation(roomId, currentRooms);
     const isOwnMessage = String(row.sender_id || '') === String(effectiveChatUserId || '');
+    if (alreadyHandledRecently && !isCurrentRoom) return;
     const previewText = getMessageDisplayText(
       row.content,
       row.file_name,
@@ -2635,11 +2630,11 @@ function ChatView({
 
   const {
     openMessageActions,
-    addTaskFromMessage,
+    handleAddTaskFromAction,
     startReplyToMessage,
     startForwardMessage,
     handleForwardToRoom,
-    forwardMessageToSelf,
+    openReadStatusPanel,
     openThreadPanel,
     deleteMessageFromActions,
   } = useChatMessageWorkflow({
@@ -2752,7 +2747,6 @@ function ChatView({
           groupedStaffs={groupedStaffs}
           expandedDepts={expandedDepts}
           onViewModeChange={setViewMode}
-          onOpenGroupModal={() => setShowGroupModal(true)}
           onOpenGlobalSearch={openGlobalSearch}
           onToggleHiddenRooms={() => setShowHiddenRooms((prev) => !prev)}
           onRoomClick={handleManualRoomListClick}
@@ -2847,9 +2841,6 @@ function ChatView({
             readCounts={readCounts}
             deliveryStates={deliveryStates}
             threadSummaries={threadSummaries}
-            activeActionMessageId={activeActionMsg ? String(activeActionMsg.id) : null}
-            pinnedIds={pinnedIds}
-            bookmarkedIds={bookmarkedIds}
             roomMembers={roomMembers}
             effectiveChatUserId={effectiveChatUserId}
             activeMessageHighlightQuery={activeMessageHighlightQuery}
@@ -2866,37 +2857,6 @@ function ChatView({
             onOpenThread={openTrackedThreadPanel}
             onOpenBoardPost={onOpenBoardPost}
             onOpenMessageActions={openMessageActions}
-            onCloseMessageActions={() => setActiveActionMsg(null)}
-            onToggleReaction={(message, emoji) => {
-              void toggleReaction(String(message.id), emoji);
-            }}
-            onAddTask={(message) => {
-              void addTaskFromMessage(message);
-            }}
-            onTogglePin={(message) => {
-              void togglePin(String(message.id));
-              setActiveActionMsg(null);
-            }}
-            onToggleBookmark={(message) => {
-              void toggleBookmark(String(message.id));
-              setActiveActionMsg(null);
-            }}
-            onForwardMessage={startForwardMessage}
-            onForwardToSelf={(message) => {
-              void forwardMessageToSelf(message, selfChatRoom);
-            }}
-            onDeleteMessage={(message) => {
-              void deleteMessageFromActions(message);
-            }}
-            onStartEdit={(message) => {
-              startEditMessage(message);
-              setActiveActionMsg(null);
-            }}
-            onOpenEditHistory={(message) => {
-              void openEditHistory(message);
-              setActiveActionMsg(null);
-            }}
-            onCopyMessageLink={handleCopyMessageLink}
             onMarkMessageRead={markMessageRead}
             renderMessageContent={renderMessageContent}
             onOpenAttachmentPreview={openAttachmentPreview}
@@ -3019,6 +2979,65 @@ function ChatView({
           onCancelEditingRoomName={handleCancelEditingRoomName}
           onStartEditingRoomName={handleStartEditingRoomName}
           onLeaveRoom={handleLeaveRoomFromDrawer}
+        />
+
+        <MessengerMessageActions
+          message={activeActionMsg}
+          currentUserId={effectiveChatUserId || user?.id}
+          isPinned={Boolean(activeActionMsg && pinnedIds.includes(String(activeActionMsg.id)))}
+          isBookmarked={Boolean(activeActionMsg && bookmarkedIds.has(String(activeActionMsg.id)))}
+          onClose={() => setActiveActionMsg(null)}
+          onToggleReaction={(emoji) => {
+            if (!activeActionMsg) return;
+            void toggleReaction(String(activeActionMsg.id), emoji);
+          }}
+          onAddTask={() => {
+            void handleAddTaskFromAction();
+          }}
+          onTogglePin={() => {
+            if (!activeActionMsg) return;
+            void togglePin(String(activeActionMsg.id));
+            setActiveActionMsg(null);
+          }}
+          onToggleBookmark={() => {
+            if (!activeActionMsg) return;
+            void toggleBookmark(String(activeActionMsg.id));
+            setActiveActionMsg(null);
+          }}
+          onStartEdit={() => {
+            if (!activeActionMsg) return;
+            startEditMessage(activeActionMsg);
+            setActiveActionMsg(null);
+          }}
+          onOpenEditHistory={() => {
+            if (!activeActionMsg) return;
+            void openEditHistory(activeActionMsg);
+            setActiveActionMsg(null);
+          }}
+          onDelete={() => {
+            if (!activeActionMsg) return;
+            void deleteMessageFromActions(activeActionMsg);
+          }}
+          onReply={() => {
+            if (!activeActionMsg) return;
+            startReplyToMessage(activeActionMsg);
+          }}
+          onForward={() => {
+            if (!activeActionMsg) return;
+            startForwardMessage(activeActionMsg);
+          }}
+          onCopyLink={() => {
+            if (!activeActionMsg) return;
+            void handleCopyMessageLink(activeActionMsg);
+          }}
+          onOpenReadStatus={() => {
+            if (!activeActionMsg) return;
+            openReadStatusPanel(activeActionMsg);
+          }}
+          onOpenThread={() => {
+            if (!activeActionMsg) return;
+            openTrackedThreadPanel(activeActionMsg);
+          }}
         />
 
         <MessageEditModal
@@ -3172,6 +3191,3 @@ function ChatView({
     </div>
   );
 }
-
-export { ChatView as useChatViewController };
-export default ChatView;

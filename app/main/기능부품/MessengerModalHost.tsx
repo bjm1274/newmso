@@ -48,9 +48,7 @@ export function MessengerModalHost({ controller }: MessengerModalHostProps) {
         rootMessage={c.threadRoot}
         messages={c.threadMessages}
         resolveStaffProfile={c.resolveStaffProfile}
-        isFollowingThread={Boolean(c.threadRoot && c.followedThreadIds?.has?.(String(c.threadRoot.id || '')))}
         onClose={() => c.setThreadRoot(null)}
-        onToggleFollowThread={c.toggleThreadFollow ?? (() => undefined)}
         onPreviewAttachment={c.openAttachmentPreviewForMessage}
         onReplyMessage={c.startReplyToMessage}
       />
@@ -139,7 +137,15 @@ export function MessengerModalHost({ controller }: MessengerModalHostProps) {
         onSubmit={c.handleDateJumpSubmit}
       />
 
-      <ChatAttachmentPreviewModal controller={c.attachmentPreviewController} />
+      <ChatAttachmentPreviewModal
+        controller={c.attachmentPreviewController}
+        onForwardAttachment={(item) => {
+          const sourceMessage = (c.messages || []).find(
+            (message: { id?: string | number | null }) => String(message?.id || '') === String(item.messageId || ''),
+          );
+          if (sourceMessage) c.startForwardMessage(sourceMessage);
+        }}
+      />
     </>
   );
 }

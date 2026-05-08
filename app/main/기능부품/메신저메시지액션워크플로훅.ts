@@ -66,7 +66,8 @@ export function useChatMessageWorkflow({
     setActiveActionMsg(message);
   }, [markMessageRead, setActiveActionMsg]);
 
-  const addTaskFromMessage = useCallback(async (message: ChatMessage) => {
+  const handleAddTaskFromAction = useCallback(async () => {
+    if (!activeActionMsg) return;
     if (!effectiveTodoUserId) {
       toast('연결된 직원 계정을 찾지 못했습니다.');
       setActiveActionMsg(null);
@@ -75,9 +76,9 @@ export function useChatMessageWorkflow({
 
     const content =
       getMessageDisplayText(
-        message.content,
-        message.file_name,
-        message.file_url,
+        activeActionMsg.content,
+        activeActionMsg.file_name,
+        activeActionMsg.file_url,
       ) || '첨부 파일 확인';
 
     const { error } = await supabase.from('todos').insert([{
@@ -85,8 +86,8 @@ export function useChatMessageWorkflow({
       content: `[채팅] ${content}`,
       is_complete: false,
       task_date: getKoreanTodayString(),
-      source_message_id: message.id,
-      source_room_id: message.room_id,
+      source_message_id: activeActionMsg.id,
+      source_room_id: activeActionMsg.room_id,
     }]);
 
     if (!error) {
@@ -97,12 +98,7 @@ export function useChatMessageWorkflow({
     }
 
     setActiveActionMsg(null);
-  }, [effectiveTodoUserId, onRefresh, setActiveActionMsg]);
-
-  const handleAddTaskFromAction = useCallback(async () => {
-    if (!activeActionMsg) return;
-    await addTaskFromMessage(activeActionMsg);
-  }, [activeActionMsg, addTaskFromMessage]);
+  }, [activeActionMsg, effectiveTodoUserId, onRefresh, setActiveActionMsg]);
 
   const startReplyToMessage = useCallback((message: ChatMessage) => {
     setReplyTo(message);
@@ -121,16 +117,18 @@ export function useChatMessageWorkflow({
     setActiveActionMsg(null);
   }, [setActiveActionMsg, setForwardSourceMsg, setShowForwardModal]);
 
-  const forwardMessageToRoom = useCallback(async (message: ChatMessage, room: ChatRoom) => {
+  const handleForwardToRoom = useCallback(async (room: ChatRoom) => {
+    if (!forwardSourceMsg) return;
+
     try {
       const { data: forwardedMessage, error } = await insertChatMessageWithFallback<Pick<ChatMessage, 'id' | 'room_id'>>(
         supabase,
         {
           room_id: room.id,
           sender_id: effectiveChatUserId || fallbackUserId,
-          content: buildForwardedMessageContent(message),
-          file_url: message.file_url || null,
-          file_name: message.file_name || null,
+          content: buildForwardedMessageContent(forwardSourceMsg),
+          file_url: forwardSourceMsg.file_url || null,
+          file_name: forwardSourceMsg.file_name || null,
         },
         'id, room_id',
       );
@@ -142,29 +140,10 @@ export function useChatMessageWorkflow({
       toast(`"${room.name || '채팅방'}"으로 메시지를 전달했습니다.`);
     } catch {
       toast('메시지 전달 중 오류가 발생했습니다.', 'error');
-    }
-  }, [effectiveChatUserId, fallbackUserId, triggerChatPush]);
-
-  const handleForwardToRoom = useCallback(async (room: ChatRoom) => {
-    if (!forwardSourceMsg) return;
-
-    try {
-      await forwardMessageToRoom(forwardSourceMsg, room);
     } finally {
       closeForwardModal();
     }
-  }, [closeForwardModal, forwardMessageToRoom, forwardSourceMsg]);
-
-  const forwardMessageToSelf = useCallback(async (message: ChatMessage, room: ChatRoom | null | undefined) => {
-    if (!room) {
-      toast('나와의 채팅방을 찾지 못했습니다.', 'warning');
-      setActiveActionMsg(null);
-      return;
-    }
-
-    await forwardMessageToRoom(message, room);
-    setActiveActionMsg(null);
-  }, [forwardMessageToRoom, setActiveActionMsg]);
+  }, [closeForwardModal, effectiveChatUserId, fallbackUserId, forwardSourceMsg, triggerChatPush]);
 
   const openReadStatusPanel = useCallback((message: ChatMessage) => {
     void loadReadStatusForMessage(message);
@@ -183,12 +162,10 @@ export function useChatMessageWorkflow({
 
   return {
     openMessageActions,
-    addTaskFromMessage,
     handleAddTaskFromAction,
     startReplyToMessage,
     startForwardMessage,
     handleForwardToRoom,
-    forwardMessageToSelf,
     openReadStatusPanel,
     openThreadPanel,
     deleteMessageFromActions,

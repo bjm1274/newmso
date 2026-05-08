@@ -2837,7 +2837,7 @@ function buildGenerationRuleSummaryItems(rule: RosterGenerationRule) {
     rule.weekendMinNightStaff > 0
   ) {
     items.push(
-      `週末 D/E/N ${rule.weekendMinDayStaff}/${rule.weekendMinEveningStaff}/${rule.weekendMinNightStaff}`
+        `주말 D/E/N ${rule.weekendMinDayStaff}/${rule.weekendMinEveningStaff}/${rule.weekendMinNightStaff}`
     );
   }
   if (

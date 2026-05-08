@@ -1,4 +1,4 @@
-import { resolvePlannerPatternGroup } from '../\uADFC\uBB34\uD45C\uC790\uB3D9\uD3B8\uC131-engine';
+import { resolvePlannerPatternGroup } from '../근무표자동편성-engine';
 
 type BuildPlannerPatternPreviewGroupsParams = Record<string, any>;
 
@@ -31,8 +31,8 @@ export function buildPlannerPatternPreviewGroups({
           key: `default-${defaultPlannerMode}`,
           label:
             defaultPlannerMode === 'rotation'
-              ? '\uC21C\uD658\uADFC\uBB34'
-              : '\uACE0\uC815\uADFC\uBB34',
+              ? '순환근무'
+              : '고정근무',
           mode: defaultPlannerMode,
           source: 'default',
         };

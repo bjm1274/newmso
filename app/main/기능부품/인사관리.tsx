@@ -18,14 +18,9 @@ const HrSubViewLoading = () => (
 const CertificateGenerator = dynamic(() => import('./인사관리서브/증명서발급'), { ssr: false, loading: HrSubViewLoading });
 const PayrollMain = dynamic(() => import('./인사관리서브/급여관리'), { ssr: false, loading: HrSubViewLoading });
 const AttendanceMain = dynamic(() => import('./인사관리서브/근태기록/근태관리메인'), { ssr: false, loading: HrSubViewLoading });
-const LeaveManagement = dynamic(() => import('./인사관리서브/휴가신청/휴가관리메인'), { ssr: false, loading: HrSubViewLoading });
-const SharedCalendarView = dynamic(() => import('./공유캘린더'), { ssr: false, loading: HrSubViewLoading });
-const CalendarSync = dynamic(() => import('./캘린더동기화'), { ssr: false, loading: HrSubViewLoading });
-const RecruitmentManager = dynamic(() => import('./인사관리서브/채용관리'), { ssr: false, loading: HrSubViewLoading });
 const ContractMain = dynamic(() => import('./인사관리서브/계약관리'), { ssr: false, loading: HrSubViewLoading });
 const 문서보관함 = dynamic(() => import('./인사관리서브/문서보관함'), { ssr: false, loading: HrSubViewLoading });
 const EducationMain = dynamic(() => import('./인사관리서브/교육관리'), { ssr: false, loading: HrSubViewLoading });
-const ShiftCalendar = dynamic(() => import('./인사관리서브/시프트캘린더'), { ssr: false, loading: HrSubViewLoading });
 const DocumentScanner = dynamic(() => import('./인사관리서브/스마트서류제출'), { ssr: false, loading: HrSubViewLoading });
 const OffboardingView = dynamic(() => import('./인사관리서브/오프보딩'), { ssr: false, loading: HrSubViewLoading });
 const HealthCheckupManagement = dynamic(() => import('./인사관리서브/건강검진관리'), { ssr: false, loading: HrSubViewLoading });
@@ -35,12 +30,7 @@ const RewardDisciplineManagement = dynamic(() => import('./인사관리서브/�
 const LicenseManager = dynamic(() => import('./인사관리서브/면허자격증관리'), { ssr: false, loading: HrSubViewLoading });
 const MedicalDeviceInspection = dynamic(() => import('./인사관리서브/의료기기점검'), { ssr: false, loading: HrSubViewLoading });
 const IncidentReport = dynamic(() => import('./인사관리서브/사고보고서'), { ssr: false, loading: HrSubViewLoading });
-const WorkTypeChangeHistory = dynamic(() => import('./인사관리서브/근무형태변경이력'), { ssr: false, loading: HrSubViewLoading });
-const AttendanceIssueAnalysisSuite = dynamic(() => import('./인사관리서브/근태이상통합분석'), { ssr: false, loading: HrSubViewLoading });
-const AttendanceDeductionSimulator = dynamic(() => import('./인사관리서브/휴가신청/근태차감시뮬레이터'), { ssr: false, loading: HrSubViewLoading });
-const AttendanceAnomalyPanel = dynamic(() => import('./인사관리서브/휴가신청/근태이상탐지'), { ssr: false, loading: HrSubViewLoading });
 const ContractAutoGenerator = dynamic(() => import('./인사관리서브/계약서자동생성'), { ssr: false, loading: HrSubViewLoading });
-const NurseSchedule = dynamic(() => import('./인사관리서브/간호근무표'), { ssr: false, loading: HrSubViewLoading });
 
 type HrWorkspaceId = '인력관리' | '근태 · 급여' | '복지 · 문서';
 type StaffStatus = '재직' | '퇴사';
@@ -49,22 +39,22 @@ type HrMenuId =
   | '인사변동'
   | '입퇴사·교육센터'
   | '근태'
-  | '연차/휴가'
   | '급여'
   | '경조사'
   | '자격·안전센터'
   | '계약'
-  | '문서센터'
-  | '캘린더'
-  | '채용관리';
+  | '문서센터';
 
 type AttendanceAnalysisTabId =
   | '근태관리'
+  | '연차휴가'
+  | '근태이상차감'
   | '근태이상분석'
   | '근태차감시뮬레이터'
   | '근태이상탐지'
   | '근무형태이력'
   | '간호근무표';
+type AttendanceMainView = 'calendar' | 'dashboard' | 'schedule' | 'leave' | 'issues';
 
 type PersonnelSuiteTabId = '인사발령' | '포상/징계';
 type LifecycleSuiteTabId = '교육' | '오프보딩';
@@ -106,18 +96,17 @@ const HR_TABS: HrTabDef[] = [
   { id: '인사변동', label: '인사변동', perm: 'hr_인사발령', icon: 'briefcase', group: '인력관리' },
   { id: '입퇴사·교육센터', label: '입퇴사·교육센터', perm: 'hr_교육', icon: 'compass', group: '인력관리' },
   { id: '근태', label: '근태', perm: 'hr_근태', icon: 'history', group: '근태/급여' },
-  { id: '연차/휴가', label: '연차 / 휴가', perm: 'hr_연차휴가', icon: 'calendar', group: '근태/급여' },
   { id: '급여', label: '급여', perm: 'hr_급여', icon: 'calculator', group: '근태/급여' },
   { id: '경조사', label: '경조사 지원', perm: 'hr_경조사', icon: 'bell', group: '복무/복지' },
   { id: '자격·안전센터', label: '자격·안전센터', perm: 'hr_건강검진', icon: 'admin', group: '복무/복지' },
   { id: '계약', label: '계약 관리', perm: 'hr_계약', icon: 'document', group: '문서/기타' },
   { id: '문서센터', label: '문서센터', perm: 'hr_문서보관함', icon: 'folder', group: '문서/기타' },
-  { id: '캘린더', label: '캘린더', perm: 'hr_캘린더', icon: 'calendar', group: '문서/기타' },
-  { id: '채용관리', label: '채용관리', perm: 'hr_채용', icon: 'bell', group: '인력관리' },
 ];
 
 const ATTENDANCE_ANALYSIS_TABS: AttendanceAnalysisTabDef[] = [
   { id: '근태관리', label: '근태 현황', perm: 'hr_근태', icon: 'history' },
+  { id: '연차휴가', label: '연차/휴가', perm: 'hr_연차휴가', icon: 'calendar' },
+  { id: '근태이상차감', label: '근태 이상/차감', perm: 'hr_근태', icon: 'alert' },
   { id: '근태이상분석', label: '지각·조퇴·조기퇴근', perm: 'hr_근태', icon: 'analytics' },
   { id: '근태차감시뮬레이터', label: '근태 차감 시뮬레이터', perm: 'hr_근태', icon: 'calculator' },
   { id: '근태이상탐지', label: '근태 이상 탐지', perm: 'hr_근태', icon: 'alert' },
@@ -168,6 +157,7 @@ const REMOVED_MENU_FALLBACKS: Record<string, HrMenuId> = {
   교육: '입퇴사·교육센터',
   오프보딩: '입퇴사·교육센터',
   '인력생애주기센터': '입퇴사·교육센터',
+  채용관리: '입퇴사·교육센터',
   조직도: '구성원',
   스킬매트릭스: '구성원',
   회의실예약: '구성원',
@@ -175,7 +165,8 @@ const REMOVED_MENU_FALLBACKS: Record<string, HrMenuId> = {
   원천징수파일: '급여',
   '4대보험': '급여',
   계약서생성기: '계약',
-  연차소멸알림: '연차/휴가',
+  '연차/휴가': '근태',
+  연차소멸알림: '근태',
   지각조퇴분석: '근태',
   근태이상분석: '근태',
   '근태 차감 시뮬레이터': '근태',
@@ -187,7 +178,7 @@ const REMOVED_MENU_FALLBACKS: Record<string, HrMenuId> = {
   근무표자동편성: '근태',
   간호근무표: '근태',
   교대근무: '근태',
-  공휴일달력: '연차/휴가',
+  공휴일달력: '근태',
   건강검진: '자격·안전센터',
   '면허/자격증': '자격·안전센터',
   의료기기점검: '자격·안전센터',
@@ -204,15 +195,18 @@ const CONTRACT_UTILITY_MENU_MAP: Record<string, ContractEmbeddedTabId> = {
 };
 
 const ATTENDANCE_ANALYSIS_MENU_MAP: Record<string, AttendanceAnalysisTabId> = {
-  지각조퇴분석: '근태이상분석',
-  근태이상분석: '근태이상분석',
-  '지각·조퇴·조기퇴근': '근태이상분석',
-  '근태 차감 시뮬레이터': '근태차감시뮬레이터',
-  근태차감시뮬레이터: '근태차감시뮬레이터',
-  '근태 이상 탐지': '근태이상탐지',
-  근태이상탐지: '근태이상탐지',
-  근무형태이력: '근무형태이력',
-  조기퇴근감지: '근태이상분석',
+  '연차/휴가': '연차휴가',
+  연차소멸알림: '연차휴가',
+  공휴일달력: '연차휴가',
+  지각조퇴분석: '근태이상차감',
+  근태이상분석: '근태이상차감',
+  '지각·조퇴·조기퇴근': '근태이상차감',
+  '근태 차감 시뮬레이터': '근태이상차감',
+  근태차감시뮬레이터: '근태이상차감',
+  '근태 이상 탐지': '근태이상차감',
+  근태이상탐지: '근태이상차감',
+  근무형태이력: '근태이상차감',
+  조기퇴근감지: '근태이상차감',
   근무표자동편성: '간호근무표',
   '근무표 자동편성': '간호근무표',
   간호근무표: '간호근무표',
@@ -289,6 +283,21 @@ function getLeaveSuiteInitialTab(menuId?: string | null): LeaveSuiteTabId {
 
 function getAttendanceInitialTab(menuId?: string | null): AttendanceAnalysisTabId {
   return ATTENDANCE_ANALYSIS_MENU_MAP[menuId || ''] || '근태관리';
+}
+
+function getAttendanceMainInitialView(tabId: AttendanceAnalysisTabId): AttendanceMainView {
+  if (tabId === '연차휴가') return 'leave';
+  if (tabId === '간호근무표') return 'schedule';
+  if (
+    tabId === '근태이상차감' ||
+    tabId === '근태이상분석' ||
+    tabId === '근태차감시뮬레이터' ||
+    tabId === '근태이상탐지' ||
+    tabId === '근무형태이력'
+  ) {
+    return 'issues';
+  }
+  return 'calendar';
 }
 
 function getPersonnelSuiteInitialTab(menuId?: string | null): PersonnelSuiteTabId {
@@ -384,14 +393,14 @@ function normalizeDocumentCenterTabForUser(user: any, requestedTab: DocumentCent
 }
 
 function canAccessHrTab(user: any, tab: HrTabDef) {
+  if (tab.id === '근태') {
+    return canAccessHrSection(user, 'hr_근태') || canAccessHrSection(user, 'hr_연차휴가');
+  }
   if (tab.id === '인사변동') {
     return canAccessHrSection(user, 'hr_인사발령') || canAccessHrSection(user, 'hr_포상징계');
   }
   if (tab.id === '입퇴사·교육센터') {
     return canAccessHrSection(user, 'hr_교육') || canAccessHrSection(user, 'hr_오프보딩');
-  }
-  if (tab.id === '연차/휴가') {
-    return canAccessHrSection(user, 'hr_연차휴가') || canAccessHrSection(user, 'hr_근태');
   }
   if (tab.id === '자격·안전센터') {
     return (
@@ -842,40 +851,18 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
           {activeMenu === '근태' && (
             <div className="flex h-full flex-col">
               <div className="min-h-0 flex-1 overflow-y-auto">
-                {activeAttendanceTab === '근태관리' && <AttendanceMain staffs={인사직원목록} selectedCo={선택사업체} user={user} />}
-                {activeAttendanceTab === '근태이상분석' && (
-                  <AttendanceIssueAnalysisSuite staffs={인사직원목록} selectedCo={선택사업체} user={user} />
-                )}
-                {activeAttendanceTab === '근태차감시뮬레이터' && (
-                  <AttendanceDeductionSimulator staffs={인사직원목록} selectedCo={선택사업체} />
-                )}
-                {activeAttendanceTab === '근태이상탐지' && (
-                  <AttendanceAnomalyPanel staffs={인사직원목록} selectedCo={선택사업체} />
-                )}
-                {activeAttendanceTab === '근무형태이력' && (
-                  <WorkTypeChangeHistory staffs={인사직원목록} selectedCo={선택사업체} user={user} />
-                )}
-                {activeAttendanceTab === '간호근무표' && (
-                  <NurseSchedule staffs={인사직원목록} selectedCo={선택사업체} user={user} />
-                )}
+                <AttendanceMain
+                  staffs={인사직원목록}
+                  selectedCo={선택사업체}
+                  user={user}
+                  onRefresh={onRefresh}
+                  initialView={getAttendanceMainInitialView(activeAttendanceTab)}
+                  initialLeaveTab={휴가내부탭}
+                />
               </div>
             </div>
           )}
 
-          {activeMenu === '연차/휴가' && (
-            <div className="flex h-full flex-col overflow-hidden">
-              <LeaveManagement
-                staffs={인사직원목록}
-                selectedCo={선택사업체}
-                onRefresh={onRefresh}
-                user={user}
-                initialTab={휴가내부탭}
-                allowLeaveTabs={canAccessHrSection(user, 'hr_연차휴가')}
-                allowHolidayTab={canAccessHrSection(user, 'hr_근태')}
-                tabMode="operational"
-              />
-            </div>
-          )}
           {activeMenu === '급여' && (
             <div className="flex h-full flex-col">
               <div className="min-h-0 flex-1 overflow-y-auto">
@@ -952,23 +939,6 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                   </div>
                 )}
               </div>
-            </div>
-          )}
-
-          {activeMenu === '캘린더' && (
-            <div className="flex flex-col gap-4 p-3 md:flex-row md:p-4">
-              <div className="flex-1">
-                <SharedCalendarView user={user} />
-              </div>
-              <div className="shrink-0 md:w-80">
-                <CalendarSync />
-              </div>
-            </div>
-          )}
-
-          {activeMenu === '채용관리' && (
-            <div className="p-3 md:p-4">
-              <RecruitmentManager user={user as Record<string, unknown>} />
             </div>
           )}
         </section>

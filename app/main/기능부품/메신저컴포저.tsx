@@ -42,7 +42,7 @@ type MessengerComposerProps = {
   onSelectMention: (name: string) => void;
 };
 
-function _MessengerComposer({
+function MessengerComposerImpl({
   replyTo,
   pendingAlbumFiles,
   albumPreviewUrls,
@@ -370,4 +370,4 @@ function _MessengerComposer({
   );
 }
 
-export const MessengerComposer = memo(_MessengerComposer);
+export const MessengerComposer = memo(MessengerComposerImpl);

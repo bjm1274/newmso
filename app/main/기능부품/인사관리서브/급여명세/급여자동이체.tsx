@@ -16,31 +16,40 @@ export default function SalaryAutoTransfer() {
 
   const fetchStaffAndSalary = async () => {
     // 직원 정보 조회
-    const { data: staff } = await supabase.from('staffs').select('*');
+    const { data: staff } = await supabase
+      .from('staff_members')
+      .select('id, name, bank_name, bank_account');
     setStaffList(staff || []);
+    const staffById = new Map((staff || []).map((row: any) => [String(row.id), row]));
 
     // 급여 정보 조회
     const { data: salaries } = await supabase
-      .from('payroll')
-      .select('*')
-      .like('month', `${selectedMonth}%`);
+      .from('payroll_records')
+      .select('id, staff_id, year_month, base_salary, total_taxable, total_taxfree, total_deduction, net_pay, status')
+      .eq('year_month', selectedMonth);
 
     if (salaries) {
-      const transferList = salaries.map((salary: any) => ({
-        id: salary.id,
-        staff_id: salary.staff_id,
-        staff_name: salary.staff_name,
-        bank_name: salary.bank_name || '국민은행',
-        account_number: salary.account_number || '****-****-****',
-        account_holder: salary.account_holder || salary.staff_name,
-        salary_amount: salary.total_salary || 0,
-        deduction_amount: salary.total_deduction || 0,
-        transfer_amount: (salary.total_salary || 0) - (salary.total_deduction || 0),
-        transfer_date: salary.transfer_date || null,
-        transfer_status: salary.transfer_status || '대기',
-        tax_amount: salary.tax_amount || 0,
-        insurance_amount: salary.insurance_amount || 0,
-      }));
+      const transferList = salaries.map((salary: any) => {
+        const staffInfo = staffById.get(String(salary.staff_id)) || {};
+        const salaryAmount = Number(salary.total_taxable ?? 0) + Number(salary.total_taxfree ?? 0);
+        const deductionAmount = Number(salary.total_deduction ?? 0);
+        const transferAmount = Number(salary.net_pay ?? Math.max(0, salaryAmount - deductionAmount));
+        return {
+          id: salary.id,
+          staff_id: salary.staff_id,
+          staff_name: staffInfo.name || salary.staff_name || '',
+          bank_name: staffInfo.bank_name || '국민은행',
+          account_number: staffInfo.bank_account || '****-****-****',
+          account_holder: staffInfo.name || salary.staff_name || '',
+          salary_amount: salaryAmount || Number(salary.base_salary ?? 0),
+          deduction_amount: deductionAmount,
+          transfer_amount: transferAmount,
+          transfer_date: null,
+          transfer_status: String(salary.status || '').trim() === 'transfer_complete' ? '완료' : '대기',
+          tax_amount: 0,
+          insurance_amount: deductionAmount,
+        };
+      });
       setTransferData(transferList);
     }
   };
@@ -72,16 +81,16 @@ export default function SalaryAutoTransfer() {
         transfer_date: new Date().toISOString(),
       };
 
-      // 이체 기록 저장
-      await supabase.from('payroll').update({
-        transfer_status: '완료',
-        transfer_date: new Date().toISOString(),
-        transfer_payload: transferPayload,
-      }).eq('id', item.id);
+      setTransferData((prev) =>
+        prev.map((row) =>
+          row.id === item.id
+            ? { ...row, transfer_status: '완료', transfer_date: transferPayload.transfer_date }
+            : row
+        )
+      );
     }
 
     setTransferStatus('완료');
-    fetchStaffAndSalary();
     toast('급여 이체가 완료되었습니다.', 'success');
   };
 

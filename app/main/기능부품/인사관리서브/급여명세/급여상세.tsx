@@ -169,20 +169,19 @@ export default function SalaryDetail({
 
     const loadResources = async () => {
       const companyName = staff?.company || 'SY INC.';
-      const [designStore, templateResult, companyResult] = await Promise.all([
+      const [designStore, templateResult] = await Promise.all([
         fetchDocumentDesignStore(),
         supabase
           .from('contract_templates')
           .select('seal_url')
           .eq('company_name', companyName)
           .maybeSingle(),
-        supabase.from('companies').select('seal_url').eq('name', companyName).maybeSingle(),
       ]);
 
       if (cancelled) return;
 
       setDesign(resolveDocumentDesign(designStore, 'payroll_slip', companyName));
-      setCompanySeal(templateResult.data?.seal_url || companyResult.data?.seal_url || null);
+      setCompanySeal(templateResult.data?.seal_url || null);
     };
 
     loadResources().catch((error) => {

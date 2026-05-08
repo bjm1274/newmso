@@ -23,6 +23,29 @@ export function calculateSeverancePayFromMonthlyWage(monthlyAvgWage: number, wor
   return calculateSeverancePay(estimateDailyAvgWageFromMonthly(monthlyAvgWage, threeMonthDays), workDays);
 }
 
+/**
+ * DC형 퇴직급여 추정.
+ * 확정기여형은 연간 임금총액의 1/12 이상을 부담금으로 적립하는 구조이므로,
+ * 월평균 임금만 있는 화면에서는 월평균임금 × 재직일수 / 365 로 보수적으로 추정합니다.
+ */
+export function calculateDcRetirementBenefitFromMonthlyWage(monthlyAvgWage: number, workDays: number): number {
+  if (workDays < 365) return 0;
+  return Math.floor(Math.max(0, monthlyAvgWage) * (workDays / 365));
+}
+
+export type RetirementBenefitBasis = 'DB' | 'DC';
+
+export function calculateRetirementBenefitFromMonthlyWage(
+  basis: RetirementBenefitBasis,
+  monthlyAvgWage: number,
+  workDays: number,
+  threeMonthDays = 91
+): number {
+  return basis === 'DC'
+    ? calculateDcRetirementBenefitFromMonthlyWage(monthlyAvgWage, workDays)
+    : calculateSeverancePayFromMonthlyWage(monthlyAvgWage, workDays, threeMonthDays);
+}
+
 export function formatWorkPeriod(workDays: number): string {
   const y = Math.floor(workDays / 365);
   const m = Math.floor((workDays % 365) / 30);

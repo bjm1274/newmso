@@ -4,6 +4,7 @@ import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push
 import { sendFcmBatch } from '@/lib/fcm-http';
 import { shouldDeferStaleChatPush } from '@/lib/push-quiet-hours';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
+import { NOTICE_ROOM_ID } from '@/lib/constants';
 
 type MessageRow = {
   id: string;
@@ -75,6 +76,8 @@ export type ChatPushDispatchResult = {
 
 const CHAT_PUSH_MAX_ATTEMPTS = 5;
 const CHAT_PUSH_RETRY_DELAYS_MINUTES = [1, 5, 15, 30, 60];
+const BOARD_META_START = '[[BOARD_META]]';
+const BOARD_META_END = '[[/BOARD_META]]';
 
 function getAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -149,6 +152,43 @@ function buildQuietHoursDeferredPatch(job: QueueJobRow, supportsRetryColumns: bo
     next_attempt_at: quietHoursDecision.resumeAt.toISOString(),
     dead_lettered_at: null,
   };
+}
+
+function parseBoardMessageMetaType(content: string | null | undefined) {
+  const rawContent = String(content || '');
+  const startIndex = rawContent.indexOf(BOARD_META_START);
+  const endIndex = rawContent.indexOf(BOARD_META_END);
+
+  if (startIndex < 0 || endIndex <= startIndex) {
+    return null;
+  }
+
+  const jsonText = rawContent
+    .slice(startIndex + BOARD_META_START.length, endIndex)
+    .trim();
+
+  if (!jsonText) return null;
+
+  try {
+    const parsed = JSON.parse(jsonText) as { type?: unknown };
+    return String(parsed.type || '').trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+export function shouldSuppressBoardAutoAnnouncementPush(
+  message: Pick<MessageRow, 'room_id' | 'content'>,
+  room: Pick<ChatRoomRow, 'id' | 'type'>,
+) {
+  const messageRoomId = String(message.room_id || '').trim();
+  const roomId = String(room.id || '').trim();
+  const isNoticeRoom =
+    messageRoomId === NOTICE_ROOM_ID ||
+    roomId === NOTICE_ROOM_ID ||
+    String(room.type || '').trim() === 'notice';
+
+  return isNoticeRoom && parseBoardMessageMetaType(message.content) === 'board_post_link';
 }
 
 async function selectPendingChatPushJobs(supabase: SupabaseClient, limit: number) {
@@ -431,6 +471,22 @@ export async function dispatchChatPushForMessage(params: {
       notificationsCreated: 0,
       pushDisabled: false,
       reason: 'album-batch-intermediate',
+    } satisfies ChatPushDispatchResult;
+  }
+
+  if (shouldSuppressBoardAutoAnnouncementPush(message, room)) {
+    await updateChatPushJobByMessageId(supabase, params.messageId, {
+      processed_at: new Date().toISOString(),
+      processing_started_at: null,
+      last_error: 'board-auto-announcement-suppressed',
+    });
+    return {
+      sent: 0,
+      failed: 0,
+      targets: 0,
+      notificationsCreated: 0,
+      pushDisabled: false,
+      reason: 'board-auto-announcement',
     } satisfies ChatPushDispatchResult;
   }
 

@@ -103,23 +103,23 @@ test('board detailed walkthrough clicks through each board menu in practical ord
     boardPosts: [],
     boardPostComments: [],
     staffMembers: [
-      { ...fakeUser, department: '?섏닠?', status: '?ъ쭅' },
+      { ...fakeUser, department: '수술팀', status: '재직' },
       {
         id: 'guide-team-member-2',
-        name: '???A',
+        name: '테스터A',
         company: fakeUser.company,
         company_id: fakeUser.company_id,
-        department: '?섏닠?',
+        department: '수술팀',
         position: '\uAC04\uD638\uC0AC',
-        status: '?ъ쭅',
+        status: '재직',
       },
     ],
     orgTeams: [
       {
         id: 'guide-org-team-1',
         company_name: fakeUser.company,
-        division: '媛꾪샇遺',
-        team_name: '?섏닠?',
+        division: '간호부',
+        name: '테스터A',
         sort_order: 1,
       },
     ],
@@ -332,13 +332,13 @@ test('guide board uploads and displays onboarding materials for new staff', asyn
   await expect(page.getByTestId('guide-team-select')).not.toHaveValue('');
   await expect(page.getByTestId('guide-kind-select')).toHaveValue('education');
   const selectedTeamLabel = await page.getByTestId('guide-team-select').inputValue();
-  await page.getByTestId('guide-title-input').fill('?멸났愿???섏닠 以鍮?媛?대뱶');
+  await page.getByTestId('guide-title-input').fill('수술관리 수술 준비 가이드');
   await page.getByTestId('guide-kind-select').selectOption('education');
   await page.getByTestId('guide-audience-select').selectOption('new_hire');
-  await page.getByTestId('guide-keywords-input').fill('?멸났愿?? 硫멸퇏, ?좉퇋援먯쑁');
+  await page.getByTestId('guide-keywords-input').fill('수술관리, 멸균, 신규교육');
   await page
     .getByTestId('guide-description-input')
-    .fill('1. ?섏닠 以鍮꾨Ъ ?뺤씤\n2. 留덉랬 以鍮?泥댄겕\n3. 硫멸퇏 湲곌뎄 ?뺤씤\n4. ?멸퀎 ?ъ씤???뺣━');
+    .fill('1. 수술 준비물 확인\n2. 마취 준비 체크\n3. 멸균 기구 확인\n4. 인계 사인 정리');
   await page.getByTestId('guide-file-input').setInputFiles({
     name: 'joint-guide.pdf',
     mimeType: 'application/pdf',
@@ -347,7 +347,7 @@ test('guide board uploads and displays onboarding materials for new staff', asyn
   await page.getByTestId('guide-save').click();
 
   await expect(page.getByTestId('guide-card-board-post-1')).toBeVisible();
-  await expect(page.getByTestId('guide-detail')).toContainText('?멸났愿???섏닠 以鍮?媛?대뱶');
+  await expect(page.getByTestId('guide-detail')).toContainText('수술관리 수술 준비 가이드');
   await expect(page.getByTestId('guide-detail')).toContainText('\uC2E0\uADDC\uC9C1\uC6D0');
   await expect(page.getByTestId('guide-detail')).toContainText(selectedTeamLabel);
   await expect(page.getByTestId('guide-detail')).toContainText('joint-guide.pdf');
@@ -512,28 +512,28 @@ test('board read status modal shows read and pending audience counts', async ({ 
         name: 'E2E Tester',
         company: 'E2E Clinic',
         company_id: '22222222-2222-2222-2222-222222222222',
-        department: '媛꾪샇遺',
-        position: '遺?쒖옣',
-        status: '?ъ쭅',
+        department: '수술팀',
+        position: '부서장',
+        status: '재직',
         permissions: { ...fakeUser.permissions },
       },
       {
         id: 'reader-1',
-        name: '?쎌쓬 吏곸썝',
+        name: '테스터A',
         company: 'E2E Clinic',
         company_id: '22222222-2222-2222-2222-222222222222',
-        department: '?먮Т遺',
-        position: '?ъ썝',
-        status: '?ъ쭅',
+        department: '수술팀',
+        position: '사원',
+        status: '재직',
       },
       {
         id: 'pending-1',
-        name: '誘명솗??吏곸썝',
+        name: '테스터A',
         company: 'E2E Clinic',
         company_id: '22222222-2222-2222-2222-222222222222',
-        department: '?됱젙遺',
-        position: '?ъ썝',
-        status: '?ъ쭅',
+        department: '수술팀',
+        position: '사원',
+        status: '재직',
       },
     ],
     boardPosts: [
@@ -541,9 +541,9 @@ test('board read status modal shows read and pending audience counts', async ({ 
         id: 'board-post-read-1',
         board_type: FREE_BOARD,
         title: '\uC77D\uC74C \uD604\uD669 \uD14C\uC2A4\uD2B8',
-        content: '?곸꽭 蹂몃Ц',
+        content: '상세 본문',
         author_id: 'reader-1',
-        author_name: '?쎌쓬 吏곸썝',
+        name: '테스터A',
         company: 'E2E Clinic',
         company_id: '22222222-2222-2222-2222-222222222222',
         created_at: '2026-03-27T01:00:00.000Z',

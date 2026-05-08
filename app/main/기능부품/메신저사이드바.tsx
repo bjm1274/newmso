@@ -56,19 +56,19 @@ type MessengerSidebarProps = {
   viewMode: MessengerViewMode;
   showHiddenRooms: boolean;
   sidebarRoomItems: MessengerSidebarRoomItem[];
-  attentionThreadItems: MessengerThreadInboxItem[];
+  attentionThreadItems?: MessengerThreadInboxItem[];
   mentionInboxItems: MessengerMentionInboxItem[];
-  threadInboxItems: MessengerThreadInboxItem[];
+  threadInboxItems?: MessengerThreadInboxItem[];
   groupedStaffs: Record<string, Record<string, StaffMember[]>>;
   expandedDepts: Set<string>;
   onViewModeChange: (mode: MessengerViewMode) => void;
-  onOpenGroupModal: () => void;
+  onOpenGroupModal?: () => void;
   onOpenGlobalSearch: () => void;
   onToggleHiddenRooms: () => void;
   onRoomClick: (roomId: string) => void;
-  onOpenAttentionThreadItem: (item: MessengerThreadInboxItem) => void;
+  onOpenAttentionThreadItem?: (item: MessengerThreadInboxItem) => void;
   onOpenMentionItem: (item: MessengerMentionInboxItem) => void;
-  onOpenThreadItem: (item: MessengerThreadInboxItem) => void;
+  onOpenThreadItem?: (item: MessengerThreadInboxItem) => void;
   onToggleRoomPinned: (roomId: string, shouldPin: boolean) => void;
   onMovePinnedRoom: (roomId: string, direction: 'up' | 'down') => void;
   onToggleRoomHidden: (roomId: string, hidden: boolean) => void;
@@ -81,19 +81,19 @@ export function MessengerSidebar({
   viewMode,
   showHiddenRooms,
   sidebarRoomItems,
-  attentionThreadItems,
+  attentionThreadItems = [],
   mentionInboxItems,
-  threadInboxItems,
+  threadInboxItems = [],
   groupedStaffs,
   expandedDepts,
   onViewModeChange,
-  onOpenGroupModal,
+  onOpenGroupModal = () => {},
   onOpenGlobalSearch,
   onToggleHiddenRooms,
   onRoomClick,
-  onOpenAttentionThreadItem,
+  onOpenAttentionThreadItem = () => {},
   onOpenMentionItem,
-  onOpenThreadItem,
+  onOpenThreadItem = () => {},
   onToggleRoomPinned,
   onMovePinnedRoom,
   onToggleRoomHidden,

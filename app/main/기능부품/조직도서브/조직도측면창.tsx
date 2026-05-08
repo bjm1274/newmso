@@ -67,14 +67,11 @@ export const SUB_MENUS: Record<string, SubMenuItem[]> = {
     { id: '인사변동', label: '인사변동', group: '인력관리', icon: 'briefcase' },
     { id: '입퇴사·교육센터', label: '입퇴사·교육센터', group: '인력관리', icon: 'compass' },
     { id: '근태', label: '근태', group: '근태/급여', icon: 'history' },
-    { id: '교대근무', label: '교대근무', group: '근태/급여', icon: 'refresh' },
-    { id: '연차/휴가', label: '연차/휴가', group: '근태/급여', icon: 'calendar' },
     { id: '급여', label: '급여', group: '근태/급여', icon: 'calculator' },
     { id: '경조사', label: '경조사', group: '복무/복지', icon: 'bell' },
     { id: '자격·안전센터', label: '자격·안전센터', group: '복무/복지', icon: 'admin' },
     { id: '계약', label: '계약', group: '문서/기타', icon: 'document' },
     { id: '문서센터', label: '문서센터', group: '문서/기타', icon: 'folder' },
-    { id: '캘린더', label: '캘린더', group: '문서/기타', icon: 'calendar' },
   ],
   관리자: ADMIN_SIDEBAR_ITEMS,
 };
@@ -124,9 +121,11 @@ const ICON_PATHS: Record<string, React.ReactNode> = {
   ),
   hr: (
     <>
-      <path d="M7 20V7a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v13" />
-      <path d="M5 20h14" />
-      <path d="M9 5V3h6v2" />
+      <rect x="3" y="5" width="18" height="14" rx="3" />
+      <circle cx="9" cy="11" r="2.4" />
+      <path d="M6.5 16c1.2-2 3.8-2 5 0" />
+      <path d="M14 10h4" />
+      <path d="M14 14h3" />
     </>
   ),
   inventory: (
@@ -188,6 +187,75 @@ const ICON_PATHS: Record<string, React.ReactNode> = {
     <>
       <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z" />
       <path d="m4 7.5 8 4.5 8-4.5" />
+    </>
+  ),
+  banknote: (
+    <>
+      <rect x="3" y="6" width="18" height="12" rx="2" />
+      <circle cx="12" cy="12" r="2" />
+      <path d="M7 12h.01M17 12h.01" />
+    </>
+  ),
+  building2: (
+    <>
+      <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18" />
+      <path d="M6 12H4a2 2 0 0 0-2 2v8" />
+      <path d="M18 9h2a2 2 0 0 1 2 2v11" />
+      <path d="M10 6h4M10 10h4M10 14h4M10 18h4" />
+    </>
+  ),
+  'circle-parking': (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9 17V7h4a3 3 0 0 1 0 6H9" />
+    </>
+  ),
+  hospital: (
+    <>
+      <path d="M3 21h18" />
+      <path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16" />
+      <path d="M9 21v-6h6v6" />
+      <path d="M12 7v4M10 9h4" />
+    </>
+  ),
+  landmark: (
+    <>
+      <path d="M3 22h18" />
+      <path d="M6 18V10" />
+      <path d="M10 18V10" />
+      <path d="M14 18V10" />
+      <path d="M18 18V10" />
+      <path d="M4 10h16" />
+      <path d="m12 2 8 4H4Z" />
+    </>
+  ),
+  mic: (
+    <>
+      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+      <path d="M12 19v3" />
+    </>
+  ),
+  printer: (
+    <>
+      <path d="M6 9V2h12v7" />
+      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+      <path d="M6 14h12v8H6z" />
+    </>
+  ),
+  'square-pen': (
+    <>
+      <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.4 2.6a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4Z" />
+    </>
+  ),
+  stethoscope: (
+    <>
+      <path d="M4.8 2.3v4.2a4 4 0 0 0 8 0V2.3" />
+      <path d="M8.8 10.5v3.7a4.8 4.8 0 0 0 9.6 0v-1.1" />
+      <circle cx="18.4" cy="10.4" r="2.2" />
+      <path d="M3 2h3" />
+      <path d="M11.6 2h3" />
     </>
   ),
   analytics: (
@@ -433,12 +501,12 @@ const LUCIDE_ICON_ALIASES: Record<string, string> = {
   AlertTriangle: 'alert',
   ArrowLeft: 'arrow-left',
   ArrowRight: 'arrow-right',
-  Banknote: 'purchase',
+  Banknote: 'banknote',
   Bell: 'bell',
   Bookmark: 'tag',
   BookOpen: 'document',
   Box: 'inventory',
-  Building2: 'server',
+  Building2: 'building2',
   Calculator: 'calculator',
   Calendar: 'calendar',
   CalendarClock: 'calendar-clock',
@@ -446,7 +514,7 @@ const LUCIDE_ICON_ALIASES: Record<string, string> = {
   Check: 'check',
   CheckSquare: 'check',
   ChevronLeft: 'arrow-left',
-  CircleParking: 'tag',
+  CircleParking: 'circle-parking',
   ClipboardCheck: 'clipboard',
   ClipboardList: 'clipboard',
   Clock: 'history',
@@ -464,10 +532,11 @@ const LUCIDE_ICON_ALIASES: Record<string, string> = {
   FolderOpen: 'folder',
   Forward: 'arrow-right',
   History: 'history',
+  Hospital: 'hospital',
   Hourglass: 'loader',
   Inbox: 'inbox',
   LoaderCircle: 'loader',
-  Landmark: 'server',
+  Landmark: 'landmark',
   Lock: 'admin',
   LockKeyhole: 'admin',
   LogOut: 'return',
@@ -475,14 +544,14 @@ const LUCIDE_ICON_ALIASES: Record<string, string> = {
   Menu: 'menu',
   MessageSquare: 'chat',
   MessageSquareReply: 'chat',
-  Mic: 'video',
+  Mic: 'mic',
   Moon: 'moon',
   MoreHorizontal: 'more',
   Package: 'inventory',
   Paperclip: 'paperclip',
   Pin: 'tag',
   Plus: 'plus',
-  Printer: 'document',
+  Printer: 'printer',
   Receipt: 'document',
   RefreshCw: 'refresh',
   Save: 'save',
@@ -492,9 +561,9 @@ const LUCIDE_ICON_ALIASES: Record<string, string> = {
   Settings: 'admin',
   ShieldCheck: 'admin',
   SmilePlus: 'plus',
-  SquarePen: 'document',
+  SquarePen: 'square-pen',
   Star: 'tag',
-  Stethoscope: 'scan',
+  Stethoscope: 'stethoscope',
   Tag: 'tag',
   Tags: 'tag',
   Trash2: 'trash',

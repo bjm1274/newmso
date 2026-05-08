@@ -58,7 +58,7 @@ test('chat deep actions can pin a notice, create a poll, and save added particip
     chatRooms: [
       {
         id: '00000000-0000-0000-0000-000000000000',
-        name: '怨듭?硫붿떆吏',
+        name: '공지 메시지',
         type: 'notice',
         members: [fakeUser.id],
         created_at: '2026-03-08T00:00:00.000Z',
@@ -71,7 +71,7 @@ test('chat deep actions can pin a notice, create a poll, and save added particip
         members: [fakeUser.id, peerOne.id],
         created_at: '2026-03-08T09:00:00.000Z',
         last_message_at: '2026-03-08T10:00:00.000Z',
-        last_message_preview: '怨듭?濡??щ┫ 硫붿떆吏',
+        last_message_preview: '공지로 올린 메시지',
         created_by: fakeUser.id,
       },
     ],
@@ -80,7 +80,7 @@ test('chat deep actions can pin a notice, create a poll, and save added particip
         id: 'msg-group-1',
         room_id: 'room-group',
         sender_id: fakeUser.id,
-        content: '怨듭?濡??щ┫ 硫붿떆吏',
+        content: '확인 부탁드립니다.',
         created_at: '2026-03-08T10:00:00.000Z',
         is_deleted: false,
         staff: { name: fakeUser.name, photo_url: null, position: fakeUser.position },
@@ -95,7 +95,7 @@ test('chat deep actions can pin a notice, create a poll, and save added particip
         id: 'msg-group-2',
         room_id: 'room-group',
         sender_id: peerOne.id,
-        content: '?뺤씤 遺?곷뱶由쎈땲??',
+        content: '확인 부탁드립니다.',
         created_at: '2026-03-08T10:05:00.000Z',
         is_deleted: false,
         staff: { name: peerOne.name, photo_url: null, position: peerOne.position },
@@ -128,7 +128,7 @@ test('chat deep actions can pin a notice, create a poll, and save added particip
 
   await page.getByTestId('chat-open-drawer').click();
   await expect(page.getByTestId('chat-room-drawer')).toBeVisible();
-  await expect(page.getByTestId('chat-drawer-notice')).toContainText('怨듭?濡??щ┫ 硫붿떆吏');
+  await expect(page.getByTestId('chat-drawer-notice')).toContainText('공지로 올린 메시지');
 
   await page.getByTestId('chat-open-poll-modal').click();
   await expect(page.getByTestId('chat-poll-modal')).toBeVisible();

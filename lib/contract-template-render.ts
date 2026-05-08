@@ -84,6 +84,116 @@ function formatResidentNo(value?: unknown) {
   return raw.replace(/(\d{6})(\d{1,7})/, '$1-$2');
 }
 
+function firstText(...values: unknown[]) {
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    const text = String(value).trim();
+    if (text) return text;
+  }
+  return '';
+}
+
+function toRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function getPrimaryShiftRecord(
+  shift?: Record<string, unknown> | Record<string, unknown>[] | null,
+) {
+  if (Array.isArray(shift)) return toRecord(shift[0]);
+
+  const shiftRecord = toRecord(shift);
+  if (Array.isArray(shiftRecord.weekly_rotation_shifts)) {
+    return toRecord(shiftRecord.weekly_rotation_shifts[0]);
+  }
+
+  return shiftRecord;
+}
+
+function readShiftMeta(shiftRecord: Record<string, unknown>) {
+  const description = String(shiftRecord.description || '');
+  const markerIndex = description.lastIndexOf('[SHIFT_META]');
+  if (markerIndex < 0) return {};
+
+  try {
+    return toRecord(JSON.parse(description.slice(markerIndex + '[SHIFT_META]'.length).trim()));
+  } catch {
+    return {};
+  }
+}
+
+function resolveWorkDayMode(
+  workingDaysPerWeek: number,
+  shift?: Record<string, unknown> | Record<string, unknown>[] | null,
+  contract?: Record<string, unknown> | null,
+  user?: Record<string, unknown> | null,
+) {
+  const shiftRecord = getPrimaryShiftRecord(shift);
+  const shiftMeta = readShiftMeta(shiftRecord);
+  const explicitMode = firstText(
+    contract?.work_day_mode,
+    user?.work_day_mode,
+    shiftRecord.work_day_mode,
+    shiftMeta.work_day_mode,
+  );
+
+  if (explicitMode === 'all_days' || explicitMode.includes('월~일')) return 'all_days';
+  if (explicitMode === 'weekdays' || explicitMode.includes('월~금')) return 'weekdays';
+  if (shiftRecord.is_weekend_work === true || Number(shiftRecord.weekly_work_days) >= 7) return 'all_days';
+  if (workingDaysPerWeek >= 7) return 'all_days';
+
+  return 'weekdays';
+}
+
+function buildWorkDayText(
+  workingDaysPerWeek: number,
+  shift?: Record<string, unknown> | Record<string, unknown>[] | null,
+  contract?: Record<string, unknown> | null,
+  user?: Record<string, unknown> | null,
+) {
+  const shiftRecord = getPrimaryShiftRecord(shift);
+  const explicitWorkingDays = firstText(
+    contract?.working_days,
+    contract?.work_days,
+    user?.working_days,
+    user?.work_days,
+    shiftRecord.working_days,
+    shiftRecord.work_days,
+  );
+  if (explicitWorkingDays && !/^\d+(\.\d+)?$/.test(explicitWorkingDays)) {
+    return explicitWorkingDays;
+  }
+
+  const workDayMode = resolveWorkDayMode(workingDaysPerWeek, shift, contract, user);
+  if (workDayMode === 'all_days') return '월요일~일요일 중 근무표에 따름';
+  if (workingDaysPerWeek >= 6) return '월요일~토요일';
+  if (workingDaysPerWeek === 5) return '월요일~금요일';
+
+  return `주 ${workingDaysPerWeek}일`;
+}
+
+function buildWeeklyHolidayText(
+  workingDaysPerWeek: number,
+  shift?: Record<string, unknown> | Record<string, unknown>[] | null,
+  contract?: Record<string, unknown> | null,
+  user?: Record<string, unknown> | null,
+) {
+  const explicitHoliday = firstText(
+    contract?.weekly_holiday,
+    contract?.holiday,
+    user?.weekly_holiday,
+    user?.holiday,
+  );
+  if (explicitHoliday) return explicitHoliday;
+
+  const workDayMode = resolveWorkDayMode(workingDaysPerWeek, shift, contract, user);
+  if (workDayMode === 'all_days') return '근무표에 따른 주 1회 이상 휴일';
+
+  return '일요일';
+}
+
 function removeAllowanceLinesWithoutAmounts(
   content: string,
   allowanceValues: Record<string, number>,
@@ -172,30 +282,50 @@ export function fillEmploymentContractTemplate(
     safeUser.payment_day ??
     safeUser.payday,
   );
+  const companyRepresentativeName = firstText(
+    safeCompany.ceo_name,
+    safeCompany.representative_name,
+    safeCompany.owner_name,
+  );
+  const companyBusinessNo = firstText(safeCompany.business_no, safeCompany.business_number);
+  const companyAddress = firstText(safeCompany.address, safeCompany.company_address);
+  const companyPhone = firstText(safeCompany.phone, safeCompany.company_phone, safeCompany.tel);
+  const employeePhone = firstText(safeUser.phone, safeUser.employee_phone, safeUser.mobile);
+  const employeeAddress = firstText(safeUser.address, safeUser.employee_address);
+  const workingDaysText = buildWorkDayText(workingDaysPerWeek, shift, safeContract, safeUser);
+  const weeklyHolidayText = buildWeeklyHolidayText(workingDaysPerWeek, shift, safeContract, safeUser);
 
   const vars: Record<string, string> = {
     staff_name: String(safeUser.name || ''),
     employee_name: String(safeUser.name || ''),
     employee_no: String(safeUser.employee_no ?? ''),
     company_name: String(safeCompany.name || safeUser.company || safeContract.company_name || ''),
-    company_ceo: String(safeCompany.ceo_name || ''),
-    ceo_name: String(safeCompany.ceo_name || ''),
-    company_business_no: String(safeCompany.business_no || ''),
-    business_no: String(safeCompany.business_no || ''),
-    company_address: String(safeCompany.address || ''),
-    address_company: String(safeCompany.address || ''),
-    company_phone: String(safeCompany.phone || ''),
-    phone_company: String(safeCompany.phone || ''),
+    company_ceo: companyRepresentativeName,
+    ceo_name: companyRepresentativeName,
+    representative_name: companyRepresentativeName,
+    company_representative_name: companyRepresentativeName,
+    company_business_no: companyBusinessNo,
+    business_no: companyBusinessNo,
+    company_business_number: companyBusinessNo,
+    business_number: companyBusinessNo,
+    company_address: companyAddress,
+    address_company: companyAddress,
+    company_phone: companyPhone,
+    phone_company: companyPhone,
     department: String(safeUser.department || ''),
     position: String(safeUser.position || ''),
     join_date: formatDate(safeUser.joined_at || salarySource.join_date),
     license_name: String(safeUser.license || ''),
     license_no: String((safeUser.permissions as Record<string, unknown> | undefined)?.license_no || ''),
     license_date: formatDate((safeUser.permissions as Record<string, unknown> | undefined)?.license_date || ''),
-    phone: String(safeUser.phone || ''),
-    address: String(safeUser.address || ''),
+    phone: employeePhone,
+    employee_phone: employeePhone,
+    address: employeeAddress,
+    employee_address: employeeAddress,
     birth_date: parseBirthFromResident(safeUser.resident_no),
+    employee_birth_date: parseBirthFromResident(safeUser.resident_no),
     resident_no: formatResidentNo(safeUser.resident_no),
+    employee_resident_no: formatResidentNo(safeUser.resident_no),
     base_salary: formatWon(getSalaryAmount('base_salary')),
     position_allowance: formatWon(getSalaryAmount('position_allowance')),
     meal_allowance: formatWon(getSalaryAmount('meal_allowance')),
@@ -213,6 +343,10 @@ export function fillEmploymentContractTemplate(
     weekly_work_hours: String(weeklyWorkHours),
     working_days_per_week: String(workingDaysPerWeek),
     work_days_per_week: String(workingDaysPerWeek),
+    working_days: workingDaysText,
+    work_days: workingDaysText,
+    weekly_holiday: weeklyHolidayText,
+    holiday: weeklyHolidayText,
     contract_type: String(
       safeUser.employment_type ||
       salarySource.contract_type ||
@@ -251,7 +385,7 @@ export function fillEmploymentContractTemplate(
 
   Object.entries(companyLineValues).forEach(([label, value]) => {
     if (!value) return;
-    const re = new RegExp(`(${label}\\s*:\\s*)([_\\s]*)`, 'g');
+    const re = new RegExp(`(${label}\\s*:\\s*)(?:_{2,}|\\s{2,})(?=\\s|$)`, 'g');
     result = result.replace(re, `$1${value}`);
   });
 

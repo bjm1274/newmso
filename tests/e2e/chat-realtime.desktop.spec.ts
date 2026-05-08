@@ -1315,7 +1315,7 @@ test("chat global search finds files by original attachment name", async ({ page
         members: [fakeUser.id, "peer-1"],
         created_at: "2026-03-08T09:00:00.000Z",
         last_message_at: "2026-03-08T11:30:00.000Z",
-        last_message_preview: "???뵬 ?⑤벊?",
+        last_message_preview: "수술동의서 파일",
       },
     ],
     staffMembers: [
@@ -1335,7 +1335,7 @@ test("chat global search finds files by original attachment name", async ({ page
         sender_name: "Chat Peer Realtime",
         content: "",
         file_url: "https://example.com/uploads/file-1.xlsx",
-        file_name: "??곷춦??꾨뱜 ??덀걠?源낆쨯??xlsx",
+        file_name: "수술동의서 환자자료.xlsx",
         file_kind: "file",
         created_at: "2026-03-08T11:30:00.000Z",
         is_deleted: false,
@@ -1345,7 +1345,7 @@ test("chat global search finds files by original attachment name", async ({ page
         room_id: "room-file-search",
         sender_id: fakeUser.id,
         sender_name: fakeUser.name,
-        content: "??삘뀲 筌롫뗄?놅쭪?",
+        content: "파일 관련 안내입니다",
         created_at: "2026-03-08T11:31:00.000Z",
         is_deleted: false,
       },
@@ -1373,5 +1373,5 @@ test("chat global search finds files by original attachment name", async ({ page
 
   const fileResult = page.getByTestId("chat-global-search-result-msg-file-search-1");
   await expect(fileResult).toBeVisible();
-  await expect(fileResult).toContainText("??곷춦??꾨뱜 ??덀걠?源낆쨯??xlsx");
+  await expect(fileResult).toContainText("수술동의서 환자자료.xlsx");
 });

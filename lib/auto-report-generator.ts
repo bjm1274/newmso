@@ -35,7 +35,7 @@ export async function generateMonthlyHRReport(
   companyId: string | null,
   period: string, // YYYY-MM
 ): Promise<{ summary: Record<string, unknown> }> {
-  let query = supabase.from('staff_members').select('id, department, position, status, employment_type');
+  let query = supabase.from('staff_members').select('id, department, position, status, permissions');
   if (companyId) query = query.eq('company', companyId);
 
   const { data: staffs } = await query;
@@ -48,7 +48,8 @@ export async function generateMonthlyHRReport(
   for (const s of list) {
     const dept = String((s as Record<string, unknown>).department || '미지정');
     const status = String((s as Record<string, unknown>).status || '기타');
-    const empType = String((s as Record<string, unknown>).employment_type || '정규직');
+    const permissions = (s as Record<string, unknown>).permissions as Record<string, unknown> | null | undefined;
+    const empType = String(permissions?.employment_type || '정규직');
     byDept[dept] = (byDept[dept] || 0) + 1;
     byStatus[status] = (byStatus[status] || 0) + 1;
     byType[empType] = (byType[empType] || 0) + 1;

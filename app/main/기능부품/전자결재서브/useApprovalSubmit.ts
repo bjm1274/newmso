@@ -129,14 +129,14 @@ export function useApprovalSubmit({
 }: UseApprovalSubmitParams) {
   const isSubmittingRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const confirmApprovalSubmit = useCallback<ConfirmApprovalSubmit>(
-    async (options) => {
-      if (openConfirm) return openConfirm(options);
-      if (typeof window === 'undefined') return true;
-      return window.confirm([options.title, options.description].filter(Boolean).join('\n\n'));
-    },
-    [openConfirm],
-  );
+  const confirmApprovalSubmit =
+    openConfirm ??
+    ((options: Parameters<ConfirmApprovalSubmit>[0]) =>
+      Promise.resolve(
+        typeof window === 'undefined'
+          ? true
+          : window.confirm([options.title, options.description].filter(Boolean).join('\n\n')),
+      ));
 
   const buildApprovalHistoryEntry = useCallback((action: ApprovalHistoryEntry['action'], note?: string | null) => ({
     action,
@@ -326,7 +326,7 @@ export function useApprovalSubmit({
         })(),
         (async () => {
           try {
-            const { data, error } = await supabase.from('inventory').select('item_name, name');
+            const { data, error } = await supabase.from('inventory').select('item_name');
             if (error) {
               throw error;
             }

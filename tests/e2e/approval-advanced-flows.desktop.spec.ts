@@ -250,7 +250,6 @@ test('rejecting a pending approval stores the reject reason in metadata', async 
 
   const rejectDialog = page.getByRole('dialog');
   await expect(rejectDialog).toBeVisible();
-  await rejectDialog.locator('textarea').fill('洹쇨굅媛 遺議깊빀?덈떎.');
   const rejectReason = '\uADFC\uAC70\uAC00 \uBD80\uC871\uD569\uB2C8\uB2E4.';
   await rejectDialog.locator('textarea').fill(rejectReason);
   await rejectDialog.locator('button').last().click();

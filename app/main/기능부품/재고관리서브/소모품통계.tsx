@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import type { InventoryItem } from '@/types';
 
 type LogRow = {
   id: string;
@@ -14,35 +15,42 @@ type LogRow = {
   inventory?: { item_name?: string; category?: string };
 };
 
-export default function ConsumableStats({
-  user,
-  selectedCo,
-  inventory: _inventory,
-}: {
-  user: any;
-  selectedCo: string;
-  inventory?: any[];
-}) {
+export default function ConsumableStats({ user, selectedCo, inventory: _inventory }: { user: any; selectedCo: string; inventory?: InventoryItem[] }) {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<'7일' | '30일' | '90일' | '전체'>('30일');
   const [groupBy, setGroupBy] = useState<'item' | 'category' | 'company' | 'actor'>('item');
 
   const periodDays: Record<string, number | null> = { '7일': 7, '30일': 30, '90일': 90, '전체': null };
+  const inventoryById = useMemo(() => {
+    return new Map(
+      (_inventory || [])
+        .filter((item: any) => item?.id)
+        .map((item: any) => [String(item.id), item])
+    );
+  }, [_inventory]);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
-    let query = supabase.from('inventory_logs').select('*, inventory:item_id(item_name, category)').order('created_at', { ascending: false });
+    let query = supabase.from('inventory_logs').select('*').order('created_at', { ascending: false });
     if (selectedCo !== '전체') query = query.eq('company', selectedCo);
     const days = periodDays[period];
     if (days) {
       const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
       query = query.gte('created_at', from);
     }
-    const { data } = await query.limit(1000);
-    setLogs(data || []);
+    const { data, error } = await query.limit(1000);
+    if (error) {
+      console.error('소모품 통계 로그 조회 실패:', error);
+      setLogs([]);
+    } else {
+      setLogs((data || []).map((log: any) => ({
+        ...log,
+        inventory: inventoryById.get(String(log.item_id || log.inventory_id || '')),
+      })));
+    }
     setLoading(false);
-  }, [selectedCo, period]);
+  }, [inventoryById, selectedCo, period]);
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
 

@@ -1437,9 +1437,20 @@ export default function NotificationSystem({
     }
 
     if (typeof window !== 'undefined') {
-      if (!suppressLiveDisplay && !suppressByRoomPreference) {
-        const evt = isChatType ? 'erp-chat-notification' : 'erp-alert';
-        window.dispatchEvent(new CustomEvent(evt, {
+      if (isChatType && incomingRoomId) {
+        window.dispatchEvent(new CustomEvent('erp-chat-notification', {
+          detail: {
+            title,
+            body,
+            type,
+            room_id: rowMetadata.room_id,
+            message_id: rowMetadata.message_id || rowMetadata.id || row.id,
+            data: rowMetadata,
+            suppress_mobile_banner: suppressLiveDisplay || suppressByRoomPreference || shouldPreferMobileNativePopup,
+          },
+        }));
+      } else if (!suppressLiveDisplay && !suppressByRoomPreference) {
+        window.dispatchEvent(new CustomEvent('erp-alert', {
           detail: {
             title,
             body,

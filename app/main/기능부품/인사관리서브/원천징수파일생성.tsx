@@ -57,14 +57,14 @@ export default function TaxFileGenerator({ staffs, selectedCo }: Props) {
     (async () => {
       const { data } = await supabase
         .from('companies')
-        .select('name, business_number, representative_name')
+        .select('name, business_no, ceo_name')
         .eq('name', selectedCo)
         .maybeSingle();
       if (data) {
         setCompanyInfo({
           companyName: String(data.name || selectedCo),
-          businessNumber: String(data.business_number || ''),
-          representativeName: String(data.representative_name || ''),
+          businessNumber: String(data.business_no || ''),
+          representativeName: String(data.ceo_name || ''),
         });
       }
     })();

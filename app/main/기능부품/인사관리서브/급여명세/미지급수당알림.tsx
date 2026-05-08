@@ -42,7 +42,7 @@ export default function UnpaidAllowanceAlert({ staffs, selectedCo, user }: Props
 
         const [payrollRes, attendRes] = await Promise.all([
           supabase.from('payroll_records').select('*').in('year_month', months).in('staff_id', staffIds),
-          supabase.from('attendance_records').select('*').in('staff_id', staffIds).gte('work_date', months[0] + '-01'),
+          supabase.from('attendances').select('*').in('staff_id', staffIds).gte('work_date', months[0] + '-01'),
         ]);
 
         const payrolls = payrollRes.data || [];

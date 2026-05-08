@@ -83,7 +83,7 @@ export default function InsuranceEDI({
       try {
         const { data, error } = await supabase
           .from('payroll_records')
-          .select('staff_id, year_month, record_type, status, gross_pay, total_taxable, total_taxfree, base_salary')
+          .select('staff_id, year_month, record_type, status, total_taxable, total_taxfree, base_salary')
           .eq('year_month', yearMonth);
 
         if (error) throw error;

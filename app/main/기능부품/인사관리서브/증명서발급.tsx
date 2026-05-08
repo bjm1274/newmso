@@ -92,7 +92,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
     const loadHistory = async () => {
       const { data } = await supabase
         .from('certificate_issuances')
-        .select('*, staff_members(name, company)')
+        .select('*, staff_members!certificate_issuances_staff_id_fkey(name, company)')
         .order('issued_at', { ascending: false })
         .limit(50);
 

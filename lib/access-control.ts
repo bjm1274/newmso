@@ -97,7 +97,6 @@ const HR_PERMISSION_KEYS: Record<string, string> = {
   문서보관함: 'hr_문서보관함',
   증명서: 'hr_증명서',
   서류제출: 'hr_서류제출',
-  캘린더: 'hr_캘린더',
 };
 
 const INVENTORY_PERMISSION_KEYS: Record<string, string> = {
@@ -171,7 +170,6 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   hr_문서보관함: ['hr'],
   hr_증명서: ['hr'],
   hr_서류제출: ['hr_구성원', 'hr'],
-  hr_캘린더: ['hr'],
   hr_근무형태이력: ['hr_근무형태', 'hr_근태', 'hr'],
   hr_연차소멸알림: ['hr_연차휴가', 'hr_근태', 'hr'],
   hr_지각조퇴분석: ['hr_근태', 'hr'],

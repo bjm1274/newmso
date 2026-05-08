@@ -157,7 +157,7 @@ async function findDestinationInventoryItem(
 ) {
   const { data, error } = await client
     .from('inventory')
-    .select('id, item_name, name, quantity, stock, company, company_id, department, category, spec, min_quantity, min_stock, unit_price, expiry_date, lot_number, is_udi, udi_code, location, supplier_name, supplier, insurance_code')
+    .select('id, item_name, quantity, stock, company, company_id, department, category, spec, min_quantity, unit_price, expiry_date, lot_number, is_udi, udi_code, location, supplier_name, supplier, insurance_code')
     .eq('company', destinationCompany)
     .eq('item_name', getItemName(sourceItem));
 
@@ -234,7 +234,7 @@ export async function ensureSupportInventoryItem(
 ) {
   const existingRows = await client
     .from('inventory')
-    .select('id, item_name, name, quantity, stock, company, company_id, department, category, min_quantity, min_stock, unit_price, expiry_date, lot_number, is_udi, udi_code, location, supplier_name, supplier')
+    .select('id, item_name, quantity, stock, company, company_id, department, category, min_quantity, unit_price, expiry_date, lot_number, is_udi, udi_code, location, supplier_name, supplier')
     .eq('company', INVENTORY_SUPPORT_COMPANY);
 
   if (existingRows.error) {
@@ -267,7 +267,7 @@ export async function ensureSupportInventoryItem(
       return client
         .from('inventory')
         .insert([payload])
-        .select('id, item_name, name, quantity, stock, company, company_id, department, category, min_quantity, min_stock, unit_price, expiry_date, lot_number, is_udi, udi_code, location, supplier_name, supplier')
+        .select('id, item_name, quantity, stock, company, company_id, department, category, min_quantity, unit_price, expiry_date, lot_number, is_udi, udi_code, location, supplier_name, supplier')
         .single() as PromiseLike<{ data: LooseRecord | null; error: unknown }>;
     },
     ['department', 'name', 'min_stock'],

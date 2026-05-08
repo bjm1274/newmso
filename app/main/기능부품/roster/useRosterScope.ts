@@ -26,11 +26,11 @@ buildStaffNightRangeStorageKey,
 getDepartmentName,
 getMonthDates,
 normalizeShiftName
-} from '../\uADFC\uBB34\uD45C\uC790\uB3D9\uD3B8\uC131-engine';
+} from '../근무표자동편성-engine';
 import type {
 StaffConfig,
 WorkShift
-} from '../\uADFC\uBB34\uD45C\uC790\uB3D9\uD3B8\uC131-types';
+} from '../근무표자동편성-types';
 
 
 import { useRosterScopeLocalStorage } from './useRosterScopeLocalStorage';
@@ -90,7 +90,7 @@ export function useRosterScope({
 
   useEffect(() => {
     if (!companyOptions.length) return;
-    if (selectedCo !== '\uC804\uCCB4' && companyOptions.includes(selectedCo)) {
+    if (selectedCo !== '전체' && companyOptions.includes(selectedCo)) {
       setSelectedCompany(selectedCo);
       return;
     }
@@ -119,7 +119,7 @@ export function useRosterScope({
     if (!isAdmin) {
       return list;
     }
-    return ['\uC804\uCCB4 \uBD80\uC11C', ...list];
+    return ['전체 부서', ...list];
   }, [activeStaffs, isAdmin, ownDepartment, selectedCompany]);
 
   useEffect(() => {
@@ -132,7 +132,7 @@ export function useRosterScope({
       forcedDepartment ||
       (departmentOptions.includes(ownDepartment)
         ? ownDepartment
-        : departmentOptions.find((department) => department !== '\uC804\uCCB4 \uBD80\uC11C') ||
+        : departmentOptions.find((department) => department !== '전체 부서') ||
           departmentOptions[0] ||
           '');
     if (forcedDepartment && selectedDepartment !== forcedDepartment) {
@@ -142,7 +142,7 @@ export function useRosterScope({
     if (
       !selectedDepartment ||
       !departmentOptions.includes(selectedDepartment) ||
-      selectedDepartment === '\uC804\uCCB4 \uBD80\uC11C'
+      selectedDepartment === '전체 부서'
     ) {
       setSelectedDepartment(defaultDepartment);
     }
@@ -152,7 +152,7 @@ export function useRosterScope({
     const validDepartments = new Set(
       departmentOptions.filter(
         (department) =>
-          department !== '\uC804\uCCB4 \uBD80\uC11C' && department !== selectedDepartment
+          department !== '전체 부서' && department !== selectedDepartment
       )
     );
     setIncludedDepartments((prev) =>
@@ -216,7 +216,7 @@ export function useRosterScope({
   const offShift = useMemo(
     () =>
       workShifts.find((shift) =>
-        ['\uD734\uBB34', 'off', '\uBE44\uBC88', '\uC2A4\uD504'].some((keyword) =>
+        ['휴무', 'off', '비번', '스프'].some((keyword) =>
           normalizeShiftName(shift.name).includes(keyword)
         )
       ),
@@ -272,9 +272,9 @@ export function useRosterScope({
       buildStaffNightRangeStorageKey(selectedCompany, selectedDepartmentScopeKey),
     [selectedCompany, selectedDepartmentScopeKey]
   );
-  const companyLockedByHrFilter = selectedCo !== '\uC804\uCCB4';
+  const companyLockedByHrFilter = selectedCo !== '전체';
   const teamOptions = useMemo(
-    () => departmentOptions.filter((department) => department !== '\uC804\uCCB4 \uBD80\uC11C'),
+    () => departmentOptions.filter((department) => department !== '전체 부서'),
     [departmentOptions]
   );
   const availableIncludedDepartments = useMemo(
@@ -286,8 +286,8 @@ export function useRosterScope({
       availableIncludedDepartments.find((department) => {
         const normalizedDepartment = String(department || '').replace(/\s+/g, '');
         return (
-          normalizedDepartment.includes('\uC218\uC5F0\uBCD1\uC6D0') &&
-          normalizedDepartment.includes('\uAC04\uD638')
+          normalizedDepartment.includes('수연병원') &&
+          normalizedDepartment.includes('간호')
         );
       }) || '',
     [availableIncludedDepartments]
@@ -310,7 +310,7 @@ export function useRosterScope({
     );
     return activeStaffs.filter((staff) => {
       if (selectedCompany && staff.company !== selectedCompany) return false;
-      if (selectedDepartment && selectedDepartment !== '\uC804\uCCB4 \uBD80\uC11C') {
+      if (selectedDepartment && selectedDepartment !== '전체 부서') {
         return scopedDepartments.has(getDepartmentName(staff));
       }
       return true;

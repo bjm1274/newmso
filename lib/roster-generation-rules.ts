@@ -29,7 +29,7 @@ export type RosterGenerationRule = {
   generationStyle: RosterGenerationStyle;
   avoidDayAfterNight: boolean;
   avoidDayAfterEvening: boolean;
-  avoidEveningAfterNight: boolean;
+  avoidEveningAfterNight?: boolean;
   maxConsecutiveEveningShifts: number;
   offDaysAfterNight: number;
   nightBlockSize: number;
@@ -174,7 +174,6 @@ function normalizeRule(rule: RosterGenerationRule): RosterGenerationRule {
       `${String(rule.id || 'date-rule')}-override`
     ),
     maxConsecutiveEveningShifts: clampInteger(rule.maxConsecutiveEveningShifts, 0, 7, 0),
-    avoidEveningAfterNight: rule.avoidEveningAfterNight === true,
     offDaysAfterNight: clampInteger(rule.offDaysAfterNight, 0, 5, 1),
     nightBlockSize: clampInteger(rule.nightBlockSize, 1, 5, 2),
     minRotationNightCount,

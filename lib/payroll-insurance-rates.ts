@@ -79,7 +79,7 @@ export function getIndustrialAccidentInsuranceInfo(companyName?: unknown): Indus
   };
 }
 
-export function calculateEmployeeInsuranceDeductions(taxableIncome: number, age: number = 30) {
+export function calculateEmployeeInsuranceDeductions(taxableIncome: number, age: number = 30, _yearMonth?: string) {
   const taxableBase = Math.max(0, Math.floor(Number(taxableIncome) || 0));
   const pensionBase = Math.min(Math.max(taxableBase, NP_INCOME_FLOOR), NP_INCOME_CEILING);
   const nationalPension =

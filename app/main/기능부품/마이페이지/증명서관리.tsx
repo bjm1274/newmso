@@ -98,7 +98,7 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
       setApprovedDocs(approvalRes.data || []);
       const certRes = await supabase
         .from('certificate_issuances')
-        .select('*, staff_members(name)')
+        .select('*, staff_members!certificate_issuances_staff_id_fkey(name)')
         .eq('staff_id', effectiveUserId)
         .order('issued_at', { ascending: false })
         .limit(20);

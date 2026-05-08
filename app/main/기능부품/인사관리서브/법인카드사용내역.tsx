@@ -31,11 +31,18 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
   const [importing, setImporting] = useState(false);
   const [form, setForm] = useState({ date: '', merchant: '', category: '식비', amount: 0, description: '', card_id: '' });
   const [cardForm, setCardForm] = useState({ company_name: '', card_nickname: '', last_four: '', issuer: '', holder_id: '' });
+  const staffById = useMemo(
+    () => new Map((staffs as Record<string, unknown>[]).map((staff) => [String(staff.id), staff])),
+    [staffs],
+  );
 
   const fetchCards = useCallback(async () => {
-    const { data, error } = await supabase.from('corporate_cards').select('*, staff_members(name)').eq('status', 'active').order('company_name');
-    setCards(error ? [] : (data || []));
-  }, []);
+    const { data, error } = await supabase.from('corporate_cards').select('*').eq('status', 'active').order('company_name');
+    setCards(error ? [] : (data || []).map((card: any) => ({
+      ...card,
+      staff_members: staffById.get(String(card.holder_id || '')),
+    })));
+  }, [staffById]);
 
   const fetchTransactions = useCallback(async () => {
     const [y, m] = month.split('-').map(Number);
@@ -43,16 +50,19 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
     const end = `${month}-${new Date(y, m, 0).getDate()}`;
     const { data, error } = await supabase
       .from('corporate_card_transactions')
-      .select('*, staff_members(name), corporate_cards(card_nickname, last_four, company_name)')
+      .select('*, corporate_cards!card_id(card_nickname, last_four, company_name)')
       .gte('transaction_date', start)
       .lte('transaction_date', end)
       .order('transaction_date', { ascending: false });
-    let rows: Record<string, unknown>[] = error ? [] : (data || []);
+    let rows: Record<string, unknown>[] = error ? [] : (data || []).map((row: any) => ({
+      ...row,
+      staff_members: staffById.get(String(row.staff_id || row.holder_id || '')),
+    }));
     if (selectedCo !== '전체') rows = rows.filter((r: Record<string, unknown>) => (r.company_name || (r.corporate_cards as Record<string, unknown>)?.company_name) === selectedCo);
     if (filterCat) rows = rows.filter((r: Record<string, unknown>) => r.category === filterCat);
     if (filterCardId) rows = rows.filter((r: Record<string, unknown>) => r.card_id === filterCardId);
     setList(rows);
-  }, [month, selectedCo, filterCat, filterCardId]);
+  }, [month, selectedCo, filterCat, filterCardId, staffById]);
 
   // cards와 staffs에서 회사 목록 동적 생성
   const COMPANIES = useMemo(() => {

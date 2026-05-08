@@ -29,13 +29,8 @@ async function installFixedDate(page: Page, initialIso = '2026-03-01T09:00:00+09
 }
 
 async function openShiftPlanner(page: Page) {
-  await installFixedDate(page);
-  await page.goto(
-    `/main?${new URLSearchParams({ open_menu: '인사관리', open_subview: '교대근무' }).toString()}`
-  );
-  await page.getByRole('button', { name: '교대근무' }).click();
-  await expect(page.getByTestId('shift-suite-bar')).toBeVisible();
-  await page.getByTestId('shift-suite-1').click();
+  await openShiftRuleManager(page);
+  await switchAdminRosterTab(page, 'planner');
   await expect(page.getByTestId('roster-pattern-planner')).toBeVisible();
 }
 
@@ -190,9 +185,9 @@ test('ward generation rule applies advanced safety constraints for evening, week
     user: rosterAdminUser,
     localStorage: {
       erp_last_menu: '인사관리',
-      erp_last_subview: '교대근무',
-      erp_hr_tab: '교대근무',
-      erp_hr_workspace: '근태 및 급여',
+      erp_last_subview: '근태',
+      erp_hr_tab: '근태',
+      erp_hr_workspace: '근태 · 급여',
     },
   });
 

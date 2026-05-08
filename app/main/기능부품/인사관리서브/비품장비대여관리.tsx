@@ -119,6 +119,10 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: Record<str
   });
 
   const scope = useMemo(() => getSettingScope(selectedCo), [selectedCo]);
+  const staffById = useMemo(
+    () => new Map((staffs as StaffRow[]).map((staff) => [String(staff.id), staff])),
+    [staffs],
+  );
   const filtered = (scope === '전체'
     ? (staffs as StaffRow[])
     : (staffs as StaffRow[]).filter((staff) => staff.company === scope));
@@ -127,16 +131,19 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: Record<str
     (async () => {
       const { data } = await supabase
         .from('asset_loans')
-        .select('*, staff_members(name, company)')
+        .select('*')
         .order('loaned_at', { ascending: false });
 
-      let rows = (data || []) as AssetLoanRow[];
+      let rows = ((data || []) as AssetLoanRow[]).map((row) => ({
+        ...row,
+        staff_members: staffById.get(String(row.staff_id || '')),
+      }));
       if (scope !== '전체') {
         rows = rows.filter((row) => row.staff_members?.company === scope);
       }
       setList(rows);
     })();
-  }, [scope]);
+  }, [scope, staffById]);
 
   useEffect(() => {
     let cancelled = false;
@@ -249,11 +256,19 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: Record<str
 
     const { data } = await supabase
       .from('asset_loans')
-      .select('*, staff_members(name, company)')
+      .select('*')
       .order('loaned_at', { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (data) setList((prev) => [data as AssetLoanRow, ...prev]);
+    if (data) {
+      setList((prev) => [
+        {
+          ...(data as AssetLoanRow),
+          staff_members: staffById.get(String((data as AssetLoanRow).staff_id || '')),
+        },
+        ...prev,
+      ]);
+    }
   };
 
   const handleReturn = async (id: string) => {

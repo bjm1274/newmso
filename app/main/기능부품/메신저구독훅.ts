@@ -143,8 +143,6 @@ export function useChatRealtimeSubscriptions({
   typingPeersTimeoutRef,
   syncChannelRef,
   chatRoomsRef,
-  visibleMessageIdsRef,
-  visiblePollIdsRef,
   selectedRoomIdRef,
   fetchDataRef,
   globalRealtimeRetryTimerRef,
@@ -156,11 +154,6 @@ export function useChatRealtimeSubscriptions({
   setChatRooms,
   fetchData,
   updateUnreadForRooms,
-  applyReadCursorFromRealtime,
-  refreshVisibleMessageReactions,
-  refreshVisibleMessageBookmarks,
-  refreshRoomPinnedMessages,
-  refreshRoomPolls,
   handleIncomingRealtimeMessage,
   scheduleRealtimeReconnect,
   isRoomInSelectedConversation,
@@ -305,7 +298,7 @@ export function useChatRealtimeSubscriptions({
     const triggerDebouncedFetch = () => {
       if (timeoutId) clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
-        if (!disposed) void fetchDataLatestRef.current();
+        if (!disposed) void fetchDataLatestRef.current({ force: true });
       }, 300);
     };
 
@@ -326,7 +319,6 @@ export function useChatRealtimeSubscriptions({
           (payload.new as Record<string, unknown> | null) ||
           (payload.old as Record<string, unknown> | null) ||
           null;
-        applyReadCursorFromRealtime?.(updatedRow);
         const updatedRoomId = String(updatedRow?.room_id || '').trim();
         if (!updatedRoomId) return;
         // 현재 열린 대화방의 커서 변경(타인)은 fetchData로 읽음수 즉시 갱신
@@ -337,76 +329,11 @@ export function useChatRealtimeSubscriptions({
           triggerDebouncedFetch();
         }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, (payload: Record<string, unknown>) => {
-        const row =
-          (payload.new as Record<string, unknown> | null) ||
-          (payload.old as Record<string, unknown> | null) ||
-          null;
-        const messageId = String(row?.message_id || '').trim();
-        if (!messageId || !visibleMessageIdsRef || visibleMessageIdsRef.current.has(messageId)) {
-          if (refreshVisibleMessageReactions) {
-            void refreshVisibleMessageReactions();
-          } else {
-            triggerDebouncedFetch();
-          }
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_bookmarks', filter: `user_id=eq.${effectiveTodoUserId || userId}` }, (payload: Record<string, unknown>) => {
-        const row =
-          (payload.new as Record<string, unknown> | null) ||
-          (payload.old as Record<string, unknown> | null) ||
-          null;
-        const messageId = String(row?.message_id || '').trim();
-        if (!messageId || !visibleMessageIdsRef || visibleMessageIdsRef.current.has(messageId)) {
-          if (refreshVisibleMessageBookmarks) {
-            void refreshVisibleMessageBookmarks();
-          } else {
-            triggerDebouncedFetch();
-          }
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pinned_messages' }, (payload: Record<string, unknown>) => {
-        const row =
-          (payload.new as Record<string, unknown> | null) ||
-          (payload.old as Record<string, unknown> | null) ||
-          null;
-        const roomId = String(row?.room_id || selectedRoomId || '').trim();
-        if (!roomId || isRoomInSelectedConversationRef.current(roomId, chatRoomsRef.current)) {
-          if (refreshRoomPinnedMessages) {
-            void refreshRoomPinnedMessages();
-          } else {
-            triggerDebouncedFetch();
-          }
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'polls' }, (payload: Record<string, unknown>) => {
-        const row =
-          (payload.new as Record<string, unknown> | null) ||
-          (payload.old as Record<string, unknown> | null) ||
-          null;
-        const roomId = String(row?.room_id || selectedRoomId || '').trim();
-        if (!roomId || isRoomInSelectedConversationRef.current(roomId, chatRoomsRef.current)) {
-          if (refreshRoomPolls) {
-            void refreshRoomPolls();
-          } else {
-            triggerDebouncedFetch();
-          }
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, (payload: Record<string, unknown>) => {
-        const row =
-          (payload.new as Record<string, unknown> | null) ||
-          (payload.old as Record<string, unknown> | null) ||
-          null;
-        const pollId = String(row?.poll_id || row?.id || '').trim();
-        if (!pollId || !visiblePollIdsRef || visiblePollIdsRef.current.has(pollId)) {
-          if (refreshRoomPolls) {
-            void refreshRoomPolls();
-          } else {
-            triggerDebouncedFetch();
-          }
-        }
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, triggerDebouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_bookmarks', filter: `user_id=eq.${effectiveTodoUserId || userId}` }, triggerDebouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pinned_messages' }, triggerDebouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'polls' }, triggerDebouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, triggerDebouncedFetch)
       .subscribe((status: string) => {
         if (disposed) return;
         if (status === 'SUBSCRIBED') {
@@ -437,13 +364,6 @@ export function useChatRealtimeSubscriptions({
     effectiveChatUserId,
     setRoomRealtimeState,
     chatRoomsRef,
-    visibleMessageIdsRef,
-    visiblePollIdsRef,
-    applyReadCursorFromRealtime,
-    refreshVisibleMessageReactions,
-    refreshVisibleMessageBookmarks,
-    refreshRoomPinnedMessages,
-    refreshRoomPolls,
   ]);
 
   useEffect(() => {
@@ -597,11 +517,22 @@ export function useChatRealtimeSubscriptions({
       }
 
       const messageId = String(detail?.message_id || detail?.data?.message_id || detail?.data?.id || '').trim();
-      if (!messageId || !knownRoom) return;
+      if (!knownRoom) return;
 
       void (async () => {
+        if (!messageId) {
+          if (isRoomInSelectedConversationRef.current(roomId, chatRoomsRef.current)) {
+            await fetchDataLatestRef.current({ force: true });
+          }
+          return;
+        }
         const data = await fetchMessageByIdWithRetryRef.current(messageId);
-        if (!data) return;
+        if (!data) {
+          if (isRoomInSelectedConversationRef.current(roomId, chatRoomsRef.current)) {
+            await fetchDataLatestRef.current({ force: true });
+          }
+          return;
+        }
         await handleIncomingRealtimeMessageRef.current(data);
       })();
     };
@@ -617,7 +548,7 @@ export function useChatRealtimeSubscriptions({
     const refreshRealtimeFallback = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       if (selectedRoomId) {
-        void fetchDataLatestRef.current();
+        void fetchDataLatestRef.current({ force: true });
       } else if (chatRoomsRef.current.length > 0) {
         void updateUnreadForRooms(chatRoomsRef.current);
       }
