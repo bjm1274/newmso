@@ -50,13 +50,13 @@ export function useStockModal({
       setStockSupplierInput('');
       return;
     }
-    const item = stockModal.item as Record<string, unknown>;
-    setStockSerialInput(String(item.serial_number || '').trim());
-    setStockLotInput(String(item.lot_number || '').trim());
-    setStockExpiryInput(String(item.expiry_date || '').slice(0, 10));
-    setStockLocationInput(String(item.location || '').trim());
-    setStockUnitPriceInput(item.unit_price === undefined || item.unit_price === null ? '' : String(item.unit_price));
-    setStockSupplierInput(String(item.supplier_name || item.supplier || '').trim());
+    const source = stockModal.item as Record<string, unknown>;
+    setStockSerialInput(String(source.serial_number || '').trim());
+    setStockLotInput(String(source.lot_number || '').trim());
+    setStockExpiryInput(String(source.expiry_date || '').slice(0, 10));
+    setStockLocationInput(String(source.location || '').trim());
+    setStockUnitPriceInput(String(source.unit_price ?? source.price ?? '').trim());
+    setStockSupplierInput(String(source.supplier_name ?? source.supplier ?? '').trim());
   }, [stockModal]);
 
   const openStockIn = useCallback((item: InventoryItem) => {
@@ -88,12 +88,18 @@ export function useStockModal({
     setIsUpdating(true);
     const delta = type === 'in' ? amount : -amount;
     const effectiveSerialNumber = String((type === 'in' ? serialNumber : (item as Record<string, unknown>).serial_number) || '').trim() || null;
-    const effectiveLotNumber = String((type === 'in' ? tracking?.lotNumber : (item as Record<string, unknown>).lot_number) || '').trim() || null;
-    const effectiveExpiryDate = String((type === 'in' ? tracking?.expiryDate : (item as Record<string, unknown>).expiry_date) || '').trim() || null;
-    const effectiveLocation = String((type === 'in' ? tracking?.location : (item as Record<string, unknown>).location) || '').trim() || null;
-    const parsedUnitPrice = Number(String(type === 'in' ? tracking?.unitPrice : (item as Record<string, unknown>).unit_price || '').replace(/,/g, ''));
-    const effectiveUnitPrice = Number.isFinite(parsedUnitPrice) && parsedUnitPrice > 0 ? Math.round(parsedUnitPrice) : null;
-    const effectiveSupplier = String((type === 'in' ? tracking?.supplier : ((item as Record<string, unknown>).supplier_name || (item as Record<string, unknown>).supplier)) || '').trim() || null;
+    const trackingPayload =
+      type === 'in'
+        ? {
+            lot_number: String(tracking?.lotNumber || '').trim() || null,
+            expiry_date: String(tracking?.expiryDate || '').trim() || null,
+            location: String(tracking?.location || '').trim() || null,
+            unit_price: String(tracking?.unitPrice || '').trim()
+              ? Math.max(0, Number(tracking?.unitPrice) || 0)
+              : null,
+            supplier_name: String(tracking?.supplier || '').trim() || null,
+          }
+        : {};
     try {
       const { data: rpcResult, error: rpcError } = await supabase.rpc('atomic_stock_update', { p_item_id: item.id, p_delta: delta, p_min_allowed: 0 });
       let prevQty: number;
@@ -115,27 +121,20 @@ export function useStockModal({
       }
 
       if (type === 'in') {
-        const inventoryPatch: Record<string, unknown> = {
+        const inventoryPayload: Record<string, unknown> = {
           serial_number: effectiveSerialNumber,
-          lot_number: effectiveLotNumber,
-          expiry_date: effectiveExpiryDate,
-          location: effectiveLocation,
-          unit_price: effectiveUnitPrice,
-          supplier_name: effectiveSupplier,
-          supplier: effectiveSupplier,
+          ...trackingPayload,
         };
-        const { error: trackingErr } = await withMissingColumnsFallback(
+        const { error: serialErr } = await withMissingColumnsFallback(
           (omitted) => {
-            const next = { ...inventoryPatch };
-            ['serial_number', 'lot_number', 'expiry_date', 'location', 'unit_price', 'supplier_name', 'supplier'].forEach((column) => {
-              if (omitted.has(column)) delete next[column];
-            });
+            const next = { ...inventoryPayload };
+            for (const column of omitted) delete next[column];
             if (Object.keys(next).length === 0) return Promise.resolve({ data: null, error: null });
             return supabase.from('inventory').update(next).eq('id', item.id);
           },
-          ['serial_number', 'lot_number', 'expiry_date', 'location', 'unit_price', 'supplier_name', 'supplier'],
+          ['serial_number', 'lot_number', 'expiry_date', 'location', 'unit_price', 'supplier_name'],
         );
-        if (trackingErr) throw trackingErr;
+        if (serialErr) throw serialErr;
       }
 
       const logRows: Record<string, unknown>[] = [{
@@ -143,12 +142,7 @@ export function useStockModal({
         type: type === 'in' ? '입고' : '출고', change_type: type === 'in' ? '입고' : '출고',
         quantity: amount, prev_quantity: prevQty, next_quantity: nextQty,
         serial_number: effectiveSerialNumber,
-        lot_number: effectiveLotNumber,
-        expiry_date: effectiveExpiryDate,
-        location: effectiveLocation,
-        unit_price: effectiveUnitPrice,
-        supplier_name: effectiveSupplier,
-        supplier: effectiveSupplier,
+        ...trackingPayload,
         actor_name: targetDept && targetDept !== '전체' ? `${user?.name} (${targetDept})` : user?.name,
         company: targetCompany || item.company,
       }];
@@ -166,12 +160,11 @@ export function useStockModal({
             if (omitted.has('location')) delete next.location;
             if (omitted.has('unit_price')) delete next.unit_price;
             if (omitted.has('supplier_name')) delete next.supplier_name;
-            if (omitted.has('supplier')) delete next.supplier;
             return next;
           });
           return supabase.from('inventory_logs').insert(rows);
         },
-        ['company_id', 'serial_number', 'lot_number', 'expiry_date', 'location', 'unit_price', 'supplier_name', 'supplier'],
+        ['company_id', 'serial_number', 'lot_number', 'expiry_date', 'location', 'unit_price', 'supplier_name'],
       );
       await Promise.all([refreshCurrentInventory(), fetchLogs()]);
       toast(`${type === 'in' ? '입고' : '출고'} 처리가 완료되었습니다.`, 'success');

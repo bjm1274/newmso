@@ -1042,7 +1042,7 @@ test.skip('interim settlement prorates vehicle and fixed allowances and stores d
   const interimStaff = {
     id: 'payroll-interim-1',
     employee_no: 'PAY-INT-001',
-    name: '中간정산테스트',
+    name: '중간정산테스트',
     company: fakeUser.company,
     company_id: fakeUser.company_id,
     department: fakeUser.department,
@@ -1077,19 +1077,19 @@ test.skip('interim settlement prorates vehicle and fixed allowances and stores d
       department: interimStaff.department,
     },
     localStorage: {
-      erp_last_menu: '?紐꾧텢?온??',
-      erp_last_subview: '疫뀀맩肉?',
-      erp_hr_tab: '疫뀀맩肉?',
-      erp_hr_workspace: '域뱀눛源?獄?疫뀀맩肉?',
+      erp_last_menu: '인사관리',
+      erp_last_subview: '급여',
+      erp_hr_tab: '급여',
+      erp_hr_workspace: '근태 및 급여',
     },
   });
 
-  await page.goto(`/main?${new URLSearchParams({ open_menu: '?紐꾧텢?온??' }).toString()}`);
+  await page.goto(`/main?open_menu=%EC%9D%B8%EC%82%AC%EA%B4%80%EB%A6%AC`);
 
   await expect(page.getByTestId('payroll-view')).toBeVisible();
   await page.getByTestId('hr-company-select').selectOption(fakeUser.company);
   await page.getByTestId('hr-status-select').selectOption('?댁궗');
-  await page.getByTestId('payroll-tab-湲됱뿬?뺤궛').click();
+  await page.getByTestId('payroll-tab-급여정산').click();
   await expect(page.getByTestId('run-payroll-wizard')).toBeVisible();
   await page.getByTestId('run-payroll-interim-button').click();
   await expect(page.getByTestId('interim-settlement-view')).toBeVisible();

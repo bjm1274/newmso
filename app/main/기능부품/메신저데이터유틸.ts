@@ -28,7 +28,6 @@ type FetchUnreadCountsForRoomIdsParams = {
   roomIds: string[];
   userId: string | null | undefined;
   cursorMap: Record<string, string | null | undefined>;
-  chunkSize?: number;
 };
 
 type UnreadMessageCountRow = {
@@ -80,13 +79,10 @@ async function fetchUnreadCandidateRows(
   roomIds: string[],
   userId: string,
   afterCreatedAt: string | null,
-  chunkSize = UNREAD_COUNT_ROOM_CHUNK_SIZE,
 ): Promise<UnreadMessageCountRow[]> {
   const rows: UnreadMessageCountRow[] = [];
 
-  const normalizedChunkSize = Math.max(1, Math.floor(Number(chunkSize) || UNREAD_COUNT_ROOM_CHUNK_SIZE));
-
-  for (const roomIdChunk of chunkValues(roomIds, normalizedChunkSize)) {
+  for (const roomIdChunk of chunkValues(roomIds, UNREAD_COUNT_ROOM_CHUNK_SIZE)) {
     let offset = 0;
     for (;;) {
       let query = client
@@ -129,7 +125,7 @@ export async function fetchUnreadCountsForRoomIds(
   const withCursorRoomIds = roomIds.filter((roomId) => Boolean(params.cursorMap[roomId]));
 
   if (noCursorRoomIds.length > 0) {
-    const rows = await fetchUnreadCandidateRows(client, noCursorRoomIds, normalizedUserId, null, params.chunkSize);
+    const rows = await fetchUnreadCandidateRows(client, noCursorRoomIds, normalizedUserId, null);
     rows.forEach((row) => {
       const roomId = String(row.room_id || '').trim();
       if (roomId && counts[roomId] !== undefined) counts[roomId] += 1;
@@ -140,7 +136,7 @@ export async function fetchUnreadCountsForRoomIds(
     const earliestCursor = pickEarliestTimestamp(
       withCursorRoomIds.map((roomId) => params.cursorMap[roomId] || null),
     );
-    const rows = await fetchUnreadCandidateRows(client, withCursorRoomIds, normalizedUserId, earliestCursor, params.chunkSize);
+    const rows = await fetchUnreadCandidateRows(client, withCursorRoomIds, normalizedUserId, earliestCursor);
     rows.forEach((row) => {
       const roomId = String(row.room_id || '').trim();
       if (!roomId || counts[roomId] === undefined) return;
@@ -225,7 +221,6 @@ export async function fetchChatUnreadCountsByRoom(
     roomIds: queryRoomIds,
     userId: normalizedUserId,
     cursorMap,
-    chunkSize: params.chunkSize,
   });
   const queriedEntries = Object.entries(queriedCounts);
 

@@ -5,7 +5,8 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { canAccessApprovalSection, hasPermission } from '@/lib/access-control';
 import { isActiveStaff } from '@/lib/active-staff';
 import { supabase } from '@/lib/supabase';
-import { withMissingColumnFallback, isMissingColumnError } from '@/lib/supabase-compat';
+import { withMissingColumnsFallback, isMissingColumnError } from '@/lib/supabase-compat';
+import { APPROVAL_OPTIONAL_COLUMNS, buildApprovalSelect } from '@/lib/approval-query-columns';
 import { notificationMatchesApprovalId } from '@/lib/notification-metadata';
 import type { StaffMember } from '@/types';
 import { extractOfficialDocRequest } from '@/lib/official-document-approval';
@@ -81,7 +82,7 @@ const [approvals, setApprovals] = useState<Record<string, unknown>[]>([]);
 const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대기' | '승인' | '반려'>('전체');
   const [approvalDocumentFilter, setApprovalDocumentFilter] = useState(ALL_DOCUMENT_FILTER);
   const [approvalKeyword, setApprovalKeyword] = useState('');
-  const [approvalDateMode, setApprovalDateMode] = useState<'month' | 'week' | 'range'>('month');
+  const [approvalDateMode, setApprovalDateMode] = useState<'month' | 'week' | 'range'>('week');
   const [approvalMonth, setApprovalMonth] = useState(getCurrentMonthValue);
   const [approvalWeekDate, setApprovalWeekDate] = useState(getCurrentDateValue);
   const [approvalDateFrom, setApprovalDateFrom] = useState('');
@@ -567,16 +568,22 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
 
 
   const fetchApprovals = useCallback(async () => {
-    const { data } = await withMissingColumnFallback(
-      async () => {
-        return supabase.from('approvals').select('id, title, type, status, sender_id, sender_name, sender_company, created_at, approval_line, current_approver_id, meta_data, doc_number').order('created_at', { ascending: false });
-      },
-      async () => {
-        return supabase.from('approvals').select('id, title, type, status, sender_id, sender_name, sender_company, created_at, approval_line, current_approver_id, meta_data, doc_number').order('created_at', { ascending: false });
-      }
+    const { data, error } = await withMissingColumnsFallback(
+      (omittedColumns) =>
+        supabase
+          .from('approvals')
+          .select(buildApprovalSelect(omittedColumns))
+          .order('created_at', { ascending: false }),
+      APPROVAL_OPTIONAL_COLUMNS,
+      { cacheKey: 'approval-list' }
     );
+    if (error) {
+      console.error('전자결재 문서 목록 조회 실패:', error);
+      setApprovals([]);
+      return;
+    }
     if (data) {
-      const nextItems = data as Record<string, unknown>[];
+      const nextItems = data as unknown as Record<string, unknown>[];
       setApprovals(nextItems);
       void Promise.allSettled(
         nextItems
@@ -822,9 +829,6 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
     }
 
     if (approvalDateMode === 'week') {
-      if (!approvalDateTouched && approvalWeekDate === defaultApprovalWeekDate) {
-        return false;
-      }
       return Boolean(approvalWeekDate);
     }
 
@@ -838,7 +842,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
   const hasApprovalFilterOverrides =
     approvalDocumentFilter !== ALL_DOCUMENT_FILTER ||
     Boolean(approvalKeyword) ||
-    approvalDateMode !== 'month' ||
+    approvalDateMode !== 'week' ||
     approvalMonth !== defaultApprovalMonth ||
     approvalWeekDate !== defaultApprovalWeekDate ||
     Boolean(approvalDateFrom) ||

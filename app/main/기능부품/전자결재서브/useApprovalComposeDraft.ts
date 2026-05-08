@@ -48,7 +48,7 @@ type UseApprovalComposeDraftParams = {
   setCcLine: Dispatch<SetStateAction<ApprovalCcUser[]>>;
   lastDraftByType: Record<string, ApprovalRecord | null>;
   setLastDraftByType: Dispatch<SetStateAction<Record<string, ApprovalRecord | null>>>;
-  suppliesLoadKey?: number;
+  suppliesLoadKey: number;
   setSuppliesLoadKey: Dispatch<SetStateAction<number>>;
   composeSeedApproval: ApprovalRecord | null;
   setComposeSeedApproval: Dispatch<SetStateAction<ApprovalRecord | null>>;

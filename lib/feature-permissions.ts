@@ -64,7 +64,6 @@ export const HR_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'hr_교육', label: '교육' },
   { key: 'hr_오프보딩', label: '오프보딩' },
   { key: 'hr_근태', label: '근태' },
-  { key: 'hr_교대근무', label: '교대근무' },
   { key: 'hr_연차휴가', label: '연차 / 휴가' },
   { key: 'hr_급여', label: '급여' },
   { key: 'hr_건강검진', label: '건강검진' },
@@ -76,7 +75,6 @@ export const HR_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'hr_문서보관함', label: '문서보관함' },
   { key: 'hr_증명서', label: '증명서' },
   { key: 'hr_서류제출', label: '서류제출' },
-  { key: 'hr_캘린더', label: '캘린더' },
 ];
 
 export const INVENTORY_PERMISSION_ITEMS: FeaturePermissionItem[] = [

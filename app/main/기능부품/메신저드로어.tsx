@@ -29,7 +29,7 @@ type MessengerDrawerProps = {
   noticeRecipientCount: number;
   noticeReminderBusy: boolean;
   threadOverviews: ThreadOverview[];
-  followedThreadIds: Set<string>;
+  followedThreadIds?: Set<string>;
   roomNotificationMode: RoomNotificationMode;
   roomNotificationKeyword: string;
   sharedMediaPreviewMessages: ChatMessage[];
@@ -52,7 +52,7 @@ type MessengerDrawerProps = {
   onPreviewMessage: (message: ChatMessage) => void;
   onReplyMessage: (message: ChatMessage) => void;
   onOpenThread: (message: ChatMessage) => void;
-  onToggleThreadFollow: (message: ChatMessage) => void;
+  onToggleThreadFollow?: (message: ChatMessage) => void;
   onScrollToMessage: (messageId: string) => void;
   onJumpToNoticeMessage: () => void;
   onOpenNoticeReadStatus: () => void;
@@ -151,7 +151,7 @@ function DrawerSectionHeader({
   );
 }
 
-function _MessengerDrawer({
+function MessengerDrawerImpl({
   isOpen,
   roomNotifyOn,
   currentNoticeMessage,
@@ -160,7 +160,7 @@ function _MessengerDrawer({
   noticeRecipientCount,
   noticeReminderBusy,
   threadOverviews,
-  followedThreadIds,
+  followedThreadIds = new Set<string>(),
   roomNotificationMode,
   roomNotificationKeyword,
   sharedMediaPreviewMessages,
@@ -183,7 +183,7 @@ function _MessengerDrawer({
   onPreviewMessage,
   onReplyMessage,
   onOpenThread,
-  onToggleThreadFollow,
+  onToggleThreadFollow = () => {},
   onScrollToMessage,
   onJumpToNoticeMessage,
   onOpenNoticeReadStatus,
@@ -867,4 +867,4 @@ function _MessengerDrawer({
   );
 }
 
-export const MessengerDrawer = memo(_MessengerDrawer);
+export const MessengerDrawer = memo(MessengerDrawerImpl);

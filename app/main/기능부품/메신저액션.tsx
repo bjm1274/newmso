@@ -71,7 +71,7 @@ export function MessengerMessageActions({
 
   return (
     <>
-      <div className="absolute inset-0 bg-black/10 z-30 animate-in fade-in duration-200" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 bg-black/10 z-30 animate-in fade-in duration-200 md:hidden" onClick={onClose} aria-hidden="true" />
 
       <div className="md:hidden absolute left-0 right-0 bottom-0 bg-[var(--card)] dark:bg-zinc-900 rounded-t-[24px] shadow-sm z-40 flex flex-col animate-in slide-in-from-bottom duration-300 max-h-[70vh] overflow-hidden">
         <div className="w-12 h-1.5 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-full mx-auto my-3 shrink-0" />
@@ -134,64 +134,6 @@ export function MessengerMessageActions({
         </div>
       </div>
 
-      <div data-testid="chat-message-actions-panel" className="hidden md:flex absolute top-0 right-0 bottom-0 w-80 bg-[var(--card)] border-l border-[var(--border)] shadow-sm z-40 flex-col animate-in slide-in-from-right duration-300">
-        <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
-          <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">메시지 작업</span>
-          <button onClick={onClose} className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[var(--radius-md)] hover:bg-[var(--muted)]">닫기</button>
-        </div>
-        <div className="p-4 space-y-4 overflow-y-auto flex-1">
-          <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">빠른 반응</p>
-          <div className="flex gap-2 flex-wrap">
-            {DESKTOP_REACTIONS.map((emoji) => (
-              <button key={emoji} onClick={() => { void onToggleReaction(emoji); }} className="w-11 h-11 flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--muted)] hover:bg-[var(--toss-blue-light)] text-xl transition-colors" title={emoji}>
-                {emoji}
-              </button>
-            ))}
-          </div>
-          <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase pt-2">기능</p>
-          <div className="space-y-1">
-            <button onClick={onReply} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">
-              답글 달기
-            </button>
-            {canEdit && (
-              <button data-testid="chat-message-action-edit" onClick={onStartEdit} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">메시지 수정</button>
-            )}
-            {message.edited_at && !message.is_deleted && (
-              <button data-testid="chat-message-action-edit-history" onClick={onOpenEditHistory} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">
-                수정 이력 보기
-              </button>
-            )}
-            {canDelete && (
-              <button data-testid="chat-message-action-delete" onClick={() => { void onDelete(); }} className="w-full p-3 text-left hover:bg-red-500/10 rounded-[var(--radius-md)] text-xs font-semibold text-red-600 transition-colors">메시지 삭제</button>
-            )}
-            <button data-testid="chat-message-action-pin" onClick={() => { void onTogglePin(); }} className={`w-full p-3 text-left rounded-[var(--radius-md)] text-xs font-semibold transition-colors ${isPinned ? 'hover:bg-[var(--muted)] text-[var(--toss-gray-3)]' : 'hover:bg-orange-500/10 text-orange-500'}`}>
-              {isPinned ? '공지 해제' : '공지로 등록'}
-            </button>
-            <button onClick={() => { void onAddTask(); onClose(); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">할일로 등록</button>
-            <button data-testid="chat-message-action-read-status" onClick={onOpenReadStatus} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">
-              읽음 확인
-            </button>
-            <button data-testid="chat-message-action-forward" onClick={onForward} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">
-              다른 채팅방으로 전달
-            </button>
-            <button data-testid="chat-message-action-copy-link" onClick={() => { void onCopyLink(); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">
-              메시지 링크 복사
-            </button>
-            <button data-testid="chat-message-action-thread" onClick={onOpenThread} className="w-full p-3 text-left hover:bg-[var(--toss-blue-light)] rounded-[var(--radius-md)] text-xs font-semibold text-[var(--accent)] transition-colors">
-              이 메시지 스레드 보기
-            </button>
-            <button onClick={async () => { await copyMessageFor(message, '[전자결재 메모]', '전자결재용으로 복사했습니다.'); onClose(); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">
-              전자결재용 내용 복사
-            </button>
-            <button onClick={async () => { await copyMessageFor(message, '[게시판 메모]', '게시판용으로 복사했습니다.'); onClose(); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">
-              게시판용 내용 복사
-            </button>
-            <button data-testid="chat-message-action-bookmark" onClick={() => { void onToggleBookmark(); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">
-              {isBookmarked ? '북마크 해제' : '중요 메시지 북마크'}
-            </button>
-          </div>
-        </div>
-      </div>
     </>
   );
 }

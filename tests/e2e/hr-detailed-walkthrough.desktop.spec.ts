@@ -146,7 +146,6 @@ test('hr walkthrough opens each submenu in practical order without runtime error
       hr_교육: true,
       hr_오프보딩: true,
       hr_근태: true,
-      hr_교대근무: true,
       hr_연차휴가: true,
       hr_급여: true,
       hr_건강검진: true,
@@ -158,7 +157,6 @@ test('hr walkthrough opens each submenu in practical order without runtime error
       hr_문서보관함: true,
       hr_증명서: true,
       hr_서류제출: true,
-      hr_캘린더: true,
       hr_근무형태: true,
     },
   };
@@ -390,6 +388,7 @@ test('hr walkthrough opens each submenu in practical order without runtime error
   await expect(page.getByRole('button', { name: '연차소멸알림' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '지각조퇴분석' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '조기퇴근감지' })).toHaveCount(0);
+  await page.getByRole('button', { name: '근태 이상/차감' }).click();
   await page.getByRole('button', { name: '지각·조퇴·조기퇴근' }).click();
   await expect(page.getByTestId('attendance-analysis-issue-suite')).toBeVisible();
   await expect(page.getByTestId('attendance-analysis-lateness')).toBeVisible();
@@ -404,15 +403,16 @@ test('hr walkthrough opens each submenu in practical order without runtime error
   const scheduleButton = page.getByRole('button', { name: '근무표 생성' });
   if (await scheduleButton.count()) {
     await scheduleButton.click();
-    await expect(page.getByText(/교대근무 및 스케줄링 간트 차트/)).toBeVisible();
-    const plannerButton = page.getByRole('button', { name: '간호근무표' });
-    if (await plannerButton.count()) {
-      await plannerButton.click();
-      await expect(page.getByTestId('roster-pattern-planner')).toBeVisible();
+    await expect(page.getByText(/근무표 생성/)).toBeVisible();
+    const wizardButton = page.getByRole('button', { name: /3교대 마법사/ });
+    if (await wizardButton.count()) {
+      await wizardButton.click();
+      await expect(page.getByText(/3교대 마법사|병동 3교대 근무표/)).toBeVisible();
+      await page.getByTitle('근태관리로 돌아가기').click();
     }
   }
 
-  await openHrMenu(page, '연차/휴가');
+  await page.getByRole('button', { name: '연차/휴가' }).click();
   await expect(page.getByTestId('leave-management-view')).toBeVisible();
   await page.getByTestId('leave-tab-연차-휴가-신청내역').click();
   await expect(page.getByText(/근로기준법 기준 연차·휴가 안내/)).toBeVisible();
@@ -486,9 +486,7 @@ test('hr walkthrough opens each submenu in practical order without runtime error
   await page.getByTestId('document-center-2').click();
   await expect(page.getByRole('heading', { name: /스마트 서류 제출/ })).toBeVisible();
 
-  await openHrMenu(page, '캘린더');
-  await expect(page.getByRole('heading', { name: '공유 캘린더' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '캘린더 동기화' })).toBeVisible();
+  await expect(page.locator('[data-testid="hr-menu-캘린더"]:visible')).toHaveCount(0);
 
   expect(runtimeErrors).toEqual([]);
 });

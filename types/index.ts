@@ -108,18 +108,6 @@ export interface AttachmentItem {
   type?: string;
 }
 
-export interface UploadPlanResponse {
-  success: true;
-  provider: 'supabase' | 'r2' | string;
-  bucket: string;
-  path: string;
-  signedUrl: string;
-  fileName: string;
-  url: string;
-  token?: string;
-  headers?: Record<string, string>;
-}
-
 // ─────────────────────────────────────────────
 // 할 일(Task)
 // ─────────────────────────────────────────────
@@ -365,6 +353,28 @@ export interface SalaryRecord {
 
 /** Supabase 응답에서 사용하는 Record 타입 */
 export type SupabaseRow = Record<string, unknown>;
+
+export type UploadPlanResponse =
+  | {
+      success: true;
+      provider: 'supabase';
+      bucket: string;
+      path: string;
+      token: string;
+      signedUrl: string;
+      fileName: string;
+      url: string;
+    }
+  | {
+      success: true;
+      provider: 'r2';
+      bucket: string;
+      path: string;
+      signedUrl: string;
+      fileName: string;
+      url: string;
+      headers: Record<string, string>;
+    };
 
 /** 정렬 방향 */
 export type SortDirection = 'asc' | 'desc';

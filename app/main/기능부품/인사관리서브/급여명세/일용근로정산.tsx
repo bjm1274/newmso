@@ -171,6 +171,7 @@ function calculateDailyWorkerInsurance({
   const fullEmployeeInsurance = calculateEmployeeInsuranceDeductions(
     base,
     getPayrollStaffAge(staff, asOf) ?? 30,
+    yearMonth,
   );
   const insuranceSettings = getPayrollInsuranceSettings(staff, asOf);
   const duruNuriActive = isDuruNuriActiveForYearMonth(
@@ -517,7 +518,7 @@ export default function DailyWorkerSettlement({
                 />
               </label>
                 <label className="space-y-1">
-                  <span className="text-xs font-medium text-[var(--toss-gray-4)]">1??洹쇰Т?쒓컙</span>
+                  <span className="text-xs font-medium text-[var(--toss-gray-4)]">1일 근무시간</span>
                   <input
                     data-testid="daily-settlement-hours-per-day"
                     type="number"

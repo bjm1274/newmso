@@ -209,7 +209,7 @@ export const FEATURE_CARDS: FeatureCard[] = [
   { id: '부서별재고', label: '부서별 재고', icon: 'Package', subView: '부서별재고', testId: 'department-inventory', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
   { id: '근무현황', label: '근무현황', icon: 'CalendarDays', subView: '근무현황', testId: 'work-status', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
   { id: '인계노트', label: '인계노트', icon: 'FileCheck2', subView: '인계노트', testId: 'handover-note', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
-  { id: '퇴원심사', label: '퇴원심사', icon: 'Building2', subView: '퇴원심사', testId: 'discharge-review', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
+  { id: '퇴원심사', label: '퇴원심사', icon: 'Hospital', subView: '퇴원심사', testId: 'discharge-review', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
   { id: '마감보고', label: '마감보고', icon: 'Banknote', subView: '마감보고', testId: 'closing-report', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
   { id: '직원평가', label: '직원평가', icon: 'SquarePen', subView: '직원평가', testId: 'staff-evaluation', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
   { id: '입금실시간조회', label: '입금 실시간 조회', icon: 'Landmark', subView: '입금실시간조회', testId: 'realtime-deposit', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },

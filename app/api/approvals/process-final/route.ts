@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     const supabase = createAdminSupabase();
     const { data: approval, error } = await supabase
       .from('approvals')
-      .select('id, status, meta_data, current_approver_id, approver_line, doc_number, sender_id, sender_company, doc_type, title')
+      .select('id, status, meta_data, current_approver_id, approver_line, doc_number, sender_id, sender_company, title')
       .eq('id', approvalId)
       .maybeSingle();
 

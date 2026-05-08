@@ -4,7 +4,10 @@ import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 import { formatPayrollMutationError } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
-import { calculateSeverancePayFromMonthlyWage, formatWorkPeriod } from '@/lib/severance-pay';
+import {
+  calculateDcRetirementBenefitFromMonthlyWage,
+  formatWorkPeriod,
+} from '@/lib/severance-pay';
 import { logAudit } from '@/lib/audit';
 import { fetchTaxFreeSettings, DEFAULT_SETTINGS, type TaxFreeSettings } from '@/lib/use-tax-free-settings';
 import {
@@ -24,6 +27,7 @@ import SmartDatePicker from '../../공통/SmartDatePicker';
 
 const INTERIM_TIME_STEP_MINUTES = 10;
 const HOLD_TO_INTERIM_UNIT_INPUT_MS = 450;
+const RETIREMENT_BENEFIT_BASIS = 'DC';
 
 type InterimAdjustmentKey =
   | 'nightDutyAdjustment'
@@ -340,7 +344,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
         const r = new Date(resigned);
         workDays = Math.max(0, Math.floor((r.getTime() - j.getTime()) / (1000 * 60 * 60 * 24)));
         const monthlyAvgWage = base + (mealAllowance || 0);
-        severance = calculateSeverancePayFromMonthlyWage(monthlyAvgWage, workDays);
+        severance = calculateDcRetirementBenefitFromMonthlyWage(monthlyAvgWage, workDays);
       }
     }
 
@@ -492,6 +496,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
         allowance_deduction: allowanceDeduction,
         attendance_deduction: attendanceDeduction,
       },
+      retirement_benefit_basis: includeSeverance && reason === '퇴사' ? RETIREMENT_BENEFIT_BASIS : null,
     };
     const net = total - deduction;
 
@@ -505,6 +510,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
       otherTaxfree,
       extraAllowance,
       severance,
+      retirementBenefitBasis: RETIREMENT_BENEFIT_BASIS,
       workDays,
       totalTaxable,
       totalTaxfree,
@@ -572,7 +578,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
 
       const u = typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USER) || '{}'); } catch { return {}; } })() : {};
       try {
-        await logAudit('중간정산확정', 'payroll', yearMonth, { staff: selectedStaff.name, total: calc.total, severance: calc.severance }, u.id, u.name);
+        await logAudit('중간정산확정', 'payroll', yearMonth, { staff: selectedStaff.name, total: calc.total, severance: calc.severance, retirementBenefitBasis: calc.retirementBenefitBasis }, u.id, u.name);
       } catch (auditError) {
         console.error('interim payroll audit log failed:', auditError);
       }
@@ -656,7 +662,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
           </div>
 
           {reason === '퇴사' && (
-            <div>
+            <div className="space-y-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -664,8 +670,16 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
                   onChange={(e) => setIncludeSeverance(e.target.checked)}
                   className="w-4 h-4 rounded border-[var(--border)] text-[var(--accent)]"
                 />
-                <span className="text-xs font-medium text-[var(--toss-gray-4)]">퇴직금 포함</span>
+                <span className="text-xs font-medium text-[var(--toss-gray-4)]">퇴직급여 포함</span>
               </label>
+              {includeSeverance && (
+                <div className="rounded-[var(--radius-md)] border border-[var(--accent)] bg-[var(--accent)] px-3 py-2 text-white shadow-sm">
+                  <span className="block text-xs font-black">DC 기준</span>
+                  <span className="mt-0.5 block text-[10px] font-semibold text-white/80">
+                    연간 임금 1/12 적립 기준
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
@@ -785,7 +799,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
                 )}
                 {result.severance > 0 && (
                   <div className="flex justify-between text-xs font-medium text-emerald-700">
-                    <span>퇴직금 (재직 {formatWorkPeriod(result.workDays)})</span>
+                    <span>퇴직급여 {result.retirementBenefitBasis} 기준 (재직 {formatWorkPeriod(result.workDays)})</span>
                     <span>{result.severance.toLocaleString()}원</span>
                   </div>
                 )}

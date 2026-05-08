@@ -12,9 +12,9 @@ type ThreadPanelProps = {
   rootMessage: ChatMessage | null;
   messages: ChatMessage[];
   resolveStaffProfile: (staffId: string | null | undefined) => StaffMember | null;
-  isFollowingThread: boolean;
+  isFollowingThread?: boolean;
   onClose: () => void;
-  onToggleFollowThread: (message: ChatMessage) => void;
+  onToggleFollowThread?: (message: ChatMessage) => void;
   onPreviewAttachment: (message: ChatMessage) => void;
   onReplyMessage: (message: ChatMessage) => void;
 };
@@ -23,9 +23,9 @@ export function ThreadPanel({
   rootMessage,
   messages,
   resolveStaffProfile,
-  isFollowingThread,
+  isFollowingThread = false,
   onClose,
-  onToggleFollowThread,
+  onToggleFollowThread = () => {},
   onPreviewAttachment,
   onReplyMessage,
 }: ThreadPanelProps) {

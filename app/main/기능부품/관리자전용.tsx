@@ -187,7 +187,7 @@ export default function AdminView(props: Record<string, unknown>) {
     const fetchInventory = async () => {
       const { data } = await supabase
         .from('inventory')
-        .select('id, item_name, name, quantity, min_quantity, company, department');
+        .select('id, item_name, quantity, min_quantity, company, department');
       setInventory(data || []);
     };
 

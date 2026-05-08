@@ -59,3 +59,17 @@ tmp*/
 tmp/
 .claude/worktrees/
 *.tmp
+
+# local agent/deploy inspection artifacts
+.codex-*
+.wrangler/
+cf-versions-list.json
+dc_retirement_contribution_*.xlsx
+~$*.xlsx
+__tmp_*
+tmp_withholding_*.pdf
+backups/
+
+# local editor/build caches
+.vscode/
+android-twa/.gradle/

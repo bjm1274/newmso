@@ -44,16 +44,16 @@ export function useChatRoomNavigation({
   pendingBottomAlignRoomIdRef,
   isNearBottomRef,
   lastTimelineTailRef,
-  optimisticUnreadFloorRef,
+  optimisticUnreadFloorRef: _optimisticUnreadFloorRef,
   messageListRef,
   scrollRef,
   effectiveChatUserId,
   setSelectedRoomId,
   setInputMsg,
-  setLoadingRoomId,
+  setLoadingRoomId: _setLoadingRoomId,
   setShowScrollToLatest,
   setRoomUnreadCounts,
-  loadingRoomId,
+  loadingRoomId: _loadingRoomId,
   persistRoomReadCursors,
   markConversationNotificationsAsRead,
   broadcastChatSync,
@@ -77,18 +77,9 @@ export function useChatRoomNavigation({
       } catch { /* ignore quota errors */ }
     }
 
-    if (requestBottomAlignmentHold) {
-      requestBottomAlignmentHold(roomId);
-    } else {
-      pendingBottomAlignRoomIdRef.current = roomId;
-    }
+    pendingBottomAlignRoomIdRef.current = roomId;
     isNearBottomRef.current = true;
     setShowScrollToLatest(false);
-    if (roomId && loadingRoomId !== roomId) {
-      setLoadingRoomId?.(roomId);
-    } else if (!roomId) {
-      setLoadingRoomId?.(null);
-    }
 
     if (previousSelectedRoomId !== roomId) {
       lastTimelineTailRef.current = '';
@@ -119,19 +110,6 @@ export function useChatRoomNavigation({
         });
         return changed ? next : prev;
       });
-
-      if (optimisticUnreadFloorRef) {
-        let floorChanged = false;
-        const nextOptimisticFloor = { ...optimisticUnreadFloorRef.current };
-        targetRoomIds.forEach((targetRoomId) => {
-          if (!(targetRoomId in nextOptimisticFloor)) return;
-          delete nextOptimisticFloor[targetRoomId];
-          floorChanged = true;
-        });
-        if (floorChanged) {
-          optimisticUnreadFloorRef.current = nextOptimisticFloor;
-        }
-      }
 
       void (async () => {
         try {
@@ -169,16 +147,12 @@ export function useChatRoomNavigation({
     inputMsgRef,
     isNearBottomRef,
     lastTimelineTailRef,
-    loadingRoomId,
     markConversationNotificationsAsRead,
     onRoomChangeCleanup,
-    optimisticUnreadFloorRef,
     pendingBottomAlignRoomIdRef,
     persistRoomReadCursors,
-    requestBottomAlignmentHold,
     selectedRoomIdRef,
     setInputMsg,
-    setLoadingRoomId,
     setRoomUnreadCounts,
     setSelectedRoomId,
     setShowScrollToLatest,

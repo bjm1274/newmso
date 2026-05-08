@@ -261,6 +261,7 @@ export type ChatAttachmentPreviewController = ReturnType<typeof useChatAttachmen
 
 type ChatAttachmentPreviewModalProps = {
   controller: ChatAttachmentPreviewController;
+  onForwardAttachment?: (item: AttachmentPreviewItem & { messageId?: string | number | null }) => void;
 };
 
 export function ChatAttachmentPreviewModal({ controller }: ChatAttachmentPreviewModalProps) {

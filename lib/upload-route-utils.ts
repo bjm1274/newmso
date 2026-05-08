@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { Buffer } from 'node:buffer';
 import {
   createChatAttachmentUploadPlan,
   isR2ChatStorageEnabled,

@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from '@/lib/toast';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 import type { ThreadOverview } from './메신저파생훅';
-import { DeferredAttachmentImage } from './MessengerAttachmentPanel';
 import {
   AttachmentListCard,
   AttachmentQuickActions,
@@ -32,6 +31,35 @@ type MessengerDrawerSectionsProps = {
 };
 const COLLAPSED_LIMITS: Record<DrawerSectionKey, number> = { media: 3, files: 3, links: 2, bookmarks: 3 };
 const DEFAULT_EXPANDED_SECTIONS: Record<DrawerSectionKey, boolean> = { media: false, files: false, links: false, bookmarks: false };
+
+function DeferredAttachmentImage({
+  src,
+  alt,
+  wrapperClassName = '',
+  placeholderClassName = '',
+  className = '',
+}: {
+  src: string;
+  alt: string;
+  wrapperClassName?: string;
+  placeholderClassName?: string;
+  className?: string;
+}) {
+  const [loaded, setLoaded] = useState(false);
+
+  return (
+    <div className={`relative overflow-hidden ${wrapperClassName}`}>
+      {!loaded ? <div className={placeholderClassName} /> : null}
+      <img
+        src={src}
+        alt={alt}
+        className={`${className} ${loaded ? 'opacity-100' : 'absolute inset-0 opacity-0'}`}
+        onLoad={() => setLoaded(true)}
+      />
+    </div>
+  );
+}
+
 function sortMessagesByRecent(messages: ChatMessage[] | null | undefined) {
   const safeMessages = Array.isArray(messages) ? messages : [];
   return [...safeMessages].sort(

@@ -8,6 +8,10 @@ import { filterRosterShiftsForDepartment } from '@/lib/roster-shift-team-filter'
 import SmartDatePicker from '../../공통/SmartDatePicker';
 import SmartMonthPicker from '../../공통/SmartMonthPicker';
 import NurseSchedule from '../간호근무표';
+import AttendanceIssueAnalysisSuite from '../근태이상통합분석';
+import LeaveManagement from '../휴가신청/휴가관리메인';
+import AttendanceDeductionSimulator from '../휴가신청/근태차감시뮬레이터';
+import AttendanceAnomalyPanel from '../휴가신청/근태이상탐지';
 import { MenuIcon } from '../../조직도서브/조직도측면창';
 
 type StaffMember = {
@@ -33,10 +37,15 @@ const LEGACY_APPROVAL_PENDING_STATUS = '\uB300\uAE30';
 const LEGACY_APPROVAL_APPROVED_STATUS = '\uC2B9\uC778';
 const LEGACY_APPROVAL_REJECTED_STATUS = '\uBC18\uB824';
 
+type AttendanceMainView = 'calendar' | 'dashboard' | 'schedule' | 'leave' | 'issues';
+
 type AttendanceMainProps = {
   staffs: StaffMember[];
   selectedCo: string;
   user?: AppStaffMember | Record<string, unknown> | null;
+  onRefresh?: () => void;
+  initialView?: AttendanceMainView;
+  initialLeaveTab?: string;
 };
 
 function padDay(day: number) {
@@ -334,8 +343,8 @@ function buildMonthCalendarCells(selectedMonth: string) {
   return cells;
 }
 
-export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceMainProps) {
-  const [viewMode, setViewMode] = useState<'calendar' | 'dashboard' | 'schedule'>('calendar');
+export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, initialView = 'calendar', initialLeaveTab }: AttendanceMainProps) {
+  const [viewMode, setViewMode] = useState<AttendanceMainView>(initialView);
   const [calendarDetailView, setCalendarDetailView] = useState<'day' | 'week' | 'month'>('month');
   const [isCalendarDetailOpen, setIsCalendarDetailOpen] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -595,6 +604,10 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
   const userCompany = String(user?.company || '');
   const canCreateRoster = ROSTER_CREATOR_POSITIONS.includes(userPosition) || ['admin', 'master'].includes(userRole) || ['최고관리자', '시스템관리자', '대표', '관리자'].includes(userPosition);
   const canApproveRoster = ROSTER_APPROVER_POSITIONS.includes(userPosition) || (ROSTER_APPROVER_COMPANIES.includes(userCompany) && userPosition === '이사') || ['admin', 'master'].includes(userRole) || ['최고관리자', '시스템관리자'].includes(userPosition);
+
+  useEffect(() => {
+    setViewMode(initialView);
+  }, [initialView]);
 
   // Team list
   const teamList = useMemo(() => {
@@ -1365,9 +1378,15 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
     if (dateStr?.slice(0, 7)) setSelectedMonth(dateStr.slice(0, 7));
   };
 
-  const mainViewButtonKey = viewMode === 'dashboard' || viewMode === 'schedule' ? viewMode : 'calendar';
+  const mainViewButtonKey =
+    viewMode === 'dashboard' ||
+    viewMode === 'schedule' ||
+    viewMode === 'leave' ||
+    viewMode === 'issues'
+      ? viewMode
+      : 'calendar';
 
-  const handleAttendanceViewChange = (nextView: 'dashboard' | 'daily' | 'monthly' | 'calendar' | 'schedule') => {
+  const handleAttendanceViewChange = (nextView: AttendanceMainView | 'daily' | 'monthly') => {
     if (nextView === 'calendar' || nextView === 'daily' || nextView === 'monthly') {
       setViewMode('calendar');
       setCalendarDetailView(nextView === 'daily' ? 'day' : nextView === 'monthly' ? 'month' : 'week');
@@ -1582,14 +1601,16 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
             </div>
 
             <div className="flex items-center gap-1 bg-[var(--tab-bg)]/80 dark:bg-zinc-800/80 p-1 rounded-[var(--radius-lg)] w-fit border border-[var(--border)]/50 dark:border-zinc-700/50 overflow-x-auto custom-scrollbar">
-              {[
+              {([
                 { id: 'dashboard', label: '대시보드', icon: 'analytics' },
                 ...((canCreateRoster || canApproveRoster) ? [{ id: 'schedule', label: '근무표 생성', icon: 'edit' }] : []),
-                { id: 'calendar', label: '근태 달력', icon: 'calendar' }
-              ].map(mode => (
+                { id: 'calendar', label: '근태 달력', icon: 'calendar' },
+                { id: 'leave', label: '연차/휴가', icon: 'calendar' },
+                { id: 'issues', label: '근태 이상/차감', icon: 'alert' },
+              ] as Array<{ id: AttendanceMainView; label: string; icon: string }>).map(mode => (
                 <button
                   key={mode.id}
-                  onClick={() => handleAttendanceViewChange(mode.id as 'dashboard' | 'daily' | 'monthly' | 'calendar' | 'schedule')}
+                  onClick={() => handleAttendanceViewChange(mode.id)}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-[var(--radius-md)] text-[12px] font-bold transition-all whitespace-nowrap ${mainViewButtonKey === mode.id
                     ? 'bg-[var(--accent)] text-white shadow-sm'
                     : 'text-[var(--toss-gray-4)] hover:text-foreground hover:bg-[var(--card)]/50 dark:hover:bg-zinc-700/50'
@@ -1602,6 +1623,7 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
             </div>
           </div>
 
+          {viewMode !== 'leave' && viewMode !== 'issues' && (
           <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
             <button
               type="button"
@@ -1620,10 +1642,36 @@ export default function AttendanceMain({ staffs, selectedCo, user }: AttendanceM
               />
             </div>
           </div>
+          )}
         </div>
       </header>
 
       <main className="flex-1 p-4 overflow-auto custom-scrollbar bg-[var(--muted)]/20">
+
+        {viewMode === 'leave' && (
+          <div className="max-w-7xl mx-auto">
+            <LeaveManagement
+              staffs={staffs}
+              selectedCo={selectedCo}
+              onRefresh={onRefresh}
+              user={user}
+              initialTab={initialLeaveTab || '연차/휴가 신청내역'}
+              allowLeaveTabs={true}
+              allowHolidayTab={true}
+              tabMode="operational"
+            />
+          </div>
+        )}
+
+        {viewMode === 'issues' && (
+          <div className="space-y-4 max-w-7xl mx-auto">
+            <AttendanceIssueAnalysisSuite staffs={staffs} selectedCo={selectedCo} user={user} />
+            <div className="grid gap-4 xl:grid-cols-2">
+              <AttendanceDeductionSimulator staffs={staffs} selectedCo={selectedCo} />
+              <AttendanceAnomalyPanel staffs={staffs} selectedCo={selectedCo} />
+            </div>
+          </div>
+        )}
 
         {viewMode === 'schedule' && (
           <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm flex flex-col min-h-[calc(100dvh-200px)]">

@@ -50,12 +50,19 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
         }
 
         const { data } = await supabase
-          .from('attendance_records')
-          .select('staff_id, late_minutes, early_leave_minutes, work_date')
+          .from('attendances')
+          .select('staff_id, status, work_date')
           .in('staff_id', staffIds)
           .gte('work_date', since.toISOString().slice(0, 10));
 
-        const records = data || [];
+        const records = (data || []).map((record: any) => {
+          const status = String(record.status || '').toLowerCase();
+          return {
+            ...record,
+            late_minutes: status.includes('late') || status.includes('지각') ? 1 : 0,
+            early_leave_minutes: status.includes('early') || status.includes('조퇴') ? 1 : 0,
+          };
+        });
         const result = filteredStaffs.map((staff: any) => {
           const staffRecords = records.filter((record: any) => String(record.staff_id) === String(staff.id));
           const lateRecords = staffRecords.filter((record: any) => Number(record.late_minutes || 0) > 0);

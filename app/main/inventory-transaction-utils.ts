@@ -80,7 +80,7 @@ export async function processInventoryIssue({
     if (!destinationItem) {
       const { data: remoteRows } = await supabase
         .from('inventory')
-        .select('id, item_name, name, quantity, stock, company, department, category, spec, min_quantity, min_stock')
+        .select('id, item_name, quantity, stock, company, department, category, spec, min_quantity')
         .eq('company', destinationCompany)
         .eq('item_name', getItemName(sourceItem));
 
@@ -381,7 +381,7 @@ export async function reverseInventoryIssue({
   // 2) 수령팀 재고 차감 (감소)
   const { data: destRows } = await supabase
     .from('inventory')
-    .select('id, quantity, stock, item_name, name, department')
+    .select('id, quantity, stock, item_name, department')
     .eq('company', destinationCompany)
     .eq('item_name', itemName);
 

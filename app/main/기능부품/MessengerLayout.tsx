@@ -19,9 +19,7 @@ export function MessengerLayout({ controller }: MessengerLayoutProps) {
         viewMode={c.viewMode}
         showHiddenRooms={c.showHiddenRooms}
         sidebarRoomItems={c.sidebarRoomItems}
-        attentionThreadItems={c.attentionThreadItems ?? []}
         mentionInboxItems={c.mentionInboxItems}
-        threadInboxItems={c.threadInboxItems ?? []}
         groupedStaffs={c.groupedStaffs}
         expandedDepts={c.expandedDepts}
         onViewModeChange={c.setViewMode}
@@ -29,9 +27,7 @@ export function MessengerLayout({ controller }: MessengerLayoutProps) {
         onOpenGlobalSearch={c.openGlobalSearch}
         onToggleHiddenRooms={() => c.setShowHiddenRooms((prev: boolean) => !prev)}
         onRoomClick={c.handleManualRoomListClick}
-        onOpenAttentionThreadItem={c.handleOpenAttentionThreadItem ?? (() => undefined)}
         onOpenMentionItem={c.handleOpenMentionInboxItem}
-        onOpenThreadItem={c.handleOpenThreadInboxItem ?? (() => undefined)}
         onToggleRoomPinned={c.toggleRoomPinned}
         onMovePinnedRoom={c.movePinnedRoom}
         onToggleRoomHidden={c.toggleRoomHidden}

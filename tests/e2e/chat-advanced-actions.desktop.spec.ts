@@ -165,22 +165,22 @@ test('chat advanced actions can bookmark, inspect reads, view thread, and forwar
   await page.goto(`/main?open_menu=${encodeURIComponent('채팅')}`);
 
   await expect(page.getByTestId('chat-view')).toBeVisible();
+  await expect(page.getByTestId('chat-thread-inbox-notif-thread-1')).toBeVisible();
+  await expect(page.getByTestId('chat-thread-attention-msg-root')).toBeVisible();
 
   await page.getByTestId('chat-message-msg-root').click();
-  await page.getByTestId('chat-message-action-more').click();
   await page.getByTestId('chat-message-action-bookmark').click();
 
   await page.getByTestId('chat-message-msg-root').click();
-  await page.getByTestId('chat-message-action-more').click();
   await expect(page.getByTestId('chat-message-action-bookmark')).toContainText('북마크 해제');
 
+  await page.getByTestId('chat-message-actions-panel').locator('button').first().click();
   await page.getByTestId('chat-open-drawer').click();
   await expect(page.getByTestId('chat-drawer-bookmark-msg-root')).toContainText('북마크 테스트 메시지');
   await page.getByTestId('chat-bookmark-jump-msg-root').click();
   await expect(page.getByTestId('chat-room-drawer')).toBeHidden();
 
   await page.getByTestId('chat-message-msg-root').click();
-  await page.getByTestId('chat-message-action-more').click();
   await page.getByTestId('chat-message-action-read-status').click();
   await expect(page.getByTestId('chat-read-status-modal')).toBeVisible();
   await expect(page.getByTestId('chat-read-status-modal')).toContainText('Chat Peer One');
@@ -273,7 +273,6 @@ test('chat edit history records revisions and shows the edited marker', async ({
   await page.getByTestId('chat-room-room-edit').click();
 
   await page.getByTestId('chat-message-msg-edit').click();
-  await page.getByTestId('chat-message-action-more').click();
   await page.getByTestId('chat-message-action-edit').click();
   await page.getByTestId('chat-message-edit-input').fill('수정 후 메시지');
   await page.getByTestId('chat-message-edit-save').click();
@@ -282,7 +281,6 @@ test('chat edit history records revisions and shows the edited marker', async ({
   await expect(page.getByTestId('chat-message-edited-msg-edit')).toBeVisible();
 
   await page.getByTestId('chat-message-msg-edit').click();
-  await page.getByTestId('chat-message-action-more').click();
   await page.getByTestId('chat-message-action-edit-history').click();
   await expect(page.getByTestId('chat-message-edit-history-modal')).toBeVisible();
   await expect(page.getByTestId('chat-message-edit-history-entry-0')).toContainText('수정 전');

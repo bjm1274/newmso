@@ -169,8 +169,8 @@ export default function ApprovalInboxView({
               }}
               className="h-10 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-[12px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]/50"
             >
+              <option value="week">주간별</option>
               <option value="month">월별</option>
-              <option value="week">주별</option>
               <option value="range">기간</option>
             </select>
 
