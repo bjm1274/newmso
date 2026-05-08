@@ -101,6 +101,10 @@ test('regular payroll settlement stores dependent deductions in the finalized re
 
   await page.getByTestId(`salary-settlement-dependent-count-${payrollStaff.id}`).fill('2');
   await page.getByTestId(`salary-settlement-custom-deduction-${payrollStaff.id}`).fill('10000');
+  const displayedTotalDeduction = parseWon(
+    await page.getByTestId(`salary-settlement-total-deduction-${payrollStaff.id}`).textContent()
+  );
+  expect(displayedTotalDeduction).toBeGreaterThan(0);
 
   const saveRequestPromise = page.waitForRequest(
     (request) => request.url().includes('/payroll_records') && request.method() === 'POST'
@@ -127,6 +131,7 @@ test('regular payroll settlement stores dependent deductions in the finalized re
       Number(record.deduction_detail.local_tax || 0) +
       Number(record.deduction_detail.custom_deduction || 0)
   );
+  expect(displayedTotalDeduction).toBe(record.total_deduction);
   await expect(page.getByTestId('salary-settlement-complete-step')).toBeVisible();
 });
 
