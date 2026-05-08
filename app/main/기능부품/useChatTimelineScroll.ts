@@ -310,7 +310,8 @@ export function useChatTimelineScroll({
     const isPendingBottomAlignActive =
       String(pendingBottomAlignRoomIdRef.current || '') === normalizedSelectedRoomId;
     const justBecameReady = readyBottomAlignRoomIdRef.current !== normalizedSelectedRoomId;
-    if (!isPendingBottomAlignActive && !justBecameReady) return;
+    const shouldAlignAfterReady = justBecameReady && isNearBottomRef.current;
+    if (!isPendingBottomAlignActive && !shouldAlignAfterReady) return;
 
     const listEl = messageListRef.current;
     if (!listEl) return;
@@ -326,6 +327,7 @@ export function useChatTimelineScroll({
   }, [
     clearPendingBottomAlignReleaseTimer,
     isSelectedRoomTimelineReady,
+    isNearBottomRef,
     messageListRef,
     messages,
     loadMessagesAroundMessage,
@@ -394,12 +396,13 @@ export function useChatTimelineScroll({
     const activeRoomId = String(selectedRoomIdRef.current || selectedRoomId || '');
     if (!activeRoomId || !isSelectedRoomTimelineReady) return false;
     if (suppressBottomAlignmentUntilRef.current > Date.now()) return false;
+    const pendingBottomAlignRoomId = String(pendingBottomAlignRoomIdRef.current || '');
     const isBottomAlignHoldActive =
       pendingBottomAlignHoldUntilRef.current > Date.now() &&
-      String(pendingBottomAlignRoomIdRef.current || activeRoomId) === activeRoomId;
+      pendingBottomAlignRoomId === activeRoomId;
     return (
       isNearBottomRef.current ||
-      String(pendingBottomAlignRoomIdRef.current || '') === activeRoomId ||
+      pendingBottomAlignRoomId === activeRoomId ||
       isBottomAlignHoldActive
     );
   }, [isSelectedRoomTimelineReady, selectedRoomId, selectedRoomIdRef]);

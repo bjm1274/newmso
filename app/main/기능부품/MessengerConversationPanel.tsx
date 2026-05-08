@@ -53,9 +53,7 @@ export function MessengerConversationPanel({ controller }: MessengerConversation
               </h3>
               <div className="flex items-center gap-1.5 text-[10px] font-medium">
                 <p className="text-[var(--toss-gray-4)]">
-                  {c.typingNoticeText
-                    ? c.typingNoticeText
-                    : c.selectedPeer
+                  {c.selectedPeer
                       ? c.selectedPeerIsOnline
                         ? '온라인'
                         : '오프라인'
@@ -147,6 +145,17 @@ export function MessengerConversationPanel({ controller }: MessengerConversation
         onOpenDateJump={c.openDateJumpPicker}
       />
 
+      {c.typingNoticeText ? (
+        <div
+          aria-live="polite"
+          className="pointer-events-none relative z-20 flex h-0 justify-center px-3"
+        >
+          <span className="-translate-y-[calc(100%+6px)] rounded-full border border-[var(--border)] bg-[var(--card)]/95 px-3 py-1 text-[11px] font-semibold text-[var(--toss-gray-4)] shadow-sm backdrop-blur">
+            {c.typingNoticeText}
+          </span>
+        </div>
+      ) : null}
+
       {c.selectedRoomId && c.selectedRoom ? (
         <>
           {c.failedMessageIdsInSelectedRoom.length > 0 ? (
@@ -181,7 +190,6 @@ export function MessengerConversationPanel({ controller }: MessengerConversation
             pendingAttachmentFiles={c.pendingAttachmentFiles}
             failedAttachmentRetryEntries={c.failedAttachmentRetryEntries.filter((entry: any) => String(entry.roomId) === String(c.selectedRoomId))}
             fileUploading={c.fileUploading}
-            typingNoticeText={c.typingNoticeText}
             selectedRoomId={c.selectedRoomId}
             canWriteNotice={c.canWriteNotice}
             composerRef={c.composerRef}

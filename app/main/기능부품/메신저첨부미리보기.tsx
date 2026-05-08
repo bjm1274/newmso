@@ -283,6 +283,11 @@ export function ChatAttachmentPreviewModal({ controller }: ChatAttachmentPreview
     handleImagePointerUp,
     handleImageDoubleClick,
   } = controller;
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
+
+  useEffect(() => {
+    setImageLoadFailed(false);
+  }, [activeItem?.url]);
 
   if (!preview || !activeItem) return null;
 
@@ -398,6 +403,11 @@ export function ChatAttachmentPreviewModal({ controller }: ChatAttachmentPreview
         onClick={(event) => event.stopPropagation()}
       >
         {activeItem.kind === 'image' ? (
+          imageLoadFailed ? (
+            <div className="flex min-h-[220px] w-full max-w-md items-center justify-center rounded-xl border border-white/15 bg-white/10 px-6 text-center text-sm font-semibold text-white">
+              이미지를 불러올 수 없습니다
+            </div>
+          ) : (
           <div
             className={`flex max-w-[92vw] max-h-[80vh] items-center justify-center overflow-hidden rounded-xl ${zoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'}`}
             style={{ touchAction: zoom > 1 ? 'none' : 'manipulation' }}
@@ -419,8 +429,10 @@ export function ChatAttachmentPreviewModal({ controller }: ChatAttachmentPreview
                 transition: isDragging ? 'none' : 'transform 160ms ease',
               }}
               draggable={false}
+              onError={() => setImageLoadFailed(true)}
             />
           </div>
+          )
         ) : activeItem.kind === 'video' ? (
           <video
             src={activeItem.url}

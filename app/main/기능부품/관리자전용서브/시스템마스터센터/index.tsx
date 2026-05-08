@@ -71,8 +71,6 @@ function BannedWordModal({ onClose }: { onClose: () => void }) {
 
 // ─── 유틸 함수들 ───
 const CHAT_FETCH_LIMIT = '500';
-const OPERATIONS_POLL_INTERVAL_MS = 60_000;
-const OPERATIONS_POLL_BACKOFF_MS = 2 * 60_000;
 
 const formatCurrency = (value: unknown) => formatWon(Number(value || 0));
 
@@ -320,74 +318,6 @@ export default function SystemMasterCenter({
     loadAuditLogs().finally(() => { if (cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [activeTab, isSystemMaster, loadAuditLogs]);
-
-  useEffect(() => {
-    if (!isSystemMaster || activeTab !== '운영대시보드') return;
-    void loadOperations();
-  }, [activeTab, isSystemMaster, loadOperations]);
-
-  useEffect(() => {
-    if (!isSystemMaster || activeTab !== '운영대시보드') return;
-
-    let timerId: number | null = null;
-    let stopped = false;
-    let inFlight = false;
-    let nextDelayMs = OPERATIONS_POLL_INTERVAL_MS;
-
-    function clearPollTimer() {
-      if (timerId !== null) {
-        window.clearTimeout(timerId);
-        timerId = null;
-      }
-    }
-
-    function scheduleNextPoll(delayMs = nextDelayMs) {
-      if (stopped) return;
-      clearPollTimer();
-      timerId = window.setTimeout(() => {
-        void runPoll();
-      }, delayMs);
-    }
-
-    async function runPoll() {
-      if (stopped) return;
-      if (document.visibilityState === 'hidden') {
-        nextDelayMs = OPERATIONS_POLL_INTERVAL_MS;
-        scheduleNextPoll();
-        return;
-      }
-      if (inFlight) {
-        scheduleNextPoll(OPERATIONS_POLL_INTERVAL_MS);
-        return;
-      }
-
-      inFlight = true;
-      const ok = await loadOperations(true);
-      inFlight = false;
-      if (stopped) return;
-
-      nextDelayMs = ok ? OPERATIONS_POLL_INTERVAL_MS : OPERATIONS_POLL_BACKOFF_MS;
-      scheduleNextPoll(nextDelayMs);
-    }
-
-    const handleVisibleRefresh = () => {
-      if (document.visibilityState === 'hidden') return;
-      nextDelayMs = OPERATIONS_POLL_INTERVAL_MS;
-      clearPollTimer();
-      void runPoll();
-    };
-
-    scheduleNextPoll();
-    window.addEventListener('focus', handleVisibleRefresh);
-    document.addEventListener('visibilitychange', handleVisibleRefresh);
-
-    return () => {
-      stopped = true;
-      clearPollTimer();
-      window.removeEventListener('focus', handleVisibleRefresh);
-      document.removeEventListener('visibilitychange', handleVisibleRefresh);
-    };
-  }, [activeTab, isSystemMaster, loadOperations]);
 
   useEffect(() => {
     if (!isSystemMaster || activeTab !== '권한변경') return;
@@ -743,6 +673,13 @@ export default function SystemMasterCenter({
             </div>
           </section>
         </>
+      )}
+
+      {activeTab === '운영대시보드' && !operations && (
+        <section className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-6 text-sm text-[var(--toss-gray-4)]">
+          <p className="font-semibold text-[var(--foreground)]">운영 데이터가 아직 로드되지 않았습니다.</p>
+          <p className="mt-1 text-xs">상단 새로고침을 누르면 최신 상태를 한 번만 조회합니다.</p>
+        </section>
       )}
 
       {activeTab === '운영대시보드' && operations && (

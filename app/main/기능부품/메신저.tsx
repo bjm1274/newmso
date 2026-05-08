@@ -131,6 +131,17 @@ type DeliveryState = {
   error?: string | null;
 };
 
+function formatChatLocalDateKey(value?: string | null) {
+  const date = new Date(value || 0);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+const UUID_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 interface ChatViewProps {
   user: StaffMember | null;
   onRefresh?: () => void;
@@ -176,6 +187,9 @@ export default function ChatView({
   const [wardQuickReplySendingMessageId, setWardQuickReplySendingMessageId] = useState<string | null>(null);
   const [deliveryStates, setDeliveryStates] = useState<Record<string, DeliveryState>>({});
   const [showScrollToLatest, setShowScrollToLatest] = useState(false);
+  const [dateJumpPickerOpen, setDateJumpPickerOpen] = useState(false);
+  const [dateJumpValue, setDateJumpValue] = useState('');
+  const [dateJumpError, setDateJumpError] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -236,6 +250,7 @@ export default function ChatView({
   const roomRealtimeRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingBottomAlignReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingMessageScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timelineMediaLoadFrameRef = useRef<number | null>(null);
   const pendingBottomAlignHoldUntilRef = useRef(0);
   const suppressBottomAlignmentUntilRef = useRef(0);
   /** 방별 입력 draft 저장소 */
@@ -1207,8 +1222,10 @@ export default function ChatView({
   useEffect(() => {
     const composerEl = composerRef.current;
     if (!composerEl) return;
-    composerEl.style.height = '0px';
-    composerEl.style.height = `${Math.min(120, composerEl.scrollHeight)}px`;
+    const maxHeight = isMobileChatViewport() ? 88 : 72;
+    composerEl.style.height = 'auto';
+    composerEl.style.height = `${Math.min(maxHeight, composerEl.scrollHeight)}px`;
+    composerEl.style.overflowY = composerEl.scrollHeight > maxHeight ? 'auto' : 'hidden';
   }, [inputMsg]);
 
   const [reactions, setReactions] = useState<Record<string, Record<string, number>>>({});
@@ -1500,7 +1517,7 @@ export default function ChatView({
 
   const fetchMessageByIdWithRetry = useCallback(async (messageId: string, attempts = 3) => {
     const targetMessageId = String(messageId || '').trim();
-    if (!targetMessageId) return null;
+    if (!targetMessageId || !UUID_ID_PATTERN.test(targetMessageId)) return null;
 
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
@@ -1888,7 +1905,8 @@ export default function ChatView({
     const isPendingBottomAlignActive =
       String(pendingBottomAlignRoomIdRef.current || '') === normalizedSelectedRoomId;
     const justBecameReady = readyBottomAlignRoomIdRef.current !== normalizedSelectedRoomId;
-    if (!isPendingBottomAlignActive && !justBecameReady) return;
+    const shouldAlignAfterReady = justBecameReady && isNearBottomRef.current;
+    if (!isPendingBottomAlignActive && !shouldAlignAfterReady) return;
 
     const listEl = messageListRef.current;
     if (!listEl) return;
@@ -1897,12 +1915,12 @@ export default function ChatView({
     listEl.scrollTop = Math.max(0, listEl.scrollHeight - listEl.clientHeight);
     isNearBottomRef.current = true;
     setShowScrollToLatest(false);
-    pendingBottomAlignRoomIdRef.current = null;
-    pendingBottomAlignHoldUntilRef.current = 0;
-    clearPendingBottomAlignReleaseTimer();
+    pendingBottomAlignRoomIdRef.current = normalizedSelectedRoomId;
+    pendingBottomAlignHoldUntilRef.current = Date.now() + 2200;
+    schedulePendingBottomAlignRelease(normalizedSelectedRoomId);
     // useEffect의 중복 스크롤 애니메이션을 막기 위해 처리 완료 표시
     layoutScrollHandledRef.current = true;
-  }, [clearPendingBottomAlignReleaseTimer, isNearBottomRef, isSelectedRoomTimelineReady, messageListRef, messages, pendingBottomAlignRoomIdRef, selectedRoomId, setShowScrollToLatest]);
+  }, [isNearBottomRef, isSelectedRoomTimelineReady, messageListRef, messages, pendingBottomAlignRoomIdRef, schedulePendingBottomAlignRelease, selectedRoomId, setShowScrollToLatest]);
 
   useEffect(() => {
     if (!selectedRoomId || messages.length === 0 || !isSelectedRoomTimelineReady) return;
@@ -1958,11 +1976,37 @@ export default function ChatView({
     const activeRoomId = String(selectedRoomIdRef.current || selectedRoomId || '');
     if (!activeRoomId || !isSelectedRoomTimelineReady) return false;
     if (suppressBottomAlignmentUntilRef.current > Date.now()) return false;
+    const pendingBottomAlignRoomId = String(pendingBottomAlignRoomIdRef.current || '');
+    const isBottomAlignHoldActive =
+      pendingBottomAlignHoldUntilRef.current > Date.now() &&
+      pendingBottomAlignRoomId === activeRoomId;
     return (
       isNearBottomRef.current ||
-      String(pendingBottomAlignRoomIdRef.current || '') === activeRoomId
+      pendingBottomAlignRoomId === activeRoomId ||
+      isBottomAlignHoldActive
     );
   }, [isSelectedRoomTimelineReady, selectedRoomId]);
+
+  const handleTimelineMediaLoad = useCallback(() => {
+    const activeRoomId = String(selectedRoomIdRef.current || selectedRoomId || '').trim();
+    if (!activeRoomId || !shouldKeepBottomAligned()) return;
+    if (timelineMediaLoadFrameRef.current !== null) return;
+
+    timelineMediaLoadFrameRef.current = window.requestAnimationFrame(() => {
+      timelineMediaLoadFrameRef.current = null;
+      if (String(selectedRoomIdRef.current || '') !== activeRoomId) return;
+      if (!shouldKeepBottomAligned()) return;
+      scrollToBottom('auto');
+    });
+  }, [scrollToBottom, selectedRoomId, shouldKeepBottomAligned]);
+
+  useEffect(() => {
+    return () => {
+      if (timelineMediaLoadFrameRef.current === null) return;
+      window.cancelAnimationFrame(timelineMediaLoadFrameRef.current);
+      timelineMediaLoadFrameRef.current = null;
+    };
+  }, []);
 
   const pinnedMessages = useMemo(
     () => messages.filter((m) => pinnedIds.includes(String(m.id))),
@@ -2226,6 +2270,45 @@ export default function ChatView({
   });
   closeMobileChatBackLayerRef.current = closeMobileChatBackLayer;
   const typingNoticeText = useChatTypingNoticeText(typingUsers);
+  const openDateJumpPicker = useCallback((dateKey?: string) => {
+    const normalizedDateKey = /^\d{4}-\d{2}-\d{2}$/.test(String(dateKey || ''))
+      ? String(dateKey)
+      : formatChatLocalDateKey(new Date().toISOString());
+    setDateJumpValue(normalizedDateKey);
+    setDateJumpError('');
+    setDateJumpPickerOpen(true);
+  }, []);
+
+  const closeDateJumpPicker = useCallback(() => {
+    setDateJumpPickerOpen(false);
+    setDateJumpError('');
+  }, []);
+
+  const handleDateJumpSubmit = useCallback((dateKey: string) => {
+    const normalizedDateKey = String(dateKey || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDateKey)) {
+      setDateJumpError('이동할 날짜를 선택해주세요.');
+      return;
+    }
+
+    const targetMessage = [...messages]
+      .filter((message) => {
+        if (!isRoomInSelectedConversation(message.room_id)) return false;
+        return formatChatLocalDateKey(message.created_at) === normalizedDateKey;
+      })
+      .sort(
+        (left, right) =>
+          new Date(left.created_at || 0).getTime() - new Date(right.created_at || 0).getTime(),
+      )[0];
+
+    if (!targetMessage?.id) {
+      setDateJumpError('해당 날짜의 메시지가 없습니다.');
+      return;
+    }
+
+    closeDateJumpPicker();
+    scrollToMessage(String(targetMessage.id));
+  }, [closeDateJumpPicker, isRoomInSelectedConversation, messages, scrollToMessage]);
 
   const { selectedPeer, selectedPeerPhotoUrl, selectedPeerIsOnline } = useChatSelectedPeerState({
     selectedRoom,
@@ -2789,13 +2872,11 @@ export default function ChatView({
                 </h3>
                 <div className="flex items-center gap-1.5 text-[10px] font-medium">
                   <p className="text-[var(--toss-gray-4)]">
-                    {typingNoticeText
-                      ? typingNoticeText
-                      : selectedPeer
-                        ? selectedPeerIsOnline
-                          ? '온라인'
-                          : '오프라인'
-                        : `${roomMembers.length || 0}명 참여중`}
+                    {selectedPeer
+                      ? selectedPeerIsOnline
+                        ? '온라인'
+                        : '오프라인'
+                      : `${roomMembers.length || 0}명 참여중`}
                   </p>
                   <span className="text-[var(--toss-gray-4)]">·</span>
                   <span className={`inline-flex items-center gap-1 ${realtimeConnectionMeta.textClassName}`}>
@@ -2836,6 +2917,7 @@ export default function ChatView({
           isLoadingMessages={Boolean(selectedRoomId && loadingRoomId === selectedRoomId)}
           messages={messages}
           combinedTimeline={combinedTimeline as MessengerTimelineItem[]}
+          showScrollToLatest={showScrollToLatest}
             pollVotes={pollVotes}
             reactions={reactions}
             readCounts={readCounts}
@@ -2866,7 +2948,20 @@ export default function ChatView({
           onRetryFailedMessage={retryFailedMessage}
           onScrollToBottom={scrollToBottom}
           shouldKeepBottomAligned={shouldKeepBottomAligned}
+          onMediaLoad={handleTimelineMediaLoad}
+          onOpenDateJump={openDateJumpPicker}
         />
+
+        {typingNoticeText ? (
+          <div
+            aria-live="polite"
+            className="pointer-events-none relative z-20 flex h-0 justify-center px-3"
+          >
+            <span className="-translate-y-[calc(100%+6px)] rounded-full border border-[var(--border)] bg-[var(--card)]/95 px-3 py-1 text-[11px] font-semibold text-[var(--toss-gray-4)] shadow-sm backdrop-blur">
+              {typingNoticeText}
+            </span>
+          </div>
+        ) : null}
 
         {selectedRoomId && selectedRoom ? (
           <>
@@ -2902,7 +2997,6 @@ export default function ChatView({
               pendingAttachmentFiles={pendingAttachmentFiles}
               failedAttachmentRetryEntries={failedAttachmentRetryEntries.filter((entry) => String(entry.roomId) === String(selectedRoomId))}
               fileUploading={fileUploading}
-              typingNoticeText={typingNoticeText}
               selectedRoomId={selectedRoomId}
               canWriteNotice={canWriteNotice}
               composerRef={composerRef}
@@ -3185,6 +3279,63 @@ export default function ChatView({
         onOpenRoom={openRoomFromGlobalSearch}
         onPreviewAttachment={openAttachmentPreview}
       />
+
+      {dateJumpPickerOpen ? (
+        <div
+          data-testid="chat-date-jump-modal"
+          className="fixed inset-0 z-[210] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+          onClick={closeDateJumpPicker}
+        >
+          <form
+            className="w-full max-w-sm rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm"
+            onClick={(event) => event.stopPropagation()}
+            onSubmit={(event) => {
+              event.preventDefault();
+              handleDateJumpSubmit(dateJumpValue);
+            }}
+          >
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h3 className="text-sm font-bold text-[var(--foreground)]">날짜로 이동</h3>
+              <button
+                type="button"
+                onClick={closeDateJumpPicker}
+                className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] transition-colors hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+                aria-label="닫기"
+              >
+                ×
+              </button>
+            </div>
+            <SmartDatePicker
+              data-testid="chat-date-jump-input"
+              value={dateJumpValue}
+              onChange={(value) => {
+                setDateJumpValue(value);
+                setDateJumpError('');
+              }}
+              className="w-full"
+              inputClassName="h-11 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-bold text-[var(--foreground)] focus:border-[var(--accent)]"
+            />
+            {dateJumpError ? (
+              <p className="mt-2 text-[11px] font-semibold text-red-500">{dateJumpError}</p>
+            ) : null}
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeDateJumpPicker}
+                className="h-9 rounded-[var(--radius-md)] border border-[var(--border)] px-3 text-xs font-bold text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--muted)]"
+              >
+                취소
+              </button>
+              <button
+                type="submit"
+                className="h-9 rounded-[var(--radius-md)] bg-[var(--accent)] px-3 text-xs font-bold text-white transition-opacity hover:opacity-90"
+              >
+                이동
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
 
       {/* 첨부 미리보기 모달 */}
       <ChatAttachmentPreviewModal controller={attachmentPreviewController} />

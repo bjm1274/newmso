@@ -165,6 +165,8 @@ export function useChatRealtimeSubscriptions({
   const handleIncomingRealtimeMessageRef = useRef(handleIncomingRealtimeMessage);
   const isRoomInSelectedConversationRef = useRef(isRoomInSelectedConversation);
   const fetchMessageByIdWithRetryRef = useRef(fetchMessageByIdWithRetry);
+  const globalRealtimeHealthyRef = useRef(false);
+  const roomRealtimeHealthyRef = useRef(false);
 
   useEffect(() => {
     fetchDataLatestRef.current = fetchData;
@@ -268,27 +270,32 @@ export function useChatRealtimeSubscriptions({
       .subscribe((status: string) => {
         if (disposed) return;
         if (status === 'SUBSCRIBED') {
+          globalRealtimeHealthyRef.current = true;
           setGlobalRealtimeState('connected');
           return;
         }
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          globalRealtimeHealthyRef.current = false;
           setGlobalRealtimeState('reconnecting');
           scheduleRealtimeReconnect('global');
           return;
         }
         if (status === 'CLOSED') {
+          globalRealtimeHealthyRef.current = false;
           setGlobalRealtimeState('reconnecting');
         }
       });
 
     return () => {
       disposed = true;
+      globalRealtimeHealthyRef.current = false;
       supabase.removeChannel(channel);
     };
   }, [globalRealtimeRetryToken, handleIncomingRealtimeMessage, scheduleRealtimeReconnect, setGlobalRealtimeState, userId]);
 
   useEffect(() => {
     if (!selectedRoomId) {
+      roomRealtimeHealthyRef.current = false;
       setRoomRealtimeState('idle');
       return;
     }
@@ -337,21 +344,25 @@ export function useChatRealtimeSubscriptions({
       .subscribe((status: string) => {
         if (disposed) return;
         if (status === 'SUBSCRIBED') {
+          roomRealtimeHealthyRef.current = true;
           setRoomRealtimeState('connected');
           return;
         }
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          roomRealtimeHealthyRef.current = false;
           setRoomRealtimeState('reconnecting');
           scheduleRealtimeReconnect('room');
           return;
         }
         if (status === 'CLOSED') {
+          roomRealtimeHealthyRef.current = false;
           setRoomRealtimeState('reconnecting');
         }
       });
 
     return () => {
       disposed = true;
+      roomRealtimeHealthyRef.current = false;
       if (timeoutId) clearTimeout(timeoutId);
       supabase.removeChannel(channel);
     };
@@ -547,9 +558,11 @@ export function useChatRealtimeSubscriptions({
     if (!userId) return;
     const refreshRealtimeFallback = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      if (selectedRoomId) {
+      const roomRealtimeNeedsFallback = Boolean(selectedRoomId) && !roomRealtimeHealthyRef.current;
+      const globalRealtimeNeedsFallback = !selectedRoomId && !globalRealtimeHealthyRef.current;
+      if (roomRealtimeNeedsFallback) {
         void fetchDataLatestRef.current({ force: true });
-      } else if (chatRoomsRef.current.length > 0) {
+      } else if (globalRealtimeNeedsFallback && chatRoomsRef.current.length > 0) {
         void updateUnreadForRooms(chatRoomsRef.current);
       }
     };

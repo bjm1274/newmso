@@ -5,6 +5,13 @@ import {
   resolveWorkingDaysPerWeek,
 } from '@/lib/payroll-working-hours';
 import { buildShiftContractVariables } from '@/lib/contract-shift-rotation';
+import {
+  cleanOptionalText,
+  getStaffEmploymentType,
+  getStaffLicenseDate,
+  getStaffLicenseNo,
+  getStaffProbationMonths,
+} from '@/lib/staff-meta';
 
 const OPTIONAL_ALLOWANCE_FIELDS = [
   { token: '{{position_allowance}}', labels: ['직책수당'] },
@@ -16,6 +23,7 @@ const OPTIONAL_ALLOWANCE_FIELDS = [
 ] as const;
 
 function formatDate(value?: unknown) {
+  if (typeof value === 'boolean') return '';
   if (value === null || value === undefined || value === '') return '';
 
   const stringValue = value instanceof Date
@@ -36,6 +44,7 @@ function formatDate(value?: unknown) {
 }
 
 function formatWon(value?: unknown) {
+  if (typeof value === 'boolean') return '';
   const numberValue = Number(value);
   if (!Number.isFinite(numberValue) || numberValue === 0) return '';
 
@@ -47,11 +56,15 @@ function formatWon(value?: unknown) {
 }
 
 function toMoneyNumber(value?: unknown) {
+  if (typeof value === 'boolean' || value === null || value === undefined || value === '') {
+    return 0;
+  }
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : 0;
 }
 
 function formatDayOfMonth(value?: unknown, fallback = '7') {
+  if (typeof value === 'boolean') return fallback;
   const raw = String(value ?? '').trim();
   if (!raw) return fallback;
 
@@ -87,7 +100,8 @@ function formatResidentNo(value?: unknown) {
 function firstText(...values: unknown[]) {
   for (const value of values) {
     if (value === null || value === undefined) continue;
-    const text = String(value).trim();
+    if (typeof value === 'boolean') continue;
+    const text = cleanOptionalText(value);
     if (text) return text;
   }
   return '';
@@ -294,6 +308,7 @@ export function fillEmploymentContractTemplate(
   const employeeAddress = firstText(safeUser.address, safeUser.employee_address);
   const workingDaysText = buildWorkDayText(workingDaysPerWeek, shift, safeContract, safeUser);
   const weeklyHolidayText = buildWeeklyHolidayText(workingDaysPerWeek, shift, safeContract, safeUser);
+  const contractEndDate = formatDate(safeContract.contract_end_date);
 
   const vars: Record<string, string> = {
     staff_name: String(safeUser.name || ''),
@@ -316,8 +331,8 @@ export function fillEmploymentContractTemplate(
     position: String(safeUser.position || ''),
     join_date: formatDate(safeUser.joined_at || salarySource.join_date),
     license_name: String(safeUser.license || ''),
-    license_no: String((safeUser.permissions as Record<string, unknown> | undefined)?.license_no || ''),
-    license_date: formatDate((safeUser.permissions as Record<string, unknown> | undefined)?.license_date || ''),
+    license_no: getStaffLicenseNo(safeUser),
+    license_date: formatDate(getStaffLicenseDate(safeUser)),
     phone: employeePhone,
     employee_phone: employeePhone,
     address: employeeAddress,
@@ -347,18 +362,18 @@ export function fillEmploymentContractTemplate(
     work_days: workingDaysText,
     weekly_holiday: weeklyHolidayText,
     holiday: weeklyHolidayText,
-    contract_type: String(
-      safeUser.employment_type ||
-      salarySource.contract_type ||
-      safeUser['고용형태'] ||
-      '정규직'
+    contract_type: firstText(salarySource.contract_type, getStaffEmploymentType(safeUser), safeUser['고용형태'], '정규직'),
+    probation_months: String(
+      getStaffProbationMonths(
+        { probation_months: safeContract.probation_months },
+        getStaffProbationMonths(safeUser, 3),
+      ),
     ),
-    probation_months: String(safeContract.probation_months ?? safeUser.probation_months ?? '3'),
     probation_percent: String(safeContract.probation_percent || '90'),
     payment_day: paymentDay,
     payday: paymentDay,
     contract_start: formatDate(safeContract.contract_start_date || safeUser.joined_at || salarySource.join_date),
-    contract_end: safeContract.contract_end_date ? formatDate(safeContract.contract_end_date) : '정년도달시',
+    contract_end: contractEndDate || '정년도달시',
     conditions_applied_at: formatDate(safeContract.conditions_applied_at || salarySource.effective_date),
     today: formatDate(new Date()),
   };

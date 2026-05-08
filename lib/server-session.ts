@@ -144,6 +144,7 @@ const SESSION_PERMISSION_KEYS = new Set([
   'inventory',
   'approval',
   'hr_교대근무',
+  'hr_근무표생성',
 ]);
 
 function compactSessionPermissions(permissions: Record<string, any>) {

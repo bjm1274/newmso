@@ -4,6 +4,7 @@ import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { resolveWeeklyWorkingHours, resolveWorkingDaysPerWeek } from '@/lib/payroll-working-hours';
+import { getStaffProbationMonths, toIntegerOrFallback } from '@/lib/staff-meta';
 import ContractList from './계약문서/계약서명단';
 import ContractPreview from './계약문서/계약서미리보기';
 import ContractTemplateEditor from './계약문서/계약서양식편집';
@@ -119,7 +120,11 @@ export default function ContractMain({
 
       const requests = checkedIds.map((staffId: number) => {
         const s = (staffs as any[])?.find((x: any) => x.id === staffId);
-        const probationMonths = s?.permissions?.probation_months || 0;
+        const probationMonths = getStaffProbationMonths(s, 0);
+        const workingDaysPerWeek = toIntegerOrFallback(
+          resolveWorkingDaysPerWeek(s, salaryInfo.working_days_per_week || 5),
+          salaryInfo.working_days_per_week || 5,
+        );
         const joinDate = s?.joined_at || s?.join_date;
 
         // 근로조건 적용일 계산 (수습 종료 익일)
@@ -160,7 +165,7 @@ export default function ContractMain({
           requested_at: new Date().toISOString(),
           contract_type: contractType,
           working_hours_per_week: resolveWeeklyWorkingHours(s, salaryInfo.working_hours_per_week || 40),
-          working_days_per_week: resolveWorkingDaysPerWeek(s, salaryInfo.working_days_per_week || 5),
+          working_days_per_week: workingDaysPerWeek,
           shift_id: s?.shift_id || null,
           shift_start_time: staffShift ? String(staffShift.start_time).slice(0, 5) : salaryInfo.shift_start_time,
           shift_end_time: staffShift ? String(staffShift.end_time).slice(0, 5) : salaryInfo.shift_end_time,

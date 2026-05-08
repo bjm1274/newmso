@@ -4,6 +4,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getStaffEmploymentType } from './staff-meta';
 
 export type ReportType = 'monthly_hr' | 'monthly_payroll' | 'quarterly_inventory' | 'quarterly_business';
 
@@ -48,8 +49,7 @@ export async function generateMonthlyHRReport(
   for (const s of list) {
     const dept = String((s as Record<string, unknown>).department || '미지정');
     const status = String((s as Record<string, unknown>).status || '기타');
-    const permissions = (s as Record<string, unknown>).permissions as Record<string, unknown> | null | undefined;
-    const empType = String(permissions?.employment_type || '정규직');
+    const empType = getStaffEmploymentType(s, '정규직');
     byDept[dept] = (byDept[dept] || 0) + 1;
     byStatus[status] = (byStatus[status] || 0) + 1;
     byType[empType] = (byType[empType] || 0) + 1;

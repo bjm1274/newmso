@@ -21,6 +21,7 @@ type SalaryChangeHistoryRow = {
   before_value: number | null;
   after_value: number | null;
   effective_date: string;
+  reason?: string | null;
 };
 
 type Props = {
@@ -37,7 +38,7 @@ export default function SalaryChangeHistory({ staffId, staffName }: Props) {
     (async () => {
       let query = supabase
         .from('salary_change_history')
-        .select('id, staff_id, change_type, before_value, after_value, effective_date')
+        .select('id, staff_id, change_type, before_value, after_value, effective_date, reason')
         .order('effective_date', { ascending: false })
         .limit(20);
 
@@ -78,6 +79,7 @@ export default function SalaryChangeHistory({ staffId, staffName }: Props) {
             <span className="font-medium">{CHANGE_LABELS[r.change_type] || r.change_type}</span>
             <span className="text-[var(--toss-gray-4)]">{(r.before_value || 0).toLocaleString()} → {(r.after_value || 0).toLocaleString()}</span>
             <span className="text-[var(--toss-gray-3)]">{r.effective_date}</span>
+            {r.reason ? <span className="text-[var(--toss-gray-3)]">{r.reason}</span> : null}
           </div>
         ))}
       </div>

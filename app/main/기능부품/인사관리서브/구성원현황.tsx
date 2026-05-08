@@ -16,6 +16,17 @@ import {
   resolveWorkingDaysPerWeek,
 } from '@/lib/payroll-working-hours';
 import { buildProfilePhotoUrlFromPath, getProfilePhotoUrl } from '@/lib/profile-photo';
+import {
+  cleanOptionalText,
+  getStaffContractEndDate,
+  getStaffEmploymentType,
+  getStaffExtension,
+  getStaffLicenseDate,
+  getStaffLicenseNo,
+  getStaffLicenseNote,
+  getStaffProbationMonths,
+  toIntegerOrFallback,
+} from '@/lib/staff-meta';
 import StaffHistoryTimeline from './인사이력타임라인';
 import OnboardingChecklist from './급여명세/입퇴사온보딩';
 import CertTransferPanel from './교육자격인사이동패널';
@@ -592,20 +603,21 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     return { photoUrl, filePath, uploadedAt };
   };
 
-  const 직원고용형태 = (직원: StaffMember): string => (직원?.permissions?.employment_type as string) || '정규직';
+  const 직원고용형태 = (직원: StaffMember): string => getStaffEmploymentType(직원);
   const 직원면허요약 = (직원: StaffMember) => {
-    const parts = [직원?.license, 직원?.permissions?.license_no, 직원?.permissions?.license_note]
-      .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    const parts = [직원?.license, getStaffLicenseNo(직원), getStaffLicenseNote(직원)]
+      .map((value) => cleanOptionalText(value))
       .filter(Boolean);
     return parts.length ? parts.join(' · ') : '-';
   };
   const 직원연락요약 = (직원: StaffMember) => {
+    const extension = getStaffExtension(직원);
     const parts = [
       직원?.phone,
       직원?.email,
-      직원?.permissions?.extension ? `내선 ${직원.permissions.extension}` : '',
+      extension ? `내선 ${extension}` : '',
     ]
-      .map((value) => (typeof value === 'string' ? value.trim() : ''))
+      .map((value) => cleanOptionalText(value))
       .filter(Boolean);
     return parts.length ? parts.join(' · ') : '-';
   };
@@ -703,7 +715,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
             duru_nuri_start: dateOrNull(신규직원.duru_nuri_start),
             duru_nuri_end: dateOrNull(신규직원.duru_nuri_end)
           },
-          probation_months: 신규직원.probation_months || 0,
+          probation_months: toIntegerOrFallback(신규직원.probation_months, 0),
           is_basic_living: 신규직원.is_basic_living,
           is_medical_benefit: 신규직원.is_medical_benefit,
           other_welfare: 신규직원.other_welfare
@@ -925,16 +937,16 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     선택된직원ID설정(직원.id);
     프로필사진파일설정(null);
     프로필사진미리보기설정(getProfilePhotoUrl(직원));
-    const extensionValue = 직원.extension || 직원.permissions?.extension || '';
+    const extensionValue = getStaffExtension(직원);
     const ins = (직원.permissions?.insurance as Record<string, unknown>) || { national: true, health: true, employment: true, injury: true };
     신규직원설정({
       성명: 직원.name || '', 전화번호: 직원.phone || '', 내선번호: extensionValue as string, 사업체: 직원.company || '박철홍정형외과',
       팀: 직원.department ?? '', 직함: 직원.position || '', 입사일: (직원.joined_at as string) || (직원.join_date as string) || '',
       퇴사일: (직원.resigned_at as string) || '', 주민번호: (직원.resident_no as string) || '', 이메일: 직원.email || '',
       주소: 직원.address || '', 면허사항: (직원.license as string) || '',
-      면허번호: (직원.permissions?.license_no as string) || '',
-      취득일자: (직원.permissions?.license_date as string) || '',
-      면허기타내용: (직원.permissions?.license_note as string) || '',
+      면허번호: getStaffLicenseNo(직원),
+      취득일자: getStaffLicenseDate(직원),
+      면허기타내용: getStaffLicenseNote(직원),
       계좌정보: 직원.bank_account || '',
       임금정보: (직원.salary_info as string) || '', 상태: 직원.status || '재직',
       연차총개수: typeof 직원.annual_leave_total === 'number' ? 직원.annual_leave_total : 0,
@@ -945,9 +957,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       other_taxfree: (직원.other_taxfree as number) ?? 0, position_allowance: (직원.position_allowance as number) ?? 0,
       overtime_allowance: (직원.overtime_allowance as number) ?? 0, night_work_allowance: (직원.night_work_allowance as number) ?? 0,
       holiday_work_allowance: (직원.holiday_work_allowance as number) ?? 0, annual_leave_pay: (직원.annual_leave_pay as number) ?? 0,
-      고용형태: (직원.permissions?.employment_type as string) || '정규직',
-      계약종료일: (직원.permissions?.contract_end_date as string) || '',
-      probation_months: (직원.permissions?.probation_months as number) || 0,
+      고용형태: getStaffEmploymentType(직원),
+      계약종료일: getStaffContractEndDate(직원),
+      probation_months: getStaffProbationMonths(직원, 0),
       ins_national: ins.national !== false,
       ins_health: ins.health !== false,
       ins_employment: ins.employment !== false,
@@ -1060,7 +1072,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         });
       });
   }, [appliedStaffNameSearch, 보기상태, 선택사업체, 직원목록]);
-  const 면허등록인원수 = 필터목록.filter((직원: StaffMember) => Boolean(직원.license || 직원.permissions?.license_no)).length;
+  const 면허등록인원수 = 필터목록.filter((직원: StaffMember) => Boolean(직원.license || getStaffLicenseNo(직원))).length;
   const 계약직인원수 = 필터목록.filter((직원: StaffMember) => 직원고용형태(직원) === '계약직').length;
   const 부서수 = new Set(필터목록.map((직원: StaffMember) => 직원.department).filter(Boolean)).size;
 
@@ -1222,7 +1234,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                   </td>
                   <td className="p-4">
                     <p className="text-xs font-bold text-[var(--foreground)]">{직원면허요약(직원)}</p>
-                    <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">취득일 {(직원.permissions?.license_date as string) || '-'}</p>
+                    <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">취득일 {getStaffLicenseDate(직원) || '-'}</p>
                   </td>
                   <td className="p-4">
                     <span className={`px-3 py-1 text-[11px] font-semibold rounded-full ${직원.status === '퇴사' ? 'bg-red-500/20 text-red-600' : 'bg-green-500/20 text-green-600'}`}>

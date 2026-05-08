@@ -5,12 +5,24 @@ type HourlyRateRounding = 'round' | 'floor' | 'ceil';
 type WorkConditionField = 'working_hours_per_week' | 'working_days_per_week';
 
 function toFiniteNumber(value: unknown) {
-  const numeric = Number(value);
+  if (typeof value === 'boolean' || value === null || value === undefined) {
+    return undefined;
+  }
+  if (typeof value === 'string' && value.trim() === '') {
+    return undefined;
+  }
+  const numeric = Number(typeof value === 'string' ? value.replace(/,/g, '').trim() : value);
   return Number.isFinite(numeric) ? numeric : undefined;
 }
 
 function toNumber(value: NumericInput, fallback = 0) {
-  const numeric = Number(value);
+  if (typeof value === 'boolean' || value === null || value === undefined) {
+    return fallback;
+  }
+  if (typeof value === 'string' && value.trim() === '') {
+    return fallback;
+  }
+  const numeric = Number(typeof value === 'string' ? value.replace(/,/g, '').trim() : value);
   return Number.isFinite(numeric) ? numeric : fallback;
 }
 

@@ -78,6 +78,14 @@ const CHAT_PUSH_MAX_ATTEMPTS = 5;
 const CHAT_PUSH_RETRY_DELAYS_MINUTES = [1, 5, 15, 30, 60];
 const BOARD_META_START = '[[BOARD_META]]';
 const BOARD_META_END = '[[/BOARD_META]]';
+const CHAT_PUSH_OPTIONAL_QUEUE_COLUMNS = [
+  'processing_started_at',
+  'next_attempt_at',
+  'dead_lettered_at',
+] as const;
+
+let chatPushRetryColumnsSupported: boolean | null = null;
+const unsupportedChatPushQueueColumns = new Set<string>();
 
 function getAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -101,8 +109,27 @@ function isMissingRelationError(error: any, relationName: string) {
 function isMissingColumnError(error: any, columnName: string) {
   if (!error) return false;
   const code = String(error?.code || '');
-  const message = String(error?.message || error?.details || '').toLowerCase();
-  return code === '42703' && message.includes(columnName.toLowerCase());
+  const message = String(error?.message || error?.details || error?.hint || '').toLowerCase();
+  const needle = columnName.toLowerCase();
+  return (code === '42703' || !code) && message.includes(needle);
+}
+
+function isChatPushQueueMigrationError(error: any) {
+  return CHAT_PUSH_OPTIONAL_QUEUE_COLUMNS.some((column) => isMissingColumnError(error, column));
+}
+
+function getSupportedChatPushPatch(patch: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(patch).filter(([key]) => !unsupportedChatPushQueueColumns.has(key)),
+  );
+}
+
+function rememberUnsupportedChatPushColumns(error: any, patch: Record<string, unknown>) {
+  CHAT_PUSH_OPTIONAL_QUEUE_COLUMNS.forEach((column) => {
+    if (column in patch && isMissingColumnError(error, column)) {
+      unsupportedChatPushQueueColumns.add(column);
+    }
+  });
 }
 
 function getRetryDelayMinutes(attemptCount: number) {
@@ -198,37 +225,16 @@ async function selectPendingChatPushJobs(supabase: SupabaseClient, limit: number
   const retryAwareSelection =
     'id, message_id, room_id, created_at, attempt_count, next_attempt_at, dead_lettered_at';
 
-  const retryAwareRes = await supabase
-    .from('chat_push_jobs')
-    .select(retryAwareSelection)
-    .is('processed_at', null)
-    .is('dead_lettered_at', null)
-    .or(`processing_started_at.is.null,processing_started_at.lt.${staleThresholdIso}`)
-    .lte('next_attempt_at', nowIso)
-    .order('created_at', { ascending: true })
-    .limit(limit);
-
-  if (!retryAwareRes.error) {
-    return {
-      jobs: (retryAwareRes.data || []) as QueueJobRow[],
-      supportsRetryColumns: true,
-      missingQueueTable: false,
-    };
-  }
-
-  if (
-    isMissingColumnError(retryAwareRes.error, 'next_attempt_at') ||
-    isMissingColumnError(retryAwareRes.error, 'dead_lettered_at')
-  ) {
+  const selectLegacyJobs = async () => {
     const fallbackRes = await supabase
       .from('chat_push_jobs')
       .select('id, message_id, room_id, created_at, attempt_count')
       .is('processed_at', null)
-      .or(`processing_started_at.is.null,processing_started_at.lt.${staleThresholdIso}`)
       .order('created_at', { ascending: true })
       .limit(limit);
 
     if (!fallbackRes.error) {
+      chatPushRetryColumnsSupported = false;
       return {
         jobs: (fallbackRes.data || []) as QueueJobRow[],
         supportsRetryColumns: false,
@@ -245,6 +251,39 @@ async function selectPendingChatPushJobs(supabase: SupabaseClient, limit: number
     }
 
     throw fallbackRes.error;
+  };
+
+  if (chatPushRetryColumnsSupported === false) {
+    return selectLegacyJobs();
+  }
+
+  const retryAwareRes = await supabase
+    .from('chat_push_jobs')
+    .select(retryAwareSelection)
+    .is('processed_at', null)
+    .is('dead_lettered_at', null)
+    .or(`processing_started_at.is.null,processing_started_at.lt.${staleThresholdIso}`)
+    .lte('next_attempt_at', nowIso)
+    .order('created_at', { ascending: true })
+    .limit(limit);
+
+  if (!retryAwareRes.error) {
+    chatPushRetryColumnsSupported = true;
+    return {
+      jobs: (retryAwareRes.data || []) as QueueJobRow[],
+      supportsRetryColumns: true,
+      missingQueueTable: false,
+    };
+  }
+
+  if (isChatPushQueueMigrationError(retryAwareRes.error)) {
+    CHAT_PUSH_OPTIONAL_QUEUE_COLUMNS.forEach((column) => {
+      if (isMissingColumnError(retryAwareRes.error, column)) {
+        unsupportedChatPushQueueColumns.add(column);
+      }
+    });
+    chatPushRetryColumnsSupported = false;
+    return selectLegacyJobs();
   }
 
   if (isMissingRelationError(retryAwareRes.error, 'chat_push_jobs')) {
@@ -379,10 +418,28 @@ async function updateChatPushJobByMessageId(
   messageId: string,
   patch: Record<string, unknown>,
 ) {
+  const supportedPatch = getSupportedChatPushPatch(patch);
+  if (Object.keys(supportedPatch).length === 0) return;
+
   const { error } = await supabase
     .from('chat_push_jobs')
-    .update(patch)
+    .update(supportedPatch)
     .eq('message_id', messageId);
+
+  if (error && isChatPushQueueMigrationError(error)) {
+    rememberUnsupportedChatPushColumns(error, supportedPatch);
+    const retryPatch = getSupportedChatPushPatch(supportedPatch);
+    if (Object.keys(retryPatch).length === 0) return;
+    const retryRes = await supabase
+      .from('chat_push_jobs')
+      .update(retryPatch)
+      .eq('message_id', messageId);
+    if (!retryRes.error) return;
+    if (!isMissingRelationError(retryRes.error, 'chat_push_jobs')) {
+      console.error('chat_push_jobs update failed', retryRes.error);
+    }
+    return;
+  }
 
   if (error && !isMissingRelationError(error, 'chat_push_jobs')) {
     console.error('chat_push_jobs update failed', error);
@@ -394,10 +451,28 @@ async function updateChatPushJobById(
   jobId: string,
   patch: Record<string, unknown>,
 ) {
+  const supportedPatch = getSupportedChatPushPatch(patch);
+  if (Object.keys(supportedPatch).length === 0) return;
+
   const { error } = await supabase
     .from('chat_push_jobs')
-    .update(patch)
+    .update(supportedPatch)
     .eq('id', jobId);
+
+  if (error && isChatPushQueueMigrationError(error)) {
+    rememberUnsupportedChatPushColumns(error, supportedPatch);
+    const retryPatch = getSupportedChatPushPatch(supportedPatch);
+    if (Object.keys(retryPatch).length === 0) return;
+    const retryRes = await supabase
+      .from('chat_push_jobs')
+      .update(retryPatch)
+      .eq('id', jobId);
+    if (!retryRes.error) return;
+    if (!isMissingRelationError(retryRes.error, 'chat_push_jobs')) {
+      console.error('chat_push_jobs update failed', retryRes.error);
+    }
+    return;
+  }
 
   if (error && !isMissingRelationError(error, 'chat_push_jobs')) {
     console.error('chat_push_jobs update failed', error);
