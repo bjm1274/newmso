@@ -5,9 +5,9 @@
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build --webpack",
-    "build:cloudflare": "npx @opennextjs/cloudflare",
-    "preview:cloudflare": "npx wrangler dev",
-    "deploy:cloudflare": "npx wrangler deploy",
+    "build:cloudflare": "npx @opennextjs/cloudflare build",
+    "preview:cloudflare": "npx @opennextjs/cloudflare preview",
+    "deploy:cloudflare": "npx @opennextjs/cloudflare deploy",
     "start": "next start",
     "lint": "eslint",
     "cleanup:supabase-chat-storage": "node scripts/cleanup-supabase-chat-storage.mjs",
