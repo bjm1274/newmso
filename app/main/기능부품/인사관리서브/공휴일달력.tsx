@@ -1,6 +1,7 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 interface Props {
@@ -79,12 +80,89 @@ const HOLIDAYS: Record<string, string> = {
   '2027-12-25': '크리스마스',
 };
 
+type CompanyHoliday = {
+  id: string;
+  company_name: string;
+  holiday_date: string;
+  name: string;
+  note?: string | null;
+  created_by?: string | null;
+  created_by_name?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+type HolidayEntry = {
+  date: string;
+  name: string;
+  source: 'legal' | 'custom' | 'mixed';
+  companyName?: string;
+};
+
+function isMissingCompanyHolidayTableError(error: any) {
+  const code = String(error?.code || '').trim();
+  const message = [error?.message, error?.details, error?.hint]
+    .map((value) => String(value || '').toLowerCase())
+    .join(' ');
+  return (
+    code === '42P01' ||
+    code === 'PGRST205' ||
+    message.includes('company_holidays') ||
+    (message.includes('schema cache') && message.includes('could not find the table'))
+  );
+}
+
 export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
+  const { dialog, openConfirm } = useActionDialog();
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [tab, setTab] = useState<'월별' | '연간'>('월별');
   const [applying, setApplying] = useState(false);
+  const [customHolidays, setCustomHolidays] = useState<CompanyHoliday[]>([]);
+  const [loadingCustomHolidays, setLoadingCustomHolidays] = useState(false);
+  const [savingCustomHoliday, setSavingCustomHoliday] = useState(false);
+  const [customHolidayDate, setCustomHolidayDate] = useState(today.toISOString().slice(0, 10));
+  const [customHolidayName, setCustomHolidayName] = useState('');
+  const [customHolidayStorageReady, setCustomHolidayStorageReady] = useState(true);
+  const holidayScopeCompany = selectedCo && selectedCo !== '전체' ? selectedCo : '전체';
+
+  const fetchCustomHolidays = useCallback(async () => {
+    setLoadingCustomHolidays(true);
+    try {
+      let query = supabase
+        .from('company_holidays')
+        .select('id, company_name, holiday_date, name, note, created_by, created_by_name, created_at, updated_at')
+        .gte('holiday_date', `${year}-01-01`)
+        .lte('holiday_date', `${year}-12-31`)
+        .order('holiday_date', { ascending: true });
+
+      if (holidayScopeCompany === '전체') {
+        query = query.eq('company_name', '전체');
+      } else {
+        query = query.in('company_name', ['전체', holidayScopeCompany]);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      setCustomHolidays((data || []) as CompanyHoliday[]);
+      setCustomHolidayStorageReady(true);
+    } catch (error) {
+      if (isMissingCompanyHolidayTableError(error)) {
+        setCustomHolidayStorageReady(false);
+        setCustomHolidays([]);
+      } else {
+        console.error('지정 공휴일 조회 실패:', error);
+        toast('지정 공휴일을 불러오지 못했습니다.', 'error');
+      }
+    } finally {
+      setLoadingCustomHolidays(false);
+    }
+  }, [holidayScopeCompany, year]);
+
+  useEffect(() => {
+    fetchCustomHolidays();
+  }, [fetchCustomHolidays]);
 
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
@@ -98,34 +176,135 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
   const knownYears = [...new Set(Object.keys(HOLIDAYS).map(k => Number(k.slice(0, 4))))];
   const hasDataForYear = knownYears.includes(year);
 
-  const dateKey = (d: number) => `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-  const isHoliday = (d: number) => HOLIDAYS[dateKey(d)];
-  const isWeekend = (d: number, i: number) => {
-    const dow = (startDow + (d - 1)) % 7;
-    return dow === 0 || dow === 6;
-  };
+  const holidayEntries = useMemo(() => {
+    const entries = new Map<string, HolidayEntry>();
 
-  const monthHolidays = Object.entries(HOLIDAYS).filter(([k]) => k.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`));
+    Object.entries(HOLIDAYS).forEach(([date, name]) => {
+      entries.set(date, { date, name, source: 'legal' });
+    });
+
+    customHolidays.forEach((holiday) => {
+      const date = String(holiday.holiday_date || '').slice(0, 10);
+      if (!date) return;
+      const existing = entries.get(date);
+      if (existing) {
+        const customName = String(holiday.name || '지정 공휴일').trim();
+        entries.set(date, {
+          date,
+          name: existing.name.includes(customName) ? existing.name : `${existing.name} / ${customName}`,
+          source: 'mixed',
+          companyName: holiday.company_name,
+        });
+      } else {
+        entries.set(date, {
+          date,
+          name: String(holiday.name || '지정 공휴일').trim(),
+          source: 'custom',
+          companyName: holiday.company_name,
+        });
+      }
+    });
+
+    return [...entries.values()].sort((left, right) => left.date.localeCompare(right.date));
+  }, [customHolidays]);
+
+  const holidayByDate = useMemo(
+    () => new Map(holidayEntries.map((entry) => [entry.date, entry])),
+    [holidayEntries],
+  );
+
+  const dateKey = (d: number) => `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const getHolidayEntry = (d: number) => holidayByDate.get(dateKey(d));
+  const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const monthHolidays = holidayEntries.filter((holiday) => holiday.date.startsWith(monthPrefix));
   const workingDays = (() => {
     let cnt = 0;
     for (let d = 1; d <= totalDays; d++) {
       const key = dateKey(d);
       const dow = new Date(year, month, d).getDay();
-      if (dow !== 0 && dow !== 6 && !HOLIDAYS[key]) cnt++;
+      if (dow !== 0 && dow !== 6 && !holidayByDate.has(key)) cnt++;
     }
     return cnt;
   })();
 
-  const yearHolidays = Object.entries(HOLIDAYS).filter(([k]) => k.startsWith(`${year}`));
+  const yearHolidays = holidayEntries.filter((holiday) => holiday.date.startsWith(`${year}`));
+  const yearCustomHolidays = customHolidays.filter((holiday) =>
+    String(holiday.holiday_date || '').startsWith(`${year}`)
+  );
+
+  const handleSaveCustomHoliday = async () => {
+    const normalizedDate = String(customHolidayDate || '').trim();
+    const normalizedName = customHolidayName.trim() || '지정 공휴일';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
+      toast('지정일을 선택해 주세요.', 'warning');
+      return;
+    }
+
+    setSavingCustomHoliday(true);
+    try {
+      const { error } = await supabase.from('company_holidays').upsert(
+        {
+          company_name: holidayScopeCompany,
+          holiday_date: normalizedDate,
+          name: normalizedName,
+          created_by: user?.id ? String(user.id) : null,
+          created_by_name: user?.name ? String(user.name) : null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'company_name,holiday_date' },
+      );
+      if (error) throw error;
+      setCustomHolidayName('');
+      setCustomHolidayStorageReady(true);
+      await fetchCustomHolidays();
+      toast('지정 공휴일을 저장했습니다.', 'success');
+    } catch (error) {
+      if (isMissingCompanyHolidayTableError(error)) {
+        setCustomHolidayStorageReady(false);
+        toast('company_holidays 테이블이 필요합니다. 마이그레이션을 먼저 적용해 주세요.', 'error');
+      } else {
+        console.error('지정 공휴일 저장 실패:', error);
+        toast('지정 공휴일 저장에 실패했습니다.', 'error');
+      }
+    } finally {
+      setSavingCustomHoliday(false);
+    }
+  };
+
+  const handleDeleteCustomHoliday = async (holiday: CompanyHoliday) => {
+    const confirmed = await openConfirm({
+      title: '지정 공휴일 삭제',
+      description: `${holiday.holiday_date} ${holiday.name} 항목을 삭제합니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase.from('company_holidays').delete().eq('id', holiday.id);
+      if (error) throw error;
+      await fetchCustomHolidays();
+      toast('지정 공휴일을 삭제했습니다.', 'success');
+    } catch (error) {
+      console.error('지정 공휴일 삭제 실패:', error);
+      toast('지정 공휴일 삭제에 실패했습니다.', 'error');
+    }
+  };
 
   const handleApplyAttendance = async () => {
-    if (!confirm(`${year}년 ${month + 1}월 공휴일(${monthHolidays.length}건)을 근태 기록에 반영하시겠습니까?`)) return;
+    const confirmed = await openConfirm({
+      title: '공휴일 근태 반영',
+      description: `${year}년 ${month + 1}월 공휴일 ${monthHolidays.length}건을 근태 기록에 반영합니다.`,
+      confirmText: '반영',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
     setApplying(true);
     try {
-      const inserts = monthHolidays.map(([date, name]) => ({
-        work_date: date,
+      const inserts = monthHolidays.map((holiday) => ({
+        work_date: holiday.date,
         type: '공휴일',
-        note: name,
+        note: holiday.name,
         company: selectedCo === '전체' ? undefined : selectedCo,
       }));
       await supabase.from('attendance_records').upsert(inserts, { onConflict: 'work_date' });
@@ -142,6 +321,7 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
 
   return (
     <div className="p-4 md:p-4 space-y-5 max-w-4xl mx-auto">
+      {dialog}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">공휴일 자동 반영 달력</h2>
@@ -174,22 +354,24 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
               <div className="grid grid-cols-7 gap-0.5">
                 {calDates.map((d, i) => {
                   if (!d) return <div key={i} />;
-                  const holidayName = isHoliday(d);
+                  const holidayEntry = getHolidayEntry(d);
                   const dow = (startDow + (d - 1)) % 7;
                   const isSun = dow === 0;
                   const isSat = dow === 6;
                   return (
-                    <div
+                    <button
                       key={i}
-                      title={holidayName}
-                      className={`relative min-h-[44px] p-1 rounded-md text-[11px] font-bold text-center
-                        ${holidayName ? 'bg-red-500/10 text-red-600' : isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-[var(--foreground)]'}
+                      type="button"
+                      title={holidayEntry?.name}
+                      onClick={() => setCustomHolidayDate(dateKey(d))}
+                      className={`relative min-h-[44px] p-1 rounded-md text-[11px] font-bold text-center transition-all hover:bg-[var(--muted)]
+                        ${holidayEntry ? 'bg-red-500/10 text-red-600' : isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-[var(--foreground)]'}
                         ${d === today.getDate() && month === today.getMonth() && year === today.getFullYear() ? 'ring-2 ring-[var(--accent)]' : ''}
                       `}
                     >
                       {d}
-                      {holidayName && <div className="text-[8px] leading-tight text-red-500 font-bold truncate">{holidayName}</div>}
-                    </div>
+                      {holidayEntry && <div className="text-[8px] leading-tight text-red-500 font-bold truncate">{holidayEntry.name}</div>}
+                    </button>
                   );
                 })}
               </div>
@@ -206,10 +388,10 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
                 <p className="text-xl font-bold text-red-500">{monthHolidays.length}일</p>
               </div>
               <div className="space-y-1 max-h-48 overflow-y-auto">
-                {monthHolidays.map(([date, name]) => (
-                  <div key={date} className="text-[10px] font-bold text-red-600 flex gap-1">
-                    <span className="shrink-0">{date.slice(8)}일</span>
-                    <span>{name}</span>
+                {monthHolidays.map((holiday) => (
+                  <div key={`${holiday.date}-${holiday.name}`} className="text-[10px] font-bold text-red-600 flex gap-1">
+                    <span className="shrink-0">{holiday.date.slice(8)}일</span>
+                    <span>{holiday.name}</span>
                   </div>
                 ))}
               </div>
@@ -222,15 +404,91 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
               </button>
             </div>
           </div>
+
+          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+            <div className="grid gap-3 md:grid-cols-[160px_minmax(0,1fr)_auto] md:items-end">
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-bold text-[var(--toss-gray-3)]">지정일</span>
+                <input
+                  type="date"
+                  value={customHolidayDate}
+                  onChange={(event) => setCustomHolidayDate(event.target.value)}
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-bold text-[var(--toss-gray-3)]">공휴일명</span>
+                <input
+                  type="text"
+                  value={customHolidayName}
+                  onChange={(event) => setCustomHolidayName(event.target.value)}
+                  placeholder={`${holidayScopeCompany} 지정 공휴일`}
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={handleSaveCustomHoliday}
+                disabled={savingCustomHoliday}
+                className="min-h-10 rounded-[var(--radius-md)] bg-[var(--accent)] px-5 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {savingCustomHoliday ? '저장 중...' : '저장'}
+              </button>
+            </div>
+
+            {!customHolidayStorageReady && (
+              <div className="mt-3 rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-800">
+                company_holidays 테이블을 적용해야 지정 공휴일을 저장할 수 있습니다.
+              </div>
+            )}
+
+            <div className="mt-4 grid gap-2 md:grid-cols-2">
+              {loadingCustomHolidays ? (
+                <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-[11px] font-bold text-[var(--toss-gray-3)]">
+                  불러오는 중...
+                </div>
+              ) : yearCustomHolidays.length === 0 ? (
+                <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-[11px] font-bold text-[var(--toss-gray-3)]">
+                  저장된 지정 공휴일이 없습니다.
+                </div>
+              ) : (
+                yearCustomHolidays.map((holiday) => (
+                  <div
+                    key={holiday.id}
+                    className="flex items-center justify-between gap-2 rounded-[var(--radius-md)] border border-red-100 bg-red-500/10 px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-[11px] font-bold text-[var(--foreground)]">
+                        {holiday.holiday_date} · {holiday.name}
+                      </p>
+                      <p className="text-[10px] font-bold text-red-500">{holiday.company_name}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCustomHoliday(holiday)}
+                      className="shrink-0 rounded-[var(--radius-md)] bg-[var(--card)] px-2 py-1 text-[10px] font-bold text-red-600"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </>
       ) : (
         <div className="space-y-2">
           <h3 className="text-sm font-bold text-[var(--foreground)]">{year}년 전체 공휴일 ({yearHolidays.length}건)</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {yearHolidays.map(([date, name]) => (
-              <div key={date} className="flex items-center gap-3 p-2.5 bg-red-500/10 rounded-[var(--radius-md)] border border-red-100">
-                <span className="text-[11px] font-bold text-red-600 shrink-0">{date}</span>
-                <span className="text-[11px] font-bold text-[var(--foreground)]">{name}</span>
+            {yearHolidays.map((holiday) => (
+              <div key={`${holiday.date}-${holiday.name}`} className="flex items-center gap-3 p-2.5 bg-red-500/10 rounded-[var(--radius-md)] border border-red-100">
+                <span className="text-[11px] font-bold text-red-600 shrink-0">{holiday.date}</span>
+                <span className="text-[11px] font-bold text-[var(--foreground)]">{holiday.name}</span>
+                {holiday.source !== 'legal' && (
+                  <span className="ml-auto rounded-full bg-[var(--card)] px-2 py-0.5 text-[10px] font-bold text-red-500">
+                    지정
+                  </span>
+                )}
               </div>
             ))}
           </div>

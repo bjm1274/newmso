@@ -2,6 +2,8 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { EmptyState } from '@/app/components/StatePanel';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
 import {
@@ -601,6 +603,7 @@ export default function OperationCheckView({
   viewMode?: OpCheckViewMode;
   title?: string;
 }) {
+  const { dialog, openConfirm } = useActionDialog();
   const allowEmbeddedTemplateSettings = viewMode !== 'templates';
   const [activeTab, setActiveTab] = useState<OpCheckViewMode>(
     viewMode === 'templates' ? 'templates' : 'patients',
@@ -1355,21 +1358,24 @@ export default function OperationCheckView({
   }, [checkForm, selectedScheduleBaseline]);
 
   const confirmWorkspaceTransition = useCallback(
-    (actionLabel: string) => {
-      if (!checkFormIsDirty || typeof window === 'undefined') return true;
-      return window.confirm(
-        `저장되지 않은 OP체크 변경사항이 있습니다.\n\n${actionLabel} 전에 저장하지 않은 내용이 사라질 수 있습니다.\n계속하시겠습니까?`,
-      );
+    async (actionLabel: string) => {
+      if (!checkFormIsDirty) return true;
+      return openConfirm({
+        title: '저장되지 않은 변경사항',
+        description: `저장되지 않은 OP체크 변경사항이 있습니다.\n\n${actionLabel} 전에 저장하지 않은 내용이 사라질 수 있습니다.\n계속하시겠습니까?`,
+        confirmText: '계속',
+        tone: 'danger',
+      });
     },
-    [checkFormIsDirty],
+    [checkFormIsDirty, openConfirm],
   );
 
   const handleScheduleSelection = useCallback(
-    (post: LinkedSchedulePost, openWorkspace = false) => {
+    async (post: LinkedSchedulePost, openWorkspace = false) => {
       const changingPatient = selectedScheduleId !== post.id;
       if (
         changingPatient &&
-        !confirmWorkspaceTransition(`"${stripHiddenMetaBlocks(post.patient_name) || '선택한 환자'}" 환자로 이동하기`)
+        !(await confirmWorkspaceTransition(`"${stripHiddenMetaBlocks(post.patient_name) || '선택한 환자'}" 환자로 이동하기`))
       ) {
         return;
       }
@@ -1382,14 +1388,14 @@ export default function OperationCheckView({
   );
 
   const handleCalendarDaySelection = useCallback(
-    (dateKey: string, daySchedules: LinkedSchedulePost[]) => {
+    async (dateKey: string, daySchedules: LinkedSchedulePost[]) => {
       const currentScheduleIdForDate =
         selectedSchedule && selectedSchedule.schedule_date === dateKey ? selectedSchedule.id : null;
       const nextSchedule = getPreferredScheduleForDate(dateKey, daySchedules, currentScheduleIdForDate);
       const willChangePatient = (nextSchedule?.id || null) !== currentScheduleIdForDate;
       const willChangeDate = dateKey !== selectedDate;
 
-      if ((willChangeDate || willChangePatient) && !confirmWorkspaceTransition(`${formatDateLabel(dateKey)} 일정 열기`)) {
+      if ((willChangeDate || willChangePatient) && !(await confirmWorkspaceTransition(`${formatDateLabel(dateKey)} 일정 열기`))) {
         return;
       }
 
@@ -1566,7 +1572,7 @@ export default function OperationCheckView({
   }, []);
 
   const handleWorkspaceStatusSummaryClick = useCallback(
-    (nextStatus: ScheduleStatus) => {
+    async (nextStatus: ScheduleStatus) => {
       const nextTab = statusFilterTab === nextStatus ? '전체' : nextStatus;
 
       if (dayWorkspaceOpen && selectedDate && nextTab !== '전체') {
@@ -1583,9 +1589,9 @@ export default function OperationCheckView({
           if (
             nextSchedule &&
             selectedScheduleId !== nextSchedule.id &&
-            !confirmWorkspaceTransition(
+            !(await confirmWorkspaceTransition(
               `"${stripHiddenMetaBlocks(nextSchedule.patient_name) || '선택 환자'}" 환자로 이동하기`,
-            )
+            ))
           ) {
             return;
           }
@@ -1621,13 +1627,13 @@ export default function OperationCheckView({
     (offset: number) => {
       const nextSchedule = workspaceSchedules[workspaceSelectedIndex + offset];
       if (!nextSchedule) return;
-      handleScheduleSelection(nextSchedule, true);
+      void handleScheduleSelection(nextSchedule, true);
     },
     [handleScheduleSelection, workspaceSchedules, workspaceSelectedIndex],
   );
 
   const handleDateFilterChange = useCallback(
-    (nextDate: string) => {
+    async (nextDate: string) => {
       const nextSchedules = getSortedSchedulesForDate(nextDate);
       const currentScheduleIdForDate =
         selectedSchedule && selectedSchedule.schedule_date === nextDate ? selectedSchedule.id : null;
@@ -1635,7 +1641,7 @@ export default function OperationCheckView({
       const willChangePatient = (nextSchedule?.id || null) !== currentScheduleIdForDate;
       const willChangeDate = nextDate !== selectedDate;
 
-      if ((willChangeDate || willChangePatient) && !confirmWorkspaceTransition(`${formatDateLabel(nextDate)} 일정 보기`)) {
+      if ((willChangeDate || willChangePatient) && !(await confirmWorkspaceTransition(`${formatDateLabel(nextDate)} 일정 보기`))) {
         return;
       }
 
@@ -1657,7 +1663,7 @@ export default function OperationCheckView({
   const handleTodaySelection = useCallback(() => {
     const today = new Date();
     const todayKey = today.toISOString().slice(0, 10);
-    handleDateFilterChange(todayKey);
+    void handleDateFilterChange(todayKey);
   }, [handleDateFilterChange]);
 
   const handleWorkspaceOpen = useCallback(() => {
@@ -1669,7 +1675,7 @@ export default function OperationCheckView({
       currentScheduleIdForDate,
     );
     if (!nextSchedule) return;
-    handleScheduleSelection(nextSchedule, true);
+    void handleScheduleSelection(nextSchedule, true);
   }, [filteredSchedules, getPreferredScheduleForDate, handleScheduleSelection, selectedDate, selectedDateSchedules, selectedSchedule]);
 
   useEffect(() => {
@@ -2020,9 +2026,12 @@ export default function OperationCheckView({
     if (newStatus === '준비완료') {
       const unchecked = checkForm.prep_items.filter((item) => item.name && !item.checked);
       if (unchecked.length > 0) {
-        const proceed = window.confirm(
-          `준비 체크 미완료 항목이 ${unchecked.length}개 있습니다.\n\n미완료 항목:\n${unchecked.map((i) => `  · ${i.name}`).join('\n')}\n\n그래도 준비완료로 변경하시겠습니까?`
-        );
+        const proceed = await openConfirm({
+          title: '준비 체크 미완료',
+          description: `준비 체크 미완료 항목이 ${unchecked.length}개 있습니다.\n\n미완료 항목:\n${unchecked.map((i) => `  · ${i.name}`).join('\n')}\n\n그래도 준비완료로 변경하시겠습니까?`,
+          confirmText: '준비완료',
+          tone: 'danger',
+        });
         if (!proceed) return;
       }
     }
@@ -2097,10 +2106,15 @@ export default function OperationCheckView({
         );
         if (itemsWithQty.length > 0) {
           setTimeout(() => {
-            const proceed = window.confirm(
-              `수술 완료 처리되었습니다.\n\n사용된 소모품 ${itemsWithQty.length}종의 재고를 자동으로 차감하시겠습니까?\n\n${itemsWithQty.map((i) => `  · ${i.name} ${i.quantity}${i.unit || ''}`).join('\n')}`
-            );
-            if (proceed) void deductInventoryItems(itemsWithQty);
+            void (async () => {
+              const proceed = await openConfirm({
+                title: '소모품 재고 자동 차감',
+                description: `수술 완료 처리되었습니다.\n\n사용된 소모품 ${itemsWithQty.length}종의 재고를 자동으로 차감하시겠습니까?\n\n${itemsWithQty.map((i) => `  · ${i.name} ${i.quantity}${i.unit || ''}`).join('\n')}`,
+                confirmText: '차감',
+                tone: 'accent',
+              });
+              if (proceed) void deductInventoryItems(itemsWithQty);
+            })();
           }, 300);
         }
       }
@@ -2110,7 +2124,7 @@ export default function OperationCheckView({
     } finally {
       setSavingCheck(false);
     }
-  }, [buildDefaultPatientCheck, checkForm, selectedSchedule, user?.company, user?.company_id, user?.id, user?.name]);
+  }, [buildDefaultPatientCheck, checkForm, openConfirm, selectedSchedule, user?.company, user?.company_id, user?.id, user?.name]);
 
   const addWardMessageTarget = useCallback((targetId: string) => {
     const normalizedTargetId = String(targetId || '').trim();
@@ -2353,7 +2367,13 @@ export default function OperationCheckView({
   }, [inventoryNameMap]);
 
   const removeTemplate = useCallback(async (templateId: string) => {
-    if (typeof window !== 'undefined' && !window.confirm('이 템플릿을 삭제하시겠습니까?')) return;
+    const confirmed = await openConfirm({
+      title: 'OP체크 템플릿 삭제',
+      description: '이 템플릿을 삭제합니다.',
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     try {
       const { error } = await supabase.from('op_check_templates').delete().eq('id', templateId);
       if (error) throw error;
@@ -2366,7 +2386,7 @@ export default function OperationCheckView({
       console.error('OP체크 템플릿 삭제 실패', error);
       toast('템플릿 삭제 중 오류가 발생했습니다.', 'error');
     }
-  }, [templateEditor.id]);
+  }, [openConfirm, templateEditor.id]);
 
   const templatesByScope = useMemo(
     () => ({
@@ -2660,14 +2680,11 @@ export default function OperationCheckView({
   );
 
   const patientWorkspaceDetailContent = !selectedSchedule || !checkForm ? (
-    <div
-      data-testid="op-check-workspace-empty"
-      className="empty-state rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--card)] p-10 text-center shadow-sm"
-    >
-      <p className="text-base font-bold text-[var(--foreground)]">환자를 선택해 주세요.</p>
-      <p className="mt-2 text-sm font-medium text-[var(--toss-gray-3)]">
-        해당 날짜 환자를 선택하면 OP체크 항목이 자동으로 준비됩니다.
-      </p>
+    <div data-testid="op-check-workspace-empty">
+      <EmptyState
+        title="환자를 선택해 주세요"
+        description="해당 날짜 환자를 선택하면 OP체크 항목이 자동으로 준비됩니다."
+      />
     </div>
   ) : (
     <>
@@ -3129,6 +3146,7 @@ export default function OperationCheckView({
 
   return (
     <div data-testid="op-check-view" className="space-y-4">
+      {dialog}
       <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div
           className={
@@ -3631,9 +3649,11 @@ export default function OperationCheckView({
                     </p>
                     <div className="space-y-2">
                       {templatesByScope[scope].length === 0 ? (
-                        <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)]/40 p-4 text-center text-sm font-medium text-[var(--toss-gray-3)]">
-                          아직 등록된 템플릿이 없습니다.
-                        </div>
+                        <EmptyState
+                          title="아직 등록된 템플릿이 없습니다"
+                          description={`${scope === 'surgery' ? '수술' : '마취'} 템플릿을 저장하면 반복 준비 항목을 빠르게 불러올 수 있습니다.`}
+                          compact
+                        />
                       ) : (
                         templatesByScope[scope].map((template) => (
                           <div

@@ -1,6 +1,6 @@
 'use client';
 
-import type { Dispatch, SetStateAction } from 'react';
+import { useMemo, type Dispatch, type SetStateAction } from 'react';
 import type { StaffMember } from '@/types';
 import AttendanceForms from './근태신청양식';
 import SuppliesForm from './비품구매양식';
@@ -108,6 +108,62 @@ export default function ApprovalComposerView({
   const showDocumentBody = formType !== '양식신청';
   const isOfficialDispatch = formType === '공문발송';
   const isEditingApproval = Boolean(editingApproval?.id);
+  const resolveFormLabel = (tab: string) => (
+    builtinFormTypes.includes(tab)
+      ? tab
+      : customFormTypes.find((customForm) => customForm.slug === tab)?.name ?? tab
+  );
+  const formPickerGroups = useMemo(() => {
+    const visibleTabs = composeFormTabs.map((tab) => ({
+      tab,
+      normalized: normalizeComposeFormType(tab),
+      label: resolveFormLabel(tab),
+    }));
+    const used = new Set<string>();
+    const pick = (predicate: (option: (typeof visibleTabs)[number]) => boolean) => {
+      const matched = visibleTabs.filter((option) => !used.has(option.normalized) && predicate(option));
+      matched.forEach((option) => used.add(option.normalized));
+      return matched;
+    };
+    const recent = pick((option) => option.normalized !== '양식신청' && Boolean(lastDraftByType[option.normalized]));
+    const leaveAndAttendance = pick((option) =>
+      ['연차/휴가', '연차계획서', '연장근무', '출결정정'].some((keyword) => option.label.includes(keyword) || option.normalized.includes(keyword))
+    );
+    const operations = pick((option) =>
+      ['물품', '수리', '보고', '업무', '공문'].some((keyword) => option.label.includes(keyword) || option.normalized.includes(keyword))
+    );
+    const remaining = pick(() => true);
+
+    return [
+      {
+        title: '최근 작성',
+        description: '이전에 사용한 문서 유형',
+        options: recent.slice(0, 4),
+      },
+      {
+        title: '근태·휴가',
+        description: '휴가, 연장근무, 출결 정정',
+        options: leaveAndAttendance,
+      },
+      {
+        title: '업무·지원',
+        description: '물품, 수리, 보고, 공문, 일반 기안',
+        options: operations,
+      },
+      {
+        title: '양식·기타',
+        description: '양식 신청과 커스텀 문서',
+        options: remaining,
+      },
+    ].filter((group) => group.options.length > 0);
+  }, [builtinFormTypes, composeFormTabs, customFormTypes, lastDraftByType]);
+  const selectFormType = (tab: string) => {
+    const nextFormType = normalizeComposeFormType(tab);
+    setFormType(nextFormType);
+    if (ccLine.length === 0) {
+      applyDefaultReferenceUsers(nextFormType);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-6xl space-y-4 pb-20 md:pb-0">
@@ -160,32 +216,39 @@ export default function ApprovalComposerView({
             <span className="erp-chip erp-chip-active shrink-0">{activeFormLabel}</span>
           </div>
 
-          <div className="border-b border-[var(--border)] bg-[var(--surface-subtle)] px-3 py-2">
-            <div className="flex w-full gap-1.5 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory">
-              {composeFormTabs.map((tab, index) => {
-                const label = builtinFormTypes.includes(tab)
-                  ? tab
-                  : customFormTypes.find((customForm) => customForm.slug === tab)?.name ?? tab;
-                const isActive = formType === tab || normalizeComposeFormType(tab) === formType;
+          <div className="border-b border-[var(--border)] bg-[var(--surface-subtle)] px-3 py-3">
+            <div className="space-y-3">
+              {formPickerGroups.map((group) => (
+                <div key={group.title}>
+                  <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                    <p className="text-[11px] font-black text-[var(--foreground)]">{group.title}</p>
+                    <p className="truncate text-[10px] font-semibold text-[var(--muted-foreground)]">{group.description}</p>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {group.options.map((option, index) => {
+                      const isActive = formType === option.tab || option.normalized === formType;
+                      const hasRecentDraft = Boolean(lastDraftByType[option.normalized]);
 
-                return (
-                  <button
-                    type="button"
-                    key={`${tab}-${index}`}
-                    data-testid={`approval-form-type-${index}`}
-                    onClick={() => {
-                      const nextFormType = normalizeComposeFormType(tab);
-                      setFormType(nextFormType);
-                      if (ccLine.length === 0) {
-                        applyDefaultReferenceUsers(nextFormType);
-                      }
-                    }}
-                    className={`snap-start inline-flex min-h-[34px] shrink-0 items-center rounded-[var(--radius-md)] border px-3 text-[12px] font-bold leading-tight whitespace-nowrap transition-all ${isActive ? 'border-[var(--accent)]/35 bg-[var(--card)] text-[var(--accent)] shadow-[var(--shadow-xs)]' : 'border-transparent text-[var(--muted-foreground)] hover:bg-[var(--card)] hover:text-[var(--foreground)]'}`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
+                      return (
+                        <button
+                          type="button"
+                          key={`${group.title}-${option.tab}-${index}`}
+                          data-testid={`approval-form-type-${option.normalized}`}
+                          onClick={() => selectFormType(option.tab)}
+                          className={`min-h-[58px] rounded-[var(--radius-lg)] border px-3 py-2 text-left transition-all ${isActive ? 'border-[var(--accent)]/40 bg-[var(--card)] shadow-[var(--shadow-xs)] ring-2 ring-[var(--accent)]/10' : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]/25 hover:bg-[var(--accent-selected-subtle)]'}`}
+                        >
+                          <span className={`block text-[13px] font-black ${isActive ? 'text-[var(--accent)]' : 'text-[var(--foreground)]'}`}>{option.label}</span>
+                          <span className="mt-1 flex flex-wrap items-center gap-1 text-[10px] font-bold text-[var(--muted-foreground)]">
+                            <span>{customFormTypes.some((customForm) => customForm.slug === option.tab) ? '커스텀 양식' : '기본 양식'}</span>
+                            {hasRecentDraft && <span className="erp-status erp-status-blue">최근 작성</span>}
+                            {option.label === '공문발송' && <span className="erp-status erp-status-yellow">권한 필요</span>}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

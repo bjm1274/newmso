@@ -52,14 +52,12 @@ export function MessengerConversationPanel({ controller }: MessengerConversation
                 {c.selectedRoomLabel}
               </h3>
               <div className="flex items-center gap-1.5 text-[10px] font-medium">
-                <p className="text-[var(--toss-gray-4)]">
-                  {c.selectedPeer
-                      ? c.selectedPeerIsOnline
-                        ? '온라인'
-                        : '오프라인'
-                      : `${c.roomMembers.length || 0}명 참여중`}
-                </p>
-                <span className="text-[var(--toss-gray-4)]">·</span>
+                {!c.selectedPeer ? (
+                  <>
+                    <p className="text-[var(--toss-gray-4)]">{c.roomMembers.length || 0}명 참여중</p>
+                    <span className="text-[var(--toss-gray-4)]">·</span>
+                  </>
+                ) : null}
                 <span className={`inline-flex items-center gap-1 ${c.realtimeConnectionMeta.textClassName}`}>
                   <span className={`h-1.5 w-1.5 rounded-full ${c.realtimeConnectionMeta.dotClassName}`} />
                   <span>{c.realtimeConnectionMeta.label}</span>

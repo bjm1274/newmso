@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { EmptyState, LoadingPanel } from '@/app/components/StatePanel';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { canAccessBoard, isAdminUser, isPrivilegedUser } from '@/lib/access-control';
 import {
   buildStorageDownloadUrl,
@@ -568,6 +570,7 @@ function matchesTeamScope(item: { companyName: string; company?: string | null; 
 }
 
 export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Props) {
+  const { dialog, openConfirm } = useActionDialog();
   const [resources, setResources] = useState<GuideResource[]>([]);
   const [teamTasks, setTeamTasks] = useState<GuideTask[]>([]);
   const [orgTeams, setOrgTeams] = useState<OrgTeamRow[]>([]);
@@ -1069,7 +1072,13 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
       toast('본인이 작성한 자료만 삭제할 수 있습니다.', 'warning');
       return;
     }
-    if (!window.confirm(`"${resource.title}" 자료를 삭제할까요?`)) return;
+    const confirmed = await openConfirm({
+      title: '업무자료 삭제',
+      description: `"${resource.title}" 자료를 삭제합니다.\n첨부와 연결된 안내 흐름에서 더 이상 보이지 않습니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
 
     try {
       const { error } = await supabase.from('board_posts').delete().eq('id', resource.id);
@@ -1256,7 +1265,13 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
       toast('본인이 작성한 팀 할일만 삭제할 수 있습니다.', 'warning');
       return;
     }
-    if (!window.confirm(`"${task.title}" 팀 할일을 삭제할까요?`)) return;
+    const confirmed = await openConfirm({
+      title: '팀 할일 삭제',
+      description: `"${task.title}" 팀 할일을 삭제합니다.\n담당자와 마감일 기준 목록에서도 함께 사라집니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
 
     try {
       const { error } = await supabase.from('board_posts').delete().eq('id', task.id);
@@ -1276,6 +1291,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto custom-scrollbar p-3 md:p-4" data-testid="guide-library-view">
+      {dialog}
       {/* 헤더 + 통계 */}
       <header className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1546,7 +1562,11 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
               </div>
 
               {!activeTeam ? (
-                <div className="empty-state">조직도에 등록된 팀이 없습니다.</div>
+                <EmptyState
+                  title="등록된 팀이 없습니다"
+                  description="조직도에서 팀을 먼저 등록하면 업무자료를 팀 단위로 정리할 수 있습니다."
+                  compact
+                />
               ) : null}
             </div>
           </div>
@@ -1604,16 +1624,13 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
             </div>
 
             {loading ? (
-              <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-6 text-center text-[13px] font-semibold text-[var(--toss-gray-4)]">
-                불러오는 중...
-              </div>
+              <LoadingPanel title="자료 목록을 불러오는 중입니다" />
             ) : filteredResources.length === 0 ? (
-              <div className="empty-state">
-                <p className="text-[13px] font-bold text-[var(--foreground)]">등록된 자료가 없습니다</p>
-                <p className="mt-1 text-xs text-[var(--toss-gray-4)]">
-                  {activeTeam ? `${activeTeam.teamName} 팀의 첫 자료를 등록해 보세요.` : '팀을 선택해 주세요.'}
-                </p>
-              </div>
+              <EmptyState
+                title="등록된 자료가 없습니다"
+                description={activeTeam ? `${activeTeam.teamName} 팀의 첫 자료를 등록해 보세요.` : '팀을 선택해 주세요.'}
+                compact
+              />
             ) : (
               filteredResources.map((resource) => (
                 <button
@@ -1716,7 +1733,11 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                     <span className="text-[11px] font-semibold text-[var(--toss-gray-4)]">{selectedResource.attachments.length}개</span>
                   </div>
                   {selectedResource.attachments.length === 0 ? (
-                    <div className="empty-state">첨부파일이 없습니다.</div>
+                    <EmptyState
+                      title="첨부파일이 없습니다"
+                      description="이미지, 영상, 문서가 첨부되면 이 영역에 바로 표시됩니다."
+                      compact
+                    />
                   ) : (
                     <div className="space-y-3">
                       <div className="grid gap-2 md:grid-cols-2">
@@ -1764,9 +1785,10 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
               </div>
             </article>
           ) : (
-            <div className="empty-state rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-8 shadow-sm">
-              <p className="text-[13px] font-bold text-[var(--foreground)]">보고 싶은 공유자료를 선택해 주세요</p>
-            </div>
+            <EmptyState
+              title="공유자료를 선택해 주세요"
+              description="왼쪽 목록에서 자료를 선택하면 상세 정보와 첨부 자료를 확인할 수 있습니다."
+            />
           )}
 
           {/* 팀별 할일 */}
@@ -1860,16 +1882,13 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
 
               {/* 할일 목록 */}
               {loading ? (
-                <div className="rounded-[var(--radius-md)] bg-[var(--muted)] p-4 text-center text-[13px] font-semibold text-[var(--toss-gray-4)]">
-                  불러오는 중...
-                </div>
+                <LoadingPanel title="팀 할일을 불러오는 중입니다" />
               ) : activeTeamTasks.length === 0 ? (
-                <div className="empty-state">
-                  <p className="text-[13px] font-bold text-[var(--foreground)]">공유된 팀 할일이 없습니다</p>
-                  <p className="mt-1 text-xs text-[var(--toss-gray-4)]">
-                    {activeTeam ? `${activeTeam.teamName} 팀의 할일을 등록해 보세요.` : '팀을 선택해 주세요.'}
-                  </p>
-                </div>
+                <EmptyState
+                  title="공유된 팀 할일이 없습니다"
+                  description={activeTeam ? `${activeTeam.teamName} 팀의 할일을 등록해 보세요.` : '팀을 선택해 주세요.'}
+                  compact
+                />
               ) : (
                 <div className="space-y-2">
                   {activeTeamTasks.map((task) => {

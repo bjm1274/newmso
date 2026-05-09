@@ -1,5 +1,6 @@
 'use client';
 import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
@@ -17,6 +18,7 @@ export interface StaffCardRowProps {
 
 /** 직원 카드: 사진 좌측, 이름·직책 우측 가로 배치 */
 export function StaffCardRow({ staff, onClick, isEditMode, setDraggedStaff, draggedStaff, onMoveStaff }: StaffCardRowProps) {
+  const { dialog, openConfirm } = useActionDialog();
   const isAdmin = staff.role === 'admin' || staff.permissions?.mso === true;
   const photoUrl = getProfilePhotoUrl(staff);
 
@@ -32,7 +34,13 @@ export function StaffCardRow({ staff, onClick, isEditMode, setDraggedStaff, drag
         e.preventDefault();
         e.stopPropagation();
         if (!draggedStaff || draggedStaff.id === staff.id) return;
-        if (confirm(`${draggedStaff.name}님과 ${staff.name}님의 순서를 바꾸시겠습니까?`)) {
+        const confirmed = await openConfirm({
+          title: '직원 순서 변경',
+          description: `${draggedStaff.name}님과 ${staff.name}님의 순서를 바꿉니다.`,
+          confirmText: '변경',
+          tone: 'accent',
+        });
+        if (confirmed) {
           // Swap logic using employee_no (acting as sort index)
           const tempNo1 = staff.employee_no;
           const tempNo2 = draggedStaff.employee_no;
@@ -49,6 +57,7 @@ export function StaffCardRow({ staff, onClick, isEditMode, setDraggedStaff, drag
         ${isEditMode ? 'cursor-grab active:cursor-grabbing hover:bg-[var(--tab-bg)]' : 'cursor-pointer'}
       `}
     >
+      {dialog}
       <div className={`w-[42px] h-[42px] shrink-0 rounded-[var(--radius-md)] flex items-center justify-center text-base overflow-hidden ${isAdmin ? 'bg-red-500/10 text-red-400' : 'bg-[var(--muted)] text-[var(--toss-gray-3)] group-hover:bg-[var(--toss-blue-light)] group-hover:text-[var(--accent)]'}`}>
         {photoUrl ? (
           <ProfilePhotoThumbnail src={photoUrl} name={staff.name} className="w-full h-full object-cover rounded-[var(--radius-md)]" previewDisabled={isEditMode} />

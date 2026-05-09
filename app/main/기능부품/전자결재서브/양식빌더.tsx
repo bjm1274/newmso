@@ -5,7 +5,7 @@ import ApprovalFormTypesManager from '@/app/main/기능부품/관리자전용서
 export default function FormBuilder(_props: { user?: any }) {
   return (
     <div className="h-full overflow-y-auto pb-10 custom-scrollbar">
-      <ApprovalFormTypesManager />
+      <ApprovalFormTypesManager user={_props.user} />
     </div>
   );
 }

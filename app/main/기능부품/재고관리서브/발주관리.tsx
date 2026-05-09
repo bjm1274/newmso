@@ -1,8 +1,10 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { InventorySummaryStrip, InventoryStepSummary } from './InventoryDesignPanels';
 import {
   getItemMinQuantity,
   getItemName,
@@ -112,6 +114,7 @@ export default function PurchaseOrderManagement({
   highlightedSource,
   onConsumeHighlightedSource,
 }: Record<string, unknown>) {
+  const { dialog, openConfirm } = useActionDialog();
   const [orderRecords, setOrderRecords] = useState<OrderRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [lowStockItems, setLowStockItems] = useState<any[]>([]);
@@ -210,7 +213,13 @@ export default function PurchaseOrderManagement({
 
   const handleAutoGeneratePurchaseOrder = async () => {
     if (lowStockItems.length === 0) return toast('발주가 필요한 항목이 없습니다.', 'warning');
-    if (!confirm(`${lowStockItems.length}개 항목에 대한 발주서를 자동으로 생성하시겠습니까?`)) return;
+    const confirmed = await openConfirm({
+      title: '발주서 자동 생성',
+      description: `${lowStockItems.length}개 항목에 대한 발주서를 자동으로 생성합니다.\n공급사별로 묶어 대기 발주로 등록됩니다.`,
+      confirmText: '생성',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
 
     setLoading(true);
     try {
@@ -259,7 +268,14 @@ export default function PurchaseOrderManagement({
   };
 
   const handleApprovePurchaseOrder = async (orderId: string) => {
-    if (!confirm('이 발주서를 확인 처리하시겠습니까?')) return;
+    const order = orderRecords.find((item) => item.id === orderId);
+    const confirmed = await openConfirm({
+      title: '발주서 확인 처리',
+      description: `${order?.requestTitle || order?.supplier_name || '선택한 발주서'}를 승인 상태로 변경합니다.\n확인 처리 후 발주 진행 현황에 반영됩니다.`,
+      confirmText: '확인 처리',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
     try {
       const { error } = await supabase.from('purchase_orders').update({ status: '승인' }).eq('id', orderId);
       if (error) throw error;
@@ -292,8 +308,30 @@ export default function PurchaseOrderManagement({
     }
   };
 
+  const pendingOrderCount = orderRecords.filter((order) => order.status !== '승인').length;
+  const linkedOrderCount = orderRecords.filter((order) => order.sourceType === 'approval').length;
+  const totalPendingAmount = orderRecords
+    .filter((order) => order.status !== '승인')
+    .reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
+
   return (
     <div className="space-y-4 animate-in fade-in duration-500" data-testid="purchase-order-management-view">
+      {dialog}
+      <InventorySummaryStrip
+        items={[
+          { label: '발주 후보', value: `${lowStockItems.length.toLocaleString('ko-KR')}건`, detail: '최소재고 이하 품목', tone: lowStockItems.length > 0 ? 'warning' : 'success' },
+          { label: '대기 발주', value: `${pendingOrderCount.toLocaleString('ko-KR')}건`, detail: `${totalPendingAmount.toLocaleString('ko-KR')}원 예정`, tone: pendingOrderCount > 0 ? 'info' : 'default' },
+          { label: '결재 연동', value: `${linkedOrderCount.toLocaleString('ko-KR')}건`, detail: '물품요청에서 생성된 발주', tone: linkedOrderCount > 0 ? 'success' : 'default' },
+          { label: '전체 이력', value: `${orderRecords.length.toLocaleString('ko-KR')}건`, detail: '직접 발주와 자동 발주 포함', tone: 'default' },
+        ]}
+      />
+      <InventoryStepSummary
+        steps={[
+          { label: '대상 확인', detail: lowStockItems.length > 0 ? `${lowStockItems.length}개 품목 보충 필요` : '현재 자동 발주 후보가 없습니다.', state: lowStockItems.length > 0 ? 'active' : 'done' },
+          { label: '발주 생성', detail: '거래처별로 묶어 발주서를 생성합니다.', state: pendingOrderCount > 0 ? 'done' : 'pending' },
+          { label: '입고 예정 관리', detail: '승인 후 입고 예정일과 D-day를 관리합니다.', state: orderRecords.some((order) => order.expected_delivery_date) ? 'done' : 'pending' },
+        ]}
+      />
       <div className="bg-[var(--card)] p-4 border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)]">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-3">
           <div>

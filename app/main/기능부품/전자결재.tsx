@@ -57,7 +57,36 @@ import {
   sanitizeCustomFormTypes,
 } from './전자결재-utils';
 
-export default function ApprovalView({ user, staffs, selectedCompanyId, onRefresh, initialView, onViewChange, initialComposeRequest, onConsumeComposeRequest }: ApprovalViewProps) {
+function normalizeApprovalCompanyName(value?: unknown, fallback = '') {
+  const text = String(value || '').trim();
+  return text && text !== '전체' ? text : fallback;
+}
+
+function getScopedApprovalRows<T extends Record<string, unknown>>(value: unknown, companyName: string): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (!value || typeof value !== 'object') return [];
+
+  const raw = value as { version?: number; defaults?: T[]; companies?: Record<string, T[]> };
+  if (raw.version === 2 && raw.companies) {
+    return raw.companies[companyName] || raw.defaults || [];
+  }
+
+  return [];
+}
+
+function resolveStoredTemplateDesign(
+  store: Record<string, any>,
+  slug: string,
+  companyName: string,
+) {
+  if (store?.version === 2) {
+    return store.companies?.[companyName]?.[slug] || store.defaults?.[slug] || {};
+  }
+
+  return store?.[slug] || {};
+}
+
+export default function ApprovalView({ user, staffs, selectedCo, selectedCompanyId, onRefresh, initialView, onViewChange, initialComposeRequest, onConsumeComposeRequest }: ApprovalViewProps) {
   const defaultApprovalView =
     APPROVAL_VIEWS.find((view) => canAccessApprovalSection(user, view)) || '기안함';
   const [viewMode, setViewMode] = useState(
@@ -109,6 +138,10 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
   const fetchApprovalsRef = useRef<() => void>(() => {});
   const { dialog, openConfirm, openPrompt } = useActionDialog();
   const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
+  const targetCompanyName = useMemo(
+    () => normalizeApprovalCompanyName(selectedCo, String(user?.company || '').trim()),
+    [selectedCo, user?.company]
+  );
   const surgeryStockDepartmentAliases = useMemo(() => ['수술실', '수술팀'], []);
   const visibleApprovalViews = useMemo(
     () => APPROVAL_VIEWS.filter((view) => canAccessApprovalSection(user, view)),
@@ -167,9 +200,17 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
       name: customForm?.name || builtInForm?.name || normalizedFormType,
     };
   }, [customFormTypes, formType]);
+  const scopedStaffs = useMemo(
+    () =>
+      staffs
+        .filter(isActiveStaff)
+        .filter((staff) => !targetCompanyName || String(staff.company || '').trim() === targetCompanyName),
+    [staffs, targetCompanyName]
+  );
+
   const approvalDirectoryStaffs = useMemo(
-    () => mergeApprovalStaffDirectory(staffs, supportApproverStaffs).filter(isActiveStaff),
-    [staffs, supportApproverStaffs]
+    () => mergeApprovalStaffDirectory(scopedStaffs, supportApproverStaffs).filter(isActiveStaff),
+    [scopedStaffs, supportApproverStaffs]
   );
   useEffect(() => {
     if (isMso) {
@@ -350,8 +391,9 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
 
   const resolveApprovalTemplateDesign = useCallback((item: Record<string, unknown>) => {
     const template = resolveApprovalTemplateMeta(item);
-    const storedDesign = template.slug ? (formTemplateDesigns?.[template.slug] || {}) : {};
-    const companyLabel = String(storedDesign.companyLabel || item?.sender_company || user?.company || DEFAULT_APPROVAL_TEMPLATE_DESIGN.companyLabel);
+    const itemCompanyName = normalizeApprovalCompanyName(item?.sender_company, targetCompanyName || String(user?.company || '').trim());
+    const storedDesign = template.slug ? resolveStoredTemplateDesign(formTemplateDesigns, template.slug, itemCompanyName) : {};
+    const companyLabel = String(storedDesign.companyLabel || itemCompanyName || DEFAULT_APPROVAL_TEMPLATE_DESIGN.companyLabel);
 
     return {
       ...DEFAULT_APPROVAL_TEMPLATE_DESIGN,
@@ -363,7 +405,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
       templateName: template.name || (item?.type as string) || '결재 문서',
       templateSlug: template.slug || ((item?.meta_data as Record<string, unknown> | null | undefined)?.form_slug as string) || (item?.type as string) || 'generic',
     };
-  }, [formTemplateDesigns, resolveApprovalTemplateMeta, user?.company]);
+  }, [formTemplateDesigns, resolveApprovalTemplateMeta, targetCompanyName, user?.company]);
 
 
   const markApprovalNotificationsAsRead = useCallback(async (approvalIds: string[]) => {
@@ -464,37 +506,61 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
       { name: '양식신청', slug: 'generic' }
     ];
 
-    if (typeof window !== 'undefined') {
+    const normalizeRows = (rows: Record<string, unknown>[]) =>
+      rows
+        .filter((row) => row?.is_active !== false)
+        .filter((row) => {
+          const rowCompany = String(row.company_name || '').trim();
+          return !rowCompany || !targetCompanyName || rowCompany === targetCompanyName;
+        })
+        .map((row) => ({ name: row.name as string, slug: row.slug as string }))
+        .filter((row: { name: string; slug: string }) => row.name && row.slug);
+
+    const loadCustomFormTypes = async () => {
+      const merged = new Map<string, { name: string; slug: string }>();
+
+      if (typeof window !== 'undefined') {
+        try {
+          const stored = window.localStorage.getItem(LOCAL_APPROVAL_FORM_TYPES_KEY);
+          const parsed = stored ? JSON.parse(stored) : [];
+          normalizeRows(getScopedApprovalRows<Record<string, unknown>>(parsed, targetCompanyName))
+            .forEach((row) => merged.set(row.slug, row));
+        } catch {
+          // ignore local storage errors and continue with server rows.
+        }
+      }
+
       try {
-        const stored = window.localStorage.getItem(LOCAL_APPROVAL_FORM_TYPES_KEY);
-        const parsed = stored ? JSON.parse(stored) : [];
-        const activeCustomTypes = Array.isArray(parsed)
-          ? parsed
-              .filter((row: Record<string, unknown>) => row?.is_active !== false)
-              .map((row: Record<string, unknown>) => ({ name: row.name as string, slug: row.slug as string }))
-              .filter((row: { name: string; slug: string }) => row.name && row.slug)
-          : [];
-        setCustomFormTypes(activeCustomTypes.length ? activeCustomTypes : normalizedFallbackTypes);
-      } catch {
-        setCustomFormTypes(normalizedFallbackTypes);
+        const { data, error } = await supabase
+          .from('approval_form_types')
+          .select('name, slug, company_name, is_active')
+          .eq('is_active', true)
+          .order('sort_order');
+
+        if (!error && Array.isArray(data)) {
+          normalizeRows(data as Record<string, unknown>[]).forEach((row) => merged.set(row.slug, row));
+        } else if (error && isMissingColumnError(error, 'company_name')) {
+          const legacyResult = await supabase
+            .from('approval_form_types')
+            .select('name, slug, is_active')
+            .eq('is_active', true)
+            .order('sort_order');
+          if (!legacyResult.error && Array.isArray(legacyResult.data)) {
+            normalizeRows(legacyResult.data as Record<string, unknown>[]).forEach((row) => merged.set(row.slug, row));
+          }
+        } else if (error && !isMissingColumnError(error, 'company_name')) {
+          console.warn('approval_form_types load failed:', error);
+        }
+      } catch (error) {
+        console.warn('approval_form_types load failed:', error);
       }
-      return;
-    }
-    supabase.from('approval_form_types').select('name, slug').eq('is_active', true).order('sort_order').then(({ data, error }) => {
-      if (!error && data?.length) {
-        setCustomFormTypes(data.map((r: { name: string; slug: string }) => ({ name: r.name, slug: r.slug })));
-      } else {
-        // Fallback hardcoded types if table is missing or empty
-        setCustomFormTypes([
-          { name: '휴가신청', slug: 'leave' },
-          { name: '연장근무', slug: 'overtime' },
-          { name: '비품구매', slug: 'purchase' },
-          { name: '출결정정', slug: 'attendance_fix' },
-          { name: '양식신청', slug: 'generic' }
-        ]);
-      }
-    });
-  }, []);
+
+      const next = Array.from(merged.values());
+      setCustomFormTypes(next.length ? next : normalizedFallbackTypes);
+    };
+
+    void loadCustomFormTypes();
+  }, [targetCompanyName]);
 
   useEffect(() => {
     setCustomFormTypes((prev) => {
@@ -719,6 +785,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
   const { handleSubmit } = useApprovalSubmit({
     user,
     selectedCompanyId,
+    selectedCompanyName: targetCompanyName,
     formType,
     formTitle,
     formContent,
@@ -739,6 +806,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
     onViewChange,
     fetchApprovals,
     onRefresh,
+    openConfirm,
     resolveEffectiveApproverId,
     resolveApprovalLineIds,
     surgeryStockDepartmentAliases,
@@ -1119,7 +1187,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
         {viewMode === '작성하기' ? (
           <ApprovalComposerView
             user={user}
-            staffs={staffs}
+            staffs={scopedStaffs}
             draftBanner={draftBanner}
             setDraftBanner={setDraftBanner}
             loadDraftFromStorage={loadDraftFromStorage}
@@ -1242,6 +1310,8 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
         openApprovalPrintView={openApprovalPrintView}
         resolveApprovalTemplateMeta={resolveApprovalTemplateMeta}
         resolveApprovalTemplateDesign={resolveApprovalTemplateDesign}
+        resolveApprovalLineIds={resolveApprovalLineIds}
+        resolveCurrentApproverId={resolveCurrentApproverId}
         resolveApprovalDelegateSnapshot={resolveApprovalDelegateSnapshot}
         resolveApprovalDelaySnapshot={resolveApprovalDelaySnapshot}
         resolveApprovalLockSnapshot={resolveApprovalLockSnapshot}

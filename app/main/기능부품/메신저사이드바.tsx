@@ -216,7 +216,7 @@ export function MessengerSidebar({
                 return (
                   <div
                     key={roomId}
-                    className={`group p-2.5 rounded-xl cursor-pointer transition-all flex items-center justify-between gap-2.5 border relative overflow-hidden ${
+                    className={`group min-h-[72px] p-3 rounded-[var(--radius-lg)] cursor-pointer transition-all flex items-center justify-between gap-3 border relative overflow-hidden ${
                       isSelected
                         ? 'bg-zinc-800 border-zinc-700 shadow-sm'
                         : 'bg-[var(--card)] dark:bg-zinc-900 border-transparent hover:border-[var(--border)] dark:hover:border-zinc-800'
@@ -229,31 +229,31 @@ export function MessengerSidebar({
                       type="button"
                       data-testid={`chat-room-${roomId}`}
                       onClick={() => onRoomClick(room.id)}
-                      className={`flex min-w-0 flex-1 items-start ${isGroupRoom ? 'gap-2' : 'gap-3'} text-left`}
+                      className={`flex min-w-0 flex-1 items-start ${isGroupRoom ? 'gap-2.5' : 'gap-3'} text-left`}
                     >
                       {isNoticeChannel ? (
                         <div
                           data-testid={`chat-room-icon-${roomId}`}
-                          className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent-light)] text-[var(--accent)]"
+                          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent-light)] text-[var(--accent)]"
                         >
                           <MenuIcon name="bell" className="h-4 w-4" />
                         </div>
                       ) : isGroupRoom ? (
                         <div
                           data-testid={`chat-room-icon-${roomId}`}
-                          className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-[10px] font-black leading-none tracking-tight text-amber-700 shadow-sm dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200"
+                          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-[10px] font-black leading-none tracking-tight text-amber-700 shadow-sm dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200"
                         >
                           {groupBadgeText}
                         </div>
                       ) : peerName ? (
                         <div
                           data-testid={`chat-room-icon-${roomId}`}
-                          className="relative flex h-8 w-8 shrink-0 items-center justify-center"
+                          className="relative flex h-10 w-10 shrink-0 items-center justify-center"
                         >
                           <MessengerAvatar
                             name={peerName || label}
                             photoUrl={peerPhotoUrl}
-                            className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-[var(--tab-bg)] text-[11px] font-bold text-[var(--toss-gray-4)] dark:bg-zinc-800"
+                            className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-[var(--tab-bg)] text-[11px] font-bold text-[var(--toss-gray-4)] dark:bg-zinc-800"
                             decorative
                           />
                           {isPeerOnline ? (
@@ -263,14 +263,14 @@ export function MessengerSidebar({
                       ) : (
                         <div
                           data-testid={`chat-room-icon-${roomId}`}
-                          className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--tab-bg)] text-[var(--toss-gray-4)] dark:bg-zinc-800"
+                          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--tab-bg)] text-[var(--toss-gray-4)] dark:bg-zinc-800"
                         >
                           <MenuIcon name="chat" className="h-4 w-4" />
                         </div>
                       )}
                       <div
                         data-testid={`chat-room-summary-${roomId}`}
-                        className="flex min-w-0 flex-1 flex-col gap-1 py-0.5"
+                        className="flex min-w-0 flex-1 flex-col gap-1.5"
                       >
                         <div className="flex items-start gap-1.5 min-w-0">
                           {unread > 0 ? (
@@ -297,15 +297,21 @@ export function MessengerSidebar({
                               {participantCount}명
                             </span>
                           ) : null}
-                          {isPinned ? <span className="text-[9px] font-bold text-amber-400">PIN</span> : null}
-                          {isHidden ? <span className="text-[9px] font-bold text-[var(--toss-gray-3)]">HIDE</span> : null}
+                          {isPinned ? <span className="rounded-[var(--radius-sm)] bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-500">고정</span> : null}
+                          {isHidden ? <span className="rounded-[var(--radius-sm)] bg-[var(--muted)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--toss-gray-3)]">숨김</span> : null}
                         </div>
                         <div
                           data-testid={`chat-room-preview-${roomId}`}
-                          className="text-[10px] text-[var(--toss-gray-3)] font-medium truncate"
+                          className="text-[11px] text-[var(--toss-gray-3)] font-medium truncate"
                         >
                           {preview}
                         </div>
+                        {(isGroupRoom && participantCount > 0) || unread > 0 ? (
+                          <div className="flex min-w-0 items-center gap-1.5 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                            {isGroupRoom && participantCount > 0 ? <span>참여 {participantCount}</span> : null}
+                            {unread > 0 ? <span className="text-[var(--accent)]">새 메시지 {unread > 99 ? '99+' : unread}</span> : null}
+                          </div>
+                        ) : null}
                       </div>
                     </button>
                   <div className="flex items-center gap-1 shrink-0">

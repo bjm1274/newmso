@@ -28,25 +28,27 @@ export default function IntegratedHRSettings({
     }, [activeMenu, showLockMenu]);
 
     return (
-        <div className="flex flex-col md:flex-row h-full rounded-[var(--radius-xl)] overflow-hidden bg-[var(--page-bg)] border border-[var(--border)] shadow-sm">
+        <div className="flex h-full min-w-0 flex-col overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--page-bg)] shadow-sm">
             {/* Left Sidebar */}
-            <aside className="w-full md:w-64 bg-[var(--muted)] border-r border-[var(--border)] p-4 shrink-0 flex flex-col gap-2">
-                <h3 className="px-3 pb-3 pt-2 text-xs font-bold text-[var(--toss-gray-4)] uppercase tracking-widest border-b border-[var(--border)] mb-2">인사/급여 앱 설정</h3>
-                {menus.map(menu => (
-                    <button
-                        key={menu.id}
-                        onClick={() => setActiveMenu(menu.id)}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-[var(--radius-md)] text-sm font-bold transition-all ${activeMenu === menu.id ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm' : 'text-[var(--foreground)] hover:bg-[var(--toss-gray-2)]'
-                            }`}
-                    >
-                        <span className="text-lg">{menu.icon}</span>
-                        <span>{menu.label}</span>
-                    </button>
-                ))}
+            <aside className="w-full shrink-0 border-b border-[var(--border)] bg-[var(--muted)] p-4">
+                <h3 className="mb-3 px-1 text-xs font-bold uppercase tracking-widest text-[var(--toss-gray-4)]">인사/급여 앱 설정</h3>
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                    {menus.map(menu => (
+                        <button
+                            key={menu.id}
+                            onClick={() => setActiveMenu(menu.id)}
+                            className={`flex min-h-12 items-center gap-3 rounded-[var(--radius-md)] px-4 py-3 text-left text-sm font-bold break-keep transition-all ${activeMenu === menu.id ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm' : 'text-[var(--foreground)] hover:bg-[var(--toss-gray-2)]'
+                                }`}
+                        >
+                            <span className="shrink-0 text-lg">{menu.icon}</span>
+                            <span className="min-w-0 whitespace-normal break-keep leading-5">{menu.label}</span>
+                        </button>
+                    ))}
+                </div>
             </aside>
 
             {/* Right Content */}
-            <main className="flex-1 p-4 md:p-4 overflow-y-auto custom-scrollbar bg-[var(--page-bg)]">
+            <main className="min-w-0 flex-1 overflow-y-auto bg-[var(--page-bg)] p-4 custom-scrollbar">
                 {activeMenu === 'policy' && <HRPolicies companyName={companyName} />}
                 {activeMenu === 'tax' && (
                     <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -104,7 +106,7 @@ function HRPolicies({ companyName }: { companyName: string }) {
     });
 
     return (
-        <div className="max-w-4xl space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="max-w-4xl min-w-0 space-y-5 break-keep animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex flex-col gap-1 mb-3">
                 <h2 className="text-base font-bold text-[var(--foreground)] tracking-tight">인사 정책 설정 (Rules)</h2>
             </div>
@@ -116,22 +118,22 @@ function HRPolicies({ companyName }: { companyName: string }) {
                     </div>
 
                     <div className="p-0 divide-y divide-[var(--border)]">
-                        <div className="p-4 flex items-center justify-between hover:bg-[var(--muted)]/50 transition-colors">
-                            <div>
+                        <div className="flex flex-col gap-3 p-4 transition-colors hover:bg-[var(--muted)]/50 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="min-w-0 flex-1 pr-2">
                                 <h4 className="font-bold text-[var(--foreground)] text-[15px] mb-1">법정 공휴일 자동 유급 처리</h4>
-                                <p className="text-[12px] text-[var(--toss-gray-4)]">빨간날(대체공휴일 포함)을 근무일에서 자동으로 제외하고 유급 휴일로 계산합니다.</p>
+                                <p className="text-[12px] leading-5 text-[var(--toss-gray-4)] break-keep">빨간날(대체공휴일 포함)을 근무일에서 자동으로 제외하고 유급 휴일로 계산합니다.</p>
                             </div>
                             <ToggleSwitch checked={policies.autoHolidayPay} onChange={(v) => setPolicies({ ...policies, autoHolidayPay: v })} />
                         </div>
 
-                        <div className="p-4 flex items-center justify-between hover:bg-[var(--muted)]/50 transition-colors">
-                            <div>
+                        <div className="flex flex-col gap-3 p-4 transition-colors hover:bg-[var(--muted)]/50 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="min-w-0 flex-1 pr-2">
                                 <h4 className="font-bold text-[var(--foreground)] text-[15px] mb-1">연차 발생 기준</h4>
-                                <p className="text-[12px] text-[var(--toss-gray-4)]">연차 부여 시점을 입사일 기준(정확함)으로 할지, 1월 1일 회계연도 기준(일괄부여)으로 할지 선택합니다.</p>
+                                <p className="text-[12px] leading-5 text-[var(--toss-gray-4)] break-keep">연차 부여 시점을 입사일 기준(정확함)으로 할지, 1월 1일 회계연도 기준(일괄부여)으로 할지 선택합니다.</p>
                             </div>
-                            <div className="flex bg-[var(--toss-gray-2)] rounded-[var(--radius-md)] p-1 shadow-inner">
-                                <button onClick={() => setPolicies({ ...policies, annualLeaveStandard: '입사일' })} className={`px-4 py-2 text-[12px] font-bold rounded-[var(--radius-md)] transition-all ${policies.annualLeaveStandard === '입사일' ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm' : 'text-[var(--toss-gray-4)]'}`}>입사일 기준</button>
-                                <button onClick={() => setPolicies({ ...policies, annualLeaveStandard: '회계연도' })} className={`px-4 py-2 text-[12px] font-bold rounded-[var(--radius-md)] transition-all ${policies.annualLeaveStandard === '회계연도' ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm' : 'text-[var(--toss-gray-4)]'}`}>회계년도 기준</button>
+                            <div className="flex shrink-0 rounded-[var(--radius-md)] bg-[var(--toss-gray-2)] p-1 shadow-inner">
+                                <button onClick={() => setPolicies({ ...policies, annualLeaveStandard: '입사일' })} className={`whitespace-nowrap rounded-[var(--radius-md)] px-4 py-2 text-[12px] font-bold transition-all ${policies.annualLeaveStandard === '입사일' ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm' : 'text-[var(--toss-gray-4)]'}`}>입사일 기준</button>
+                                <button onClick={() => setPolicies({ ...policies, annualLeaveStandard: '회계연도' })} className={`whitespace-nowrap rounded-[var(--radius-md)] px-4 py-2 text-[12px] font-bold transition-all ${policies.annualLeaveStandard === '회계연도' ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm' : 'text-[var(--toss-gray-4)]'}`}>회계년도 기준</button>
                             </div>
                         </div>
                     </div>
@@ -143,26 +145,26 @@ function HRPolicies({ companyName }: { companyName: string }) {
                     </div>
 
                     <div className="p-0 divide-y divide-[var(--border)]">
-                        <div className="p-4 flex items-center justify-between hover:bg-[var(--muted)]/50 transition-colors">
-                            <div>
+                        <div className="flex flex-col gap-3 p-4 transition-colors hover:bg-[var(--muted)]/50 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="min-w-0 flex-1 pr-2">
                                 <h4 className="font-bold text-[var(--foreground)] text-[15px] mb-1">지각/조퇴 시 분 단위 자동 시급 차감</h4>
-                                <p className="text-[12px] text-[var(--toss-gray-4)]">출결 기록에서 지각이 확인되면, 한 달치 시급을 합산하여 급여 정산 마법사 구동 시 자동으로 기본급에서 차감합니다.</p>
+                                <p className="text-[12px] leading-5 text-[var(--toss-gray-4)] break-keep">출결 기록에서 지각이 확인되면, 한 달치 시급을 합산하여 급여 정산 마법사 구동 시 자동으로 기본급에서 차감합니다.</p>
                             </div>
                             <ToggleSwitch checked={policies.deductLateArrivals} onChange={(v) => setPolicies({ ...policies, deductLateArrivals: v })} />
                         </div>
 
-                        <div className="p-4 flex items-center justify-between hover:bg-[var(--muted)]/50 transition-colors">
-                            <div>
+                        <div className="flex flex-col gap-3 p-4 transition-colors hover:bg-[var(--muted)]/50 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="min-w-0 flex-1 pr-2">
                                 <h4 className="font-bold text-[var(--foreground)] text-[15px] mb-1">연장근로 무조건 보상휴가(대휴) 전환</h4>
-                                <p className="text-[12px] text-[var(--toss-gray-4)]">추가 수당(돈)을 지급하는 대신, 1.5배 가산된 시간만큼 직원의 &apos;보상 연차&apos; 개수에 자동으로 더해줍니다.</p>
+                                <p className="text-[12px] leading-5 text-[var(--toss-gray-4)] break-keep">추가 수당(돈)을 지급하는 대신, 1.5배 가산된 시간만큼 직원의 &apos;보상 연차&apos; 개수에 자동으로 더해줍니다.</p>
                             </div>
                             <ToggleSwitch checked={policies.autoConvertOvertimeToLeave} onChange={(v) => setPolicies({ ...policies, autoConvertOvertimeToLeave: v })} />
                         </div>
 
-                        <div className="p-4 flex items-center justify-between hover:bg-[var(--muted)]/50 transition-colors">
-                            <div>
+                        <div className="flex flex-col gap-3 p-4 transition-colors hover:bg-[var(--muted)]/50 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="min-w-0 flex-1 pr-2">
                                 <h4 className="font-bold text-[var(--foreground)] text-[15px] mb-1">포괄임금제 (고정 연장수당) 적용 자동화</h4>
-                                <p className="text-[12px] text-[var(--toss-gray-4)]">직원 등록 시 월 20시간 등의 연장수당이 미리 세팅된 경우, 초과근무 발생 시 자동 상계(차감) 처리합니다.</p>
+                                <p className="text-[12px] leading-5 text-[var(--toss-gray-4)] break-keep">직원 등록 시 월 20시간 등의 연장수당이 미리 세팅된 경우, 초과근무 발생 시 자동 상계(차감) 처리합니다.</p>
                             </div>
                             <ToggleSwitch checked={policies.includeOvertimeInBase} onChange={(v) => setPolicies({ ...policies, includeOvertimeInBase: v })} />
                         </div>

@@ -100,7 +100,6 @@ export const ADMIN_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'admin_경영분석', label: '경영분석' },
   { key: 'admin_감사센터', label: '감사센터' },
   { key: 'admin_시스템마스터센터', label: '시스템마스터센터', hint: '시스템 마스터 계정이 추가로 필요할 수 있습니다.' },
-  { key: 'admin_엑셀등록', label: '엑셀등록' },
   { key: 'admin_알림자동화', label: '알림자동화' },
   { key: 'admin_회사관리', label: '회사관리' },
   { key: 'admin_직원권한', label: '직원권한' },

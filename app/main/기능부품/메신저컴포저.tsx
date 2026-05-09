@@ -100,7 +100,7 @@ function MessengerComposerImpl({
   return (
     <div
       data-testid="chat-upload-dropzone"
-      className={`relative z-10 shrink-0 bg-[var(--card)] px-1 py-0.5 pb-[calc(env(safe-area-inset-bottom)+2px)] md:px-2 md:py-1 md:pb-1 transition-all ${isDragging ? 'border-t-2 border-[var(--accent)] border-dashed bg-blue-500/10 dark:bg-blue-900/20' : 'border-t border-[var(--border)]'}`}
+      className={`relative z-10 shrink-0 bg-[var(--card)] px-2 py-2 pb-[calc(env(safe-area-inset-bottom)+8px)] md:px-3 md:py-2 md:pb-2 transition-all ${isDragging ? 'border-t-2 border-[var(--accent)] border-dashed bg-blue-500/10 dark:bg-blue-900/20' : 'border-t border-[var(--border)]'}`}
       onDragOver={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -130,14 +130,14 @@ function MessengerComposerImpl({
       {pendingAlbumFiles.length > 0 && (
         <div
           data-testid="chat-pending-album-panel"
-          className="mb-1 flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--accent)]/30 bg-blue-500/10 dark:bg-blue-950/20 px-3 py-2"
+          className="mb-2 flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--accent)]/30 bg-blue-500/10 dark:bg-blue-950/20 px-3 py-2"
         >
           <div className="flex items-center justify-between">
             <span className="text-[12px] font-bold text-[var(--accent)]">📷 사진 {pendingAlbumFiles.length}장 묶어 보내기</span>
             <button
               data-testid="chat-pending-album-cancel-button"
               onClick={onCancelAlbumUpload}
-              className="text-[11px] text-[var(--toss-gray-3)] hover:text-red-500 font-semibold"
+              className="min-h-[44px] rounded-[var(--radius-md)] px-3 text-[11px] text-[var(--toss-gray-3)] hover:bg-[var(--muted)] hover:text-red-500 font-semibold"
             >
               취소
             </button>
@@ -153,7 +153,7 @@ function MessengerComposerImpl({
                 <button
                   onClick={() => onRemoveAlbumFile(index)}
                   aria-label={`앨범 미리보기 ${index + 1} 제거`}
-                  className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/60 rounded-full flex items-center justify-center text-white text-[9px] font-bold hover:bg-red-600 transition-colors"
+                  className="absolute top-0.5 right-0.5 min-h-[24px] min-w-[24px] bg-black/60 rounded-full flex items-center justify-center text-white text-[9px] font-bold hover:bg-red-600 transition-colors"
                 >
                   ✕
                 </button>
@@ -174,7 +174,7 @@ function MessengerComposerImpl({
               data-testid="chat-pending-album-send-button"
               onClick={() => void onSendAlbum()}
               disabled={fileUploading}
-              className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50 flex items-center gap-1"
+              className="flex min-h-[44px] items-center gap-1 rounded-[var(--radius-md)] bg-[var(--accent)] px-4 text-[11px] font-bold text-white disabled:opacity-50"
             >
               {fileUploading ? <span className="animate-pulse">전송 중...</span> : '📤 묶어서 전송'}
             </button>
@@ -185,7 +185,7 @@ function MessengerComposerImpl({
       {pendingAttachmentFiles.length > 0 && (
         <div
           data-testid="chat-pending-upload-panel"
-          className="mb-1 flex flex-col gap-1 rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/10 px-2 py-1 text-[12px] text-blue-900"
+          className="mb-2 flex flex-col gap-2 rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-[12px] text-blue-900"
         >
           <p className="font-semibold">선택한 파일 {pendingAttachmentFiles.length}개를 채팅방에 전송할까요?</p>
           <div className="flex flex-wrap gap-1.5">
@@ -208,7 +208,7 @@ function MessengerComposerImpl({
               type="button"
               data-testid="chat-pending-upload-cancel-button"
               onClick={onCancelPendingAttachmentUpload}
-              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-[11px] font-bold text-[var(--foreground)]"
+              className="min-h-[44px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-[11px] font-bold text-[var(--foreground)]"
             >
               취소
             </button>
@@ -216,7 +216,7 @@ function MessengerComposerImpl({
               type="button"
               data-testid="chat-pending-upload-send-button"
               onClick={() => void onConfirmPendingAttachmentUpload()}
-              className="rounded-[var(--radius-md)] bg-[var(--accent)] px-2.5 py-1 text-[11px] font-bold text-white"
+              className="min-h-[44px] rounded-[var(--radius-md)] bg-[var(--accent)] px-4 text-[11px] font-bold text-white"
             >
               전송
             </button>
@@ -266,7 +266,7 @@ function MessengerComposerImpl({
                     type="button"
                     data-testid={`chat-failed-attachment-retry-${entry.id}`}
                     onClick={() => void onRetryFailedAttachmentUpload(entry.id)}
-                    className="rounded-[var(--radius-md)] bg-amber-500/15 px-2 py-1 text-[10px] font-bold text-amber-700"
+                    className="min-h-[36px] rounded-[var(--radius-md)] bg-amber-500/15 px-3 text-[10px] font-bold text-amber-700"
                   >
                     재시도
                   </button>
@@ -274,7 +274,7 @@ function MessengerComposerImpl({
                     type="button"
                     data-testid={`chat-failed-attachment-dismiss-${entry.id}`}
                     onClick={() => void onDismissFailedAttachmentUpload(entry.id)}
-                    className="rounded-[var(--radius-md)] border border-amber-500/20 bg-white/80 px-2 py-1 text-[10px] font-bold text-amber-700"
+                    className="min-h-[36px] rounded-[var(--radius-md)] border border-amber-500/20 bg-white/80 px-3 text-[10px] font-bold text-amber-700"
                   >
                     삭제
                   </button>
@@ -285,7 +285,7 @@ function MessengerComposerImpl({
         </div>
       )}
 
-      <div className={`flex items-end gap-1 px-1 py-0 md:gap-1.5 md:px-1.5 transition-all ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
+      <div className={`flex items-end gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/50 px-2 py-2 md:gap-2.5 md:px-2.5 transition-all ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
         ? 'opacity-60 pointer-events-none'
         : ''
         }`}>
@@ -312,7 +312,7 @@ function MessengerComposerImpl({
           disabled={fileUploading}
           aria-label="사진 또는 파일 첨부"
           title="사진/파일 첨부"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] transition-colors hover:text-[var(--accent)] disabled:opacity-50"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-3)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
         >
           {fileUploading ? <span className="animate-pulse text-xs">...</span> : <span className="text-[11px] font-bold md:text-xs">첨부</span>}
         </button>
@@ -321,7 +321,7 @@ function MessengerComposerImpl({
             ref={composerRef}
             data-testid="chat-message-input"
             rows={1}
-            className="block min-h-[24px] w-full min-w-0 resize-none bg-transparent px-1 py-0 text-[16px] font-semibold leading-5 outline-none md:min-h-[20px] md:px-1.5 md:text-xs md:leading-5"
+            className="block min-h-[44px] w-full min-w-0 resize-none bg-transparent px-1 py-2.5 text-[16px] font-semibold leading-5 outline-none md:px-1.5 md:text-sm md:leading-5"
             placeholder={selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice ? '부서장 이상만 공지 작성 가능' : '메시지를 입력하세요... (@이름 멘션 가능)'}
             value={inputMsg}
             onChange={(event) => {
@@ -354,7 +354,7 @@ function MessengerComposerImpl({
         <button
           data-testid="chat-send-button"
           onClick={() => void onSendMessage()}
-          className="flex h-7 min-w-[46px] shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)] px-2 text-[12px] font-bold text-white shadow-sm transition-all hover:scale-105 active:scale-95 md:min-w-[50px] md:text-xs"
+          className="flex h-11 min-w-[56px] shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)] px-3 text-[12px] font-bold text-white shadow-sm transition-all hover:scale-105 active:scale-95 md:min-w-[60px] md:text-xs"
         >
           전송
         </button>

@@ -17,7 +17,6 @@ export type AdminOuterTabId =
   | '운영설정'
   | '감사센터'
   | '시스템마스터센터'
-  | '엑셀등록'
   | '회사관리'
   | '직원권한'
   | '데이터백업'
@@ -71,8 +70,7 @@ export const ADMIN_SIDEBAR_ITEMS: AdminSidebarItem[] = [
   { id: '회사관리', label: '회사 / 조직', group: '조직 / 권한', icon: 'server' },
   { id: '직원권한', label: '직원 권한', group: '조직 / 권한', icon: 'admin' },
   { id: '운영설정', label: '운영 설정', group: '시스템 설정', icon: 'settings' },
-  { id: '문서양식', label: '문서 양식', group: '시스템 설정', icon: 'document' },
-  { id: '엑셀등록', label: '엑셀 일괄 등록', group: '데이터 관리', icon: 'send' },
+  { id: '문서양식', label: '결재 양식 관리', group: '시스템 설정', icon: 'document' },
   { id: '데이터백업', label: '백업 / 복원', group: '데이터 관리', icon: 'save' },
   { id: '데이터초기화', label: '데이터 초기화', group: '데이터 관리', icon: 'refresh' },
   { id: '감사센터', label: '감사 센터', group: '감사 센터', icon: 'search' },

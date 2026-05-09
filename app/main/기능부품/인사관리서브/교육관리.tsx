@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -30,6 +31,7 @@ interface LicenseAlert {
 }
 
 export default function EducationMain({ staffs, selectedCo }: Record<string, unknown>) {
+  const { dialog, openConfirm } = useActionDialog();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [licenseNotifications, setLicenseNotifications] = useState<LicenseAlert[]>([]);
   const [completionMap, setCompletionMap] = useState<Record<string, { is_completed: boolean; certificate_url?: string | null }>>({});
@@ -220,6 +222,7 @@ export default function EducationMain({ staffs, selectedCo }: Record<string, unk
 
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-500 bg-[var(--tab-bg)]/20 relative">
+      {dialog}
       {activeAlerts.length > 0 && (
         <div className="bg-red-600 text-white px-5 py-2 flex justify-between items-center animate-pulse">
           <p className="text-[11px] font-semibold">{bannerText}</p>
@@ -297,7 +300,13 @@ export default function EducationMain({ staffs, selectedCo }: Record<string, unk
                 <button
                   type="button"
                   onClick={async () => {
-                    if (!confirm(`${item.name}님에게 알림 발송을 하시겠습니까?`)) return;
+                    const confirmed = await openConfirm({
+                      title: '교육/면허 알림 발송',
+                      description: `${item.name}님에게 알림을 발송합니다.\n현재 탭의 미이수 또는 갱신 대상 상태가 함께 안내됩니다.`,
+                      confirmText: '발송',
+                      tone: 'accent',
+                    });
+                    if (!confirmed) return;
                     const { error } = await supabase.from('notifications').insert({
                       user_id: activeTab === '의무교육' ? item.id : item.staffId,
                       type: activeTab === '의무교육' ? 'education' : 'license_expiry',

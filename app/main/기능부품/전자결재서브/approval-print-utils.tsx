@@ -165,6 +165,7 @@ window.onload = () => window.print();
   const referenceSection = ccUsers.length > 0
     ? `<div class="reference"><strong>참조자</strong><span>${ccUsers.map((user) => escapeHtml(user.position ? `${user.name} ${user.position}` : user.name)).join(', ')}</span></div>`
     : '';
+  const sealImageUrl = String(design.sealImageUrl || '').trim();
 
   const html = `<!DOCTYPE html>
 <html>
@@ -200,7 +201,8 @@ window.onload = () => window.print();
     .approval-line{display:flex;flex-wrap:wrap;gap:8px;padding:0 28px 16px;break-inside:avoid}
     .sig-box{border:1px dashed ${escapeHtml(alphaColor(design.primaryColor || '#155eef', 0.45))};border-radius:10px;padding:10px 14px;min-width:90px;text-align:center;font-size:11px;color:#475569;background:#fff}
     .footer{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 28px 16px;border-top:1px solid ${escapeHtml(alphaColor(design.borderColor || '#d7e3ff', 0.9))};font-size:12px;color:#64748b;break-inside:avoid}
-    .seal{width:72px;height:72px;border-radius:999px;border:2px solid ${escapeHtml(alphaColor(design.primaryColor || '#155eef', 0.75))};display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;font-size:10px;color:${escapeHtml(design.primaryColor || '#155eef')}}
+    .seal{width:72px;height:72px;border-radius:999px;border:2px solid ${escapeHtml(alphaColor(design.primaryColor || '#155eef', 0.75))};display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;font-size:10px;color:${escapeHtml(design.primaryColor || '#155eef')};overflow:hidden;background:#fff}
+    .seal img{max-width:100%;max-height:100%;object-fit:contain}
     @media print{body{background:#fff;padding:0}.sheet{box-shadow:none;border-radius:0;max-width:none;border:none}.hero,.meta,.body,.section,.reference,.approval-line,.footer{break-inside:avoid}}
   </style>
 </head>
@@ -230,7 +232,7 @@ window.onload = () => window.print();
     ${design.showSignArea === false ? '' : `<div class="approval-line">${approvalBoxes}</div>`}
     <div class="footer">
       <div>${escapeHtml(design.footerText || DEFAULT_APPROVAL_TEMPLATE_DESIGN.footerText)}</div>
-      ${design.showSeal === false ? '' : `<div class="seal">${escapeHtml(design.sealLabel || `${design.companyLabel || 'SY INC.'} 직인`)}</div>`}
+      ${design.showSeal === false ? '' : sealImageUrl ? `<div class="seal"><img src="${escapeHtml(sealImageUrl)}" alt=""></div>` : `<div class="seal">${escapeHtml(design.sealLabel || `${design.companyLabel || 'SY INC.'} 직인`)}</div>`}
     </div>
   </div>
   ${autoPrintScript}

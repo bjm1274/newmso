@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -25,6 +26,7 @@ const PERIOD_MONTHS: Record<'1개월' | '3개월' | '6개월', number> = {
 };
 
 export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
+  const { dialog, openConfirm } = useActionDialog();
   const [period, setPeriod] = useState<'1개월' | '3개월' | '6개월'>('1개월');
   const [stats, setStats] = useState<StaffStat[]>([]);
   const [loading, setLoading] = useState(false);
@@ -129,7 +131,13 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
       return;
     }
 
-    if (!confirm(`${targets.length}명에게 지각 경고 알림을 보낼까요?`)) return;
+    const confirmed = await openConfirm({
+      title: '지각 경고 알림 발송',
+      description: `${targets.length}명에게 지각 경고 알림을 발송합니다.\n최근 근태 패턴 기준 대상자에게만 전송됩니다.`,
+      confirmText: '발송',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
     setSending(true);
 
     try {
@@ -155,6 +163,7 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 p-4 md:p-4" data-testid="attendance-analysis-lateness">
+      {dialog}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">지각 / 조퇴 패턴 분석</h2>

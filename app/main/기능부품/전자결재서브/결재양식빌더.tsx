@@ -1,5 +1,6 @@
 'use client';
 import { toast } from '@/lib/toast';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -28,6 +29,7 @@ const FIELD_TYPES: { type: FormField['type']; label: string }[] = [
 ];
 
 export default function ApprovalFormBuilder({ user }: Props) {
+  const { dialog, openConfirm } = useActionDialog();
   const [tab, setTab] = useState<'빌더' | '목록'>('빌더');
   const [formName, setFormName] = useState('');
   const [fields, setFields] = useState<FormField[]>([]);
@@ -107,7 +109,17 @@ export default function ApprovalFormBuilder({ user }: Props) {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('이 양식을 삭제하시겠습니까?')) return;
+    const targetForm = savedForms.find((form) => form.id === id);
+    const confirmed = await openConfirm({
+      title: '결재 양식을 삭제할까요?',
+      description: [
+        targetForm?.name ? `"${targetForm.name}" 양식을 삭제합니다.` : '선택한 결재 양식을 삭제합니다.',
+        '이미 작성된 결재 문서는 유지되지만 새 문서 작성에서는 이 양식을 사용할 수 없습니다.',
+      ].join('\n'),
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await supabase.from('custom_form_templates').delete().eq('id', id);
       setSavedForms(prev => prev.filter(f => f.id !== id));
@@ -132,6 +144,7 @@ export default function ApprovalFormBuilder({ user }: Props) {
 
   return (
     <div className="p-4 space-y-4 max-w-3xl mx-auto">
+      {dialog}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">결재 양식 빌더</h2>

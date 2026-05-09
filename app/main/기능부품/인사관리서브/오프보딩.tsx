@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
@@ -99,6 +100,7 @@ export default function OffboardingView({
   selectedCo = '전체',
   onRefresh,
 }: Props) {
+  const { dialog, openConfirm } = useActionDialog();
   const [activeTab, setActiveTab] = useState<TabKey>('active');
   const [selectedStaff, setSelectedStaff] = useState('');
   const [exitDate, setExitDate] = useState('');
@@ -263,13 +265,13 @@ export default function OffboardingView({
       return;
     }
 
-    if (
-      !window.confirm(
-        `[${staff.name}]님의 오프보딩을 시작할까요?\n퇴사 예정일: ${exitDate}\n사유: ${reason}`,
-      )
-    ) {
-      return;
-    }
+    const confirmed = await openConfirm({
+      title: '오프보딩 시작',
+      description: `[${staff.name}]님의 오프보딩을 시작합니다.\n퇴사 예정일: ${exitDate}\n사유: ${reason}`,
+      confirmText: '시작',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
 
     setLoading(true);
     const actor = readClientAuditActor();
@@ -335,7 +337,13 @@ export default function OffboardingView({
   };
 
   const cancelOffboarding = async (staff: StaffMember) => {
-    if (!window.confirm(`${staff.name}님의 퇴사 예정 상태를 취소할까요?`)) return;
+    const confirmed = await openConfirm({
+      title: '퇴사 예정 취소',
+      description: `${staff.name}님의 퇴사 예정 상태를 취소합니다.\n진행 중인 퇴사 체크리스트와 예정 정보가 정리됩니다.`,
+      confirmText: '취소 처리',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     setLoading(true);
     const actor = readClientAuditActor();
 
@@ -420,7 +428,13 @@ export default function OffboardingView({
       return;
     }
 
-    if (!window.confirm(`${staff.name}님의 최종 퇴사 처리를 완료할까요?`)) return;
+    const confirmed = await openConfirm({
+      title: '최종 퇴사 처리',
+      description: `${staff.name}님의 최종 퇴사 처리를 완료합니다.\n권한과 알림 구독이 정리되며 직원 상태가 퇴사로 변경됩니다.`,
+      confirmText: '퇴사 처리',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
 
     setLoading(true);
     const actor = readClientAuditActor();
@@ -495,12 +509,10 @@ export default function OffboardingView({
 
   return (
     <div className="max-w-6xl space-y-4" data-testid="offboarding-view">
+      {dialog}
       <div className="flex flex-col gap-3 border-b border-[var(--border)] pb-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-[var(--foreground)]">인력 오프보딩 타임라인</h2>
-          <p className="text-sm text-[var(--toss-gray-3)]">
-            퇴사 예정, 체크리스트, 최종 퇴사 처리를 한 화면에서 관리합니다.
-          </p>
         </div>
         <div className="flex gap-2">
           {([

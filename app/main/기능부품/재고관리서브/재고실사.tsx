@@ -2,7 +2,9 @@
 import { toast } from '@/lib/toast';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { getItemName, getItemQuantity, validateInventoryQuantity } from '@/app/main/inventory-utils';
+import { InventorySummaryStrip, InventoryStepSummary } from './InventoryDesignPanels';
 
 type CountItem = {
   id: string;
@@ -14,6 +16,7 @@ type CountItem = {
 };
 
 export default function InventoryCount({ user, inventory, fetchInventory }: { user: any; inventory: any[]; fetchInventory: () => void }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [sessionStarted, setSessionStarted] = useState(false);
   const [items, setItems] = useState<CountItem[]>([]);
   const [search, setSearch] = useState('');
@@ -70,7 +73,17 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
 
     const unenteredCount = items.filter(it => it.actual === '').length;
     if (unenteredCount > 0) {
-      if (!confirm(`아직 ${unenteredCount}개 품목의 실사 수량이 입력되지 않았습니다.\n미입력 품목은 제외하고 완료하시겠습니까?`)) return;
+      const confirmed = await openConfirm({
+        title: '미입력 품목을 제외하고 실사를 완료할까요?',
+        description: [
+          `아직 ${unenteredCount}개 품목의 실물 수량이 입력되지 않았습니다.`,
+          `입력 완료 ${enteredCount}건만 저장하고, 수량 차이 ${discrepancies.length}건을 조정합니다.`,
+          '미입력 품목은 이번 실사 기록에서 제외됩니다.',
+        ].join('\n'),
+        confirmText: '완료 진행',
+        tone: 'accent',
+      });
+      if (!confirmed) return;
     }
     setSaving(true);
     try {
@@ -216,7 +229,24 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
 
   // 실사 진행 중
   return (
+    <>
+    {dialog}
     <div className="space-y-4">
+      <InventorySummaryStrip
+        items={[
+          { label: '실사 대상', value: `${items.length.toLocaleString('ko-KR')}건`, detail: '세션 시작 시점의 등록 품목', tone: 'info' },
+          { label: '입력 완료', value: `${enteredCount.toLocaleString('ko-KR')}건`, detail: `${Math.round(items.length > 0 ? (enteredCount / items.length) * 100 : 0)}% 진행`, tone: enteredCount === items.length ? 'success' : 'default' },
+          { label: '차이 발견', value: `${discrepancies.length.toLocaleString('ko-KR')}건`, detail: '저장 시 재고 조정 대상', tone: discrepancies.length > 0 ? 'warning' : 'success' },
+          { label: '입력 오류', value: `${invalidEntries.length.toLocaleString('ko-KR')}건`, detail: '완료 전 수정 필요', tone: invalidEntries.length > 0 ? 'danger' : 'default' },
+        ]}
+      />
+      <InventoryStepSummary
+        steps={[
+          { label: '대상 확정', detail: `${items.length.toLocaleString('ko-KR')}개 품목으로 실사를 시작했습니다.`, state: 'done' },
+          { label: '실수량 입력', detail: `${enteredCount.toLocaleString('ko-KR')}개 입력됨`, state: enteredCount === items.length ? 'done' : 'active' },
+          { label: '차이 조정', detail: discrepancies.length > 0 ? `${discrepancies.length}개 품목 변경 예정` : '차이가 발견되면 완료 시 자동 조정됩니다.', state: discrepancies.length > 0 ? 'warning' : 'pending' },
+        ]}
+      />
       {/* 진행 상황 */}
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 shadow-sm">
         <div className="flex items-center justify-between mb-2">
@@ -253,7 +283,22 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
           {saving ? '저장 중...' : '실사 완료'}
         </button>
         <button
-          onClick={() => { if (confirm('실사를 중단하시겠습니까? 입력한 내용이 사라집니다.')) { setSessionStarted(false); setItems([]); } }}
+          onClick={() => {
+            void (async () => {
+              const confirmed = await openConfirm({
+                title: '실사를 중단할까요?',
+                description: [
+                  '현재 입력한 실물 수량은 저장되지 않습니다.',
+                  `입력 완료 ${enteredCount}건, 차이 발견 ${discrepancies.length}건이 모두 사라집니다.`,
+                ].join('\n'),
+                confirmText: '중단',
+                tone: 'danger',
+              });
+              if (!confirmed) return;
+              setSessionStarted(false);
+              setItems([]);
+            })();
+          }}
           className="px-3 py-2 bg-[var(--muted)] text-[var(--toss-gray-4)] rounded-[var(--radius-md)] text-sm font-semibold"
         >
           중단
@@ -312,5 +357,6 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
         </div>
       </div>
     </div>
+    </>
   );
 }

@@ -1,3 +1,4 @@
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -5,6 +6,7 @@ import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import SmartDatePicker from '../공통/SmartDatePicker';
 
 export default function InvoiceAutoExtraction({ onRefresh, user }: Record<string, unknown>) {
+    const { dialog, openConfirm } = useActionDialog();
     const [file, setFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -85,7 +87,13 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: Record<string
 
     const handleRegisterAll = async () => {
         if (extractedItems.length === 0) return;
-        if (!confirm(`총 ${extractedItems.length}개의 품목을 재고 자산으로 일괄 등록하시겠습니까?`)) return;
+        const confirmed = await openConfirm({
+            title: '명세서 품목 일괄 등록',
+            description: `총 ${extractedItems.length}개의 품목을 재고 자산으로 일괄 등록합니다.\n등록 후 재고 목록과 자산 기준정보에 반영됩니다.`,
+            confirmText: '일괄 등록',
+            tone: 'accent',
+        });
+        if (!confirmed) return;
 
         setIsLoading(true);
         let successCount = 0;
@@ -135,6 +143,7 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: Record<string
 
     return (
         <div className="bg-[var(--card)] p-4 md:p-5 border border-[var(--border)] shadow-sm rounded-2xl animate-in fade-in duration-500">
+            {dialog}
             <div className="mb-4">
                 <h3 className="text-xl font-bold text-[var(--foreground)] tracking-tight">📄 명세서 추출 자동 입고</h3>
             </div>

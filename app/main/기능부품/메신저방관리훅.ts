@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
 import { CHAT_ROOM_SELECT } from '@/lib/chat-query-columns';
@@ -67,6 +68,7 @@ export function useChatRoomManagement({
   triggerChatPush,
   user,
 }: UseChatRoomManagementParams) {
+  const { dialog, openConfirm } = useActionDialog();
   const persistRoomMembers = useCallback(async (roomId: string, members: string[]) => {
     const { error } = await supabase.from('chat_rooms').update({ members }).eq('id', roomId);
     if (error) throw error;
@@ -132,7 +134,13 @@ export function useChatRoomManagement({
       toast('나와의 채팅은 나갈 수 없습니다.', 'warning');
       return;
     }
-    if (!confirm('이 채팅방에서 나가시겠습니까? 대화방 목록에서 사라지고 새 메시지 알림도 받지 않습니다.')) {
+    const confirmed = await openConfirm({
+      title: '채팅방 나가기',
+      description: '이 채팅방에서 나갑니다.\n대화방 목록에서 사라지고 새 메시지 알림도 받지 않습니다.',
+      confirmText: '나가기',
+      tone: 'danger',
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -177,6 +185,7 @@ export function useChatRoomManagement({
   }, [
     effectiveChatUserId,
     insertRoomSystemMessage,
+    openConfirm,
     persistRoomMembers,
     selectedRoom,
     setChatRooms,
@@ -191,16 +200,22 @@ export function useChatRoomManagement({
       if (!selectedRoom) return;
       if (selectedRoom.created_by !== (effectiveChatUserId || user?.id)) return;
       if (String(memberId) === String(effectiveChatUserId || user?.id || '')) return;
-      if (!confirm('이 참여자를 채팅방에서 제외하시겠습니까?')) return;
+      const removedName =
+        resolveRoomMemberProfile(selectedRoom, String(memberId))?.name ||
+        resolveStaffProfile(memberId)?.name ||
+        '선택한 참여자';
+      const confirmed = await openConfirm({
+        title: '참여자 제외',
+        description: `${removedName}님을 채팅방에서 제외합니다.`,
+        confirmText: '제외',
+        tone: 'danger',
+      });
+      if (!confirmed) return;
 
       try {
         const currentMembers = Array.isArray(selectedRoom.members) ? selectedRoom.members : [];
         const newMembers = currentMembers.filter((id: unknown) => String(id) !== String(memberId));
 
-        const removedName =
-          resolveRoomMemberProfile(selectedRoom, String(memberId))?.name ||
-          resolveStaffProfile(memberId)?.name ||
-          '알 수 없음';
         const removerName = user?.name || '알 수 없음';
 
         await applyRoomMemberChange({
@@ -217,6 +232,7 @@ export function useChatRoomManagement({
     [
       applyRoomMemberChange,
       effectiveChatUserId,
+      openConfirm,
       resolveRoomMemberProfile,
       resolveStaffProfile,
       selectedRoom,
@@ -445,6 +461,7 @@ export function useChatRoomManagement({
   ]);
 
   return {
+    dialog,
     handleLeaveRoom,
     removeRoomMember,
     handleLeaveRoomFromDrawer,

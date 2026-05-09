@@ -23,6 +23,22 @@ const MAX_RECENT = 5;
 const LS_FAVORITES = 'erp_favorites';
 const LS_RECENT = 'erp_recent_features';
 
+const FEATURE_GROUP_ORDER = ['운영 보조', '의료/현장'] as const;
+
+const FEATURE_PRESENTATION: Record<string, { group: (typeof FEATURE_GROUP_ORDER)[number] }> = {
+  'org-chart': { group: '운영 보조' },
+  'department-inventory': { group: '운영 보조' },
+  'work-status': { group: '운영 보조' },
+  'handover-note': { group: '운영 보조' },
+  'closing-report': { group: '운영 보조' },
+  'staff-evaluation': { group: '운영 보조' },
+  'realtime-deposit': { group: '운영 보조' },
+  'discharge-review': { group: '의료/현장' },
+  'surgery-consultation': { group: '의료/현장' },
+  'op-check': { group: '의료/현장' },
+  'esl-manager': { group: '의료/현장' },
+};
+
 type ExtraFeaturesProps = {
   user?: any;
   staffs?: any[];
@@ -213,6 +229,15 @@ export default function ExtraFeatures({
     [recentFeatures, user]
   );
 
+  const groupedNormalCards = useMemo(
+    () =>
+      FEATURE_GROUP_ORDER.map((group) => ({
+        group,
+        cards: normalCards.filter((card) => FEATURE_PRESENTATION[card.testId]?.group === group),
+      })).filter((section) => section.cards.length > 0),
+    [normalCards]
+  );
+
   const compactToolbar = (
     <div className="flex shrink-0 flex-wrap items-center gap-2">
       <FontFamilyControl />
@@ -250,24 +275,31 @@ export default function ExtraFeatures({
     <div
       key={card.id}
       data-testid={`extra-card-shell-${card.testId}`}
-      className="group relative flex h-[110px] flex-col items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--toss-blue-light)]/35"
+      className="group relative flex min-h-[112px] flex-col justify-between rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 text-left shadow-sm transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--toss-blue-light)]/35"
     >
       <button
         type="button"
         data-testid={`extra-card-${card.testId}`}
         onClick={() => handleFeatureClick(card.id, card.subView)}
-        className="flex h-full w-full flex-col items-center justify-center text-center"
+        className="flex h-full w-full flex-col items-start justify-between text-left"
       >
-        <div className={`mb-3 flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] transition-colors ${card.accentClass}`}>
-          <LucideIcon name={card.icon} size={22} strokeWidth={1.9} />
+        <div className="flex w-full items-start justify-between gap-3 pr-8">
+          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] transition-colors ${card.accentClass}`}>
+            <LucideIcon name={card.icon} size={22} strokeWidth={1.9} />
+          </div>
+          <span className="rounded-full border border-[var(--border)] bg-[var(--surface-subtle)] px-2 py-1 text-[10px] font-black text-[var(--muted-foreground)]">
+            {FEATURE_PRESENTATION[card.testId]?.group || '기능'}
+          </span>
         </div>
-        <h3 className="text-[13px] font-bold text-[var(--foreground)]">{card.label}</h3>
+        <div className="mt-3 min-w-0">
+          <h3 className="text-[13px] font-black text-[var(--foreground)]">{card.label}</h3>
+        </div>
       </button>
       <button
         type="button"
         data-testid={`extra-favorite-${card.testId}`}
         onClick={(event) => toggleFavorite(card.id, event)}
-        className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] opacity-0 transition-all hover:bg-[var(--muted)] hover:text-[var(--accent)] group-hover:opacity-100"
+        className="absolute right-2.5 top-2.5 flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] opacity-100 transition-all hover:bg-[var(--muted)] hover:text-[var(--accent)]"
         title={favorites.includes(card.id) ? '즐겨찾기 해제' : '즐겨찾기 추가'}
         aria-label={favorites.includes(card.id) ? '즐겨찾기 해제' : '즐겨찾기 추가'}
       >
@@ -321,7 +353,7 @@ export default function ExtraFeatures({
           {favoriteCards.length > 0 ? (
             <div>
               <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">즐겨찾기</p>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {favoriteCards.map(renderCard)}
               </div>
             </div>
@@ -330,7 +362,7 @@ export default function ExtraFeatures({
           {recentCards.length > 0 ? (
             <div>
               <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">최근 사용</p>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {recentCards.map(renderCard)}
               </div>
             </div>
@@ -340,23 +372,45 @@ export default function ExtraFeatures({
             {(favoriteCards.length > 0 || recentCards.length > 0) && (
               <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">전체</p>
             )}
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-            {normalCards.map(renderCard)}
+            <div className="space-y-5">
+              {groupedNormalCards.map((section) => (
+                <section key={section.group}>
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <p className="text-[11px] font-black uppercase tracking-wider text-[var(--toss-gray-3)]">{section.group}</p>
+                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">{section.cards.length}개</span>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {section.cards.map(renderCard)}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </div>
 
-            {EXTERNAL_LINKS.map((item) => (
+          <div>
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">외부 시스템</p>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {EXTERNAL_LINKS.map((item) => (
               <a
                 key={item.id}
                 href={item.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group flex h-[110px] flex-col items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 text-center shadow-sm transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/50"
+                className="group flex min-h-[112px] flex-col items-start justify-between rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 text-left shadow-sm transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/50"
               >
-                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--accent)] transition-colors group-hover:bg-[var(--toss-blue-light)]">
-                  <LucideIcon name={item.icon} size={20} strokeWidth={1.8} />
+                <div className="flex w-full items-start justify-between gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--accent)] transition-colors group-hover:bg-[var(--toss-blue-light)]">
+                    <LucideIcon name={item.icon} size={20} strokeWidth={1.8} />
+                  </div>
+                  <span className="rounded-full border border-[var(--border)] bg-[var(--surface-subtle)] px-2 py-1 text-[10px] font-black text-[var(--muted-foreground)]">
+                    새 창
+                  </span>
                 </div>
-                <h3 className="text-[13px] font-bold text-[var(--foreground)]">{item.label}</h3>
+                <div className="mt-3">
+                  <h3 className="text-[13px] font-black text-[var(--foreground)]">{item.label}</h3>
+                </div>
               </a>
-            ))}
+              ))}
             </div>
           </div>
       </div>

@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -86,6 +87,7 @@ export default function OrgChartEditor({
   selectedCo: string;
   user: any;
 }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [nodes, setNodes] = useState<OrgNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -119,12 +121,19 @@ export default function OrgChartEditor({
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('노드를 삭제하시겠습니까? 하위 노드도 함께 삭제됩니다.')) return;
     const toDelete = [id];
     const findChildren = (pid: string) => {
       nodes.filter(n => n.parent_id === pid).forEach(c => { toDelete.push(c.id); findChildren(c.id); });
     };
     findChildren(id);
+    const target = nodes.find((node) => node.id === id);
+    const confirmed = await openConfirm({
+      title: '조직도 노드 삭제',
+      description: `${target?.name || '선택한 노드'}를 삭제합니다.\n하위 노드 ${Math.max(toDelete.length - 1, 0)}개도 함께 삭제됩니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     await supabase.from('org_chart_nodes').delete().in('id', toDelete);
     fetchNodes();
   };
@@ -154,7 +163,13 @@ export default function OrgChartEditor({
       toast('현재 선택한 사업체에 등록된 직원이 없습니다.', 'success');
       return;
     }
-    if (!confirm(`직원 ${sourceStaffs.length}명으로 조직도를 자동 구성하시겠습니까?\n기존 조직도가 초기화됩니다.`)) return;
+    const confirmed = await openConfirm({
+      title: '직원 기반 조직도 자동 구성',
+      description: `직원 ${sourceStaffs.length}명으로 조직도를 자동 구성합니다.\n기존 조직도가 초기화됩니다.`,
+      confirmText: '자동 구성',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     setSaving(true);
     try {
       await supabase.from('org_chart_nodes').delete().neq('id', ZERO_UUID);
@@ -178,10 +193,10 @@ export default function OrgChartEditor({
 
   return (
     <div className="flex flex-col h-full">
+      {dialog}
       <div className="p-4 md:p-4 border-b border-[var(--border)] flex flex-col md:flex-row gap-3 items-start md:items-center justify-between shrink-0">
         <div>
           <h2 className="text-base font-bold text-[var(--foreground)]">조직도 편집기</h2>
-          <p className="text-xs text-[var(--toss-gray-3)]">직원 기반 조직 구조를 편집하고 차트로 관리합니다.</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <button onClick={() => setViewMode('chart')} className={`px-3 py-1.5 rounded-[var(--radius-md)] text-xs font-bold ${viewMode === 'chart' ? 'bg-[var(--foreground)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 
@@ -57,6 +58,7 @@ function formatTime(iso?: string) {
 
 // ── 금지어 관리 패널 ──────────────────────────────────────────────────
 function BannedWordManager({ onClose }: { onClose: () => void }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [words, setWords] = useState<string[]>(loadBannedWords);
   const [input, setInput] = useState('');
 
@@ -77,16 +79,24 @@ function BannedWordManager({ onClose }: { onClose: () => void }) {
     saveBannedWords(next);
   };
 
-  const reset = () => {
-    if (!confirm('기본 금지어 목록으로 초기화하시겠습니까?')) return;
+  const reset = async () => {
+    const confirmed = await openConfirm({
+      title: '금지어 기본값 초기화',
+      description: '현재 금지어 목록을 기본 금지어 목록으로 되돌립니다.',
+      confirmText: '초기화',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     setWords(DEFAULT_BANNED);
     saveBannedWords(DEFAULT_BANNED);
     toast('초기화 완료', 'success');
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+    <>
+      {dialog}
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+        <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-bold text-[var(--foreground)]">🚫 금지어 관리</h3>
           <button onClick={onClose} className="text-[var(--toss-gray-3)] hover:text-[var(--foreground)] text-lg leading-none">×</button>
@@ -117,13 +127,15 @@ function BannedWordManager({ onClose }: { onClose: () => void }) {
           <button onClick={reset} className="px-3 py-1.5 text-xs text-[var(--toss-gray-3)] border border-[var(--border)] rounded-[var(--radius-md)] hover:bg-[var(--muted)]">기본값으로 초기화</button>
           <button onClick={onClose} className="px-3 py-1.5 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)]">확인</button>
         </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
 // ── 메인 컴포넌트 ─────────────────────────────────────────────────────
 export default function ChatMonitor({ staffs: propStaffs }: { staffs?: Staff[] }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [staffs, setStaffs] = useState<Staff[]>(propStaffs || []);
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -208,7 +220,13 @@ export default function ChatMonitor({ staffs: propStaffs }: { staffs?: Staff[] }
   );
 
   const deleteMessage = async (msg: Message) => {
-    if (!confirm('이 메시지를 삭제하시겠습니까?')) return;
+    const confirmed = await openConfirm({
+      title: '채팅 메시지 삭제',
+      description: '선택한 메시지를 삭제합니다.\n모니터링 목록과 대화 내역에서 제거됩니다.',
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     setDeletingId(msg.id);
     const { error } = await supabase.from('messages').delete().eq('id', msg.id);
     if (error) {
@@ -241,6 +259,7 @@ export default function ChatMonitor({ staffs: propStaffs }: { staffs?: Staff[] }
 
   return (
     <>
+      {dialog}
       {showBannedManager && <BannedWordManager onClose={handleCloseBannedManager} />}
 
       <div className="flex h-[calc(100vh-200px)] min-h-[500px] gap-0 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)]">

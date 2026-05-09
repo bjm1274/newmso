@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, type CSSProperties, type ReactElement } from 'react';
 import { List } from 'react-window';
+import { EmptyState, LoadingPanel } from '@/app/components/StatePanel';
 import { supabase } from '@/lib/supabase';
 
 const PAGE_SIZE = 100;
@@ -85,9 +86,17 @@ export default function AuditLogViewer() {
       </div>
       <div>
         {loading && logs.length === 0 ? (
-          <div className="p-5 text-center text-[var(--toss-gray-3)]">로딩 중...</div>
+          <div className="p-4">
+            <LoadingPanel title="감사 로그를 불러오는 중입니다" />
+          </div>
         ) : logs.length === 0 ? (
-          <div className="p-5 text-center text-[var(--toss-gray-3)]">기록이 없습니다.</div>
+          <div className="p-4">
+            <EmptyState
+              title="기록이 없습니다"
+              description="급여, 결재, 인사 등 주요 변경 이력이 발생하면 이곳에 표시됩니다."
+              compact
+            />
+          </div>
         ) : (
           <>
             {/* 테이블 헤더 */}

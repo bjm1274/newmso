@@ -30,12 +30,73 @@ type RoomSummary = {
   last_message_at: string | null;
 };
 
+const CHAT_METADATA_QUERY_CHUNK_SIZE = 100;
+
 type SelectChatMessagesWithFallback = <TData>(
   execute: (selectClause: string) => PromiseLike<{ data: TData | null; error: unknown }>,
 ) => Promise<{ data: TData | null; error: unknown }>;
 
 const defaultLegacySelectChatMessagesWithFallback: SelectChatMessagesWithFallback = (execute) =>
   defaultSelectChatMessagesWithFallback(({ selectClause }) => execute(selectClause));
+
+function chunkArray<T>(items: T[], chunkSize = CHAT_METADATA_QUERY_CHUNK_SIZE) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += chunkSize) {
+    chunks.push(items.slice(index, index + chunkSize));
+  }
+  return chunks;
+}
+
+function describeQueryError(error: unknown) {
+  if (!error) return '알 수 없는 오류';
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  if (typeof error === 'object') {
+    const record = error as Record<string, unknown>;
+    const pieces = [
+      record.message,
+      record.details,
+      record.hint,
+      record.code ? `code=${record.code}` : null,
+      record.status ? `status=${record.status}` : null,
+    ].filter(Boolean);
+    if (pieces.length > 0) return pieces.join(' / ');
+    try {
+      const serialized = JSON.stringify(error);
+      return serialized && serialized !== '{}' ? serialized : '응답 메타데이터 조회 실패';
+    } catch {
+      return '응답 메타데이터 조회 실패';
+    }
+  }
+  return String(error);
+}
+
+async function selectMessageReactionRows(messageIds: string[]) {
+  const rows: Record<string, unknown>[] = [];
+  for (const chunk of chunkArray(messageIds)) {
+    const { data, error } = await supabase
+      .from('message_reactions')
+      .select('message_id, emoji, user_id')
+      .in('message_id', chunk);
+    if (error) throw error;
+    rows.push(...(data || []));
+  }
+  return rows;
+}
+
+async function selectMessageBookmarkRows(userId: string, messageIds: string[]) {
+  const rows: Record<string, unknown>[] = [];
+  for (const chunk of chunkArray(messageIds)) {
+    const { data, error } = await supabase
+      .from('message_bookmarks')
+      .select('message_id')
+      .eq('user_id', userId)
+      .in('message_id', chunk);
+    if (error) throw error;
+    rows.push(...(data || []));
+  }
+  return rows;
+}
 
 type UseChatRoomDataSyncParams = {
   selectedRoomId: string | null;
@@ -446,11 +507,7 @@ export function useChatRoomDataSync({
     }
 
     try {
-      const { data, error } = await supabase
-        .from('message_reactions')
-        .select('message_id, emoji, user_id')
-        .in('message_id', messageIds);
-      if (error) throw error;
+      const data = await selectMessageReactionRows(messageIds);
 
       const reactionCounts: Record<string, Record<string, number>> = {};
       const reactionUsersMap: ReactionUsersByMessage = {};
@@ -497,7 +554,7 @@ export function useChatRoomDataSync({
       setReactions(reactionCounts);
       setReactionUsersByMessage(reactionUsersMap);
     } catch (error) {
-      console.error('message reactions query failed:', error);
+      console.warn('message reactions query failed:', describeQueryError(error));
     }
   }, [messagesRef, resolveStaffProfile, setReactionUsersByMessage, setReactions]);
 
@@ -511,12 +568,7 @@ export function useChatRoomDataSync({
     }
 
     try {
-      const { data, error } = await supabase
-        .from('message_bookmarks')
-        .select('message_id')
-        .eq('user_id', effectiveTodoUserId)
-        .in('message_id', messageIds);
-      if (error) throw error;
+      const data = await selectMessageBookmarkRows(effectiveTodoUserId, messageIds);
 
       const nextBookmarkIds = (data || []).map((bookmark: Record<string, unknown>) =>
         String(bookmark.message_id),
@@ -783,21 +835,14 @@ export function useChatRoomDataSync({
             .in('user_id', roomMemberIds)
         : Promise.resolve({ data: [], error: null }),
       effectiveTodoUserId && messageIds.length > 0
-        ? supabase
-            .from('message_bookmarks')
-            .select('message_id')
-            .eq('user_id', effectiveTodoUserId)
-            .in('message_id', messageIds)
+        ? selectMessageBookmarkRows(effectiveTodoUserId, messageIds).then((data) => ({ data, error: null }))
         : Promise.resolve({ data: [], error: null }),
       supabase
         .from('pinned_messages')
         .select('message_id')
         .eq('room_id', roomIdForFetch),
       messageIds.length > 0
-        ? supabase
-            .from('message_reactions')
-            .select('message_id, emoji, user_id')
-            .in('message_id', messageIds)
+        ? selectMessageReactionRows(messageIds).then((data) => ({ data, error: null }))
         : Promise.resolve({ data: [], error: null }),
       supabase
         .from('polls')
@@ -983,9 +1028,7 @@ export function useChatRoomDataSync({
       setReactions(reactionCounts);
       setReactionUsersByMessage(reactionUsersMap);
     } catch (error) {
-      console.error('메시지 반응 조회 실패:', error);
-      setReactions({});
-      setReactionUsersByMessage({});
+      console.warn('메시지 반응 조회 실패:', describeQueryError(error));
     }
 
     try {

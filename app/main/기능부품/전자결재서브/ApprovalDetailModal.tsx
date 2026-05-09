@@ -13,6 +13,7 @@ import {
   ReportInfoPanel,
   SupplyRequestItemsPanel,
 } from './ApprovalMetaPanels';
+import { ApprovalProgressSummary } from './ApprovalRiskReviewDialog';
 
 type ApprovalRecord = Record<string, unknown>;
 type TemplateMeta = { slug?: string | null; name?: string | null };
@@ -26,6 +27,8 @@ type ApprovalDetailModalProps = {
   openApprovalPrintView: (item: ApprovalRecord) => void;
   resolveApprovalTemplateMeta: (item: ApprovalRecord) => TemplateMeta;
   resolveApprovalTemplateDesign: (item: ApprovalRecord) => TemplateDesign;
+  resolveApprovalLineIds: (item: ApprovalRecord) => string[];
+  resolveCurrentApproverId: (item: ApprovalRecord) => string | null;
   resolveApprovalDelegateSnapshot: (item: ApprovalRecord) => {
     delegatedFromName?: string;
     delegatedToName?: string;
@@ -58,6 +61,8 @@ export default function ApprovalDetailModal({
   openApprovalPrintView,
   resolveApprovalTemplateMeta,
   resolveApprovalTemplateDesign,
+  resolveApprovalLineIds,
+  resolveCurrentApproverId,
   resolveApprovalDelegateSnapshot,
   resolveApprovalDelaySnapshot,
   resolveApprovalLockSnapshot,
@@ -122,6 +127,21 @@ export default function ApprovalDetailModal({
           <div className="mx-auto w-full max-w-[860px] rounded-[var(--radius-lg)] border border-slate-200/80 bg-white/90 p-4 shadow-[0_16px_48px_-38px_rgba(15,23,42,0.6)] md:p-5">
             <h3 className="font-bold text-[var(--foreground)] text-[15px] mb-0.5">{detailTitle || '(제목 없음)'}</h3>
             <p className="text-[10px] text-[var(--toss-gray-3)] mb-2.5">기안자 {detailSenderName} · {new Date(detailCreatedAt).toLocaleString('ko-KR')}</p>
+            <div className="mb-2.5 rounded-[var(--radius-lg)] border border-[var(--accent)]/15 bg-[var(--accent-selected-subtle)] p-3">
+              <div className="mb-2 flex items-start gap-2">
+                <span className="mt-0.5 rounded-[var(--radius-md)] bg-[var(--card)] px-2 py-1 text-[10px] font-black text-[var(--accent)]">권한</span>
+                <p className="text-[11px] font-semibold leading-relaxed text-[var(--muted-foreground)]">
+                  이 상세 화면은 기안자, 결재선 참여자, 참조자에게 허용된 범위의 문서 정보만 보여줍니다. 승인·반려는 현재 결재자에게만 노출됩니다.
+                </p>
+              </div>
+              <ApprovalProgressSummary
+                item={item}
+                staffs={approvalDirectoryStaffs}
+                resolveApprovalLineIds={resolveApprovalLineIds}
+                resolveCurrentApproverId={resolveCurrentApproverId}
+                resolveApprovalDelaySnapshot={resolveApprovalDelaySnapshot}
+              />
+            </div>
             {detailCcUsers.length > 0 && (
               <div className="mb-2 flex flex-wrap items-center gap-1 rounded-[var(--radius-md)] border border-yellow-500/20 bg-yellow-500/10 px-2 py-1.5">
                 <span className="text-[10px] font-bold text-yellow-700 shrink-0">참조자</span>

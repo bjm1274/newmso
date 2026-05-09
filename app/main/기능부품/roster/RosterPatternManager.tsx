@@ -2,6 +2,8 @@
 // @ts-nocheck
 'use client';
 
+import { useActionDialog } from '@/app/components/useActionDialog';
+
 type RosterPatternManagerProps = Record<string, any>;
 
 export default function RosterPatternManager(props: RosterPatternManagerProps) {
@@ -23,9 +25,11 @@ export default function RosterPatternManager(props: RosterPatternManagerProps) {
     updatePatternGroup,
     workingShifts,
   } = props;
+  const { dialog, openConfirm } = useActionDialog();
   return (
 (
       <div className="space-y-4" data-testid="roster-pattern-manager">
+        {dialog}
         <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -251,8 +255,14 @@ export default function RosterPatternManager(props: RosterPatternManagerProps) {
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
-                              if (confirm(`"${profile.name}" 패턴을 삭제할까요?`)) {
+                            onClick={async () => {
+                              const confirmed = await openConfirm({
+                                title: '근무 패턴 삭제',
+                                description: `"${profile.name}" 패턴을 삭제합니다.`,
+                                confirmText: '삭제',
+                                tone: 'danger',
+                              });
+                              if (confirmed) {
                                 deletePatternProfile(profile.id);
                               }
                             }}

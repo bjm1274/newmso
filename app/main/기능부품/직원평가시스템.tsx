@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -17,6 +18,7 @@ interface Evaluation {
 }
 
 export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any; staffs?: any[] }) {
+    const { dialog, openConfirm } = useActionDialog();
     const [selectedStaff, setSelectedStaff] = useState<Record<string, unknown> | null>(null);
     const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
     const [loading, setLoading] = useState(false);
@@ -127,7 +129,13 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
     };
 
     const deleteEvaluation = async (id: string) => {
-        if (!confirm('이 기록을 정말 삭제하시겠습니까?')) return;
+        const confirmed = await openConfirm({
+            title: '직원 평가 기록 삭제',
+            description: '선택한 직원 평가 기록을 삭제합니다.\n삭제 후에는 평가 목록에서 복구할 수 없습니다.',
+            confirmText: '삭제',
+            tone: 'danger',
+        });
+        if (!confirmed) return;
         try {
             const { error } = await supabase.from('staff_evaluations').delete().eq('id', id);
             if (error) throw error;
@@ -139,6 +147,7 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
 
     return (
         <div className="flex flex-col lg:flex-row h-full gap-4 animate-in fade-in duration-500" data-testid="staff-evaluation-view">
+            {dialog}
             {/* 1. 직원 목록 (좌측) */}
             <aside className="w-full lg:w-80 flex flex-col bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-sm overflow-hidden">
                 <div className="p-5 border-b border-[var(--border)] bg-[var(--muted)]/30">

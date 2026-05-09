@@ -180,6 +180,7 @@ export function useChatRealtimeSubscriptions({
   const refreshRoomPollsRef = useRef(refreshRoomPolls);
   const globalRealtimeHealthyRef = useRef(false);
   const roomRealtimeHealthyRef = useRef(false);
+  const lastRoomInitialFetchRef = useRef<string | null>(null);
 
   useEffect(() => {
     fetchDataLatestRef.current = fetchData;
@@ -333,6 +334,7 @@ export function useChatRealtimeSubscriptions({
   useEffect(() => {
     if (!selectedRoomId) {
       roomRealtimeHealthyRef.current = false;
+      lastRoomInitialFetchRef.current = null;
       setRoomRealtimeState('idle');
       return;
     }
@@ -354,7 +356,10 @@ export function useChatRealtimeSubscriptions({
       }, 300);
     };
     setRoomRealtimeState((prev) => (prev === 'connected' ? prev : 'connecting'));
-    void fetchDataLatestRef.current();
+    if (lastRoomInitialFetchRef.current !== selectedRoomId) {
+      lastRoomInitialFetchRef.current = selectedRoomId;
+      void fetchDataLatestRef.current();
+    }
 
     const channel = supabase.channel(`chat-realtime-${selectedRoomId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, (payload: Record<string, unknown>) => {
@@ -616,7 +621,7 @@ export function useChatRealtimeSubscriptions({
       const roomRealtimeNeedsFallback = Boolean(selectedRoomId) && !roomRealtimeHealthyRef.current;
       const globalRealtimeNeedsFallback = !selectedRoomId && !globalRealtimeHealthyRef.current;
       if (roomRealtimeNeedsFallback) {
-        void fetchDataLatestRef.current({ force: true });
+        scheduleRealtimeReconnect('room');
       } else if (globalRealtimeNeedsFallback && chatRoomsRef.current.length > 0) {
         void updateUnreadForRooms(chatRoomsRef.current);
       }
@@ -627,5 +632,5 @@ export function useChatRealtimeSubscriptions({
     return () => {
       unbindRealtimeFallback();
     };
-  }, [chatRoomsRef, selectedRoomId, updateUnreadForRooms, userId]);
+  }, [chatRoomsRef, scheduleRealtimeReconnect, selectedRoomId, updateUnreadForRooms, userId]);
 }

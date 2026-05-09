@@ -8,10 +8,11 @@ import { useInventoryFilters } from '@/app/main/hooks/useInventoryFilters';
 import { useSupplyWorkflow } from '@/app/main/hooks/useSupplyWorkflow';
 import { useStockModal } from '@/app/main/hooks/useStockModal';
 import { PageHeader } from '@/app/components/PageHeader';
+import { EmptyState } from '@/app/components/StatePanel';
 import { INV_VIEW_KEY } from '@/app/main/navigation-state';
 import { INVENTORY_SUPPORT_COMPANY, INVENTORY_SUPPORT_DEPARTMENT } from '@/app/main/inventory-utils';
 import {
-  INVENTORY_VIEWS, LEGACY_VIEWS, VALID_VIEWS, INVENTORY_VIEW_META,
+  INVENTORY_VIEWS, VALID_VIEWS, INVENTORY_VIEW_META,
   type IntegratedInventoryProps, type InventoryStatusFilter, type SupplierWorkspaceTab, type RegistrationMode,
 } from './재고관리서브/types';
 
@@ -210,6 +211,8 @@ export default function IntegratedInventoryManagement({
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-x-hidden app-page" data-testid="inventory-view">
+      {stockModal.dialog}
+      {workflow.dialog}
       <PageHeader title={currentViewMeta.title} />
       <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
         <main className="flex-1 bg-[var(--page-bg)] p-3 md:p-4 overflow-y-auto custom-scrollbar">
@@ -252,7 +255,13 @@ export default function IntegratedInventoryManagement({
               </div>
               <div className="overflow-x-auto">
                 {data.logs.length === 0 ? (
-                  <div className="empty-state rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)]/30 px-4 py-10 text-sm font-semibold">이력이 없습니다.</div>
+                  <div className="p-4">
+                    <EmptyState
+                      title="입출고 이력이 없습니다"
+                      description="입고, 출고, 재고 조정이 발생하면 최근 이력이 이곳에 표시됩니다."
+                      compact
+                    />
+                  </div>
                 ) : (
                   <table className="min-w-[860px] w-full text-left text-xs">
                     <thead className="bg-[var(--muted)]/50 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">
@@ -297,13 +306,38 @@ export default function IntegratedInventoryManagement({
           {activeView === '스캔' && <ScanModule user={user} inventory={data.inventory} fetchInventory={data.fetchInventory} />}
           {activeView === '등록' && (
             <div className="space-y-4">
-              <div className="flex gap-2 mb-2">
-                {([['form', '✏️ 일반 등록', '일반 입력 모드', 'bg-[var(--accent)] text-white shadow-sm'], ['excel', '📊 엑셀 일괄 등록', '엑셀 업로드 모드', 'bg-emerald-600 text-white shadow-md'], ['auto_extract', '📄 입고 자동추출 (AI)', 'AI 추출 모드', 'bg-purple-600 text-white shadow-md']] as const).map(([mode, label, ariaLabel, activeClass]) => (
-                  <button key={mode} type="button" aria-label={ariaLabel} onClick={() => setRegistrationMode(mode)} className={`flex-1 px-4 py-3 rounded-[var(--radius-md)] text-[11px] font-semibold transition-all ${registrationMode === mode ? activeClass : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>{label}</button>
-                ))}
+              <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm">
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                  {([
+                    ['form', '직접 등록'],
+                    ['excel', '일괄 업로드'],
+                    ['auto_extract', '명세서 추출'],
+                  ] as const).map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      aria-pressed={registrationMode === mode}
+                      onClick={() => setRegistrationMode(mode)}
+                      className={`min-h-[56px] rounded-[var(--radius-md)] border px-4 py-3 text-center text-sm font-black transition-all ${
+                        registrationMode === mode
+                          ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)] shadow-sm'
+                          : 'border-[var(--border)] bg-[var(--muted)] text-[var(--toss-gray-4)] hover:border-[var(--accent)] hover:bg-[var(--accent)]/5'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
               {registrationMode === 'form' ? <ProductRegistration user={user} inventory={data.inventory} suppliers={data.suppliers} fetchInventory={data.fetchInventory} fetchSuppliers={data.fetchSuppliers} />
-                : registrationMode === 'excel' ? <ExcelBulkUpload onRefresh={data.fetchInventory} />
+                : registrationMode === 'excel' ? (
+                  <ExcelBulkUpload
+                    onRefresh={data.fetchInventory}
+                    allowedModes={['inventory', 'inventory_ecount']}
+                    initialMode="inventory"
+                    title="재고 엑셀 업로드"
+                  />
+                )
                 : <InvoiceAutoExtraction onRefresh={data.fetchInventory} user={user} />}
             </div>
           )}
@@ -327,6 +361,28 @@ export default function IntegratedInventoryManagement({
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4" onClick={() => stockModal.setStockModal(null)}>
           <div data-testid="inventory-stock-modal" className="bg-[var(--card)] rounded-[var(--radius-lg)] shadow-sm p-5 max-w-sm w-full overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">{stockModal.stockModal.type === 'in' ? '입고' : '출고'} 상세 입력</h3>
+            <div className="mb-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/40 p-3">
+              <div className="grid grid-cols-2 gap-1 rounded-[var(--radius-md)] bg-[var(--card)] p-1">
+                {(['in', 'out'] as const).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    aria-pressed={stockModal.stockModal?.type === type}
+                    onClick={() => stockModal.setStockModal(stockModal.stockModal ? { ...stockModal.stockModal, type } : null)}
+                    className={`min-h-11 rounded-[var(--radius-sm)] text-xs font-black transition-all ${
+                      stockModal.stockModal?.type === type
+                        ? 'bg-[var(--accent)] text-white shadow-sm'
+                        : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
+                    }`}
+                  >
+                    {type === 'in' ? '입고 등록' : '출고 등록'}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-3 text-[11px] font-semibold leading-5 text-[var(--toss-gray-3)]">
+                필수 입력은 수량입니다. 출고는 현재고를 초과할 수 없고, 입고는 LOT, Serial, 위치, 단가 정보를 함께 남기면 이력 추적 품질이 높아집니다.
+              </p>
+            </div>
             <p className="text-xs font-bold text-[var(--toss-gray-3)] mb-2">{String((stockModal.stockModal.item as Record<string, unknown>).item_name || stockModal.stockModal.item.name || '')}</p>
             <p className="text-[11px] text-[var(--toss-gray-3)] mb-4">현재고: {stockModal.stockModal.item.quantity ?? Number((stockModal.stockModal.item as Record<string, unknown>).stock ?? 0)}</p>
             <div className="space-y-4 mb-4">

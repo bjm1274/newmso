@@ -2179,6 +2179,7 @@ export default function ChatView({
     roomUnreadCounts,
   });
   const {
+    dialog: roomActionDialog,
     handleLeaveRoom,
     removeRoomMember,
     handleLeaveRoomFromDrawer,
@@ -2704,6 +2705,7 @@ export default function ChatView({
   });
 
   const {
+    dialog: messageActionDialog,
     toggleReaction,
     togglePin,
     toggleBookmark,
@@ -2724,6 +2726,10 @@ export default function ChatView({
     setMessages,
     setPersistedPinnedMessages,
     fetchData,
+    refreshVisibleMessageReactions,
+    refreshVisibleMessageBookmarks,
+    refreshRoomPinnedMessages,
+    refreshReadCursorsForRoom,
     syncRoomSummaryFromMessages,
     persistRoomReadCursors,
     broadcastChatSync,
@@ -2861,6 +2867,8 @@ export default function ChatView({
 
   return (
     <div data-testid="chat-view" className="flex flex-1 min-h-0 overflow-hidden relative font-sans bg-[var(--background)] md:h-[100dvh] md:max-h-[100dvh] md:bg-[var(--card)]">
+        {roomActionDialog}
+        {messageActionDialog}
         <MessengerSidebar
           selectedRoomId={selectedRoomId}
           viewMode={viewMode}
@@ -2913,14 +2921,12 @@ export default function ChatView({
                   {selectedRoomLabel}
                 </h3>
                 <div className="flex items-center gap-1.5 text-[10px] font-medium">
-                  <p className="text-[var(--toss-gray-4)]">
-                    {selectedPeer
-                      ? selectedPeerIsOnline
-                        ? '온라인'
-                        : '오프라인'
-                      : `${roomMembers.length || 0}명 참여중`}
-                  </p>
-                  <span className="text-[var(--toss-gray-4)]">·</span>
+                  {!selectedPeer ? (
+                    <>
+                      <p className="text-[var(--toss-gray-4)]">{roomMembers.length || 0}명 참여중</p>
+                      <span className="text-[var(--toss-gray-4)]">·</span>
+                    </>
+                  ) : null}
                   <span className={`inline-flex items-center gap-1 ${realtimeConnectionMeta.textClassName}`}>
                     <span className={`h-1.5 w-1.5 rounded-full ${realtimeConnectionMeta.dotClassName}`} />
                     <span>{realtimeConnectionMeta.label}</span>
@@ -2960,6 +2966,7 @@ export default function ChatView({
           messages={messages}
           combinedTimeline={combinedTimeline as MessengerTimelineItem[]}
           showScrollToLatest={showScrollToLatest}
+          activeActionMessageId={activeActionMsg ? String(activeActionMsg.id) : null}
             pollVotes={pollVotes}
             reactions={reactions}
             readCounts={readCounts}

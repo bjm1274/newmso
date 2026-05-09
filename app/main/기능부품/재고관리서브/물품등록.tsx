@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import SmartDatePicker from '../공통/SmartDatePicker';
+import { InventoryStepSummary } from './InventoryDesignPanels';
 
 type InventoryUnit = 'EA' | 'BOX';
 
@@ -201,6 +202,13 @@ export default function ProductRegistration({
 
   return (
     <div className="space-y-4 animate-in fade-in duration-500" data-testid="inventory-registration-view">
+      <InventoryStepSummary
+        steps={[
+          { label: '품목 식별', detail: productForm.item_name.trim() ? productForm.item_name.trim() : '품목명을 입력하거나 자동완성에서 선택합니다.', state: productForm.item_name.trim() ? 'done' : 'active' },
+          { label: '분류와 단위', detail: productForm.category.trim() ? `${productForm.category} / ${productForm.unit}` : '분류와 EA/BOX 단위를 확인합니다.', state: productForm.category.trim() ? 'done' : 'pending' },
+          { label: '소유 위치', detail: `${productForm.company || '회사 미지정'}${productForm.department ? ` / ${productForm.department}` : ''}`, state: productForm.company ? 'done' : 'warning' },
+        ]}
+      />
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm md:p-5">
         <div className="mb-5">
           <h2 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">신규 물품 자산 등록</h2>

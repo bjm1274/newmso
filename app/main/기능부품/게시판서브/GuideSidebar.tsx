@@ -1,5 +1,6 @@
 'use client';
 
+import { EmptyState, LoadingPanel } from '@/app/components/StatePanel';
 import type { CompanyScope, GuideAudience, GuideKind, GuideResource, TeamScope } from './guide-types';
 import { formatDate, getGuideAudienceLabel, getGuideKindLabel } from './guide-utils';
 
@@ -103,7 +104,13 @@ export default function GuideSidebar({
             </select>
           </div>
 
-          {!activeTeam ? <div className="empty-state">조직도에 등록된 팀이 없습니다.</div> : null}
+          {!activeTeam ? (
+            <EmptyState
+              title="등록된 팀이 없습니다"
+              description="조직도에서 팀을 먼저 등록하면 업무자료를 팀 단위로 정리할 수 있습니다."
+              compact
+            />
+          ) : null}
         </div>
       </div>
 
@@ -162,16 +169,13 @@ export default function GuideSidebar({
         </div>
 
         {loading ? (
-          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-6 text-center text-[13px] font-semibold text-[var(--toss-gray-4)]">
-            불러오는 중...
-          </div>
+          <LoadingPanel title="자료 목록을 불러오는 중입니다" />
         ) : filteredResources.length === 0 ? (
-          <div className="empty-state">
-            <p className="text-[13px] font-bold text-[var(--foreground)]">등록된 자료가 없습니다</p>
-            <p className="mt-1 text-xs text-[var(--toss-gray-4)]">
-              {activeTeam ? `${activeTeam.teamName} 팀의 첫 자료를 등록해 보세요.` : '팀을 선택해 주세요.'}
-            </p>
-          </div>
+          <EmptyState
+            title="등록된 자료가 없습니다"
+            description={activeTeam ? `${activeTeam.teamName} 팀의 첫 자료를 등록해 보세요.` : '팀을 선택해 주세요.'}
+            compact
+          />
         ) : (
           filteredResources.map((resource) => (
             <button

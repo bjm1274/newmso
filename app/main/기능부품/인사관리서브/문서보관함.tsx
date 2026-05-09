@@ -1,41 +1,9 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { extractApprovalDocNumberFromDocument, mapApprovalToDocumentRepositoryEntry } from '@/lib/approval-document-archive';
-
-const DOCUMENT_PDF_BUCKET_CANDIDATES = ['document-pdfs', 'board-attachments'];
-
-function isMissingBucketError(error: any, bucketName: string) {
-  if (!error) return false;
-  const message = String(error?.message || error?.details || '').toLowerCase();
-  return (
-    message.includes('bucket') &&
-    (message.includes('not found') || message.includes(bucketName.toLowerCase()))
-  );
-}
-
-async function uploadDocumentPdf(filePath: string, blob: Blob) {
-  let lastError: any = null;
-
-  for (const bucket of DOCUMENT_PDF_BUCKET_CANDIDATES) {
-    const { error } = await supabase.storage
-      .from(bucket)
-      .upload(filePath, blob, { contentType: 'application/pdf', upsert: true });
-
-    if (!error) {
-      const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
-      return data.publicUrl as string;
-    }
-
-    lastError = error;
-    if (!isMissingBucketError(error, bucket)) {
-      throw error;
-    }
-  }
-
-  throw lastError || new Error('No available storage bucket for document PDFs.');
-}
 
 const CATEGORIES = [
   { id: '규정', label: '규정' },
@@ -44,6 +12,73 @@ const CATEGORIES = [
   { id: '기타', label: '기타' }
 ];
 
+function escapeHtml(value: unknown) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatDocumentDate(value: unknown) {
+  const date = value ? new Date(String(value)) : new Date();
+  if (Number.isNaN(date.getTime())) return new Date().toLocaleDateString('ko-KR');
+  return date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function openDocumentPrintView(doc: Record<string, unknown>, selectedCo: string) {
+  const title = String(doc.title || '문서');
+  const category = String(doc.category || '문서');
+  const companyName = String(doc.company_name || selectedCo || '전체');
+  const content = String(doc.content || '');
+  const updatedAt = formatDocumentDate(doc.updated_at || doc.created_at);
+  const popup = window.open('', '_blank');
+  if (!popup) {
+    toast('팝업 차단을 해제한 뒤 다시 열어 주세요.', 'warning');
+    return;
+  }
+
+  popup.document.write(`<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(title)}</title>
+  <style>
+    @page { size: A4; margin: 18mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f1f4f8; color: #111827; font-family: "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif; }
+    .toolbar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; background: #111827; }
+    button { border: 0; border-radius: 8px; background: #2563eb; color: #fff; font-weight: 700; padding: 8px 14px; cursor: pointer; }
+    .sheet { width: 210mm; min-height: 297mm; margin: 18px auto; background: #fff; padding: 22mm 20mm; box-shadow: 0 24px 70px rgba(15,23,42,.18); }
+    .meta { display: flex; justify-content: space-between; gap: 16px; border-bottom: 2px solid #111827; padding-bottom: 14px; margin-bottom: 24px; font-size: 12px; color: #4b5563; }
+    h1 { margin: 0 0 8px; font-size: 24px; letter-spacing: 0; color: #111827; }
+    .badge { display: inline-flex; border-radius: 999px; background: #eff6ff; color: #1d4ed8; padding: 4px 10px; font-size: 11px; font-weight: 800; }
+    .content { white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; line-height: 1.78; font-size: 13px; }
+    .footer { margin-top: 36px; border-top: 1px solid #d1d5db; padding-top: 16px; text-align: right; font-size: 12px; color: #6b7280; }
+    @media print { body { background: #fff; } .toolbar { display: none; } .sheet { margin: 0; box-shadow: none; width: auto; min-height: auto; padding: 0; } }
+  </style>
+</head>
+<body>
+  <div class="toolbar"><button onclick="window.print()">인쇄 / PDF 저장</button></div>
+  <main class="sheet">
+    <div class="meta">
+      <div>
+        <span class="badge">${escapeHtml(category)}</span>
+        <h1>${escapeHtml(title)}</h1>
+        <div>${escapeHtml(companyName)}</div>
+      </div>
+      <div>${escapeHtml(updatedAt)}</div>
+    </div>
+    <section class="content">${escapeHtml(content)}</section>
+    <div class="footer">${escapeHtml(companyName)}</div>
+  </main>
+</body>
+</html>`);
+  popup.document.close();
+}
+
 // ESLint 규칙에 맞게 컴포넌트 이름을 영문 대문자로 시작하게 변경합니다.
 // default export 이므로 외부에서의 import 이름(문서보관함)은 그대로 유지됩니다.
 export default function DocumentRepository({
@@ -51,12 +86,15 @@ export default function DocumentRepository({
   selectedCo,
   linkedTarget,
   canManageDocuments = false,
+  title = '문서 보관함',
 }: {
   user: any;
   selectedCo: string;
   linkedTarget?: { id?: string; name?: string };
   canManageDocuments?: boolean;
+  title?: string;
 }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [docs, setDocs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
@@ -104,12 +142,15 @@ export default function DocumentRepository({
   }, [linkedTarget?.name]);
 
   const visibleDocs = docs.filter((d) => {
+    const docCompany = String(d.company_name || '전체').trim() || '전체';
+    const scopeCompany = String(selectedCo || '전체').trim() || '전체';
+    const matchCompany = scopeCompany === '전체' || docCompany === scopeCompany || docCompany === '전체';
     const matchStaff = staffFilterName
       ? (`${d.title || ''} ${d.content || ''}`).includes(staffFilterName)
       : true;
     const matchCategory =
       categoryFilter === '전체' ? true : (d.category || '규정') === categoryFilter;
-    return matchStaff && matchCategory;
+    return matchCompany && matchStaff && matchCategory;
   });
 
   const isReadOnlySelected = Boolean(selected?.source_type === 'approval' || selected?.read_only);
@@ -124,55 +165,9 @@ export default function DocumentRepository({
     if (!form.title.trim()) return toast('제목을 입력하세요.', 'warning');
     setSaving(true);
     try {
-      // 모든 문서는 PDF로도 보관: 내용 기반으로 PDF 생성 후 Storage 업로드
-      const generatePdf = async () => {
-        try {
-          const jsPDFModule: any = await import('jspdf');
-          const jsPDF = jsPDFModule.jsPDF || jsPDFModule.default;
-          const doc = new jsPDF('p', 'mm', 'a4');
-
-          const title = form.title.trim() || '문서';
-          const content = form.content || '';
-
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(14);
-          doc.text(title, 20, 20);
-
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(11);
-          const lines = doc.splitTextToSize(content, 170);
-          doc.text(lines, 20, 32);
-
-          const blob = doc.output('blob') as Blob;
-          const safeCompany =
-            selectedCo && selectedCo !== '전체'
-              ? selectedCo.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'company'
-              : 'all';
-          const safeTitle = title.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'document';
-          const filePath = `${safeCompany}/${safeTitle}_${Date.now()}.pdf`;
-          const uploadedUrl = await uploadDocumentPdf(filePath, blob);
-          if (uploadedUrl) return uploadedUrl;
-
-          const { error: upErr } = await supabase.storage
-            .from('document-pdfs')
-            .upload(filePath, blob, { contentType: 'application/pdf', upsert: true });
-          if (upErr) {
-            console.warn('document pdf upload error', upErr);
-            toast(`PDF 생성 또는 업로드 중 오류가 발생했습니다.\n\n${upErr.message || ''}\n\nSupabase Storage에 document-pdfs 버킷이 있고, anon 역할에 INSERT/SELECT 권한이 있는지 확인해주세요.`, 'error');
-            return null;
-          }
-          const { data: urlData } = supabase.storage.from('document-pdfs').getPublicUrl(filePath);
-          return urlData.publicUrl as string;
-        } catch (e) {
-          console.warn('document pdf generate/upload failed', e);
-          return null;
-        }
-      };
-
-      const pdfUrl = await generatePdf();
-
       const isContract = selected?.category === '근로계약서';
       if (isContract) return toast('근로계약서 카테고리의 문서는 법적 효력 유지를 위해 수정이 불가능합니다.', 'success');
+      const companyName = selectedCo && selectedCo !== '전체' ? selectedCo : (user?.company || '전체');
 
       if (selected) {
         const newVersion = (Number(selected.version) || 1) + 1;
@@ -187,19 +182,19 @@ export default function DocumentRepository({
           title: form.title,
           category: form.category,
           content: form.content,
-          file_url: pdfUrl || selected.file_url || null,
+          file_url: selected.file_url || null,
           version: newVersion,
           updated_at: new Date().toISOString(),
-          company_name: '전체'
+          company_name: companyName
         }).eq('id', selected.id);
       } else {
         await supabase.from('document_repository').insert({
           title: form.title,
           category: form.category,
           content: form.content,
-          file_url: pdfUrl || null,
+          file_url: null,
           version: 1,
-          company_name: '전체',
+          company_name: companyName,
           created_by: user?.id
         });
       }
@@ -225,7 +220,13 @@ export default function DocumentRepository({
       toast('전자결재 문서는 문서보관함에서 삭제할 수 없습니다.', 'warning');
       return;
     }
-    if (!window.confirm('해당 문서를 완전히 삭제하시겠습니까?\n삭제 후에는 되돌릴 수 없습니다.')) return;
+    const confirmed = await openConfirm({
+      title: '문서 완전 삭제',
+      description: '해당 문서를 완전히 삭제합니다.\n삭제 후에는 되돌릴 수 없습니다.',
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     try {
       const { error } = await supabase.from('document_repository').delete().eq('id', doc.id);
       if (error) throw error;
@@ -247,78 +248,23 @@ export default function DocumentRepository({
 
   const handleOpenPdf = async () => {
     if (!selected) return;
-    // 이미 PDF URL이 있으면 바로 새 창으로 열기
+    if (selected.content) {
+      openDocumentPrintView(selected, selectedCo);
+      return;
+    }
+
     if (selected.file_url) {
       window.open(selected.file_url as string, '_blank');
       return;
     }
-    // 없으면 선택된 문서 내용을 기반으로 즉시 PDF 생성 후 저장·열기
-    try {
-      const jsPDFModule: any = await import('jspdf');
-      const jsPDF = jsPDFModule.jsPDF || jsPDFModule.default;
-      const doc = new jsPDF('p', 'mm', 'a4');
-
-      const title = selected.title || '문서';
-      const content = selected.content || '';
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(14);
-      doc.text(title, 20, 20);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(11);
-      const lines = doc.splitTextToSize(content, 170);
-      doc.text(lines, 20, 32);
-
-      const blob = doc.output('blob') as Blob;
-      const safeCompany =
-        String(selected.company_name && selected.company_name !== '전체'
-          ? selected.company_name
-          : selectedCo).replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'company';
-      const safeTitle = String(title).replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'document';
-      const filePath = `${safeCompany}/${safeTitle}_${Date.now()}.pdf`;
-      const uploadedUrl = await uploadDocumentPdf(filePath, blob);
-      if (uploadedUrl) {
-        const url = uploadedUrl;
-
-        await supabase
-          .from('document_repository')
-          .update({ file_url: url, updated_at: new Date().toISOString() })
-          .eq('id', selected.id);
-
-        setSelected({ ...selected, file_url: url });
-        window.open(url, '_blank');
-        return;
-      }
-
-      const { error: upErr } = await supabase.storage
-        .from('document-pdfs')
-        .upload(filePath, blob, { contentType: 'application/pdf', upsert: true });
-      if (upErr) {
-        console.warn('document pdf upload error', upErr);
-        toast(`PDF 생성 또는 업로드 중 오류가 발생했습니다.\n\n${upErr.message || ''}\n\nSupabase Storage에 document-pdfs 버킷이 있고, anon 역할에 INSERT/SELECT 권한이 있는지 확인해주세요.`, 'error');
-        return;
-      }
-      const { data: urlData } = supabase.storage.from('document-pdfs').getPublicUrl(filePath);
-      const url = urlData.publicUrl as string;
-
-      await supabase
-        .from('document_repository')
-        .update({ file_url: url, updated_at: new Date().toISOString() })
-        .eq('id', selected.id);
-
-      setSelected({ ...selected, file_url: url });
-      window.open(url, '_blank');
-    } catch (e) {
-      console.warn('handleOpenPdf error', e);
-      toast('PDF를 여는 중 오류가 발생했습니다.', 'error');
-    }
+    toast('열 수 있는 문서 내용이나 파일이 없습니다.', 'warning');
   };
 
   return (
     <div className="flex flex-col h-full app-page p-4 md:p-5">
+      {dialog}
       <div className="flex justify-between items-center mb-4 gap-3 flex-wrap">
-        <h2 className="text-xl font-bold text-[var(--foreground)]">문서 보관함</h2>
+        <h2 className="text-xl font-bold text-[var(--foreground)]">{title}</h2>
         <div className="flex items-center gap-2 flex-wrap">
           <select
             value={categoryFilter}
@@ -429,7 +375,7 @@ export default function DocumentRepository({
                   onClick={handleOpenPdf}
                   className="px-3 py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] border border-[var(--border)] text-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
                 >
-                  PDF 열기/인쇄
+                  문서 열기/인쇄
                 </button>
                 <button
                   type="button"

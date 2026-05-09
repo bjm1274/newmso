@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { EmptyState } from '@/app/components/StatePanel';
 
 type StatusTabOption = {
   value: string;
@@ -164,9 +165,11 @@ export function OpCheckScheduleList<T extends ScheduleListItem>({
   return (
     <div className={containerClassName}>
       {items.length === 0 ? (
-        <div className="empty-state rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)]/40 p-6 text-center">
-          <p className="text-sm font-semibold text-[var(--toss-gray-3)]">{emptyMessage}</p>
-        </div>
+        <EmptyState
+          title={emptyMessage}
+          description="날짜, 상태, 검색 조건을 변경하면 다른 수술 일정을 확인할 수 있습니다."
+          compact
+        />
       ) : (
         items.map((item) => {
           const currentStatus = statusByScheduleId[item.id] || '준비중';

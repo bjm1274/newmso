@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -45,6 +46,7 @@ export default function DailyClosurePage({
     staffs?: any[];
     selectedCompanyId?: string | null;
 }) {
+    const { dialog, openConfirm } = useActionDialog();
     const normalizedPosition = String(user?.position || '').trim();
     const isAdmin = useMemo(() => isAdminUser(user), [user]);
     const isSyIncDirector = useMemo(() => {
@@ -339,9 +341,12 @@ export default function DailyClosurePage({
         }
 
         const authorName = getAuthorName(closure);
-        const confirmed = window.confirm(
-            `${closure.date} 마감보고를 삭제할까요?\n작성자: ${authorName}\n삭제 후에는 복구할 수 없습니다.`
-        );
+        const confirmed = await openConfirm({
+            title: '마감보고 삭제',
+            description: `${closure.date} 마감보고를 삭제합니다.\n작성자: ${authorName}\n삭제 후에는 복구할 수 없습니다.`,
+            confirmText: '삭제',
+            tone: 'danger',
+        });
         if (!confirmed) return;
 
         setLoading(true);
@@ -386,6 +391,7 @@ export default function DailyClosurePage({
 
     return (
         <div className="space-y-4" data-testid="daily-closure-view">
+            {dialog}
             <div className="flex justify-between items-center">
                 <div>
                     <h2 className="text-xl font-bold text-[var(--foreground)] flex items-center gap-2">

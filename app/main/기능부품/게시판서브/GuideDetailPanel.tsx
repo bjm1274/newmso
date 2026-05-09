@@ -1,6 +1,7 @@
 'use client';
 
 import type { AttachmentItem } from '@/types';
+import { EmptyState } from '@/app/components/StatePanel';
 import {
   buildManagedDownloadUrl,
   handleManagedDownloadClick,
@@ -27,9 +28,10 @@ export default function GuideDetailPanel({
 }: GuideDetailPanelProps) {
   if (!selectedResource) {
     return (
-      <div className="empty-state rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-8 shadow-sm">
-        <p className="text-[13px] font-bold text-[var(--foreground)]">보고 싶은 공유자료를 선택해 주세요</p>
-      </div>
+      <EmptyState
+        title="공유자료를 선택해 주세요"
+        description="왼쪽 목록에서 자료를 선택하면 상세 정보와 첨부 자료를 확인할 수 있습니다."
+      />
     );
   }
 
@@ -105,7 +107,11 @@ export default function GuideDetailPanel({
             </span>
           </div>
           {selectedResource.attachments.length === 0 ? (
-            <div className="empty-state">첨부파일이 없습니다.</div>
+            <EmptyState
+              title="첨부파일이 없습니다"
+              description="이미지, 영상, 문서가 첨부되면 이 영역에 바로 표시됩니다."
+              compact
+            />
           ) : (
             <div className="space-y-3">
               <div className="grid gap-2 md:grid-cols-2">

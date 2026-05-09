@@ -33,7 +33,6 @@ const DataBackup = dynamic(() => import('./관리자전용서브/데이터백업
 const AuditLogViewer = dynamic(() => import('./관리자전용서브/감사로그뷰어'), { ssr: false, loading: AdminSubViewLoading });
 const BusinessDashboard = dynamic(() => import('./관리자전용서브/경영대시보드'), { ssr: false, loading: AdminSubViewLoading });
 const CompanyManager = dynamic(() => import('./관리자전용서브/회사관리'), { ssr: false, loading: AdminSubViewLoading });
-const ExcelBulkUpload = dynamic(() => import('./관리자전용서브/엑셀일괄등록'), { ssr: false, loading: AdminSubViewLoading });
 const NotificationAutomation = dynamic(() => import('./관리자전용서브/알림자동화설정'), { ssr: false, loading: AdminSubViewLoading });
 const SurgeryExamTemplateManager = dynamic(() => import('./관리자전용서브/수술검사템플릿관리'), { ssr: false, loading: AdminSubViewLoading });
 const FormBuilder = dynamic(() => import('./전자결재서브/양식빌더'), { ssr: false, loading: AdminSubViewLoading });
@@ -56,14 +55,12 @@ function canAccessAdminTab(user: any, tabId: AdminOuterTabId) {
 
 function InnerTabBar({
   title,
-  description,
   tabs,
   activeTab,
   onChange,
   testIdPrefix,
 }: {
   title: string;
-  description: string;
   tabs: { id: string; label: string; icon: string }[];
   activeTab: string;
   onChange: (tabId: string) => void;
@@ -88,7 +85,6 @@ function InnerTabBar({
     >
       <div className="mb-2">
         <h3 className="text-sm font-bold text-[var(--foreground)]">{title}</h3>
-        {description ? <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{description}</p> : null}
       </div>
       <div ref={scrollRef} className="no-scrollbar flex gap-1.5 overflow-x-auto">
         {tabs.map((tab, index) => (
@@ -218,7 +214,6 @@ export default function AdminView(props: Record<string, unknown>) {
           <>
             <InnerTabBar
               title="경영분석"
-              description=""
               tabs={ADMIN_ANALYSIS_TABS}
               activeTab={analysisTab}
               onChange={(tabId) => setAnalysisTab(tabId as AdminAnalysisTabId)}
@@ -237,7 +232,6 @@ export default function AdminView(props: Record<string, unknown>) {
           <>
             <InnerTabBar
               title="운영설정"
-              description=""
               tabs={visibleOperationsTabs}
               activeTab={operationsTab}
               onChange={(tabId) => setOperationsTab(tabId as AdminOperationsTabId)}
@@ -253,7 +247,6 @@ export default function AdminView(props: Record<string, unknown>) {
           <>
             <InnerTabBar
               title="감사센터"
-              description=""
               tabs={visibleAuditTabs}
               activeTab={auditTab}
               onChange={(tabId) => setAuditTab(tabId as AdminAuditTabId)}
@@ -265,7 +258,6 @@ export default function AdminView(props: Record<string, unknown>) {
           </>
         )}
 
-        {activeTab === '엑셀등록' && <ExcelBulkUpload onRefresh={onRefresh} />}
         {activeTab === '회사관리' && <CompanyManager user={user as Record<string, unknown> | null | undefined} staffs={staffs} onRefresh={onRefresh} />}
         {activeTab === '직원권한' && <StaffPermissionManager onRefresh={onRefresh} />}
         {activeTab === '데이터백업' && <DataBackup user={user as Record<string, unknown> | null | undefined} />}

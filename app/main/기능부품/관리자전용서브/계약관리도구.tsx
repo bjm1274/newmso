@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -12,6 +13,7 @@ import {
 // COMPANIES 상수는 이제 DB에서 동적으로 관리됩니다.
 
 export default function ContractManager() {
+  const { dialog, openConfirm } = useActionDialog();
   const [selectedCo, setSelectedCo] = useState('박철홍정형외과');
   const { companies } = useCompaniesCache();
   const [template, setTemplate] = useState('');
@@ -63,8 +65,20 @@ export default function ContractManager() {
     else toast(`${selectedCo} 계약서 표준 양식이 저장되었습니다. 인사관리에서 발송하는 계약서에 적용됩니다.`, 'success');
   };
 
+  const handleLoadDefaultTemplate = async () => {
+    const confirmed = await openConfirm({
+      title: '표준 근로계약서로 초기화',
+      description: '현재 본문 내용을 지우고 표준 근로계약서 양식으로 초기화합니다.\n저장 전까지는 데이터베이스에 반영되지 않습니다.',
+      confirmText: '초기화',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+    setTemplate(DEFAULT_CONTRACT_TEMPLATE);
+  };
+
   return (
     <div className="flex min-h-[calc(100dvh-180px)] flex-col overflow-x-hidden overflow-y-auto animate-in fade-in duration-500">
+      {dialog}
       {/* 상단 액션바: 회사 선택 및 저장 */}
       <div className="mb-4 flex shrink-0 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex max-w-full overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] p-1 no-scrollbar xl:max-w-[70%]">
@@ -83,11 +97,7 @@ export default function ContractManager() {
         </div>
         <div className="flex flex-wrap items-center gap-3 xl:justify-end">
           <button
-            onClick={() => {
-              if (window.confirm('현재 본문 내용을 지우고 표준 근로계약서 양식으로 초기화할까요?')) {
-                setTemplate(DEFAULT_CONTRACT_TEMPLATE);
-              }
-            }}
+            onClick={handleLoadDefaultTemplate}
             className="px-4 py-1.5 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] text-[11px] font-bold hover:bg-red-500/10 hover:text-red-500 transition-colors border border-[var(--border)]"
           >
             기본 양식 로드

@@ -1,6 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
@@ -65,6 +66,7 @@ function createRoom(roomNumber: string, capacity: number, admissionDate: string)
 }
 
 export default function HandoverNotes({ user }: Props) {
+  const { dialog, openConfirm, openPrompt } = useActionDialog();
   const [notes, setNotes] = useState<HandoverNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -312,9 +314,17 @@ export default function HandoverNotes({ user }: Props) {
     setShowBedSettings(true);
   }
 
-  function closeBedSettings() {
-    if (roomDirty && !window.confirm('저장하지 않은 병상 설정이 있습니다. 닫으시겠습니까?')) {
-      return;
+  async function closeBedSettings() {
+    if (roomDirty) {
+      const confirmed = await openConfirm({
+        title: '병상 설정 닫기',
+        description: '저장하지 않은 병상 설정이 있습니다. 닫으시겠습니까?',
+        confirmText: '닫기',
+        tone: 'danger',
+      });
+      if (!confirmed) {
+        return;
+      }
     }
     setShowBedSettings(false);
     setRoomConfigs(effectiveRoomConfigs);
@@ -532,7 +542,18 @@ export default function HandoverNotes({ user }: Props) {
 
     const suggestedName =
       selectedTemplateNote?.template_name || `${noteScope === 'patient' ? '환자별' : '공통'} 인계`;
-    const templateName = String(window.prompt('템플릿 이름을 입력해 주세요.', suggestedName) || '').trim();
+    const templateName = String(
+      (await openPrompt({
+        title: '템플릿 이름',
+        description: '저장할 인계 템플릿 이름을 입력해 주세요.',
+        initialValue: suggestedName,
+        placeholder: '템플릿 이름',
+        confirmText: '저장',
+        required: true,
+        maxLength: 60,
+        tone: 'accent',
+      })) || '',
+    ).trim();
     if (!templateName) return;
 
     const nextVersion =
@@ -712,7 +733,12 @@ export default function HandoverNotes({ user }: Props) {
   }
 
   async function deleteNote(targetNote: HandoverNote) {
-    const shouldDelete = window.confirm('이 인계노트를 삭제할까요?');
+    const shouldDelete = await openConfirm({
+      title: '인계노트 삭제',
+      description: '이 인계노트를 삭제합니다.',
+      confirmText: '삭제',
+      tone: 'danger',
+    });
     if (!shouldDelete) return;
 
     setNoteMutationId(targetNote.id);
@@ -779,6 +805,7 @@ export default function HandoverNotes({ user }: Props) {
       className="space-y-4 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm"
       data-testid="handover-notes-view"
     >
+      {dialog}
       <div className="flex flex-col gap-3 border-b border-[var(--border)] pb-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-xl font-bold text-[var(--foreground)]">병동 인계노트</h2>

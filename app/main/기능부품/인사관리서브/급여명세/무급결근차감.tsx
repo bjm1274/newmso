@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { supabase } from '@/lib/supabase';
 
 interface Props {
@@ -23,6 +24,7 @@ interface AbsenceRecord {
 }
 
 export default function UnpaidAbsenceDeduction({ staffs, selectedCo, user }: Props) {
+  const { dialog, openConfirm } = useActionDialog();
   const [yearMonth, setYearMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
   const [records, setRecords] = useState<AbsenceRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -134,7 +136,14 @@ export default function UnpaidAbsenceDeduction({ staffs, selectedCo, user }: Pro
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('삭제하시겠습니까?')) return;
+    const target = records.find((record) => record.id === id);
+    const confirmed = await openConfirm({
+      title: '무급결근 차감 기록 삭제',
+      description: `${target?.staff_name || '선택한 기록'}의 무급결근 차감 기록을 삭제합니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     try {
       const { error } = await supabase.from('unpaid_absence_records').delete().eq('id', id);
       if (error) throw error;
@@ -148,6 +157,7 @@ export default function UnpaidAbsenceDeduction({ staffs, selectedCo, user }: Pro
 
   return (
     <div className="p-4 md:p-4 space-y-4">
+      {dialog}
       {/* 헤더 */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

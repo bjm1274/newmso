@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
@@ -113,6 +114,7 @@ function buildPlainText(result: ConsultationResult): string {
 
 // ─── 메인 컴포넌트 ─────────────────────────────────────────────────────────────
 export default function SurgeryConsultationView({ user }: { user?: any }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [tab, setTab] = useState<'record' | 'upload' | 'history'>('record');
 
   // 녹음 관련
@@ -356,6 +358,7 @@ export default function SurgeryConsultationView({ user }: { user?: any }) {
   // ─── 렌더 ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4 animate-in fade-in duration-500 max-w-4xl mx-auto">
+      {dialog}
       {/* 헤더 */}
       <div className="flex items-center gap-3 border-b border-[var(--border)] pb-4">
         <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center text-xl">🎙️</div>
@@ -585,7 +588,15 @@ export default function SurgeryConsultationView({ user }: { user?: any }) {
                     >📋</button>
                     <button
                       type="button"
-                      onClick={() => { if (confirm('이 기록을 삭제하시겠습니까?')) deleteRecord(rec.id); }}
+                      onClick={async () => {
+                        const confirmed = await openConfirm({
+                          title: '수술상담 기록 삭제',
+                          description: '선택한 수술상담 기록을 삭제합니다.\n녹취 요약과 분석 결과가 함께 제거됩니다.',
+                          confirmText: '삭제',
+                          tone: 'danger',
+                        });
+                        if (confirmed) deleteRecord(rec.id);
+                      }}
                       className="p-1.5 rounded-lg text-[var(--toss-gray-3)] hover:bg-red-500/10 hover:text-red-500 transition-colors text-sm"
                       title="삭제"
                     >🗑️</button>

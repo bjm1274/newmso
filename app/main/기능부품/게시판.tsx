@@ -1,5 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
+import { EmptyState, PermissionState } from '@/app/components/StatePanel';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import Image from 'next/image';
 import { useDeferredValue, useState, useEffect, useMemo, useRef, useCallback, type MouseEvent as ReactMouseEvent } from 'react';
 import { canAccessBoard, isAdminUser, isPrivilegedUser } from '@/lib/access-control';
@@ -437,6 +439,7 @@ type BoardCommentRow = {
   [key: string]: unknown;
 };
 export default function BoardView({ user, subView, setSubView, selectedCo, selectedCompanyId, initialBoard, initialPostId, onConsumePostId, surgeries, mris, setMainMenu }: BoardViewProps) {
+  const { dialog, openConfirm } = useActionDialog();
   const defaultBoard =
     BOARD_IDS.find((boardId) => canAccessBoard(user, boardId, 'read')) || '공지사항';
   const [activeBoard, setActiveBoard] = useState(
@@ -1158,7 +1161,13 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       toast('본인이 작성한 댓글만 삭제할 수 있습니다.', 'error');
       return;
     }
-    if (!confirm('이 댓글을 삭제할까요?')) return;
+    const confirmed = await openConfirm({
+      title: '댓글을 삭제할까요?',
+      description: '선택한 댓글과 연결된 답글이 함께 삭제됩니다.',
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     // 자식 댓글 먼저 DB에서 삭제
     await supabase.from('board_post_comments').delete().eq('parent_comment_id', commentId);
     const { error } = await supabase.from('board_post_comments').delete().eq('id', commentId);
@@ -1355,7 +1364,16 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       return;
     }
 
-    if (!confirm('이 게시물을 정말 삭제하시겠습니까?')) return;
+    const confirmed = await openConfirm({
+      title: '게시물을 삭제할까요?',
+      description: [
+        post.title ? `"${post.title}" 게시물을 삭제합니다.` : '선택한 게시물을 삭제합니다.',
+        '댓글, 읽음 상태, 첨부 메타 정보가 함께 사라질 수 있습니다.',
+      ].join('\n'),
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     const { error } = await supabase.from('board_posts').delete().eq('id', post.id);
     if (error) {
       toast('게시물 삭제 중 오류가 발생했습니다.', 'error');
@@ -1639,7 +1657,16 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       // 수정 모드인 경우 업데이트
       if (editingPostId) {
         if (isScheduleBoard && !isDepartmentHead) {
-          if (!confirm('부서장 이상 권한이 필요합니다. 관리자(간호과장 등)에게 일정 수정 승인 결재를 상신하시겠습니까?')) {
+          const confirmed = await openConfirm({
+            title: '일정 수정 승인 결재를 상신할까요?',
+            description: [
+              '부서장 이상 권한이 필요한 일정 수정입니다.',
+              '관리자 또는 간호과장에게 승인 요청 문서를 상신하고, 승인 후 일정에 반영됩니다.',
+            ].join('\n'),
+            confirmText: '승인 요청',
+            tone: 'accent',
+          });
+          if (!confirmed) {
             setLoading(false);
             return;
           }
@@ -1777,12 +1804,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
   if (visibleBoards.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-[var(--muted)] p-4 text-center">
-        <div className="mb-4 text-6xl">🔒</div>
-        <h2 className="text-xl font-bold text-[var(--foreground)]">게시판 접근 권한이 없습니다.</h2>
-        <p className="mt-2 text-sm font-semibold text-[var(--toss-gray-3)]">
-          메인 메뉴 권한과 게시판 읽기 권한을 확인해 주세요.
-        </p>
+      <div className="flex h-full flex-col justify-center bg-[var(--muted)] p-4">
+        <PermissionState
+          title="게시판 접근 권한이 없습니다"
+          description="메인 메뉴 권한과 게시판 읽기 권한을 확인해 주세요."
+        />
       </div>
     );
   }
@@ -1792,6 +1818,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       className="flex h-full min-h-0 flex-col overflow-x-hidden app-page"
       data-testid="board-view"
     >
+      {dialog}
       {/* 상세 메뉴(공지사항·자유게시판 등)는 메인 좌측 사이드바에서 게시판 호버/클릭 시 플라이아웃으로 선택 */}
       {activeBoard === '업무가이드' ? (
         <div className="flex-1 min-h-0">
@@ -1807,7 +1834,6 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
                 <h2 className="text-lg md:text-xl font-bold text-[var(--foreground)] tracking-tight">{currentBoardMeta.title}</h2>
-                <p className="mt-1 text-[11px] md:text-xs text-[var(--toss-gray-3)] font-bold">{currentBoardMeta.description}</p>
               </div>
               {canCreatePost && (
                 <div className="flex justify-start md:justify-end">
@@ -1842,7 +1868,29 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                 )}
               </div>
 
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                {['기본', '옵션', '첨부', '일정'].map((label, index) => (
+                  <div
+                    key={label}
+                    className={`rounded-[var(--radius-md)] border px-3 py-2 text-center text-[11px] font-black ${
+                      index === 0
+                        ? 'border-[var(--accent)] bg-[var(--accent-light)] text-[var(--accent)]'
+                        : 'border-[var(--border)] bg-[var(--muted)] text-[var(--toss-gray-3)]'
+                    }`}
+                  >
+                    {label}
+                  </div>
+                ))}
+              </div>
+
               <div className="space-y-4">
+                <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)]/60 p-3">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-widest text-[var(--toss-gray-3)]">기본 정보</p>
+                    </div>
+                    <span className="rounded-[var(--radius-sm)] bg-[var(--accent)] px-2 py-1 text-[10px] font-black text-white">필수</span>
+                  </div>
                 <div>
                   {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
                     <div className="space-y-3">
@@ -1926,8 +1974,16 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                     </>
                   )}
                 </div>
+                </div>
 
                 {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
+                  <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)]/60 p-3">
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-[11px] font-black uppercase tracking-widest text-[var(--toss-gray-3)]">일정</p>
+                      </div>
+                      <span className="rounded-[var(--radius-sm)] bg-[var(--accent)] px-2 py-1 text-[10px] font-black text-white">필수</span>
+                    </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -2082,8 +2138,12 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                       </span>
                     </div>
                   </div>
+                  </div>
                 ) : (
                   <>
+                    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)]/60 p-3">
+                      <p className="text-[11px] font-black uppercase tracking-widest text-[var(--toss-gray-3)]">옵션</p>
+                    </div>
                     <div>
                       <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">태그 (쉼표로 구분)</label>
                       <input
@@ -2109,7 +2169,13 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                         </p>
                       </div>
                     )}
-                    <div>
+                    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)]/60 p-3">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[11px] font-black uppercase tracking-widest text-[var(--toss-gray-3)]">첨부</p>
+                        </div>
+                        <span className="rounded-[var(--radius-sm)] bg-[var(--muted)] px-2 py-1 text-[10px] font-black text-[var(--toss-gray-3)]">선택</span>
+                      </div>
                       <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">내용</label>
                       <textarea
                         data-testid="board-new-post-content"
@@ -2524,7 +2590,13 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                 const { filteredPosts, eventsByDate, days, month, toKey } = scheduleCalendarData;
 
                 if (filteredPosts.length === 0) {
-                  return <div className="empty-state rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)]/30 py-8 text-xs font-bold">등록된 일정이 없습니다.</div>;
+                  return (
+                    <EmptyState
+                      title="등록된 일정이 없습니다"
+                      description="새 일정을 등록하면 캘린더에 날짜별로 표시됩니다."
+                      compact
+                    />
+                  );
                 }
 
                 return (
@@ -2754,13 +2826,14 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                   )
                 })
               ) : (
-                <div className="empty-state rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)]/30 py-20">
-                  <p className="font-semibold text-sm italic">
-                    {activeBoard === '익명소리함' && !(user?.permissions?.mso || user?.role === 'admin' || user?.permissions?.hr)
-                      ? '🙌 작성된 소중한 의견은 인사팀 및 경영진에게만 안전하게 익명으로 전달됩니다.'
-                      : '게시물이 없습니다.'}
-                  </p>
-                </div>
+                <EmptyState
+                  title={activeBoard === '익명소리함' ? '아직 등록된 의견이 없습니다' : '게시물이 없습니다'}
+                  description={
+                    activeBoard === '익명소리함' && !(user?.permissions?.mso || user?.role === 'admin' || user?.permissions?.hr)
+                      ? '작성된 의견은 인사팀 및 경영진에게만 안전하게 익명으로 전달됩니다.'
+                      : '새 게시물이 등록되면 이 목록에 표시됩니다.'
+                  }
+                />
               )}
             </div>
           )}

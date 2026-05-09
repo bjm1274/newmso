@@ -1,6 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { type ChangeEvent, useEffect, useRef, useState } from 'react';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { formatPayrollMutationError } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
@@ -243,6 +244,7 @@ function InterimTenMinuteUnitField({
 }
 
 export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }: Record<string, unknown>) {
+  const { dialog, openConfirm } = useActionDialog();
   const _staffs = (staffs as Record<string, unknown>[]) ?? [];
   const _onRefresh = onRefresh as (() => void) | undefined;
   const [selectedStaff, setSelectedStaff] = useState<Record<string, unknown> | null>(null);
@@ -533,7 +535,13 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
 
   const handleConfirm = async () => {
     if (!selectedStaff) return toast('정산 대상을 선택해 주세요.', 'warning');
-    if (!confirm('정산 내역을 확정하고 저장하시겠습니까?')) return;
+    const confirmed = await openConfirm({
+      title: '중간정산 확정 저장',
+      description: '정산 내역을 확정하고 저장합니다.\n확정 후 급여 레코드에 반영됩니다.',
+      confirmText: '확정 저장',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
 
     setLoading(true);
     try {
@@ -602,6 +610,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
 
   return (
     <div className="bg-[var(--card)] p-4 rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm animate-in fade-in duration-300" data-testid="interim-settlement-view">
+      {dialog}
       <div className="mb-4 pb-3 border-b border-[var(--border)]">
         <h2 className="text-lg font-bold text-[var(--foreground)]">중간정산</h2>
       </div>

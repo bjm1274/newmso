@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import type { StaffMember } from '@/types';
 import { toast } from '@/lib/toast';
 import { formatPayrollMutationError } from '@/lib/payroll-records';
@@ -240,6 +241,7 @@ export default function DailyWorkerSettlement({
   yearMonth,
   onRefresh,
 }: DailyWorkerSettlementProps) {
+  const { dialog, openConfirm } = useActionDialog();
   const candidates = useMemo(
     () => staffs.filter((staff) => selectedCo === '전체' || staff.company === selectedCo),
     [staffs, selectedCo],
@@ -380,7 +382,15 @@ export default function DailyWorkerSettlement({
       );
       return;
     }
-    if (status === '확정' && !confirm(`${selectedStaff.name}님의 일용근로 정산을 확정하시겠습니까?`)) return;
+    if (status === '확정') {
+      const confirmed = await openConfirm({
+        title: '일용근로 정산 확정',
+        description: `${selectedStaff.name}님의 일용근로 정산을 확정합니다.\n확정 후 급여 레코드에 반영됩니다.`,
+        confirmText: '확정',
+        tone: 'accent',
+      });
+      if (!confirmed) return;
+    }
 
     setLoading(true);
     try {
@@ -447,6 +457,7 @@ export default function DailyWorkerSettlement({
 
   return (
     <div className="bg-[var(--card)] p-4 rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm animate-in fade-in duration-300" data-testid="daily-settlement-view">
+      {dialog}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
         <div className="flex min-w-0 items-center gap-3">
           <span className="erp-icon-box">

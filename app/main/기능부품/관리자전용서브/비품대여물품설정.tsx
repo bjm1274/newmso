@@ -46,9 +46,6 @@ export default function AssetLoanSettingsAdminView({
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <h3 className="text-lg font-bold text-[var(--foreground)]">비품대여 물품 설정</h3>
-            <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
-              회사별 비품 대여 물품 목록을 관리자 화면에서 바로 관리합니다.
-            </p>
           </div>
           <label className="flex min-w-[220px] flex-col gap-1 text-xs font-semibold text-[var(--toss-gray-4)]">
             회사 선택

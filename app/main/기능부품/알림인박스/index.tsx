@@ -25,6 +25,7 @@ const TABS = [
 ] as const;
 
 type InboxDateRange = 'all' | 'today' | '7d' | '30d';
+type InboxStateFilter = 'all' | 'unread' | 'action';
 
 const INBOX_DATE_FILTERS: Array<{ id: InboxDateRange; label: string }> = [
   { id: 'all', label: '전체 기간' },
@@ -50,6 +51,19 @@ const TYPE_CFG: Record<string, NotificationTypeConfig> = {
 };
 const DEFAULT_CFG: NotificationTypeConfig = { icon: 'Bell', bg: 'bg-[var(--tab-bg)]', text: 'text-[var(--toss-gray-4)]', border: 'border-[var(--border)]' };
 const getTypeCfg = (t: string) => TYPE_CFG[t] || DEFAULT_CFG;
+
+function isActionRequiredNotification(notification: Record<string, unknown>) {
+  const metadata =
+    notification.metadata && typeof notification.metadata === 'object'
+      ? notification.metadata as Record<string, unknown>
+      : {};
+  const type = String(notification.type || '');
+  const actionValue = String(metadata.action_required || metadata.requires_action || metadata.action || '').toLowerCase();
+  return Boolean(metadata.action_required || metadata.requires_action)
+    || actionValue === 'true'
+    || actionValue === 'required'
+    || type === 'approval';
+}
 
 // ─── 필터 유틸 함수들 ───
 function isWithinInboxDateRange(dateValue: string, range: InboxDateRange) {
@@ -134,6 +148,7 @@ function NotificationInbox({
   const [searchQuery, setSearchQuery] = useState('');
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [dateRange, setDateRange] = useState<InboxDateRange>('all');
+  const [stateFilter, setStateFilter] = useState<InboxStateFilter>('all');
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -369,12 +384,13 @@ function NotificationInbox({
     () =>
       notifications.filter((notification) => {
         if (tabTypes && !tabTypes.includes(notification.type)) return false;
-        if (showUnreadOnly && notification.read_at) return false;
+        if ((showUnreadOnly || stateFilter === 'unread') && notification.read_at) return false;
+        if (stateFilter === 'action' && !isActionRequiredNotification(notification)) return false;
         if (!isWithinInboxDateRange(String(notification.created_at || ''), dateRange)) return false;
         if (!matchesNotificationSearch(notification, searchQuery)) return false;
         return true;
       }),
-    [dateRange, notifications, searchQuery, showUnreadOnly, tabTypes]
+    [dateRange, notifications, searchQuery, showUnreadOnly, stateFilter, tabTypes]
   );
 
   // 안읽음 배지 per 탭
@@ -383,6 +399,7 @@ function NotificationInbox({
       : notifications.filter(n => !n.read_at).length;
 
   const unreadCount = notifications.filter(n => !n.read_at).length;
+  const actionRequiredCount = notifications.filter((notification) => isActionRequiredNotification(notification)).length;
   const selectedCount = selectedIds.length;
 
   // 날짜 그룹화
@@ -451,14 +468,34 @@ function NotificationInbox({
                 <button
                   type="button"
                   data-testid="notification-unread-filter"
-                  onClick={() => setShowUnreadOnly((prev) => !prev)}
+                  onClick={() => {
+                    const next = stateFilter === 'unread' ? 'all' : 'unread';
+                    setStateFilter(next);
+                    setShowUnreadOnly(next === 'unread');
+                  }}
                   className={`rounded-[var(--radius-md)] border px-3 py-2 text-xs font-bold transition-colors ${
-                    showUnreadOnly
+                    showUnreadOnly || stateFilter === 'unread'
                       ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
                       : 'border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]'
                   }`}
                 >
                   안읽음만
+                </button>
+                <button
+                  type="button"
+                  data-testid="notification-action-required-filter"
+                  onClick={() => {
+                    const next = stateFilter === 'action' ? 'all' : 'action';
+                    setStateFilter(next);
+                    setShowUnreadOnly(false);
+                  }}
+                  className={`rounded-[var(--radius-md)] border px-3 py-2 text-xs font-bold transition-colors ${
+                    stateFilter === 'action'
+                      ? 'border-[var(--warning)] bg-[var(--warning)] text-white'
+                      : 'border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]'
+                  }`}
+                >
+                  액션 필요 {actionRequiredCount > 0 ? actionRequiredCount : ''}
                 </button>
                 <select
                   data-testid="notification-date-filter"
@@ -547,12 +584,15 @@ function NotificationInbox({
                       {grouped[group].map(n => {
                         const cfg = getTypeCfg(n.type);
                         const isSelected = selectedIds.includes(String(n.id));
+                        const isUnread = !n.read_at;
+                        const needsAction = isActionRequiredNotification(n);
                         return (
                           <div
                             key={n.id}
                             onClick={() => handleClick(n)}
                             className={`group relative flex cursor-pointer items-start gap-3.5 border-l-4 bg-[var(--card)] px-5 py-4 transition-colors hover:bg-[var(--muted)]
-                              ${!n.read_at ? cfg.border : 'border-transparent opacity-80'}
+                              ${isUnread ? cfg.border : 'border-transparent opacity-80'}
+                              ${needsAction ? 'ring-1 ring-[var(--warning)]/20' : ''}
                               ${isSelected ? 'bg-[var(--accent)]/10 ring-1 ring-[var(--accent)]' : ''}`}
                             data-testid={`notification-inbox-item-${n.id}`}
                           >
@@ -574,7 +614,7 @@ function NotificationInbox({
                               </button>
                             )}
                             {/* 타입 아이콘 */}
-                            <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[var(--radius-md)] ${n.read_at ? 'bg-[var(--muted)]' : cfg.bg}`}>
+                            <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[var(--radius-md)] ${n.read_at ? 'bg-[var(--muted)]' : cfg.bg}`}>
                               <LucideIcon name={cfg.icon} size={18} strokeWidth={2} className={n.read_at ? 'text-[var(--toss-gray-3)]' : cfg.text} />
                             </div>
 
@@ -589,10 +629,24 @@ function NotificationInbox({
                               {n.body && (
                                 <p className="text-xs text-[var(--toss-gray-3)] mt-0.5 line-clamp-2 leading-relaxed">{n.body}</p>
                               )}
+                              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                <span className={`rounded-[var(--radius-sm)] px-2 py-1 text-[10px] font-black ${
+                                  isUnread
+                                    ? 'bg-[var(--accent-light)] text-[var(--accent)]'
+                                    : 'bg-[var(--muted)] text-[var(--toss-gray-3)]'
+                                }`}>
+                                  {isUnread ? '안읽음' : '읽음'}
+                                </span>
+                                {needsAction ? (
+                                  <span className="rounded-[var(--radius-sm)] bg-[var(--warning-light)] px-2 py-1 text-[10px] font-black text-[var(--warning)]">
+                                    액션 필요
+                                  </span>
+                                ) : null}
+                              </div>
                             </div>
 
                             {/* 안읽음 점 */}
-                            {!n.read_at && (
+                            {isUnread && (
                               <span className="absolute right-5 top-1/2 h-2 w-2 -translate-y-1/2 rounded-[var(--radius-sm)] bg-[var(--accent)]" />
                             )}
 

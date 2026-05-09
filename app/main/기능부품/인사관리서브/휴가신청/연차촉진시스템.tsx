@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -25,6 +26,7 @@ type PromotionTarget = StaffLite & {
 };
 
 export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: StaffLite[]; selectedCo: string }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [promotionTargets, setPromotionTargets] = useState<PromotionTarget[]>([]);
   const [loading, setLoading] = useState(false);
   const [submittedPlans, setSubmittedPlans] = useState<any[]>([]);
@@ -104,7 +106,13 @@ export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: S
   };
 
   const handleSendPromotion = async (staff: PromotionTarget) => {
-    if (!confirm(`${staff.name}님께 연차사용촉진 통보를 발송하시겠습니까?\n발송 시 알림과 함께 전자결재 작성이 요청됩니다.`)) return;
+    const confirmed = await openConfirm({
+      title: '연차사용촉진 통보 발송',
+      description: `${staff.name}님께 연차사용촉진 통보를 발송합니다.\n발송 시 알림과 함께 전자결재 작성이 요청됩니다.`,
+      confirmText: '발송',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
     setLoading(true);
     try {
       await supabase.from('notifications').insert([{
@@ -129,6 +137,7 @@ export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: S
 
   return (
     <div className="space-y-4 animate-in fade-in duration-500">
+      {dialog}
       <div className="bg-[var(--card)] p-4 border border-[var(--border)] shadow-sm rounded-2xl">
         <div className="flex justify-between items-center mb-4">
           <div>

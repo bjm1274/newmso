@@ -1,5 +1,6 @@
 'use client';
 import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { isActiveStaff } from '@/lib/active-staff';
 import { buildAuditDiff,logAudit,readClientAuditActor } from '@/lib/audit';
 import { getWeeklyRotationShiftIds } from '@/lib/contract-shift-rotation';
@@ -241,6 +242,7 @@ interface StaffListManagerProps {
 }
 
 export default function StaffListManager({ 직원목록 = [], 선택사업체, 보기상태 = '재직', 새로고침, 창상태, 창닫기, onOpenDocumentRepoForStaff, canRegisterNewStaff = false, onOpenNewStaff }: StaffListManagerProps) {
+  const { dialog, openConfirm } = useActionDialog();
   const [편집모드, 편집모드설정] = useState(false);
   const [선택된직원ID, 선택된직원ID설정] = useState<string | number | null>(null);
   const [근무형태목록, 근무형태목록설정] = useState<any[]>([]);
@@ -433,7 +435,14 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
   }, [새로고침, 선택사업체, 직원목록]);
 
   const handleApproveEssSafe = async (request: Record<string, unknown>) => {
-    if (!confirm(`${request.user_name}님의 정보 변경 요청을 승인하시겠습니까?`)) return;
+    const userName = String(request.user_name || '선택 직원');
+    const confirmed = await openConfirm({
+      title: '정보 변경 요청 승인',
+      description: `${userName}님의 정보 변경 요청을 승인합니다.`,
+      confirmText: '승인',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
     try {
       const updates =
         ((request.details as Record<string, unknown> | undefined)?.requested_changes as Record<string, unknown> | undefined) || {};
@@ -484,7 +493,14 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
   };
 
   const handleRejectEss = async (request: Record<string, unknown>) => {
-    if (!confirm(`${request.user_name}님의 정보 변경 요청을 반려하시겠습니까?`)) return;
+    const userName = String(request.user_name || '선택 직원');
+    const confirmed = await openConfirm({
+      title: '정보 변경 요청 반려',
+      description: `${userName}님의 정보 변경 요청을 반려합니다.`,
+      confirmText: '반려',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await supabase.from('audit_logs').update({ target_type: 'ESS_PROFILE_UPDATE_REJECTED' }).eq('id', request.id);
       toast('반려되었습니다.');
@@ -1015,7 +1031,13 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
   };
 
   const 직원삭제 = async (직원: StaffMember) => {
-    if (!confirm(`${직원.name} 직원을 삭제(퇴사 처리) 하시겠습니까?`)) return;
+    const confirmed = await openConfirm({
+      title: '직원 퇴사 처리',
+      description: `${직원.name} 직원을 퇴사 처리합니다.\n구성원 목록에서 상태가 퇴사로 변경됩니다.`,
+      confirmText: '퇴사 처리',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     try {
       const actor = readClientAuditActor();
       const today = new Date().toISOString().slice(0, 10);
@@ -1097,6 +1119,7 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
 
   return (
     <div className="flex flex-col h-full app-page">
+      {dialog}
       <header className="flex min-h-[72px] items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--card)] px-5 py-3">
         <div className="min-w-0">
           <h2 className="text-[15px] font-bold leading-tight text-[var(--foreground)]">인사관리</h2>

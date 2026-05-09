@@ -1,5 +1,6 @@
 'use client';
 import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import { toast } from '@/lib/toast';
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -79,6 +80,7 @@ function getStaffExtensionText(staff: StaffMember | null | undefined) {
 // const CAN_SEE_PERSONAL_CONTACT_POSITIONS = ['병원장', '원장', '이사', '진료부장', '간호과장', '간호부장', '실장', '총무부장', '본부장', '팀장', '부장'];
 
 export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo }: OrgChartProps) {
+  const { dialog, openConfirm } = useActionDialog();
   const [selectedMember, setSelectedMember] = useState<StaffMember | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   /** 팀 선택 필터: '' = 선택 안함(전체), 팀명 = 해당 팀만 표시 */
@@ -409,6 +411,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
 
   return (
     <div className="flex flex-col h-full app-page font-sans overflow-hidden">
+      {dialog}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* 상단 필터 및 검색 */}
         <div className="px-4 pt-3 pb-0 bg-[var(--card)] border-b border-[var(--border)] shrink-0 shadow-sm">
@@ -631,7 +634,13 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                                           e.preventDefault();
                                           e.stopPropagation();
                                           if (!draggedStaff || draggedStaff.department === team.teamName) return;
-                                          if (confirm(`${draggedStaff.name}님을 [${team.teamName}] (으)로 이동하시겠습니까?`)) {
+                                          const confirmed = await openConfirm({
+                                            title: '직원 팀 이동',
+                                            description: `${draggedStaff.name}님을 [${team.teamName}] (으)로 이동합니다.`,
+                                            confirmText: '이동',
+                                            tone: 'accent',
+                                          });
+                                          if (confirmed) {
                                             await supabase.from('staff_members').update({ department: team.teamName }).eq('id', draggedStaff.id);
                                             toast('이동되었습니다.');
                                             window.location.reload();
@@ -776,7 +785,13 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                                   e.preventDefault();
                                   e.stopPropagation();
                                   if (!draggedStaff || draggedStaff.department === team.teamName) return;
-                                  if (confirm(`${draggedStaff.name}님을 [${team.teamName}] (으)로 이동하시겠습니까?`)) {
+                                  const confirmed = await openConfirm({
+                                    title: '직원 팀 이동',
+                                    description: `${draggedStaff.name}님을 [${team.teamName}] (으)로 이동합니다.`,
+                                    confirmText: '이동',
+                                    tone: 'accent',
+                                  });
+                                  if (confirmed) {
                                     await supabase.from('staff_members').update({ department: team.teamName }).eq('id', draggedStaff.id);
                                     toast('이동되었습니다.');
                                     window.location.reload();
@@ -843,7 +858,13 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                                 e.preventDefault();
                                 e.stopPropagation();
                                 if (!draggedStaff || draggedStaff.department === t.teamName) return;
-                                if (confirm(`${draggedStaff.name}님을 [${t.teamName}] (으)로 이동하시겠습니까?`)) {
+                                const confirmed = await openConfirm({
+                                  title: '직원 팀 이동',
+                                  description: `${draggedStaff.name}님을 [${t.teamName}] (으)로 이동합니다.`,
+                                  confirmText: '이동',
+                                  tone: 'accent',
+                                });
+                                if (confirmed) {
                                   await supabase.from('staff_members').update({ department: t.teamName }).eq('id', draggedStaff.id);
                                   toast('이동되었습니다.');
                                   window.location.reload();
@@ -952,6 +973,7 @@ interface StaffCardRowProps {
 
 /** 직원 카드: 사진 좌측, 이름·직책 우측 가로 배치 */
 function StaffCardRow({ staff, onClick, isEditMode, setDraggedStaff, draggedStaff, onMoveStaff }: StaffCardRowProps) {
+  const { dialog, openConfirm } = useActionDialog();
   const isAdmin = staff.role === 'admin' || staff.permissions?.mso === true;
   const photoUrl = getProfilePhotoUrl(staff);
 
@@ -967,7 +989,13 @@ function StaffCardRow({ staff, onClick, isEditMode, setDraggedStaff, draggedStaf
         e.preventDefault();
         e.stopPropagation();
         if (!draggedStaff || draggedStaff.id === staff.id) return;
-        if (confirm(`${draggedStaff.name}님과 ${staff.name}님의 순서를 바꾸시겠습니까?`)) {
+        const confirmed = await openConfirm({
+          title: '직원 순서 변경',
+          description: `${draggedStaff.name}님과 ${staff.name}님의 순서를 바꿉니다.`,
+          confirmText: '변경',
+          tone: 'accent',
+        });
+        if (confirmed) {
           // Swap logic using employee_no (acting as sort index)
           const tempNo1 = staff.employee_no;
           const tempNo2 = draggedStaff.employee_no;
@@ -984,6 +1012,7 @@ function StaffCardRow({ staff, onClick, isEditMode, setDraggedStaff, draggedStaf
         ${isEditMode ? 'cursor-grab active:cursor-grabbing hover:bg-[var(--tab-bg)]' : 'cursor-pointer'}
       `}
     >
+      {dialog}
       <div className={`w-[42px] h-[42px] shrink-0 rounded-[var(--radius-md)] flex items-center justify-center text-base overflow-hidden ${isAdmin ? 'bg-red-500/10 text-red-400' : 'bg-[var(--muted)] text-[var(--toss-gray-3)] group-hover:bg-[var(--toss-blue-light)] group-hover:text-[var(--accent)]'}`}>
         {photoUrl ? (
           <ProfilePhotoThumbnail src={photoUrl} name={staff.name} className="w-full h-full object-cover rounded-[var(--radius-md)]" previewDisabled={isEditMode} />

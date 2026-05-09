@@ -1,5 +1,6 @@
 'use client';
 
+import { EmptyState, LoadingPanel } from '@/app/components/StatePanel';
 import type { GuideRow, GuideTask, GuideTaskPriority, TeamScope } from './guide-types';
 import {
   formatDate,
@@ -144,16 +145,13 @@ export default function GuideTaskBoard({
         ) : null}
 
         {loading ? (
-          <div className="rounded-[var(--radius-md)] bg-[var(--muted)] p-4 text-center text-[13px] font-semibold text-[var(--toss-gray-4)]">
-            불러오는 중...
-          </div>
+          <LoadingPanel title="팀 할일을 불러오는 중입니다" />
         ) : activeTeamTasks.length === 0 ? (
-          <div className="empty-state">
-            <p className="text-[13px] font-bold text-[var(--foreground)]">공유된 팀 할일이 없습니다</p>
-            <p className="mt-1 text-xs text-[var(--toss-gray-4)]">
-              {activeTeam ? `${activeTeam.teamName} 팀의 할일을 등록해 보세요.` : '팀을 선택해 주세요.'}
-            </p>
-          </div>
+          <EmptyState
+            title="공유된 팀 할일이 없습니다"
+            description={activeTeam ? `${activeTeam.teamName} 팀의 할일을 등록해 보세요.` : '팀을 선택해 주세요.'}
+            compact
+          />
         ) : (
           <div className="space-y-2">
             {activeTeamTasks.map((task) => {

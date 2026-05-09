@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -88,6 +89,7 @@ function chartLinesToCheckItems(lines: ChartLine[]): CheckItem[] {
 type Tab = 'reviews' | 'template' | 'new';
 
 export default function DischargeReviewPage({ user }: { user: any }) {
+    const { dialog, openConfirm } = useActionDialog();
     const [tab, setTab] = useState<Tab>('reviews');
     const [reviews, setReviews] = useState<DischargeReview[]>([]);
     const [templates, setTemplates] = useState<Template[]>([]);
@@ -222,7 +224,14 @@ export default function DischargeReviewPage({ user }: { user: any }) {
     };
 
     const deleteTemplate = async (id: string) => {
-        if (!confirm('이 템플릿을 삭제하시겠습니까?')) return;
+        const target = templates.find(t => t.id === id);
+        const confirmed = await openConfirm({
+            title: '퇴원심사 템플릿 삭제',
+            description: `${target?.title || '선택한 템플릿'}을 삭제합니다.\n새 심사 생성 시 더 이상 선택할 수 없습니다.`,
+            confirmText: '삭제',
+            tone: 'danger',
+        });
+        if (!confirmed) return;
         setTemplates(templates.filter(t => t.id !== id));
         if (editTmplId === id) { setEditTmplId(null); setEditTmplTitle(''); setEditTmplData(''); }
         try { await supabase.from('discharge_templates').delete().eq('id', id); } catch (err) { console.error(err); }
@@ -352,9 +361,22 @@ export default function DischargeReviewPage({ user }: { user: any }) {
     const approveReview = async (id: string) => {
         if (!selectedReview) return;
         const u = selectedReview.items.filter(i => !i.checked);
-        if (u.length > 0 && !confirm(`${u.length}개 미체크 항목이 있습니다. 승인하시겠습니까?`)) return;
+        if (u.length > 0) {
+            const confirmedUnchecked = await openConfirm({
+                title: '미체크 항목 승인',
+                description: `${u.length}개 미체크 항목이 있습니다.\n그래도 퇴원심사를 승인하시겠습니까?`,
+                confirmText: '승인',
+                tone: 'danger',
+            });
+            if (!confirmedUnchecked) return;
+        }
         if (selectedRuleAnalysis && selectedRuleAnalysis.summary.critical > 0) {
-            const allowCriticalApproval = confirm(`규정 기반 점검에서 Critical ${selectedRuleAnalysis!.summary.critical}건이 감지되었습니다. 그래도 퇴원 승인하시겠습니까?`);
+            const allowCriticalApproval = await openConfirm({
+                title: 'Critical 규정 점검 승인',
+                description: `규정 기반 점검에서 Critical ${selectedRuleAnalysis.summary.critical}건이 감지되었습니다.\n그래도 퇴원 승인하시겠습니까?`,
+                confirmText: '승인',
+                tone: 'danger',
+            });
             if (!allowCriticalApproval) return;
         }
         setSelectedReview({ ...selectedReview, status: 'approved' });
@@ -363,7 +385,14 @@ export default function DischargeReviewPage({ user }: { user: any }) {
     };
 
     const deleteReview = async (id: string) => {
-        if (!confirm('삭제하시겠습니까?')) return;
+        const target = reviews.find(r => r.id === id);
+        const confirmed = await openConfirm({
+            title: '퇴원심사 삭제',
+            description: `${target?.patient_name || '선택한 퇴원심사'} 기록을 삭제합니다.\n삭제 후에는 목록에서 복구할 수 없습니다.`,
+            confirmText: '삭제',
+            tone: 'danger',
+        });
+        if (!confirmed) return;
         setReviews(reviews.filter(r => r.id !== id));
         if (selectedReview?.id === id) setSelectedReview(null);
         try { await supabase.from('discharge_reviews').delete().eq('id', id); } catch { }
@@ -385,7 +414,13 @@ export default function DischargeReviewPage({ user }: { user: any }) {
 
         let updatedItems = editForm.items || [];
         if (editForm.chart_data !== selectedReview.chart_data) {
-            if (confirm('차트 데이터가 변경되었습니다. 체크리스트 항목을 다시 생성하시겠습니까? (기본 체크 해제됨)')) {
+            const shouldRegenerate = await openConfirm({
+                title: '체크리스트 재생성',
+                description: '차트 데이터가 변경되었습니다.\n체크리스트 항목을 다시 생성하면 기본 체크가 해제됩니다.',
+                confirmText: '재생성',
+                tone: 'accent',
+            });
+            if (shouldRegenerate) {
                 const newLines = parseChartData(editForm.chart_data || '');
                 updatedItems = chartLinesToCheckItems(newLines);
             }
@@ -475,6 +510,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
 
     return (
         <div className="bg-[var(--page-bg)] animate-in fade-in duration-300" data-testid="discharge-review-view">
+            {dialog}
             {/* 헤더 */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 bg-[var(--card)] border-b border-[var(--border)] gap-4">
                 <div>

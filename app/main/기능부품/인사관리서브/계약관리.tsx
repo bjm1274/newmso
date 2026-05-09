@@ -1,13 +1,16 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase-compat';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { resolveWeeklyWorkingHours, resolveWorkingDaysPerWeek } from '@/lib/payroll-working-hours';
 import { getStaffProbationMonths, toIntegerOrFallback } from '@/lib/staff-meta';
 import ContractList from './계약문서/계약서명단';
 import ContractPreview from './계약문서/계약서미리보기';
 import ContractTemplateEditor from './계약문서/계약서양식편집';
+import RiskActionDialog from './RiskActionDialog';
+
+const formatWon = (amount: number) => `₩${Math.round(Number(amount) || 0).toLocaleString()}`;
 
 export default function ContractMain({
   staffs,
@@ -23,6 +26,7 @@ export default function ContractMain({
   const [activeTab, setActiveTab] = useState('계약현황');
   const [contractSubType, setContractSubType] = useState<'신규' | '변경'>('신규'); // 신규/변경계약서용
   const [mobileListOpen, setMobileListOpen] = useState(false);
+  const [showSignatureReview, setShowSignatureReview] = useState(false);
 
   // 확장된 비과세 항목 상태 (근로계약서·변경계약서·연봉계약서 공통)
   const [salaryInfo, setSalaryInfo] = useState({
@@ -76,6 +80,15 @@ export default function ContractMain({
         { onConflict: 'staff_id,contract_type' }
       );
 
+  const getContractType = () => activeTab === '연봉계약갱신' ? '연봉계약서'
+    : activeTab === '신규/변경계약서' ? (contractSubType === '신규' ? '신규계약서' : '변경계약서')
+      : '표준근로계약서';
+
+  const selectedContractStaffs = useMemo(
+    () => ((staffs as any[]) || []).filter((staff: any) => checkedIds.includes(Number(staff.id))),
+    [checkedIds, staffs],
+  );
+
   const fetchContracts = async () => {
     const { data, error } = await supabase.from('employment_contracts').select('*');
     if (!error && data) setContracts(data);
@@ -100,9 +113,7 @@ export default function ContractMain({
     setLoading(true);
     try {
       const includeTaxFree = activeTab === '연봉계약갱신' || activeTab === '신규/변경계약서';
-      const contractType = activeTab === '연봉계약갱신' ? '연봉계약서'
-        : activeTab === '신규/변경계약서' ? (contractSubType === '신규' ? '신규계약서' : '변경계약서')
-          : '표준근로계약서';
+      const contractType = getContractType();
 
       // 선택된 직원들의 shift_id로 근무형태 데이터 일괄 조회
       const shiftIds = [...new Set(checkedIds.map((staffId: number) => {
@@ -281,7 +292,7 @@ export default function ContractMain({
           </div>
         </div>
         {activeTab !== '양식 편집' && (
-          <button onClick={handleRequestSignature} disabled={loading || checkedIds.length === 0} className="px-4 py-3 bg-[var(--foreground)] text-white text-[12px] font-semibold rounded-[var(--radius-md)] shadow-sm hover:scale-[0.98] transition-all disabled:opacity-50">
+          <button onClick={() => checkedIds.length === 0 ? toast("직원을 선택해주세요.", 'warning') : setShowSignatureReview(true)} disabled={loading || checkedIds.length === 0} className="px-4 py-3 bg-[var(--foreground)] text-white text-[12px] font-semibold rounded-[var(--radius-md)] shadow-sm hover:scale-[0.98] transition-all disabled:opacity-50">
             {loading ? '처리 중...' : `${activeTab === '연봉계약갱신' ? '연봉 갱신 및 계약 발송' : activeTab === '신규/변경계약서' ? `${contractSubType} 계약서 발송` : '근로계약서 발송'} (${checkedIds.length}명)`}
           </button>
         )}
@@ -481,6 +492,45 @@ export default function ContractMain({
         </div>
         )}
       </div>
+
+      <RiskActionDialog
+        open={showSignatureReview}
+        title="계약 발송 전 영향 범위 확인"
+        description="선택한 직원에게 전자서명 요청과 알림이 발송됩니다. 연봉/변경 계약은 직원 급여 정보도 함께 갱신될 수 있습니다."
+        targetLabel={`${getContractType()} · ${selectedContractStaffs.length}명`}
+        tone="warning"
+        loading={loading}
+        items={[
+          { label: '계약 유형', value: getContractType() },
+          { label: '대상자', value: selectedContractStaffs.length > 0 ? selectedContractStaffs.slice(0, 4).map((staff: any) => staff.name).join(', ') + (selectedContractStaffs.length > 4 ? ` 외 ${selectedContractStaffs.length - 4}명` : '') : '-' },
+          { label: '적용일', value: salaryInfo.effective_date || '직원 입사일 기준' },
+          { label: '기본급', value: activeTab === '계약현황' ? '직원 현재 기본급 사용' : formatWon(salaryInfo.base_salary) },
+          { label: '주당 근무', value: `${salaryInfo.working_hours_per_week}시간 · ${salaryInfo.working_days_per_week}일` },
+          { label: '근무 시간', value: `${salaryInfo.shift_start_time} - ${salaryInfo.shift_end_time}` },
+        ]}
+        changes={activeTab === '계약현황' ? [] : [
+          { label: '계약 상태', before: '미발송/반려', after: '서명대기' },
+          { label: '기본급', before: '직원별 기존 값', after: formatWon(salaryInfo.base_salary) },
+          { label: '식대', before: '직원별 기존 값', after: formatWon(salaryInfo.meal_allowance) },
+        ]}
+        impacts={[
+          'employment_contracts에 서명대기 계약 레코드가 생성 또는 갱신됩니다.',
+          '선택 직원에게 계약서 서명 요청 알림이 발송됩니다.',
+          activeTab === '계약현황'
+            ? '표준근로계약서는 직원의 현재 급여/근무 조건을 기준으로 생성됩니다.'
+            : '신규/변경/연봉 계약은 입력한 급여 항목이 직원 마스터에도 반영됩니다.',
+        ]}
+        warnings={[
+          '계약 발송 후 직원 로그인 시 즉시 서명 화면이 표시됩니다.',
+          '연봉 갱신과 변경 계약은 적용일과 비과세 한도를 다시 확인하세요.',
+        ]}
+        confirmLabel="계약 발송"
+        onCancel={() => setShowSignatureReview(false)}
+        onConfirm={async () => {
+          await handleRequestSignature();
+          setShowSignatureReview(false);
+        }}
+      />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -64,6 +65,7 @@ export default function LeaveManagement({
   allowHolidayTab = true,
   tabMode = 'all',
 }: Record<string, unknown>) {
+  const { dialog, openConfirm } = useActionDialog();
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<LeaveManagementTabId>((initialTab as LeaveManagementTabId) ?? '연차/휴가 신청내역');
@@ -198,7 +200,13 @@ export default function LeaveManagement({
   };
 
   const runAnnualLeaveAutoGrant = async () => {
-    if (!confirm('전 직원의 연차를 입사일 기준으로 재계산합니다. 진행할까요?')) return;
+    const confirmed = await openConfirm({
+      title: '전 직원 연차 재계산',
+      description: '전 직원의 연차를 입사일 기준으로 재계산합니다.\n기존 연차 총량이 갱신될 수 있습니다.',
+      confirmText: '재계산',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     setLoading(true);
     try {
       for (const s of staffList) {
@@ -227,6 +235,7 @@ export default function LeaveManagement({
       className="app-page flex h-full min-h-0 flex-col overflow-hidden animate-in fade-in duration-500"
       data-testid="leave-management-view"
     >
+      {dialog}
       <div className="relative z-10 flex shrink-0 flex-col gap-4 border-b border-[var(--border)] bg-[var(--card)] p-4 md:flex-row md:items-center md:justify-between md:p-4">
         <div className="flex min-h-[48px] shrink-0 items-center">
           <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">전문 연차/휴가 통합 관리</h2>

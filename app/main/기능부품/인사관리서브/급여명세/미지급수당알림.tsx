@@ -1,6 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { supabase } from '@/lib/supabase';
 import { calculateHourlyRateFromMonthlySalary, resolveWeeklyWorkingHours } from '@/lib/payroll-working-hours';
 
@@ -19,6 +20,7 @@ interface AlertItem {
 }
 
 export default function UnpaidAllowanceAlert({ staffs, selectedCo, user }: Props) {
+  const { dialog, openConfirm } = useActionDialog();
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState<string | null>(null);
@@ -108,7 +110,13 @@ export default function UnpaidAllowanceAlert({ staffs, selectedCo, user }: Props
   }, [selectedCo]);
 
   const handleApply = async (item: AlertItem) => {
-    if (!confirm(`${item.staff.name}의 ${item.type} 미지급 건을 결재 상신하시겠습니까?`)) return;
+    const confirmed = await openConfirm({
+      title: '미지급 수당 결재 상신',
+      description: `${item.staff.name}의 ${item.type} 미지급 건을 결재 상신합니다.\n추정 금액 ${item.estimatedPay.toLocaleString('ko-KR')}원이 포함됩니다.`,
+      confirmText: '상신',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
     setSubmitting(`${item.staff.id}_${item.type}`);
     try {
       await supabase.from('approvals').insert({
@@ -137,6 +145,7 @@ export default function UnpaidAllowanceAlert({ staffs, selectedCo, user }: Props
 
   return (
     <div className="p-4 md:p-4 space-y-5 max-w-4xl mx-auto">
+      {dialog}
       <div>
         <h2 className="text-lg font-bold text-[var(--foreground)]">장기 미지급 수당 알림</h2>
       </div>
