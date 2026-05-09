@@ -51,6 +51,7 @@ export const BACKUP_GROUPS: BackupGroupDefinition[] = [
       'attendances',
       'attendance_corrections',
       'attendance_deduction_rules',
+      'company_holidays',
       'leave_requests',
       'payroll_records',
       'payroll_locks',

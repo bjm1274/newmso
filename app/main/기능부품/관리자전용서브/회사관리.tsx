@@ -14,10 +14,7 @@ import AttendanceDeductionRules from './근태차감규칙설정';
 import LeaveManagement from '../인사관리서브/휴가신청/휴가관리메인';
 import IntegratedHRSettings from '../인사관리서브/인사통합설정';
 import PayrollAdvancedCenter from '../인사관리서브/급여명세/급여고도화센터';
-import dynamic from 'next/dynamic';
-const AutoRosterPlanner = dynamic(() => import('../근무표자동편성'), { ssr: false, loading: () => <div className="flex items-center justify-center py-8"><div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" /></div> });
 import DocumentRepository from '../인사관리서브/문서보관함';
-import ContractMain from '../인사관리서브/계약관리';
 
 const COMPANY_COLUMNS = [
   'id',
@@ -45,14 +42,11 @@ type Props = {
 
 type CompanyManagerTabId =
   | 'company'
-  | 'team'
   | 'shift'
-  | 'attendanceRules'
   | 'card'
   | 'contract'
   | 'leavePolicy'
   | 'payrollPolicy'
-  | 'rosterPolicy'
   | 'documentPolicy';
 
 type FormState = {
@@ -68,26 +62,12 @@ type FormState = {
 
 const COMPANY_TABS: { id: CompanyManagerTabId; label: string }[] = [
   { id: 'company', label: '회사 기본정보' },
-  { id: 'team', label: '팀 관리' },
   { id: 'shift', label: '근무형태' },
-  { id: 'attendanceRules', label: '근태 규칙' },
   { id: 'card', label: '법인카드' },
-  { id: 'contract', label: '계약 설정' },
-  { id: 'leavePolicy', label: '휴가 정책' },
-  { id: 'payrollPolicy', label: '급여 정책' },
-  { id: 'rosterPolicy', label: '근무표 정책' },
-  { id: 'documentPolicy', label: '문서 정책' },
-];
-
-const ROSTER_POLICY_TABS: Array<{ id: 'planner' | 'rules' | 'patterns'; label: string }> = [
-  { id: 'planner', label: '월간 편성 저장' },
-  { id: 'rules', label: '근무 규칙' },
-  { id: 'patterns', label: '근무 패턴' },
-];
-
-const CONTRACT_POLICY_TABS: Array<{ id: 'tool' | 'policy'; label: string }> = [
-  { id: 'tool', label: '기본 계약 도구' },
-  { id: 'policy', label: '계약 정책/갱신' },
+  { id: 'contract', label: '계약 템플릿' },
+  { id: 'leavePolicy', label: '휴가 기준/공휴일' },
+  { id: 'payrollPolicy', label: '급여 기준' },
+  { id: 'documentPolicy', label: '문서보관 정책' },
 ];
 
 function createEmptyForm(): FormState {
@@ -171,8 +151,7 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
   const [activeTab, setActiveTab] = useState<CompanyManagerTabId>('company');
   const [policyCompany, setPolicyCompany] = useState('전체');
   const [policyYearMonth, setPolicyYearMonth] = useState(() => new Date().toISOString().slice(0, 7));
-  const [rosterPolicyTab, setRosterPolicyTab] = useState<'planner' | 'rules' | 'patterns'>('planner');
-  const [contractTab, setContractTab] = useState<'tool' | 'policy'>('tool');
+  const companyFormScope = (editing?.name || form.name).trim();
 
   const companyOptions = useMemo(() => {
     const names = companies
@@ -358,9 +337,6 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">회사관리</h2>
-          <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
-            위험도가 높은 인사·급여·근무표 정책은 관리자 메뉴로 일원화했습니다.
-          </p>
         </div>
         <div className="flex flex-wrap gap-1 rounded-[var(--radius-lg)] bg-[var(--muted)] p-1">
           {COMPANY_TABS.map((tab) => (
@@ -551,45 +527,32 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
                 </button>
               ) : null}
             </div>
+
+            <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.85fr)]">
+              <TeamManager
+                selectedCompany={companyFormScope}
+                hideCompanySelect
+                embedded
+                disabled={!companyFormScope}
+                onRefresh={onRefresh}
+              />
+              <AttendanceDeductionRules
+                selectedCo={companyFormScope}
+                compact
+                disabled={!companyFormScope}
+              />
+            </div>
           </div>
         </div>
       )}
 
-      {activeTab === 'team' && <TeamManager onRefresh={onRefresh} />}
       {activeTab === 'shift' && <ShiftManagement selectedCo="전체" />}
-      {activeTab === 'attendanceRules' && <AttendanceDeductionRules />}
       {activeTab === 'card' && <CorporateCardTransactions staffs={staffs} />}
 
       {activeTab === 'contract' && (
         <div className="space-y-4">
           <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-            <div className="mb-3 flex flex-wrap gap-2">
-              {CONTRACT_POLICY_TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setContractTab(tab.id)}
-                  className={`rounded-[var(--radius-md)] px-3 py-2 text-xs font-bold transition-all ${
-                    contractTab === tab.id
-                      ? 'bg-[var(--accent)] text-white'
-                      : 'bg-[var(--muted)] text-[var(--toss-gray-3)]'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-            {contractTab === 'tool' ? (
-              <ContractManager />
-            ) : (
-              <ContractMain
-                staffs={staffs}
-                selectedCo={policyCompany}
-                onRefresh={onRefresh}
-                showAdminPolicyTabs
-                showTemplateEditor={false}
-              />
-            )}
+            <ContractManager />
           </div>
         </div>
       )}
@@ -625,7 +588,7 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
             yearMonth={policyYearMonth}
             onYearMonthChange={setPolicyYearMonth}
           />
-          <div className="grid gap-4 xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
+          <div className="grid gap-4 2xl:grid-cols-[minmax(520px,620px)_minmax(0,1fr)]">
             <IntegratedHRSettings companyName={policyCompany} showLockMenu={false} />
             <PayrollAdvancedCenter
               staffs={staffs}
@@ -638,41 +601,6 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
         </div>
       )}
 
-      {activeTab === 'rosterPolicy' && (
-        <div className="space-y-4">
-          <PolicyScopeControls
-            companyOptions={companyOptions}
-            selectedCompany={policyCompany}
-            onCompanyChange={setPolicyCompany}
-          />
-          <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-            <div className="mb-3 flex flex-wrap gap-2">
-              {ROSTER_POLICY_TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setRosterPolicyTab(tab.id)}
-                  className={`rounded-[var(--radius-md)] px-3 py-2 text-xs font-bold transition-all ${
-                    rosterPolicyTab === tab.id
-                      ? 'bg-[var(--accent)] text-white'
-                      : 'bg-[var(--muted)] text-[var(--toss-gray-3)]'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-            <AutoRosterPlanner
-              user={user as any}
-              staffs={staffs}
-              selectedCo={policyCompany}
-              panelMode={rosterPolicyTab}
-              adminMode
-            />
-          </div>
-        </div>
-      )}
-
       {activeTab === 'documentPolicy' && (
         <div className="space-y-4">
           <PolicyScopeControls
@@ -680,7 +608,12 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
             selectedCompany={policyCompany}
             onCompanyChange={setPolicyCompany}
           />
-          <DocumentRepository user={user as any} selectedCo={policyCompany} canManageDocuments />
+          <DocumentRepository
+            user={user as any}
+            selectedCo={policyCompany}
+            canManageDocuments
+            title="문서보관 정책"
+          />
         </div>
       )}
     </div>

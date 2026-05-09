@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -19,6 +20,7 @@ type TemplateDesign = {
   backgroundLogoOpacity?: number;
   showSeal?: boolean;
   sealLabel?: string;
+  sealImageUrl?: string;
   titleXPercent?: number;
   titleYPercent?: number;
   subtitleXPercent?: number;
@@ -32,6 +34,7 @@ type FormTypeRow = {
   name: string;
   slug?: string;
   base_slug?: string | null;
+  company_name?: string | null;
   sort_order?: number | null;
   is_active?: boolean;
   created_at?: string;
@@ -73,6 +76,7 @@ const DEFAULT_DESIGN: TemplateDesign = {
   backgroundLogoUrl: DEFAULT_LOGO_URL,
   backgroundLogoOpacity: 0.06,
   showSeal: true,
+  sealImageUrl: '',
   sealLabel: 'SY INC. 직인',
   titleXPercent: 9,
   titleYPercent: 18,
@@ -586,27 +590,132 @@ function resolveCurrentDesign(
   } satisfies TemplateDesign;
 }
 
-async function persistDesigns(designs: Record<string, TemplateDesign>) {
-  writeLocalStorage(LOCAL_FORM_TEMPLATE_DESIGNS_KEY, designs);
+type TemplateDesignStore = {
+  version: 2;
+  defaults: Record<string, TemplateDesign>;
+  companies: Record<string, Record<string, TemplateDesign>>;
+};
+
+type FormTypeStore = {
+  version: 2;
+  defaults: FormTypeRow[];
+  companies: Record<string, FormTypeRow[]>;
+};
+
+function normalizeCompanyKey(companyName?: string | null) {
+  const trimmed = String(companyName || '').trim();
+  return trimmed || '전체';
+}
+
+function createEmptyDesignStore(): TemplateDesignStore {
+  return { version: 2, defaults: {}, companies: {} };
+}
+
+function normalizeTemplateDesignStore(value: unknown): TemplateDesignStore {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return createEmptyDesignStore();
+  }
+
+  const raw = value as Partial<TemplateDesignStore> & Record<string, unknown>;
+  if (raw.version === 2 && (raw.defaults || raw.companies)) {
+    return {
+      version: 2,
+      defaults: typeof raw.defaults === 'object' && raw.defaults && !Array.isArray(raw.defaults) ? raw.defaults : {},
+      companies: typeof raw.companies === 'object' && raw.companies && !Array.isArray(raw.companies) ? raw.companies : {},
+    };
+  }
+
+  return {
+    version: 2,
+    defaults: value as Record<string, TemplateDesign>,
+    companies: {},
+  };
+}
+
+function normalizeFormTypeStore(value: unknown): FormTypeStore {
+  if (Array.isArray(value)) {
+    return { version: 2, defaults: value as FormTypeRow[], companies: {} };
+  }
+
+  if (value && typeof value === 'object') {
+    const raw = value as Partial<FormTypeStore>;
+    if (raw.version === 2 && (raw.defaults || raw.companies)) {
+      return {
+        version: 2,
+        defaults: Array.isArray(raw.defaults) ? raw.defaults : [],
+        companies: raw.companies && typeof raw.companies === 'object' && !Array.isArray(raw.companies)
+          ? raw.companies
+          : {},
+      };
+    }
+  }
+
+  return { version: 2, defaults: [], companies: {} };
+}
+
+function readLocalRowsForCompany(companyName: string) {
+  const store = normalizeFormTypeStore(readLocalStorage<unknown>(LOCAL_APPROVAL_FORM_TYPES_KEY, []));
+  const key = normalizeCompanyKey(companyName);
+  const rows = store.companies[key] || store.defaults || [];
+  return rows.map((row) => ({ ...row, company_name: normalizeCompanyKey(row.company_name || key) }));
+}
+
+function writeLocalRowsForCompany(companyName: string, rows: FormTypeRow[]) {
+  const store = normalizeFormTypeStore(readLocalStorage<unknown>(LOCAL_APPROVAL_FORM_TYPES_KEY, []));
+  const key = normalizeCompanyKey(companyName);
+  const normalizedRows = rows.map((row) => ({ ...row, company_name: key }));
+  store.companies = { ...store.companies, [key]: normalizedRows };
+  writeLocalStorage(LOCAL_APPROVAL_FORM_TYPES_KEY, store);
+}
+
+function getDesignsForCompany(store: TemplateDesignStore, companyName: string) {
+  const key = normalizeCompanyKey(companyName);
+  return store.companies[key] || store.defaults || {};
+}
+
+async function persistDesignsForCompany(
+  companyName: string,
+  designs: Record<string, TemplateDesign>,
+  previousStore: TemplateDesignStore,
+) {
+  const key = normalizeCompanyKey(companyName);
+  const nextStore: TemplateDesignStore = {
+    version: 2,
+    defaults: { ...previousStore.defaults },
+    companies: { ...previousStore.companies },
+  };
+
+  if (key === '전체') {
+    nextStore.defaults = designs;
+  } else {
+    nextStore.companies[key] = designs;
+  }
+
+  writeLocalStorage(LOCAL_FORM_TEMPLATE_DESIGNS_KEY, nextStore);
   const result = await supabase
     .from('system_settings')
     .upsert(
       {
         key: 'form_template_designs',
-        value: JSON.stringify(designs),
+        value: JSON.stringify(nextStore),
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'key' }
     );
 
   if (isMissingTableError(result.error, 'system_settings')) {
-    return { data: designs, error: null } as unknown as typeof result;
+    return { data: nextStore, error: null };
   }
 
-  return result;
+  if (result.error) {
+    return { data: nextStore, error: result.error };
+  }
+
+  return { data: nextStore, error: null };
 }
 
 export default function ApprovalFormTypesManager({ user }: { user?: any }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [list, setList] = useState<FormTypeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [designLoading, setDesignLoading] = useState(true);
@@ -619,12 +728,52 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
   const [selectedSlug, setSelectedSlug] = useState<string | null>(builtinTemplates[0]?.slug || null);
   const [selectedName, setSelectedName] = useState(builtinTemplates[0]?.name || '연차/휴가');
   const [designs, setDesigns] = useState<Record<string, TemplateDesign>>({});
+  const [designStore, setDesignStore] = useState<TemplateDesignStore>(() => createEmptyDesignStore());
+  const [companies, setCompanies] = useState<string[]>([]);
   const designEditorRef = useRef<HTMLElement | null>(null);
-  const currentCompanyLabel = useMemo(() => readRuntimeCompanyLabel(user), [user]);
+  const runtimeCompanyLabel = useMemo(() => readRuntimeCompanyLabel(user), [user]);
+  const [selectedCompany, setSelectedCompany] = useState(() => runtimeCompanyLabel);
+  const currentCompanyLabel = useMemo(
+    () => normalizeCompanyKey(selectedCompany || runtimeCompanyLabel),
+    [runtimeCompanyLabel, selectedCompany]
+  );
   const selectedBaseTemplate = useMemo(
     () => builtinTemplates.find((template) => template.slug === addBaseSlug) ?? builtinTemplates[0],
     [addBaseSlug]
   );
+
+  useEffect(() => {
+    setSelectedCompany((current) => current || runtimeCompanyLabel);
+  }, [runtimeCompanyLabel]);
+
+  useEffect(() => {
+    const loadCompanies = async () => {
+      const fallback = normalizeCompanyKey(runtimeCompanyLabel);
+      const names = new Set<string>([fallback]);
+
+      try {
+        const { data, error } = await supabase
+          .from('companies')
+          .select('name')
+          .order('name', { ascending: true });
+
+        if (!error && Array.isArray(data)) {
+          data.forEach((row: any) => {
+            const name = normalizeCompanyKey(row?.name);
+            if (name) names.add(name);
+          });
+        }
+      } catch {
+        // local fallback is enough when the companies table is not available.
+      }
+
+      const next = Array.from(names).filter(Boolean);
+      setCompanies(next);
+      setSelectedCompany((current) => (current && next.includes(current) ? current : next[0] || fallback));
+    };
+
+    void loadCompanies();
+  }, [runtimeCompanyLabel]);
 
   const customTemplates = useMemo(
     () =>
@@ -672,10 +821,10 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
 
   const previewDesign = useMemo(() => {
     const previewTemplateName =
-      builtinTemplates.find((template) => template.slug === previewTemplateSlug)?.name || selectedName;
+      selectedTemplate?.name || builtinTemplates.find((template) => template.slug === previewTemplateSlug)?.name || selectedName;
 
-    return resolveCurrentDesign(previewTemplateSlug, previewTemplateName, {}, currentCompanyLabel);
-  }, [currentCompanyLabel, previewTemplateSlug, selectedName]);
+    return resolveCurrentDesign(selectedSlug || previewTemplateSlug, previewTemplateName, designs, currentCompanyLabel);
+  }, [currentCompanyLabel, designs, previewTemplateSlug, selectedName, selectedSlug, selectedTemplate?.name]);
 
   const previewSourceName = useMemo(
     () => builtinTemplates.find((template) => template.slug === previewTemplateSlug)?.name || selectedName,
@@ -707,14 +856,41 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
     [previewTemplateSlug]
   );
 
+  const selectedDesignKey = selectedSlug || previewTemplateSlug || 'generic';
+
+  const updatePreviewDesign = (patch: Partial<TemplateDesign>) => {
+    setDesigns((prev) => {
+      const base = resolveCurrentDesign(selectedDesignKey, selectedName, prev, currentCompanyLabel);
+      return {
+        ...prev,
+        [selectedDesignKey]: {
+          ...base,
+          ...patch,
+        },
+      };
+    });
+  };
+
+  const savePreviewDesign = async () => {
+    const { data, error } = await persistDesignsForCompany(currentCompanyLabel, designs, designStore);
+    if (error) {
+      return toast('양식 디자인 저장에 실패했습니다: ' + error.message, 'error');
+    }
+
+    setDesignStore(data);
+    toast('회사별 양식 디자인을 저장했습니다.');
+  };
+
   const syncListState = (next: FormTypeRow[]) => {
-    writeLocalStorage(LOCAL_APPROVAL_FORM_TYPES_KEY, next);
-    setList(next);
+    const scopedRows = next.map((row) => ({ ...row, company_name: currentCompanyLabel }));
+    writeLocalRowsForCompany(currentCompanyLabel, scopedRows);
+    setList(scopedRows);
   };
 
   useEffect(() => {
     const loadList = async () => {
-      const localRows = readLocalStorage<FormTypeRow[]>(LOCAL_APPROVAL_FORM_TYPES_KEY, []);
+      setLoading(true);
+      const localRows = readLocalRowsForCompany(currentCompanyLabel);
 
       try {
         const { data, error } = await supabase
@@ -725,7 +901,11 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
 
         if (!error && Array.isArray(data)) {
           const map = new Map<string, FormTypeRow>();
-          [...(data as FormTypeRow[]), ...localRows].forEach((row) => {
+          const dbRows = (data as FormTypeRow[])
+            .filter((row) => !row.company_name || normalizeCompanyKey(row.company_name) === currentCompanyLabel)
+            .map((row) => ({ ...row, company_name: normalizeCompanyKey(row.company_name || currentCompanyLabel) }));
+
+          [...localRows, ...dbRows].forEach((row) => {
             const key = row.slug || row.id;
             if (!map.has(key)) {
               map.set(key, row);
@@ -748,15 +928,16 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
     };
 
     const loadSavedDesigns = async () => {
+      setDesignLoading(true);
       try {
-        const localDesigns = readLocalStorage<Record<string, TemplateDesign>>(LOCAL_FORM_TEMPLATE_DESIGNS_KEY, {});
+        const localDesigns = readLocalStorage<unknown>(LOCAL_FORM_TEMPLATE_DESIGNS_KEY, {});
         const { data, error } = await supabase
           .from('system_settings')
           .select('value')
           .eq('key', 'form_template_designs')
           .maybeSingle();
 
-        let parsed = localDesigns;
+        let parsed: unknown = localDesigns;
         if (!error && data?.value) {
           parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
           writeLocalStorage(LOCAL_FORM_TEMPLATE_DESIGNS_KEY, parsed);
@@ -764,10 +945,14 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
           throw error;
         }
 
-        setDesigns(mergeWithDefaultDesigns(parsed, currentCompanyLabel));
+        const store = normalizeTemplateDesignStore(parsed);
+        setDesignStore(store);
+        setDesigns(mergeWithDefaultDesigns(getDesignsForCompany(store, currentCompanyLabel), currentCompanyLabel));
       } catch (error) {
         console.error(error);
-        setDesigns(createDefaultDesignMap(currentCompanyLabel));
+        const fallbackStore = normalizeTemplateDesignStore(readLocalStorage<unknown>(LOCAL_FORM_TEMPLATE_DESIGNS_KEY, {}));
+        setDesignStore(fallbackStore);
+        setDesigns(mergeWithDefaultDesigns(getDesignsForCompany(fallbackStore, currentCompanyLabel), currentCompanyLabel));
       } finally {
         setDesignLoading(false);
       }
@@ -818,31 +1003,51 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
     const nextDesigns = {
       ...designs,
       [slug]: {
-        ...resolveCurrentDesign(baseTemplate.slug, baseTemplate.name, designs),
+        ...resolveCurrentDesign(baseTemplate.slug, baseTemplate.name, designs, currentCompanyLabel),
         title: name,
       },
     };
 
-    const { error: designError } = await persistDesigns(nextDesigns);
+    const { data: nextDesignStore, error: designError } = await persistDesignsForCompany(currentCompanyLabel, nextDesigns, designStore);
     if (designError) {
       return toast('기본양식 복제에 실패했습니다: ' + designError.message, 'error');
     }
 
+    let newRow: FormTypeRow = {
+      id: globalThis.crypto?.randomUUID?.() || `local-${Date.now()}`,
+      name,
+      slug,
+      base_slug: baseTemplate.slug,
+      company_name: currentCompanyLabel,
+      sort_order: list.length,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    try {
+      const { data, error } = await supabase
+        .from('approval_form_types')
+        .insert(newRow)
+        .select('*')
+        .maybeSingle();
+
+      if (!error && data) {
+        newRow = data as FormTypeRow;
+      } else if (error && !isMissingTableError(error, 'approval_form_types')) {
+        console.warn('approval_form_types insert failed:', error);
+      }
+    } catch (error) {
+      console.warn('approval_form_types insert failed:', error);
+    }
+
     const nextRows = [
       ...list,
-      {
-        id: globalThis.crypto?.randomUUID?.() || `local-${Date.now()}`,
-        name,
-        slug,
-        base_slug: baseTemplate.slug,
-        sort_order: list.length,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
+      newRow,
     ];
 
     setDesigns(nextDesigns);
+    setDesignStore(nextDesignStore);
     syncListState(nextRows);
     setAddName('');
     setAddSlug('');
@@ -873,16 +1078,29 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
     if (previousSlug !== slug && designs[previousSlug]) {
       const nextDesigns = { ...designs, [slug]: { ...designs[previousSlug], title: name } };
       delete nextDesigns[previousSlug];
-      const { error } = await persistDesigns(nextDesigns);
+      const { data, error } = await persistDesignsForCompany(currentCompanyLabel, nextDesigns, designStore);
       if (error) {
         return toast('양식 디자인 이동에 실패했습니다: ' + error.message, 'error');
       }
       setDesigns(nextDesigns);
+      setDesignStore(data);
     }
 
     const nextRows = list.map((row) =>
       row.id === editingId ? { ...row, name, slug, updated_at: new Date().toISOString() } : row
     );
+    try {
+      const { error } = await supabase
+        .from('approval_form_types')
+        .update({ name, slug, company_name: currentCompanyLabel, updated_at: new Date().toISOString() })
+        .eq('id', editingId);
+
+      if (error && !isMissingTableError(error, 'approval_form_types')) {
+        console.warn('approval_form_types update failed:', error);
+      }
+    } catch (error) {
+      console.warn('approval_form_types update failed:', error);
+    }
     syncListState(nextRows);
     setEditingId(null);
 
@@ -892,25 +1110,57 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
     }
   };
 
-  const toggleActive = (row: FormTypeRow) => {
+  const toggleActive = async (row: FormTypeRow) => {
     const nextRows = list.map((item) =>
       item.id === row.id ? { ...item, is_active: !row.is_active, updated_at: new Date().toISOString() } : item
     );
+    try {
+      const { error } = await supabase
+        .from('approval_form_types')
+        .update({ is_active: !row.is_active, updated_at: new Date().toISOString() })
+        .eq('id', row.id);
+
+      if (error && !isMissingTableError(error, 'approval_form_types')) {
+        console.warn('approval_form_types active toggle failed:', error);
+      }
+    } catch (error) {
+      console.warn('approval_form_types active toggle failed:', error);
+    }
     syncListState(nextRows);
   };
 
   const handleDelete = async (row: FormTypeRow) => {
-    if (!confirm('이 추가 양식을 삭제하시겠습니까?')) return;
+    const confirmed = await openConfirm({
+      title: '추가 결재 양식 삭제',
+      description: `${row.name || '선택한 추가 양식'}을 삭제합니다.\n연결된 디자인 설정도 함께 정리됩니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
 
     const key = row.slug || row.id;
     if (designs[key]) {
       const nextDesigns = { ...designs };
       delete nextDesigns[key];
-      const { error } = await persistDesigns(nextDesigns);
+      const { data, error } = await persistDesignsForCompany(currentCompanyLabel, nextDesigns, designStore);
       if (error) {
         return toast('양식 디자인 정리에 실패했습니다: ' + error.message, 'error');
       }
       setDesigns(nextDesigns);
+      setDesignStore(data);
+    }
+
+    try {
+      const { error } = await supabase
+        .from('approval_form_types')
+        .delete()
+        .eq('id', row.id);
+
+      if (error && !isMissingTableError(error, 'approval_form_types')) {
+        console.warn('approval_form_types delete failed:', error);
+      }
+    } catch (error) {
+      console.warn('approval_form_types delete failed:', error);
     }
 
     syncListState(list.filter((item) => item.id !== row.id));
@@ -923,11 +1173,24 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
 
   return (
     <div className="max-w-6xl space-y-5">
-      <div className="space-y-2">
+      {dialog}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-semibold text-[var(--foreground)]">기본양식 관리</h2>
-        <p className="text-sm leading-6 text-[var(--toss-gray-3)]">
-          예전처럼 양식빌더, 문서양식, 결재양식을 나누지 않고 기본양식을 기준으로 바로 보고 추가하도록 정리했습니다.
-        </p>
+        <label className="flex items-center gap-2 text-xs font-bold text-[var(--toss-gray-4)]">
+          회사
+          <select
+            value={currentCompanyLabel}
+            onChange={(event) => setSelectedCompany(event.target.value)}
+            className="min-w-[180px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-blue-200"
+          >
+            {companies.length === 0 && <option value={currentCompanyLabel}>{currentCompanyLabel}</option>}
+            {companies.map((company) => (
+              <option key={company} value={company}>
+                {company}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <section ref={designEditorRef} className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
@@ -1154,6 +1417,74 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
             </div>
           </div>
 
+          <div className="mt-4 grid grid-cols-1 gap-3 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 md:grid-cols-2 xl:grid-cols-4">
+            <label className="space-y-1">
+              <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">문서 제목</span>
+              <input
+                value={previewDesign.title || ''}
+                onChange={(event) => updatePreviewDesign({ title: event.target.value })}
+                className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-2 text-sm font-semibold"
+              />
+            </label>
+            <label className="space-y-1">
+              <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">회사명</span>
+              <input
+                value={previewDesign.companyLabel || ''}
+                onChange={(event) => updatePreviewDesign({ companyLabel: event.target.value })}
+                className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-2 text-sm font-semibold"
+              />
+            </label>
+            <label className="space-y-1">
+              <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">로고 URL</span>
+              <input
+                value={previewDesign.backgroundLogoUrl || ''}
+                onChange={(event) => updatePreviewDesign({ backgroundLogoUrl: event.target.value })}
+                className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-2 text-sm font-semibold"
+              />
+            </label>
+            <label className="space-y-1">
+              <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">직인 이미지 URL</span>
+              <input
+                value={previewDesign.sealImageUrl || ''}
+                onChange={(event) => updatePreviewDesign({ sealImageUrl: event.target.value })}
+                className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-2 text-sm font-semibold"
+              />
+            </label>
+            <label className="space-y-1">
+              <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">주 색상</span>
+              <input
+                type="color"
+                value={previewDesign.primaryColor || '#155eef'}
+                onChange={(event) => updatePreviewDesign({ primaryColor: event.target.value })}
+                className="h-10 w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-1"
+              />
+            </label>
+            <label className="space-y-1">
+              <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">테두리 색상</span>
+              <input
+                type="color"
+                value={previewDesign.borderColor || '#d7e3ff'}
+                onChange={(event) => updatePreviewDesign({ borderColor: event.target.value })}
+                className="h-10 w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-1"
+              />
+            </label>
+            <label className="space-y-1">
+              <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">직인 문구</span>
+              <input
+                value={previewDesign.sealLabel || ''}
+                onChange={(event) => updatePreviewDesign({ sealLabel: event.target.value })}
+                className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-2 text-sm font-semibold"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={savePreviewDesign}
+              className="self-end rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white hover:bg-blue-700"
+            >
+              회사별 디자인 저장
+            </button>
+          </div>
+
           <div className="mt-5 flex min-h-[700px] items-center justify-center rounded-[var(--radius-xl)] border border-[var(--border)] bg-[#dde4e8] px-5 py-5">
             <div
               className="relative aspect-[210/297] w-full max-w-[430px] overflow-hidden bg-[var(--card)] shadow-[0_28px_70px_rgba(15,23,42,0.14)]"
@@ -1178,7 +1509,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
                     className="flex h-[66px] w-[66px] shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--card)]"
                     style={{ border: `1px solid ${previewDesign.borderColor || '#d5dce4'}` }}
                   >
-                    <img src="/logo.png" alt="" className="h-10 w-10 object-contain" />
+                    <img src={previewDesign.backgroundLogoUrl || DEFAULT_LOGO_URL} alt="" className="h-10 w-10 object-contain" />
                   </div>
                   <div className="min-w-0 flex-1 pt-1">
                     <h4 className="mt-1 text-[26px] font-black tracking-[-0.04em] text-[var(--foreground)]">
@@ -1251,9 +1582,15 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
                     </div>
                     {previewDesign.showSeal !== false && (
                       <div className="-ml-5 flex h-[66px] w-[66px] items-center justify-center rounded-full border-[3px] border-double border-[#b42318] bg-[var(--card)] text-center text-[10px] font-black leading-4 text-[#b42318] opacity-80">
-                        회사
-                        <br />
-                        직인
+                        {previewDesign.sealImageUrl ? (
+                          <img src={previewDesign.sealImageUrl} alt="" className="h-full w-full rounded-full object-contain" />
+                        ) : (
+                          <>
+                            회사
+                            <br />
+                            직인
+                          </>
+                        )}
                       </div>
                     )}
                   </div>

@@ -30,6 +30,7 @@ import {
 import StaffHistoryTimeline from './인사이력타임라인';
 import OnboardingChecklist from './급여명세/입퇴사온보딩';
 import CertTransferPanel from './교육자격인사이동패널';
+import RiskActionDialog from './RiskActionDialog';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import { formatWon as libFormatWon } from '@/lib/date-formatter';
 
@@ -88,6 +89,16 @@ const STAFF_MUTATION_WORK_CONDITION_COLUMNS = [
   'working_hours_per_week',
   'working_days_per_week',
 ] as const;
+
+const ESS_FIELD_LABELS: Record<string, string> = {
+  email: '이메일',
+  phone: '연락처',
+  extension: '내선번호',
+  address: '거주지 주소',
+  bank_name: '급여 은행',
+  bank_account: '급여 계좌번호',
+  permissions: '권한/복지 정보',
+};
 
 function buildStaffMutationPayload(
   payload: Record<string, unknown>,
@@ -270,6 +281,11 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   // ESS (직원 셀프 서비스) 승인 대기함 관련
   const [essRequests, setEssRequests] = useState<any[]>([]);
   const [showEssModal, setShowEssModal] = useState(false);
+  const [pendingEssAction, setPendingEssAction] = useState<{
+    type: 'approve' | 'reject';
+    request: Record<string, unknown>;
+  } | null>(null);
+  const [pendingRetirementStaff, setPendingRetirementStaff] = useState<StaffMember | null>(null);
   const [staffNameSearchInput, setStaffNameSearchInput] = useState('');
   const [appliedStaffNameSearch, setAppliedStaffNameSearch] = useState('');
 
@@ -355,8 +371,21 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     fetchEssRequests();
   }, [새로고침, 선택사업체, 직원목록]);
 
+  const getEssReviewChanges = (request: Record<string, unknown>) => {
+    const details = (request.details as Record<string, unknown> | undefined) || {};
+    const changes = (details.requested_changes as Record<string, unknown> | undefined) || {};
+    const original = (details.original_data as Record<string, unknown> | undefined) || {};
+
+    return Object.keys(changes)
+      .filter((key) => JSON.stringify(changes[key] ?? null) !== JSON.stringify(original[key] ?? null))
+      .map((key) => ({
+        label: ESS_FIELD_LABELS[key] || key,
+        before: typeof original[key] === 'object' ? JSON.stringify(original[key]) : String(original[key] ?? '(빈 값)'),
+        after: typeof changes[key] === 'object' ? JSON.stringify(changes[key]) : String(changes[key] ?? '(빈 값)'),
+      }));
+  };
+
   const handleApproveEssSafe = async (request: Record<string, unknown>) => {
-    if (!confirm(`${request.user_name}님의 정보 변경 요청을 승인하시겠습니까?`)) return;
     try {
       const updates =
         ((request.details as Record<string, unknown> | undefined)?.requested_changes as Record<string, unknown> | undefined) || {};
@@ -431,7 +460,6 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   };
 
   const handleApproveEss = async (request: Record<string, unknown>) => {
-    if (!confirm(`${request.user_name}님의 정보 변경 요청을 승인하시겠습니까?`)) return;
     try {
       const updates = (request.details as Record<string, unknown>)?.requested_changes;
       // 1. 실제 직원 정보 업데이트
@@ -448,7 +476,6 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   };
 
   const handleRejectEss = async (request: Record<string, unknown>) => {
-    if (!confirm(`${request.user_name}님의 정보 변경 요청을 반려하시겠습니까?`)) return;
     try {
       await supabase.from('audit_logs').update({ target_type: 'ESS_PROFILE_UPDATE_REJECTED' }).eq('id', request.id);
       toast('반려되었습니다.');
@@ -989,7 +1016,6 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   };
 
   const 직원삭제 = async (직원: StaffMember) => {
-    if (!confirm(`${직원.name} 직원을 삭제(퇴사 처리) 하시겠습니까?`)) return;
     try {
       const actor = readClientAuditActor();
       const today = new Date().toISOString().slice(0, 10);
@@ -1249,7 +1275,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       수정
                     </button>
                     <button
-                      onClick={() => 직원삭제(직원)}
+                      onClick={() => setPendingRetirementStaff(직원)}
                       className="px-3 py-2 bg-red-500/10 text-red-600 text-[11px] font-semibold rounded-[var(--radius-md)] hover:bg-red-500/20 transition-all"
                     >
                       삭제
@@ -1313,7 +1339,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                   정보 수정하기
                 </button>
                 <button
-                  onClick={() => 직원삭제(직원)}
+                  onClick={() => setPendingRetirementStaff(직원)}
                   className="px-3 py-3 bg-red-500/10 text-red-600 text-[11px] font-semibold rounded-[var(--radius-md)] hover:bg-red-500/20 transition-all"
                 >
                   삭제
@@ -1933,11 +1959,6 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                     // 바뀐 항목만 필터링
                     const changedKeys = Object.keys(changes).filter(k => changes[k] !== original[k]);
 
-                    const fieldLabels: Record<string, string> = {
-                      email: '이메일', phone: '연락처', extension: '내선번호',
-                      address: '거주지 주소', bank_name: '급여 은행', bank_account: '급여 계좌번호'
-                    };
-
                     return (
                       <div key={req.id} className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm p-5 space-y-4">
                         <div className="flex justify-between items-center border-b border-[var(--border)] pb-3">
@@ -1956,7 +1977,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                           ) : (
                             changedKeys.map(k => (
                               <div key={k} className="p-3 bg-[var(--muted)] rounded-[var(--radius-md)] flex flex-col gap-1">
-                                <span className="text-[10px] font-bold text-[var(--accent)] uppercase tracking-wider">{fieldLabels[k] || k}</span>
+                                <span className="text-[10px] font-bold text-[var(--accent)] uppercase tracking-wider">{ESS_FIELD_LABELS[k] || k}</span>
                                 <div className="text-xs font-semibold text-[var(--foreground)] break-words">
                                   <span className="line-through text-[var(--toss-gray-3)] text-[11px] block">{original[k] || '(빈 값)'}</span>
                                   <span className="text-emerald-600 block mt-0.5">→ {changes[k] || '(빈 값)'}</span>
@@ -1967,8 +1988,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         </div>
 
                         <div className="flex justify-end gap-2 pt-2">
-                          <button onClick={() => handleRejectEss(req)} className="px-5 py-2.5 bg-red-500/10 text-red-600 hover:bg-red-500/20 rounded-[var(--radius-md)] font-semibold text-[11px] transition-colors">반려</button>
-                          <button onClick={() => handleApproveEssSafe(req)} className="px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-600 rounded-[var(--radius-md)] font-semibold text-[11px] transition-colors shadow-sm">승인하기</button>
+                          <button onClick={() => setPendingEssAction({ type: 'reject', request: req })} className="px-5 py-2.5 bg-red-500/10 text-red-600 hover:bg-red-500/20 rounded-[var(--radius-md)] font-semibold text-[11px] transition-colors">반려</button>
+                          <button onClick={() => setPendingEssAction({ type: 'approve', request: req })} className="px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-600 rounded-[var(--radius-md)] font-semibold text-[11px] transition-colors shadow-sm">승인하기</button>
                         </div>
                       </div>
                     )
@@ -1984,6 +2005,75 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           </div>
         </div>
       )}
+
+      <RiskActionDialog
+        open={!!pendingEssAction}
+        title={pendingEssAction?.type === 'approve' ? 'ESS 정보 변경 승인' : 'ESS 정보 변경 반려'}
+        description="직원 셀프서비스 요청을 처리하기 전 변경 전후와 영향 범위를 확인합니다."
+        targetLabel={pendingEssAction ? `${pendingEssAction.request.user_name || '-'}님의 프로필 변경 요청` : undefined}
+        tone={pendingEssAction?.type === 'reject' ? 'danger' : 'success'}
+        items={[
+          { label: '처리 결과', value: pendingEssAction?.type === 'approve' ? '직원 기본정보에 반영' : '요청 반려 및 대기함 제거', tone: pendingEssAction?.type === 'reject' ? 'danger' : 'success' },
+          { label: '요청 일시', value: pendingEssAction?.request.created_at ? new Date(String(pendingEssAction.request.created_at)).toLocaleString() : '-' },
+        ]}
+        changes={pendingEssAction ? getEssReviewChanges(pendingEssAction.request) : []}
+        impacts={[
+          pendingEssAction?.type === 'approve'
+            ? '급여 계좌, 연락처, 주소 등 직원 마스터 데이터가 즉시 갱신됩니다.'
+            : '직원 마스터 데이터는 변경되지 않고 요청 상태만 반려로 기록됩니다.',
+          '처리 결과는 audit_logs에 남아 이후 검토 이력으로 사용됩니다.',
+        ]}
+        warnings={[
+          '급여 계좌 변경은 급여 지급 전 검토가 필요합니다.',
+          '권한/복지 정보가 포함된 요청은 접근 범위 변경 여부를 다시 확인하세요.',
+        ]}
+        confirmLabel={pendingEssAction?.type === 'approve' ? '승인 확정' : '반려 확정'}
+        onCancel={() => setPendingEssAction(null)}
+        onConfirm={async () => {
+          if (!pendingEssAction) return;
+          const action = pendingEssAction;
+          if (action.type === 'approve') {
+            await handleApproveEssSafe(action.request);
+          } else {
+            await handleRejectEss(action.request);
+          }
+          setPendingEssAction(null);
+        }}
+      />
+
+      <RiskActionDialog
+        open={!!pendingRetirementStaff}
+        title="퇴사 처리 확인"
+        description="직원 삭제 버튼은 실제 삭제가 아니라 재직 상태를 퇴사로 전환합니다."
+        targetLabel={pendingRetirementStaff ? `${pendingRetirementStaff.name} · ${pendingRetirementStaff.company || '-'} · ${pendingRetirementStaff.department || '-'}` : undefined}
+        tone="danger"
+        items={[
+          { label: '처리 방식', value: '재직 → 퇴사', tone: 'danger' },
+          { label: '퇴사일', value: String(pendingRetirementStaff?.resigned_at || new Date().toISOString().slice(0, 10)) },
+          { label: '사번', value: String(pendingRetirementStaff?.employee_no || '-') },
+          { label: '직함', value: String(pendingRetirementStaff?.position || '-') },
+        ]}
+        changes={[
+          { label: '상태', before: String(pendingRetirementStaff?.status || '재직'), after: '퇴사' },
+          { label: '퇴사일', before: String(pendingRetirementStaff?.resigned_at || '(빈 값)'), after: String(pendingRetirementStaff?.resigned_at || new Date().toISOString().slice(0, 10)) },
+        ]}
+        impacts={[
+          '재직자 목록과 인사관리 기본 필터에서 제외됩니다.',
+          '퇴사 처리 감사 로그가 남고 선택 중인 직원 편집 화면은 닫힙니다.',
+          '급여, 계약, 문서 이력은 삭제되지 않으며 기존 데이터와 연결을 유지합니다.',
+        ]}
+        warnings={[
+          '최종 급여 정산, 계약 종료, 장비 반납 등 오프보딩 작업 완료 여부를 확인하세요.',
+        ]}
+        confirmLabel="퇴사 처리"
+        onCancel={() => setPendingRetirementStaff(null)}
+        onConfirm={async () => {
+          if (!pendingRetirementStaff) return;
+          const staff = pendingRetirementStaff;
+          await 직원삭제(staff);
+          setPendingRetirementStaff(null);
+        }}
+      />
     </div>
   );
 }

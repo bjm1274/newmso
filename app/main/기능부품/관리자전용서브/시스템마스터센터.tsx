@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import AnnualLeaveManualGrant from './연차수동부여';
 import {
   getFlaggedChatRooms,
@@ -15,6 +16,7 @@ import { formatWon } from '@/lib/date-formatter';
 import { DEFAULT_BANNED, loadBannedWords, saveBannedWords, highlightBanned } from '@/lib/banned-words';
 
 function BannedWordModal({ onClose }: { onClose: () => void }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [words, setWords] = useState<string[]>(loadBannedWords);
   const [input, setInput] = useState('');
   const add = () => {
@@ -23,10 +25,23 @@ function BannedWordModal({ onClose }: { onClose: () => void }) {
     const next = [...words, w]; setWords(next); saveBannedWords(next); setInput(''); toast(`"${w}" 등록 완료`, 'success');
   };
   const remove = (w: string) => { const next = words.filter((x) => x !== w); setWords(next); saveBannedWords(next); };
-  const reset = () => { if (!confirm('기본 금지어로 초기화하시겠습니까?')) return; setWords(DEFAULT_BANNED); saveBannedWords(DEFAULT_BANNED); toast('초기화 완료', 'success'); };
+  const reset = async () => {
+    const confirmed = await openConfirm({
+      title: '금지어 기본값 초기화',
+      description: '현재 금지어 목록을 기본 금지어 목록으로 되돌립니다.',
+      confirmText: '초기화',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+    setWords(DEFAULT_BANNED);
+    saveBannedWords(DEFAULT_BANNED);
+    toast('초기화 완료', 'success');
+  };
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+    <>
+      {dialog}
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+        <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-bold text-[var(--foreground)]">🔍 단어 필터</h3>
           <button onClick={onClose} className="text-[var(--toss-gray-3)] hover:text-[var(--foreground)] text-lg">×</button>
@@ -47,8 +62,9 @@ function BannedWordModal({ onClose }: { onClose: () => void }) {
           <button onClick={reset} className="px-3 py-1.5 text-xs text-[var(--toss-gray-3)] border border-[var(--border)] rounded-[var(--radius-md)] hover:bg-[var(--muted)]">기본값으로 초기화</button>
           <button onClick={onClose} className="px-3 py-1.5 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)]">확인</button>
         </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -354,6 +370,7 @@ export default function SystemMasterCenter({
   onRefresh?: () => void;
   initialTab?: MasterTabId;
 }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [activeTab, setActiveTab] = useState<MasterTabId>('개요');
   const [overview, setOverview] = useState<SystemMasterOverviewPayload | null>(null);
   const [operations, setOperations] = useState<SystemMasterOperationsPayload | null>(null);
@@ -561,9 +578,13 @@ export default function SystemMasterCenter({
 
   const handleDeleteRoom = useCallback(async (room: SystemMasterChatRoom) => {
     if (!room?.id) return;
-    if (!confirm(`"${room.room_label || '채팅방'}" 채팅방 자체를 삭제하시겠습니까?\n대화내역과 관련 데이터도 함께 삭제됩니다.`)) {
-      return;
-    }
+    const confirmed = await openConfirm({
+      title: '채팅방 삭제',
+      description: `"${room.room_label || '채팅방'}" 채팅방 자체를 삭제합니다.\n대화내역과 관련 데이터도 함께 삭제됩니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
 
     setDeletingRoomId(room.id);
     try {
@@ -587,7 +608,7 @@ export default function SystemMasterCenter({
     } finally {
       setDeletingRoomId(null);
     }
-  }, []);
+  }, [openConfirm]);
 
   const runOpsAction = useCallback(async (action: SystemMasterActionId) => {
     setOpsActionLoading(action);
@@ -721,14 +742,11 @@ export default function SystemMasterCenter({
 
   return (
     <div className="space-y-5" data-testid="system-master-center">
+      {dialog}
       <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[var(--toss-gray-3)]">System Master</p>
             <h2 className="mt-2 text-2xl font-black tracking-tight text-[var(--foreground)]">시스템마스터센터</h2>
-            <p className="mt-2 text-sm text-[var(--toss-gray-3)]">
-              직원 민감정보, 급여 변경 이력, 전 직원 채팅 대화, 연차 수동 조정을 한곳에서 점검합니다.
-            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {MASTER_TABS.map((tab) => (
@@ -792,7 +810,6 @@ export default function SystemMasterCenter({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-base font-bold text-[var(--foreground)]">최근 변경 이력</h3>
-                  <p className="mt-1 text-xs text-[var(--toss-gray-3)]">직원, 급여, 채팅 관련 최근 로그를 확인합니다.</p>
                 </div>
               </div>
               <div className="mt-4 space-y-3">
@@ -816,7 +833,6 @@ export default function SystemMasterCenter({
 
             <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
               <h3 className="text-base font-bold text-[var(--foreground)]">최근 급여 반영</h3>
-              <p className="mt-1 text-xs text-[var(--toss-gray-3)]">최근 저장된 급여 레코드 기준입니다.</p>
               <div className="mt-4 space-y-3">
                 {(overview.recentPayrolls || []).slice(0, 8).map((record) => (
                   <div key={record.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
@@ -837,7 +853,6 @@ export default function SystemMasterCenter({
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <h3 className="text-base font-bold text-[var(--foreground)]">직원 민감정보 현황</h3>
-                <p className="mt-1 text-xs text-[var(--toss-gray-3)]">시스템마스터만 주민번호, 계좌정보, 급여 기준값을 확인할 수 있습니다.</p>
               </div>
               <label className="inline-flex items-center gap-2 text-[11px] font-bold text-[var(--foreground)]">
                 <input
@@ -911,7 +926,6 @@ export default function SystemMasterCenter({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-base font-bold text-[var(--foreground)]">실패/주의 작업 모니터</h3>
-                  <p className="mt-1 text-xs text-[var(--toss-gray-3)]">푸시 큐, 구독 정리, 백업 지연 같은 운영 이슈를 즉시 확인합니다.</p>
                 </div>
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
                   마지막 갱신 {formatDateTime(operations.checkedAt)}
@@ -1413,7 +1427,13 @@ export default function SystemMasterCenter({
                               type="button"
                               disabled={deletingMsgId === message.id}
                               onClick={async () => {
-                                if (!confirm('이 메시지를 삭제하시겠습니까?')) return;
+                                const confirmed = await openConfirm({
+                                  title: '채팅 메시지 삭제',
+                                  description: '선택한 메시지를 삭제합니다.\n전체 채팅 모니터링 목록에서도 제거됩니다.',
+                                  confirmText: '삭제',
+                                  tone: 'danger',
+                                });
+                                if (!confirmed) return;
                                 setDeletingMsgId(message.id);
                                 const { error: delErr } = await supabase.from('messages').delete().eq('id', message.id);
                                 if (delErr) { toast('삭제 실패: ' + delErr.message, 'error'); }

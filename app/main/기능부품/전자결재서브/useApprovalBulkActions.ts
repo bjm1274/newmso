@@ -100,16 +100,18 @@ export function useApprovalBulkActions({
     return payload as TransitionApprovalsPayload;
   }, []);
 
-  const handleBulkApprove = useCallback(async () => {
+  const handleBulkApprove = useCallback(async (options?: { skipConfirm?: boolean }) => {
     const count = selectedApprovalIds.length;
     if (count === 0) return;
-    const confirmed = await openConfirm({
-      title: '일괄 승인',
-      description: `선택한 ${count}건을 승인할까요?`,
-      confirmText: '승인',
-      cancelText: '취소',
-      tone: 'accent',
-    });
+    const confirmed = options?.skipConfirm
+      ? true
+      : await openConfirm({
+          title: '일괄 승인',
+          description: `선택한 ${count}건을 승인할까요?`,
+          confirmText: '승인',
+          cancelText: '취소',
+          tone: 'accent',
+        });
     if (!confirmed) return;
     try {
       const payload = await transitionApprovalsOnServer({
@@ -145,19 +147,21 @@ export function useApprovalBulkActions({
     }
   }, [fetchApprovals, markApprovalNotificationsAsRead, openConfirm, selectedApprovalIds, setSelectedApprovalIds, transitionApprovalsOnServer]);
 
-  const handleBulkReject = useCallback(async () => {
+  const handleBulkReject = useCallback(async (options?: { reason?: string; skipPrompt?: boolean }) => {
     const count = selectedApprovalIds.length;
     if (count === 0) return;
-    const reason = await openPrompt({
-      title: '일괄 반려',
-      description: `선택한 ${count}건을 반려합니다. 사유는 선택 입력입니다.`,
-      confirmText: '반려',
-      cancelText: '취소',
-      tone: 'danger',
-      inputType: 'textarea',
-      placeholder: '반려 사유를 입력해 주세요.',
-      helperText: '비워 두면 기본 반려 문구로 저장됩니다.',
-    });
+    const reason = options?.skipPrompt
+      ? options.reason ?? ''
+      : await openPrompt({
+          title: '일괄 반려',
+          description: `선택한 ${count}건을 반려합니다. 사유는 선택 입력입니다.`,
+          confirmText: '반려',
+          cancelText: '취소',
+          tone: 'danger',
+          inputType: 'textarea',
+          placeholder: '반려 사유를 입력해 주세요.',
+          helperText: '비워 두면 기본 반려 문구로 저장됩니다.',
+        });
     if (reason === null) return;
     try {
       const payload = await transitionApprovalsOnServer({

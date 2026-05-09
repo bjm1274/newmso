@@ -24,6 +24,7 @@ import {
   calculateHourlyRateFromMonthlySalary,
   resolveWeeklyWorkingHours,
 } from '@/lib/payroll-working-hours';
+import RiskActionDialog from '../RiskActionDialog';
 
 interface SettlementEntry {
   base_salary: number;
@@ -685,6 +686,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
   const [step, setStep] = useState(1);
   const [yearMonth, setYearMonth] = useState(new Date().toISOString().slice(0, 7));
   const [selectedStaffs, setSelectedStaffs] = useState<StaffMember[]>([]);
+  const [showFinalizeReview, setShowFinalizeReview] = useState(false);
   const [settlementData, setSettlementData] = useState<Record<string, SettlementEntry>>({});
   const [loading, setLoading] = useState(false);
   const [taxFreeLimits, setTaxFreeLimits] = useState<TaxFreeSettings>(DEFAULT_SETTINGS);
@@ -1345,8 +1347,6 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
   };
 
   const handleFinalizeLegacy = async () => {
-    if (!confirm(`${selectedStaffs.length}명의 급여 정산을 확정하고 명세서를 생성하시겠습니까?`)) return;
-
     const needsExactIncomeTax = selectedStaffs.some((staff: StaffMember) => settlementData[staff.id]?.apply_tax);
     if (needsExactIncomeTax && !hasExactIncomeTaxBracket(taxInsuranceRates)) {
       toast('근로소득세 간이세액표가 설정되지 않아 급여를 안전하게 확정할 수 없습니다.\n\n' +
@@ -1473,8 +1473,6 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
   };
 
   const handleFinalize = async () => {
-    if (!confirm(`${selectedStaffs.length}명의 급여 정산을 확정하고 명세서를 생성하시겠습니까?`)) return;
-
     const needsExactIncomeTax = selectedStaffs.some((staff: StaffMember) => settlementData[staff.id]?.apply_tax);
     if (needsExactIncomeTax && !hasExactIncomeTaxBracket(taxInsuranceRates)) {
       toast('근로소득세 간이세액표가 설정되지 않아 급여를 안전하게 확정할 수 없습니다.\n\n세율·보험요율 관리에서 income_tax_bracket을 먼저 설정한 뒤 다시 진행해 주세요.');
@@ -1875,7 +1873,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
               >
                 {loading ? '처리 중...' : '임시 저장'}
               </button>
-              <button data-testid="salary-settlement-finalize-button" onClick={handleFinalize} disabled={loading || !hasExactIncomeTaxBracket(taxInsuranceRates) || hasBlockingVerificationIssues} className="flex-[2] py-3 bg-[var(--accent)] text-white text-sm font-semibold rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50">
+              <button data-testid="salary-settlement-finalize-button" onClick={() => setShowFinalizeReview(true)} disabled={loading || !hasExactIncomeTaxBracket(taxInsuranceRates) || hasBlockingVerificationIssues} className="flex-[2] py-3 bg-[var(--accent)] text-white text-sm font-semibold rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50">
                 {loading ? '처리 중...' : '저장하기 · 정산 확정'}
               </button>
             </div>
@@ -1891,6 +1889,41 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
           </div>
         )}
       </div>
+
+      <RiskActionDialog
+        open={showFinalizeReview}
+        title="급여 정산 확정 전 검토"
+        description="확정 후 급여 레코드와 명세서 생성 기준이 저장됩니다. 대상자, 금액, 검산 결과를 확인하세요."
+        targetLabel={`${yearMonth} 급여 · ${selectedStaffs.length}명`}
+        tone="warning"
+        loading={loading}
+        items={[
+          { label: '실지급 합계', value: `₩${verificationReport.netTotal.toLocaleString()}`, tone: 'success' },
+          { label: '총 공제', value: `₩${verificationReport.deductionTotal.toLocaleString()}` },
+          { label: '검산 결과', value: `오류 ${verificationReport.errorCount}건 · 경고 ${verificationReport.warningCount}건`, tone: verificationReport.errorCount > 0 ? 'danger' : verificationReport.warningCount > 0 ? 'warning' : 'success' },
+          { label: '세액표', value: hasExactIncomeTaxBracket(taxInsuranceRates) ? '확정 가능' : '설정 필요', tone: hasExactIncomeTaxBracket(taxInsuranceRates) ? 'success' : 'danger' },
+        ]}
+        changes={[
+          { label: '정산 상태', before: '임시/미확정', after: '확정' },
+          { label: '대상자', before: '선택 단계', after: selectedStaffs.slice(0, 4).map((staff) => staff.name).join(', ') + (selectedStaffs.length > 4 ? ` 외 ${selectedStaffs.length - 4}명` : '') },
+          { label: '명세 기준', before: '화면 입력값', after: `${yearMonth} 확정 레코드` },
+        ]}
+        impacts={[
+          'payroll_records에 선택 직원의 해당 월 정산 값이 확정 상태로 저장됩니다.',
+          '실지급액, 과세/비과세, 공제, 근태 차감, 선지급 차감이 감사 로그에 남습니다.',
+          '확정된 데이터는 급여명세서, 신고 파일, 연말/퇴직 정산 기준으로 사용됩니다.',
+        ]}
+        warnings={[
+          '은행 계좌와 실지급액이 지급 파일과 일치하는지 확인하세요.',
+          '확정 후 수정은 재정산 또는 별도 감사 로그가 필요한 운영 작업입니다.',
+        ]}
+        confirmLabel="정산 확정"
+        onCancel={() => setShowFinalizeReview(false)}
+        onConfirm={async () => {
+          await handleFinalize();
+          setShowFinalizeReview(false);
+        }}
+      />
     </div>
   );
 }

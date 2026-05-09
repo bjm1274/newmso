@@ -84,6 +84,12 @@ const HR_WORKSPACES: { id: HrWorkspaceId; label: string; icon: string; groups: H
   { id: '복지 · 문서', label: '복지 · 문서', icon: 'folder', groups: ['복무/복지', '문서/기타'] },
 ];
 
+const HR_WORKSPACE_META: Record<HrWorkspaceId, { risk: string }> = {
+  인력관리: { risk: 'ESS/퇴사 검토' },
+  '근태 · 급여': { risk: '급여 확정 검토' },
+  '복지 · 문서': { risk: '계약 발송 검토' },
+};
+
 const HR_GROUP_LABELS: Record<HrTabDef['group'], string> = {
   인력관리: '인력관리',
   '근태/급여': '· 근태/급여',
@@ -709,23 +715,37 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
           </div>
 
           <div className="hidden px-2 py-3 md:block">
-            <div className="mb-5 flex flex-col gap-0.5">
+            <div className="mb-5 flex flex-col gap-2">
               <p className="app-subnav-group-label px-2 pb-1 select-none">업무 공간</p>
               {HR_WORKSPACES.map((workspace) => {
                 const isActive = activeWorkspace === workspace.id;
-                const disabled = !visibleHrTabs.some((tab) => workspace.groups.includes(tab.group));
+                const availableCount = visibleHrTabs.filter((tab) => workspace.groups.includes(tab.group)).length;
+                const disabled = availableCount === 0;
+                const meta = HR_WORKSPACE_META[workspace.id];
                 return (
                   <button
                     key={workspace.id}
                     type="button"
                     onClick={() => handleWorkspaceSelect(workspace.id)}
                     disabled={disabled}
-                    className={`app-subnav-item flex min-h-[32px] w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-semibold tracking-normal disabled:cursor-not-allowed disabled:opacity-40 ${isActive ? 'is-active' : ''}`}
+                    className={`w-full rounded-[var(--radius-lg)] border px-3 py-3 text-left transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
+                      isActive
+                        ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/70 shadow-sm'
+                        : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
+                    }`}
                   >
-                    <span className="inline-flex shrink-0" style={{ opacity: isActive ? 1 : 0.65 }}>
-                      <MenuIcon name={workspace.icon} className="h-[14px] w-[14px]" />
+                    <span className="flex items-center gap-2">
+                      <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] ${isActive ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>
+                        <MenuIcon name={workspace.icon} className="h-[15px] w-[15px]" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-[12px] font-bold text-[var(--foreground)]">{workspace.label}</span>
+                      </span>
                     </span>
-                    <span className="truncate">{workspace.label}</span>
+                    <span className="mt-2 flex items-center justify-between gap-2 text-[10px] font-bold">
+                      <span className={isActive ? 'text-[var(--accent)]' : 'text-[var(--toss-gray-3)]'}>{availableCount}개 메뉴</span>
+                      <span className="rounded-full border border-[var(--border)] bg-[var(--page-bg)] px-2 py-0.5 text-[9px] text-[var(--toss-gray-4)]">{meta.risk}</span>
+                    </span>
                   </button>
                 );
               })}

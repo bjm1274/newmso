@@ -6,6 +6,7 @@ import { isExpirySoon } from '@/app/main/inventory-utils';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import ExpirationAlert from './유효기간알림';
+import { InventorySummaryStrip, InventoryStepSummary } from './InventoryDesignPanels';
 import { MenuIcon } from '../조직도서브/조직도측면창';
 
 // ─────────────────────────────────────────────────────
@@ -272,6 +273,12 @@ export default function InventoryStatusView({
   const hasAlert = urgentItems.length > 0 && !alertDismissed;
   const hasPending = isOpsUser && pendingApprovals.length > 0;
   const STATUS_FILTERS: StatusFilter[] = ['전체', '재고부족', '유통기한임박', '정상'];
+  const selectedItems = useMemo(
+    () => filteredInventory.filter((item) => batchSelectedIds.includes(item.id)),
+    [batchSelectedIds, filteredInventory],
+  );
+  const selectedQuantity = selectedItems.reduce((sum, item) => sum + qty(item), 0);
+  const selectedLowStockCount = selectedItems.filter((item) => qty(item) <= minQty(item)).length;
 
   return (
     <div className="space-y-3">
@@ -294,6 +301,23 @@ export default function InventoryStatusView({
           </button>
         </div>
       </div>
+
+      <InventorySummaryStrip
+        items={[
+          { label: '조회 결과', value: `${sorted.length.toLocaleString('ko-KR')}건`, detail: `${viewCompany} / ${selectedDept}`, tone: 'info' },
+          { label: '선택 대상', value: `${batchSelectedIds.length.toLocaleString('ko-KR')}건`, detail: batchMode ? `선택 재고 합계 ${selectedQuantity.toLocaleString('ko-KR')}` : '일괄 입출고를 켜면 대상 요약이 표시됩니다.', tone: batchSelectedIds.length > 0 ? 'success' : 'default' },
+          { label: '변경 주의', value: `${selectedLowStockCount.toLocaleString('ko-KR')}건`, detail: '선택 대상 중 최소재고 이하 품목', tone: selectedLowStockCount > 0 ? 'warning' : 'default' },
+          { label: '긴급 처리', value: `${urgentItems.length.toLocaleString('ko-KR')}건`, detail: hasAlert ? '상단 알림 확인 필요' : '현재 숨김 또는 처리 완료', tone: urgentItems.length > 0 ? 'danger' : 'success' },
+        ]}
+      />
+
+      <InventoryStepSummary
+        steps={[
+          { label: '필터로 대상 좁히기', detail: `${statusFilter} 기준으로 ${sorted.length.toLocaleString('ko-KR')}건을 보고 있습니다.`, state: 'done' },
+          { label: '품목 선택', detail: batchMode ? `${batchSelectedIds.length.toLocaleString('ko-KR')}건 선택됨` : '일괄 입출고 버튼으로 선택 모드를 시작합니다.', state: batchMode ? 'active' : 'pending' },
+          { label: '결과 반영', detail: '입고/출고 실행 후 재고와 이력이 함께 갱신됩니다.', state: batchSelectedIds.length > 0 ? 'active' : 'pending' },
+        ]}
+      />
 
       <div className="erp-stat-grid">
         <InventoryMetricCard label="총 품목" value={`${filteredInventory.length.toLocaleString('ko-KR')}개`} icon="inventory" />

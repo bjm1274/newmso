@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { EmptyState, LoadingPanel, StatePanel } from '@/app/components/StatePanel';
 import { supabase } from '@/lib/supabase';
 
 interface Props {
@@ -103,9 +104,12 @@ export default function AccessAuditLog({ user }: Props) {
     return (
       <div className="p-4 space-y-4 max-w-3xl mx-auto" data-testid="admin-audit-access">
         <h2 className="text-lg font-bold text-[var(--foreground)]">접근 권한 감사 로그</h2>
-        <div className="p-4 bg-warning/10 border border-warning/20 rounded-[var(--radius-md)]">
-          <p className="text-sm font-bold text-warning">access_logs 테이블이 없습니다.</p>
-          <p className="text-xs text-[var(--foreground)] mt-2">아래 SQL을 Supabase SQL Editor에서 실행하여 테이블을 생성하세요:</p>
+        <StatePanel
+          title="access_logs 테이블이 없습니다"
+          description="아래 SQL을 Supabase SQL Editor에서 실행하여 테이블을 생성하세요."
+          tone="warning"
+          eyebrow="스키마 확인"
+        >
           <pre className="mt-3 p-3 bg-[var(--muted)] text-xs font-mono text-[var(--foreground)] rounded-[var(--radius-md)] overflow-x-auto whitespace-pre-wrap">{`CREATE TABLE access_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id text,
@@ -117,7 +121,7 @@ export default function AccessAuditLog({ user }: Props) {
   user_agent text,
   created_at timestamptz DEFAULT now()
 );`}</pre>
-        </div>
+        </StatePanel>
       </div>
     );
   }
@@ -158,11 +162,13 @@ export default function AccessAuditLog({ user }: Props) {
 
       {/* 로그 테이블 */}
       {loading ? (
-        <div className="text-center py-5 text-sm text-[var(--toss-gray-3)]">로딩 중...</div>
+        <LoadingPanel title="접근 로그를 불러오는 중입니다" />
       ) : filtered.length === 0 ? (
-        <div className="text-center py-8 border border-dashed border-[var(--border)] rounded-[var(--radius-md)]">
-          <p className="text-sm text-[var(--toss-gray-3)]">로그 데이터가 없습니다.</p>
-        </div>
+        <EmptyState
+          title="로그 데이터가 없습니다"
+          description="기간이나 필터 조건을 변경하면 더 많은 접근 이력을 확인할 수 있습니다."
+          compact
+        />
       ) : (
         <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
           <table className="w-full text-[11px]">

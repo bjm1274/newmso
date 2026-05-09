@@ -65,13 +65,11 @@ export type EslTransferProgress = {
 };
 
 // Web Bluetooth API 타입 (런타임 전용, TS 타입 보완)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type BleDevice = any;
 
 // ─── Web Bluetooth 지원 확인 ───
 
 export function isBleSupported(): boolean {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return typeof navigator !== 'undefined' && 'bluetooth' in (navigator as any);
 }
 
@@ -82,7 +80,6 @@ export async function scanEslDevice(): Promise<BleDevice> {
     throw new Error('이 브라우저는 Web Bluetooth를 지원하지 않습니다. Chrome을 사용해 주세요.');
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bt = (navigator as any).bluetooth;
   if (!bt) throw new Error('Web Bluetooth API를 사용할 수 없습니다.');
 

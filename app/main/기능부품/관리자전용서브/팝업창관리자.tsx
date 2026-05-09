@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -56,6 +57,7 @@ function validatePopupFileSelection(file: File, mediaType: PopupDraft['media_typ
 }
 
 export default function PopupManager() {
+  const { dialog, openConfirm } = useActionDialog();
   const [popups, setPopups] = useState<any[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -170,9 +172,13 @@ export default function PopupManager() {
 
   const handleDeletePopup = async (popup: any) => {
     if (!popup?.id) return;
-    if (!confirm(`"${popup.title || '제목 없음'}" 팝업을 삭제하시겠습니까?`)) {
-      return;
-    }
+    const confirmed = await openConfirm({
+      title: '팝업 삭제',
+      description: `"${popup.title || '제목 없음'}" 팝업을 삭제합니다.\n홈 화면 노출 설정에서도 함께 제거됩니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
 
     setDeletingPopupId(popup.id);
     try {
@@ -202,6 +208,7 @@ export default function PopupManager() {
 
   return (
     <div className="space-y-4 animate-in slide-in-from-right-4 duration-500">
+      {dialog}
       <div className="bg-[var(--card)] p-4 border border-[var(--border)] shadow-sm space-y-4">
         <div className="flex justify-between items-center border-b border-[var(--border-subtle)] pb-4">
           <h3 className="font-semibold text-base text-[var(--foreground)] tracking-tight">

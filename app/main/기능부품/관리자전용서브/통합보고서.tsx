@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { EmptyState, LoadingPanel } from '@/app/components/StatePanel';
 import { supabase } from '@/lib/supabase';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -19,6 +20,10 @@ interface StaffMember {
 }
 
 const PIE_COLORS = ['var(--accent)', 'var(--success, #34C759)', 'var(--warning, #FF9500)', 'var(--danger, #FF6B6B)', '#AF52DE', '#5AC8FA'];
+
+function ReportEmptyState({ description }: { description: string }) {
+  return <EmptyState title="데이터가 없습니다" description={description} compact />;
+}
 
 export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[] }) {
   const [activeTab, setActiveTab] = useState<ReportTab>('인사현황');
@@ -201,7 +206,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
             <div className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
               <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">부서별 인원</h3>
               {hrChartData.length === 0 ? (
-                <div className="py-10 text-center text-sm text-[var(--toss-gray-3)]">데이터가 없습니다.</div>
+                <ReportEmptyState description="직원 소속 정보가 있으면 부서별 인원 분포가 표시됩니다." />
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={hrChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
@@ -223,7 +228,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
             <div className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
               <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">고용형태 비율</h3>
               {employmentPieData.length === 0 ? (
-                <div className="py-10 text-center text-sm text-[var(--toss-gray-3)]">데이터가 없습니다.</div>
+                <ReportEmptyState description="직원 고용형태가 있으면 정규직/계약직 비율이 표시됩니다." />
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
@@ -309,7 +314,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
           <div className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
             <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">부서별 인건비</h3>
             {salaryChartData.length === 0 ? (
-              <div className="py-10 text-center text-sm text-[var(--toss-gray-3)]">데이터가 없습니다.</div>
+              <ReportEmptyState description="직원 급여 정보가 있으면 부서별 인건비가 표시됩니다." />
             ) : (
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={salaryChartData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
@@ -363,7 +368,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
       {activeTab === '재고현황' && (
         <div className="space-y-4">
           {loadingInventory ? (
-            <div className="py-20 text-center text-sm text-[var(--toss-gray-3)]">재고 데이터를 불러오는 중...</div>
+            <LoadingPanel title="재고 데이터를 불러오는 중입니다" />
           ) : (
             <>
               {/* 요약 카드 */}
@@ -389,7 +394,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
                 <div className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
                   <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">카테고리별 품목 수</h3>
                   {inventoryChartData.length === 0 ? (
-                    <div className="py-10 text-center text-sm text-[var(--toss-gray-3)]">데이터가 없습니다.</div>
+                    <ReportEmptyState description="재고 품목이 등록되면 카테고리별 품목 수가 표시됩니다." />
                   ) : (
                     <ResponsiveContainer width="100%" height={220}>
                       <PieChart>
@@ -420,7 +425,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
                 <div className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
                   <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">카테고리별 재고 금액</h3>
                   {inventoryChartData.length === 0 ? (
-                    <div className="py-10 text-center text-sm text-[var(--toss-gray-3)]">데이터가 없습니다.</div>
+                    <ReportEmptyState description="단가와 수량이 있는 재고 품목이 있으면 금액 분석이 표시됩니다." />
                   ) : (
                     <ResponsiveContainer width="100%" height={220}>
                       <BarChart data={inventoryChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
@@ -444,7 +449,13 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
                   <span className="text-sm font-bold text-[var(--foreground)]">카테고리별 재고 상세</span>
                 </div>
                 {inventoryChartData.length === 0 ? (
-                  <div className="py-8 text-center text-sm text-[var(--toss-gray-3)]">재고 데이터가 없습니다.</div>
+                  <div className="p-4">
+                    <EmptyState
+                      title="재고 데이터가 없습니다"
+                      description="재고 품목을 등록하면 카테고리별 상세 표가 표시됩니다."
+                      compact
+                    />
+                  </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">

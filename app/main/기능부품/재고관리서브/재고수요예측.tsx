@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -21,6 +22,7 @@ interface ItemForecast {
 }
 
 export default function InventoryDemandForecast({ user, inventory, selectedCo }: Props) {
+  const { dialog, openConfirm } = useActionDialog();
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState<'전체' | '긴급' | '주의'>('전체');
@@ -93,7 +95,13 @@ export default function InventoryDemandForecast({ user, inventory, selectedCo }:
     'text-green-600 bg-green-500/10 border-green-500/20';
 
   const handleAutoOrder = async (fc: ItemForecast) => {
-    if (!confirm(`${getItemName(fc.item)} ${fc.orderQty}개 발주를 자동 신청하시겠습니까?`)) return;
+    const confirmed = await openConfirm({
+      title: '수요 예측 발주 신청',
+      description: `${getItemName(fc.item)} ${fc.orderQty}개 발주를 자동 신청합니다.\n최근 출고 추세 기반 권장 수량으로 결재 요청이 생성됩니다.`,
+      confirmText: '발주 신청',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
     setOrdering(String(fc.item.id));
     try {
       const { error } = await requestInventoryReorder({
@@ -115,6 +123,7 @@ export default function InventoryDemandForecast({ user, inventory, selectedCo }:
 
   return (
     <div className="p-4 md:p-4 space-y-4 max-w-5xl mx-auto">
+      {dialog}
       <div>
         <h2 className="text-lg font-bold text-[var(--foreground)]">재고 수요 예측</h2>
         <p className="text-xs text-[var(--toss-gray-3)] mt-1">최근 90일 출고 이력 기반 품목별 소진일수 예측</p>

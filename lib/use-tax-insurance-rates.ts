@@ -50,6 +50,9 @@ export const DEFAULT_TAX_INSURANCE_RATES: TaxInsuranceRates = {
   configured: false,
 };
 
+const TAX_INSURANCE_RATES_CACHE_TTL_MS = 5 * 60 * 1000;
+const taxInsuranceRatesCache = new Map<string, { rates: TaxInsuranceRates; cachedAt: number }>();
+
 function toFiniteNumber(value: any): number | null {
   if (typeof value === 'boolean' || value === null || value === undefined || value === '') return null;
   const parsed = Number(value);
@@ -376,6 +379,11 @@ export async function fetchTaxInsuranceRates(
   year: number = new Date().getFullYear()
 ): Promise<TaxInsuranceRates> {
   const companyScope = companyName === '전체' ? '전체' : companyName;
+  const cacheKey = `${companyScope}:${year}`;
+  const cached = taxInsuranceRatesCache.get(cacheKey);
+  if (cached && Date.now() - cached.cachedAt < TAX_INSURANCE_RATES_CACHE_TTL_MS) {
+    return cached.rates;
+  }
 
   const companyRes = await supabase
     .from('tax_insurance_rates')
@@ -384,34 +392,45 @@ export async function fetchTaxInsuranceRates(
     .eq('effective_year', year)
     .maybeSingle();
 
-  const fallbackRes = await supabase
-    .from('tax_insurance_rates')
-    .select('*')
-    .eq('company_name', '전체')
-    .eq('effective_year', year)
-    .maybeSingle();
+  const fetchFallbackRates = () =>
+    supabase
+      .from('tax_insurance_rates')
+      .select('*')
+      .eq('company_name', '전체')
+      .eq('effective_year', year)
+      .maybeSingle();
 
+  let resolvedRates: TaxInsuranceRates;
   if (companyRes.data) {
     const companyRates = normalizeRates(companyRes.data, true);
     if (hasOfficialMonthlyIncomeTaxTable(companyRates.income_tax_bracket)) {
-      return companyRates;
+      resolvedRates = companyRates;
+      taxInsuranceRatesCache.set(cacheKey, { rates: resolvedRates, cachedAt: Date.now() });
+      return resolvedRates;
     }
 
+    const fallbackRes = companyScope !== '전체' ? await fetchFallbackRates() : { data: null };
     if (fallbackRes.data) {
       const fallbackRates = normalizeRates(fallbackRes.data, true);
       if (hasOfficialMonthlyIncomeTaxTable(fallbackRates.income_tax_bracket)) {
-        return {
+        resolvedRates = {
           ...companyRates,
           income_tax_bracket: fallbackRates.income_tax_bracket,
           configured: true,
         };
+        taxInsuranceRatesCache.set(cacheKey, { rates: resolvedRates, cachedAt: Date.now() });
+        return resolvedRates;
       }
     }
 
-    return companyRates;
+    resolvedRates = companyRates;
+  } else {
+    const fallbackRes = await fetchFallbackRates();
+    resolvedRates = normalizeRates(fallbackRes.data, Boolean(fallbackRes.data));
   }
 
-  return normalizeRates(fallbackRes.data, Boolean(fallbackRes.data));
+  taxInsuranceRatesCache.set(cacheKey, { rates: resolvedRates, cachedAt: Date.now() });
+  return resolvedRates;
 }
 
 export function hasExactIncomeTaxBracket(rates: TaxInsuranceRates): boolean {

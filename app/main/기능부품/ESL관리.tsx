@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { supabase } from '@/lib/supabase';
 import {
   type HandoverRoomConfig,
@@ -51,6 +52,7 @@ function loadResolution(): { width: number; height: number } {
 // ─── 컴포넌트 ───
 
 export default function EslManager({ user }: { user?: any }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [rooms, setRooms] = useState<HandoverRoomConfig[]>([]);
   const [bindings, setBindings] = useState<EslBinding[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,7 +63,6 @@ export default function EslManager({ user }: { user?: any }) {
   const [showSettings, setShowSettings] = useState(false);
   const [editDoctor, setEditDoctor] = useState<Record<string, string>>({});
   const previewCanvasRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const deviceCacheRef = useRef<Map<string, any>>(new Map());
 
   // BLE 지원 확인 + 바인딩 로드
@@ -138,10 +139,14 @@ export default function EslManager({ user }: { user?: any }) {
   // ESL 기기 스캔 + 바인딩
   async function handleScanDevice(roomNumber: string) {
     // Web Bluetooth 사전 확인
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const nav = navigator as any;
     if (!nav.bluetooth) {
-      alert('이 브라우저에서 Web Bluetooth를 사용할 수 없습니다.\n\nChrome 주소창에 chrome://flags/#enable-web-bluetooth 를 입력하고 Enabled로 변경한 뒤 브라우저를 재시작해 주세요.');
+      await openConfirm({
+        title: 'Web Bluetooth 미지원',
+        description: '이 브라우저에서 Web Bluetooth를 사용할 수 없습니다.\n\nChrome 주소창에 chrome://flags/#enable-web-bluetooth 를 입력하고 Enabled로 변경한 뒤 브라우저를 재시작해 주세요.',
+        confirmText: '확인',
+        tone: 'danger',
+      });
       return;
     }
 
@@ -160,11 +165,26 @@ export default function EslManager({ user }: { user?: any }) {
       if (err.name === 'NotFoundError') {
         // 사용자가 기기 선택 팝업에서 취소함
       } else if (err.name === 'SecurityError') {
-        alert('Web Bluetooth가 차단되었습니다.\nHTTPS 또는 localhost에서만 사용 가능합니다.');
+        await openConfirm({
+          title: 'Web Bluetooth 차단',
+          description: 'Web Bluetooth가 차단되었습니다.\nHTTPS 또는 localhost에서만 사용 가능합니다.',
+          confirmText: '확인',
+          tone: 'danger',
+        });
       } else if (err.name === 'NotSupportedError') {
-        alert('이 PC에 블루투스 어댑터가 없거나 비활성화되어 있습니다.\n\n1. PC에 블루투스가 있는지 확인\n2. Windows 설정 → 블루투스 켜기\n3. Chrome 재시작');
+        await openConfirm({
+          title: '블루투스 어댑터 확인 필요',
+          description: '이 PC에 블루투스 어댑터가 없거나 비활성화되어 있습니다.\n\n1. PC에 블루투스가 있는지 확인\n2. Windows 설정 → 블루투스 켜기\n3. Chrome 재시작',
+          confirmText: '확인',
+          tone: 'danger',
+        });
       } else {
-        alert(`스캔 실패: ${err.name}\n${err.message}`);
+        await openConfirm({
+          title: 'ESL 스캔 실패',
+          description: `스캔 실패: ${err.name}\n${err.message}`,
+          confirmText: '확인',
+          tone: 'danger',
+        });
       }
     }
   }
@@ -181,7 +201,12 @@ export default function EslManager({ user }: { user?: any }) {
   async function handleSendToEsl(room: HandoverRoomConfig) {
     const binding = bindings.find((b) => b.roomNumber === room.roomNumber);
     if (!binding?.deviceId) {
-      alert('먼저 ESL 기기를 연결해 주세요.');
+      await openConfirm({
+        title: 'ESL 기기 연결 필요',
+        description: '먼저 ESL 기기를 연결해 주세요.',
+        confirmText: '확인',
+        tone: 'default',
+      });
       return;
     }
 
@@ -195,7 +220,12 @@ export default function EslManager({ user }: { user?: any }) {
         deviceCacheRef.current.set(room.roomNumber, device);
       } catch (err: any) {
         if (err.name !== 'NotFoundError') {
-          alert(`기기 연결 실패: ${err.message}`);
+          await openConfirm({
+            title: 'ESL 기기 연결 실패',
+            description: `기기 연결 실패: ${err.message}`,
+            confirmText: '확인',
+            tone: 'danger',
+          });
         }
         return;
       }
@@ -239,7 +269,14 @@ export default function EslManager({ user }: { user?: any }) {
         device = await scanEslDevice();
         deviceCacheRef.current.set(room.roomNumber, device);
       } catch (err: any) {
-        if (err.name !== 'NotFoundError') alert(`기기 연결 실패: ${err.message}`);
+        if (err.name !== 'NotFoundError') {
+          await openConfirm({
+            title: 'ESL 기기 연결 실패',
+            description: `기기 연결 실패: ${err.message}`,
+            confirmText: '확인',
+            tone: 'danger',
+          });
+        }
         return;
       }
     }
@@ -328,6 +365,7 @@ export default function EslManager({ user }: { user?: any }) {
 
   return (
     <div className="flex flex-col gap-3">
+      {dialog}
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div>

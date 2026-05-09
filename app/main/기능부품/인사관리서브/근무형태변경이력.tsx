@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
@@ -55,6 +56,7 @@ function getCurrentWorkType(staff?: StaffMember | null) {
 }
 
 export default function WorkTypeChangeHistory({ staffs, selectedCo, user }: Props) {
+  const { dialog, openConfirm } = useActionDialog();
   const [records, setRecords] = useState<WorkTypeRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -253,7 +255,13 @@ export default function WorkTypeChangeHistory({ staffs, selectedCo, user }: Prop
 
   const handleDelete = async (record: WorkTypeRecord) => {
     if (!record.id) return;
-    if (!window.confirm(`${record.staff_name}님의 근무형태 변경 이력을 삭제할까요?`)) return;
+    const confirmed = await openConfirm({
+      title: '근무형태 변경 이력 삭제',
+      description: `${record.staff_name}님의 근무형태 변경 이력을 삭제합니다.\n감사 이력에는 삭제 기록이 남습니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
 
     const actor = readClientAuditActor();
 
@@ -288,12 +296,10 @@ export default function WorkTypeChangeHistory({ staffs, selectedCo, user }: Prop
 
   return (
     <div className="space-y-4 p-4 md:p-5" data-testid="attendance-analysis-worktype-history">
+      {dialog}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-xl font-bold text-[var(--foreground)]">근무형태이력</h2>
-          <p className="text-xs text-[var(--toss-gray-3)]">
-            직원별 근무형태 변경 원장을 조회하고 최신 상태를 함께 관리합니다.
-          </p>
         </div>
         <button
           type="button"

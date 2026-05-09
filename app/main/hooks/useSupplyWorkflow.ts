@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import type { StaffMember, InventoryItem } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
@@ -50,6 +51,7 @@ export function useSupplyWorkflow({
   fetchLogs: () => Promise<void>;
   onRefresh?: () => void;
 }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [pendingSupplyApprovals, setPendingSupplyApprovals] = useState<ApprovalRecord[]>([]);
   const [completedSupplyApprovals, setCompletedSupplyApprovals] = useState<ApprovalRecord[]>([]);
   const [workflowActionKey, setWorkflowActionKey] = useState<string | null>(null);
@@ -129,7 +131,13 @@ export function useSupplyWorkflow({
   const handleSupplyIssue = useCallback(async (approval: ApprovalRecord, workflowItem: Record<string, unknown>) => {
     const itemName = String(workflowItem.name || '');
     const itemQty = Number(workflowItem.qty || 0);
-    if (!confirm(`[최종불출] ${itemName} ${itemQty}개를 신청팀으로 불출 처리하시겠습니까?\n재고가 SY INC.에서 차감되고 신청팀으로 이동됩니다.`)) return;
+    const confirmed = await openConfirm({
+      title: '최종불출 처리',
+      description: `${itemName} ${itemQty}개를 신청팀으로 불출 처리합니다.\n재고가 SY INC.에서 차감되고 신청팀으로 이동됩니다.`,
+      confirmText: '불출 처리',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
 
     const actionKey = `${approval.id}:${workflowItem.request_index}:issue`;
     setWorkflowActionKey(actionKey);
@@ -182,7 +190,7 @@ export function useSupplyWorkflow({
     } finally {
       setWorkflowActionKey(null);
     }
-  }, [fetchLogs, fetchPendingSupplyApprovals, onRefresh, refreshCurrentInventory, updateSupplyApprovalWorkflow, user]);
+  }, [fetchLogs, fetchPendingSupplyApprovals, onRefresh, openConfirm, refreshCurrentInventory, updateSupplyApprovalWorkflow, user]);
 
   // ── 발주 처리 ──
   const handleSupplyOrder = useCallback(async (approval: ApprovalRecord, workflowItem: Record<string, unknown>) => {
@@ -262,7 +270,13 @@ export function useSupplyWorkflow({
       toast('자동으로 생성된 발주 요청이 있으면 발주 관리에서 먼저 확인해 주세요.', 'warning');
       return;
     }
-    if (!confirm('이 항목의 발주 처리 상태를 취소하고 다시 발주 필요 상태로 되돌릴까요?')) return;
+    const confirmed = await openConfirm({
+      title: '발주 처리 취소',
+      description: '이 항목의 발주 처리 상태를 취소하고 다시 발주 필요 상태로 되돌립니다.',
+      confirmText: '되돌리기',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
 
     const actionKey = `${approval.id}:${workflowItem.request_index}:order-cancel`;
     setWorkflowActionKey(actionKey);
@@ -292,11 +306,17 @@ export function useSupplyWorkflow({
     } finally {
       setWorkflowActionKey(null);
     }
-  }, [fetchPendingSupplyApprovals, updateSupplyApprovalWorkflow]);
+  }, [fetchPendingSupplyApprovals, openConfirm, updateSupplyApprovalWorkflow]);
 
   // ── 불출 취소 ──
   const handleSupplyIssueCancel = useCallback(async (approval: ApprovalRecord, workflowItem: Record<string, unknown>) => {
-    if (!confirm('이 품목의 불출 처리를 취소하고 재고를 원복하시겠습니까?\nSY INC. 재고가 복원되고 수령팀 재고가 차감됩니다.')) return;
+    const confirmed = await openConfirm({
+      title: '불출 처리 취소',
+      description: '이 품목의 불출 처리를 취소하고 재고를 원복합니다.\nSY INC. 재고가 복원되고 수령팀 재고가 차감됩니다.',
+      confirmText: '불출 취소',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
 
     const actionKey = `${approval.id}:${workflowItem.request_index}:issue-cancel`;
     setWorkflowActionKey(actionKey);
@@ -347,7 +367,7 @@ export function useSupplyWorkflow({
     } finally {
       setWorkflowActionKey(null);
     }
-  }, [fetchLogs, fetchPendingSupplyApprovals, onRefresh, refreshCurrentInventory, updateSupplyApprovalWorkflow, user]);
+  }, [fetchLogs, fetchPendingSupplyApprovals, onRefresh, openConfirm, refreshCurrentInventory, updateSupplyApprovalWorkflow, user]);
 
   // ── 실시간 구독 ──
   useEffect(() => {
@@ -391,6 +411,7 @@ export function useSupplyWorkflow({
   );
 
   return {
+    dialog,
     pendingSupplyApprovals,
     completedSupplyApprovals,
     workflowActionKey,

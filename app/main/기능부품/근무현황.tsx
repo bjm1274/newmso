@@ -235,7 +235,10 @@ function WorkStatus({ user }: { user?: any }) {
       setLoading(true);
       try {
         const [shiftRes, staffRes, assignmentRes, attendanceRes, attendancesRes] = await Promise.allSettled([
-          supabase.from('work_shifts').select('id, name, start_time, end_time').eq('is_active', true),
+          supabase
+            .from('work_shifts')
+            .select('id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work')
+            .eq('is_active', true),
           supabase.from('staff_members').select('id, name, shift_id, department, position, status'),
           withMissingColumnFallback(
             () =>
@@ -409,7 +412,10 @@ function WorkStatus({ user }: { user?: any }) {
     assignment: ShiftAssignmentRow | undefined,
     fallbackShiftId?: string | null,
   ) => {
-    const shift = resolveAssignedShift(assignment, shiftLookup, { fallbackShiftId });
+    const shift = resolveAssignedShift(assignment, shiftLookup, {
+      fallbackShiftId,
+      workDate: assignment?.work_date,
+    });
     const assignedShiftName = String(assignment?.shift_name || '').trim();
     const shiftId =
       String(

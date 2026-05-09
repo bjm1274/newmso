@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -19,6 +20,7 @@ function isMissingSchemaError(error: any) {
 }
 
 export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<string, unknown>) {
+  const { dialog, openConfirm } = useActionDialog();
   const _staffs = (staffs as Record<string, unknown>[]) ?? [];
   const [loading, setLoading] = useState(false);
   const [eligibleCount, setEligibleCount] = useState(0);
@@ -93,7 +95,13 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<st
       return;
     }
 
-    if (!confirm(`${targetRecords.length}명에게 ${yearMonth} 급여명세서를 발송할까요?`)) return;
+    const confirmed = await openConfirm({
+      title: '급여명세서 발송',
+      description: `${targetRecords.length}명에게 ${yearMonth} 급여명세서를 발송합니다.`,
+      confirmText: '발송',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
 
     setLoading(true);
     setSummary(null);
@@ -181,6 +189,7 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<st
 
   return (
     <div className="bg-[var(--card)] p-4 border border-[var(--border)] rounded-[var(--radius-md)] shadow-sm">
+      {dialog}
       <div className="pb-2 border-b border-[var(--border)] mb-4">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">급여명세서 발송</h3>
         <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">

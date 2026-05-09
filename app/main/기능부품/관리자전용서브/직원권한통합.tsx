@@ -1,5 +1,6 @@
 ﻿'use client';
 import { toast } from '@/lib/toast';
+import { useActionDialog } from '@/app/components/useActionDialog';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -99,6 +100,100 @@ type ApprovalReferenceSettingUser = {
   company?: string | null;
 };
 
+type PermissionReviewItem = {
+  key: string;
+  label: string;
+  before: string;
+  after: string;
+  tone?: FeaturePermissionItem['tone'];
+};
+
+type PermissionReview = {
+  title: string;
+  summary: string;
+  targetName: string;
+  added: PermissionReviewItem[];
+  removed: PermissionReviewItem[];
+  changed: PermissionReviewItem[];
+  affectedGroups: string[];
+  riskCount: number;
+};
+
+function formatPermissionValue(value: unknown) {
+  if (value === true) return '허용';
+  if (value === false || value == null || value === '') return '해제';
+  if (Array.isArray(value)) return `${value.length}개 설정`;
+  if (typeof value === 'object') return '세부 설정';
+  return String(value);
+}
+
+function buildPermissionReview({
+  title,
+  summary,
+  targetName,
+  beforePermissions,
+  afterPermissions,
+}: {
+  title: string;
+  summary: string;
+  targetName: string;
+  beforePermissions: Record<string, unknown>;
+  afterPermissions: Record<string, unknown>;
+}): PermissionReview {
+  const labelMap = new Map<string, FeaturePermissionItem>();
+  const groupMap = new Map<string, string>();
+  FEATURE_PERMISSION_GROUPS.forEach((group) => {
+    group.items.forEach((item) => {
+      labelMap.set(item.key, item);
+      groupMap.set(item.key, group.label);
+    });
+  });
+
+  const allKeys = Array.from(new Set([...Object.keys(beforePermissions || {}), ...Object.keys(afterPermissions || {})]));
+  const added: PermissionReviewItem[] = [];
+  const removed: PermissionReviewItem[] = [];
+  const changed: PermissionReviewItem[] = [];
+  const affectedGroups = new Set<string>();
+  let riskCount = 0;
+
+  allKeys.forEach((key) => {
+    const before = beforePermissions?.[key];
+    const after = afterPermissions?.[key];
+    if (JSON.stringify(before ?? null) === JSON.stringify(after ?? null)) return;
+
+    const item = labelMap.get(key);
+    const reviewItem: PermissionReviewItem = {
+      key,
+      label: item?.label || key,
+      before: formatPermissionValue(before),
+      after: formatPermissionValue(after),
+      tone: item?.tone,
+    };
+    const groupLabel = groupMap.get(key);
+    if (groupLabel) affectedGroups.add(groupLabel);
+    if (item?.tone === 'critical') riskCount += 1;
+
+    if (before !== true && after === true) {
+      added.push(reviewItem);
+    } else if (before === true && after !== true) {
+      removed.push(reviewItem);
+    } else {
+      changed.push(reviewItem);
+    }
+  });
+
+  return {
+    title,
+    summary,
+    targetName,
+    added,
+    removed,
+    changed,
+    affectedGroups: Array.from(affectedGroups),
+    riskCount,
+  };
+}
+
 function normalizeApprovalReferenceUser(entry: any, staffs: any[] = []): ApprovalReferenceSettingUser | null {
   if (entry == null) return null;
 
@@ -130,6 +225,113 @@ function normalizeApprovalReferenceUser(entry: any, staffs: any[] = []): Approva
   return null;
 }
 
+function PermissionDiffPanel({ review, mode }: { review: PermissionReview; mode: 'preview' | 'saved' }) {
+  const totalChanges = review.added.length + review.removed.length + review.changed.length;
+  const hasChanges = totalChanges > 0;
+
+  return (
+    <section
+      className={`rounded-[var(--radius-md)] border p-3 shadow-sm ${
+        mode === 'preview'
+          ? 'border-[var(--accent)]/20 bg-[var(--accent)]/6'
+          : 'border-warning/20 bg-warning/10'
+      }`}
+      data-testid={`staff-permission-diff-${mode}`}
+    >
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <div>
+          <p className="text-[13px] font-black text-[var(--foreground)]">{review.title}</p>
+          <p className="mt-1 text-[11px] font-semibold leading-relaxed text-[var(--toss-gray-4)]">
+            {review.summary}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <span className="rounded-[var(--radius-md)] bg-[var(--card)] px-2 py-1 text-[10px] font-bold text-[var(--toss-gray-4)] ring-1 ring-[var(--border)]">
+            대상 {review.targetName}
+          </span>
+          <span className="rounded-[var(--radius-md)] bg-[var(--card)] px-2 py-1 text-[10px] font-bold text-[var(--toss-gray-4)] ring-1 ring-[var(--border)]">
+            변경 {totalChanges.toLocaleString('ko-KR')}건
+          </span>
+          <span className={`rounded-[var(--radius-md)] px-2 py-1 text-[10px] font-bold ${review.riskCount > 0 ? 'bg-danger/15 text-danger' : 'bg-success/15 text-success'}`}>
+            고위험 {review.riskCount.toLocaleString('ko-KR')}건
+          </span>
+        </div>
+      </div>
+
+      {review.affectedGroups.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {review.affectedGroups.map((group) => (
+            <span key={group} className="rounded-full bg-[var(--card)] px-2.5 py-1 text-[10px] font-bold text-[var(--foreground)] ring-1 ring-[var(--border)]">
+              {group}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      {hasChanges ? (
+        <div className="mt-3 grid gap-2 lg:grid-cols-3">
+          <PermissionDiffList title="추가 허용" items={review.added} tone="added" />
+          <PermissionDiffList title="해제" items={review.removed} tone="removed" />
+          <PermissionDiffList title="설정 변경" items={review.changed} tone="changed" />
+        </div>
+      ) : (
+        <div className="mt-3 rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--card)] px-3 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+          권한 값 차이가 없습니다.
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PermissionDiffList({
+  title,
+  items,
+  tone,
+}: {
+  title: string;
+  items: PermissionReviewItem[];
+  tone: 'added' | 'removed' | 'changed';
+}) {
+  const toneClass =
+    tone === 'added'
+      ? 'text-success'
+      : tone === 'removed'
+        ? 'text-danger'
+        : 'text-warning';
+
+  return (
+    <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-2.5">
+      <p className={`text-[11px] font-black ${toneClass}`}>{title} {items.length.toLocaleString('ko-KR')}</p>
+      {items.length > 0 ? (
+        <div className="mt-2 max-h-32 space-y-1.5 overflow-y-auto pr-1">
+          {items.slice(0, 12).map((item) => (
+            <div key={`${item.key}-${item.before}-${item.after}`} className="rounded-[var(--radius-md)] bg-[var(--muted)]/70 px-2 py-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="min-w-0 truncate text-[10px] font-bold text-[var(--foreground)]">{item.label}</p>
+                {item.tone === 'critical' ? (
+                  <span className="shrink-0 rounded-full bg-danger/15 px-1.5 py-0.5 text-[9px] font-bold text-danger">
+                    고위험
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-0.5 text-[9px] font-semibold text-[var(--toss-gray-3)]">
+                {item.before} → {item.after}
+              </p>
+            </div>
+          ))}
+          {items.length > 12 ? (
+            <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">
+              외 {items.length - 12}건 더 있음
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-2 text-[10px] font-semibold text-[var(--toss-gray-3)]">해당 변경 없음</p>
+      )}
+    </div>
+  );
+}
+
 function normalizeApprovalReferenceDefaults(value: unknown, staffs: any[] = []) {
   if (!value || typeof value !== 'object') return {} as Record<string, ApprovalReferenceSettingUser[]>;
 
@@ -151,6 +353,7 @@ function normalizeApprovalReferenceDefaults(value: unknown, staffs: any[] = []) 
 }
 
 export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () => void }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [staffs, setStaffs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedStaff, setSelectedStaff] = useState<Record<string, unknown> | null>(null);
@@ -159,6 +362,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
   const [copyRoleToo, setCopyRoleToo] = useState(true);
   const [copying, setCopying] = useState(false);
   const [selectedApprovalReferenceFormKey, setSelectedApprovalReferenceFormKey] = useState<string>('all');
+  const [permissionReview, setPermissionReview] = useState<PermissionReview | null>(null);
 
   const fetchStaffs = useCallback(async () => {
     setLoading(true);
@@ -244,6 +448,24 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     try {
       const actor = readClientAuditActor();
       const beforeStaff = staffs.find((staff) => staff.id === staffId);
+      setPermissionReview({
+        title: '역할 변경 검토',
+        summary: `${beforeStaff?.role || 'staff'} 역할에서 ${newRole} 역할로 변경됩니다.`,
+        targetName: String(beforeStaff?.name || '-'),
+        added: [],
+        removed: [],
+        changed: [
+          {
+            key: 'role',
+            label: '역할',
+            before: String(beforeStaff?.role || 'staff'),
+            after: newRole,
+            tone: newRole === 'admin' ? 'critical' : 'warning',
+          },
+        ],
+        affectedGroups: ['조직 / 권한'],
+        riskCount: newRole === 'admin' ? 1 : 0,
+      });
       const { error } = await updateStaffRecord(staffId, { role: newRole });
       if (error) {
         toast('역할 변경 중 오류가 발생했습니다.', 'error');
@@ -305,6 +527,13 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       const staff = staffs.find((item) => item.id === staffId);
       if (!staff) return;
       const nextPermissions = { ...(staff.permissions || {}), [permKey]: !staff.permissions?.[permKey] };
+      setPermissionReview(buildPermissionReview({
+        title: '권한 토글 검토',
+        summary: '단일 권한 변경이 저장됩니다.',
+        targetName: String(staff.name || '-'),
+        beforePermissions: staff.permissions || {},
+        afterPermissions: nextPermissions,
+      }));
       await setPermissions(staffId, nextPermissions);
     } finally {
       pendingRef.current = false;
@@ -321,6 +550,13 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       keys.forEach((key) => {
         nextPermissions[key] = enabled;
       });
+      setPermissionReview(buildPermissionReview({
+        title: enabled ? '권한 그룹 전체 허용 검토' : '권한 그룹 전체 해제 검토',
+        summary: `${keys.length.toLocaleString('ko-KR')}개 권한이 한 번에 변경됩니다.`,
+        targetName: String(staff.name || '-'),
+        beforePermissions: staff.permissions || {},
+        afterPermissions: nextPermissions,
+      }));
       await setPermissions(staffId, nextPermissions);
     } finally {
       pendingRef.current = false;
@@ -349,6 +585,14 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     if (copyRoleToo && source.role) {
       updates.role = source.role;
     }
+
+    setPermissionReview(buildPermissionReview({
+      title: '권한 복사 적용 전 검토',
+      summary: `[${source.name}]의 권한${copyRoleToo ? '과 역할' : ''}을 [${target.name}]에게 적용합니다.`,
+      targetName: String(target.name || '-'),
+      beforePermissions: target.permissions || {},
+      afterPermissions: updates.permissions,
+    }));
 
     const { error } = await updateStaffRecord(target.id, updates);
     setCopying(false);
@@ -478,6 +722,34 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       active: group.items.filter((item) => selectedPermissions?.[item.key] === true).length,
     }));
   }, [selectedPermissions]);
+  const copyPreviewReview = useMemo(() => {
+    if (!copySourceId || !selectedStaff?.id || copySourceId === selectedStaff.id) return null;
+    const source = staffs.find((staff) => staff.id === copySourceId);
+    const target = staffs.find((staff) => staff.id === selectedStaff.id);
+    if (!source || !target) return null;
+
+    const review = buildPermissionReview({
+      title: '권한 복사 미리보기',
+      summary: `[${source.name}] 권한을 [${target.name}]에게 복사하면 변경되는 항목입니다.`,
+      targetName: String(target.name || '-'),
+      beforePermissions: target.permissions || {},
+      afterPermissions: source.permissions || {},
+    });
+
+    if (copyRoleToo && source.role !== target.role) {
+      review.changed.unshift({
+        key: 'role',
+        label: '역할',
+        before: String(target.role || 'staff'),
+        after: String(source.role || 'staff'),
+        tone: source.role === 'admin' ? 'critical' : 'warning',
+      });
+      review.affectedGroups = Array.from(new Set(['조직 / 권한', ...review.affectedGroups]));
+      if (source.role === 'admin') review.riskCount += 1;
+    }
+
+    return review;
+  }, [copyRoleToo, copySourceId, selectedStaff?.id, staffs]);
 
   const updateApprovalReferenceDefaults = useCallback(
     async (formKey: string, nextUsers: ApprovalReferenceSettingUser[]) => {
@@ -571,6 +843,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       className="flex min-h-fit flex-col rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] shadow-sm md:flex-row md:rounded-[var(--radius-lg)]"
       data-testid="staff-permission-view"
     >
+      {dialog}
       <div className="flex w-full max-h-[34vh] shrink-0 flex-col border-[var(--border)] md:sticky md:top-0 md:max-h-[calc(100vh-8rem)] md:min-w-[200px] md:self-start md:w-[200px] md:border-r lg:w-[216px]">
         <div className="p-4 border-b border-[var(--border)] bg-[var(--muted)]">
           <h3 className="text-sm font-semibold text-[var(--foreground)]">직원 명단</h3>
@@ -594,7 +867,10 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                             key={staff.id}
                             type="button"
                             data-testid={`staff-permission-row-${staff.id}`}
-                            onClick={() => setSelectedStaff(staff)}
+                            onClick={() => {
+                              setSelectedStaff(staff);
+                              setPermissionReview(null);
+                            }}
                             className={`w-full rounded-[var(--radius-md)] px-2 py-1.5 text-left transition-all ${
                               selectedStaff?.id === staff.id
                                 ? 'bg-[var(--toss-blue-light)] ring-1 ring-[var(--accent)]'
@@ -654,7 +930,10 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
               <select
                 data-testid="staff-permission-copy-target"
                 value={(selectedStaff?.id as string) || ''}
-                onChange={(e) => setSelectedStaff(staffs.find((staff) => staff.id === e.target.value) ?? null)}
+                onChange={(e) => {
+                  setSelectedStaff(staffs.find((staff) => staff.id === e.target.value) ?? null);
+                  setPermissionReview(null);
+                }}
                 className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2.5 py-2 text-[11px] font-bold"
               >
                 <option value="">직원 선택</option>
@@ -696,6 +975,12 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
           </div>
         </div>
 
+        {copyPreviewReview ? (
+          <div className="mx-2 mt-2 md:mx-4">
+            <PermissionDiffPanel review={copyPreviewReview} mode="preview" />
+          </div>
+        ) : null}
+
         {selectedStaff ? (
           <div className="px-2 pb-32 pt-1 md:px-4 md:pb-40 md:pt-1.5" data-testid="staff-permission-detail">
             <div className="max-w-6xl space-y-3">
@@ -707,6 +992,14 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                   사번 {selectedStaff.employee_no as string} | {selectedStaff.department as string} {selectedStaff.position as string}
                 </p>
               </div>
+
+              {permissionReview ? (
+                <PermissionDiffPanel review={permissionReview} mode="saved" />
+              ) : (
+                <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                  권한을 변경하면 이 영역에 변경 전후 차이, 영향 그룹, 고위험 권한 수가 표시됩니다.
+                </div>
+              )}
 
               <div className="grid gap-3 xl:grid-cols-[minmax(0,300px)_minmax(0,1fr)]">
               <div className="space-y-3">
@@ -1034,11 +1327,16 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                   <button
                     type="button"
                     onClick={async () => {
-                      if (
-                        !confirm(
-                          `[${selectedStaff.name}] 직원을 즉시 강제 로그아웃 시키겠습니까?\n현재 활성화된 모든 기기의 세션이 즉시 종료됩니다.`
-                        )
-                      ) {
+                      const confirmed = await openConfirm({
+                        title: '기기 전체 강제 로그아웃을 실행할까요?',
+                        description: [
+                          `[${selectedStaff.name}] 직원의 현재 활성화된 모든 기기 세션이 즉시 종료됩니다.`,
+                          '저장되지 않은 작업이 있다면 손실될 수 있으며, 감사 로그에 계정 보안 조치로 기록됩니다.',
+                        ].join('\n'),
+                        confirmText: '강제 로그아웃',
+                        tone: 'danger',
+                      });
+                      if (!confirmed) {
                         return;
                       }
                       const { error } = await supabase

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import type { InventoryItem, StaffMember } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
@@ -24,6 +25,7 @@ export function useStockModal({
   fetchLogs: () => Promise<void>;
   onRefresh?: () => void;
 }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [stockModal, setStockModal] = useState<StockModalState>(null);
   const [stockAmount, setStockAmount] = useState(1);
   const [stockSerialInput, setStockSerialInput] = useState('');
@@ -211,7 +213,13 @@ export function useStockModal({
     const minQuantity = getItemMinQuantity(item);
     const itemName = (item as Record<string, unknown>).item_name as string || item.name || '품목';
     const requestQuantity = Math.max(minQuantity * 2 - quantity, 1);
-    if (!confirm(`[안전재고 부족] ${itemName} 품목의 비품구매 신청서를 자동으로 작성하여 MSO 결재 상신을 진행하시겠습니까?`)) return;
+    const confirmed = await openConfirm({
+      title: '안전재고 부족 자동 기안',
+      description: `${itemName} 품목의 비품구매 신청서를 자동으로 작성하여 MSO 결재 상신을 진행합니다.\n보충 필요량은 ${requestQuantity}개입니다.`,
+      confirmText: '결재 상신',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
     try {
       const { error } = await requestInventoryReorder({
         item, user, selectedCompanyId, quantity: requestQuantity,
@@ -223,7 +231,7 @@ export function useStockModal({
       console.error('결재 상신 실패:', err);
       toast('자동 기안 중 오류가 발생했습니다.', 'error');
     }
-  }, [selectedCompanyId, user]);
+  }, [openConfirm, selectedCompanyId, user]);
 
   const toggleBatchItem = useCallback((id: string) => {
     setBatchSelectedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
@@ -259,6 +267,7 @@ export function useStockModal({
   }, [handleStockUpdate]);
 
   return {
+    dialog,
     stockModal, setStockModal,
     stockAmount, setStockAmount,
     stockSerialInput, setStockSerialInput,
@@ -284,15 +293,20 @@ export function useStockModal({
       if (!item?.id) return;
       const displayName = String((item as Record<string, unknown>).item_name || item.name || '');
       const currentQty = item.quantity ?? Number((item as Record<string, unknown>).stock ?? 0);
-      if (confirm(`[${displayName}] (현재고: ${currentQty}개) 품목을 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
-        try {
-          await supabase.from('inventory').delete().eq('id', item.id);
-          toast('삭제되었습니다.', 'success');
-          refreshCurrentInventory();
-        } catch {
-          toast('삭제 오류가 발생했습니다.', 'error');
-        }
+      const confirmed = await openConfirm({
+        title: '재고 품목 삭제',
+        description: `[${displayName}] 현재고 ${currentQty}개 품목을 삭제합니다.\n이 작업은 되돌릴 수 없습니다.`,
+        confirmText: '삭제',
+        tone: 'danger',
+      });
+      if (!confirmed) return;
+      try {
+        await supabase.from('inventory').delete().eq('id', item.id);
+        toast('삭제되었습니다.', 'success');
+        refreshCurrentInventory();
+      } catch {
+        toast('삭제 오류가 발생했습니다.', 'error');
       }
-    }, [refreshCurrentInventory]),
+    }, [openConfirm, refreshCurrentInventory]),
   };
 }

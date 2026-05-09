@@ -304,7 +304,7 @@ export function ChatAttachmentPreviewModal({ controller }: ChatAttachmentPreview
               <button
                 type="button"
                 onClick={() => nudgeZoom(-0.25)}
-                className="h-9 min-w-9 rounded-full px-2 text-sm font-bold transition-colors hover:bg-white/15"
+                className="h-11 min-w-11 rounded-full px-2 text-sm font-bold transition-colors hover:bg-white/15"
                 aria-label="축소"
               >
                 -
@@ -312,14 +312,14 @@ export function ChatAttachmentPreviewModal({ controller }: ChatAttachmentPreview
               <button
                 type="button"
                 onClick={resetTransform}
-                className="h-9 min-w-[68px] rounded-full px-3 text-[11px] font-bold transition-colors hover:bg-white/15"
+                className="h-11 min-w-[72px] rounded-full px-3 text-[11px] font-bold transition-colors hover:bg-white/15"
               >
                 {Math.round(zoom * 100)}%
               </button>
               <button
                 type="button"
                 onClick={() => nudgeZoom(0.25)}
-                className="h-9 min-w-9 rounded-full px-2 text-sm font-bold transition-colors hover:bg-white/15"
+                className="h-11 min-w-11 rounded-full px-2 text-sm font-bold transition-colors hover:bg-white/15"
                 aria-label="확대"
               >
                 +

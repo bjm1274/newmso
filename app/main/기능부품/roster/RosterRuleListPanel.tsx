@@ -1,5 +1,7 @@
 'use client';
 
+import { useActionDialog } from '@/app/components/useActionDialog';
+
 type RosterRuleListPanelProps = Record<string, any>;
 
 export default function RosterRuleListPanel({
@@ -7,8 +9,10 @@ export default function RosterRuleListPanel({
   deleteGenerationRule,
   editGenerationRule,
 }: RosterRuleListPanelProps) {
+  const { dialog, openConfirm } = useActionDialog();
   return (
     <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+      {dialog}
       <h4 className="text-lg font-bold text-[var(--foreground)]">저장된 규칙</h4>
 
       {companyGenerationRules.length === 0 ? (
@@ -41,8 +45,14 @@ export default function RosterRuleListPanel({
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (confirm(`"${rule.name}" 규칙을 삭제할까요?`)) {
+                    onClick={async () => {
+                      const confirmed = await openConfirm({
+                        title: '근무 규칙 삭제',
+                        description: `"${rule.name}" 규칙을 삭제합니다.`,
+                        confirmText: '삭제',
+                        tone: 'danger',
+                      });
+                      if (confirmed) {
                         deleteGenerationRule(rule.id);
                       }
                     }}

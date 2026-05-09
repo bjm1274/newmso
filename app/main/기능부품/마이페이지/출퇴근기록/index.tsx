@@ -448,10 +448,10 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     if (shiftIds.length > 0 || shiftNames.length > 0) {
       const [shiftIdsResult, shiftNamesResult] = await Promise.all([
         shiftIds.length > 0
-          ? supabase.from('work_shifts').select('id, name, company_name, start_time, end_time').in('id', shiftIds)
+          ? supabase.from('work_shifts').select('id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work').in('id', shiftIds)
           : Promise.resolve({ data: [], error: null }),
         shiftNames.length > 0
-          ? supabase.from('work_shifts').select('id, name, company_name, start_time, end_time').in('name', shiftNames)
+          ? supabase.from('work_shifts').select('id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work').in('name', shiftNames)
           : Promise.resolve({ data: [], error: null }),
       ]);
 
@@ -475,6 +475,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       const shiftRow = resolveAssignedShift(assignmentByDate.get(dateStr), shiftLookup, {
         fallbackShiftId: defaultShiftId,
         preferredCompany: effectiveCompany,
+        workDate: dateStr,
       });
       const boundary = shiftRow
         ? buildShiftBoundary(
@@ -813,10 +814,10 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
       const [shiftIdsResult, shiftNamesResult] = await Promise.all([
         shiftIds.length > 0
-          ? supabase.from('work_shifts').select('id, name, company_name, start_time, end_time').in('id', shiftIds)
+          ? supabase.from('work_shifts').select('id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work').in('id', shiftIds)
           : Promise.resolve({ data: [], error: null }),
         shiftNames.length > 0
-          ? supabase.from('work_shifts').select('id, name, company_name, start_time, end_time').in('name', shiftNames)
+          ? supabase.from('work_shifts').select('id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work').in('name', shiftNames)
           : Promise.resolve({ data: [], error: null }),
       ]);
 
@@ -834,6 +835,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       const shiftRow = resolveAssignedShift(assignment, shiftLookup, {
         fallbackShiftId: latestShiftId,
         preferredCompany: effectiveCompany,
+        workDate,
       });
       if (!shiftRow) {
         return buildFallbackShiftBoundary(effectiveDepartment);

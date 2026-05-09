@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -32,6 +33,7 @@ type SurgeryExamTemplateManagerProps = {
 };
 
 export default function SurgeryExamTemplateManager({ user }: SurgeryExamTemplateManagerProps) {
+  const { dialog, openConfirm } = useActionDialog();
   const [activeTab, setActiveTab] = useState<'catalogs' | 'opCheck'>('catalogs');
   const [surgeryTemplates, setSurgeryTemplates] = useState<Template[]>([]);
   const [mriTemplates, setMriTemplates] = useState<Template[]>([]);
@@ -100,7 +102,15 @@ export default function SurgeryExamTemplateManager({ user }: SurgeryExamTemplate
   };
 
   const removeTemplate = async (type: 'surgery' | 'mri', id: string) => {
-    if (!confirm('이 항목을 삭제하시겠습니까?')) return;
+    const list = type === 'surgery' ? surgeryTemplates : mriTemplates;
+    const target = list.find((template) => template.id === id);
+    const confirmed = await openConfirm({
+      title: '템플릿 삭제',
+      description: `${target?.name || '선택한 템플릿'}을 삭제합니다.\n수술/검사 항목 목록에서 제거됩니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     setLoading(true);
     try {
       const table = type === 'surgery' ? 'surgery_templates' : 'mri_templates';
@@ -133,6 +143,7 @@ export default function SurgeryExamTemplateManager({ user }: SurgeryExamTemplate
 
   return (
     <div className="space-y-4">
+      {dialog}
       <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm">
         <div className="flex flex-wrap gap-1.5">
           <button

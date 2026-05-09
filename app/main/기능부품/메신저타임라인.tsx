@@ -117,6 +117,7 @@ function MessengerTimelineComponent({
   readCounts,
   deliveryStates,
   threadSummaries,
+  activeActionMessageId,
   roomMembers,
   effectiveChatUserId,
   activeMessageHighlightQuery,
@@ -390,8 +391,10 @@ function MessengerTimelineComponent({
               }
 
               const msg = item as MessengerMessageItem;
+              const messageId = String(msg.id);
               const isMine = String(msg.sender_id) === effectiveChatUserId;
               const isDeletedMessage = Boolean(msg.is_deleted);
+              const isActionActive = activeActionMessageId === messageId;
               const msgReacts = reactions[msg.id] || {};
               const hasReacts = Object.keys(msgReacts).some((emoji) => (msgReacts[emoji] || 0) > 0);
               const readersCount = readCounts[msg.id] || 0;
@@ -498,7 +501,7 @@ function MessengerTimelineComponent({
                         ) : null}
                         <div
                           data-testid={!isMine ? `chat-message-stack-${msg.id}` : undefined}
-                          className={isMine ? 'flex w-full flex-col items-end' : 'flex min-w-0 max-w-[82%] flex-col items-start md:max-w-[74%]'}
+                          className={isMine ? 'group flex w-full flex-col items-end' : 'group flex min-w-0 max-w-[82%] flex-col items-start md:max-w-[74%]'}
                         >
                           {!isMine && showIncomingAvatar && (
                             <span
@@ -743,7 +746,13 @@ function MessengerTimelineComponent({
                         </p>
                       )}
                       <div
-                        className={`flex items-center gap-1 overflow-hidden opacity-0 pointer-events-none transition-all max-h-0 ${isMine ? 'flex-row-reverse' : ''} group-hover:mt-0.5 group-hover:max-h-10 group-hover:opacity-100 group-hover:pointer-events-auto [@media(hover:none)]:mt-0.5 [@media(hover:none)]:max-h-10 [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto`}
+                        data-chat-active-action-scope={isActionActive ? 'true' : undefined}
+                        data-testid={isActionActive ? 'chat-message-actions-panel' : `chat-message-inline-actions-${msg.id}`}
+                        className={`flex items-center gap-1 overflow-hidden transition-all ${isMine ? 'flex-row-reverse' : ''} ${
+                          isActionActive
+                            ? 'mt-0.5 max-h-10 opacity-100 pointer-events-auto'
+                            : 'max-h-0 opacity-0 pointer-events-none group-hover:mt-0.5 group-hover:max-h-10 group-hover:opacity-100 group-hover:pointer-events-auto [@media(hover:none)]:mt-0.5 [@media(hover:none)]:max-h-10 [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto'
+                        }`}
                         onClick={(event) => event.stopPropagation()}
                       >
                         <button

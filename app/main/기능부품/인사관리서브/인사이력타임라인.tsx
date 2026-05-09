@@ -59,9 +59,6 @@ export default function StaffHistoryTimeline({ staffId, staffName }: Props) {
       <div className="flex items-start justify-between gap-3 mb-4">
         <div>
           <h3 className="text-base font-semibold text-[var(--foreground)]">{staffName} 인사 이력 원장</h3>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-1">
-            인사발령, 계약, 급여 조건, 근무형태, 휴가 이력을 한눈에 확인합니다.
-          </p>
         </div>
         <div className="flex gap-2 shrink-0">
           <span className="px-2 py-1 rounded-full bg-blue-500/10 text-blue-700 text-[11px] font-semibold">

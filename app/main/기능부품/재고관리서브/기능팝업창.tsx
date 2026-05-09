@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -224,6 +225,7 @@ export function ScanModals({ isOpen, onClose: _onClose, onComplete: _onComplete,
 
 // [모달 6] UDI 보고 (기존 유지)
 export function UDIModal({ isOpen, onClose: _onClose, inventory: _inventory, user: _rawUser, onRefresh: _onRefresh }: Record<string, unknown>) {
+  const { dialog, openConfirm } = useActionDialog();
   const onClose = _onClose as () => void;
   const onRefresh = _onRefresh as () => void;
   const inventory = (_inventory ?? []) as Record<string, unknown>[];
@@ -233,10 +235,24 @@ export function UDIModal({ isOpen, onClose: _onClose, inventory: _inventory, use
   const [barcodeInput, setBarcodeInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const handleScan = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') { const f = inventory.find((i: Record<string, unknown>) => i.barcode === barcodeInput); if (f) setUdiItems(p => [{ ...f, report_qty: 1, lot_number: '', expiration_date: '' }, ...p]); setBarcodeInput(''); } };
-  const submit = async () => { if (!confirm("전송하시겠습니까?")) return; await supabase.from('inventory_logs').insert(udiItems.map(i => ({ item_id: i.id, type: '출고', amount: i.report_qty, worker_id: user.id, lot_number: i.lot_number, expiration_date: i.expiration_date }))); toast("완료", 'success'); setUdiItems([]); onRefresh(); onClose(); };
+  const submit = async () => {
+    const confirmed = await openConfirm({
+      title: 'UDI 공급내역 전송',
+      description: `${udiItems.length}건의 공급내역을 전송합니다.\n전송 후 출고 로그에 반영됩니다.`,
+      confirmText: '전송',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
+    await supabase.from('inventory_logs').insert(udiItems.map(i => ({ item_id: i.id, type: '출고', amount: i.report_qty, worker_id: user.id, lot_number: i.lot_number, expiration_date: i.expiration_date })));
+    toast("완료", 'success');
+    setUdiItems([]);
+    onRefresh();
+    onClose();
+  };
   if (!isOpen) return null;
   return (
     <div className="absolute inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      {dialog}
       <div className="bg-[var(--card)] w-full max-w-4xl rounded-[var(--radius-lg)] p-5 shadow-sm h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center border-b pb-4"><h2 className="text-2xl font-semibold text-purple-700">📡 공급내역보고</h2><p className="font-bold">대상: {udiItems.length}건</p></div>
         <div className="bg-[var(--muted)] p-4 rounded-[var(--radius-lg)] mt-4 flex gap-4 items-center"><span className="text-2xl">🔫</span><input ref={inputRef} value={barcodeInput} onChange={e => setBarcodeInput(e.target.value)} onKeyDown={handleScan} className="flex-1 p-3 rounded-[var(--radius-lg)] font-bold" placeholder="바코드 스캔..." autoFocus /></div>

@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -21,6 +22,7 @@ function getStatus(expiry: string | null): 'valid' | 'expiring' | 'expired' {
 }
 
 export default function LicenseManager({ staffs = [], selectedCo, user }: { staffs: any[]; selectedCo: string; user: any }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [licenses, setLicenses] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ staff_id: '', license_name: '', license_number: '', issued_date: '', expiry_date: '', issuing_body: '', memo: '' });
@@ -83,7 +85,14 @@ export default function LicenseManager({ staffs = [], selectedCo, user }: { staf
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('삭제하시겠습니까?')) return;
+    const target = licenses.find((license) => license.id === id);
+    const confirmed = await openConfirm({
+      title: '면허·자격증 삭제',
+      description: `${target?.license_name || '선택한 면허·자격증'} 기록을 삭제합니다.\n만료 알림과 자격 현황에서 제거됩니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     await supabase.from('staff_licenses').delete().eq('id', id);
     fetchLicenses();
   };
@@ -96,6 +105,7 @@ export default function LicenseManager({ staffs = [], selectedCo, user }: { staf
 
   return (
     <div className="p-4 md:p-5 space-y-5">
+      {dialog}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-[var(--foreground)]">면허·자격증 관리</h2>

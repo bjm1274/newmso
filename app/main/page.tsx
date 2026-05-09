@@ -1110,6 +1110,9 @@ function MainPageContent() {
 
               return groups.map(groupName => (
                 <div key={groupName!} className="flex shrink-0 flex-row gap-0.5 md:mb-5 md:flex-col">
+                  <div className="app-subnav-group-label flex min-h-11 items-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-subtle)] px-3 text-[11px] font-black select-none md:hidden">
+                    {subgroupLabels[groupName!] || groupName}
+                  </div>
                   <div className="app-subnav-group-label hidden px-2 pb-1 select-none md:block">
                     {subgroupLabels[groupName!] || groupName}
                   </div>
@@ -1119,7 +1122,7 @@ function MainPageContent() {
                       onClick={() => handleSubViewChange(sub.id)}
                       data-testid={buildSubMenuTestId(mainMenu, sub.id)}
                       aria-current={displayedSubView === sub.id ? 'page' : undefined}
-                      className={`app-subnav-item touch-manipulation flex-none px-3 py-2.5 text-center text-[12px] font-semibold tracking-normal whitespace-nowrap md:flex md:min-h-[32px] md:w-full md:items-center md:gap-2 md:px-3 md:py-2 md:text-left ${displayedSubView === sub.id ? 'is-active' : ''}`}
+                      className={`app-subnav-item touch-manipulation flex min-h-11 flex-none items-center justify-center px-3 py-2.5 text-center text-[12px] font-semibold tracking-normal whitespace-nowrap md:min-h-[36px] md:w-full md:justify-start md:gap-2 md:px-3 md:py-2 md:text-left ${displayedSubView === sub.id ? 'is-active' : ''}`}
                     >
                       <span className="hidden shrink-0 md:inline-flex" style={{ opacity: displayedSubView === sub.id ? 1 : 0.65 }}>
                         <MenuIcon name={sub.icon} className="h-[14px] w-[14px]" />
@@ -1137,7 +1140,7 @@ function MainPageContent() {
                 onClick={() => handleSubViewChange(sub.id)}
                 data-testid={buildSubMenuTestId(mainMenu, sub.id)}
                 aria-current={displayedSubView === sub.id ? 'page' : undefined}
-                className={`app-subnav-item touch-manipulation flex-none px-3 py-2.5 text-center text-[12px] font-semibold tracking-normal whitespace-nowrap md:flex md:min-h-[32px] md:w-full md:items-center md:gap-2 md:px-3 md:py-2 md:text-left ${displayedSubView === sub.id ? 'is-active' : ''}`}
+                className={`app-subnav-item touch-manipulation flex min-h-11 flex-none items-center justify-center px-3 py-2.5 text-center text-[12px] font-semibold tracking-normal whitespace-nowrap md:min-h-[36px] md:w-full md:justify-start md:gap-2 md:px-3 md:py-2 md:text-left ${displayedSubView === sub.id ? 'is-active' : ''}`}
               >
                 <span className="hidden shrink-0 md:inline-flex" style={{ opacity: displayedSubView === sub.id ? 1 : 0.65 }}>
                   <MenuIcon name={sub.icon} className="h-[14px] w-[14px]" />

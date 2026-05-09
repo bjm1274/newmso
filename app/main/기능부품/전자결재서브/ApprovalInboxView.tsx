@@ -1,9 +1,15 @@
 'use client';
 
-import type { Dispatch, SetStateAction } from 'react';
+import { useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { EmptyState } from '@/app/components/StatePanel';
 import type { StaffMember } from '@/types';
 import { LucideIcon } from '../조직도서브/조직도측면창';
 import { ALL_DOCUMENT_FILTER } from './approval-constants';
+import {
+  ApprovalProgressSummary,
+  ApprovalRiskReviewDialog,
+  buildApprovalWorkflowSummary,
+} from './ApprovalRiskReviewDialog';
 
 type ApprovalRecord = Record<string, unknown>;
 type TemplateMeta = { slug?: string | null; name?: string | null };
@@ -40,8 +46,8 @@ type ApprovalInboxViewProps = {
   selectedApprovalIds: string[];
   toggleSelectAll: () => void;
   toggleSelectOne: (id: string) => void;
-  handleBulkApprove: () => void | Promise<void>;
-  handleBulkReject: () => void | Promise<void>;
+  handleBulkApprove: (options?: { skipConfirm?: boolean }) => void | Promise<void>;
+  handleBulkReject: (options?: { reason?: string; skipPrompt?: boolean }) => void | Promise<void>;
   setSelectedApprovalId: Dispatch<SetStateAction<string | null>>;
   approvalDirectoryStaffs: StaffMember[];
   resolveApprovalLineIds: (item: ApprovalRecord) => string[];
@@ -49,7 +55,12 @@ type ApprovalInboxViewProps = {
   resolveApprovalTemplateMeta: (item: ApprovalRecord) => TemplateMeta;
   resolveApprovalTemplateDesign: (item: ApprovalRecord) => TemplateDesign;
   resolveApprovalDelegateSnapshot: (item: ApprovalRecord) => { delegatedToName?: string; delegatedFromName?: string };
-  resolveApprovalDelaySnapshot: (item: ApprovalRecord) => { overdue: boolean; notificationCount: number };
+  resolveApprovalDelaySnapshot: (item: ApprovalRecord) => {
+    overdue: boolean;
+    notificationCount: number;
+    elapsedHours?: number;
+    thresholdHours?: number;
+  };
   resolveApprovalLockSnapshot: (item: ApprovalRecord) => { revision?: number };
   isApprovalEditLockedItem: (item: ApprovalRecord) => boolean;
   canUserRecallItem: (item: ApprovalRecord) => boolean;
@@ -95,8 +106,18 @@ export default function ApprovalInboxView({
   handleApproveAction,
   handleRejectAction,
   handleRecallAction,
+  approvalDirectoryStaffs,
+  resolveApprovalLineIds,
+  resolveCurrentApproverId,
+  resolveApprovalDelaySnapshot,
 }: ApprovalInboxViewProps) {
+  const [bulkReviewAction, setBulkReviewAction] = useState<'approve' | 'reject' | null>(null);
+  const [bulkRejectReason, setBulkRejectReason] = useState('');
   const documentFilterOptions = [ALL_DOCUMENT_FILTER, ...documentTypeOptions];
+  const selectedBulkItems = useMemo(
+    () => bulkTargetList.filter((item) => selectedApprovalIds.includes(String(item.id || ''))),
+    [bulkTargetList, selectedApprovalIds]
+  );
   const approvalSummary = listForView.reduce<{ pending: number; approved: number; rejected: number }>(
     (acc, item) => {
       const status = String(item.status || '');
@@ -127,8 +148,44 @@ export default function ApprovalInboxView({
     return { label: '대기', className: 'erp-status erp-status-yellow' };
   };
 
+  const permissionScopeCopy =
+    viewMode === '기안함'
+      ? '내가 기안한 문서만 표시됩니다. 회수 가능한 문서는 대기 상태 문서로 제한됩니다.'
+      : viewMode === '참조 문서함'
+        ? '참조자로 지정된 문서만 표시됩니다. 승인·반려 권한은 현재 결재자에게만 있습니다.'
+        : '내 결재선에 포함되었거나 현재 결재자로 지정된 문서만 표시됩니다. 일괄 처리는 현재 내가 처리할 수 있는 대기 문서에만 적용됩니다.';
+
+  const closeBulkReview = () => {
+    setBulkReviewAction(null);
+    setBulkRejectReason('');
+  };
+
+  const confirmBulkReview = async () => {
+    if (bulkReviewAction === 'approve') {
+      await handleBulkApprove({ skipConfirm: true });
+    } else if (bulkReviewAction === 'reject') {
+      await handleBulkReject({ reason: bulkRejectReason, skipPrompt: true });
+    }
+    closeBulkReview();
+  };
+
   return (
     <div className="space-y-4">
+      {bulkReviewAction && selectedBulkItems.length > 0 && (
+        <ApprovalRiskReviewDialog
+          action={bulkReviewAction}
+          items={selectedBulkItems}
+          staffs={approvalDirectoryStaffs}
+          resolveApprovalLineIds={resolveApprovalLineIds}
+          resolveCurrentApproverId={resolveCurrentApproverId}
+          resolveApprovalTemplateMeta={resolveApprovalTemplateMeta}
+          reason={bulkRejectReason}
+          setReason={setBulkRejectReason}
+          onClose={closeBulkReview}
+          onConfirm={confirmBulkReview}
+        />
+      )}
+
       <section className="app-card p-4">
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -136,6 +193,18 @@ export default function ApprovalInboxView({
               <h2 className="text-lg font-black tracking-tight text-[var(--foreground)]">{viewMode}</h2>
             </div>
             <span className="erp-chip erp-chip-active">{listForView.length}건</span>
+          </div>
+
+          <div className="rounded-[var(--radius-lg)] border border-[var(--accent)]/15 bg-[var(--accent-selected-subtle)] px-3 py-2">
+            <div className="flex items-start gap-2">
+              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--card)] text-[var(--accent)]">
+                <LucideIcon name="ShieldCheck" size={15} strokeWidth={2.2} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[12px] font-black text-[var(--foreground)]">권한 스코프</p>
+                <p className="mt-0.5 text-[11px] font-semibold leading-relaxed text-[var(--muted-foreground)]">{permissionScopeCopy}</p>
+              </div>
+            </div>
           </div>
 
           <div className="grid gap-2 md:grid-cols-[minmax(140px,180px)_minmax(140px,180px)_minmax(140px,180px)_1fr]">
@@ -282,7 +351,7 @@ export default function ApprovalInboxView({
             <button
               type="button"
               disabled={selectedApprovalIds.length === 0}
-              onClick={handleBulkApprove}
+              onClick={() => setBulkReviewAction('approve')}
               className="h-9 rounded-[var(--radius-md)] bg-[var(--accent)] px-4 text-xs font-bold text-white shadow-sm transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               일괄 승인
@@ -290,7 +359,7 @@ export default function ApprovalInboxView({
             <button
               type="button"
               disabled={selectedApprovalIds.length === 0}
-              onClick={handleBulkReject}
+              onClick={() => setBulkReviewAction('reject')}
               className="h-9 rounded-[var(--radius-md)] border border-[var(--danger)]/20 bg-[var(--danger-light)] px-4 text-xs font-bold text-[var(--danger)] shadow-sm transition-all hover:bg-[var(--danger-light)]/80 disabled:cursor-not-allowed disabled:opacity-40"
             >
               일괄 반려
@@ -300,18 +369,16 @@ export default function ApprovalInboxView({
       )}
 
       {listForView.length === 0 ? (
-        <div className="empty-state h-56 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)]">
-          <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent-light)] text-[var(--accent)]">
-            <LucideIcon name="FileText" size={22} />
-          </span>
-          <p className="font-semibold text-base">
-            {approvalKeyword
-              ? '검색 조건에 맞는 결재 내역이 없습니다.'
+        <EmptyState
+          title={
+            approvalKeyword
+              ? '검색 조건에 맞는 결재 내역이 없습니다'
               : approvalStatusFilter === '전체'
-                ? '조건에 맞는 결재 내역이 없습니다.'
-                : `${approvalStatusFilter === '대기' ? '대기중' : approvalStatusFilter === '승인' ? '승인된' : '반려된'} 건이 없습니다.`}
-          </p>
-        </div>
+                ? '조건에 맞는 결재 내역이 없습니다'
+                : `${approvalStatusFilter === '대기' ? '대기중' : approvalStatusFilter === '승인' ? '승인된' : '반려된'} 건이 없습니다`
+          }
+          description="문서 유형, 상태, 기간, 검색어를 조정하면 다른 결재 내역을 확인할 수 있습니다."
+        />
       ) : (
         <section className="erp-table-card">
           <div className="overflow-x-auto">
@@ -334,6 +401,12 @@ export default function ApprovalInboxView({
                   const isChecked = selectedApprovalIds.includes(itemId);
                   const templateMeta = resolveApprovalTemplateMeta(item);
                   const status = statusTone(item.status);
+                  const workflowSummary = buildApprovalWorkflowSummary({
+                    item,
+                    staffs: approvalDirectoryStaffs,
+                    resolveApprovalLineIds,
+                    resolveCurrentApproverId,
+                  });
 
                   return (
                     <tr
@@ -348,6 +421,7 @@ export default function ApprovalInboxView({
                             <input
                               type="checkbox"
                               checked={isChecked}
+                              onClick={(event) => event.stopPropagation()}
                               onChange={() => toggleSelectOne(itemId)}
                               className="h-4 w-4 accent-[var(--accent)]"
                               aria-label={`${String(item.title || '결재 문서')} 선택`}
@@ -355,11 +429,32 @@ export default function ApprovalInboxView({
                           ) : null}
                         </td>
                       )}
-                      <td className="font-bold text-[var(--foreground)]">{String(item.title || '제목 없음')}</td>
+                      <td>
+                        <div className="min-w-[220px]">
+                          <p className="font-bold text-[var(--foreground)]">{String(item.title || '제목 없음')}</p>
+                          <ApprovalProgressSummary
+                            item={item}
+                            staffs={approvalDirectoryStaffs}
+                            resolveApprovalLineIds={resolveApprovalLineIds}
+                            resolveCurrentApproverId={resolveCurrentApproverId}
+                            resolveApprovalDelaySnapshot={resolveApprovalDelaySnapshot}
+                            compact
+                          />
+                        </div>
+                      </td>
                       <td>{String(item.sender_name || '사용자')}</td>
                       <td><span className="erp-status erp-status-blue">{templateMeta.name || String(item.type || '결재')}</span></td>
                       <td>{formatDraftDate(item.created_at)}</td>
-                      <td><span className={status.className}>{status.label}</span></td>
+                      <td>
+                        <div className="flex flex-col items-start gap-1">
+                          <span className={status.className}>{status.label}</span>
+                          {String(item.status || '').includes('대기') && (
+                            <span className="text-[10px] font-bold text-[var(--muted-foreground)]">
+                              {workflowSummary.currentApproverName}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td>
                         <div className="flex items-center justify-end gap-2">
                           {canUserRecallItem(item) && (

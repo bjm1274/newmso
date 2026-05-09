@@ -1,6 +1,7 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { supabase } from '@/lib/supabase';
@@ -117,6 +118,7 @@ export default function PayrollMain({
   user = null,
   initialTab = '대시보드',
 }: PayrollMainProps) {
+  const { dialog, openConfirm } = useActionDialog();
   const [activeTab, setActiveTab] = useState(initialTab);
   const [selectedStaffId, setSelectedStaffId] = useState<string | number | null>(null);
   const [checkedIds, setCheckedIds] = useState<(string | number)[]>([]);
@@ -125,7 +127,14 @@ export default function PayrollMain({
   const [payrollAudit, setPayrollAudit] = useState<{ orphanCount: number; officialBracketConfigured: boolean } | null>(null);
   const [payrollReloadNonce, setPayrollReloadNonce] = useState(0);
 
-  const filtered: Staff[] = selectedCo === '전체' ? staffs : staffs.filter((s: Staff) => s.company === selectedCo);
+  const filtered: Staff[] = useMemo(
+    () => (selectedCo === '전체' ? staffs : staffs.filter((s: Staff) => s.company === selectedCo)),
+    [selectedCo, staffs],
+  );
+  const filteredStaffIds = useMemo(
+    () => filtered.map((staff) => String(staff.id)).join(','),
+    [filtered],
+  );
   const current =
     filtered.find((s) => s.id === selectedStaffId) ||
     filtered.find((staff) => payrollRecords.some((row) => String(row.staff_id) === String(staff.id))) ||
@@ -286,7 +295,7 @@ export default function PayrollMain({
         setPayrollRecords([]);
       }
     })();
-  }, [yearMonth, filtered.map(s => s.id).join(','), payrollReloadNonce]);
+  }, [yearMonth, filteredStaffIds, payrollReloadNonce]);
 
   useEffect(() => {
     (async () => {
@@ -307,7 +316,7 @@ export default function PayrollMain({
 
       setPayrollAudit({ orphanCount, officialBracketConfigured });
     })();
-  }, [filtered, payrollRecords, yearMonth]);
+  }, [filtered, filteredStaffIds, payrollRecords, selectedCo, yearMonth]);
 
   const [y, m] = (yearMonth || '').split('-');
   const periodLabel = y && m ? `${y}년 ${Number(m)}월` : '';
@@ -357,6 +366,7 @@ export default function PayrollMain({
       className="flex flex-col h-full animate-in fade-in duration-500 app-page"
       data-testid="payroll-view"
     >
+      {dialog}
       <header className="sticky top-0 z-30 flex flex-col justify-between gap-4 border-b border-[var(--border)] bg-[var(--card)] p-4 md:flex-row md:items-center md:p-5 shadow-sm">
         <div className="flex flex-wrap items-center gap-4 bg-[var(--muted)] p-1.5 rounded-2xl border border-[var(--border)]">
           <div className="flex items-center gap-2 px-4 py-2 bg-[var(--card)] rounded-[var(--radius-xl)] shadow-sm ring-1 ring-black/5">
@@ -431,9 +441,14 @@ export default function PayrollMain({
                     onSendAll={async () => {
                       const records = payrollRecords.filter(r => r.year_month === yearMonth);
                       if (records.length === 0) return toast("해당 월에 정산 완료된 레코드가 없습니다.", 'success');
-                      if (confirm(`${records.length}명의 직원에게 급여명세서 알림을 발송하시겠습니까?`)) {
-                        toast(`${records.length}건의 알림 발송이 예약되었습니다.`, 'success');
-                      }
+                      const confirmed = await openConfirm({
+                        title: '급여명세서 알림 발송',
+                        description: `${records.length}명의 직원에게 급여명세서 알림을 발송합니다.`,
+                        confirmText: '발송',
+                        tone: 'accent',
+                      });
+                      if (!confirmed) return;
+                      toast(`${records.length}건의 알림 발송이 예약되었습니다.`, 'success');
                     }}
                   />
                 </div>

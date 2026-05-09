@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
 import type { ChatMessage, ChatRoom } from '@/types';
@@ -26,6 +27,10 @@ type UseChatMessageActionsParams = {
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   setPersistedPinnedMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   fetchData: () => void | Promise<void>;
+  refreshVisibleMessageReactions?: () => void | Promise<void>;
+  refreshVisibleMessageBookmarks?: () => void | Promise<void>;
+  refreshRoomPinnedMessages?: () => void | Promise<void>;
+  refreshReadCursorsForRoom?: (roomId: string | null | undefined) => void | Promise<void>;
   syncRoomSummaryFromMessages: (roomId: string | null | undefined, nextMessages: ChatMessage[]) => void;
   persistRoomReadCursors: (
     roomIds: Array<string | null | undefined>,
@@ -51,12 +56,17 @@ export function useChatMessageActions({
   setMessages,
   setPersistedPinnedMessages,
   fetchData,
+  refreshVisibleMessageReactions,
+  refreshVisibleMessageBookmarks,
+  refreshRoomPinnedMessages,
+  refreshReadCursorsForRoom,
   syncRoomSummaryFromMessages,
   persistRoomReadCursors,
   broadcastChatSync,
   auditUserId,
   auditUserName,
 }: UseChatMessageActionsParams) {
+  const { dialog, openConfirm } = useActionDialog();
   const actorId = currentUserId || fallbackUserId || '';
 
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
@@ -80,11 +90,15 @@ export function useChatMessageActions({
       } else {
         await supabase.from('message_reactions').insert([{ message_id: messageId, user_id: actorId, emoji }]);
       }
-      await fetchData();
+      if (refreshVisibleMessageReactions) {
+        await refreshVisibleMessageReactions();
+      } else {
+        await fetchData();
+      }
     } catch (error) {
       console.error('toggleReaction error', error);
     }
-  }, [actorId, fetchData]);
+  }, [actorId, fetchData, refreshVisibleMessageReactions]);
 
   const togglePin = useCallback(async (messageId: string) => {
     if (!selectedRoomId) return;
@@ -110,12 +124,16 @@ export function useChatMessageActions({
         setPinnedIds([normalizedMessageId]);
         writeStoredPinnedIds(selectedRoomId, [normalizedMessageId]);
       }
-      await fetchData();
+      if (refreshRoomPinnedMessages) {
+        await refreshRoomPinnedMessages();
+      } else {
+        await fetchData();
+      }
     } catch (error) {
       console.error('공지 고정 상태 변경 실패:', error);
       toast(isPinned ? '공지 해제에 실패했습니다.' : '공지 등록에 실패했습니다.', 'error');
     }
-  }, [actorId, fetchData, pinnedIds, selectedRoomId, setPinnedIds]);
+  }, [actorId, fetchData, pinnedIds, refreshRoomPinnedMessages, selectedRoomId, setPinnedIds]);
 
   const toggleBookmark = useCallback(async (messageId: string) => {
     const normalizedMessageId = String(messageId);
@@ -146,7 +164,7 @@ export function useChatMessageActions({
       }
       setBookmarkedIds(new Set(nextBookmarkIds));
       writeStoredBookmarks(effectiveTodoUserId, nextBookmarkIds);
-      await fetchData();
+      await refreshVisibleMessageBookmarks?.();
     } catch (error) {
       console.error('toggleBookmark error', error);
       if (effectiveTodoUserId) {
@@ -154,7 +172,7 @@ export function useChatMessageActions({
         writeStoredBookmarks(effectiveTodoUserId, nextBookmarkIds);
       }
     }
-  }, [bookmarkedIds, effectiveTodoUserId, fetchData, selectedRoomId, setBookmarkedIds]);
+  }, [bookmarkedIds, effectiveTodoUserId, refreshVisibleMessageBookmarks, selectedRoomId, setBookmarkedIds]);
 
   const markMessageRead = useCallback(async (message: ChatMessage) => {
     if (String(message.sender_id) === actorId) return;
@@ -168,11 +186,11 @@ export function useChatMessageActions({
       if (cursorWriteOk) {
         broadcastChatSync('message-read', message.room_id);
       }
-      await fetchData();
+      await refreshReadCursorsForRoom?.(message.room_id);
     } catch {
       // 읽음 처리는 UX 우선이므로 실패해도 조용히 넘긴다.
     }
-  }, [actorId, broadcastChatSync, chatRoomsRef, fetchData, persistRoomReadCursors]);
+  }, [actorId, broadcastChatSync, chatRoomsRef, persistRoomReadCursors, refreshReadCursorsForRoom]);
 
   const deleteMessage = useCallback(async (message: ChatMessage) => {
     if (selectedRoom?.id === NOTICE_ROOM_ID && !isMso) {
@@ -180,7 +198,13 @@ export function useChatMessageActions({
       return;
     }
     if (String(message.sender_id) !== String(actorId) && !isMso) return;
-    if (!confirm('이 메시지를 삭제하시겠습니까?')) return;
+    const confirmed = await openConfirm({
+      title: '메시지 삭제',
+      description: '이 메시지를 삭제합니다.',
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
 
     let nextMessagesSnapshot: ChatMessage[] = [];
     setMessages((prev) => {
@@ -219,10 +243,10 @@ export function useChatMessageActions({
     } catch {
       // 감사로그 실패는 사용자 흐름을 막지 않는다.
     }
-    await fetchData();
-  }, [actorId, auditUserId, auditUserName, fetchData, isMso, selectedRoom?.id, selectedRoomId, setMessages, setPersistedPinnedMessages, syncRoomSummaryFromMessages]);
+  }, [actorId, auditUserId, auditUserName, isMso, openConfirm, selectedRoom?.id, selectedRoomId, setMessages, setPersistedPinnedMessages, syncRoomSummaryFromMessages]);
 
   return {
+    dialog,
     toggleReaction,
     togglePin,
     toggleBookmark,

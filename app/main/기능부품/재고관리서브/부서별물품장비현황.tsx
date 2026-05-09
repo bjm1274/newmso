@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
@@ -7,6 +8,7 @@ import { getRecommendedOrderQuantity, getItemQuantity, requestInventoryReorder }
 // ESLint 규칙에 맞게 컴포넌트 이름을 영문 대문자로 시작하게 변경합니다.
 // default export 이므로 외부에서의 import 이름(부서별물품장비현황)은 그대로 유지됩니다.
 export default function DepartmentAssetOverview({ user, inventory: inventoryProp }: { user: any; inventory?: any[] }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [assetLoans, setAssetLoans] = useState<any[]>([]);
   const [inventoryFetched, setInventoryFetched] = useState<any[]>([]);
   const [transferHistory, setTransferHistory] = useState<any[]>([]);
@@ -82,9 +84,13 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
 
   const handleQuickReorder = async (item: any) => {
     const orderQty = getRecommendedOrderQuantity(item);
-    if (!confirm(`${item.name || item.item_name} ${orderQty}개를 자동 발주 신청하시겠습니까?`)) {
-      return;
-    }
+    const confirmed = await openConfirm({
+      title: '부서 재고 발주 신청',
+      description: `${item.name || item.item_name} ${orderQty}개를 자동 발주 신청합니다.\n부서 보유 현황 기준으로 결재 요청이 생성됩니다.`,
+      confirmText: '발주 신청',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
 
     setOrderingItemId(String(item.id));
     try {
@@ -105,6 +111,7 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
 
   return (
     <div className="space-y-4">
+      {dialog}
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-base font-bold text-[var(--foreground)]">부서별 물품·장비 현황</h2>
         {departments.length > 0 && (

@@ -3,36 +3,56 @@ import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function AttendanceDeductionRules({ selectedCo = '전체' }: Record<string, unknown>) {
+type AttendanceDeductionRulesProps = {
+  selectedCo?: string;
+  compact?: boolean;
+  disabled?: boolean;
+};
+
+export default function AttendanceDeductionRules({
+  selectedCo = '전체',
+  compact = false,
+  disabled = false,
+}: AttendanceDeductionRulesProps) {
   const [rules, setRules] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const companyName = String(selectedCo || '').trim();
 
   const fetchRules = useCallback(async () => {
+    if (!companyName || disabled) {
+      setRules(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const { data } = await supabase
       .from('attendance_deduction_rules')
       .select('*')
-      .eq('company_name', selectedCo)
+      .eq('company_name', companyName)
       .maybeSingle();
-    if (data) setRules(data);
+    if (data) setRules({ ...data, company_name: companyName });
     else {
       const { data: all } = await supabase.from('attendance_deduction_rules').select('*').eq('company_name', '전체').maybeSingle();
-      setRules(all || { company_name: selectedCo, late_deduction_type: 'fixed', late_deduction_amount: 10000, early_leave_deduction_type: 'fixed', early_leave_deduction_amount: 10000 });
+      setRules({
+        ...(all || { late_deduction_type: 'fixed', late_deduction_amount: 10000, early_leave_deduction_type: 'fixed', early_leave_deduction_amount: 10000 }),
+        company_name: companyName,
+      });
     }
     setLoading(false);
-  }, [selectedCo]);
+  }, [companyName, disabled]);
 
   useEffect(() => {
     fetchRules();
   }, [fetchRules]);
 
   const handleSave = async () => {
+    if (disabled || !companyName) return toast('회사명을 먼저 입력해 주세요.', 'warning');
     if (!rules) return;
     setSaving(true);
     try {
       await supabase.from('attendance_deduction_rules').upsert({
-        company_name: rules.company_name || selectedCo,
+        company_name: companyName,
         late_deduction_type: rules.late_deduction_type,
         late_deduction_amount: rules.late_deduction_amount || 0,
         early_leave_deduction_type: rules.early_leave_deduction_type,
@@ -47,10 +67,19 @@ export default function AttendanceDeductionRules({ selectedCo = '전체' }: Reco
     setSaving(false);
   };
 
+  if (disabled || !companyName) {
+    return (
+      <div className={`${compact ? '' : 'max-w-2xl'} rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm opacity-70`}>
+        <h3 className="text-base font-bold text-[var(--foreground)]">근태 차감 규칙 설정</h3>
+        <p className="mt-2 text-xs font-semibold text-[var(--toss-gray-3)]">회사명을 입력하면 근태 규칙을 설정할 수 있습니다.</p>
+      </div>
+    );
+  }
+
   if (loading || !rules) return <div className="p-5">로딩 중...</div>;
 
   return (
-    <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 shadow-sm max-w-2xl">
+    <div className={`bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 shadow-sm ${compact ? '' : 'max-w-2xl'}`}>
       <h3 className="text-base font-bold text-[var(--foreground)] mb-2">근태 차감 규칙 설정</h3>
 
       <div className="space-y-4">

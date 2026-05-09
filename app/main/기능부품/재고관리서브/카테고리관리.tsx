@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -59,6 +60,7 @@ function CategoryNode({ cat, onEdit, onDelete, onAdd, depth = 0 }: {
 }
 
 export default function CategoryManager({ user }: { user: any }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [categories, setCategories] = useState<Category[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -87,12 +89,19 @@ export default function CategoryManager({ user }: { user: any }) {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('카테고리를 삭제하시겠습니까? 하위 카테고리도 삭제됩니다.')) return;
     const toDelete = [id];
     const findChildren = (pid: string) => {
       categories.filter(c => c.parent_id === pid).forEach(c => { toDelete.push(c.id); findChildren(c.id); });
     };
     findChildren(id);
+    const target = categories.find((category) => category.id === id);
+    const confirmed = await openConfirm({
+      title: '카테고리 삭제',
+      description: `${target?.name ?? '선택한 카테고리'}를 삭제합니다.\n하위 카테고리 ${Math.max(toDelete.length - 1, 0)}개도 함께 삭제됩니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     await supabase.from('inventory_categories').delete().in('id', toDelete);
     fetchCategories();
   };
@@ -118,7 +127,13 @@ export default function CategoryManager({ user }: { user: any }) {
     const existing = categories.map(c => c.name);
     const newCats = cats.filter(c => !existing.includes(c));
     if (newCats.length === 0) return toast('새로 추가할 카테고리가 없습니다.');
-    if (!confirm(`재고 데이터에서 ${newCats.length}개 카테고리를 가져오시겠습니까?\n${newCats.slice(0, 5).join(', ')}${newCats.length > 5 ? ' ...' : ''}`)) return;
+    const confirmed = await openConfirm({
+      title: '재고 카테고리 가져오기',
+      description: `재고 데이터에서 ${newCats.length}개 카테고리를 기준정보로 추가합니다.\n${newCats.slice(0, 5).join(', ')}${newCats.length > 5 ? ' ...' : ''}`,
+      confirmText: '가져오기',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
     await supabase.from('inventory_categories').insert(newCats.map((name, i) => ({ name, parent_id: null, color: CAT_COLORS[i % CAT_COLORS.length] })));
     fetchCategories();
     toast(`${newCats.length}개 카테고리가 추가되었습니다.`);
@@ -126,6 +141,7 @@ export default function CategoryManager({ user }: { user: any }) {
 
   return (
     <div className="p-4 md:p-5 space-y-5" data-testid="inventory-category-manager-view">
+      {dialog}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-[var(--foreground)]">재고 카테고리 트리 관리</h2>

@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -10,6 +11,7 @@ const EMPTY_FORM = {
 };
 
 export default function SupplierManagement({ user }: { user: any }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -58,7 +60,13 @@ export default function SupplierManagement({ user }: { user: any }) {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`[${name}] 거래처를 삭제하시겠습니까?`)) return;
+    const confirmed = await openConfirm({
+      title: '거래처 삭제',
+      description: `[${name}] 거래처를 삭제합니다.\n계약 기간, 연락처, 공급사 기준정보에서 제거됩니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     await supabase.from('suppliers').delete().eq('id', id);
     fetchSuppliers();
   };
@@ -92,6 +100,7 @@ export default function SupplierManagement({ user }: { user: any }) {
 
   return (
     <div className="space-y-4" data-testid="supplier-management-view">
+      {dialog}
       {/* 헤더 */}
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         <div className="flex gap-3 items-center">

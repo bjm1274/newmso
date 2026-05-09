@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -34,6 +35,7 @@ interface DocumentScannerProps {
 }
 
 export default function DocumentScanner({ user, staffs, selectedCo = '전체' }: DocumentScannerProps) {
+    const { dialog, openConfirm } = useActionDialog();
     const _staffs = (staffs ?? []) as Record<string, unknown>[];
     const filteredStaffs = _staffs.filter((s: any) => selectedCo === '전체' || s.company === selectedCo);
     const [activeTab, setActiveTab] = useState<'내제출' | '관리자현황'>('내제출');
@@ -139,6 +141,7 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
 
     return (
         <div className="space-y-4 animate-in fade-in duration-500">
+            {dialog}
             <div className="flex justify-between items-end border-b border-[var(--border)] pb-3">
                 <div>
                     <h2 className="text-base font-bold text-[var(--foreground)] tracking-tight">스마트 서류 제출</h2>
@@ -244,7 +247,7 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
                         </div>
                         <div className="flex gap-2">
                             <button
-                                onClick={() => {
+                                onClick={async () => {
                                     const lazyStaff = filteredStaffs.filter((s: any) => {
                                         const joinDate = new Date(s.join_date);
                                         const weekAgo = new Date();
@@ -253,9 +256,14 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
                                         return joinDate < weekAgo && staffDocs.length < REQUIRED_DOCS.length;
                                     });
                                     if (lazyStaff.length === 0) return toast("독촉 대상자가 없습니다.");
-                                    if (confirm(`${lazyStaff.length}명의 미제출자에게 독촉 알림을 발송할까요?`)) {
-                                        toast("독촉 알림이 전송되었습니다.", 'success');
-                                    }
+                                    const confirmed = await openConfirm({
+                                        title: '미제출자 일괄 독촉',
+                                        description: `${lazyStaff.length}명의 미제출자에게 독촉 알림을 발송합니다.\n입사 후 7일이 지나고 필수 서류가 부족한 직원만 대상입니다.`,
+                                        confirmText: '발송',
+                                        tone: 'accent',
+                                    });
+                                    if (!confirmed) return;
+                                    toast("독촉 알림이 전송되었습니다.", 'success');
                                 }}
                                 className="px-4 py-2 bg-rose-500 text-white text-[11px] font-bold rounded-lg hover:scale-105 transition-transform shadow-sm flex items-center gap-1"
                             >

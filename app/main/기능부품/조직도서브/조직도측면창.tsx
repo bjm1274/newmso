@@ -51,7 +51,7 @@ export const SUB_MENUS: Record<string, SubMenuItem[]> = {
   게시판: [
     { id: '공지사항', label: '공지사항', icon: 'bell' },
     { id: '자유게시판', label: '자유게시판', icon: 'document' },
-    { id: '경조사', label: '경조사', icon: 'tag' },
+    { id: '경조사', label: '경조사 소식', icon: 'tag' },
     { id: '수술일정', label: '수술일정', icon: 'calendar' },
     { id: 'MRI일정', label: 'MRI일정', icon: 'scan' },
     { id: '업무가이드', label: '업무공유', icon: 'folder' },
@@ -948,6 +948,7 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
                 onClick={() => handleMenuClick(menu.id)}
                 onMouseEnter={() => prefetchMenuModule(menu.id)}
                 onFocus={() => prefetchMenuModule(menu.id)}
+                aria-current={isActive ? 'page' : undefined}
                 className={`app-shell-menu-item relative flex min-h-[58px] w-14 flex-col items-center justify-center px-1.5 py-2 ${
                   isActive ? 'is-active' : ''
                 }`}
@@ -998,7 +999,8 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
                   type="button"
                   data-testid={`${menu.testId}-mobile`}
                   onClick={() => handleMenuClick(menu.id)}
-                  className={`flex min-h-[56px] flex-1 touch-manipulation flex-col items-center justify-center rounded-[var(--radius-md)] px-1 py-1.5 transition-all duration-150 ${
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`flex min-h-[56px] min-w-[64px] flex-none touch-manipulation flex-col items-center justify-center rounded-[var(--radius-md)] px-1 py-1.5 transition-all duration-150 ${
                     isActive ? 'text-[var(--accent)]' : 'text-[var(--toss-gray-3)]'
                   }`}
                 >

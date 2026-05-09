@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -504,6 +505,7 @@ function DesignFieldRow({
 }
 
 export default function PayrollSlipDesignManager() {
+  const { dialog, openConfirm } = useActionDialog();
   const [store, setStore] = useState<DocumentDesignStore | null>(null);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [selectedType, setSelectedType] = useState<DocumentDesignType>('payroll_slip');
@@ -623,14 +625,14 @@ export default function PayrollSlipDesignManager() {
     }
   };
 
-  const handleResetScope = () => {
-    if (
-      !confirm(
-        `${selectedScopeLabel}의 ${selectedDocument.label} 수정값을 모두 지우고 기준 디자인으로 되돌릴까요?`,
-      )
-    ) {
-      return;
-    }
+  const handleResetScope = async () => {
+    const confirmed = await openConfirm({
+      title: '문서 디자인 초기화',
+      description: `${selectedScopeLabel}의 ${selectedDocument.label} 수정값을 모두 지우고 기준 디자인으로 되돌립니다.`,
+      confirmText: '초기화',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
 
     setStore(
       resetDocumentDesignScope(
@@ -643,6 +645,7 @@ export default function PayrollSlipDesignManager() {
 
   return (
     <div className="space-y-4">
+      {dialog}
       <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div>

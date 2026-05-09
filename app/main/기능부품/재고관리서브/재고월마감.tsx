@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { EmptyState, LoadingPanel, StatePanel } from '@/app/components/StatePanel';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { formatWon } from '@/lib/date-formatter';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
@@ -182,6 +184,7 @@ export default function InventoryClosingManagement({
   selectedCo: string;
   inventory: InventoryRow[];
 }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [closingMonth, setClosingMonth] = useState(currentMonthInput());
   const [snapshots, setSnapshots] = useState<ClosingSnapshot[]>([]);
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null);
@@ -240,7 +243,13 @@ export default function InventoryClosingManagement({
       toast('마감할 재고 데이터가 없습니다.', 'warning');
       return;
     }
-    if (!confirm(`${normalizedMonth} 재고 월마감 스냅샷을 생성하시겠습니까?\n생성 후에도 별도 버전으로 보관됩니다.`)) return;
+    const confirmed = await openConfirm({
+      title: '재고 월마감 스냅샷 생성',
+      description: `${normalizedMonth} 재고 월마감 스냅샷을 생성합니다.\n생성 후에도 별도 버전으로 보관됩니다.`,
+      confirmText: '스냅샷 생성',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
 
     setSaving(true);
     try {
@@ -286,6 +295,7 @@ export default function InventoryClosingManagement({
 
   return (
     <div className="space-y-4 p-4" data-testid="inventory-closing-view">
+      {dialog}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-base font-black text-[var(--foreground)]">재고 월마감</h2>
@@ -309,9 +319,13 @@ export default function InventoryClosingManagement({
       </div>
 
       {unavailable && (
-        <div className="rounded-[var(--radius-md)] border border-orange-200 bg-orange-50 p-3 text-xs font-bold text-orange-700">
-          재고 월마감 저장소가 준비되지 않았습니다.
-        </div>
+        <StatePanel
+          title="재고 월마감 저장소가 준비되지 않았습니다"
+          description="마이그레이션 적용 여부를 확인한 뒤 다시 시도해 주세요."
+          tone="warning"
+          eyebrow="저장소 확인"
+          compact
+        />
       )}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -330,9 +344,13 @@ export default function InventoryClosingManagement({
             </span>
           </div>
           {loading ? (
-            <EmptyState text="마감 이력을 불러오는 중..." />
+            <LoadingPanel title="마감 이력을 불러오는 중입니다" />
           ) : snapshots.length === 0 ? (
-            <EmptyState text="아직 생성된 월마감이 없습니다." />
+            <EmptyState
+              title="아직 생성된 월마감이 없습니다"
+              description="현재 재고를 기준으로 첫 월마감 스냅샷을 생성해 보세요."
+              compact
+            />
           ) : (
             <div className="space-y-2">
               {snapshots.map((snapshot) => (
@@ -366,7 +384,11 @@ export default function InventoryClosingManagement({
 
         <section className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
           {!selectedSnapshot ? (
-            <EmptyState text="왼쪽에서 월마감 스냅샷을 선택해 주세요." />
+            <EmptyState
+              title="월마감 스냅샷을 선택해 주세요"
+              description="왼쪽 마감 이력에서 스냅샷을 선택하면 상세 품목과 평가액을 확인할 수 있습니다."
+              compact
+            />
           ) : (
             <div className="space-y-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -437,7 +459,6 @@ export default function InventoryClosingManagement({
     </div>
   );
 }
-
 function MetricCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-3 text-center">
@@ -445,8 +466,4 @@ function MetricCard({ label, value, color }: { label: string; value: string; col
       <p className="mt-0.5 text-[9px] font-bold text-[var(--toss-gray-3)]">{label}</p>
     </div>
   );
-}
-
-function EmptyState({ text: label }: { text: string }) {
-  return <div className="py-8 text-center text-xs font-bold text-[var(--toss-gray-3)]">{label}</div>;
 }

@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -19,6 +20,7 @@ function autoClassify(merchant: string): string {
 }
 
 export default function CorporateCardTransactions({ staffs = [] }: Record<string, unknown>) {
+  const { dialog, openConfirm } = useActionDialog();
   const [activeTab, setActiveTab] = useState<'cards' | 'transactions'>('transactions');
   const [selectedCo, setSelectedCo] = useState('전체');
   const [cards, setCards] = useState<any[]>([]);
@@ -125,7 +127,14 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
   };
 
   const handleDeleteCard = async (id: string) => {
-    if (!confirm('카드를 비활성화하시겠습니까?')) return;
+    const target = cards.find((card) => card.id === id);
+    const confirmed = await openConfirm({
+      title: '법인카드 비활성화',
+      description: `${target?.card_name || target?.card_number || '선택한 카드'}를 비활성화합니다.\n거래 내역 조회는 유지되지만 신규 사용 카드 목록에서는 제외됩니다.`,
+      confirmText: '비활성화',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     const { error } = await supabase.from('corporate_cards').update({ status: 'inactive' }).eq('id', id);
     if (error) {
       toast('카드 비활성화에 실패했습니다.', 'error');
@@ -206,7 +215,13 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
   const handleBulkAutoClassify = async () => {
     const unclassified = list.filter((r: Record<string, unknown>) => r.category === '기타' && r.merchant);
     if (unclassified.length === 0) return toast('자동 분류할 항목이 없습니다. (이미 분류됨)', 'warning');
-    if (!confirm(`${unclassified.length}건을 자동 분류하시겠습니까?`)) return;
+    const confirmed = await openConfirm({
+      title: '법인카드 내역 자동 분류',
+      description: `${unclassified.length}건을 가맹점 키워드 기준으로 자동 분류합니다.`,
+      confirmText: '자동 분류',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
     let updated = 0;
     let failed = 0;
     for (const r of unclassified) {
@@ -227,6 +242,7 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
 
   return (
     <div className="bg-[var(--card)] p-4 md:p-5 rounded-2xl border border-[var(--border)] shadow-sm">
+      {dialog}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-5">
         <div>
           <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">법인카드 관리</h3>

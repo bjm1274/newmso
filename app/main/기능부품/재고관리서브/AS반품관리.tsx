@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 
@@ -86,6 +87,7 @@ const DEFAULT_RETURN_FORM = {
 };
 
 export default function ASReturnManagement({ user }: { user: any }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [activeTab, setActiveTab] = useState<ActiveTab>('as');
   const [asRecords, setAsRecords] = useState<AsRecord[]>([]);
   const [returnRecords, setReturnRecords] = useState<ReturnRecord[]>([]);
@@ -257,7 +259,14 @@ export default function ASReturnManagement({ user }: { user: any }) {
 
   // AS 삭제
   const deleteAsRecord = async (id: string) => {
-    if (!confirm('이 AS 접수 내역을 삭제하시겠습니까?')) return;
+    const target = asRecords.find((record) => record.id === id);
+    const confirmed = await openConfirm({
+      title: 'AS 접수 내역 삭제',
+      description: `${target?.device_name || '선택한 AS 접수'} 내역을 삭제합니다.\n처리 이력 목록에서도 더 이상 보이지 않습니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     try {
       const { supabase } = await import('@/lib/supabase');
       const { error } = await supabase.from('as_repair_records').delete().eq('id', id);
@@ -271,7 +280,14 @@ export default function ASReturnManagement({ user }: { user: any }) {
 
   // 반품 삭제
   const deleteReturnRecord = async (id: string) => {
-    if (!confirm('이 반품 내역을 삭제하시겠습니까?')) return;
+    const target = returnRecords.find((record) => record.id === id);
+    const confirmed = await openConfirm({
+      title: '반품 내역 삭제',
+      description: `${target?.item_name || '선택한 반품'} 내역을 삭제합니다.\n승인 및 완료 이력에서 제거됩니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     try {
       const { supabase } = await import('@/lib/supabase');
       const { error } = await supabase.from('return_records').delete().eq('id', id);
@@ -356,6 +372,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
 
   return (
     <div className="space-y-4" data-testid="as-return-management-view">
+      {dialog}
       {/* 요약 카드 */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <div className="bg-[var(--card)] p-3 rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm text-center">

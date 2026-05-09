@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -22,6 +23,7 @@ const FILTER_OPTIONS = ['전체', '30일이내', '7일이내', '소멸'] as cons
 type FilterType = (typeof FILTER_OPTIONS)[number];
 
 export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
+  const { dialog, openConfirm } = useActionDialog();
   const [leaveData, setLeaveData] = useState<LeaveInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<FilterType>('전체');
@@ -89,7 +91,13 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
     });
 
   const handleSendAlert = async (info: LeaveInfo) => {
-    if (!confirm(`${info.staff.name}님에게 연차 소멸 예정 알림을 보낼까요?`)) return;
+    const confirmed = await openConfirm({
+      title: '연차 소멸 예정 알림',
+      description: `${info.staff.name}님에게 연차 소멸 예정 알림을 발송합니다.\n남은 연차 ${info.remaining}일 기준으로 안내됩니다.`,
+      confirmText: '발송',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
     setSendingId(String(info.staff.id));
 
     try {
@@ -120,6 +128,7 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
 
   return (
     <div className="mx-auto max-w-4xl space-y-5 p-4 md:p-4" data-testid="attendance-analysis-leave-expiry">
+      {dialog}
       <div>
         <h2 className="text-base font-bold text-[var(--foreground)]">연차 소멸 예정 알림</h2>
       </div>

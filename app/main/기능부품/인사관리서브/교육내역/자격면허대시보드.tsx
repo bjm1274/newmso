@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
 
@@ -61,6 +62,7 @@ function getLicenseStatus(expiryDate?: string | null) {
 }
 
 export default function LicenseTracking({ staffs, selectedCo }: Record<string, unknown>) {
+  const { dialog, openConfirm } = useActionDialog();
   const [searchTerm, setSearchTerm] = useState('');
   const [licenses, setLicenses] = useState<any[]>([]);
   const [usingFallbackData, setUsingFallbackData] = useState(false);
@@ -181,7 +183,13 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
   };
 
   const handleSendNotification = async (item: LicenseItem) => {
-    if (!confirm(`${item.staff?.name}님에게 ${item.license_name as string} 갱신 알림을 보낼까요?`)) return;
+    const confirmed = await openConfirm({
+      title: '면허 갱신 알림',
+      description: `${item.staff?.name || '대상자'}님에게 ${item.license_name as string} 갱신 알림을 발송합니다.`,
+      confirmText: '발송',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
 
     const daysLeft = item.daysLeft ?? null;
     const expireMessage = item.expiry_date
@@ -209,6 +217,7 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
 
   return (
     <div className="space-y-4 animate-in slide-in-from-bottom-5">
+      {dialog}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h3 className="text-sm font-black text-[var(--foreground)]">자격 및 면허 갱신 대상 트래커</h3>

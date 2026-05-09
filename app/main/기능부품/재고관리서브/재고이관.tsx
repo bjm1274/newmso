@@ -11,6 +11,7 @@ import {
   validateInventoryQuantity,
   validateInventoryTransfer,
 } from '@/app/main/inventory-utils';
+import { InventorySummaryStrip, InventoryStepSummary } from './InventoryDesignPanels';
 
 const EMPTY_TRANSFER_FORM = {
   item_id: '',
@@ -436,6 +437,23 @@ export default function InventoryTransfer({
           + 새 이관 요청
         </button>
       </div>
+
+      <InventorySummaryStrip
+        items={[
+          { label: '선택 품목', value: selectedItem ? getItemName(selectedItem) : '미선택', detail: selectedItem ? `${sourceCompany || '회사 미지정'} ${sourceDept || ''}` : '이관할 품목을 먼저 선택합니다.', tone: selectedItem ? 'info' : 'default' },
+          { label: '이관 수량', value: requestedQuantity || '-', detail: selectedItem ? `현재고 ${maxQty.toLocaleString('ko-KR')}` : '선택 후 수량 제한이 적용됩니다.', tone: quantityValidation.error ? 'danger' : requestedQuantity > 0 ? 'success' : 'default' },
+          { label: '출발지 결과', value: selectedItem ? `${maxQty} -> ${sourceNextQty}` : '-', detail: '실행 시 출발지 재고가 차감됩니다.', tone: selectedItem ? 'warning' : 'default' },
+          { label: '목적지 결과', value: form.to_company ? `${destinationPrevQty} -> ${destinationNextQty}` : '-', detail: destinationItem ? '기존 목적지 품목에 합산' : '없으면 새 품목 카드 생성', tone: form.to_company ? 'success' : 'default' },
+        ]}
+      />
+
+      <InventoryStepSummary
+        steps={[
+          { label: '품목 선택', detail: selectedItem ? getItemName(selectedItem) : '이관할 재고를 선택합니다.', state: selectedItem ? 'done' : 'active' },
+          { label: '목적지 입력', detail: form.to_company ? `${form.to_company}${form.to_dept ? ` / ${form.to_dept}` : ''}` : '이관 받을 회사와 부서를 지정합니다.', state: form.to_company ? 'done' : 'pending' },
+          { label: '변경 결과 확인', detail: validationMessage || '출발지 차감과 목적지 증가를 확인한 뒤 실행합니다.', state: validationMessage ? 'warning' : selectedItem && form.to_company ? 'active' : 'pending' },
+        ]}
+      />
 
       <div className="flex gap-1 bg-[var(--muted)] rounded-[var(--radius-md)] p-1 w-fit">
         {[{ key: 'request', label: '이관 신청' }, { key: 'history', label: '이관 이력' }].map((tab) => (

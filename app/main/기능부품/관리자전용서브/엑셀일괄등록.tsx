@@ -1,15 +1,18 @@
 'use client';
 
-import { type ChangeEvent, useEffect, useRef, useState } from 'react';
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 // XLSX: dynamic import로 전환 (번들 사이즈 최적화)
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { toast } from '@/lib/toast';
 
-type UploadMode = 'staff' | 'inventory' | 'inventory_ecount';
+type UploadMode = 'inventory' | 'inventory_ecount';
 
 type ExcelBulkUploadProps = {
   onRefresh?: () => void;
+  allowedModes?: UploadMode[];
+  initialMode?: UploadMode;
+  title?: string;
 };
 
 type ExcelRow = Record<string, unknown>;
@@ -56,16 +59,6 @@ type EcountInventoryRow = {
   usage: string;
 };
 
-const STAFF_FIELD_ALIASES = {
-  employeeNo: ['사번', '직원번호', 'employee_no', 'employee no', 'employeeno'],
-  name: ['이름', '성명', 'name'],
-  company: ['회사', '회사명', 'company'],
-  department: ['부서', 'department'],
-  position: ['직급', '직책', 'position'],
-  baseSalary: ['기본급', '연봉', 'base_salary', 'basesalary'],
-  joinDate: ['입사일', 'join_date', 'joindate', 'hire_date', 'hiredate'],
-} as const;
-
 const INVENTORY_FIELD_ALIASES = {
   itemName: ['품목명', '제품명', 'item_name', 'itemname', 'name'],
   quantity: ['수량', '재고', '재고수량', 'quantity', 'qty', 'stock'],
@@ -78,6 +71,25 @@ const INVENTORY_FIELD_ALIASES = {
   supplierName: ['공급처명', '공급처', 'supplier_name', 'suppliername', 'supplier'],
   insuranceCode: ['요양급여코드', '보험코드', 'insurance_code', 'insurancecode'],
 } as const;
+
+const DEFAULT_UPLOAD_MODES: UploadMode[] = ['inventory', 'inventory_ecount'];
+
+const UPLOAD_MODE_LABELS: Record<UploadMode, string> = {
+  inventory: '재고',
+  inventory_ecount: '이카운트 품목표',
+};
+
+function normalizeAllowedModes(allowedModes?: UploadMode[]) {
+  const uniqueModes = [...new Set((allowedModes || DEFAULT_UPLOAD_MODES).filter((mode) =>
+    DEFAULT_UPLOAD_MODES.includes(mode)
+  ))];
+  return uniqueModes.length > 0 ? uniqueModes : DEFAULT_UPLOAD_MODES;
+}
+
+function resolveInitialMode(allowedModes?: UploadMode[], initialMode?: UploadMode) {
+  const modes = normalizeAllowedModes(allowedModes);
+  return initialMode && modes.includes(initialMode) ? initialMode : modes[0];
+}
 
 const ECOUNT_FIELD_ALIASES = {
   itemCode: ['품목코드', 'itemcode'],
@@ -259,11 +271,9 @@ function detectCompanyName(sheetRows: unknown[][]) {
 
 function detectHeaderRowIndex(sheetRows: unknown[][], mode: UploadMode) {
   const targetAliases =
-    mode === 'staff'
-      ? [...STAFF_FIELD_ALIASES.employeeNo, ...STAFF_FIELD_ALIASES.name]
-      : mode === 'inventory'
-        ? [...INVENTORY_FIELD_ALIASES.itemName, ...INVENTORY_FIELD_ALIASES.quantity]
-        : [...ECOUNT_FIELD_ALIASES.itemCode, ...ECOUNT_FIELD_ALIASES.itemName, ...ECOUNT_FIELD_ALIASES.unit];
+    mode === 'inventory'
+      ? [...INVENTORY_FIELD_ALIASES.itemName, ...INVENTORY_FIELD_ALIASES.quantity]
+      : [...ECOUNT_FIELD_ALIASES.itemCode, ...ECOUNT_FIELD_ALIASES.itemName, ...ECOUNT_FIELD_ALIASES.unit];
 
   const targetKeys = new Set(targetAliases.map((alias) => normalizeHeaderKey(alias)));
   let bestIndex = 0;
@@ -403,18 +413,6 @@ function inferEcountCategory(row: EcountInventoryRow) {
   return '소모품';
 }
 
-function mapStaffRow(row: ExcelRow) {
-  return {
-    employee_no: normalizeText(findCellValue(row, STAFF_FIELD_ALIASES.employeeNo)),
-    name: normalizeText(findCellValue(row, STAFF_FIELD_ALIASES.name)),
-    company: normalizeText(findCellValue(row, STAFF_FIELD_ALIASES.company)),
-    department: normalizeText(findCellValue(row, STAFF_FIELD_ALIASES.department)),
-    position: normalizeText(findCellValue(row, STAFF_FIELD_ALIASES.position)),
-    base_salary: parseIntegerValue(findCellValue(row, STAFF_FIELD_ALIASES.baseSalary)),
-    join_date: normalizeText(findCellValue(row, STAFF_FIELD_ALIASES.joinDate)) || null,
-  };
-}
-
 function mapInventoryRow(row: ExcelRow, defaultCompany: string, companyOptions: readonly string[] = []) {
   const resolvedCompany =
     resolveKnownCompanyName(findCellValue(row, INVENTORY_FIELD_ALIASES.company), companyOptions) ||
@@ -536,9 +534,15 @@ function buildEcountPayloadDedupeKey(
   ].join(':');
 }
 
-export default function ExcelBulkUpload({ onRefresh }: ExcelBulkUploadProps) {
+export default function ExcelBulkUpload({
+  onRefresh,
+  allowedModes,
+  initialMode,
+  title = '데이터 엑셀 등록',
+}: ExcelBulkUploadProps) {
+  const availableModes = useMemo(() => normalizeAllowedModes(allowedModes), [allowedModes]);
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<UploadMode>('staff');
+  const [mode, setMode] = useState<UploadMode>(() => resolveInitialMode(allowedModes, initialMode));
   const [preview, setPreview] = useState<Record<string, unknown>[]>([]);
   const [defaultCompany, setDefaultCompany] = useState('SY INC.');
   const [defaultDepartment, setDefaultDepartment] = useState('');
@@ -547,6 +551,12 @@ export default function ExcelBulkUpload({ onRefresh }: ExcelBulkUploadProps) {
   const [sheetCompanyName, setSheetCompanyName] = useState('');
   const [companyManuallySelected, setCompanyManuallySelected] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!availableModes.includes(mode)) {
+      setMode(availableModes[0]);
+    }
+  }, [availableModes, mode]);
 
   useEffect(() => {
     let active = true;
@@ -634,26 +644,7 @@ export default function ExcelBulkUpload({ onRefresh }: ExcelBulkUploadProps) {
         return;
       }
 
-      if (mode === 'staff') {
-        const payloads = parsedSheet.rows
-          .map(mapStaffRow)
-          .filter((row) => row.employee_no);
-
-        setPreview(payloads.slice(0, 10));
-
-        if (payloads.length === 0) {
-          toast('직원 엑셀에서 사번을 찾지 못했습니다.', 'warning');
-          return;
-        }
-
-        const { error } = await supabase.from('staff_members').upsert(payloads, {
-          onConflict: 'employee_no',
-        });
-
-        if (error) throw error;
-
-        toast(`직원 ${payloads.length}건 등록을 완료했습니다.`, 'success');
-      } else if (mode === 'inventory') {
+      if (mode === 'inventory') {
         const payloads = parsedSheet.rows
           .map((row) => mapInventoryRow(row, effectiveCompany, companyOptions))
           .filter((row) => row.item_name);
@@ -816,48 +807,26 @@ export default function ExcelBulkUpload({ onRefresh }: ExcelBulkUploadProps) {
 
   return (
     <div className="max-w-3xl rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-      <h3 className="mb-2 text-base font-bold text-[var(--foreground)]">엑셀 일괄 등록</h3>
-      <p className="mb-3 text-xs font-bold text-[var(--toss-gray-3)]">
-        엑셀 양식을 읽어 직원, 재고, 이카운트 품목표를 한 번에 반영합니다.
-      </p>
+      <h3 className="mb-3 text-base font-bold text-[var(--foreground)]">{title}</h3>
 
       <div className="mb-3 flex flex-wrap gap-2">
-        <button
-          type="button"
-          data-testid="excel-bulk-mode-staff"
-          onClick={() => setMode('staff')}
-          className={`rounded-[var(--radius-md)] px-4 py-2 text-xs font-bold ${
-            mode === 'staff'
-              ? 'bg-[var(--accent)] text-white'
-              : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
-          }`}
-        >
-          직원
-        </button>
-        <button
-          type="button"
-          data-testid="excel-bulk-mode-inventory"
-          onClick={() => setMode('inventory')}
-          className={`rounded-[var(--radius-md)] px-4 py-2 text-xs font-bold ${
-            mode === 'inventory'
-              ? 'bg-[var(--accent)] text-white'
-              : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
-          }`}
-        >
-          재고
-        </button>
-        <button
-          type="button"
-          data-testid="excel-bulk-mode-inventory-ecount"
-          onClick={() => setMode('inventory_ecount')}
-          className={`rounded-[var(--radius-md)] px-4 py-2 text-xs font-bold ${
-            mode === 'inventory_ecount'
-              ? 'bg-teal-600 text-white'
-              : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
-          }`}
-        >
-          이카운트 품목표
-        </button>
+        {availableModes.map((uploadMode) => (
+          <button
+            key={uploadMode}
+            type="button"
+            data-testid={`excel-bulk-mode-${uploadMode.replace('_', '-')}`}
+            onClick={() => setMode(uploadMode)}
+            className={`rounded-[var(--radius-md)] px-4 py-2 text-xs font-bold ${
+              mode === uploadMode
+                ? uploadMode === 'inventory_ecount'
+                  ? 'bg-teal-600 text-white'
+                  : 'bg-[var(--accent)] text-white'
+                : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
+            }`}
+          >
+            {UPLOAD_MODE_LABELS[uploadMode]}
+          </button>
+        ))}
       </div>
 
       {isEcount && (

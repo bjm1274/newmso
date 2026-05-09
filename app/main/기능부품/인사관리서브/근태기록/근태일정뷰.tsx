@@ -1,5 +1,7 @@
 ﻿'use client';
 
+import { toast } from '@/lib/toast';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import {
   getCompactShiftLabel,
   getShiftBandColorClass,
@@ -89,7 +91,11 @@ export default function AttendanceScheduleView({
   handleSubmitApproval,
   setShowShiftWizard,
 }: AttendanceScheduleViewProps) {
+  const { dialog, openConfirm, openPrompt } = useActionDialog();
+
   return (
+    <>
+    {dialog}
     <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] overflow-hidden shadow-sm flex flex-col min-h-[calc(100dvh-200px)]">
       <div className="p-4 border-b border-[var(--border)] bg-[var(--tab-bg)]/50 flex flex-col gap-3 shrink-0">
         <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
@@ -122,13 +128,28 @@ export default function AttendanceScheduleView({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     const standardShift = visibleWorkShifts.find((sh: any) => sh.name.includes('통상') || sh.name.includes('일반') || sh.name.includes('주간') || sh.name.includes('9to6'));
                     if (!standardShift) {
-                      alert('통상/일반/주간 이라는 이름이 포함된 근무형태가 부재합니다.');
+                      toast('통상/일반/주간 이라는 이름이 포함된 근무형태가 부재합니다.', 'warning');
                       return;
                     }
-                    if (!confirm('현재 화면의 모든 직원에 대해 평일(월~금)을 모두 통상근무로 채우시겠습니까?')) return;
+                    const weekdayCount = daysArray.filter((d) => {
+                      const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
+                      const dayOfWeek = new Date(dStr).getDay();
+                      return dayOfWeek !== 0 && dayOfWeek !== 6;
+                    }).length;
+                    const confirmed = await openConfirm({
+                      title: '통상근무를 일괄 적용할까요?',
+                      description: [
+                        `${selectedMonth} ${rosterTeam} 범위의 평일 근무를 "${standardShift.name}"으로 채웁니다.`,
+                        `대상: ${rosterFiltered.length}명 · ${weekdayCount}일 · 최대 ${rosterFiltered.length * weekdayCount}칸`,
+                        '이미 입력된 평일 배정도 덮어쓸 수 있습니다.',
+                      ].join('\n'),
+                      confirmText: '일괄 적용',
+                      tone: 'accent',
+                    });
+                    if (!confirmed) return;
                     rosterFiltered.forEach((s: LocalStaffMember) => {
                       daysArray.forEach((d) => {
                         const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
@@ -169,8 +190,18 @@ export default function AttendanceScheduleView({
                     승인
                   </button>
                   <button onClick={() => {
-                    const reason = prompt('반려 사유를 입력하세요:');
-                    if (reason) handleReject(req, reason);
+                    void (async () => {
+                      const reason = await openPrompt({
+                        title: '근무표를 반려할까요?',
+                        description: `${req.team_name || '전체'} · ${req.year_month} 근무표를 반려합니다. 사유는 요청자에게 전달됩니다.`,
+                        placeholder: '반려 사유를 입력하세요.',
+                        inputType: 'textarea',
+                        required: true,
+                        confirmText: '반려',
+                        tone: 'danger',
+                      });
+                      if (reason?.trim()) handleReject(req, reason.trim());
+                    })();
                   }} className="inline-flex items-center gap-1 rounded-[var(--radius-md)] bg-[var(--danger)] px-3 py-1.5 text-[11px] font-bold text-white transition-colors hover:opacity-90">
                     <LucideIcon name="X" size={13} strokeWidth={2.4} />
                     반려
@@ -197,8 +228,18 @@ export default function AttendanceScheduleView({
                 <div className="flex gap-2 shrink-0">
                   <button onClick={() => handleApproveSwap(req)} className="px-3 py-1.5 bg-[var(--success)] text-white text-[10px] font-bold rounded-lg hover:opacity-90">승인</button>
                   <button onClick={() => {
-                    const r = prompt('반려 사유:');
-                    if (r) handleRejectSwap(req, r);
+                    void (async () => {
+                      const reason = await openPrompt({
+                        title: '근무 교환 요청을 반려할까요?',
+                        description: `${req.requested_by_name || '요청자'}님의 ${req.work_date || '선택일'} 근무 교환 요청을 반려합니다.`,
+                        placeholder: '반려 사유를 입력하세요.',
+                        inputType: 'textarea',
+                        required: true,
+                        confirmText: '반려',
+                        tone: 'danger',
+                      });
+                      if (reason?.trim()) handleRejectSwap(req, reason.trim());
+                    })();
                   }} className="px-3 py-1.5 bg-rose-500 text-white text-[10px] font-bold rounded-lg hover:bg-rose-600">반려</button>
                 </div>
               </div>
@@ -385,7 +426,10 @@ export default function AttendanceScheduleView({
               <button
                 onClick={() => {
                   const reason = (document.getElementById('swapReason') as HTMLTextAreaElement).value;
-                  if (!reason) return alert('사유를 입력해주세요.');
+                  if (!reason) {
+                    toast('사유를 입력해주세요.', 'warning');
+                    return;
+                  }
                   handleSwapRequest(swapData.date, reason);
                 }}
                 className="w-full py-3 bg-[var(--success)] text-white font-bold text-sm rounded-[var(--radius-lg)] hover:opacity-90 shadow-md transition-all"
@@ -398,5 +442,6 @@ export default function AttendanceScheduleView({
         </div>
       )}
     </div>
+    </>
   );
 }

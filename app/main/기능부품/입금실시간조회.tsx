@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import {
   buildCompanyWebhookUrl,
   getDepositStatusLabel,
@@ -69,6 +70,7 @@ function createDraft(row: VirtualAccountDepositRow): DepositDraft {
 const TOSS_BANK_ACCOUNT = '1002-4939-3286';
 
 export default function RealtimeDepositView({ user }: { user?: any }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [activeTab, setActiveTab] = useState<'list' | 'manual' | 'guide'>('list');
   const [rows, setRows] = useState<VirtualAccountDepositRow[]>([]);
   const [drafts, setDrafts] = useState<Record<string, DepositDraft>>({});
@@ -236,7 +238,14 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
 
   // 수동 등록건 삭제
   const handleDeleteDeposit = async (id: string) => {
-    if (!confirm('이 입금 내역을 삭제하시겠습니까?')) return;
+    const target = rows.find((row) => String(row.id) === id);
+    const confirmed = await openConfirm({
+      title: '입금 내역 삭제',
+      description: `${target?.patient_name || '선택한 입금 내역'}을 삭제합니다.\n수동 등록 내역에서 제거됩니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     const res = await fetch(`/api/payments/virtual-account-deposits?id=${id}`, { method: 'DELETE' });
     if (res.ok) await loadDeposits({ silent: true });
   };
@@ -475,6 +484,7 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
 
   return (
     <div data-testid="realtime-deposit-view" className="space-y-4">
+      {dialog}
       {/* 헤더 */}
       <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

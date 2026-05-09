@@ -1,5 +1,6 @@
 'use client';
 import { toast } from '@/lib/toast';
+import { useActionDialog } from '@/app/components/useActionDialog';
 
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -24,6 +25,7 @@ type ScannedItem = {
 };
 
 export default function ScanModule({ user, inventory, fetchInventory }: ScanModuleProps) {
+  const { dialog, openConfirm } = useActionDialog();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [codeInput, setCodeInput] = useState('');
   const [scannedItems, setScannedItems] = useState<ScannedItem[]>([]);
@@ -121,7 +123,23 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
       return;
     }
 
-    if (!confirm(`총 ${scannedItems.length}개 품목의 입고를 확정할까요?`)) return;
+    const totalQuantity = scannedItems.reduce((sum, item) => sum + item.qty, 0);
+    const preview = scannedItems
+      .slice(0, 5)
+      .map((item) => `- ${item.item_name} ${item.qty}개`)
+      .join('\n');
+    const confirmed = await openConfirm({
+      title: '스캔 입고를 확정할까요?',
+      description: [
+        `대상 품목 ${scannedItems.length}개, 총 입고 수량 ${totalQuantity}개를 재고에 반영합니다.`,
+        preview,
+        scannedItems.length > 5 ? `외 ${scannedItems.length - 5}개 품목` : '',
+        '입고 이력이 함께 기록됩니다.',
+      ].filter(Boolean).join('\n'),
+      confirmText: '입고 확정',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
 
     setLoading(true);
     try {
@@ -169,6 +187,8 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
   };
 
   return (
+    <>
+    {dialog}
     <div className="space-y-4 animate-in fade-in duration-500">
       <div className="bg-[var(--card)] p-4 border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)]">
         <div className="mb-3">
@@ -286,6 +306,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
         </div>
       </div>
     </div>
+    </>
   );
 }
 

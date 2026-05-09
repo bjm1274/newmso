@@ -1,5 +1,6 @@
 'use client';
 import { toast } from '@/lib/toast';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
@@ -76,6 +77,7 @@ async function uploadSealImage(imageFile: File, fallbackPreview: string | null) 
 }
 
 export default function SealManager({ user, selectedCo }: Props) {
+  const { dialog, openConfirm } = useActionDialog();
   const [seals, setSeals] = useState<Seal[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -185,7 +187,17 @@ export default function SealManager({ user, selectedCo }: Props) {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('이 직인을 삭제하시겠습니까?')) return;
+    const targetSeal = seals.find((seal) => seal.id === id);
+    const confirmed = await openConfirm({
+      title: '직인 이미지를 삭제할까요?',
+      description: [
+        targetSeal ? `${targetSeal.company} · ${targetSeal.type} 직인을 삭제합니다.` : '선택한 직인을 삭제합니다.',
+        '삭제 후 새 결재 완료 문서에는 이 직인이 자동 삽입되지 않습니다.',
+      ].join('\n'),
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     try {
       const { error } = await supabase.from('company_seals').delete().eq('id', id);
       if (error) {
@@ -207,6 +219,7 @@ export default function SealManager({ user, selectedCo }: Props) {
 
   return (
     <div className="p-4 space-y-4 max-w-4xl mx-auto">
+      {dialog}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">법인 직인 이미지 관리</h2>

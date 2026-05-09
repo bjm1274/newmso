@@ -73,6 +73,7 @@ function normalizeDuplicateApprovalTitle(value: unknown) {
 type UseApprovalSubmitParams = {
   user: StaffMember | null;
   selectedCompanyId?: string | null;
+  selectedCompanyName?: string | null;
   formType: string;
   formTitle: string;
   formContent: string;
@@ -93,7 +94,7 @@ type UseApprovalSubmitParams = {
   onViewChange?: (view: string) => void;
   fetchApprovals: () => void | Promise<void>;
   onRefresh?: () => void;
-  openConfirm?: ConfirmApprovalSubmit;
+  openConfirm: ConfirmApprovalSubmit;
   resolveEffectiveApproverId: (approverId: string | null | undefined) => string | null;
   resolveApprovalLineIds: (item: ApprovalRecord) => string[];
   surgeryStockDepartmentAliases: string[];
@@ -102,6 +103,7 @@ type UseApprovalSubmitParams = {
 export function useApprovalSubmit({
   user,
   selectedCompanyId,
+  selectedCompanyName,
   formType,
   formTitle,
   formContent,
@@ -129,14 +131,7 @@ export function useApprovalSubmit({
 }: UseApprovalSubmitParams) {
   const isSubmittingRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const confirmApprovalSubmit =
-    openConfirm ??
-    ((options: Parameters<ConfirmApprovalSubmit>[0]) =>
-      Promise.resolve(
-        typeof window === 'undefined'
-          ? true
-          : window.confirm([options.title, options.description].filter(Boolean).join('\n\n')),
-      ));
+  const confirmApprovalSubmit = openConfirm;
 
   const buildApprovalHistoryEntry = useCallback((action: ApprovalHistoryEntry['action'], note?: string | null) => ({
     action,
@@ -632,11 +627,19 @@ export function useApprovalSubmit({
     const sourceDocNumber = String(
       composeSeedApproval?.doc_number || sourceApprovalMeta?.doc_number || ''
     ).trim() || null;
-    const companyId = user.company_id ?? selectedCompanyId ?? null;
+    const selectedCompanyLabel = String(selectedCompanyName || '').trim();
+    const userCompanyLabel = String(user.company || '').trim();
+    const companyName =
+      selectedCompanyLabel && selectedCompanyLabel !== '전체'
+        ? selectedCompanyLabel
+        : userCompanyLabel;
+    const companyId =
+      selectedCompanyId ??
+      (companyName && companyName === userCompanyLabel ? user.company_id ?? null : null);
     const { docNumber: structuredDocNumber, revision } = await createStructuredDocNumber({
       formSlug: resolvedFormSlug,
       typeName: resolvedFormName,
-      companyName: user.company || '',
+      companyName,
       companyId: companyId ? String(companyId) : null,
       sourceMetaData: sourceApprovalMeta,
       sourceDocNumber,
@@ -647,7 +650,7 @@ export function useApprovalSubmit({
     const row: ApprovalRecord = {
       sender_id: user.id,
       sender_name: user.name || '이름 없음',
-      sender_company: user.company || '',
+      sender_company: companyName,
       current_approver_id: initialApproverId,
       approver_line: approverLine.map((a) => a.id),
       type: formType,
@@ -740,6 +743,7 @@ export function useApprovalSubmit({
     resolveDefaultReferenceUsersForForm,
     resolveEffectiveApproverId,
     selectedCompanyId,
+    selectedCompanyName,
     setCcLine,
     setComposeSeedApproval,
     setViewMode,

@@ -1,6 +1,7 @@
 'use client';
 
 import { toast } from '@/lib/toast';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -49,6 +50,7 @@ const emptyForm = (): Report => ({
 });
 
 export default function IncidentReport({ staffs, selectedCo, user }: Props) {
+  const { dialog, openConfirm } = useActionDialog();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -169,9 +171,12 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
   const handleDelete = async (report: Report) => {
     if (!report.id) return;
 
-    const confirmed = window.confirm(
-      `${report.incident_date} 사고 보고서를 삭제할까요?\n삭제 후에는 복구할 수 없습니다.`
-    );
+    const confirmed = await openConfirm({
+      title: '사고 보고서 삭제',
+      description: `${report.incident_date} 사고 보고서를 삭제합니다.\n삭제 후에는 복구할 수 없습니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
     if (!confirmed) return;
 
     setDeletingId(report.id);
@@ -269,12 +274,10 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 p-4 md:p-4" data-testid="incident-report-view">
+      {dialog}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">사고 보고서 관리</h2>
-          <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
-            사고 발생 시 즉시 보고하고 이력을 관리합니다.
-          </p>
         </div>
         <div className="flex gap-2">
           {(['목록', '작성', '통계'] as const).map((targetTab) => (

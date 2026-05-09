@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
 
@@ -21,6 +22,7 @@ export function useRosterAssignmentSave({
   setSaving,
   setWorkShifts,
 }: UseRosterAssignmentSaveParams) {
+  const { dialog, openConfirm } = useActionDialog();
   const ensureOffShift = useCallback(async () => {
     if (offShift) return offShift;
 
@@ -64,7 +66,13 @@ export function useRosterAssignmentSave({
       toast('차단 경고가 남아 있어 저장할 수 없습니다. 경고 요약을 먼저 확인하세요.', 'warning');
       return;
     }
-    if (!confirm(`${selectedMonth} ${rosterScopeLabel} 근무표를 저장하시겠습니까?\n기존 월간 편성은 덮어씁니다.`)) return;
+    const confirmed = await openConfirm({
+      title: '근무표 저장',
+      description: `${selectedMonth} ${rosterScopeLabel} 근무표를 저장합니다.\n기존 월간 편성은 덮어씁니다.`,
+      confirmText: '저장',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
 
     setSaving(true);
     try {
@@ -122,6 +130,7 @@ export function useRosterAssignmentSave({
     monthDates.length,
     offShiftToken,
     onAssignmentsSaved,
+    openConfirm,
     previewRows,
     rosterScopeLabel,
     rosterWarningReport.items.length,
@@ -132,5 +141,5 @@ export function useRosterAssignmentSave({
     setSaving,
   ]);
 
-  return { saveAssignments };
+  return { dialog, saveAssignments };
 }

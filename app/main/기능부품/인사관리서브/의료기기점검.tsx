@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -15,6 +16,7 @@ function getStatus(nextDate: string | null): 'ok' | 'due' | 'overdue' {
 }
 
 export default function MedicalDeviceInspection({ selectedCo, user }: { selectedCo: string; user: any }) {
+  const { dialog, openConfirm } = useActionDialog();
   const [devices, setDevices] = useState<any[]>([]);
   const [histories, setHistories] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'devices' | 'history'>('devices');
@@ -99,7 +101,14 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
   };
 
   const handleDeleteDevice = async (id: string) => {
-    if (!confirm('장비를 삭제하시겠습니까?')) return;
+    const target = devices.find((device) => device.id === id);
+    const confirmed = await openConfirm({
+      title: '의료기기 삭제',
+      description: `${target?.device_name || '선택한 장비'}를 삭제합니다.\n점검 주기와 다음 점검 일정도 함께 제거됩니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     await supabase.from('medical_devices').delete().eq('id', id);
     fetchDevices();
   };
@@ -109,10 +118,10 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
 
   return (
     <div className="p-4 md:p-5 space-y-5">
+      {dialog}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-[var(--foreground)]">의료기기 정기점검 관리</h2>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">의료기기 점검 일정 및 이력을 관리합니다.</p>
         </div>
         <button onClick={openAddDevice} className="px-4 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-sm font-bold shadow-sm hover:opacity-90">+ 장비 등록</button>
       </div>

@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -6,26 +7,51 @@ import { supabase } from '@/lib/supabase';
 const HOSPITAL_DIVISIONS = ['진료부', '간호부', '총무부'];
 const MSO_DIVISIONS = ['운영본부', '전략기획본부'];
 
-export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
+type TeamManagerProps = {
+  onRefresh?: () => void;
+  selectedCompany?: string;
+  hideCompanySelect?: boolean;
+  embedded?: boolean;
+  disabled?: boolean;
+};
+
+export default function TeamManager({
+  onRefresh,
+  selectedCompany,
+  hideCompanySelect = false,
+  embedded = false,
+  disabled = false,
+}: TeamManagerProps) {
+  const { dialog, openConfirm } = useActionDialog();
   const [teams, setTeams] = useState<any[]>([]);
   const [companies, setCompanies] = useState<string[]>([]);
-  const [company, setCompany] = useState('');
+  const [company, setCompany] = useState(selectedCompany || '');
   const [adding, setAdding] = useState(false);
   const [newTeam, setNewTeam] = useState({ division: '진료부', team_name: '' });
+  const effectiveCompany = selectedCompany ?? company;
 
   const currentDivisions =
-    company === 'SY INC.' ? MSO_DIVISIONS : HOSPITAL_DIVISIONS;
+    effectiveCompany === 'SY INC.' ? MSO_DIVISIONS : HOSPITAL_DIVISIONS;
 
   const fetchTeams = useCallback(async () => {
-    if (!company) return;
+    if (!effectiveCompany || disabled) {
+      setTeams([]);
+      return;
+    }
     const { data } = await supabase
       .from('org_teams')
       .select('*')
-      .eq('company_name', company)
+      .eq('company_name', effectiveCompany)
       .order('division')
       .order('sort_order');
     setTeams(data || []);
-  }, [company]);
+  }, [disabled, effectiveCompany]);
+
+  useEffect(() => {
+    if (selectedCompany !== undefined) {
+      setCompany(selectedCompany);
+    }
+  }, [selectedCompany]);
 
   useEffect(() => {
     // 회사 목록 DB에서 동적 조회
@@ -41,7 +67,7 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
           .map((row: any) => row.name)
           .filter(Boolean) as string[];
         setCompanies(names);
-        if (names.length > 0 && !company) setCompany(names[0]);
+        if (!selectedCompany && names.length > 0 && !company) setCompany(names[0]);
         return;
       }
 
@@ -50,30 +76,31 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
         new Set((staffRows || []).map((row: any) => row.company).filter(Boolean)),
       ).sort() as string[];
       setCompanies(names);
-      if (names.length > 0 && !company) setCompany(names[0]);
+      if (!selectedCompany && names.length > 0 && !company) setCompany(names[0]);
     };
 
     fetchCompanies();
-  }, [company]);
+  }, [company, selectedCompany]);
 
   useEffect(() => {
     // 회사 변경 시 Division 기본값도 회사 유형에 맞게 변경
     setNewTeam((prev) => ({
-      division: company === 'SY INC.' ? MSO_DIVISIONS[0] : HOSPITAL_DIVISIONS[0],
+      division: effectiveCompany === 'SY INC.' ? MSO_DIVISIONS[0] : HOSPITAL_DIVISIONS[0],
       team_name: prev.team_name,
     }));
     fetchTeams();
-  }, [company, fetchTeams]);
+  }, [effectiveCompany, fetchTeams]);
 
   const handleAdd = async () => {
+    if (disabled || !effectiveCompany) return toast('회사명을 먼저 입력해 주세요.', 'warning');
     if (!newTeam.team_name.trim()) return toast('팀명을 입력하세요.', 'warning');
     const { error } = await supabase.from('org_teams').insert({
-      company_name: company,
-      division: company === 'SY INC.' ? (newTeam.division === '운영본부' ? '총무부' : '진료부') : newTeam.division,
+      company_name: effectiveCompany,
+      division: effectiveCompany === 'SY INC.' ? (newTeam.division === '운영본부' ? '총무부' : '진료부') : newTeam.division,
       team_name: newTeam.team_name.trim(),
       sort_order: teams.filter((t: any) => {
         const d = newTeam.division;
-        if (company === 'SY INC.') return d === '운영본부' ? t.division === '총무부' : t.division === '진료부';
+        if (effectiveCompany === 'SY INC.') return d === '운영본부' ? t.division === '총무부' : t.division === '진료부';
         return t.division === d;
       }).length + 1,
     });
@@ -88,7 +115,14 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('해당 팀을 삭제하시겠습니까?')) return;
+    const target = teams.find((team) => team.id === id);
+    const confirmed = await openConfirm({
+      title: '팀 삭제',
+      description: `${target?.team_name || '선택한 팀'}을 삭제합니다.\n조직도와 팀 기준정보에 영향을 줄 수 있습니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     await supabase.from('org_teams').delete().eq('id', id);
     fetchTeams();
     onRefresh?.();
@@ -97,24 +131,34 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
   const byDivision = currentDivisions.map((d) => ({
     name: d,
     teams: teams.filter((t: any) => {
-      if (company === 'SY INC.') return d === '운영본부' ? t.division === '총무부' : t.division === '진료부';
+      if (effectiveCompany === 'SY INC.') return d === '운영본부' ? t.division === '총무부' : t.division === '진료부';
       return t.division === d;
     }),
   }));
 
   return (
-    <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm p-4 animate-in fade-in" data-testid="team-manager-view">
+    <div className={`${embedded ? '' : 'bg-[var(--card)]'} rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm p-4 animate-in fade-in`} data-testid="team-manager-view">
+      {dialog}
       <div className="flex justify-between items-center mb-3">
         <div>
           <h3 className="text-base font-semibold text-[var(--foreground)] tracking-tight">팀 관리</h3>
         </div>
         <div className="flex gap-2">
-          <select data-testid="team-manager-company-select" value={company} onChange={(e) => setCompany(e.target.value)} className="p-2 border rounded-[var(--radius-lg)] text-sm font-bold">
-            {companies.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-          <button data-testid="team-manager-open-add" onClick={() => setAdding(true)} className="px-4 py-1.5 bg-[var(--accent)] text-white text-xs font-semibold rounded-[var(--radius-md)]">+ 팀 추가</button>
+          {!hideCompanySelect && (
+            <select data-testid="team-manager-company-select" value={company} onChange={(e) => setCompany(e.target.value)} className="p-2 border rounded-[var(--radius-lg)] text-sm font-bold">
+              {companies.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          )}
+          <button
+            data-testid="team-manager-open-add"
+            onClick={() => setAdding(true)}
+            disabled={disabled || !effectiveCompany}
+            className="px-4 py-1.5 bg-[var(--accent)] text-white text-xs font-semibold rounded-[var(--radius-md)] disabled:opacity-50"
+          >
+            + 팀 추가
+          </button>
         </div>
       </div>
 
@@ -135,7 +179,7 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
         ))}
       </div>
 
-      {adding && (
+      {adding && !disabled && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]" onClick={() => setAdding(false)}>
           <div data-testid="team-manager-add-modal" className="bg-[var(--card)] p-4 rounded-[var(--radius-md)] max-w-sm w-full space-y-3" onClick={(e) => e.stopPropagation()}>
             <h4 className="font-semibold">팀 추가</h4>

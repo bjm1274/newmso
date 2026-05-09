@@ -1,4 +1,5 @@
 'use client';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -28,6 +29,7 @@ function isValidEmail(v: string) {
 }
 
 export default function InvoiceManagement({ user, inventory, suppliers, fetchSuppliers }: AnyRecord) {
+  const { dialog, openConfirm } = useActionDialog();
   const [showNewSupplier, setShowNewSupplier] = useState(false);
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -133,8 +135,14 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
 
   const handleDeleteSupplier = async (id: string) => {
     if (!id) return;
-    const ok = window.confirm('해당 거래처를 삭제하시겠습니까?\n\n관련 발주/명세서 데이터가 있다면 영향이 있을 수 있습니다.');
-    if (!ok) return;
+    const target = customPresets.find((supplier) => supplier.id === id);
+    const confirmed = await openConfirm({
+      title: '거래처 삭제',
+      description: `${target?.sangho || target?.name || '선택한 거래처'}를 삭제합니다.\n관련 발주/명세서 데이터가 있다면 영향이 있을 수 있습니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     try {
       const { error } = await supabase.from('suppliers').delete().eq('id', id);
       if (error) {
@@ -187,6 +195,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
 
   return (
     <div className="space-y-4 animate-in fade-in duration-500">
+      {dialog}
       <div className="bg-[var(--card)] p-4 border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)]">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-3">
           <div>

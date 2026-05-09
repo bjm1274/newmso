@@ -27,9 +27,6 @@ export default function AttendanceIssueAnalysisSuite({ staffs, selectedCo, user 
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-lg font-bold text-[var(--foreground)]">근태 이상 통합 분석</h2>
-            <p className="mt-1 text-xs font-medium text-[var(--toss-gray-4)]">
-              지각 · 조퇴 패턴 분석과 조기퇴근 감지를 한 화면에서 함께 확인합니다.
-            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {VIEW_OPTIONS.map((option) => (

@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { EmptyState, LoadingPanel } from '@/app/components/StatePanel';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { supabase } from '@/lib/supabase';
 import {
   buildOfficialDocumentApprovalContent,
@@ -47,6 +49,7 @@ function buildApprovalStatusClass(status: string) {
 }
 
 export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenApproval }: Props) {
+  const { dialog, openConfirm } = useActionDialog();
   const [docs, setDocs] = useState<OfficialDoc[]>([]);
   const [approvalQueue, setApprovalQueue] = useState<ApprovalWorkflowItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -237,7 +240,14 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('삭제하시겠습니까?')) return;
+    const target = docs.find((doc) => doc.id === id);
+    const confirmed = await openConfirm({
+      title: '공문서 발송 기록 삭제',
+      description: `${target?.title || '선택한 공문서'} 기록을 삭제합니다.\n발송대장에서 더 이상 조회되지 않습니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     try {
       const { error } = await supabase.from('official_doc_log').delete().eq('id', id);
       if (error) throw error;
@@ -283,12 +293,10 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
 
   return (
     <div className="space-y-4 p-4 md:p-4">
+      {dialog}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">공문서 발송 대장</h2>
-          <p className="mt-1 text-xs font-semibold text-[var(--toss-gray-3)]">
-            신규 공문은 전자결재 승인 후 자동 반영되고, 대장에서는 발송 이후 이력과 수신 확인을 관리합니다.
-          </p>
         </div>
         <button
           onClick={openAdd}
@@ -490,9 +498,17 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
 
       <div className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)]">
         {loading ? (
-          <div className="p-5 text-center text-sm text-[var(--toss-gray-3)]">불러오는 중...</div>
+          <div className="p-4">
+            <LoadingPanel title="공문 발송 기록을 불러오는 중입니다" />
+          </div>
         ) : displayDocs.length === 0 ? (
-          <div className="p-5 text-center text-sm text-[var(--toss-gray-3)]">공문 발송 기록이 없습니다.</div>
+          <div className="p-4">
+            <EmptyState
+              title="공문 발송 기록이 없습니다"
+              description="전자결재 승인 후 최종 반영된 공문 발송 이력이 이곳에 표시됩니다."
+              compact
+            />
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">

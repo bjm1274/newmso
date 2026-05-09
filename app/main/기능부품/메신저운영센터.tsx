@@ -530,11 +530,7 @@ export default function MessengerOperationsCenter({
       >
         <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] pb-5">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[var(--accent)]">Messenger Ops</p>
             <h2 className="mt-2 text-xl font-bold text-[var(--foreground)]">메신저 운영센터</h2>
-            <p className="mt-2 text-[12px] text-[var(--toss-gray-3)]">
-              읽음 SLA, 중요공지 확인, 공지 읽음률, 근무 상태, 파일 버전, 대용량 드라이브 링크를 한 화면에서 관리합니다.
-            </p>
           </div>
           <button data-testid="chat-ops-center-close" onClick={onClose} className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-sm font-bold text-[var(--toss-gray-4)]">
             닫기

@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
+import { useActionDialog } from '@/app/components/useActionDialog';
 import { supabase } from '@/lib/supabase';
 import {
   buildExportRows,
@@ -13,6 +14,7 @@ import {
 type Props = { staffs: any[]; selectedCo: string };
 
 export default function TaxFileGenerator({ staffs, selectedCo }: Props) {
+  const { dialog, openConfirm } = useActionDialog();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedMonth, setSelectedMonth] = useState(
     (new Date().getMonth() + 1).toString().padStart(2, '0'),
@@ -92,7 +94,12 @@ export default function TaxFileGenerator({ staffs, selectedCo }: Props) {
         .in('status', ['확정', 'finalized']);
 
       if (!payrollData || payrollData.length === 0) {
-        alert('해당 월에 확정된 급여 데이터가 없습니다.');
+        await openConfirm({
+          title: '확정 급여 데이터 없음',
+          description: '해당 월에 확정된 급여 데이터가 없습니다.',
+          confirmText: '확인',
+          tone: 'default',
+        });
         setIsGenerating(false);
         return;
       }
@@ -137,17 +144,23 @@ export default function TaxFileGenerator({ staffs, selectedCo }: Props) {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('원천징수 파일 생성 실패:', err);
-      alert('파일 생성 중 오류가 발생했습니다.');
+      await openConfirm({
+        title: '파일 생성 실패',
+        description: '파일 생성 중 오류가 발생했습니다.',
+        confirmText: '확인',
+        tone: 'danger',
+      });
     } finally {
       setIsGenerating(false);
     }
-  }, [staffs, selectedCo, yearMonth, exportType, companyInfo]);
+  }, [staffs, selectedCo, yearMonth, exportType, companyInfo, openConfirm]);
 
   return (
     <div
       className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm animate-in fade-in duration-500"
       data-testid="payroll-utility-tax-file"
     >
+      {dialog}
       <div className="mb-3 flex items-center gap-3">
         <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] bg-indigo-500/10 text-base font-bold text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
           📑
