@@ -161,10 +161,16 @@ export function useChatRoomNavigation({
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     const listEl = messageListRef.current;
     if (listEl) {
+      const targetTop = Math.max(0, listEl.scrollHeight - listEl.clientHeight);
+      if (Math.abs(listEl.scrollTop - targetTop) <= 2) {
+        isNearBottomRef.current = true;
+        setShowScrollToLatest(false);
+        return;
+      }
       if (behavior === 'auto') {
-        listEl.scrollTop = listEl.scrollHeight;
+        listEl.scrollTop = targetTop;
       } else {
-        listEl.scrollTo({ top: listEl.scrollHeight, behavior });
+        listEl.scrollTo({ top: targetTop, behavior });
       }
     } else {
       scrollRef.current?.scrollIntoView({ behavior, block: 'end' });

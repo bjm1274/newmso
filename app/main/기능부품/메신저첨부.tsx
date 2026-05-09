@@ -57,13 +57,15 @@ export function DeferredAttachmentImage({
     <div className={`relative overflow-hidden ${wrapperClassName}`}>
       {loadFailed ? (
         <div
+          role="img"
+          aria-label={`${alt || '이미지'} 로드 실패`}
           className={`flex h-full w-full items-center justify-center bg-[var(--muted)] px-3 text-center text-xs text-[var(--toss-gray-3)] ${fallbackClassName || 'min-h-[96px]'}`}
         >
           이미지를 불러올 수 없습니다
         </div>
       ) : (
         <>
-          {!loaded ? <div className={placeholderClassName} /> : null}
+          {!loaded ? <div aria-hidden="true" className={placeholderClassName} /> : null}
           <img
             src={src}
             alt={alt}
@@ -407,10 +409,10 @@ export function AttachmentListCard({
                 src={url}
                 alt={name}
                 onLoad={() => onMediaLoad?.()}
-                wrapperClassName="max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]"
-                placeholderClassName="h-[120px] w-[200px] max-w-full animate-pulse bg-[var(--muted)]"
-                fallbackClassName="h-[120px] w-[200px] max-w-full rounded-[var(--radius-md)] border border-[var(--border)]"
-                className="block max-h-[200px] max-w-full object-cover cursor-zoom-in"
+                wrapperClassName="aspect-[4/3] w-[200px] max-w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] md:w-[240px]"
+                placeholderClassName="h-full w-full animate-pulse bg-[var(--muted)]"
+                fallbackClassName="h-full min-h-0 rounded-[var(--radius-md)]"
+                className="block h-full w-full object-cover cursor-zoom-in"
               />
             </button>
             <div className="absolute inset-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity bg-black/40 flex items-center justify-center rounded-[var(--radius-md)] pointer-events-none px-2">
@@ -525,7 +527,7 @@ export function AttachmentListCard({
               alt={name}
               wrapperClassName="h-full w-full"
               placeholderClassName="h-full w-full animate-pulse bg-[var(--muted)]"
-              fallbackClassName="h-full min-h-0 text-[9px] leading-tight"
+              fallbackClassName="h-full min-h-0 px-1 text-[9px] leading-tight"
               className="h-full w-full object-cover"
               onLoad={() => onMediaLoad?.()}
             />
