@@ -55,7 +55,6 @@ const designUser = {
     admin_경영분석: true,
     admin_회사관리: true,
     admin_직원권한: true,
-    admin_엑셀등록: true,
     admin_데이터백업: true,
     admin_데이터초기화: true,
     admin_문서양식: true,

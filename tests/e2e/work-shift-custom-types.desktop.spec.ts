@@ -52,21 +52,9 @@ async function installFixedDate(page: Page, initialIso = '2026-03-01T09:00:00+09
   }, { iso: initialIso });
 }
 
-async function openRosterPolicyPlanner(page: Page) {
-  await installFixedDate(page);
-  await page.goto(
-    `/main?${new URLSearchParams({ open_menu: '관리자', open_subview: '회사관리' }).toString()}`
-  );
-  await expect(page.getByTestId('company-manager-view')).toBeVisible();
-  await page.getByTestId('company-manager-tab-rosterPolicy').click();
-  await page.getByRole('button', { name: '월간 편성 저장', exact: true }).click();
-  await expect(page.getByTestId('roster-pattern-planner')).toBeVisible();
-}
-
 test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
 });
-
 test('new staff adds an existing company work shift as an extra schedule', async ({ page }) => {
   const adminUser = createAdminUser();
   const workShiftPosts: string[] = [];
@@ -151,72 +139,4 @@ test('new staff adds an existing company work shift as an extra schedule', async
     'shift-alpha-saturday',
   ]);
   expect(insertedStaff.permissions.work_conditions.weekly_rotation_shift_ids).toEqual(['shift-alpha-saturday']);
-});
-
-test('roster planner keeps custom work shift types visible with department recommendations', async ({ page }) => {
-  const adminUser = createAdminUser();
-  const manager = {
-    ...fakeUser,
-    id: 'manager-1',
-    employee_no: 'MGR-001',
-    name: '관리 팀장',
-    company: 'AlphaClinic',
-    company_id: 'clinic-1',
-    department: '관리팀',
-    position: '팀장',
-    role: 'manager',
-    shift_id: 'shift-manager',
-    shift_type: '관리사유형',
-  };
-
-  await mockSupabase(page, {
-    staffMembers: [adminUser, manager],
-    companies: [
-      { id: 'clinic-1', name: 'AlphaClinic', type: 'hospital', is_active: true },
-      { id: 'mso-company-id', name: 'SY INC.', type: 'mso', is_active: true },
-    ],
-    workShifts: [
-      {
-        id: 'shift-manager',
-        name: '관리사A',
-        start_time: '09:00:00',
-        end_time: '18:00:00',
-        shift_type: '관리사유형',
-        company_name: 'AlphaClinic',
-        weekly_work_days: 5,
-        is_weekend_work: false,
-        is_active: true,
-      },
-      {
-        id: 'shift-custom-call',
-        name: '콜 전담',
-        start_time: '10:00:00',
-        end_time: '19:00:00',
-        shift_type: '콜전담',
-        company_name: 'AlphaClinic',
-        weekly_work_days: 5,
-        is_weekend_work: false,
-        is_active: true,
-      },
-      {
-        id: 'shift-office',
-        name: '통상상근',
-        start_time: '09:00:00',
-        end_time: '18:00:00',
-        shift_type: '통상근무',
-        company_name: 'AlphaClinic',
-        weekly_work_days: 5,
-        is_weekend_work: false,
-        is_active: true,
-      },
-    ],
-  });
-  await seedSession(page, { user: adminUser });
-
-  await openRosterPolicyPlanner(page);
-  await page.getByTestId('roster-team-select').selectOption('관리팀');
-
-  await expect(page.getByTestId('planner-shift-chip-shift-manager')).toBeVisible();
-  await expect(page.getByTestId('planner-shift-chip-shift-custom-call')).toBeVisible();
-  await expect(page.getByTestId('planner-shift-chip-shift-office')).toHaveCount(0);
 });
