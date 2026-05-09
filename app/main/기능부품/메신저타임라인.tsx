@@ -6,6 +6,7 @@ import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import type { ChatMessage, StaffMember } from '@/types';
 import {
   AttachmentListCard,
+  DeferredAttachmentImage,
   getAttachmentDisplayName,
   getDeletedMessagePreviewText,
   getMessageDisplayText,
@@ -330,11 +331,14 @@ function MessengerTimelineComponent({
                               onClick={() => onOpenAttachmentPreviewForMessage(message)}
                               aria-label={`${message.file_name || `앨범 사진 ${index + 1}`} 미리보기`}
                             >
-                              <img
+                              <DeferredAttachmentImage
                                 src={message.file_url || ''}
                                 alt={message.file_name || '사진'}
-                                className="w-full h-full object-cover"
-                                loading="lazy"
+                                wrapperClassName="h-full w-full"
+                                placeholderClassName="h-full w-full animate-pulse bg-[var(--muted)]"
+                                fallbackClassName="h-full min-h-0 px-1 text-[10px] leading-tight"
+                                className="h-full w-full object-cover"
+                                onLoad={() => onMediaLoad?.()}
                               />
                               {index === 4 && count > 5 && (
                                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
