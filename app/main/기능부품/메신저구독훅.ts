@@ -117,6 +117,7 @@ type UseChatRealtimeSubscriptionsParams = {
   fetchData: (options?: { force?: boolean }) => Promise<void>;
   updateUnreadForRooms: (rooms: ChatRoom[]) => void | Promise<void>;
   applyReadCursorFromRealtime?: (row: Record<string, unknown> | null | undefined) => void;
+  refreshReadCursorsForRoom?: (roomId: string | null | undefined) => Promise<void>;
   refreshVisibleMessageReactions?: () => Promise<void>;
   refreshVisibleMessageBookmarks?: () => Promise<void>;
   refreshRoomPinnedMessages?: () => Promise<void>;
@@ -154,6 +155,12 @@ export function useChatRealtimeSubscriptions({
   setChatRooms,
   fetchData,
   updateUnreadForRooms,
+  applyReadCursorFromRealtime,
+  refreshReadCursorsForRoom,
+  refreshVisibleMessageReactions,
+  refreshVisibleMessageBookmarks,
+  refreshRoomPinnedMessages,
+  refreshRoomPolls,
   handleIncomingRealtimeMessage,
   scheduleRealtimeReconnect,
   isRoomInSelectedConversation,
@@ -165,6 +172,12 @@ export function useChatRealtimeSubscriptions({
   const handleIncomingRealtimeMessageRef = useRef(handleIncomingRealtimeMessage);
   const isRoomInSelectedConversationRef = useRef(isRoomInSelectedConversation);
   const fetchMessageByIdWithRetryRef = useRef(fetchMessageByIdWithRetry);
+  const applyReadCursorFromRealtimeRef = useRef(applyReadCursorFromRealtime);
+  const refreshReadCursorsForRoomRef = useRef(refreshReadCursorsForRoom);
+  const refreshVisibleMessageReactionsRef = useRef(refreshVisibleMessageReactions);
+  const refreshVisibleMessageBookmarksRef = useRef(refreshVisibleMessageBookmarks);
+  const refreshRoomPinnedMessagesRef = useRef(refreshRoomPinnedMessages);
+  const refreshRoomPollsRef = useRef(refreshRoomPolls);
   const globalRealtimeHealthyRef = useRef(false);
   const roomRealtimeHealthyRef = useRef(false);
 
@@ -183,6 +196,30 @@ export function useChatRealtimeSubscriptions({
   useEffect(() => {
     fetchMessageByIdWithRetryRef.current = fetchMessageByIdWithRetry;
   }, [fetchMessageByIdWithRetry]);
+
+  useEffect(() => {
+    applyReadCursorFromRealtimeRef.current = applyReadCursorFromRealtime;
+  }, [applyReadCursorFromRealtime]);
+
+  useEffect(() => {
+    refreshReadCursorsForRoomRef.current = refreshReadCursorsForRoom;
+  }, [refreshReadCursorsForRoom]);
+
+  useEffect(() => {
+    refreshVisibleMessageReactionsRef.current = refreshVisibleMessageReactions;
+  }, [refreshVisibleMessageReactions]);
+
+  useEffect(() => {
+    refreshVisibleMessageBookmarksRef.current = refreshVisibleMessageBookmarks;
+  }, [refreshVisibleMessageBookmarks]);
+
+  useEffect(() => {
+    refreshRoomPinnedMessagesRef.current = refreshRoomPinnedMessages;
+  }, [refreshRoomPinnedMessages]);
+
+  useEffect(() => {
+    refreshRoomPollsRef.current = refreshRoomPolls;
+  }, [refreshRoomPolls]);
 
   useEffect(() => {
     return () => {
@@ -301,14 +338,21 @@ export function useChatRealtimeSubscriptions({
     }
 
     let disposed = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const triggerDebouncedFetch = () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
+    let messageRefreshTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    let metadataRefreshTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    const triggerDebouncedMessageFetch = () => {
+      if (messageRefreshTimeoutId) clearTimeout(messageRefreshTimeoutId);
+      messageRefreshTimeoutId = setTimeout(() => {
         if (!disposed) void fetchDataLatestRef.current({ force: true });
       }, 300);
     };
-
+    const triggerDebouncedMetadataRefresh = (refresh: (() => Promise<void>) | undefined) => {
+      if (!refresh) return;
+      if (metadataRefreshTimeoutId) clearTimeout(metadataRefreshTimeoutId);
+      metadataRefreshTimeoutId = setTimeout(() => {
+        if (!disposed) void refresh();
+      }, 300);
+    };
     setRoomRealtimeState((prev) => (prev === 'connected' ? prev : 'connecting'));
     void fetchDataLatestRef.current();
 
@@ -318,9 +362,8 @@ export function useChatRealtimeSubscriptions({
         if (!row?.id) return;
         void handleIncomingRealtimeMessageRef.current(row);
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, triggerDebouncedFetch)
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, triggerDebouncedFetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, triggerDebouncedFetch)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, triggerDebouncedMessageFetch)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, triggerDebouncedMessageFetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_read_cursors' }, (payload: Record<string, unknown>) => {
         const updatedRow =
           (payload.new as Record<string, unknown> | null) ||
@@ -333,14 +376,24 @@ export function useChatRealtimeSubscriptions({
           const updatedUserId = updatedRow?.user_id;
           // 내 자신의 커서 변경은 무시 (이미 setRoomUnreadCounts로 처리됨)
           if (updatedUserId && String(updatedUserId) === String(effectiveChatUserId || '')) return;
-          triggerDebouncedFetch();
+          applyReadCursorFromRealtimeRef.current?.(updatedRow);
         }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, triggerDebouncedFetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_bookmarks', filter: `user_id=eq.${effectiveTodoUserId || userId}` }, triggerDebouncedFetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pinned_messages' }, triggerDebouncedFetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'polls' }, triggerDebouncedFetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, triggerDebouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, () => {
+        triggerDebouncedMetadataRefresh(refreshVisibleMessageReactionsRef.current);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_bookmarks', filter: `user_id=eq.${effectiveTodoUserId || userId}` }, () => {
+        triggerDebouncedMetadataRefresh(refreshVisibleMessageBookmarksRef.current);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pinned_messages' }, () => {
+        triggerDebouncedMetadataRefresh(refreshRoomPinnedMessagesRef.current);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'polls' }, () => {
+        triggerDebouncedMetadataRefresh(refreshRoomPollsRef.current);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, () => {
+        triggerDebouncedMetadataRefresh(refreshRoomPollsRef.current);
+      })
       .subscribe((status: string) => {
         if (disposed) return;
         if (status === 'SUBSCRIBED') {
@@ -363,7 +416,8 @@ export function useChatRealtimeSubscriptions({
     return () => {
       disposed = true;
       roomRealtimeHealthyRef.current = false;
-      if (timeoutId) clearTimeout(timeoutId);
+      if (messageRefreshTimeoutId) clearTimeout(messageRefreshTimeoutId);
+      if (metadataRefreshTimeoutId) clearTimeout(metadataRefreshTimeoutId);
       supabase.removeChannel(channel);
     };
   }, [
@@ -460,10 +514,11 @@ export function useChatRealtimeSubscriptions({
     channel.onmessage = (event) => {
       const payload = event.data;
       if (!payload?.roomId) return;
-      if (
-        payload.action !== 'message-sent' &&
-        isRoomInSelectedConversation(String(payload.roomId), chatRoomsRef.current)
-      ) {
+      const roomId = String(payload.roomId);
+      const isSelectedConversation = isRoomInSelectedConversation(roomId, chatRoomsRef.current);
+      if (payload.action === 'message-read' && isSelectedConversation) {
+        void refreshReadCursorsForRoomRef.current?.(roomId);
+      } else if (payload.action === 'message-sent' && isSelectedConversation) {
         void fetchDataRef.current?.();
       } else if (chatRoomsRef.current.length > 0) {
         void updateUnreadForRooms(chatRoomsRef.current);

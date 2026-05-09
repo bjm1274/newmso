@@ -225,6 +225,7 @@ export default function ChatView({
   const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
 
   const chatRoomsRef = useRef<ChatRoom[]>([]);
+  const messagesRef = useRef<ChatMessage[]>([]);
   const deliveryStatesRef = useRef<Record<string, DeliveryState>>({});
   const presenceChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -1312,10 +1313,17 @@ export default function ChatView({
     syncChatRoomsState,
     syncRoomSummaryFromMessages,
     fetchData,
+    applyReadCursorFromRealtime,
+    refreshReadCursorsForRoom,
+    refreshVisibleMessageReactions,
+    refreshVisibleMessageBookmarks,
+    refreshRoomPinnedMessages,
+    refreshRoomPolls,
   } = useChatRoomDataSync({
     selectedRoomId,
     selectedRoomIdRef,
     chatRoomsRef,
+    messagesRef,
     pendingBottomAlignRoomIdRef,
     fetchDataRequestSeqRef,
     deliveryStatesRef,
@@ -1637,6 +1645,10 @@ export default function ChatView({
   }, [chatRooms]);
 
   useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  useEffect(() => {
     selectedRoomIdRef.current = selectedRoomId;
   }, [selectedRoomId]);
 
@@ -1810,17 +1822,41 @@ export default function ChatView({
 
   useEffect(() => {
     const channel = supabase.channel('chat-rooms-list')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, () => {
-        supabase.from('chat_rooms').select(CHAT_ROOM_SELECT).then(async (result) => {
-          const rooms = (result as { data: ChatRoom[] | null; error: unknown }).data;
-          if (!rooms) return;
-          const roomsWithSelf = await ensureSelfChatRoom(rooms);
-          await syncChatRoomsState(roomsWithSelf);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, (payload: Record<string, unknown>) => {
+        const eventType = String(payload.eventType || '');
+        const nextRoom = (payload.new as ChatRoom | null) || null;
+        const previousRoom = (payload.old as Partial<ChatRoom> | null) || null;
+        const roomId = String(nextRoom?.id || previousRoom?.id || '').trim();
+        if (!roomId) return;
+
+        setChatRooms((prev) => {
+          if (eventType === 'DELETE') {
+            return prev.filter((room: ChatRoom) => String(room.id) !== roomId);
+          }
+
+          if (!nextRoom?.id) return prev;
+          const existingIndex = prev.findIndex((room: ChatRoom) => String(room.id) === roomId);
+          const mergedRoom = {
+            ...(existingIndex >= 0 ? prev[existingIndex] : {}),
+            ...nextRoom,
+          } as ChatRoom;
+
+          if (!isRoomAccessibleToCurrentUser(mergedRoom)) {
+            return existingIndex >= 0
+              ? prev.filter((room: ChatRoom) => String(room.id) !== roomId)
+              : prev;
+          }
+
+          const nextRooms =
+            existingIndex >= 0
+              ? prev.map((room: ChatRoom, index: number) => (index === existingIndex ? mergedRoom : room))
+              : [...prev, mergedRoom];
+          return sortChatRoomsWithNoticeFirst(nextRooms);
         });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [ensureSelfChatRoom, syncChatRoomsState]);
+  }, [isRoomAccessibleToCurrentUser, sortChatRoomsWithNoticeFirst]);
   useChatRealtimeSubscriptions({
     userId: user?.id,
     userName: user?.name,
@@ -1846,6 +1882,12 @@ export default function ChatView({
     setChatRooms,
     fetchData,
     updateUnreadForRooms,
+    applyReadCursorFromRealtime,
+    refreshReadCursorsForRoom,
+    refreshVisibleMessageReactions,
+    refreshVisibleMessageBookmarks,
+    refreshRoomPinnedMessages,
+    refreshRoomPolls,
     handleIncomingRealtimeMessage,
     scheduleRealtimeReconnect,
     isRoomInSelectedConversation,
