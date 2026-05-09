@@ -1,13 +1,11 @@
 import 'server-only';
-import { randomUUID } from 'node:crypto';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const INTERNAL_OBJECT_PROXY_PATH = '/api/storage/object';
 const DEFAULT_R2_CHAT_BUCKET = 'pchos-files';
 const DEFAULT_CACHE_CONTROL = 'public, max-age=3600';
 const DEFAULT_UPLOAD_EXPIRATION_SECONDS = 60 * 15;
 const DEFAULT_DOWNLOAD_EXPIRATION_SECONDS = 60 * 5;
+const encoder = new TextEncoder();
 
 type R2Config = {
   accountId: string;
@@ -38,6 +36,122 @@ function encodeObjectKey(objectKey: string): string {
     .join('/');
 }
 
+function awsEncode(value: string): string {
+  return encodeURIComponent(value).replace(/[!'()*]/g, (char) =>
+    `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function toBytes(value: string | Uint8Array): Uint8Array {
+  return typeof value === 'string' ? encoder.encode(value) : value;
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', encoder.encode(value));
+  return bytesToHex(new Uint8Array(digest));
+}
+
+async function hmacSha256(key: string | Uint8Array, value: string): Promise<Uint8Array> {
+  const cryptoKey = await globalThis.crypto.subtle.importKey(
+    'raw',
+    toBytes(key) as unknown as BufferSource,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const signature = await globalThis.crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(value));
+  return new Uint8Array(signature);
+}
+
+function formatAmzDate(date: Date): { amzDate: string; dateStamp: string } {
+  const iso = date.toISOString().replace(/[:-]|\.\d{3}/g, '');
+  return {
+    amzDate: iso,
+    dateStamp: iso.slice(0, 8),
+  };
+}
+
+function buildCanonicalQueryString(params: Array<[string, string]>): string {
+  return [...params]
+    .sort(([leftKey, leftValue], [rightKey, rightValue]) => {
+      if (leftKey === rightKey) return leftValue.localeCompare(rightValue);
+      return leftKey.localeCompare(rightKey);
+    })
+    .map(([key, value]) => `${awsEncode(key)}=${awsEncode(value)}`)
+    .join('&');
+}
+
+async function createR2PresignedUrl({
+  method,
+  bucket,
+  objectKey,
+  expiresIn,
+  headers = {},
+  query = [],
+}: {
+  method: 'GET' | 'PUT';
+  bucket: string;
+  objectKey: string;
+  expiresIn: number;
+  headers?: Record<string, string>;
+  query?: Array<[string, string]>;
+}): Promise<string> {
+  const config = getR2Config();
+  if (!config) {
+    throw new Error('Cloudflare R2 configuration is missing.');
+  }
+
+  const now = new Date();
+  const { amzDate, dateStamp } = formatAmzDate(now);
+  const host = `${config.accountId}.r2.cloudflarestorage.com`;
+  const credentialScope = `${dateStamp}/auto/s3/aws4_request`;
+  const canonicalUri = `/${awsEncode(bucket)}/${encodeObjectKey(objectKey)}`;
+  const normalizedHeaders = Object.fromEntries(
+    Object.entries({ ...headers, host })
+      .map(([key, value]) => [key.toLowerCase(), String(value).trim()])
+      .sort(([left], [right]) => left.localeCompare(right)),
+  ) as Record<string, string>;
+  const signedHeaders = Object.keys(normalizedHeaders).join(';');
+  const canonicalHeaders = Object.entries(normalizedHeaders)
+    .map(([key, value]) => `${key}:${value.replace(/\s+/g, ' ')}`)
+    .join('\n');
+  const canonicalQuery = buildCanonicalQueryString([
+    ...query,
+    ['X-Amz-Algorithm', 'AWS4-HMAC-SHA256'],
+    ['X-Amz-Credential', `${config.accessKeyId}/${credentialScope}`],
+    ['X-Amz-Date', amzDate],
+    ['X-Amz-Expires', String(expiresIn)],
+    ['X-Amz-SignedHeaders', signedHeaders],
+  ]);
+  const canonicalRequest = [
+    method,
+    canonicalUri,
+    canonicalQuery,
+    `${canonicalHeaders}\n`,
+    signedHeaders,
+    'UNSIGNED-PAYLOAD',
+  ].join('\n');
+  const stringToSign = [
+    'AWS4-HMAC-SHA256',
+    amzDate,
+    credentialScope,
+    await sha256Hex(canonicalRequest),
+  ].join('\n');
+  const dateKey = await hmacSha256(`AWS4${config.secretAccessKey}`, dateStamp);
+  const regionKey = await hmacSha256(dateKey, 'auto');
+  const serviceKey = await hmacSha256(regionKey, 's3');
+  const signingKey = await hmacSha256(serviceKey, 'aws4_request');
+  const signature = bytesToHex(await hmacSha256(signingKey, stringToSign));
+
+  return `https://${host}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`;
+}
+
 export function buildResponseContentDisposition(rawName: string): string {
   const normalizedName = String(rawName || 'download');
   const ascii = normalizedName.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
@@ -62,17 +176,6 @@ function getR2Config(): R2Config | null {
   };
 }
 
-function getR2Client(config: R2Config): S3Client {
-  return new S3Client({
-    region: 'auto',
-    endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId: config.accessKeyId,
-      secretAccessKey: config.secretAccessKey,
-    },
-  });
-}
-
 export function isR2ChatStorageEnabled(): boolean {
   return !!getR2Config();
 }
@@ -90,7 +193,7 @@ export function buildChatAttachmentObjectKey(fileName: string, mimeType: string)
         ? 'txt'
         : 'bin';
   const ext = /^[a-z0-9]+$/i.test(extFromName || '') ? String(extFromName) : String(extFromMimeType || 'bin');
-  return `chat/${Date.now()}_${randomUUID()}.${ext || 'bin'}`;
+  return `chat/${Date.now()}_${globalThis.crypto.randomUUID()}.${ext || 'bin'}`;
 }
 
 export function buildR2AccessUrl(bucket: string, objectKey: string): string {
@@ -169,27 +272,24 @@ export async function createChatAttachmentUploadPlan(
     return null;
   }
 
-  const client = getR2Client(config);
-  const signedUrl = await getSignedUrl(
-    client,
-    new PutObjectCommand({
-      Bucket: config.chatBucket,
-      Key: objectKey,
-      ContentType: mimeType,
-      CacheControl: DEFAULT_CACHE_CONTROL,
-    }),
-    { expiresIn: DEFAULT_UPLOAD_EXPIRATION_SECONDS },
-  );
+  const headers = {
+    'content-type': mimeType,
+    'cache-control': DEFAULT_CACHE_CONTROL,
+  };
+  const signedUrl = await createR2PresignedUrl({
+    method: 'PUT',
+    bucket: config.chatBucket,
+    objectKey,
+    expiresIn: DEFAULT_UPLOAD_EXPIRATION_SECONDS,
+    headers,
+  });
 
   return {
     provider: 'r2',
     bucket: config.chatBucket,
     path: objectKey,
     signedUrl,
-    headers: {
-      'content-type': mimeType,
-      'cache-control': DEFAULT_CACHE_CONTROL,
-    },
+    headers,
     url: buildR2AccessUrl(config.chatBucket, objectKey),
   };
 }
@@ -204,16 +304,27 @@ export async function uploadChatAttachmentToR2(
     throw new Error('Cloudflare R2 configuration is missing.');
   }
 
-  const client = getR2Client(config);
-  await client.send(
-    new PutObjectCommand({
-      Bucket: config.chatBucket,
-      Key: objectKey,
-      Body: body,
-      ContentType: mimeType,
-      CacheControl: DEFAULT_CACHE_CONTROL,
-    }),
-  );
+  const signedUrl = await createR2PresignedUrl({
+    method: 'PUT',
+    bucket: config.chatBucket,
+    objectKey,
+    expiresIn: DEFAULT_UPLOAD_EXPIRATION_SECONDS,
+    headers: {
+      'content-type': mimeType,
+      'cache-control': DEFAULT_CACHE_CONTROL,
+    },
+  });
+  const response = await fetch(signedUrl, {
+    method: 'PUT',
+    headers: {
+      'content-type': mimeType,
+      'cache-control': DEFAULT_CACHE_CONTROL,
+    },
+    body: body as BodyInit,
+  });
+  if (!response.ok) {
+    throw new Error(`Cloudflare R2 upload failed with status ${response.status}.`);
+  }
 
   return {
     provider: 'r2',
@@ -233,18 +344,13 @@ export async function createR2DownloadUrl(
     return null;
   }
 
-  const client = getR2Client(config);
-  return getSignedUrl(
-    client,
-    new GetObjectCommand({
-      Bucket: bucket,
-      Key: objectKey,
-      ...(options?.downloadFileName
-        ? {
-            ResponseContentDisposition: buildResponseContentDisposition(options.downloadFileName),
-          }
-        : {}),
-    }),
-    { expiresIn: DEFAULT_DOWNLOAD_EXPIRATION_SECONDS },
-  );
+  return createR2PresignedUrl({
+    method: 'GET',
+    bucket,
+    objectKey,
+    expiresIn: DEFAULT_DOWNLOAD_EXPIRATION_SECONDS,
+    query: options?.downloadFileName
+      ? [['response-content-disposition', buildResponseContentDisposition(options.downloadFileName)]]
+      : [],
+  });
 }
