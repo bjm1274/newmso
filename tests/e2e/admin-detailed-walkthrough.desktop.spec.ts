@@ -169,7 +169,6 @@ test('admin sidebar walkthrough opens each submenu in order without runtime erro
 
   await openAdminSubMenu(page, '회사관리');
   await expect(page.getByTestId('company-manager-view')).toBeVisible();
-  await page.getByTestId('company-manager-tab-team').click();
   await expect(page.getByTestId('team-manager-view')).toBeVisible();
   await page.getByTestId('company-manager-tab-company').click();
   await expect(page.getByTestId('company-manager-view')).toBeVisible();
@@ -188,9 +187,6 @@ test('admin sidebar walkthrough opens each submenu in order without runtime erro
 
   await openAdminSubMenu(page, '문서양식');
   await expect(page.getByRole('heading', { name: '기본양식 관리' })).toBeVisible();
-
-  await openAdminSubMenu(page, '엑셀등록');
-  await expect(page.getByRole('heading', { name: '엑셀 일괄 등록' })).toBeVisible();
 
   await openAdminSubMenu(page, '데이터백업');
   await expect(page.getByRole('heading', { name: '데이터 백업' })).toBeVisible();

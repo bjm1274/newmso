@@ -1479,11 +1479,8 @@ test("team manager adds a new team under company management", async ({
   );
 
   await expect(page.getByTestId("company-manager-view")).toBeVisible();
-  await page.getByTestId("company-manager-tab-team").click();
+  await page.getByTestId("company-manager-edit-hospital-1").click();
   await expect(page.getByTestId("team-manager-view")).toBeVisible();
-  await page
-    .getByTestId("team-manager-company-select")
-    .selectOption("박철홍정형외과");
   await page.getByTestId("team-manager-open-add").click();
   await expect(page.getByTestId("team-manager-add-modal")).toBeVisible();
   await page.getByTestId("team-manager-division-select").selectOption("진료부");
@@ -2108,8 +2105,7 @@ test("employee and admin can complete a realistic monthly operations lifecycle",
   );
 
   await expect(page.getByTestId("company-manager-view")).toBeVisible();
-  await page.getByTestId("company-manager-tab-team").click();
-  await page.getByTestId("team-manager-company-select").selectOption(hospital.name);
+  await page.getByTestId(`company-manager-edit-${hospital.id}`).click();
   await page.getByTestId("team-manager-open-add").click();
   await page.getByTestId("team-manager-division-select").selectOption("진료부");
   await page.getByTestId("team-manager-name-input").fill(teamName);
