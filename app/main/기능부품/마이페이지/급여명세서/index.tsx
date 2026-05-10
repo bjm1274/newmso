@@ -1,4 +1,5 @@
 'use client';
+import { logger } from '@/lib/logger';
 
 import { useEffect, useMemo, useState } from 'react';
 import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
@@ -163,9 +164,6 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           password: pwd,
-          userId: effectiveUserId,
-          name: (resolvedUser.name || _user.name) as string,
-          employeeNo: (resolvedUser.employee_no || _user.employee_no) as string,
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -214,7 +212,7 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
       if (cancelled) return;
 
       if (recordsResult.error) {
-        console.error('Error fetching issued salary records:', recordsResult.error);
+        logger.error('Error fetching issued salary records:', recordsResult.error);
         setIssuedRecords([]);
         setSelectedYearMonth('');
         return;
@@ -345,11 +343,18 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
             left: 0;
             top: 0;
             width: 100%;
-          }
-          #print-section * { visibility: visible !important; }
-          #print-section > div {
-            width: 100% !important;
             max-width: none !important;
+            overflow: visible !important;
+            background: #ffffff !important;
+          }
+          #print-section * {
+            visibility: visible !important;
+            overflow: visible !important;
+          }
+          #print-section > div {
+            width: 194mm !important;
+            max-width: 194mm !important;
+            margin: 0 auto !important;
           }
         }
       `}</style>
@@ -387,8 +392,8 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
 
         {salaryHistory.length >= 2 && <SalaryTrendChart history={salaryHistory} />}
 
-        <div className="flex-1 overflow-auto bg-[var(--muted)] p-4 sm:p-5 lg:p-5 flex justify-center custom-scrollbar">
-          <div id="print-section" className="w-full max-w-[880px] print:max-w-none print:w-full mx-auto shadow-sm print:shadow-none bg-[var(--card)] print:bg-transparent overflow-visible">
+        <div className="flex-1 overflow-auto bg-[var(--muted)] p-4 sm:p-5 lg:p-5 flex justify-center custom-scrollbar print:overflow-visible print:bg-white print:p-0">
+          <div id="print-section" className="w-full max-w-[210mm] print:max-w-none print:w-full mx-auto shadow-sm print:shadow-none bg-[var(--card)] print:bg-white overflow-visible">
             <SalaryDetail
               staff={(resolvedUser || _user) as StaffInfo | undefined}
               record={salaryData as SalaryRecord | undefined}

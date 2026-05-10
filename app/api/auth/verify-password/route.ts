@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyPrivilegedSessionPassword } from '@/lib/admin-credentials';
-import { readSessionFromRequest } from '@/lib/server-session';
+import { readSessionFromRequest, resolveLatestSessionUser } from '@/lib/server-session';
 import {
   pickStoredPassword,
   selectStaffPasswordRowsWithFallback,
@@ -44,12 +44,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ verified: false, error: 'Password is required' }, { status: 400 });
     }
 
-    const sessionUserId = String(session?.user?.id ?? '').trim();
-    const sessionEmployeeNo = String(session?.user?.employee_no ?? '').trim();
-    const sessionUserName = String(session?.user?.name ?? '').trim();
+    const resolvedSessionUser = await resolveLatestSessionUser(session.user);
+    const sessionUserId = String(resolvedSessionUser?.id ?? '').trim();
+    const sessionAuthUserId = String(resolvedSessionUser?.auth_user_id ?? '').trim();
+    const sessionEmployeeNo = String(resolvedSessionUser?.employee_no ?? '').trim();
+    const sessionUserName = String(resolvedSessionUser?.name ?? '').trim();
+    const allowedSessionUserIds = new Set([sessionUserId, sessionAuthUserId].filter(Boolean));
 
     if (
-      isIdentityMismatch(requestUserId, sessionUserId) ||
+      Boolean(requestUserId && allowedSessionUserIds.size > 0 && !allowedSessionUserIds.has(requestUserId)) ||
       isIdentityMismatch(requestEmployeeNo, sessionEmployeeNo) ||
       isIdentityMismatch(requestName, sessionUserName)
     ) {

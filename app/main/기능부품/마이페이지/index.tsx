@@ -51,8 +51,6 @@ const FAVORITE_OPTIONS: { id: FavoriteId; label: string; icon: string }[] = [
   { id: 'mypage_profile', label: '내 정보', icon: 'User' },
   { id: 'mypage_commute', label: '출퇴근', icon: 'Clock' },
   { id: 'mypage_todo', label: '할일', icon: 'CheckSquare' },
-  { id: 'mypage_leave', label: '연차휴가', icon: 'CalendarDays' },
-  { id: 'mypage_records', label: '급여·증명서', icon: 'Receipt' },
   { id: 'mypage_documents', label: '서류제출', icon: 'Upload' },
   { id: 'hr_payroll', label: '인사관리 · 급여', icon: 'Users' },
   { id: 'inv_purchase', label: '재고관리 · 발주', icon: 'Package' },
@@ -491,9 +489,6 @@ function MyPageMain({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           password: input,
-          userId: profileSummary.id || user?.id,
-          name: profileSummary.name || user?.name,
-          employeeNo: profileSummary.employeeNo || user?.employee_no,
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -646,6 +641,53 @@ function MyPageMain({
         : attendanceLate > 0
           ? `지각 ${attendanceLate}회`
           : '개근';
+  const profileQuickCards = [
+    {
+      label: '이번 달 근태',
+      value: attendanceValue,
+      note: attendanceNote,
+      icon: 'Clock',
+      tone: 'text-teal-500 bg-teal-50',
+      onClick: isRetired ? undefined : () => setActiveTab('commute'),
+    },
+    {
+      label: '연차휴가',
+      value: `${leaveRemaining}일`,
+      note: '사용 내역 확인',
+      icon: 'CalendarDays',
+      tone: 'text-[var(--accent)] bg-[var(--accent-light)]',
+      onClick: isRetired ? undefined : () => setActiveTab('leave'),
+    },
+    {
+      label: '급여명세서',
+      value: '열기',
+      note: '월별 명세서 확인',
+      icon: 'Receipt',
+      tone: 'text-blue-600 bg-blue-50',
+      onClick: () => {
+        setRecordsView('salary');
+        setActiveTab('records');
+      },
+    },
+    {
+      label: '증명서',
+      value: '열기',
+      note: '발급 문서 확인',
+      icon: 'FileText',
+      tone: 'text-indigo-600 bg-indigo-50',
+      onClick: () => {
+        setRecordsView('certificates');
+        setActiveTab('records');
+      },
+    },
+    {
+      label: '미결재',
+      value: `${pendingApprovalCount}건`,
+      note: '결재 대기중',
+      icon: 'FileWarning',
+      tone: 'text-amber-500 bg-amber-50',
+    },
+  ];
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-x-hidden app-page">
@@ -660,32 +702,6 @@ function MyPageMain({
           onSuccess={handleSignComplete}
         />
       )}
-
-      <header className="flex min-h-[72px] shrink-0 items-center justify-between border-b border-[var(--border)] bg-[var(--card)] px-5 md:px-6">
-        <div className="min-w-0">
-          <h1 className="text-[15px] font-bold text-[var(--foreground)]">내 정보</h1>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={handleLogout}
-            data-testid="mypage-logout-button"
-            className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--toss-gray-4)] shadow-sm transition-all hover:border-[var(--danger)]/30 hover:bg-[var(--danger-light)] hover:text-[var(--danger)]"
-          >
-            <LucideIcon name="LogOut" size={15} />
-            로그아웃
-          </button>
-          <button
-            type="button"
-            onClick={handleToggleEdit}
-            data-testid="mypage-profile-edit-toggle"
-            className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--foreground)] shadow-sm transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--accent-light)]"
-          >
-            <LucideIcon name="SquarePen" size={15} />
-            {isEditingProfile ? '수정 취소' : '정보 수정'}
-          </button>
-        </div>
-      </header>
 
       <section className="shrink-0 border-b border-[var(--border)] bg-[var(--card)] px-5 py-2.5 md:px-6">
         <div className="flex min-w-0 flex-col gap-2">
@@ -712,21 +728,6 @@ function MyPageMain({
                 icon="CheckSquare"
               />
             )}
-            {!isRetired && (
-              <TabButton
-                isActive={activeTab === 'leave'}
-                onClick={() => setActiveTab('leave')}
-                label="연차휴가"
-                icon="CalendarDays"
-              />
-            )}
-            <TabButton
-              isActive={activeTab === 'records'}
-              onClick={() => { setActiveTab('records'); }}
-              label="급여·증명서"
-              icon="Receipt"
-              ariaLabel="급여·증명서"
-            />
             {!isRetired && (
               <TabButton
                 isActive={activeTab === 'documents'}
@@ -824,7 +825,7 @@ function MyPageMain({
       {/* 메인 콘텐츠 영역 */}
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[var(--page-bg)] px-5 py-5 transition-all duration-300 md:px-6">
           {activeTab === 'profile' && (
-            <div data-testid="mypage-profile-tab" className="animate-premium-fade space-y-4 pb-4">
+            <div data-testid="mypage-profile-tab" className="animate-premium-fade flex min-h-full flex-col gap-4 pb-4">
               <section className="erp-card rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
                 <div className="flex items-center justify-between gap-5">
                   <div className="flex min-w-0 items-center gap-5">
@@ -856,6 +857,58 @@ function MyPageMain({
                 </div>
               </section>
 
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+                {profileQuickCards.map((item) => {
+                  const noteTone =
+                    item.note === '개근' ||
+                    (!item.note.startsWith('지각') &&
+                      item.note !== '집계 중' &&
+                      item.note !== '결재 대기중')
+                      ? 'text-[var(--success)]'
+                      : 'text-[var(--toss-gray-3)]';
+                  const content = (
+                    <>
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] ${item.tone}`}>
+                          <LucideIcon name={item.icon} size={15} />
+                        </span>
+                        <div className="min-w-0 text-left">
+                          <p className="truncate text-[11px] font-bold text-[var(--toss-gray-4)]">{item.label}</p>
+                          <p className={`mt-0.5 truncate text-[10px] font-semibold ${noteTone}`}>
+                            {item.note}
+                          </p>
+                        </div>
+                      </div>
+                      <p className={`shrink-0 font-black leading-none ${item.value === '열기' ? 'text-[13px] text-[var(--accent)]' : 'text-[18px] text-[var(--foreground)]'}`}>
+                        {item.value}
+                      </p>
+                    </>
+                  );
+
+                  if (item.onClick) {
+                    return (
+                      <button
+                        key={item.label}
+                        type="button"
+                        onClick={item.onClick}
+                        className="flex min-h-[52px] items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 shadow-sm transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--accent-light)]"
+                      >
+                        {content}
+                      </button>
+                    );
+                  }
+
+                  return (
+                    <article
+                      key={item.label}
+                      className="flex min-h-[52px] items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 shadow-sm"
+                    >
+                      {content}
+                    </article>
+                  );
+                })}
+              </div>
+
               {isEditingProfile && (
                 <section data-testid="mypage-profile-edit-panel" className="rounded-[var(--radius-lg)] border border-[var(--accent)]/20 bg-[var(--card)] p-4 shadow-sm">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -876,51 +929,25 @@ function MyPageMain({
                 </section>
               )}
 
-              <div className="erp-stat-grid">
-                {[
-                  { label: '이번 달 근태', value: attendanceValue, note: attendanceNote, icon: 'Clock', tone: 'text-teal-500 bg-teal-50' },
-                  { label: '잔여 연차', value: `${leaveRemaining}일`, note: '연차 현황', icon: 'CalendarDays', tone: 'text-[var(--accent)] bg-[var(--accent-light)]' },
-                  { label: '이번 달 급여', value: '비공개', note: '급여명세서에서 확인', icon: 'Lock', tone: 'text-[var(--toss-gray-3)] bg-[var(--muted)]' },
-                  { label: '미결재', value: `${pendingApprovalCount}건`, note: '결재 대기중', icon: 'FileWarning', tone: 'text-amber-500 bg-amber-50' },
-                ].map((item) => (
-                  <article key={item.label} className="erp-stat-card">
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="text-[12px] font-medium text-[var(--toss-gray-4)]">{item.label}</p>
-                      <span className={`flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] ${item.tone}`}>
-                        <LucideIcon name={item.icon} size={16} />
-                      </span>
-                    </div>
-                    <p className={`mt-3 text-[24px] font-black leading-none ${item.label === '이번 달 급여' ? 'text-[var(--toss-gray-3)] tracking-widest' : 'text-[var(--foreground)]'}`}>
-                      {item.value}
-                    </p>
-                    <p className={`mt-2 text-[11px] font-semibold ${item.note === '개근' || (!item.note.startsWith('지각') && item.note !== '집계 중' && item.note !== '결재 대기중' && item.label !== '이번 달 급여') ? 'text-[var(--success)]' : 'text-[var(--toss-gray-3)]'}`}>
-                      {item.note}
-                    </p>
-                  </article>
-                ))}
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {[
-                  { label: '급여명세서 보기', desc: '비밀번호 입력 후 확인', icon: 'ShieldCheck', action: () => { setActiveTab('records'); setRecordsView('salary'); } },
-                  { label: '연차/휴가 내역', desc: `잔여 ${leaveRemaining}일`, icon: 'CalendarDays', action: () => setActiveTab('leave') },
-                  { label: '전자결재 확인', desc: `${pendingApprovalCount}건 대기`, icon: 'FileCheck2', action: () => onOpenApproval?.({ viewMode: '결재함' }) },
-                ].map((item) => (
-                  <button
-                    key={item.label}
-                    type="button"
-                    onClick={item.action}
-                    className="erp-action-tile flex items-center gap-3 text-left hover:bg-[var(--accent-light)]/35"
-                  >
-                    <span className="erp-icon-box shrink-0">
-                      <LucideIcon name={item.icon} size={17} />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-[12px] font-bold text-[var(--foreground)]">{item.label}</span>
-                      <span className="mt-1 block text-[11px] font-medium text-[var(--toss-gray-3)]">{item.desc}</span>
-                    </span>
-                  </button>
-                ))}
+              <div className="mt-auto flex flex-col gap-2 border-t border-[var(--border)] pt-4 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  data-testid="mypage-logout-button"
+                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-[12px] font-bold text-[var(--toss-gray-4)] shadow-sm transition-all hover:border-[var(--danger)]/30 hover:bg-[var(--danger-light)] hover:text-[var(--danger)]"
+                >
+                  <LucideIcon name="LogOut" size={15} />
+                  로그아웃
+                </button>
+                <button
+                  type="button"
+                  onClick={handleToggleEdit}
+                  data-testid="mypage-profile-edit-toggle"
+                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-[12px] font-bold text-[var(--foreground)] shadow-sm transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--accent-light)]"
+                >
+                  <LucideIcon name="SquarePen" size={15} />
+                  {isEditingProfile ? '수정 취소' : '정보 수정'}
+                </button>
               </div>
             </div>
           )}
@@ -945,7 +972,7 @@ function MyPageMain({
               <PayrollAndCertificatesHub
                 user={user}
                 activeView={recordsView}
-                onChangeView={setRecordsView}
+                onBack={() => setActiveTab('profile')}
               />
             </div>
           )}
