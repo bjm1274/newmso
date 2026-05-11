@@ -1044,6 +1044,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     return `${hours}시간 ${minutes}분`;
   };
 
+  // 정의: 출+퇴 모두 + 결근 아님. 출근만 있어도 카운트하려면 check_out 조건 제거
   const workedDaysCount = logs.filter((log) => !!log.check_in && !!log.check_out && getDisplayStatus(log) !== '결근').length;
   const lateCount = logs.filter((log) => getDisplayStatus(log) === '지각').length;
   const normalCount = logs.filter((log) => getDisplayStatus(log) === '정상').length;
