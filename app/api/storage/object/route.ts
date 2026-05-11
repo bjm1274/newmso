@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     const provider = String(request.nextUrl.searchParams.get('provider') || '').trim().toLowerCase();
     const bucket = String(request.nextUrl.searchParams.get('bucket') || '').trim();
-    const objectKey = String(request.nextUrl.searchParams.get('key') || '').trim();
+    const objectKey = String(request.nextUrl.searchParams.get('key') || '').trim().split('?')[0];
     const download = request.nextUrl.searchParams.get('download') === '1';
     const fileName = String(request.nextUrl.searchParams.get('name') || '').trim() || 'download';
 

@@ -1148,11 +1148,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   };
 
   const uploadBoardAttachment = useCallback(async (file: File) => {
-    const uploaded = await uploadBoardAttachmentFile(file, activeBoard);
-    return {
-      ...uploaded,
-      url: `${uploaded.url}?t=${Date.now()}`,
-    };
+    return await uploadBoardAttachmentFile(file, activeBoard);
   }, [activeBoard]);
 
   const handleNewPost = async () => {
