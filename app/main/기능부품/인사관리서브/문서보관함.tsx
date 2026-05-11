@@ -4,6 +4,7 @@ import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { extractApprovalDocNumberFromDocument, mapApprovalToDocumentRepositoryEntry } from '@/lib/approval-document-archive';
+import ArchivedDocumentView from './ArchivedDocumentView';
 
 const CATEGORIES = [
   { id: '규정', label: '규정' },
@@ -11,6 +12,19 @@ const CATEGORIES = [
   { id: '근로계약서', label: '근로계약서' },
   { id: '기타', label: '기타' }
 ];
+
+function hasApprovalArchiveSignature(doc: Record<string, unknown> | null | undefined): boolean {
+  if (!doc) return false;
+  const docNumber = String(
+    (doc as Record<string, unknown>).doc_number
+      || ((doc as Record<string, unknown>).meta_data as Record<string, unknown> | null | undefined)?.doc_number
+      || ''
+  );
+  if (/^APRV-/i.test(docNumber)) return true;
+  const content = String(doc.content || '');
+  if (/^문서번호:\s*APRV-/im.test(content)) return true;
+  return false;
+}
 
 function escapeHtml(value: unknown) {
   return String(value ?? '')
@@ -153,7 +167,11 @@ export default function DocumentRepository({
     return matchCompany && matchStaff && matchCategory;
   });
 
-  const isReadOnlySelected = Boolean(selected?.source_type === 'approval' || selected?.read_only);
+  const isReadOnlySelected = Boolean(
+    selected?.source_type === 'approval'
+    || selected?.read_only
+    || hasApprovalArchiveSignature(selected)
+  );
 
   const handleSave = async () => {
     if (!canManageDocuments) {
@@ -366,7 +384,13 @@ export default function DocumentRepository({
         <div className="lg:col-span-2 bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] p-4">
           <div className="flex items-center justify-between mb-4 gap-2">
             <h3 className="text-lg font-bold text-[var(--foreground)]">
-              {selected ? (selected.category === '근로계약서' ? '문서 열람 (수정 불가)' : '문서 수정 (버전 관리)') : '새 문서 등록'}
+              {selected
+                ? (isReadOnlySelected && selected.category !== '근로계약서')
+                  ? '보관 문서 열람'
+                  : selected.category === '근로계약서'
+                    ? '문서 열람 (수정 불가)'
+                    : '문서 수정 (버전 관리)'
+                : '새 문서 등록'}
             </h3>
             {selected && (
               <div className="flex items-center gap-2">
@@ -390,7 +414,10 @@ export default function DocumentRepository({
               </div>
             )}
           </div>
-          {selected?.category === '근로계약서' ? (
+          {isReadOnlySelected && selected && selected.category !== '근로계약서' ? (
+            /* 전자결재 자동 보관 문서 — 시각적 결재 문서 뷰 */
+            <ArchivedDocumentView doc={selected} companyName={selectedCo} />
+          ) : selected?.category === '근로계약서' ? (
             /* 계약서 전용 뷰어 (A4 스타일) */
             <div className="bg-[var(--tab-bg)] p-4 md:p-5 rounded-[var(--radius-md)] min-h-[600px] flex justify-center overflow-y-auto max-h-[700px] custom-scrollbar">
               <div className="w-full max-w-[650px] bg-[var(--card)] shadow-sm p-5 md:p-14 font-serif text-[12px] leading-relaxed relative border border-[var(--border)]">
@@ -469,11 +496,19 @@ export default function DocumentRepository({
               </p>
             </div>
           )}
-          <div className="flex gap-2">
-            {selected?.category !== '근로계약서' && (
+          <div className="flex gap-2 mt-3">
+            {!isReadOnlySelected && selected?.category !== '근로계약서' && (
               <button onClick={handleSave} disabled={saving || !canManageDocuments} className="px-4 py-2 bg-[var(--accent)] text-white font-semibold rounded-[var(--radius-md)] hover:bg-[var(--accent)] disabled:opacity-50">저장</button>
             )}
-            {selected && <button onClick={() => { setSelected(null); setForm({ title: '', category: '규정', content: '' }); }} className="px-4 py-2 bg-[var(--muted)] text-[var(--toss-gray-4)] font-semibold rounded-[var(--radius-md)]">취소</button>}
+            {selected && (
+              <button
+                type="button"
+                onClick={() => { setSelected(null); setForm({ title: '', category: '규정', content: '' }); }}
+                className="px-4 py-2 bg-[var(--muted)] text-[var(--toss-gray-4)] font-semibold rounded-[var(--radius-md)]"
+              >
+                {isReadOnlySelected ? '닫기' : '취소'}
+              </button>
+            )}
           </div>
         </div>
       </div>

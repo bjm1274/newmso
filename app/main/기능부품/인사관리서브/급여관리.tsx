@@ -11,6 +11,7 @@ import type { StaffMember } from '@/types';
 import SalaryDetail from './급여명세/급여상세';
 import PayrollTable from './급여명세/급여대장표';
 import InterimSettlement from './급여명세/중간정산';
+import DailyWorkerSettlement from './급여명세/일용근로정산';
 import PayrollLockPanel from './급여명세/급여월마감잠금';
 import YearEndSettlement from './급여명세/연말정산';
 import SalarySettlement from './급여명세/급여정산';
@@ -26,7 +27,6 @@ import SalarySimulator from './급여명세/급여시뮬레이터';
 import InsuranceEDI from './급여명세/4대보험EDI';
 import RetirementPensionManager from './급여명세/퇴직연금관리';
 import WagePeakCalculator from './급여명세/임금피크제';
-import PayrollComplianceCheck from './급여명세/급여기준점검';
 import OrdinaryWageCalculator from './급여명세/통상임금계산기';
 import UnpaidAllowanceAlert from './급여명세/미지급수당알림';
 import PayrollAdvancedCenter from './급여명세/급여고도화센터';
@@ -332,7 +332,6 @@ export default function PayrollMain({
     { id: '급여시뮬레이터', label: '급여 시뮬레이터', icon: '🧮' },
     { id: '퇴직연금', label: '퇴직연금', icon: '💼' },
     { id: '임금피크제', label: '임금피크제', icon: '📉' },
-    { id: '급여기준체크', label: '최저임금·비과세 점검', icon: '⚠️' },
     { id: '통상임금', label: '통상임금 계산기', icon: '🧮' },
     { id: '미지급수당', label: '미지급 수당 알림', icon: '🔔' },
     { id: '급여고도화', label: '급여 고도화', icon: '🧩' },
@@ -501,7 +500,7 @@ export default function PayrollMain({
             )}
 
             {activeTab === '통합설정' && (
-              <IntegratedHRSettings companyName={selectedCo ?? ''} />
+              <IntegratedHRSettings companyName={selectedCo ?? ''} enabledMenus={['policy', 'shift', 'lock']} />
             )}
             {activeTab === '원천징수파일' && (
               <div className="p-4">
@@ -528,7 +527,6 @@ export default function PayrollMain({
             )}
             {activeTab === '퇴직연금' && <RetirementPensionManager staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
             {activeTab === '임금피크제' && <WagePeakCalculator staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
-            {activeTab === '급여기준체크' && <PayrollComplianceCheck staffs={filtered} selectedCo={selectedCo ?? ''} user={user} />}
             {activeTab === '통상임금' && <OrdinaryWageCalculator staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
             {activeTab === '미지급수당' && <UnpaidAllowanceAlert staffs={filtered} selectedCo={selectedCo ?? ''} user={null} />}
             {activeTab === '급여고도화' && (
@@ -569,7 +567,7 @@ function RunPayrollWizard({
   yearMonth: string;
   onRefresh?: () => void;
 }) {
-  const [mode, setMode] = useState<'select' | 'regular' | 'interim' | 'lock'>('select');
+  const [mode, setMode] = useState<'select' | 'regular' | 'interim' | 'daily' | 'lock'>('select');
 
   if (mode === 'regular') {
     return (
@@ -593,6 +591,17 @@ function RunPayrollWizard({
     );
   }
 
+  if (mode === 'daily') {
+    return (
+      <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <button onClick={() => setMode('select')} className="px-4 py-2 bg-[var(--muted)] text-[var(--foreground)] text-xs font-bold rounded-[var(--radius-md)] hover:bg-[var(--toss-gray-2)] transition-colors">
+          ← 마법사 홈으로 돌아가기
+        </button>
+        <DailyWorkerSettlement staffs={staffs} selectedCo={selectedCo} yearMonth={yearMonth} onRefresh={onRefresh} />
+      </div>
+    );
+  }
+
   if (mode === 'lock') {
     return (
       <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -612,7 +621,7 @@ function RunPayrollWizard({
   return (
     <div className="flex flex-col items-center justify-center py-20 px-4 min-h-[60vh] animate-in zoom-in-95 duration-500" data-testid="run-payroll-wizard">
       <div className="bg-[var(--card)] backdrop-blur-3xl p-4 rounded-2xl border border-[var(--border)] shadow-sm text-center max-w-3xl w-full">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           <button
             data-testid="run-payroll-regular-button"
             onClick={() => setMode('regular')}
@@ -631,6 +640,16 @@ function RunPayrollWizard({
             <div className="w-12 h-12 bg-amber-50 text-amber-500 rounded-[var(--radius-xl)] flex items-center justify-center text-2xl mb-4 shadow-inner group-hover:scale-110 transition-transform">👋</div>
             <h3 className="text-lg font-bold text-[var(--foreground)] mb-2">중도 퇴사자 정산</h3>
             <p className="text-xs text-[var(--toss-gray-3)] leading-relaxed">월중 퇴사한 직원의 급여를 근무일수에 비례하여 일할 계산(Prorated) 처리합니다.</p>
+          </button>
+
+          <button
+            data-testid="run-payroll-daily-button"
+            onClick={() => setMode('daily')}
+            className="group flex flex-col items-start p-4 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] hover:border-orange-500 hover:shadow-sm transition-all text-left"
+          >
+            <div className="w-12 h-12 bg-orange-50 text-orange-500 rounded-[var(--radius-xl)] flex items-center justify-center text-2xl mb-4 shadow-inner group-hover:scale-110 transition-transform">📆</div>
+            <h3 className="text-lg font-bold text-[var(--foreground)] mb-2">일용직 정산</h3>
+            <p className="text-xs text-[var(--toss-gray-3)] leading-relaxed">일용근로자에게 지급되는 일당과 원천세를 자동으로 계산하여 정산 처리합니다.</p>
           </button>
 
           <button

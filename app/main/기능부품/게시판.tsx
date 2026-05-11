@@ -1515,21 +1515,6 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                {['기본', '옵션', '첨부', '일정'].map((label, index) => (
-                  <div
-                    key={label}
-                    className={`rounded-[var(--radius-md)] border px-3 py-2 text-center text-[11px] font-black ${
-                      index === 0
-                        ? 'border-[var(--accent)] bg-[var(--accent-light)] text-[var(--accent)]'
-                        : 'border-[var(--border)] bg-[var(--muted)] text-[var(--toss-gray-3)]'
-                    }`}
-                  >
-                    {label}
-                  </div>
-                ))}
-              </div>
-
               <div className="space-y-4">
                 <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)]/60 p-3">
                   <div className="mb-3 flex items-center justify-between gap-2">

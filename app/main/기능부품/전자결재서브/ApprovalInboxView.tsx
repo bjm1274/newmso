@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState, type Dispatch, type SetStateAction } from 'react';
-import { EmptyState } from '@/app/components/StatePanel';
 import type { StaffMember } from '@/types';
 import { LucideIcon } from '../조직도서브/조직도측면창';
 import { ALL_DOCUMENT_FILTER } from './approval-constants';
@@ -148,13 +147,6 @@ export default function ApprovalInboxView({
     return { label: '대기', className: 'erp-status erp-status-yellow' };
   };
 
-  const permissionScopeCopy =
-    viewMode === '기안함'
-      ? '내가 기안한 문서만 표시됩니다. 회수 가능한 문서는 대기 상태 문서로 제한됩니다.'
-      : viewMode === '참조 문서함'
-        ? '참조자로 지정된 문서만 표시됩니다. 승인·반려 권한은 현재 결재자에게만 있습니다.'
-        : '내 결재선에 포함되었거나 현재 결재자로 지정된 문서만 표시됩니다. 일괄 처리는 현재 내가 처리할 수 있는 대기 문서에만 적용됩니다.';
-
   const closeBulkReview = () => {
     setBulkReviewAction(null);
     setBulkRejectReason('');
@@ -193,18 +185,6 @@ export default function ApprovalInboxView({
               <h2 className="text-lg font-black tracking-tight text-[var(--foreground)]">{viewMode}</h2>
             </div>
             <span className="erp-chip erp-chip-active">{listForView.length}건</span>
-          </div>
-
-          <div className="rounded-[var(--radius-lg)] border border-[var(--accent)]/15 bg-[var(--accent-selected-subtle)] px-3 py-2">
-            <div className="flex items-start gap-2">
-              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--card)] text-[var(--accent)]">
-                <LucideIcon name="ShieldCheck" size={15} strokeWidth={2.2} />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[12px] font-black text-[var(--foreground)]">권한 스코프</p>
-                <p className="mt-0.5 text-[11px] font-semibold leading-relaxed text-[var(--muted-foreground)]">{permissionScopeCopy}</p>
-              </div>
-            </div>
           </div>
 
           <div className="grid gap-2 md:grid-cols-[minmax(140px,180px)_minmax(140px,180px)_minmax(140px,180px)_1fr]">
@@ -368,18 +348,7 @@ export default function ApprovalInboxView({
         </div>
       )}
 
-      {listForView.length === 0 ? (
-        <EmptyState
-          title={
-            approvalKeyword
-              ? '검색 조건에 맞는 결재 내역이 없습니다'
-              : approvalStatusFilter === '전체'
-                ? '조건에 맞는 결재 내역이 없습니다'
-                : `${approvalStatusFilter === '대기' ? '대기중' : approvalStatusFilter === '승인' ? '승인된' : '반려된'} 건이 없습니다`
-          }
-          description="문서 유형, 상태, 기간, 검색어를 조정하면 다른 결재 내역을 확인할 수 있습니다."
-        />
-      ) : (
+      {listForView.length === 0 ? null : (
         <section className="erp-table-card">
           <div className="overflow-x-auto">
             <table className="erp-table min-w-[860px]">

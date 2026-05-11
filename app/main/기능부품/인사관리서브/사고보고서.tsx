@@ -15,6 +15,19 @@ const INCIDENT_TYPES = ['부상', '의료사고', '화재', '안전사고', '감
 const SEVERITIES = ['경미', '중간', '중대', '심각'];
 const STATUSES = ['접수', '조사중', '조치완료', '종결'];
 
+function normalizeInvolvedPersons(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === 'string');
+  if (typeof value === 'string' && value.trim().startsWith('[')) {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 interface Report {
   id?: string;
   incident_date: string;
@@ -74,7 +87,12 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      setReports(data || []);
+      setReports(
+        (data || []).map((row) => ({
+          ...row,
+          involved_persons: normalizeInvolvedPersons(row.involved_persons),
+        }))
+      );
     } catch (error) {
       console.error('incident_reports fetch failed:', error);
       setReports([]);
@@ -235,7 +253,7 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
             <tr><th>즉시 조치</th><td colspan="3">${report.immediate_action || '-'}</td></tr>
             <tr><th>근본 원인</th><td colspan="3">${report.root_cause || '-'}</td></tr>
             <tr><th>재발 방지</th><td colspan="3">${report.preventive_measures || '-'}</td></tr>
-            <tr><th>관련자</th><td colspan="3">${(report.involved_persons || []).join(', ') || '-'}</td></tr>
+            <tr><th>관련자</th><td colspan="3">${normalizeInvolvedPersons(report.involved_persons).join(', ') || '-'}</td></tr>
             <tr><th>보고자</th><td>${report.reporter_name || '-'}</td><th>상태</th><td>${report.status}</td></tr>
           </table>
         </body>
@@ -545,9 +563,9 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
 
                   <p className="line-clamp-2 text-xs text-[var(--toss-gray-4)]">{report.description}</p>
 
-                  {report.involved_persons?.length ? (
+                  {(Array.isArray(report.involved_persons) ? report.involved_persons : []).length ? (
                     <p className="mt-2 text-[10px] text-[var(--toss-gray-3)]">
-                      관련 직원: {report.involved_persons.join(', ')}
+                      관련 직원: {(Array.isArray(report.involved_persons) ? report.involved_persons : []).join(', ')}
                     </p>
                   ) : null}
 

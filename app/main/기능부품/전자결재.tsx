@@ -479,8 +479,26 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
     });
   }, [buildApprovalPrintHtml]);
 
+  const allCompaniesApproverCandidates = useMemo(() => {
+    const list = Array.isArray(staffs) ? staffs : [];
+    const positionOrder = (staff: StaffMember) =>
+      APPROVER_POSITIONS.indexOf(String(staff.position || '').trim());
+    return list
+      .filter(
+        (staff) =>
+          isActiveStaff(staff) &&
+          APPROVER_POSITIONS.includes(String(staff.position || '').trim())
+      )
+      .sort((a, b) => {
+        const order = positionOrder(a) - positionOrder(b);
+        if (order !== 0) return order;
+        const companyDiff = String(a.company || '').localeCompare(String(b.company || ''));
+        if (companyDiff !== 0) return companyDiff;
+        return String(a.name || '').localeCompare(String(b.name || ''));
+      });
+  }, [staffs]);
+
   const {
-    approverCandidates,
     normalizeApprovalLineIds,
     resolveApprovalLineIds,
     resolveStoredCurrentApproverId,
@@ -1192,7 +1210,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
             setDraftBanner={setDraftBanner}
             loadDraftFromStorage={loadDraftFromStorage}
             clearDraftFromStorage={clearDraftFromStorage}
-            approverCandidates={approverCandidates}
+            approverCandidates={allCompaniesApproverCandidates}
             approvalDirectoryStaffs={approvalDirectoryStaffs}
             approverLine={approverLine}
             setApproverLine={setApproverLine}
