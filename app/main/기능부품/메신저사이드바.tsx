@@ -293,10 +293,9 @@ export function MessengerSidebar({
                         >
                           {preview}
                         </div>
-                        {(isGroupRoom && participantCount > 0) || unread > 0 ? (
+                        {unread > 0 ? (
                           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                            {isGroupRoom && participantCount > 0 ? <span>참여 {participantCount}</span> : null}
-                            {unread > 0 ? <span className="text-[var(--accent)]">새 메시지 {unread > 99 ? '99+' : unread}</span> : null}
+                            <span className="text-[var(--accent)]">새 메시지 {unread > 99 ? '99+' : unread}</span>
                           </div>
                         ) : null}
                       </div>
