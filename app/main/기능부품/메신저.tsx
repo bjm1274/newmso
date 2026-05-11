@@ -12,10 +12,7 @@ import {
 import { upsertRoomReadCursors } from '@/lib/chat-read-cursors';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
-import {
-  CHAT_ROOM_SELECT,
-  POLL_SELECT,
-} from '@/lib/chat-query-columns';
+import { POLL_SELECT } from '@/lib/chat-query-columns';
 import { CHAT_ACTIVE_ROOM_KEY, CHAT_FOCUS_KEY, CHAT_ROOM_KEY } from '@/app/main/navigation-state';
 import SmartDatePicker from './공통/SmartDatePicker';
 import {
@@ -37,6 +34,7 @@ import { useChatMessageWorkflow } from './메신저메시지액션워크플로�
 import { useChatRoomManagement } from './메신저방관리훅';
 import { useChatRoomDataSync } from './메신저방데이터훅';
 import { useChatSidebarState } from './메신저사이드바훅';
+import { fetchAllChatRooms, writeCachedChatRooms } from './chatQueryService';
 import { useChatMessageSending } from './메신저전송훅';
 import { useScheduledNoticeDispatcher } from './메신저예약공지훅';
 import { useChatRoomPreferences } from './메신저방환경설정훅';
@@ -516,10 +514,16 @@ export default function ChatView({
     return getEffectiveRoomMemberIds(room).includes(effectiveChatUserId);
   }, [effectiveChatUserId, getEffectiveRoomMemberIds]);
 
-  const selectedRoom = useMemo(
-    () => chatRooms.find((room: ChatRoom) => room.id === selectedRoomId && isRoomAccessibleToCurrentUser(room)) || null,
-    [chatRooms, isRoomAccessibleToCurrentUser, selectedRoomId]
-  );
+  const selectedRoom = useMemo(() => {
+    const room = chatRooms.find((candidate: ChatRoom) => candidate.id === selectedRoomId) || null;
+    if (!room) return null;
+    if (isRoomAccessibleToCurrentUser(room)) return room;
+
+    const hasAnyAccessibleConversation = chatRooms.some((candidate: ChatRoom) =>
+      String(candidate.id) !== NOTICE_ROOM_ID && isRoomAccessibleToCurrentUser(candidate),
+    );
+    return hasAnyAccessibleConversation ? null : room;
+  }, [chatRooms, isRoomAccessibleToCurrentUser, selectedRoomId]);
 
   const {
     unreadModalMsg,
@@ -1627,7 +1631,7 @@ export default function ChatView({
         const { data: insertedRoom, error } = (await supabase
           .from('chat_rooms')
           .insert([{ name: SELF_ROOM_NAME, type: 'direct', members: [currentUserId] }])
-          .select(CHAT_ROOM_SELECT)
+          .select('id, name, type, members, created_at')
           .single()) as { data: ChatRoom | null; error: unknown };
         if (error) throw error;
         if (!insertedRoom) return sourceRooms;
@@ -1789,32 +1793,44 @@ export default function ChatView({
   }, [clearPendingBottomAlignReleaseTimer, clearPendingMessageScrollTimer]);
 
   useEffect(() => {
+    let active = true;
     const loadRooms = async () => {
-      const { data: noticeRoom } = await supabase
-        .from('chat_rooms')
-        .select('id')
-        .eq('id', NOTICE_ROOM_ID)
-        .maybeSingle();
-
-      if (!noticeRoom) {
-        await supabase.from('chat_rooms').insert([
-          { id: NOTICE_ROOM_ID, name: NOTICE_ROOM_NAME, type: 'notice', members: noticeRoomMemberIds },
-        ]);
-      } else {
-        await supabase
+      try {
+        const { data: noticeRoom } = await supabase
           .from('chat_rooms')
-          .update({ name: NOTICE_ROOM_NAME, type: 'notice', members: noticeRoomMemberIds })
-          .eq('id', NOTICE_ROOM_ID);
+          .select('id')
+          .eq('id', NOTICE_ROOM_ID)
+          .maybeSingle();
+
+        if (!noticeRoom) {
+          await supabase.from('chat_rooms').insert([
+            { id: NOTICE_ROOM_ID, name: NOTICE_ROOM_NAME, type: 'notice', members: noticeRoomMemberIds },
+          ]);
+        } else {
+          await supabase
+            .from('chat_rooms')
+            .update({ name: NOTICE_ROOM_NAME, type: 'notice', members: noticeRoomMemberIds })
+            .eq('id', NOTICE_ROOM_ID);
+        }
+
+        const roomResult = await fetchAllChatRooms({ force: true });
+        if (roomResult.error) throw roomResult.error;
+        const roomsWithSelf = await ensureSelfChatRoom(roomResult.data);
+        if (!active) return;
+        const syncedRooms = await syncChatRoomsState(roomsWithSelf);
+        writeCachedChatRooms(syncedRooms);
+      } catch (error) {
+        logger.error('채팅방 목록 로드 실패:', error);
+        if (active && chatRoomsRef.current.length > 0) {
+          await syncChatRoomsState(chatRoomsRef.current);
+        }
       }
-      const { data: rooms } = (await supabase.from('chat_rooms').select(CHAT_ROOM_SELECT)) as {
-        data: ChatRoom[] | null;
-        error: unknown;
-      };
-      const roomsWithSelf = await ensureSelfChatRoom(rooms || []);
-      await syncChatRoomsState(roomsWithSelf);
     };
-    loadRooms();
+    void loadRooms();
     // selectedRoomId 변경과 무관하게 방 목록은 한 번 더 동기화한다.
+    return () => {
+      active = false;
+    };
   }, [ensureSelfChatRoom, noticeRoomMemberIds, syncChatRoomsState]);
 
   useEffect(() => {

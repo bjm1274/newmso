@@ -1,8 +1,12 @@
-const CHAT_ROOM_COLUMNS = [
+const CHAT_ROOM_REQUIRED_COLUMNS = [
   'id',
   'name',
   'type',
+];
+
+export const CHAT_ROOM_OPTIONAL_COLUMNS = [
   'members',
+  'member_ids',
   'created_at',
   'created_by',
   'last_message',
@@ -10,7 +14,14 @@ const CHAT_ROOM_COLUMNS = [
   'last_message_preview',
 ];
 
-export const CHAT_ROOM_SELECT = CHAT_ROOM_COLUMNS.join(', ');
+export function buildChatRoomSelect(omittedColumns?: ReadonlySet<string>) {
+  return [
+    ...CHAT_ROOM_REQUIRED_COLUMNS,
+    ...CHAT_ROOM_OPTIONAL_COLUMNS.filter((column) => !omittedColumns?.has(column)),
+  ].join(', ');
+}
+
+export const CHAT_ROOM_SELECT = buildChatRoomSelect(new Set(['member_ids']));
 
 const CHAT_MESSAGE_COLUMNS = [
   'id',

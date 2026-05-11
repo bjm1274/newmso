@@ -2,12 +2,13 @@
 
 import { useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { supabase } from '@/lib/supabase';
-import { CHAT_ROOM_SELECT, POLL_SELECT } from '@/lib/chat-query-columns';
+import { POLL_SELECT } from '@/lib/chat-query-columns';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 import {
   fetchUnreadCountsForRoomIds,
   selectChatMessagesWithFallback as defaultSelectChatMessagesWithFallback,
 } from './메신저데이터유틸';
+import { fetchAllChatRooms } from './chatQueryService';
 import { getDeletedMessagePreviewText, getMessageDisplayText } from './메신저첨부';
 import {
   compareStaffMembers,
@@ -713,13 +714,13 @@ export function useChatRoomDataSync({
       fetchDataRequestSeqRef.current === requestSeq &&
       String(selectedRoomIdRef.current || '') === roomIdForFetch;
 
-    const { data: roomRows } = (await supabase.from('chat_rooms').select(CHAT_ROOM_SELECT)) as {
-      data: ChatRoom[] | null;
-      error: unknown;
-    };
+    const roomResult = await fetchAllChatRooms({ force: true });
+    if (roomResult.error) {
+      console.error('채팅방 목록 조회 실패:', roomResult.error);
+    }
     if (!isCurrentRequest()) return;
 
-    const repairedRooms = await repairDirectRooms(roomRows || []);
+    const repairedRooms = await repairDirectRooms(roomResult.data || []);
     if (!isCurrentRequest()) return;
 
     const selectedRoomRecord =

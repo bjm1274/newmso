@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { supabase } from '@/lib/supabase';
-import { CHAT_ROOM_SELECT } from '@/lib/chat-query-columns';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 import { fetchAllChatRooms, readCachedChatRooms, writeCachedChatRooms } from './chatQueryService';
 import type { PresenceInfo } from './메신저타입';
@@ -404,7 +403,7 @@ export function useChatRealtimeBridge({
       const { data: insertedRoom, error } = (await supabase
         .from('chat_rooms')
         .insert([{ name: SELF_ROOM_NAME, type: 'direct', members: [currentUserId] }])
-        .select(CHAT_ROOM_SELECT)
+        .select('id, name, type, members, created_at')
         .single()) as { data: ChatRoom | null; error: unknown };
       if (error) throw error;
       if (!insertedRoom) return sourceRooms;
