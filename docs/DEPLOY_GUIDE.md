@@ -42,31 +42,23 @@ npm run dev
 
 ---
 
-## 3. Vercel 배포
+## 3. Cloudflare Workers 배포
 
 ### 3-1. 준비
-1. [Vercel](https://vercel.com) 계정
-2. GitHub에 프로젝트 푸시
+1. Cloudflare 계정 및 Workers 권한 확인
+2. `.env.local`에 Supabase 및 푸시 관련 환경 변수 설정
+3. `wrangler.toml`의 Worker 이름과 호환성 날짜 확인
 
-### 3-2. 배포 (방법 A: Vercel 대시보드)
-1. [vercel.com](https://vercel.com) 로그인
-2. **Add New** → **Project**
-3. GitHub에서 `bjm1274/newmso` 레포지토리 Import
-4. **Environment Variables**에 추가:
-   - `NEXT_PUBLIC_SUPABASE_URL` = Supabase 프로젝트 URL
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = Supabase anon key
-5. **Deploy** 클릭
-
-### 3-3. 배포 (방법 B: Vercel CLI)
+### 3-2. 배포
 ```bash
-npx vercel login     # 먼저 로그인
-npx vercel --prod    # 프로덕션 배포
+npm run build:cloudflare
+npx wrangler deploy
 ```
 
-### 3-3. 빌드 명령
-- Build Command: `npm run build`
-- Output Directory: `.next`
-- Install Command: `npm install`
+### 3-3. 빌드 산출물
+- Build Command: `npm run build:cloudflare`
+- Worker Entry: `cloudflare-worker.ts`
+- OpenNext Output: `.open-next/`
 
 ---
 

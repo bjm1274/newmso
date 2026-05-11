@@ -29,7 +29,7 @@ import { MenuIcon } from './조직도서브/조직도측면창';
 import { selectChatMessagesWithFallback } from './메신저데이터유틸';
 import { MessengerDrawer } from './메신저드로어';
 import { bindMockNotificationInsert } from './메신저테스트이벤트';
-import { MessengerMessageActions, ReactionDetailModal } from './메신저액션';
+import { ReactionDetailModal } from './메신저액션';
 import { useChatMessageActions } from './메신저액션훅';
 import { useChatGlobalSearch } from './메신저검색훅';
 import { renderMessageContent } from './메신저메시지렌더';
@@ -2764,7 +2764,6 @@ export default function ChatView({
   const {
     openMessageActions,
     addTaskFromMessage,
-    handleAddTaskFromAction,
     startReplyToMessage,
     startForwardMessage,
     handleForwardToRoom,
@@ -2974,6 +2973,9 @@ export default function ChatView({
             readCounts={readCounts}
             deliveryStates={deliveryStates}
             threadSummaries={threadSummaries}
+            activeActionMessageId={activeActionMsg ? String(activeActionMsg.id) : null}
+            pinnedIds={pinnedIds}
+            bookmarkedIds={bookmarkedIds}
             roomMembers={roomMembers}
             effectiveChatUserId={effectiveChatUserId}
             activeMessageHighlightQuery={activeMessageHighlightQuery}
@@ -2990,6 +2992,24 @@ export default function ChatView({
             onOpenThread={openTrackedThreadPanel}
             onOpenBoardPost={onOpenBoardPost}
             onOpenMessageActions={openMessageActions}
+            onCloseMessageActions={() => setActiveActionMsg(null)}
+            onToggleReaction={(message, emoji) => {
+              void toggleReaction(String(message.id), emoji);
+            }}
+            onAddTask={addTaskFromMessage}
+            onTogglePin={(message) => {
+              void togglePin(String(message.id));
+            }}
+            onToggleBookmark={(message) => {
+              void toggleBookmark(String(message.id));
+            }}
+            onForwardMessage={startForwardMessage}
+            onDeleteMessage={deleteMessageFromActions}
+            onStartEdit={startEditMessage}
+            onOpenEditHistory={openEditHistory}
+            onCopyMessageLink={handleCopyMessageLink}
+            onOpenReadStatusPanel={openReadStatusPanel}
+            onOpenThreadPanel={openTrackedThreadPanel}
             onMarkMessageRead={markMessageRead}
             renderMessageContent={renderMessageContent}
             onOpenAttachmentPreview={openAttachmentPreview}
@@ -3124,65 +3144,6 @@ export default function ChatView({
           onCancelEditingRoomName={handleCancelEditingRoomName}
           onStartEditingRoomName={handleStartEditingRoomName}
           onLeaveRoom={handleLeaveRoomFromDrawer}
-        />
-
-        <MessengerMessageActions
-          message={activeActionMsg}
-          currentUserId={effectiveChatUserId || user?.id}
-          isPinned={Boolean(activeActionMsg && pinnedIds.includes(String(activeActionMsg.id)))}
-          isBookmarked={Boolean(activeActionMsg && bookmarkedIds.has(String(activeActionMsg.id)))}
-          onClose={() => setActiveActionMsg(null)}
-          onToggleReaction={(emoji) => {
-            if (!activeActionMsg) return;
-            void toggleReaction(String(activeActionMsg.id), emoji);
-          }}
-          onAddTask={() => {
-            void handleAddTaskFromAction();
-          }}
-          onTogglePin={() => {
-            if (!activeActionMsg) return;
-            void togglePin(String(activeActionMsg.id));
-            setActiveActionMsg(null);
-          }}
-          onToggleBookmark={() => {
-            if (!activeActionMsg) return;
-            void toggleBookmark(String(activeActionMsg.id));
-            setActiveActionMsg(null);
-          }}
-          onStartEdit={() => {
-            if (!activeActionMsg) return;
-            startEditMessage(activeActionMsg);
-            setActiveActionMsg(null);
-          }}
-          onOpenEditHistory={() => {
-            if (!activeActionMsg) return;
-            void openEditHistory(activeActionMsg);
-            setActiveActionMsg(null);
-          }}
-          onDelete={() => {
-            if (!activeActionMsg) return;
-            void deleteMessageFromActions(activeActionMsg);
-          }}
-          onReply={() => {
-            if (!activeActionMsg) return;
-            startReplyToMessage(activeActionMsg);
-          }}
-          onForward={() => {
-            if (!activeActionMsg) return;
-            startForwardMessage(activeActionMsg);
-          }}
-          onCopyLink={() => {
-            if (!activeActionMsg) return;
-            void handleCopyMessageLink(activeActionMsg);
-          }}
-          onOpenReadStatus={() => {
-            if (!activeActionMsg) return;
-            openReadStatusPanel(activeActionMsg);
-          }}
-          onOpenThread={() => {
-            if (!activeActionMsg) return;
-            openTrackedThreadPanel(activeActionMsg);
-          }}
         />
 
         <MessageEditModal

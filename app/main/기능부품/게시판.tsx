@@ -83,6 +83,10 @@ type BoardCommentRow = {
   parent_comment_id?: string | null;
   [key: string]: unknown;
 };
+
+const isAnonymousReadStatusPost = (post: BoardPost | null | undefined) =>
+  Boolean(post?.is_anonymous) || String(post?.board_type || '') === '익명소리함';
+
 export default function BoardView({ user, subView, setSubView, selectedCo, selectedCompanyId, initialBoard, initialPostId, onConsumePostId, surgeries, mris, setMainMenu }: BoardViewProps) {
   const { dialog, openConfirm } = useActionDialog();
   const defaultBoard =
@@ -277,7 +281,12 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   }, [effectiveBoardUserId]);
 
   const loadBoardReadState = useCallback(async (postIds?: string[]) => {
-    const targetIds = (postIds || visiblePosts.map((post) => String(post.id ?? '').trim()).filter(Boolean));
+    const targetIds = (postIds || visiblePosts.map((post) => String(post.id ?? '').trim()).filter(Boolean))
+      .filter((postId) => {
+        const post = visiblePosts.find((item) => String(item.id ?? '').trim() === postId) ||
+          posts.find((item) => String(item.id ?? '').trim() === postId);
+        return !post || !isAnonymousReadStatusPost(post);
+      });
     if (targetIds.length === 0) {
       setPostReadMap({});
       return;
@@ -304,10 +313,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       nextMap[postId].add(userId);
     });
     setPostReadMap(nextMap);
-  }, [visiblePosts]);
+  }, [posts, visiblePosts]);
 
   const markBoardPostRead = useCallback(async (post: BoardPost | null) => {
     if (!post?.id || !effectiveBoardUserId) return;
+    if (isAnonymousReadStatusPost(post)) return;
     const postId = String(post.id).trim();
     if (!postId || readMarkingRef.current.has(postId)) return;
 
@@ -332,6 +342,10 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     readMarkingRef.current.delete(postId);
   }, [effectiveBoardUserId]);
   const openReadStatusModal = useCallback(async (post: BoardPost) => {
+    if (isAnonymousReadStatusPost(post)) {
+      toast('익명 게시글은 읽음 확인을 사용할 수 없습니다.', 'warning');
+      return;
+    }
     setReadStatusPost(post);
     setReadStatusLoading(true);
     try {
@@ -856,6 +870,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   }, [selectedPostComments]);
   const readStatusReaders = useMemo(() => {
     if (!readStatusPost) return [];
+    if (isAnonymousReadStatusPost(readStatusPost)) return [];
     const postId = String(readStatusPost.id ?? '').trim();
     const readSet = postReadMap[postId] || new Set<string>();
     const audience = readStatusAudience.length > 0 ? readStatusAudience : boardAudience;
@@ -868,6 +883,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   }, [boardAudience, readStatusAudience, postReadMap, readStatusPost]);
   const readStatusPendingAudience = useMemo(() => {
     if (!readStatusPost) return [];
+    if (isAnonymousReadStatusPost(readStatusPost)) return [];
     const postId = String(readStatusPost.id ?? '').trim();
     const readSet = postReadMap[postId] || new Set<string>();
     const audience = readStatusAudience.length > 0 ? readStatusAudience : boardAudience;
@@ -2562,13 +2578,15 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                     >
                       {myLikedPostIds.has(String(selectedPost.id ?? '').trim()) ? '♥' : '♡'} 좋아요 {(selectedPost.likes_count as number) ?? 0}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => void openReadStatusModal(selectedPost)}
-                      className="px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--border)] text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
-                    >
-                      읽음 확인
-                    </button>
+                    {!isAnonymousReadStatusPost(selectedPost) && (
+                      <button
+                        type="button"
+                        onClick={() => void openReadStatusModal(selectedPost)}
+                        className="px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--border)] text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
+                      >
+                        읽음 확인
+                      </button>
+                    )}
                     {(canEditPost(selectedPost) || canDeletePost(selectedPost)) && (
                       <>
                         {canEditPost(selectedPost) && (
@@ -2920,7 +2938,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
               </div>
             </div>
           )}
-          {readStatusPost && (
+          {readStatusPost && !isAnonymousReadStatusPost(readStatusPost) && (
             <div
               className="fixed inset-0 z-[var(--z-modal)] flex items-end md:items-center justify-center bg-black/40 p-0 md:p-5"
               onClick={() => setReadStatusPost(null)}

@@ -9,7 +9,7 @@
 | 언어 | TypeScript |
 | DB / Auth | Supabase (PostgreSQL, Realtime, Storage, Auth) |
 | AI | OpenAI (채팅), Google Gemini (퇴원심사) |
-| 배포 | Vercel |
+| 배포 | Cloudflare Workers |
 | 푸시 알림 | Web Push (VAPID) |
 | PWA | Service Worker, TWA (Android) |
 

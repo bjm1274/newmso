@@ -7,7 +7,6 @@ import { MessengerComposer } from './메신저컴포저';
 import { MessengerDrawer } from './메신저드로어';
 import { GroupChatModal } from './메신저그룹생성모달';
 import { MessengerTimeline, type MessengerTimelineItem } from './메신저타임라인';
-import { MessengerMessageActions } from './메신저액션';
 import { NOTICE_ROOM_ID } from './메신저유틸';
 import type { ChatViewController } from './useChatViewController';
 
@@ -89,6 +88,9 @@ export function MessengerConversationPanel({ controller }: MessengerConversation
         readCounts={c.readCounts}
         deliveryStates={c.deliveryStates}
         threadSummaries={c.threadSummaries}
+        activeActionMessageId={c.activeActionMsg ? String(c.activeActionMsg.id) : null}
+        pinnedIds={c.pinnedIds || []}
+        bookmarkedIds={c.bookmarkedIds || new Set<string>()}
         roomMembers={c.roomMembers}
         effectiveChatUserId={c.effectiveChatUserId}
         activeMessageHighlightQuery={c.activeMessageHighlightQuery}
@@ -104,6 +106,18 @@ export function MessengerConversationPanel({ controller }: MessengerConversation
         onStartReplyToMessage={c.startReplyToMessage}
         onOpenThread={c.openTrackedThreadPanel}
         onOpenMessageActions={c.openMessageActions}
+        onCloseMessageActions={() => c.setActiveActionMsg?.(null)}
+        onToggleReaction={(message, emoji) => c.toggleReaction?.(String(message.id), emoji)}
+        onAddTask={c.addTaskFromMessage}
+        onTogglePin={(message) => c.togglePin?.(String(message.id))}
+        onToggleBookmark={(message) => c.toggleBookmark?.(String(message.id))}
+        onForwardMessage={c.startForwardMessage}
+        onDeleteMessage={c.deleteMessageFromActions}
+        onStartEdit={c.startEditMessage}
+        onOpenEditHistory={c.openEditHistory}
+        onCopyMessageLink={c.handleCopyMessageLink}
+        onOpenReadStatusPanel={c.openReadStatusPanel}
+        onOpenThreadPanel={c.openTrackedThreadPanel}
         onMarkMessageRead={c.markMessageRead}
         renderMessageContent={c.renderMessageContent}
         onOpenAttachmentPreview={c.openAttachmentPreview}
@@ -233,70 +247,6 @@ export function MessengerConversationPanel({ controller }: MessengerConversation
         onCancelEditingRoomName={c.handleCancelEditingRoomName}
         onStartEditingRoomName={c.handleStartEditingRoomName}
         onLeaveRoom={c.handleLeaveRoomFromDrawer}
-      />
-
-      <MessengerMessageActions
-        message={c.activeActionMsg}
-        currentUserId={c.effectiveChatUserId || c.user?.id}
-        isPinned={Boolean(c.activeActionMsg && c.pinnedIds?.includes(String(c.activeActionMsg.id)))}
-        isBookmarked={Boolean(c.activeActionMsg && c.bookmarkedIds?.has(String(c.activeActionMsg.id)))}
-        onClose={() => c.setActiveActionMsg(null)}
-        onToggleReaction={(emoji) => {
-          if (!c.activeActionMsg) return;
-          return c.toggleReaction?.(String(c.activeActionMsg.id), emoji);
-        }}
-        onAddTask={() => {
-          if (!c.activeActionMsg) return;
-          return c.addTaskFromMessage?.(c.activeActionMsg);
-        }}
-        onTogglePin={() => {
-          if (!c.activeActionMsg) return;
-          void c.togglePin?.(String(c.activeActionMsg.id));
-          c.setActiveActionMsg(null);
-        }}
-        onToggleBookmark={() => {
-          if (!c.activeActionMsg) return;
-          void c.toggleBookmark?.(String(c.activeActionMsg.id));
-          c.setActiveActionMsg(null);
-        }}
-        onStartEdit={() => {
-          if (!c.activeActionMsg) return;
-          c.startEditMessage?.(c.activeActionMsg);
-          c.setActiveActionMsg(null);
-        }}
-        onOpenEditHistory={() => {
-          if (!c.activeActionMsg) return;
-          void c.openEditHistory?.(c.activeActionMsg);
-          c.setActiveActionMsg(null);
-        }}
-        onDelete={() => {
-          if (!c.activeActionMsg) return;
-          void c.deleteMessageFromActions?.(c.activeActionMsg);
-        }}
-        onReply={() => {
-          if (!c.activeActionMsg) return;
-          c.startReplyToMessage?.(c.activeActionMsg);
-          c.setActiveActionMsg(null);
-        }}
-        onForward={() => {
-          if (!c.activeActionMsg) return;
-          c.startForwardMessage?.(c.activeActionMsg);
-          c.setActiveActionMsg(null);
-        }}
-        onCopyLink={() => {
-          if (!c.activeActionMsg) return;
-          void c.handleCopyMessageLink?.(c.activeActionMsg);
-        }}
-        onOpenReadStatus={() => {
-          if (!c.activeActionMsg) return;
-          c.openReadStatusPanel?.(c.activeActionMsg);
-          c.setActiveActionMsg(null);
-        }}
-        onOpenThread={() => {
-          if (!c.activeActionMsg) return;
-          c.openTrackedThreadPanel?.(c.activeActionMsg);
-          c.setActiveActionMsg(null);
-        }}
       />
 
       <GroupChatModal

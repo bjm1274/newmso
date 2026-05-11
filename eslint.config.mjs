@@ -48,8 +48,6 @@ const eslintConfig = defineConfig([
     ".venv/**",
     "android-twa/.gradle/**",
     ".vscode/**",
-    // Local deployment inspection scratch files should not affect app linting.
-    "tmp_vercel_inspect/**",
     // APK extraction scratch directory contains third-party minified JS.
     "tmp_apk_extract/**",
   ]),

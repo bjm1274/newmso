@@ -292,7 +292,7 @@ function SettingsTab({ userId }: { userId?: string | null }) {
         const env = data.diagnostics.env as Record<string, string>;
         const missing = Object.entries(env).filter(([, v]) => String(v).startsWith('❌')).map(([k]) => k);
         if (missing.length > 0) {
-          setServerTestResult(`❌ Vercel 환경변수 없음: ${missing.join(', ')}\n→ Vercel 대시보드 Settings > Environment Variables에 추가 필요`);
+          setServerTestResult(`❌ Cloudflare 환경변수 없음: ${missing.join(', ')}\n→ Cloudflare Workers Settings > Variables에 추가 필요`);
           return;
         }
       }

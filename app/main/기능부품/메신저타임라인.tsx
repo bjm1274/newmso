@@ -3,6 +3,7 @@
 import { useLayoutEffect, memo } from 'react';
 import type { MutableRefObject, ReactNode, RefObject } from 'react';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
+import { toast } from '@/lib/toast';
 import type { ChatMessage, StaffMember } from '@/types';
 import {
   AttachmentListCard,
@@ -48,6 +49,12 @@ type DeliveryState = {
   error?: string | null;
 };
 
+const INLINE_ACTION_REACTIONS = ['👍', '❤️', '🙏', '👏', '😊', '👌'];
+const inlineActionButtonClass =
+  'shrink-0 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2.5 py-1.5 text-[10px] font-bold text-[var(--foreground)] shadow-sm transition hover:border-[var(--accent)] hover:bg-[var(--toss-blue-light)]';
+const inlineDangerActionButtonClass =
+  'shrink-0 rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/5 px-2.5 py-1.5 text-[10px] font-bold text-red-600 shadow-sm transition hover:bg-red-500/10';
+
 const formatTimelineDateKey = (value?: string | null) => {
   const date = new Date(value || 0);
   if (Number.isNaN(date.getTime())) return '';
@@ -56,6 +63,27 @@ const formatTimelineDateKey = (value?: string | null) => {
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
+
+async function copyMessageText(message: ChatMessage) {
+  const text = getMessageDisplayText(
+    message.content,
+    message.file_name,
+    message.file_url,
+    message.file_url ? '첨부 파일' : '',
+  );
+
+  if (!text) {
+    toast('복사할 내용이 없습니다.', 'warning');
+    return;
+  }
+
+  try {
+    await navigator.clipboard?.writeText(text);
+    toast('복사했습니다.');
+  } catch {
+    toast('복사 실패', 'error');
+  }
+}
 
 type MessengerTimelineProps = {
   selectedRoomId: string | null;
@@ -67,6 +95,9 @@ type MessengerTimelineProps = {
   readCounts: Record<string, number>;
   deliveryStates: Record<string, DeliveryState>;
   threadSummaries: Record<string, ThreadSummary>;
+  activeActionMessageId?: string | null;
+  pinnedIds?: string[];
+  bookmarkedIds?: Set<string>;
   roomMembers: StaffMember[];
   effectiveChatUserId: string;
   activeMessageHighlightQuery: string;
@@ -83,6 +114,18 @@ type MessengerTimelineProps = {
   onStartReplyToMessage: (message: ChatMessage) => void;
   onOpenThread: (message: ChatMessage) => void;
   onOpenMessageActions: (message: ChatMessage) => void;
+  onCloseMessageActions?: () => void;
+  onToggleReaction?: (message: ChatMessage, emoji: string) => void | Promise<void>;
+  onAddTask?: (message: ChatMessage) => void | Promise<void>;
+  onTogglePin?: (message: ChatMessage) => void | Promise<void>;
+  onToggleBookmark?: (message: ChatMessage) => void | Promise<void>;
+  onForwardMessage?: (message: ChatMessage) => void;
+  onDeleteMessage?: (message: ChatMessage) => void | Promise<void>;
+  onStartEdit?: (message: ChatMessage) => void;
+  onOpenEditHistory?: (message: ChatMessage) => void | Promise<void>;
+  onCopyMessageLink?: (message: ChatMessage) => void | Promise<void>;
+  onOpenReadStatusPanel?: (message: ChatMessage) => void;
+  onOpenThreadPanel?: (message: ChatMessage) => void;
   onMarkMessageRead: (message: ChatMessage) => void;
   renderMessageContent: (content: string, isMine?: boolean, highlightQuery?: string) => ReactNode;
   onOpenAttachmentPreview: (url: string, name: string, kind: AttachmentPreviewKind) => void;
@@ -106,6 +149,9 @@ function MessengerTimelineComponent({
   readCounts,
   deliveryStates,
   threadSummaries,
+  activeActionMessageId = null,
+  pinnedIds = [],
+  bookmarkedIds = new Set<string>(),
   roomMembers,
   effectiveChatUserId,
   activeMessageHighlightQuery,
@@ -122,6 +168,18 @@ function MessengerTimelineComponent({
   onStartReplyToMessage,
   onOpenThread,
   onOpenMessageActions,
+  onCloseMessageActions = () => {},
+  onToggleReaction = () => {},
+  onAddTask = () => {},
+  onTogglePin = () => {},
+  onToggleBookmark = () => {},
+  onForwardMessage = () => {},
+  onDeleteMessage = () => {},
+  onStartEdit = () => {},
+  onOpenEditHistory = () => {},
+  onCopyMessageLink = () => {},
+  onOpenReadStatusPanel,
+  onOpenThreadPanel,
   onMarkMessageRead,
   renderMessageContent,
   onOpenAttachmentPreview,
@@ -201,6 +259,205 @@ function MessengerTimelineComponent({
       <div className="flex-1 h-px bg-[var(--border)]" />
     </div>
   );
+
+  const renderMessageActions = (
+    message: ChatMessage,
+    isMine: boolean,
+    canOpenReadStatus: boolean,
+    isDeletedMessage: boolean,
+  ) => {
+    const messageId = String(message.id);
+    if (isDeletedMessage || activeActionMessageId !== messageId) return null;
+
+    const isPinnedMessage = pinnedIds.includes(messageId);
+    const isBookmarkedMessage = bookmarkedIds.has(messageId);
+    const openThread = onOpenThreadPanel || onOpenThread;
+
+    return (
+      <div
+        data-chat-active-action-scope="true"
+        data-testid="chat-message-actions-panel"
+        className={`mt-1 flex max-w-[88vw] overflow-x-auto pb-0.5 custom-scrollbar ${
+          isMine ? 'self-end justify-end' : 'self-start justify-start'
+        }`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className={`flex items-center gap-1 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
+          {INLINE_ACTION_REACTIONS.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              title={`${emoji} 반응`}
+              aria-label={`${emoji} 반응`}
+              onClick={(event) => {
+                event.stopPropagation();
+                void onToggleReaction(message, emoji);
+                onCloseMessageActions();
+              }}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-base shadow-sm transition hover:border-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
+            >
+              {emoji}
+            </button>
+          ))}
+          <button
+            type="button"
+            data-testid="chat-message-action-reply"
+            onClick={(event) => {
+              event.stopPropagation();
+              onStartReplyToMessage(message);
+            }}
+            className={inlineActionButtonClass}
+          >
+            답장
+          </button>
+          <button
+            type="button"
+            data-testid="chat-message-action-add-task"
+            onClick={(event) => {
+              event.stopPropagation();
+              void onAddTask(message);
+              onCloseMessageActions();
+            }}
+            className={inlineActionButtonClass}
+          >
+            할일
+          </button>
+          <button
+            type="button"
+            data-testid="chat-message-action-pin"
+            onClick={(event) => {
+              event.stopPropagation();
+              void onTogglePin(message);
+              onCloseMessageActions();
+            }}
+            className={`${inlineActionButtonClass} ${
+              isPinnedMessage ? 'border-amber-300 bg-amber-50 text-amber-700' : ''
+            }`}
+          >
+            {isPinnedMessage ? '해제' : '고정'}
+          </button>
+          <button
+            type="button"
+            data-testid="chat-message-action-copy-text"
+            onClick={(event) => {
+              event.stopPropagation();
+              void copyMessageText(message);
+              onCloseMessageActions();
+            }}
+            className={inlineActionButtonClass}
+          >
+            복사
+          </button>
+          <button
+            type="button"
+            data-testid="chat-message-action-forward"
+            onClick={(event) => {
+              event.stopPropagation();
+              onForwardMessage(message);
+              onCloseMessageActions();
+            }}
+            className={inlineActionButtonClass}
+          >
+            전달
+          </button>
+          {canOpenReadStatus && isMine ? (
+            <button
+              type="button"
+              data-testid="chat-message-action-read-status"
+              onClick={(event) => {
+                event.stopPropagation();
+                (onOpenReadStatusPanel || onLoadReadStatus)(message);
+                onCloseMessageActions();
+              }}
+              className={inlineActionButtonClass}
+            >
+              읽음
+            </button>
+          ) : null}
+          <button
+            type="button"
+            data-testid="chat-message-action-thread"
+            onClick={(event) => {
+              event.stopPropagation();
+              openThread(message);
+              onCloseMessageActions();
+            }}
+            className={inlineActionButtonClass}
+          >
+            스레드
+          </button>
+          <button
+            type="button"
+            data-testid="chat-message-action-copy-link"
+            onClick={(event) => {
+              event.stopPropagation();
+              void onCopyMessageLink(message);
+              onCloseMessageActions();
+            }}
+            className={inlineActionButtonClass}
+          >
+            링크
+          </button>
+          <button
+            type="button"
+            data-testid="chat-message-action-bookmark"
+            onClick={(event) => {
+              event.stopPropagation();
+              void onToggleBookmark(message);
+              onCloseMessageActions();
+            }}
+            className={`${inlineActionButtonClass} ${
+              isBookmarkedMessage ? 'border-[var(--accent)] bg-[var(--toss-blue-light)] text-[var(--accent)]' : ''
+            }`}
+          >
+            {isBookmarkedMessage ? '북마크 해제' : '북마크'}
+          </button>
+          {isMine ? (
+            <button
+              type="button"
+              data-testid="chat-message-action-edit"
+              onClick={(event) => {
+                event.stopPropagation();
+                onStartEdit(message);
+                onCloseMessageActions();
+              }}
+              className={inlineActionButtonClass}
+            >
+              수정
+            </button>
+          ) : null}
+          {message.edited_at ? (
+            <button
+              type="button"
+              data-testid="chat-message-action-edit-history"
+              onClick={(event) => {
+                event.stopPropagation();
+                void onOpenEditHistory(message);
+                onCloseMessageActions();
+              }}
+              className={inlineActionButtonClass}
+            >
+              이력
+            </button>
+          ) : null}
+          {isMine ? (
+            <button
+              type="button"
+              data-testid="chat-message-action-delete"
+              onClick={(event) => {
+                event.stopPropagation();
+                void onDeleteMessage(message);
+                onCloseMessageActions();
+              }}
+              className={inlineDangerActionButtonClass}
+            >
+              삭제
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <>
@@ -610,6 +867,7 @@ function MessengerTimelineComponent({
                               </span>
                             </div>
                           </div>
+                          {renderMessageActions(msg, isMine, canOpenReadStatus, isDeletedMessage)}
                           {showWardQuickReplies && (
                             <div
                               data-testid={`chat-ward-quick-replies-${msg.id}`}

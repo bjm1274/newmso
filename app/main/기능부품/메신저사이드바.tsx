@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { MessengerAvatar } from './메신저공통';
 import { getGroupChatRoomBadgeText } from './메신저유틸';
 import { MenuIcon } from './조직도서브/조직도측면창';
@@ -99,6 +100,9 @@ export function MessengerSidebar({
   onToggleDept,
   onOpenDirectChat,
 }: MessengerSidebarProps) {
+  const [actionRoomId, setActionRoomId] = useState<string | null>(null);
+  void onMovePinnedRoom;
+
   return (
     <aside
       className={`${selectedRoomId ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-[var(--border)] dark:border-zinc-800 bg-[var(--card)] dark:bg-zinc-950 flex-col shrink-0 z-50 transition-all`}
@@ -186,14 +190,16 @@ export function MessengerSidebar({
                 isPeerOnline,
                 isPinned,
                 isHidden,
-                pinnedIndex,
-                pinnedCount,
               }) => {
                 const groupBadgeText = isGroupRoom ? getGroupChatRoomBadgeText(label) : '';
 
                 return (
                   <div
                     key={roomId}
+                    onDoubleClick={(event) => {
+                      event.preventDefault();
+                      setActionRoomId((current) => current === roomId ? null : roomId);
+                    }}
                     className={`group min-h-[72px] p-3 rounded-[var(--radius-lg)] cursor-pointer transition-all flex flex-col items-stretch justify-start gap-2 border relative overflow-hidden ${
                       isSelected
                         ? 'bg-zinc-800 border-zinc-700 shadow-sm'
@@ -206,7 +212,10 @@ export function MessengerSidebar({
                     <button
                       type="button"
                       data-testid={`chat-room-${roomId}`}
-                      onClick={() => onRoomClick(room.id)}
+                      onClick={() => {
+                        setActionRoomId((current) => current && current !== roomId ? null : current);
+                        onRoomClick(room.id);
+                      }}
                       className={`flex w-full min-w-0 flex-1 items-start ${isGroupRoom ? 'gap-2.5' : 'gap-3'} text-left`}
                     >
                       {isNoticeChannel ? (
@@ -292,7 +301,13 @@ export function MessengerSidebar({
                         ) : null}
                       </div>
                     </button>
-                  <div className="flex w-full shrink-0 items-center justify-end gap-1 pl-12">
+                  {actionRoomId === roomId && !isNoticeChannel ? (
+                  <div
+                    data-testid={`chat-room-actions-${roomId}`}
+                    className="flex w-full shrink-0 items-center justify-end gap-1 pl-12"
+                    onClick={(event) => event.stopPropagation()}
+                    onDoubleClick={(event) => event.stopPropagation()}
+                  >
                     {!isNoticeChannel ? (
                       <>
                         <button
@@ -301,8 +316,9 @@ export function MessengerSidebar({
                           onClick={(event) => {
                             event.stopPropagation();
                             onToggleRoomPinned(room.id, !isPinned);
+                            setActionRoomId(null);
                           }}
-                          className={`min-w-[44px] min-h-[44px] flex items-center justify-center px-1.5 py-1 rounded-md text-[9px] font-bold ${
+                          className={`flex min-h-[30px] min-w-[46px] items-center justify-center rounded-md px-2.5 py-1 text-[10px] font-bold ${
                             isSelected
                               ? 'text-white/80 hover:bg-[var(--card)]/10'
                               : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800'
@@ -311,52 +327,15 @@ export function MessengerSidebar({
                         >
                           {isPinned ? '해제' : '고정'}
                         </button>
-                        {isPinned ? (
-                          <>
-                            <button
-                              type="button"
-                              data-testid={`chat-room-pin-up-${roomId}`}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                onMovePinnedRoom(room.id, 'up');
-                              }}
-                              disabled={pinnedIndex <= 0}
-                              className={`min-w-[36px] min-h-[44px] flex items-center justify-center px-1 py-1 rounded-md text-[10px] font-bold ${
-                                isSelected
-                                  ? 'text-white/80 hover:bg-[var(--card)]/10 disabled:text-white/30'
-                                  : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 disabled:text-[var(--toss-gray-1)]'
-                              } disabled:cursor-not-allowed`}
-                              title="고정방 위로"
-                            >
-                              ↑
-                            </button>
-                            <button
-                              type="button"
-                              data-testid={`chat-room-pin-down-${roomId}`}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                onMovePinnedRoom(room.id, 'down');
-                              }}
-                              disabled={pinnedIndex < 0 || pinnedIndex >= pinnedCount - 1}
-                              className={`min-w-[36px] min-h-[44px] flex items-center justify-center px-1 py-1 rounded-md text-[10px] font-bold ${
-                                isSelected
-                                  ? 'text-white/80 hover:bg-[var(--card)]/10 disabled:text-white/30'
-                                  : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 disabled:text-[var(--toss-gray-1)]'
-                              } disabled:cursor-not-allowed`}
-                              title="고정방 아래로"
-                            >
-                              ↓
-                            </button>
-                          </>
-                        ) : null}
                         <button
                           type="button"
                           data-testid={`chat-room-hide-${roomId}`}
                           onClick={(event) => {
                             event.stopPropagation();
                             onToggleRoomHidden(room.id, !isHidden);
+                            setActionRoomId(null);
                           }}
-                          className={`min-w-[44px] min-h-[44px] flex items-center justify-center px-1.5 py-1 rounded-md text-[9px] font-bold ${
+                          className={`flex min-h-[30px] min-w-[46px] items-center justify-center rounded-md px-2.5 py-1 text-[10px] font-bold ${
                             isSelected
                               ? 'text-white/80 hover:bg-[var(--card)]/10'
                               : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800'
@@ -368,6 +347,7 @@ export function MessengerSidebar({
                       </>
                     ) : null}
                   </div>
+                  ) : null}
                   </div>
                 );
               }

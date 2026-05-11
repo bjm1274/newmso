@@ -1,6 +1,6 @@
 /**
  * 채팅 보관정책 정리 API
- * Vercel Cron: 매일 새벽 2시(Asia/Seoul) 등으로 호출 권장
+ * Cloudflare Cron Trigger: 매일 새벽 2시(Asia/Seoul) 등으로 호출 권장
  * 보관: 대화 5년, 사진/10MB 이하 1년, 동영상·10MB 초과 3개월
  */
 import { NextResponse } from 'next/server';

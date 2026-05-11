@@ -1,9 +1,9 @@
 # MSO 통합 시스템 진행 기록 (요약)
 
 ## 1. 인프라 / 배포
-- Vercel `newmso` 프로젝트 + GitHub `bjm1274/newmso` 연동
-- 도메인 `erp.pchos.kr` → Vercel `newmso` 에 연결 (CNAME `erp` → `...vercel-dns-017z.com`)
-- Supabase 새 프로젝트 생성 후 `.env.local`, Vercel 환경변수에 다음 설정:
+- Cloudflare Workers `erp-pchos` 배포 + GitHub `bjm1274/newmso` 소스 관리
+- 도메인 `erp.pchos.kr` → Cloudflare Worker 라우트에 연결
+- Supabase 새 프로젝트 생성 후 `.env.local`, Cloudflare Worker 환경변수에 다음 설정:
   - `NEXT_PUBLIC_SUPABASE_URL`
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
