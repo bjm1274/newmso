@@ -32,9 +32,9 @@ export async function POST(request: NextRequest) {
 
   diagnostics.env = {
     vapidPublicKey: vapidPublic ? `${vapidPublic.slice(0, 10)}...` : '❌ 없음',
-    vapidPrivateKey: vapidPrivate ? '✅ 설정됨' : '❌ 없음 (Vercel에 추가 필요)',
-    vapidSubject: vapidSubject || '❌ 없음 (Vercel에 추가 필요)',
-    firebaseServiceAccount: firebaseSA ? '✅ 설정됨' : '❌ 없음 (Vercel에 추가 필요)',
+    vapidPrivateKey: vapidPrivate ? '✅ 설정됨' : '❌ 없음 (Cloudflare에 추가 필요)',
+    vapidSubject: vapidSubject || '❌ 없음 (Cloudflare에 추가 필요)',
+    firebaseServiceAccount: firebaseSA ? '✅ 설정됨' : '❌ 없음 (Cloudflare에 추가 필요)',
   };
 
   // ── 2. DB 구독 정보 확인 ──

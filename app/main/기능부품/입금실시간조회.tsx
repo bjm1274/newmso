@@ -639,11 +639,11 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
               },
               {
                 step: 3,
-                title: 'Vercel 환경변수 등록',
+                title: 'Cloudflare 환경변수 등록',
                 color: 'teal',
                 content: (
                   <div className="space-y-1 text-xs">
-                    <p>Vercel 대시보드 → Settings → Environment Variables</p>
+                    <p>Cloudflare Workers → Settings → Variables</p>
                     <div className="bg-[var(--muted)] p-2 rounded space-y-1 font-mono text-[11px]">
                       <p><strong>VIRTUAL_ACCOUNT_WEBHOOK_TOKEN</strong></p>
                       <p className="text-[var(--toss-gray-3)]">= a382ddced...b02 (위 토큰)</p>
