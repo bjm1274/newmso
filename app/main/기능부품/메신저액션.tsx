@@ -31,8 +31,7 @@ type ReactionDetailModalProps = {
   onClose: () => void;
 };
 
-const MOBILE_REACTIONS = ['👍', '👏', '❤️', '😂', '🙏', '🎉', '🔥', '✅'];
-const DESKTOP_REACTIONS = ['👍', '👏', '❤️', '🔥', '✅'];
+const ACTION_REACTIONS = ['👍', '👏', '❤️', '😂', '🙏', '🎉', '🔥', '✅'];
 
 async function copyMessageFor(message: ChatMessage, prefix: string, successMessage: string) {
   try {
@@ -71,62 +70,62 @@ export function MessengerMessageActions({
 
   return (
     <>
-      <div className="absolute inset-0 bg-black/10 z-30 animate-in fade-in duration-200 md:hidden" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 bg-black/10 z-30 animate-in fade-in duration-200" onClick={onClose} aria-hidden="true" />
 
-      <div className="md:hidden absolute left-0 right-0 bottom-0 bg-[var(--card)] dark:bg-zinc-900 rounded-t-[24px] shadow-sm z-40 flex flex-col animate-in slide-in-from-bottom duration-300 max-h-[70vh] overflow-hidden">
+      <div className="absolute left-0 right-0 bottom-0 bg-[var(--card)] dark:bg-zinc-900 rounded-t-[24px] shadow-sm z-40 flex flex-col animate-in slide-in-from-bottom duration-300 max-h-[70vh] overflow-hidden">
         <div className="w-12 h-1.5 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-full mx-auto my-3 shrink-0" />
         <div className="px-4 pb-8 space-y-4 overflow-y-auto">
           <div className="flex justify-between items-center bg-[var(--tab-bg)] dark:bg-zinc-800/50 p-2 rounded-[var(--radius-xl)] gap-1 px-4">
-            {MOBILE_REACTIONS.map((emoji) => (
-              <button key={emoji} onClick={() => { void onToggleReaction(emoji); onClose(); }} className="text-2xl hover:scale-110 transition-transform p-1">
+            {ACTION_REACTIONS.map((emoji) => (
+              <button type="button" key={emoji} onClick={() => { void onToggleReaction(emoji); onClose(); }} className="text-2xl hover:scale-110 transition-transform p-1">
                 {emoji}
               </button>
             ))}
           </div>
           <div className="space-y-1">
-            <button onClick={() => { void onAddTask(); onClose(); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
+            <button type="button" onClick={() => { void onAddTask(); onClose(); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
               <span className="text-xl">📋</span>
               <span className="text-sm font-bold">할일 추가</span>
             </button>
-            <button onClick={() => { void onTogglePin(); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
+            <button type="button" onClick={() => { void onTogglePin(); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
               <span className="text-xl">📌</span>
               <span className="text-sm font-bold">{isPinned ? '공지 해제' : '공지 등록'}</span>
             </button>
-            <button data-testid="chat-message-action-bookmark-mobile" onClick={() => { void onToggleBookmark(); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
+            <button type="button" data-testid="chat-message-action-bookmark-mobile" onClick={() => { void onToggleBookmark(); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
               <span className="text-xl">🔖</span>
               <span className="text-sm font-bold">{isBookmarked ? '북마크 해제' : '북마크 등록'}</span>
             </button>
-            <button onClick={async () => { await navigator.clipboard?.writeText(message.content || ''); toast('복사했습니다.'); onClose(); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
+            <button type="button" onClick={async () => { await navigator.clipboard?.writeText(message.content || ''); toast('복사했습니다.'); onClose(); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
               <span className="text-xl">📄</span>
               <span className="text-sm font-bold">복사</span>
             </button>
             {canEdit && (
-              <button data-testid="chat-message-action-edit-mobile" onClick={onStartEdit} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
+              <button type="button" data-testid="chat-message-action-edit-mobile" onClick={onStartEdit} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
                 <span className="text-xl">✏️</span>
                 <span className="text-sm font-bold">수정</span>
               </button>
             )}
             {message.edited_at && !message.is_deleted && (
-              <button data-testid="chat-message-action-edit-history-mobile" onClick={onOpenEditHistory} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
+              <button type="button" data-testid="chat-message-action-edit-history-mobile" onClick={onOpenEditHistory} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
                 <span className="text-xl">🕘</span>
                 <span className="text-sm font-bold">수정 이력</span>
               </button>
             )}
             {canDelete && (
-              <button onClick={() => { void onDelete(); }} className="w-full flex items-center gap-4 p-4 hover:bg-red-500/10 dark:hover:bg-red-900/20 rounded-[var(--radius-md)] transition-colors text-red-500">
+              <button type="button" onClick={() => { void onDelete(); }} className="w-full flex items-center gap-4 p-4 hover:bg-red-500/10 dark:hover:bg-red-900/20 rounded-[var(--radius-md)] transition-colors text-red-500">
                 <span className="text-xl">🗑️</span>
                 <span className="text-sm font-bold">삭제</span>
               </button>
             )}
-            <button onClick={onReply} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
+            <button type="button" onClick={onReply} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
               <span className="text-xl">↩️</span>
               <span className="text-sm font-bold">답글</span>
             </button>
-            <button onClick={onForward} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
+            <button type="button" onClick={onForward} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
               <span className="text-xl">📤</span>
               <span className="text-sm font-bold">전달</span>
             </button>
-            <button data-testid="chat-message-action-copy-link-mobile" onClick={() => { void onCopyLink(); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
+            <button type="button" data-testid="chat-message-action-copy-link-mobile" onClick={() => { void onCopyLink(); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
               <span className="text-xl">🔗</span>
               <span className="text-sm font-bold">메시지 링크 복사</span>
             </button>
@@ -148,7 +147,7 @@ export function ReactionDetailModal({
   return (
     <div
       data-testid="chat-reaction-detail-modal"
-      className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4"
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-[var(--z-modal)] p-4"
       onClick={onClose}
     >
       <div

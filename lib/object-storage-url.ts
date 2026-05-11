@@ -34,6 +34,23 @@ export function buildStorageDownloadUrl(url: string, fileName: string): string {
   return `/api/download?url=${encodeURIComponent(normalizedUrl)}&name=${encodeURIComponent(normalizedFileName)}`;
 }
 
+export function buildStorageInlineUrl(url: string, fileName: string): string {
+  const normalizedUrl = String(url || '').trim();
+  const normalizedFileName = String(fileName || '').trim() || 'preview';
+  if (!normalizedUrl) return '';
+  if (/^(blob|data):/i.test(normalizedUrl)) return normalizedUrl;
+
+  if (isInternalStorageObjectUrl(normalizedUrl)) {
+    return normalizedUrl;
+  }
+
+  if (normalizedUrl.startsWith('/')) {
+    return normalizedUrl;
+  }
+
+  return `/api/download?url=${encodeURIComponent(normalizedUrl)}&name=${encodeURIComponent(normalizedFileName)}&inline=1`;
+}
+
 export function buildPublicStorageDownloadUrl(url: string, fileName: string): string {
   const normalizedUrl = String(url || '').trim();
   if (!normalizedUrl) return '';

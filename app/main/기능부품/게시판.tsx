@@ -1,4 +1,6 @@
 'use client';
+import { logger } from '@/lib/logger';
+
 import { toast } from '@/lib/toast';
 import { EmptyState, PermissionState } from '@/app/components/StatePanel';
 import { useActionDialog } from '@/app/components/useActionDialog';
@@ -9,6 +11,7 @@ import { getStaffLikeId, resolveStaffLike } from '@/lib/staff-identity';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import {
+  buildStorageInlineUrl,
   buildStorageDownloadUrl,
   shouldUseManagedBrowserDownload,
   triggerManagedBrowserDownload,
@@ -18,7 +21,7 @@ import SmartDatePicker from './공통/SmartDatePicker';
 import GuideLibrary from './게시판서브/업무가이드';
 import { uploadBoardAttachmentFile } from './게시판업로드';
 import type { StaffMember, BoardPost, ScheduleItem, AttachmentItem } from '@/types';
-import { BOARD_MENU_ITEMS, BOARD_META_MAP } from './게시판메뉴';
+import { BOARD_MENU_ITEMS } from './게시판메뉴';
 import {
   NOTICE_ROOM_ID,
   BOARD_AUTO_CHAT_TYPES,
@@ -30,392 +33,34 @@ import {
   BOARD_COMMENT_SELECT,
   BOARD_CHAT_ROOM_SELECT,
 } from './게시판공통';
-const SCHEDULE_META_PREFIX = '[[SCHEDULE_META]]';
-const SCHEDULE_META_SUFFIX = '[[/SCHEDULE_META]]';
-const ATTACHMENTS_META_PREFIX = '[[ATTACHMENTS_META]]';
-const ATTACHMENTS_META_SUFFIX = '[[/ATTACHMENTS_META]]';
-const BOARD_META_PREFIX = '[[BOARD_META]]';
-const BOARD_META_SUFFIX = '[[/BOARD_META]]';
-
-type ScheduleMetaPayload = {
-  date?: string;
-  time?: string;
-  room?: string;
-  patient?: string;
-  fasting?: boolean;
-  inpatient?: boolean;
-  guardian?: boolean;
-  caregiver?: boolean;
-  transfusion?: boolean;
-  contrast?: boolean;
-};
-
-type BoardMetaPayload = {
-  scheduled_publish_at?: string;
-  status?: string;
-};
-
-type BoardReadRow = {
-  post_id: string;
-  user_id: string;
-  read_at?: string | null;
-};
-
-type StaffSummary = Pick<StaffMember, 'id' | 'name' | 'company' | 'company_id' | 'department' | 'position' | 'status'>;
-type QueryResult<T> = {
-  data: T | null;
-  error: unknown;
-};
-type BoardPostRow = BoardPost & {
-  board_type?: string | null;
-  views?: number | null;
-  poll?: Record<string, unknown> | null;
-  poll_votes?: Record<string, string[]> | null;
-  is_anonymous?: boolean | null;
-  is_pinned?: boolean | null;
-};
-type BoardTemplateRow = {
-  id: string;
-  name: string;
-  sort_order?: number | null;
-  body_part?: string | null;
-};
-type BoardLikeRow = {
-  post_id?: string | null;
-};
-type BoardChatRoomRow = {
-  id: string;
-};
-
-function buildSelectColumns(
-  requiredColumns: readonly string[],
-  optionalColumns: readonly string[] = [],
-  omittedColumns?: ReadonlySet<string>,
-) {
-  return [...requiredColumns, ...optionalColumns.filter((column) => !omittedColumns?.has(column))].join(', ');
-}
-
-function inferAttachmentType(nameOrUrl: string, explicitType?: string | null) {
-  const normalizedExplicitType = String(explicitType || '').trim().toLowerCase();
-  if (normalizedExplicitType === 'image' || normalizedExplicitType === 'video' || normalizedExplicitType === 'file') {
-    return normalizedExplicitType;
-  }
-
-  const raw = String(nameOrUrl || '').trim().toLowerCase();
-  const clean = raw.split('?')[0];
-  const ext = clean.includes('.') ? clean.slice(clean.lastIndexOf('.') + 1) : '';
-
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic', 'heif'].includes(ext)) return 'image';
-  if (['mp4', 'mov', 'avi', 'wmv', 'webm', 'mkv', 'm4v'].includes(ext)) return 'video';
-  return 'file';
-}
-
-function extractAttachmentMetaFromContent(value: unknown) {
-  const raw = String(value ?? '');
-  const start = raw.indexOf(ATTACHMENTS_META_PREFIX);
-  const end = raw.indexOf(ATTACHMENTS_META_SUFFIX);
-  if (start < 0 || end < 0 || end <= start) {
-    return {
-      displayContent: raw.trim(),
-      attachments: [] as AttachmentItem[],
-      hasEmbeddedAttachments: false,
-    };
-  }
-
-  const displayContent = `${raw.slice(0, start)}${raw.slice(end + ATTACHMENTS_META_SUFFIX.length)}`.trim();
-  const attachmentsText = raw.slice(start + ATTACHMENTS_META_PREFIX.length, end).trim();
-
-  try {
-    const parsed = JSON.parse(attachmentsText);
-    const attachments = Array.isArray(parsed)
-      ? parsed
-          .map((item) => ({
-            name: String((item as AttachmentItem)?.name ?? '').trim(),
-            url: String((item as AttachmentItem)?.url ?? '').trim(),
-            type: inferAttachmentType(
-              String((item as AttachmentItem)?.name ?? (item as AttachmentItem)?.url ?? ''),
-              String((item as AttachmentItem)?.type ?? '')
-            ),
-          }))
-          .filter((item) => item.name && item.url)
-      : [];
-
-    return {
-      displayContent,
-      attachments,
-      hasEmbeddedAttachments: attachments.length > 0,
-    };
-  } catch {
-    return {
-      displayContent,
-      attachments: [] as AttachmentItem[],
-      hasEmbeddedAttachments: true,
-    };
-  }
-}
-
-function buildAttachmentMetaContent(visibleContent: string, attachments: AttachmentItem[]) {
-  if (!attachments.length) return visibleContent.trim();
-  const normalizedVisibleContent = visibleContent.trim();
-  const attachmentPayload = attachments.map((item) => ({
-    name: String(item.name || '').trim(),
-    url: String(item.url || '').trim(),
-    type: inferAttachmentType(String(item.name || item.url || ''), String(item.type || '')),
-  }));
-
-  return `${normalizedVisibleContent}${normalizedVisibleContent ? '\n' : ''}${ATTACHMENTS_META_PREFIX}${JSON.stringify(attachmentPayload)}${ATTACHMENTS_META_SUFFIX}`;
-}
-
-function normalizeScheduledPublishAtValue(value: unknown) {
-  const raw = String(value ?? '').trim();
-  if (!raw) return '';
-
-  const normalized = raw.replace(' ', 'T');
-  const parsed = new Date(normalized);
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toISOString();
-  }
-
-  return raw;
-}
-
-function formatScheduledPublishInputValue(value: unknown) {
-  const normalized = normalizeScheduledPublishAtValue(value);
-  if (!normalized) return '';
-
-  const parsed = new Date(normalized);
-  if (Number.isNaN(parsed.getTime())) return '';
-
-  const year = parsed.getFullYear();
-  const month = String(parsed.getMonth() + 1).padStart(2, '0');
-  const day = String(parsed.getDate()).padStart(2, '0');
-  const hour = String(parsed.getHours()).padStart(2, '0');
-  const minute = String(parsed.getMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day}T${hour}:${minute}`;
-}
-
-function buildScheduleTimeValue(period: string, hour: string, minute: string) {
-  if (!period || !hour) return '';
-
-  const hNum = parseInt(hour, 10);
-  if (Number.isNaN(hNum)) return '';
-
-  let h24 = hNum;
-  if (period === '오전') {
-    if (h24 === 12) h24 = 0;
-  } else if (period === '오후') {
-    if (h24 !== 12) h24 += 12;
-  } else {
-    return '';
-  }
-
-  const hh = String(h24).padStart(2, '0');
-  const mm = String(minute || '00').padStart(2, '0');
-  return `${hh}:${mm}`;
-}
-
-function normalizeScheduleDateValue(value: unknown) {
-  const raw = String(value ?? '').trim();
-  if (!raw) return '';
-
-  const matched = raw.match(/^(\d{4}-\d{2}-\d{2})/);
-  if (matched) return matched[1];
-
-  const parsed = new Date(raw);
-  if (!Number.isNaN(parsed.getTime())) {
-    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
-  }
-
-  return raw;
-}
-
-function normalizeScheduleTimeValue(value: unknown) {
-  const raw = String(value ?? '').trim();
-  if (!raw) return '';
-  const matched = raw.match(/^(\d{2}:\d{2})/);
-  return matched ? matched[1] : raw;
-}
-
-function isScheduleBoardType(boardType: unknown) {
-  return boardType === '수술일정' || boardType === 'MRI일정';
-}
-
-function extractScheduleMetaFromContent(value: unknown) {
-  const raw = String(value ?? '');
-  const start = raw.indexOf(SCHEDULE_META_PREFIX);
-  const end = raw.indexOf(SCHEDULE_META_SUFFIX);
-  if (start < 0 || end < 0 || end <= start) {
-    return {
-      displayContent: raw.trim(),
-      meta: null as ScheduleMetaPayload | null,
-      hasEmbeddedMeta: false,
-    };
-  }
-
-  const displayContent = `${raw.slice(0, start)}${raw.slice(end + SCHEDULE_META_SUFFIX.length)}`.trim();
-  const metaText = raw.slice(start + SCHEDULE_META_PREFIX.length, end).trim();
-
-  try {
-    const parsed = JSON.parse(metaText) as ScheduleMetaPayload;
-    return { displayContent, meta: parsed, hasEmbeddedMeta: true };
-  } catch {
-    return { displayContent, meta: null as ScheduleMetaPayload | null, hasEmbeddedMeta: true };
-  }
-}
-
-function buildScheduleMetaContent(chartNo: string, meta: ScheduleMetaPayload) {
-  const visibleContent = chartNo.trim();
-  return `${visibleContent}${visibleContent ? '\n' : ''}${SCHEDULE_META_PREFIX}${JSON.stringify(meta)}${SCHEDULE_META_SUFFIX}`;
-}
-
-function extractBoardMetaFromContent(value: unknown) {
-  const raw = String(value ?? '');
-  const start = raw.indexOf(BOARD_META_PREFIX);
-  const end = raw.indexOf(BOARD_META_SUFFIX);
-  if (start < 0 || end < 0 || end <= start) {
-    return {
-      displayContent: raw.trim(),
-      meta: null as BoardMetaPayload | null,
-      hasEmbeddedMeta: false,
-    };
-  }
-
-  const displayContent = `${raw.slice(0, start)}${raw.slice(end + BOARD_META_SUFFIX.length)}`.trim();
-  const metaText = raw.slice(start + BOARD_META_PREFIX.length, end).trim();
-
-  try {
-    const parsed = JSON.parse(metaText) as BoardMetaPayload;
-    return { displayContent, meta: parsed, hasEmbeddedMeta: true };
-  } catch {
-    return { displayContent, meta: null as BoardMetaPayload | null, hasEmbeddedMeta: true };
-  }
-}
-
-function buildBoardMetaContent(visibleContent: string, meta: BoardMetaPayload | null) {
-  const normalizedVisibleContent = visibleContent.trim();
-  if (!meta || (!meta.scheduled_publish_at && !meta.status)) return normalizedVisibleContent;
-  return `${normalizedVisibleContent}${normalizedVisibleContent ? '\n' : ''}${BOARD_META_PREFIX}${JSON.stringify(meta)}${BOARD_META_SUFFIX}`;
-}
-
-function normalizeBoardPost<T extends Partial<BoardPost>>(post: T): T {
-  if (!post) return post;
-  const {
-    displayContent: attachmentStrippedContent,
-    attachments: embeddedAttachments,
-  } = extractAttachmentMetaFromContent(post.content ?? '');
-  const {
-    displayContent: scheduleStrippedContent,
-    meta: scheduleMeta,
-    hasEmbeddedMeta,
-  } = extractScheduleMetaFromContent(attachmentStrippedContent);
-  const {
-    displayContent,
-    meta: boardMeta,
-  } = extractBoardMetaFromContent(scheduleStrippedContent);
-  const normalizedScheduleDate = normalizeScheduleDateValue(post.schedule_date ?? scheduleMeta?.date ?? '');
-  const normalizedScheduleTime = normalizeScheduleTimeValue(post.schedule_time ?? scheduleMeta?.time ?? '');
-  const scheduleMetaLegacyMissing = isScheduleBoardType(post.board_type) && !normalizedScheduleDate && !hasEmbeddedMeta;
-  const normalizedAttachments = (Array.isArray(post.attachments) && post.attachments.length > 0 ? post.attachments : embeddedAttachments).map((item) => ({
-    ...item,
-    type: inferAttachmentType(String(item?.name || item?.url || ''), String(item?.type || '')),
-  }));
-
-  return {
-    ...post,
-    content: displayContent,
-    attachments: normalizedAttachments,
-    status: String(post.status ?? boardMeta?.status ?? '').trim() || null,
-    scheduled_publish_at: normalizeScheduledPublishAtValue(post.scheduled_publish_at ?? boardMeta?.scheduled_publish_at ?? ''),
-    schedule_date: normalizedScheduleDate,
-    schedule_time: normalizedScheduleTime,
-    schedule_room: String(post.schedule_room ?? scheduleMeta?.room ?? '').trim(),
-    patient_name: String(post.patient_name ?? scheduleMeta?.patient ?? '').trim(),
-    surgery_fasting: typeof post.surgery_fasting === 'boolean' ? post.surgery_fasting : Boolean(scheduleMeta?.fasting),
-    surgery_inpatient: typeof post.surgery_inpatient === 'boolean' ? post.surgery_inpatient : Boolean(scheduleMeta?.inpatient),
-    surgery_guardian: typeof post.surgery_guardian === 'boolean' ? post.surgery_guardian : Boolean(scheduleMeta?.guardian),
-    surgery_caregiver: typeof post.surgery_caregiver === 'boolean' ? post.surgery_caregiver : Boolean(scheduleMeta?.caregiver),
-    surgery_transfusion: typeof post.surgery_transfusion === 'boolean' ? post.surgery_transfusion : Boolean(scheduleMeta?.transfusion),
-    mri_contrast_required:
-      typeof post.mri_contrast_required === 'boolean'
-        ? post.mri_contrast_required
-        : Boolean(scheduleMeta?.contrast),
-    schedule_meta_embedded: hasEmbeddedMeta,
-    schedule_meta_legacy_missing: scheduleMetaLegacyMissing,
-  };
-}
-
-function isScheduledNoticePending(post: Partial<BoardPost>, nowMs: number) {
-  if (post.board_type !== '공지사항') return false;
-  const scheduledPublishAt = normalizeScheduledPublishAtValue(post.scheduled_publish_at);
-  if (!scheduledPublishAt) return false;
-  const scheduledMs = new Date(scheduledPublishAt).getTime();
-  if (Number.isNaN(scheduledMs)) return false;
-  return scheduledMs > nowMs;
-}
-
-function getMissingBoardPostColumn(error: unknown) {
-  if (!error) return null;
-  const e = error as Record<string, unknown>;
-  const message = `${e?.message || ''} ${e?.details || ''} ${e?.hint || ''}`.toLowerCase();
-  return BOARD_POST_OPTIONAL_COLUMNS.find((column) => message.includes(column.toLowerCase())) || null;
-}
-
-function isMissingBoardReadStorageError(error: unknown) {
-  const e = error as Record<string, unknown> | null;
-  const code = String(e?.code || '').trim();
-  const message = `${e?.message || ''} ${e?.details || ''} ${e?.hint || ''}`.toLowerCase();
-  return (
-    code === '42P01' ||
-    code === '42703' ||
-    code === '42P10' ||
-    message.includes('board_post_reads') ||
-    message.includes('relation') && message.includes('does not exist')
-  );
-}
-
-function normalizeBoardPostStatus(value: unknown) {
-  const raw = String(value ?? '').trim();
-  if (!raw) return '게시중';
-  return raw;
-}
-
-const BOARD_POST_STATUSES = ['게시중', '중요', '검토중', '완료', '보류'] as const;
-
-function getBoardStatusTone(status: string | null | undefined) {
-  switch (normalizeBoardPostStatus(status)) {
-    case '중요':
-      return 'bg-red-500/10 text-red-600';
-    case '검토중':
-      return 'bg-amber-50 text-amber-700';
-    case '완료':
-      return 'bg-emerald-50 text-emerald-700';
-    case '보류':
-      return 'bg-[var(--muted)] text-[var(--toss-gray-3)]';
-    default:
-      return 'bg-[var(--toss-blue-light)] text-[var(--accent)]';
-  }
-}
-
-async function runBoardPostMutation<T>(
-  mutation: (payload: Record<string, unknown>) => PromiseLike<{ data: T | null; error: unknown }>,
-  payload: Record<string, unknown>
-) {
-  let nextPayload = { ...payload };
-  let result = await mutation(nextPayload);
-  let guard = 0;
-
-  while (result?.error && guard < BOARD_POST_OPTIONAL_COLUMNS.length) {
-    const missingColumn = getMissingBoardPostColumn(result.error);
-    if (!missingColumn || !(missingColumn in nextPayload)) break;
-
-    const { [missingColumn]: _removed, ...rest } = nextPayload;
-    nextPayload = rest;
-    result = await mutation(nextPayload);
-    guard += 1;
-  }
-
-  return { ...result, payload: nextPayload };
-}
+import {
+  BOARD_POST_STATUSES,
+  buildAttachmentMetaContent,
+  buildBoardMetaContent,
+  buildScheduleMetaContent,
+  buildScheduleTimeValue,
+  buildSelectColumns,
+  formatScheduledPublishInputValue,
+  getBoardPostAuthorSignal,
+  getBoardPostPreview,
+  getBoardStatusTone,
+  isMissingBoardReadStorageError,
+  isScheduleBoardType,
+  isScheduledNoticePending,
+  normalizeBoardPost,
+  normalizeBoardPostStatus,
+  normalizeScheduleDateValue,
+  normalizeScheduleTimeValue,
+  normalizeScheduledPublishAtValue,
+  runBoardPostMutation,
+  type BoardChatRoomRow,
+  type BoardLikeRow,
+  type BoardPostRow,
+  type BoardReadRow,
+  type BoardTemplateRow,
+  type QueryResult,
+  type StaffSummary,
+} from './게시판-view-utils';
 
 interface BoardViewProps {
   user: StaffMember | null;
@@ -551,7 +196,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     try {
       await triggerManagedBrowserDownload(href, fileName);
     } catch (error) {
-      console.error('board attachment download failed', error);
+      logger.error('board attachment download failed', error);
       toast('모바일 다운로드에 실패했습니다. 다시 시도해 주세요.', 'error');
     }
   }, []);
@@ -590,10 +235,6 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     [user]
   );
 
-  const currentBoardMeta = BOARD_META_MAP[activeBoard] || {
-    title: activeBoard || '게시판',
-    description: '',
-  };
   const canCreatePost = canAccessBoard(user, activeBoard, 'write');
   const canScheduleNoticePost =
     activeBoard === '공지사항' && (isAdminUser(user) || isPrivilegedUser(user));
@@ -629,7 +270,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
     const { data, error } = await loadStaff();
     if (error) {
-      console.warn('board audience load failed', error);
+      logger.warn('board audience load failed', error);
       return;
     }
     setBoardAudience((data || []) as StaffSummary[]);
@@ -649,7 +290,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
     if (error) {
       if (!isMissingBoardReadStorageError(error)) {
-        console.warn('board read state load failed', error);
+        logger.warn('board read state load failed', error);
       }
       return;
     }
@@ -685,7 +326,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     );
 
     if (error && !isMissingBoardReadStorageError(error)) {
-      console.warn('board read mark failed', error);
+      logger.warn('board read mark failed', error);
     }
 
     readMarkingRef.current.delete(postId);
@@ -1059,7 +700,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       }
       setMainMenu?.('채팅');
     } catch (e) {
-      console.error('openChatForSchedule error', e);
+      logger.error('openChatForSchedule error', e);
       toast('관련 채팅방을 여는 중 오류가 발생했습니다.', 'error');
     }
   };
@@ -1106,7 +747,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       updateLocalLikes(realCount);
     } catch (error) {
       // ── 실패 시 롤백 ──
-      console.error('좋아요 처리 실패:', error);
+      logger.error('좋아요 처리 실패:', error);
       toast('좋아요 처리 중 오류가 발생했습니다.', 'error');
       updateLocalLikes(post.likes_count ?? 0);
       if (isLiked) {
@@ -1138,7 +779,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       .select()
       .maybeSingle();
     if (error) {
-      console.error('댓글 등록 실패:', error);
+      logger.error('댓글 등록 실패:', error);
       toast(`댓글 등록에 실패했습니다.\n\n${error.message || ''}`, 'error');
       return;
     }
@@ -1172,7 +813,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     await supabase.from('board_post_comments').delete().eq('parent_comment_id', commentId);
     const { error } = await supabase.from('board_post_comments').delete().eq('id', commentId);
     if (error) {
-      console.error('댓글 삭제 실패:', error);
+      logger.error('댓글 삭제 실패:', error);
       toast(`댓글 삭제에 실패했습니다.\n\n${error.message || ''}`, 'error');
       return;
     }
@@ -1195,6 +836,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   );
   const [selectedPostDetail, setSelectedPostDetail] = useState<BoardPost | null>(null);
   const selectedPost = selectedPostDetail || selectedPostFromList;
+  const selectedPostAuthorSignal = selectedPost ? getBoardPostAuthorSignal(selectedPost) : null;
   const selectedPostComments = useMemo(
     () => (selectedPost ? comments[selectedPost.id] || [] : []),
     [comments, selectedPost]
@@ -1353,7 +995,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       if (error) throw error;
       toast(`해당 일정의 ${actionType} 처리를 위해 부서장/관리자에게 승인 요청 문서가 상신되었습니다.`, 'success');
     } catch (err) {
-      console.error(err);
+      logger.error(err);
       toast('승인 요청 중 오류가 발생했습니다.', 'error');
     }
   };
@@ -1620,7 +1262,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
           } catch (uploadError) {
             lastUploadError =
               uploadError instanceof Error ? uploadError.message : String(uploadError || '첨부 업로드 실패');
-            console.error('[게시판 첨부 업로드 실패]', uploadError);
+            logger.error('[게시판 첨부 업로드 실패]', uploadError);
           }
         }
         if (uploaded.length === 0 && attachmentFiles.length > 0) {
@@ -1631,7 +1273,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
           return;
         }
         if (uploaded.length < attachmentFiles.length) {
-          console.warn('일부 첨부만 업로드됨.', lastUploadError);
+          logger.warn('일부 첨부만 업로드됨.', lastUploadError);
         }
         postData.attachments = uploaded;
       }
@@ -1704,7 +1346,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       );
       if (!error && insertedPost) {
         if (attachmentFiles.length > 0 && (!insertedPost.attachments || (Array.isArray(insertedPost.attachments) && insertedPost.attachments.length === 0))) {
-          console.warn('첨부파일이 저장되지 않았을 수 있습니다. Supabase에 board_posts_attachments.sql 적용 및 board-attachments 버킷 생성 여부를 확인하세요.');
+          logger.warn('첨부파일이 저장되지 않았을 수 있습니다. Supabase에 board_posts_attachments.sql 적용 및 board-attachments 버킷 생성 여부를 확인하세요.');
         }
         const normalizedInsertedPost = normalizeBoardPost(insertedPost);
         toast('게시물이 등록되었습니다.', 'success');
@@ -1736,7 +1378,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
               await supabase.from('notifications').insert(rows);
             }
           } catch (e) {
-            console.warn('게시판 전 직원 알림 발송 실패:', e);
+            logger.warn('게시판 전 직원 알림 발송 실패:', e);
           }
 
           // 2) 공지 채팅방 자동 메시지 전송 (공지사항·경조사)
@@ -1779,7 +1421,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                 }
               }
             } catch (e) {
-              console.warn('공지 채팅방 자동 메시지 전송 실패:', e);
+              logger.warn('공지 채팅방 자동 메시지 전송 실패:', e);
             }
           }
         }
@@ -1790,7 +1432,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         toast(`게시물 등록에 실패했습니다.\n\n${(error as Record<string, unknown>)?.message || ''}${hint}`, 'error');
       }
     } catch (error: unknown) {
-      console.error('게시물 등록 실패:', error);
+      logger.error('게시물 등록 실패:', error);
       const errObj = error as Record<string, unknown>;
       const msg = typeof errObj?.message === 'string' ? errObj.message : '';
       const hint = (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (msg.includes('column') || ((error as Record<string, unknown>)?.code) === '42703')
@@ -1830,24 +1472,17 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         </div>
       ) : (
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto custom-scrollbar p-4 md:p-4 space-y-4 md:space-y-4 pb-24 md:pb-8">
-          <header className="shrink-0">
-            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-              <div>
-                <h2 className="text-lg md:text-xl font-bold text-[var(--foreground)] tracking-tight">{currentBoardMeta.title}</h2>
-              </div>
-              {canCreatePost && (
-                <div className="flex justify-start md:justify-end">
-                  <button
-                    data-testid="board-toggle-new-post"
-                    onClick={() => setShowNewPost(!showNewPost)}
-                    className="px-4 md:px-4 py-2.5 md:py-3 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-[11px] md:text-xs font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
-                  >
-                    {showNewPost ? '취소' : '+ 새 게시물'}
-                  </button>
-                </div>
-              )}
+          {canCreatePost && (
+            <div className="shrink-0 flex justify-start md:justify-end">
+              <button type="button"
+                data-testid="board-toggle-new-post"
+                onClick={() => setShowNewPost(!showNewPost)}
+                className="px-4 md:px-4 py-2.5 md:py-3 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-[11px] md:text-xs font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
+              >
+                {showNewPost ? '취소' : '+ 새 게시물'}
+              </button>
             </div>
-          </header>
+          )}
 
           {/* 새 게시물 작성 폼 (업무가이드일 때는 표시 안함) */}
           {showNewPost && activeBoard !== '업무가이드' && (
@@ -2251,7 +1886,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                       <input
                         type="file"
                         multiple
-                        accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.hwp,.zip"
+                        accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.bmp,.heic,.heif,.avif,video/*,.mp4,.mov,.webm,.m4v,.pdf,.doc,.docx,.xls,.xlsx,.hwp,.hwpx,.zip"
                         onChange={(e) => {
                           const files = e.target.files ? Array.from(e.target.files) : [];
                           setAttachmentFiles((prev) => [...prev, ...files].slice(0, 10));
@@ -2354,7 +1989,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                 </p>
               )}
 
-              <button
+              <button type="button"
                 data-testid="board-new-post-submit"
                 onClick={handleNewPost}
                 disabled={loading || !isScheduleDraftReady}
@@ -2368,7 +2003,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
           {/* 수술/MRI용 사람 모형 선택 모달 - 사람 이미지 + 부위 하이라이트 */}
           {showBodyPicker && (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
             <div
-              className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-3 md:p-4"
+              className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/50 p-3 md:p-4"
               onClick={() => {
                 setShowBodyPicker(false);
                 if (!VALID_BODY_IDS.has(selectedBodyPart)) setSelectedBodyPart('all');
@@ -2694,6 +2329,15 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                   const isSchedule = activeBoard === '수술일정' || activeBoard === 'MRI일정';
                   const isPendingScheduledNotice = isScheduledNoticePending(post, noticeVisibilityTick);
                   const hasAttachments = (Array.isArray(post.attachments) ? post.attachments : []).length > 0;
+                  const authorSignal = getBoardPostAuthorSignal(post);
+                  const normalizedPostStatus = normalizeBoardPostStatus(post.status);
+                  const isImportantPost = normalizedPostStatus === '중요';
+                  const postPreview = getBoardPostPreview(post);
+                  const postTitle = String(post.title || '').trim() || postPreview || '제목 없음';
+                  const shouldShowPreview = Boolean(postPreview && postPreview !== postTitle);
+                  const postDateLabel = isPendingScheduledNotice && post.scheduled_publish_at
+                    ? new Date(post.scheduled_publish_at).toLocaleDateString()
+                    : new Date(post.created_at ?? '').toLocaleDateString();
                   return (
                     <div
                       key={post.id || idx}
@@ -2701,11 +2345,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                       className={`bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] px-3 md:px-4 py-2.5 md:py-3 hover:border-[var(--accent)]/40 hover:shadow-md transition-all cursor-pointer`}
                       onClick={() => setSelectedPostId(post.id)}
                     >
-                      {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
+                      {isSchedule ? (
                         <div className="space-y-2 md:space-y-1">
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
-                              <h3 className="font-bold text-[var(--foreground)] text-base md:text-lg line-clamp-1">{post.title}</h3>
+                              <h3 className="font-bold text-[var(--foreground)] text-base md:text-lg line-clamp-1">{postTitle}</h3>
                               <p className="text-[11px] text-[var(--accent)] font-bold mt-1 uppercase tracking-widest">
                                 {post.patient_name || '환자명 미지정'} {post.content && <span className="text-[var(--toss-gray-4)] ml-1">| 차트번호: {post.content}</span>}
                               </p>
@@ -2760,22 +2404,44 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                           )}
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 md:gap-3 text-[11px] md:text-xs">
-                          <div className="w-8 text-center text-[11px] font-bold text-[var(--toss-gray-3)] shrink-0">
+                        <div className="flex items-start gap-1.5 text-[11px] md:gap-2 md:text-xs">
+                          <div className="w-5 shrink-0 pt-1 text-center text-[11px] font-bold text-[var(--toss-gray-3)] md:w-6">
                             {rowNumber}
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex min-w-0 items-center gap-1.5">
-                              <p className="min-w-0 flex-1 font-bold text-[var(--foreground)] truncate group-hover:text-[var(--accent)]">
-                                {post.title}
-                              </p>
+                          <div
+                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                              authorSignal.isAnonymous
+                                ? 'bg-[var(--muted)] text-[var(--toss-gray-3)]'
+                                : 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
+                            }`}
+                            title={`작성자 ${authorSignal.name}`}
+                            aria-label={`작성자 ${authorSignal.name}`}
+                          >
+                            {authorSignal.initials}
+                          </div>
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <div className="flex min-w-0 items-start gap-1.5">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex min-w-0 items-center gap-1.5">
+                                  <p className="min-w-0 flex-1 truncate text-[13px] font-bold leading-5 text-[var(--foreground)] group-hover:text-[var(--accent)] md:text-xs md:leading-normal">
+                                    {postTitle}
+                                  </p>
+                                  {isImportantPost && (
+                                    <span className="shrink-0 rounded-[var(--radius-md)] bg-red-500/10 px-1.5 py-0.5 text-[10px] font-bold text-red-600">
+                                      중요
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-bold text-[var(--toss-gray-3)] md:hidden">
+                                  <span className={`rounded-[var(--radius-md)] px-2 py-0.5 ${getBoardStatusTone(normalizedPostStatus)}`}>
+                                    {normalizedPostStatus}
+                                  </span>
+                                  <span>{postDateLabel}</span>
+                                  <span>조회 {(post.views as number) ?? 0}</span>
+                                  {hasAttachments && <span>첨부 있음</span>}
+                                </div>
+                              </div>
                               <div className="shrink-0 flex items-center gap-1 whitespace-nowrap">
-                                <span
-                                  data-testid={`board-post-status-pill-${post.id}`}
-                                  className={`shrink-0 rounded-[var(--radius-md)] px-2 py-1 text-[11px] font-semibold ${getBoardStatusTone(post.status)}`}
-                                >
-                                  {normalizeBoardPostStatus(post.status)}
-                                </span>
                                 {isPendingScheduledNotice && (
                                   <span className="shrink-0 rounded-[var(--radius-md)] bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700">
                                     예약
@@ -2798,25 +2464,28 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                                 )}
                               </div>
                             </div>
-                          </div>
-                          <div className="hidden md:flex w-32 text-[11px] font-bold text-[var(--toss-gray-3)] justify-center shrink-0">
-                            {post.author_name || '익명'}
+                            {shouldShowPreview && (
+                              <p
+                                data-testid={`board-post-preview-${post.id}`}
+                                className="line-clamp-2 text-[11px] leading-5 text-[var(--toss-gray-4)]"
+                              >
+                                {postPreview}
+                              </p>
+                            )}
                           </div>
                           <div
                             data-testid={`board-post-date-${post.id}`}
-                            className="w-[72px] md:w-24 text-[10px] md:text-[11px] font-bold text-[var(--toss-gray-3)] text-center shrink-0"
+                            className="hidden w-20 shrink-0 pt-1 text-center text-[11px] font-bold text-[var(--toss-gray-3)] md:block"
                           >
-                            {isPendingScheduledNotice && post.scheduled_publish_at
-                              ? new Date(post.scheduled_publish_at).toLocaleDateString()
-                              : new Date(post.created_at ?? '').toLocaleDateString()}
+                            {postDateLabel}
                           </div>
-                          <div className="w-12 md:w-14 text-[10px] md:text-[11px] font-bold text-[var(--toss-gray-3)] text-center shrink-0">
+                          <div className="hidden w-12 shrink-0 pt-1 text-center text-[11px] font-bold text-[var(--toss-gray-3)] md:block">
                             조회 {(post.views as number) ?? 0}
                           </div>
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); handleLike(post); }}
-                            className={`w-12 md:w-14 text-[10px] md:text-[11px] font-bold text-center shrink-0 transition ${myLikedPostIds.has(String(post.id ?? '').trim()) ? 'text-red-500' : 'text-[var(--toss-gray-3)] hover:text-red-400'}`}
+                            className={`w-10 shrink-0 pt-1 text-center text-[10px] font-bold transition md:w-12 md:text-[11px] ${myLikedPostIds.has(String(post.id ?? '').trim()) ? 'text-red-500' : 'text-[var(--toss-gray-3)] hover:text-red-400'}`}
                           >
                             {myLikedPostIds.has(String(post.id ?? '').trim()) ? '♥' : '♡'} {(post.likes_count as number) ?? 0}
                           </button>
@@ -2842,24 +2511,36 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
           {/* 게시글 상세 보기 모달 */}
           {selectedPost && (
-            <div data-testid="board-post-detail-overlay" className="fixed inset-0 z-[110] flex items-end md:items-center justify-center bg-black/40 p-0 md:p-5">
+            <div data-testid="board-post-detail-overlay" className="fixed inset-0 z-[var(--z-modal)] flex items-end md:items-center justify-center bg-black/40 p-0 md:p-5">
               <div data-testid="board-post-detail" className="w-full max-w-4xl max-h-[90dvh] overflow-y-auto bg-[var(--card)] border-0 md:border border-[var(--border)] rounded-t-[24px] md:rounded-[var(--radius-xl)] shadow-sm p-3 md:p-4 pb-8 space-y-4 md:space-y-5 text-[13px] md:text-[14px] safe-area-pb">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <p className="text-[11px] md:text-[12px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">
                       {selectedPost.board_type as string}
                     </p>
-                    <h3 className="text-lg md:text-xl font-semibold text-[var(--foreground)]">
-                      {selectedPost.title}
+                    <h3 className="flex flex-wrap items-center gap-2 text-lg font-semibold text-[var(--foreground)] md:text-xl">
+                      <span>{selectedPost.title}</span>
+                      {normalizeBoardPostStatus(selectedPost.status) === '중요' && (
+                        <span className="rounded-[var(--radius-md)] bg-red-500/10 px-2 py-1 text-[11px] font-bold text-red-600">
+                          중요
+                        </span>
+                      )}
                     </h3>
-                    <p className="mt-2 text-[11px] md:text-[12px] text-[var(--toss-gray-3)] font-bold">
-                      👤 {selectedPost.author_name || '익명'} ·{' '}
-                      {new Date(selectedPost.created_at ?? '').toLocaleString('ko-KR')}
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <span className={`rounded-[var(--radius-md)] px-2 py-1 text-[11px] font-semibold ${getBoardStatusTone(selectedPost.status)}`}>
-                        {normalizeBoardPostStatus(selectedPost.status)}
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-bold text-[var(--toss-gray-3)] md:text-[12px]">
+                      <span
+                        className={`flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold ${
+                          selectedPostAuthorSignal?.isAnonymous
+                            ? 'bg-[var(--muted)] text-[var(--toss-gray-3)]'
+                            : 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
+                        }`}
+                      >
+                        {selectedPostAuthorSignal?.initials || '?'}
                       </span>
+                      <span>
+                        작성자 {selectedPostAuthorSignal?.name || selectedPost.author_name || '익명'}
+                        {selectedPostAuthorSignal?.meta ? ` · ${selectedPostAuthorSignal.meta}` : ''}
+                      </span>
+                      <span>{new Date(selectedPost.created_at ?? '').toLocaleString('ko-KR')}</span>
                     </div>
                     {selectedPost.board_type === '공지사항' && selectedPost.scheduled_publish_at && (
                       <p className="mt-1 text-[11px] md:text-[12px] font-bold text-amber-700">
@@ -3098,9 +2779,9 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                     <div className="flex flex-wrap gap-4">
                       {(Array.isArray(selectedPost.attachments) ? selectedPost.attachments as AttachmentItem[] : []).map((att: AttachmentItem, i: number) =>
                         att.type === 'image' ? (
-                          <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" className="block">
+                          <a key={i} href={buildStorageInlineUrl(att.url, att.name ?? '') || att.url} target="_blank" rel="noopener noreferrer" className="block">
                             <img
-                              src={att.url}
+                              src={buildStorageInlineUrl(att.url, att.name ?? '') || att.url}
                               alt={att.name}
                               loading="eager"
                               decoding="async"
@@ -3115,7 +2796,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                           </a>
                         ) : att.type === 'video' ? (
                           <div key={i} className="rounded-[var(--radius-lg)] border border-[var(--border)] overflow-hidden bg-black max-w-[320px]">
-                            <video src={att.url} controls className="w-full max-h-[240px]" preload="metadata" />
+                            <video src={buildStorageInlineUrl(att.url, att.name ?? '') || att.url} controls className="w-full max-h-[240px]" preload="metadata" />
                             <p className="text-[11px] font-bold text-[var(--toss-gray-4)] p-2 bg-[var(--page-bg)] truncate">{att.name}</p>
                           </div>
                         ) : (
@@ -3241,7 +2922,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
           )}
           {readStatusPost && (
             <div
-              className="fixed inset-0 z-[120] flex items-end md:items-center justify-center bg-black/40 p-0 md:p-5"
+              className="fixed inset-0 z-[var(--z-modal)] flex items-end md:items-center justify-center bg-black/40 p-0 md:p-5"
               onClick={() => setReadStatusPost(null)}
             >
               <div

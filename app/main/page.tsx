@@ -1,4 +1,6 @@
 'use client';
+import { logger } from '@/lib/logger';
+
 import { toast } from '@/lib/toast';
 import { Suspense, startTransition, useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -72,6 +74,17 @@ function buildSubMenuTestId(mainMenuId: string, subMenuId: string) {
 
   return `submenu-${slug}`;
 }
+
+const SIDEBAR_NAV_LABELS = [
+  { testId: 'sidebar-menu-home', label: '내정보' },
+  { testId: 'sidebar-menu-extra', label: '추가기능' },
+  { testId: 'sidebar-menu-chat', label: '채팅' },
+  { testId: 'sidebar-menu-board', label: '게시판' },
+  { testId: 'sidebar-menu-approval', label: '전자결재' },
+  { testId: 'sidebar-menu-hr', label: '인사관리' },
+  { testId: 'sidebar-menu-inventory', label: '재고관리' },
+  { testId: 'sidebar-menu-admin', label: '관리자' },
+];
 
 function MainPageFallback() {
   return (
@@ -484,7 +497,7 @@ function MainPageContent() {
             .eq('is_active', true)
             .then(({ data: list, error }) => {
               if (error) {
-                console.error('companies 조회 오류:', error);
+                logger.error('companies 조회 오류:', error);
                 return;
               }
               const sorted = (list || []).sort((a: { id: string; name: string; type: string }, b: { id: string; name: string; type: string }) => {
@@ -843,7 +856,7 @@ function MainPageContent() {
         mris: []
       });
     } catch (error) {
-      console.error("데이터 로딩 실패:", error);
+      logger.error("데이터 로딩 실패:", error);
     } finally {
       setHasLoadedInitialData(true);
       setLoading(false);
@@ -1069,6 +1082,37 @@ function MainPageContent() {
     [data, handleRefresh, user],
   );
 
+  useEffect(() => {
+    if (!user?.id || typeof document === 'undefined') return;
+
+    const setNavLabel = (element: Element | null, label: string) => {
+      if (!(element instanceof HTMLElement)) return;
+      element.setAttribute('title', label);
+      element.setAttribute('aria-label', label);
+      element.setAttribute('data-nav-label', label);
+    };
+
+    const applySidebarNavLabels = () => {
+      const desktopSidebar = document.querySelector('[data-testid="desktop-sidebar"]');
+      if (!desktopSidebar) return;
+
+      setNavLabel(desktopSidebar.querySelector('.app-shell-logo'), '내정보');
+      SIDEBAR_NAV_LABELS.forEach(({ testId, label }) => {
+        setNavLabel(desktopSidebar.querySelector(`[data-testid="${testId}"]`), label);
+      });
+    };
+
+    applySidebarNavLabels();
+
+    if (typeof MutationObserver === 'undefined') return;
+    const desktopSidebar = document.querySelector('[data-testid="desktop-sidebar"]');
+    if (!desktopSidebar) return;
+
+    const observer = new MutationObserver(applySidebarNavLabels);
+    observer.observe(desktopSidebar, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [mainMenu, user?.id]);
+
   // user 없으면 로그인 페이지로 리다이렉트 (초기 로드 시)
   if (!user) {
     return (
@@ -1085,10 +1129,72 @@ function MainPageContent() {
 
   return (
     <div
-      className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[var(--page-bg)] md:flex-row"
+      className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[var(--page-bg)] pt-[env(safe-area-inset-top)] md:flex-row md:pt-0"
       data-testid="main-shell"
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-[80] p-2 md:p-3">
+      <style>{`
+        @media (min-width: 768px) {
+          [data-testid="desktop-sidebar"] .app-shell-menu-item[data-nav-label],
+          [data-testid="desktop-sidebar"] .app-shell-logo[data-nav-label] {
+            position: relative;
+          }
+
+          [data-testid="desktop-sidebar"] .app-shell-menu-item[data-nav-label]::after,
+          [data-testid="desktop-sidebar"] .app-shell-logo[data-nav-label]::after {
+            position: absolute;
+            left: calc(100% + 10px);
+            top: 50%;
+            z-index: calc(var(--z-modal) + 1);
+            max-width: 11rem;
+            overflow: hidden;
+            border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+            border-radius: var(--radius-md);
+            background: color-mix(in srgb, var(--foreground) 94%, transparent);
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
+            color: var(--card);
+            content: attr(data-nav-label);
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 1;
+            opacity: 0;
+            padding: 8px 10px;
+            pointer-events: none;
+            text-overflow: ellipsis;
+            transform: translate(-4px, -50%);
+            transition: opacity var(--transition-fast), transform var(--transition-fast);
+            white-space: nowrap;
+          }
+
+          [data-testid="desktop-sidebar"] .app-shell-menu-item[data-nav-label]::before,
+          [data-testid="desktop-sidebar"] .app-shell-logo[data-nav-label]::before {
+            position: absolute;
+            left: calc(100% + 4px);
+            top: 50%;
+            z-index: calc(var(--z-modal) + 2);
+            border-bottom: 5px solid transparent;
+            border-right: 6px solid color-mix(in srgb, var(--foreground) 94%, transparent);
+            border-top: 5px solid transparent;
+            content: '';
+            opacity: 0;
+            pointer-events: none;
+            transform: translate(-4px, -50%);
+            transition: opacity var(--transition-fast), transform var(--transition-fast);
+          }
+
+          [data-testid="desktop-sidebar"] .app-shell-menu-item[data-nav-label]:hover::after,
+          [data-testid="desktop-sidebar"] .app-shell-menu-item[data-nav-label]:focus-visible::after,
+          [data-testid="desktop-sidebar"] .app-shell-menu-item[data-nav-label]:hover::before,
+          [data-testid="desktop-sidebar"] .app-shell-menu-item[data-nav-label]:focus-visible::before,
+          [data-testid="desktop-sidebar"] .app-shell-logo[data-nav-label]:hover::after,
+          [data-testid="desktop-sidebar"] .app-shell-logo[data-nav-label]:focus-visible::after,
+          [data-testid="desktop-sidebar"] .app-shell-logo[data-nav-label]:hover::before,
+          [data-testid="desktop-sidebar"] .app-shell-logo[data-nav-label]:focus-visible::before {
+            opacity: 1;
+            transform: translate(0, -50%);
+          }
+        }
+      `}</style>
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[var(--z-sticky)] p-2 md:p-3">
         <OfflineStatusBanner />
       </div>
       <Sidebar
@@ -1099,10 +1205,6 @@ function MainPageContent() {
 
       {selectableSubMenus.length > 0 && (
         <aside className="app-subnav no-scrollbar scroll-smooth snap-x snap-mandatory flex w-full shrink-0 flex-col overflow-x-auto border-b md:sticky md:top-0 md:max-h-[100dvh] md:w-[var(--submenu-width)] md:snap-none md:overflow-x-visible md:overflow-y-auto md:border-r md:border-b-0">
-          <div className="hidden px-4 pt-4 md:block">
-              <h2 className="app-subnav-title">{mainMenu}</h2>
-              <div className="mt-4 h-px bg-[var(--border)]" />
-            </div>
           <div className="flex flex-row gap-0.5 px-2 py-1.5 md:flex-col md:px-2 md:py-3">
           {(() => {
             if (mainMenu === '관리자' || mainMenu === '재고관리') {
@@ -1117,7 +1219,7 @@ function MainPageContent() {
                     {subgroupLabels[groupName!] || groupName}
                   </div>
                   {selectableSubMenus.filter(s => s.group === groupName).map(sub => (
-                    <button
+                    <button type="button"
                       key={sub.id}
                       onClick={() => handleSubViewChange(sub.id)}
                       data-testid={buildSubMenuTestId(mainMenu, sub.id)}
@@ -1135,7 +1237,7 @@ function MainPageContent() {
             }
 
             return selectableSubMenus.map((sub) => (
-              <button
+              <button type="button"
                 key={sub.id}
                 onClick={() => handleSubViewChange(sub.id)}
                 data-testid={buildSubMenuTestId(mainMenu, sub.id)}

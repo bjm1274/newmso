@@ -1,4 +1,5 @@
 'use client';
+import { logger } from '@/lib/logger';
 
 import {
   useCallback,
@@ -26,6 +27,27 @@ import {
 
 import { CHAT_MAX_FILE_SIZE_BYTES as MAX_FILE_SIZE_BYTES, CHAT_MAX_VIDEO_SIZE_BYTES as MAX_VIDEO_SIZE_BYTES } from '@/lib/chat-upload-constants';
 
+const DEFAULT_CONTENT_TYPE = 'application/octet-stream';
+const MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  bmp: 'image/bmp',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  avif: 'image/avif',
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
+  m4v: 'video/mp4',
+  webm: 'video/webm',
+  pdf: 'application/pdf',
+  txt: 'text/plain',
+  csv: 'text/csv',
+  zip: 'application/zip',
+};
+
 type ShareTarget = {
   id: string;
   fileCount: number;
@@ -51,6 +73,28 @@ function getFileKind(mime: string): 'image' | 'video' | 'file' {
   if (mime.startsWith('image/')) return 'image';
   if (mime.startsWith('video/')) return 'video';
   return 'file';
+}
+
+function getFileExtension(file: File) {
+  const rawName = String(file.name || '').trim();
+  const lastDotIndex = rawName.lastIndexOf('.');
+  if (lastDotIndex > -1 && lastDotIndex < rawName.length - 1) {
+    return rawName.slice(lastDotIndex + 1).toLowerCase();
+  }
+  return '';
+}
+
+function getUploadContentType(file: File) {
+  const rawMimeType = String(file.type || '').trim().toLowerCase();
+  if (rawMimeType === 'image/jpg' || rawMimeType === 'image/pjpeg') return 'image/jpeg';
+  if (rawMimeType === 'image/x-png') return 'image/png';
+  if (rawMimeType && rawMimeType !== DEFAULT_CONTENT_TYPE) return rawMimeType;
+
+  return MIME_BY_EXTENSION[getFileExtension(file)] || rawMimeType || DEFAULT_CONTENT_TYPE;
+}
+
+function isImageFile(file: File) {
+  return getUploadContentType(file).startsWith('image/');
 }
 
 export function useChatUploads({
@@ -151,13 +195,13 @@ export function useChatUploads({
           }
         }
       } catch (error) {
-        console.warn('[Share Target] file restore failed:', error);
+        logger.warn('[Share Target] file restore failed:', error);
       }
     })();
   }, [inputMsgRef, onConsumeShareTarget, setInputMsg, shareTarget]);
 
   const appendPendingAlbumFiles = useCallback((files: File[]) => {
-    const imageFiles = files.filter((file) => file.type.startsWith('image/'));
+    const imageFiles = files.filter(isImageFile);
     if (imageFiles.length === 0) return;
 
     const previewUrls = imageFiles.map((file) => URL.createObjectURL(file));
@@ -178,12 +222,13 @@ export function useChatUploads({
         skipRetryQueue?: boolean;
       }
     ) => {
-      if (file.type.startsWith('video/')) {
+      const uploadContentType = getUploadContentType(file);
+      if (uploadContentType.startsWith('video/')) {
         if (file.size > MAX_VIDEO_SIZE_BYTES) {
           toast('동영상 크기는 200MB 이하여야 합니다.');
           return false;
         }
-      } else if (!file.type.startsWith('image/')) {
+      } else if (!uploadContentType.startsWith('image/')) {
         if (file.size > MAX_FILE_SIZE_BYTES) {
           toast('파일 크기는 20MB 이하여야 합니다.');
           return false;
@@ -225,7 +270,7 @@ export function useChatUploads({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               fileName: uploadFileName,
-              mimeType: file.type || 'application/octet-stream',
+              mimeType: uploadContentType,
               fileSize: file.size,
             }),
           });
@@ -286,7 +331,7 @@ export function useChatUploads({
 
             if (typeof uploadClient.uploadToSignedUrl === 'function') {
               const uploadResult = await uploadClient.uploadToSignedUrl(payload.path, payload.token, file, {
-                contentType: file.type || 'application/octet-stream',
+                contentType: uploadContentType,
                 upsert: false,
                 cacheControl: '3600',
               });
@@ -299,9 +344,9 @@ export function useChatUploads({
               method: 'PUT',
               headers:
                 payload.provider === 'r2'
-                  ? payload.headers || { 'content-type': file.type || 'application/octet-stream' }
+                  ? payload.headers || { 'content-type': uploadContentType }
                   : {
-                      'content-type': file.type || 'application/octet-stream',
+                      'content-type': uploadContentType,
                       'x-upsert': 'false',
                       'cache-control': '3600',
                     },
@@ -315,7 +360,7 @@ export function useChatUploads({
             }
           }
         } catch (directUploadError) {
-          console.warn('직접 업로드 실패, 서버 업로드로 다시 시도합니다.', directUploadError);
+          logger.warn('직접 업로드 실패, 서버 업로드로 다시 시도합니다.', directUploadError);
           const fallbackPayload = await uploadViaAppServer();
           publicUrl = fallbackPayload.url || '';
         }
@@ -327,7 +372,7 @@ export function useChatUploads({
         return await handleSendMessage({
           fileUrl: publicUrl,
           fileSizeBytes: file.size,
-          fileKind: getFileKind(file.type || ''),
+          fileKind: getFileKind(uploadContentType),
           fileName: uploadFileName,
           contentOverride: contentSnapshot.trim(),
           clearComposerIfUnchangedFrom: options?.shouldClearSnapshot === false ? undefined : contentSnapshot,
@@ -337,7 +382,7 @@ export function useChatUploads({
           albumTotal: options?.albumTotal ?? null,
         });
       } catch (error: unknown) {
-        console.error('file upload failed:', error);
+        logger.error('file upload failed:', error);
         const message = (error as Error)?.message || String(error);
         const hint = message.includes('Unauthorized')
           ? '로그인 세션이 만료되었을 수 있습니다. 다시 로그인 후 시도해 주세요.'
@@ -386,7 +431,7 @@ export function useChatUploads({
   }, []);
 
   const handleAlbumFileSelect = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []).filter((file) => file.type.startsWith('image/'));
+    const files = Array.from(event.target.files || []).filter(isImageFile);
     if (files.length === 0) return;
     appendPendingAlbumFiles(files);
     event.target.value = '';
@@ -478,8 +523,8 @@ export function useChatUploads({
   const queueDroppedFiles = useCallback((files: File[]) => {
     if (!files.length) return;
 
-    const imageFiles = files.filter((file) => file.type.startsWith('image/'));
-    const otherFiles = files.filter((file) => !file.type.startsWith('image/'));
+    const imageFiles = files.filter(isImageFile);
+    const otherFiles = files.filter((file) => !isImageFile(file));
     const shouldBundleImages = imageFiles.length > 1 || (pendingAlbumFiles.length > 0 && imageFiles.length > 0);
 
     if (shouldBundleImages) {

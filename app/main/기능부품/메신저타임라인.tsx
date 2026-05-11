@@ -67,9 +67,6 @@ type MessengerTimelineProps = {
   readCounts: Record<string, number>;
   deliveryStates: Record<string, DeliveryState>;
   threadSummaries: Record<string, ThreadSummary>;
-  activeActionMessageId?: string | null;
-  pinnedIds?: string[];
-  bookmarkedIds?: Set<string>;
   roomMembers: StaffMember[];
   effectiveChatUserId: string;
   activeMessageHighlightQuery: string;
@@ -86,14 +83,6 @@ type MessengerTimelineProps = {
   onStartReplyToMessage: (message: ChatMessage) => void;
   onOpenThread: (message: ChatMessage) => void;
   onOpenMessageActions: (message: ChatMessage) => void;
-  onCloseMessageActions?: () => void;
-  onToggleReaction?: (message: ChatMessage, emoji: string) => void | Promise<void>;
-  onAddTask?: (message: ChatMessage) => void | Promise<void>;
-  onTogglePin?: (message: ChatMessage) => void | Promise<void>;
-  onToggleBookmark?: (message: ChatMessage) => void | Promise<void>;
-  onForwardMessage?: (message: ChatMessage) => void;
-  onForwardToSelf?: (message: ChatMessage) => void | Promise<void>;
-  onDeleteMessage?: (message: ChatMessage) => void | Promise<void>;
   onMarkMessageRead: (message: ChatMessage) => void;
   renderMessageContent: (content: string, isMine?: boolean, highlightQuery?: string) => ReactNode;
   onOpenAttachmentPreview: (url: string, name: string, kind: AttachmentPreviewKind) => void;
@@ -117,7 +106,6 @@ function MessengerTimelineComponent({
   readCounts,
   deliveryStates,
   threadSummaries,
-  activeActionMessageId,
   roomMembers,
   effectiveChatUserId,
   activeMessageHighlightQuery,
@@ -254,7 +242,7 @@ function MessengerTimelineComponent({
                     <p className="mb-4 text-xs font-bold text-foreground leading-relaxed">{pollItem.question}</p>
                     <div className="space-y-1.5">
                       {(pollItem.options || []).map((opt: string, idx: number) => (
-                        <button
+                        <button type="button"
                           data-testid={`chat-poll-vote-${pollItem.id}-${idx}`}
                           key={idx}
                           onClick={() => onVote(pollItem.id, idx)}
@@ -293,7 +281,6 @@ function MessengerTimelineComponent({
                   albumMsgs.find((message) => String(message.content || '').trim()) ||
                   albumMsgs[0] ||
                   albumItem;
-                const albumActionTarget = albumReplyTarget || albumItem;
 
                 return (
                   <div
@@ -325,7 +312,7 @@ function MessengerTimelineComponent({
                         )}
                         <div className={`grid ${gridCols} gap-0.5 rounded-[var(--radius-lg)] overflow-hidden`} style={{ maxWidth: count === 1 ? 200 : count <= 4 ? 260 : 300 }}>
                           {albumMsgs.map((message, index) => (
-                            <button
+                            <button type="button"
                               key={message.id}
                               className={`relative overflow-hidden bg-[var(--muted)] ${count === 3 && index === 2 ? 'col-span-2' : ''} ${count === 5 && index === 3 ? 'col-span-1' : ''}`}
                               style={{ aspectRatio: count === 1 ? '4/3' : '1/1' }}
@@ -362,28 +349,6 @@ function MessengerTimelineComponent({
                             </button>
                           ) : null}
                         </div>
-                        {albumActionTarget ? (
-                          <div
-                            data-testid={`chat-album-inline-actions-${albumItem.album_id || albumItem.id}`}
-                            className={`flex items-center gap-1 overflow-hidden opacity-0 pointer-events-none transition-all max-h-0 ${isMineAlbum ? 'flex-row-reverse' : ''} group-hover:mt-0.5 group-hover:max-h-10 group-hover:opacity-100 group-hover:pointer-events-auto [@media(hover:none)]:mt-0.5 [@media(hover:none)]:max-h-10 [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto`}
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => { onStartReplyToMessage(albumActionTarget); }}
-                              className="touch-manipulation min-h-[40px] p-1.5 px-2.5 rounded-lg hover:bg-[var(--tab-bg)] active:bg-[var(--tab-bg)] dark:hover:bg-[var(--muted)] text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-blue-500 transition-colors"
-                            >
-                              답장
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => { onOpenMessageActions(albumActionTarget); }}
-                              className="touch-manipulation min-h-[40px] p-1.5 px-2.5 rounded-lg hover:bg-[var(--tab-bg)] active:bg-[var(--tab-bg)] dark:hover:bg-[var(--muted)] text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] transition-colors"
-                            >
-                              •••
-                            </button>
-                          </div>
-                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -394,7 +359,6 @@ function MessengerTimelineComponent({
               const messageId = String(msg.id);
               const isMine = String(msg.sender_id) === effectiveChatUserId;
               const isDeletedMessage = Boolean(msg.is_deleted);
-              const isActionActive = activeActionMessageId === messageId;
               const msgReacts = reactions[msg.id] || {};
               const hasReacts = Object.keys(msgReacts).some((emoji) => (msgReacts[emoji] || 0) > 0);
               const readersCount = readCounts[msg.id] || 0;
@@ -745,31 +709,6 @@ function MessengerTimelineComponent({
                           {deliveryErrorText}
                         </p>
                       )}
-                      <div
-                        data-chat-active-action-scope={isActionActive ? 'true' : undefined}
-                        data-testid={isActionActive ? 'chat-message-actions-panel' : `chat-message-inline-actions-${msg.id}`}
-                        className={`flex items-center gap-1 overflow-hidden transition-all ${isMine ? 'flex-row-reverse' : ''} ${
-                          isActionActive
-                            ? 'mt-0.5 max-h-10 opacity-100 pointer-events-auto'
-                            : 'max-h-0 opacity-0 pointer-events-none group-hover:mt-0.5 group-hover:max-h-10 group-hover:opacity-100 group-hover:pointer-events-auto [@media(hover:none)]:mt-0.5 [@media(hover:none)]:max-h-10 [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto'
-                        }`}
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => { onStartReplyToMessage(msg); }}
-                          className="touch-manipulation min-h-[40px] p-1.5 px-2.5 rounded-lg hover:bg-[var(--tab-bg)] active:bg-[var(--tab-bg)] dark:hover:bg-[var(--muted)] text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-blue-500 transition-colors"
-                        >
-                          답장
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { onOpenMessageActions(msg); }}
-                          className="touch-manipulation min-h-[40px] p-1.5 px-2.5 rounded-lg hover:bg-[var(--tab-bg)] active:bg-[var(--tab-bg)] dark:hover:bg-[var(--muted)] text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] transition-colors"
-                        >
-                          ···
-                        </button>
-                      </div>
                     </div>
                   )}
                 </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { buildStorageInlineUrl } from '@/lib/object-storage-url';
 import {
   useCallback,
   useEffect,
@@ -290,11 +291,12 @@ export function ChatAttachmentPreviewModal({ controller }: ChatAttachmentPreview
   }, [activeItem?.url]);
 
   if (!preview || !activeItem) return null;
+  const activeViewUrl = buildStorageInlineUrl(activeItem.url, activeItem.name ?? '') || activeItem.url;
 
   return (
     <div
       data-testid="chat-attachment-preview-modal"
-      className="fixed inset-0 z-[140] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-[var(--z-modal)] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={closePreview}
     >
       <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-3 p-3 text-white">
@@ -336,7 +338,7 @@ export function ChatAttachmentPreviewModal({ controller }: ChatAttachmentPreview
           ) : null}
         </div>
         <a
-          href={activeItem.url}
+          href={activeViewUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="h-11 inline-flex items-center justify-center rounded-full bg-white/15 hover:bg-white/30 px-4 text-white text-xs font-semibold transition-colors"
@@ -419,7 +421,7 @@ export function ChatAttachmentPreviewModal({ controller }: ChatAttachmentPreview
             onDoubleClick={handleImageDoubleClick}
           >
             <img
-              src={activeItem.url}
+              src={activeViewUrl}
               alt={activeItem.name || '미리보기'}
               data-testid="chat-attachment-preview-image"
               className="max-w-[92vw] max-h-[80vh] rounded-xl object-contain shadow-sm select-none"
@@ -435,7 +437,7 @@ export function ChatAttachmentPreviewModal({ controller }: ChatAttachmentPreview
           )
         ) : activeItem.kind === 'video' ? (
           <video
-            src={activeItem.url}
+            src={activeViewUrl}
             controls
             autoPlay
             playsInline
@@ -443,7 +445,7 @@ export function ChatAttachmentPreviewModal({ controller }: ChatAttachmentPreview
           />
         ) : /\.pdf(\?|#|$)/i.test(activeItem.url) ? (
           <iframe
-            src={activeItem.url}
+            src={activeViewUrl}
             title={activeItem.name}
             className="w-[92vw] h-[88vh] rounded-xl bg-[var(--card)] shadow-sm"
           />
@@ -453,7 +455,7 @@ export function ChatAttachmentPreviewModal({ controller }: ChatAttachmentPreview
             <p className="mt-2 text-xs text-[var(--toss-gray-4)] break-all">{activeItem.url}</p>
             <div className="mt-4 flex flex-wrap gap-2">
               <a
-                href={activeItem.url}
+                href={activeViewUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center rounded-lg bg-[var(--accent)] px-3 py-2 text-xs font-bold text-white"

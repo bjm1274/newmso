@@ -14,6 +14,26 @@ export const dynamic = 'force-dynamic';
 
 import { CHAT_MAX_FILE_SIZE_BYTES as MAX_FILE_SIZE_BYTES, CHAT_MAX_VIDEO_SIZE_BYTES as MAX_VIDEO_SIZE_BYTES } from '@/lib/chat-upload-constants';
 const CHAT_BUCKET_CANDIDATES = ['pchos-files', 'board-attachments'] as const;
+const DEFAULT_CONTENT_TYPE = 'application/octet-stream';
+const MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  bmp: 'image/bmp',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  avif: 'image/avif',
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
+  m4v: 'video/mp4',
+  webm: 'video/webm',
+  pdf: 'application/pdf',
+  txt: 'text/plain',
+  csv: 'text/csv',
+  zip: 'application/zip',
+};
 
 type UploadPlanRequest = {
   fileName?: string;
@@ -66,6 +86,16 @@ function guessFileExtension(fileName: string, mimeType: string) {
   if (mimeType === 'application/pdf') return 'pdf';
   if (mimeType === 'text/plain') return 'txt';
   return 'bin';
+}
+
+function normalizeUploadMimeType(fileName: string, mimeType: string) {
+  const rawMimeType = String(mimeType || '').trim().toLowerCase();
+  if (rawMimeType === 'image/jpg' || rawMimeType === 'image/pjpeg') return 'image/jpeg';
+  if (rawMimeType === 'image/x-png') return 'image/png';
+  if (rawMimeType && rawMimeType !== DEFAULT_CONTENT_TYPE) return rawMimeType;
+
+  const ext = guessFileExtension(fileName, '');
+  return MIME_BY_EXTENSION[ext] || rawMimeType || DEFAULT_CONTENT_TYPE;
 }
 
 function buildFallbackFileName(mimeType: string, ext: string) {
@@ -130,8 +160,9 @@ async function createSignedUploadPlan(
   supabase: any,
   payload: UploadPlanRequest,
 ) {
-  const mimeType = String(payload.mimeType || 'application/octet-stream').trim() || 'application/octet-stream';
-  const fileName = normalizeUploadFileName(String(payload.fileName || '').trim(), mimeType);
+  const rawFileName = String(payload.fileName || '').trim();
+  const mimeType = normalizeUploadMimeType(rawFileName, payload.mimeType || DEFAULT_CONTENT_TYPE);
+  const fileName = normalizeUploadFileName(rawFileName, mimeType);
   const fileSize = Number(payload.fileSize || 0);
 
   validateUploadTarget(fileName, mimeType, fileSize);
@@ -215,8 +246,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '업로드할 파일이 없습니다.' }, { status: 400 });
     }
 
-    const mimeType = file.type || 'application/octet-stream';
-    const normalizedFileName = normalizeUploadFileName(String(file.name || '').trim(), mimeType);
+    const rawFileName = String(file.name || '').trim();
+    const mimeType = normalizeUploadMimeType(rawFileName, file.type || DEFAULT_CONTENT_TYPE);
+    const normalizedFileName = normalizeUploadFileName(rawFileName, mimeType);
     validateUploadTarget(normalizedFileName, mimeType, file.size);
 
     const filePath = buildSafeFilePath(normalizedFileName, mimeType);
@@ -225,7 +257,7 @@ export async function POST(request: NextRequest) {
       const uploaded = await uploadChatAttachmentToR2(
         filePath,
         Buffer.from(arrayBuffer),
-        file.type || 'application/octet-stream',
+        mimeType,
       );
       return NextResponse.json({
         success: true,
@@ -243,7 +275,7 @@ export async function POST(request: NextRequest) {
       const { error } = await supabase.storage
         .from(bucket)
         .upload(filePath, Buffer.from(arrayBuffer), {
-          contentType: file.type || 'application/octet-stream',
+          contentType: mimeType,
           upsert: false,
           cacheControl: '3600',
         });

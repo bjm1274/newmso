@@ -87,7 +87,6 @@ export function MessengerSidebar({
   groupedStaffs,
   expandedDepts,
   onViewModeChange,
-  onOpenGroupModal = () => {},
   onOpenGlobalSearch,
   onToggleHiddenRooms,
   onRoomClick,
@@ -107,7 +106,7 @@ export function MessengerSidebar({
       <div className="p-3 md:p-3 space-y-3 flex flex-col min-h-0">
         <div className="flex items-center gap-1">
           <div className="flex flex-1 gap-1 bg-[var(--tab-bg)] dark:bg-zinc-800 p-1 rounded-xl glass">
-            <button
+            <button type="button"
               data-testid="chat-tab-chat"
               onClick={() => onViewModeChange('chat')}
               className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
@@ -118,7 +117,7 @@ export function MessengerSidebar({
             >
               채팅
             </button>
-            <button
+            <button type="button"
               data-testid="chat-tab-org"
               onClick={() => onViewModeChange('org')}
               className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
@@ -130,28 +129,7 @@ export function MessengerSidebar({
               조직도
             </button>
           </div>
-          <button
-            data-testid="chat-open-group-modal-legacy"
-            type="button"
-            onClick={onOpenGroupModal}
-            title="새 그룹 채팅방 만들기"
-            className="hidden"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 20 20"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M10 4v12" />
-              <path d="M4 10h12" />
-            </svg>
-          </button>
-          <button
+          <button type="button"
             data-testid="chat-open-global-search"
             onClick={onOpenGlobalSearch}
             title="대화내용·파일·사진 통합 검색"
@@ -216,7 +194,7 @@ export function MessengerSidebar({
                 return (
                   <div
                     key={roomId}
-                    className={`group min-h-[72px] p-3 rounded-[var(--radius-lg)] cursor-pointer transition-all flex items-center justify-between gap-3 border relative overflow-hidden ${
+                    className={`group min-h-[72px] p-3 rounded-[var(--radius-lg)] cursor-pointer transition-all flex flex-col items-stretch justify-start gap-2 border relative overflow-hidden ${
                       isSelected
                         ? 'bg-zinc-800 border-zinc-700 shadow-sm'
                         : 'bg-[var(--card)] dark:bg-zinc-900 border-transparent hover:border-[var(--border)] dark:hover:border-zinc-800'
@@ -229,7 +207,7 @@ export function MessengerSidebar({
                       type="button"
                       data-testid={`chat-room-${roomId}`}
                       onClick={() => onRoomClick(room.id)}
-                      className={`flex min-w-0 flex-1 items-start ${isGroupRoom ? 'gap-2.5' : 'gap-3'} text-left`}
+                      className={`flex w-full min-w-0 flex-1 items-start ${isGroupRoom ? 'gap-2.5' : 'gap-3'} text-left`}
                     >
                       {isNoticeChannel ? (
                         <div
@@ -272,15 +250,15 @@ export function MessengerSidebar({
                         data-testid={`chat-room-summary-${roomId}`}
                         className="flex min-w-0 flex-1 flex-col gap-1.5"
                       >
-                        <div className="flex items-start gap-1.5 min-w-0">
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
                           {unread > 0 ? (
-                            <span className="shrink-0 min-w-[18px] h-[18px] px-1.5 inline-flex items-center justify-center rounded-[var(--radius-md)] bg-blue-600 text-white text-[9px] font-bold shadow-soft">
+                            <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-blue-600 px-1.5 text-[10px] font-bold text-white shadow-soft">
                               {unread > 99 ? '99+' : unread}
                             </span>
                           ) : null}
                           <p
                             title={isGroupRoom ? label : undefined}
-                            className={`text-[12px] font-bold truncate ${
+                            className={`min-w-0 flex-1 truncate text-[13px] font-extrabold leading-5 ${
                               isSelected
                                 ? 'text-white'
                                 : 'text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]'
@@ -289,7 +267,7 @@ export function MessengerSidebar({
                             {label || '단체 채팅방'}
                           </p>
                           {isGroupRoom && participantCount > 0 ? (
-                            <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                            <span className={`shrink-0 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
                               isSelected
                                 ? 'bg-white/10 text-white/80'
                                 : 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-200'
@@ -307,14 +285,14 @@ export function MessengerSidebar({
                           {preview}
                         </div>
                         {(isGroupRoom && participantCount > 0) || unread > 0 ? (
-                          <div className="flex min-w-0 items-center gap-1.5 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-semibold text-[var(--toss-gray-3)]">
                             {isGroupRoom && participantCount > 0 ? <span>참여 {participantCount}</span> : null}
                             {unread > 0 ? <span className="text-[var(--accent)]">새 메시지 {unread > 99 ? '99+' : unread}</span> : null}
                           </div>
                         ) : null}
                       </div>
                     </button>
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex w-full shrink-0 items-center justify-end gap-1 pl-12">
                     {!isNoticeChannel ? (
                       <>
                         <button
@@ -452,7 +430,7 @@ export function MessengerSidebar({
                                     </span>
                                   </div>
                                 </div>
-                                <button
+                                <button type="button"
                                   data-testid={`chat-direct-${staff.id}`}
                                   onClick={() => void onOpenDirectChat(staff)}
                                   className="px-2 py-0.5 bg-blue-500/10 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md text-[9px] font-bold opacity-100 transition-all border border-blue-100 dark:border-blue-800/50 shrink-0"
