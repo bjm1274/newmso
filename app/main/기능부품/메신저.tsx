@@ -1,4 +1,6 @@
 ﻿'use client';
+import { logger } from '@/lib/logger';
+
 import { toast } from '@/lib/toast';
 import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -448,7 +450,7 @@ export default function ChatView({
           setChatDirectoryStaffs(Array.isArray(data) ? data.map(( staff: StaffMember) => normalizeProfileUser(staff)) : []);
         }
       } catch (error) {
-        console.error('채팅 직원 디렉터리 로드 실패:', error);
+        logger.error('채팅 직원 디렉터리 로드 실패:', error);
         if (active) {
           setChatDirectoryStaffs([]);
         }
@@ -773,7 +775,7 @@ export default function ChatView({
 
       return repairedRooms;
     } catch (error) {
-      console.error('repairDirectRooms failed', error);
+      logger.error('repairDirectRooms failed', error);
       return sourceRooms;
     }
   }, []);
@@ -1092,7 +1094,7 @@ export default function ChatView({
         throw new Error(payload?.error || `push trigger failed (${response.status})`);
       }
     } catch (error) {
-      console.error('chat push trigger failed', error);
+      logger.error('chat push trigger failed', error);
     }
   }, []);
 
@@ -1223,7 +1225,7 @@ export default function ChatView({
   useEffect(() => {
     const composerEl = composerRef.current;
     if (!composerEl) return;
-    const maxHeight = isMobileChatViewport() ? 88 : 72;
+    const maxHeight = isMobileChatViewport() ? 44 : 72;
     composerEl.style.height = 'auto';
     composerEl.style.height = `${Math.min(maxHeight, composerEl.scrollHeight)}px`;
     composerEl.style.overflowY = composerEl.scrollHeight > maxHeight ? 'auto' : 'hidden';
@@ -1564,7 +1566,7 @@ export default function ChatView({
         .eq('id', NOTICE_ROOM_ID);
       if (error) throw error;
     } catch (error) {
-      console.error('공지방 멤버 동기화 실패:', error);
+      logger.error('공지방 멤버 동기화 실패:', error);
     }
   }, [noticeRoomMemberIds]);
 
@@ -1601,7 +1603,7 @@ export default function ChatView({
             .eq('id', existingSelfRoom.id);
           if (error) throw error;
         } catch (error) {
-          console.error('나와의 채팅방 업데이트 실패:', error);
+          logger.error('나와의 채팅방 업데이트 실패:', error);
         }
 
         return sourceRooms
@@ -1631,7 +1633,7 @@ export default function ChatView({
         if (!insertedRoom) return sourceRooms;
         return [...sourceRooms, insertedRoom];
       } catch (error) {
-        console.error('나와의 채팅방 생성 실패:', error);
+        logger.error('나와의 채팅방 생성 실패:', error);
         return sourceRooms;
       } finally {
         selfChatCreationInFlightRef.current = false;
@@ -2680,7 +2682,7 @@ export default function ChatView({
       if (error) throw error;
       toast(`${noticeReadStats.unreadMembers.length}명에게 공지 리마인드를 보냈습니다.`, 'success');
     } catch (error) {
-      console.error('send notice reminder failed', error);
+      logger.error('send notice reminder failed', error);
       toast('공지 리마인드 발송에 실패했습니다.', 'error');
     } finally {
       setNoticeReminderBusy(false);
@@ -2761,6 +2763,7 @@ export default function ChatView({
 
   const {
     openMessageActions,
+    addTaskFromMessage,
     handleAddTaskFromAction,
     startReplyToMessage,
     startForwardMessage,
@@ -2897,7 +2900,7 @@ export default function ChatView({
         {selectedRoomId && selectedRoom && (
           <header className="px-4 py-2.5 flex items-center justify-between border-b border-[var(--border)]/50 dark:border-zinc-800/50 glass glass-border shrink-0 z-40">
             <div className="flex items-center gap-3 min-w-0">
-              <button onClick={() => setRoom(null)} className="md:hidden text-[var(--toss-gray-3)]">뒤로</button>
+              <button type="button" onClick={() => setRoom(null)} className="md:hidden text-[var(--toss-gray-3)]">뒤로</button>
               <div data-testid="chat-room-header-avatar" className="flex h-9 w-9 shrink-0 items-center justify-center">
                 {selectedRoom.id === NOTICE_ROOM_ID ? (
                   <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--accent-light)] text-[var(--accent)]">
@@ -2936,7 +2939,7 @@ export default function ChatView({
             </div>
 
             <div className="flex items-center gap-2">
-              <button
+              <button type="button"
                 data-testid="chat-open-drawer"
                 onClick={() => setShowDrawer(true)}
                 className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 text-[var(--toss-gray-4)] hover:text-foreground"
@@ -2966,7 +2969,6 @@ export default function ChatView({
           messages={messages}
           combinedTimeline={combinedTimeline as MessengerTimelineItem[]}
           showScrollToLatest={showScrollToLatest}
-          activeActionMessageId={activeActionMsg ? String(activeActionMsg.id) : null}
             pollVotes={pollVotes}
             reactions={reactions}
             readCounts={readCounts}
@@ -3332,7 +3334,7 @@ export default function ChatView({
       {dateJumpPickerOpen ? (
         <div
           data-testid="chat-date-jump-modal"
-          className="fixed inset-0 z-[210] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
           onClick={closeDateJumpPicker}
         >
           <form

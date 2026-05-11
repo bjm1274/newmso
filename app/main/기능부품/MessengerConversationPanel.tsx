@@ -7,6 +7,7 @@ import { MessengerComposer } from './메신저컴포저';
 import { MessengerDrawer } from './메신저드로어';
 import { GroupChatModal } from './메신저그룹생성모달';
 import { MessengerTimeline, type MessengerTimelineItem } from './메신저타임라인';
+import { MessengerMessageActions } from './메신저액션';
 import { NOTICE_ROOM_ID } from './메신저유틸';
 import type { ChatViewController } from './useChatViewController';
 
@@ -22,7 +23,7 @@ export function MessengerConversationPanel({ controller }: MessengerConversation
       {c.selectedRoomId && c.selectedRoom && (
         <header className="px-4 py-2.5 flex items-center justify-between border-b border-[var(--border)] bg-[var(--card)] shrink-0 z-40">
           <div className="flex items-center gap-3 min-w-0">
-            <button
+            <button type="button"
               onClick={() => c.setRoom(null)}
               className="md:hidden flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--toss-blue-light)] hover:text-[var(--accent)]"
               aria-label="채팅 목록으로 돌아가기"
@@ -67,7 +68,7 @@ export function MessengerConversationPanel({ controller }: MessengerConversation
           </div>
 
           <div className="flex items-center gap-2">
-            <button
+            <button type="button"
               data-testid="chat-open-drawer"
               onClick={() => c.setShowDrawer(true)}
               className="w-8 h-8 rounded-[var(--radius-md)] flex items-center justify-center transition-colors hover:bg-[var(--toss-blue-light)] text-[var(--toss-gray-4)] hover:text-[var(--accent)]"
@@ -88,9 +89,6 @@ export function MessengerConversationPanel({ controller }: MessengerConversation
         readCounts={c.readCounts}
         deliveryStates={c.deliveryStates}
         threadSummaries={c.threadSummaries}
-        activeActionMessageId={c.activeActionMsg ? String(c.activeActionMsg.id) : null}
-        pinnedIds={c.pinnedIds}
-        bookmarkedIds={c.bookmarkedIds}
         roomMembers={c.roomMembers}
         effectiveChatUserId={c.effectiveChatUserId}
         activeMessageHighlightQuery={c.activeMessageHighlightQuery}
@@ -106,29 +104,6 @@ export function MessengerConversationPanel({ controller }: MessengerConversation
         onStartReplyToMessage={c.startReplyToMessage}
         onOpenThread={c.openTrackedThreadPanel}
         onOpenMessageActions={c.openMessageActions}
-        onCloseMessageActions={() => c.setActiveActionMsg(null)}
-        onToggleReaction={(message, emoji) => {
-          void c.toggleReaction(String(message.id), emoji);
-        }}
-        onAddTask={(message) => {
-          void c.addTaskFromMessage(message);
-        }}
-        onTogglePin={(message) => {
-          void c.togglePin(String(message.id));
-          c.setActiveActionMsg(null);
-        }}
-        onToggleBookmark={(message) => {
-          void c.toggleBookmark(String(message.id));
-          c.setActiveActionMsg(null);
-        }}
-        onForwardMessage={c.startForwardMessage}
-        onForwardToSelf={(message) => {
-          void c.forwardMessageToSelf(message);
-          c.setActiveActionMsg(null);
-        }}
-        onDeleteMessage={(message) => {
-          void c.deleteMessageFromActions(message);
-        }}
         onMarkMessageRead={c.markMessageRead}
         renderMessageContent={c.renderMessageContent}
         onOpenAttachmentPreview={c.openAttachmentPreview}
@@ -258,6 +233,70 @@ export function MessengerConversationPanel({ controller }: MessengerConversation
         onCancelEditingRoomName={c.handleCancelEditingRoomName}
         onStartEditingRoomName={c.handleStartEditingRoomName}
         onLeaveRoom={c.handleLeaveRoomFromDrawer}
+      />
+
+      <MessengerMessageActions
+        message={c.activeActionMsg}
+        currentUserId={c.effectiveChatUserId || c.user?.id}
+        isPinned={Boolean(c.activeActionMsg && c.pinnedIds?.includes(String(c.activeActionMsg.id)))}
+        isBookmarked={Boolean(c.activeActionMsg && c.bookmarkedIds?.has(String(c.activeActionMsg.id)))}
+        onClose={() => c.setActiveActionMsg(null)}
+        onToggleReaction={(emoji) => {
+          if (!c.activeActionMsg) return;
+          return c.toggleReaction?.(String(c.activeActionMsg.id), emoji);
+        }}
+        onAddTask={() => {
+          if (!c.activeActionMsg) return;
+          return c.addTaskFromMessage?.(c.activeActionMsg);
+        }}
+        onTogglePin={() => {
+          if (!c.activeActionMsg) return;
+          void c.togglePin?.(String(c.activeActionMsg.id));
+          c.setActiveActionMsg(null);
+        }}
+        onToggleBookmark={() => {
+          if (!c.activeActionMsg) return;
+          void c.toggleBookmark?.(String(c.activeActionMsg.id));
+          c.setActiveActionMsg(null);
+        }}
+        onStartEdit={() => {
+          if (!c.activeActionMsg) return;
+          c.startEditMessage?.(c.activeActionMsg);
+          c.setActiveActionMsg(null);
+        }}
+        onOpenEditHistory={() => {
+          if (!c.activeActionMsg) return;
+          void c.openEditHistory?.(c.activeActionMsg);
+          c.setActiveActionMsg(null);
+        }}
+        onDelete={() => {
+          if (!c.activeActionMsg) return;
+          void c.deleteMessageFromActions?.(c.activeActionMsg);
+        }}
+        onReply={() => {
+          if (!c.activeActionMsg) return;
+          c.startReplyToMessage?.(c.activeActionMsg);
+          c.setActiveActionMsg(null);
+        }}
+        onForward={() => {
+          if (!c.activeActionMsg) return;
+          c.startForwardMessage?.(c.activeActionMsg);
+          c.setActiveActionMsg(null);
+        }}
+        onCopyLink={() => {
+          if (!c.activeActionMsg) return;
+          void c.handleCopyMessageLink?.(c.activeActionMsg);
+        }}
+        onOpenReadStatus={() => {
+          if (!c.activeActionMsg) return;
+          c.openReadStatusPanel?.(c.activeActionMsg);
+          c.setActiveActionMsg(null);
+        }}
+        onOpenThread={() => {
+          if (!c.activeActionMsg) return;
+          c.openTrackedThreadPanel?.(c.activeActionMsg);
+          c.setActiveActionMsg(null);
+        }}
       />
 
       <GroupChatModal

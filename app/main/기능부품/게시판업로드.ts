@@ -1,4 +1,5 @@
 'use client';
+import { logger } from '@/lib/logger';
 
 import { supabase } from '@/lib/supabase';
 import { inferAttachmentType } from './게시판공통';
@@ -6,6 +7,26 @@ import { inferAttachmentType } from './게시판공통';
 const BOARD_UPLOAD_ENDPOINT = '/api/board/upload';
 const DEFAULT_CONTENT_TYPE = 'application/octet-stream';
 const CACHE_CONTROL = '3600';
+
+const MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  bmp: 'image/bmp',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  avif: 'image/avif',
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
+  m4v: 'video/mp4',
+  webm: 'video/webm',
+  pdf: 'application/pdf',
+  txt: 'text/plain',
+  csv: 'text/csv',
+  zip: 'application/zip',
+};
 
 type UploadProvider = 'supabase' | 'r2';
 
@@ -32,8 +53,26 @@ function getUploadFileName(file: File) {
   return String(file.name || '').trim() || 'attachment';
 }
 
+function getFileExtension(file: File) {
+  const rawName = String(file.name || '').trim();
+  const lastDotIndex = rawName.lastIndexOf('.');
+  if (lastDotIndex > -1 && lastDotIndex < rawName.length - 1) {
+    return rawName.slice(lastDotIndex + 1).toLowerCase();
+  }
+  return '';
+}
+
+function getUploadContentType(file: File) {
+  const rawMimeType = String(file.type || '').trim().toLowerCase();
+  if (rawMimeType === 'image/jpg' || rawMimeType === 'image/pjpeg') return 'image/jpeg';
+  if (rawMimeType === 'image/x-png') return 'image/png';
+  if (rawMimeType && rawMimeType !== DEFAULT_CONTENT_TYPE) return rawMimeType;
+
+  return MIME_BY_EXTENSION[getFileExtension(file)] || rawMimeType || DEFAULT_CONTENT_TYPE;
+}
+
 function getFallbackAttachmentType(file: File) {
-  const mimeType = String(file.type || '').trim().toLowerCase();
+  const mimeType = getUploadContentType(file);
   if (mimeType.startsWith('image/')) return 'image';
   if (mimeType.startsWith('video/')) return 'video';
   return 'file';
@@ -73,7 +112,7 @@ export async function uploadBoardAttachmentFile(file: File, boardType: string): 
     body: JSON.stringify({
       boardType,
       fileName: uploadFileName,
-      mimeType: file.type || DEFAULT_CONTENT_TYPE,
+      mimeType: getUploadContentType(file),
       fileSize: file.size,
     }),
   });
@@ -114,7 +153,7 @@ export async function uploadBoardAttachmentFile(file: File, boardType: string): 
 
       if (typeof uploadClient.uploadToSignedUrl === 'function') {
         const uploadResult = await uploadClient.uploadToSignedUrl(payload.path, payload.token, file, {
-          contentType: file.type || DEFAULT_CONTENT_TYPE,
+          contentType: getUploadContentType(file),
           upsert: false,
           cacheControl: CACHE_CONTROL,
         });
@@ -127,9 +166,9 @@ export async function uploadBoardAttachmentFile(file: File, boardType: string): 
         method: 'PUT',
         headers:
           payload.provider === 'r2'
-            ? payload.headers || { 'content-type': file.type || DEFAULT_CONTENT_TYPE }
+            ? payload.headers || { 'content-type': getUploadContentType(file) }
             : {
-                'content-type': file.type || DEFAULT_CONTENT_TYPE,
+                'content-type': getUploadContentType(file),
                 'x-upsert': 'false',
                 'cache-control': CACHE_CONTROL,
               },
@@ -143,7 +182,7 @@ export async function uploadBoardAttachmentFile(file: File, boardType: string): 
       }
     }
   } catch (directUploadError) {
-    console.warn('직접 업로드 실패, 서버 업로드로 다시 시도합니다.', directUploadError);
+    logger.warn('직접 업로드 실패, 서버 업로드로 다시 시도합니다.', directUploadError);
     return await uploadViaAppServer(file, boardType);
   }
 

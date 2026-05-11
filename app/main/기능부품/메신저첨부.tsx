@@ -1,4 +1,5 @@
 'use client';
+import { logger } from '@/lib/logger';
 
 import {
   useEffect,
@@ -7,6 +8,7 @@ import {
 } from 'react';
 import { toast } from '@/lib/toast';
 import {
+  buildStorageInlineUrl,
   buildStorageDownloadUrl,
   extractStorageUrlExtension,
   shouldUseManagedBrowserDownload,
@@ -47,11 +49,12 @@ export function DeferredAttachmentImage({
 }) {
   const [loaded, setLoaded] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
+  const viewSrc = buildStorageInlineUrl(src, alt) || src;
 
   useEffect(() => {
     setLoaded(false);
     setLoadFailed(false);
-  }, [src]);
+  }, [viewSrc]);
 
   return (
     <div className={`relative overflow-hidden ${wrapperClassName}`}>
@@ -67,7 +70,7 @@ export function DeferredAttachmentImage({
         <>
           {!loaded ? <div aria-hidden="true" className={placeholderClassName} /> : null}
           <img
-            src={src}
+            src={viewSrc}
             alt={alt}
             className={`${className} ${loaded ? 'opacity-100' : 'absolute inset-0 opacity-0'}`}
             onLoad={() => {
@@ -146,7 +149,7 @@ export async function handleStorageDownloadLinkClick(
   try {
     await triggerManagedBrowserDownload(downloadUrl, fileName);
   } catch (error) {
-    console.error('managed download failed', error);
+    logger.error('managed download failed', error);
     toast('모바일 다운로드에 실패했습니다. 다시 시도해 주세요.', 'error');
   }
 }
@@ -393,6 +396,7 @@ export function AttachmentListCard({
 }: AttachmentListCardProps) {
   const isClickable = typeof onActivate === 'function';
   const bubbleAlignmentClass = tone === 'accent' ? 'items-end text-right' : 'items-start text-left';
+  const mediaUrl = kind === 'image' || kind === 'video' ? buildStorageInlineUrl(url, name) || url : url;
 
   if (layout === 'bubble') {
     if (kind === 'image') {
@@ -438,7 +442,7 @@ export function AttachmentListCard({
             onLoadedMetadata={() => onMediaLoad?.()}
             className="max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] bg-black border border-[var(--border)]"
           >
-            <source src={url} />
+            <source src={mediaUrl} />
           </video>
           <AttachmentQuickActions
             url={url}

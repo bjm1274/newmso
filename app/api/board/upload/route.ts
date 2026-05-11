@@ -18,6 +18,26 @@ export const dynamic = 'force-dynamic';
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 const MAX_VIDEO_SIZE_BYTES = 200 * 1024 * 1024;
 const BOARD_BUCKET_CANDIDATES = ['board-attachments', 'pchos-files'] as const;
+const DEFAULT_CONTENT_TYPE = 'application/octet-stream';
+const MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  bmp: 'image/bmp',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  avif: 'image/avif',
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
+  m4v: 'video/mp4',
+  webm: 'video/webm',
+  pdf: 'application/pdf',
+  txt: 'text/plain',
+  csv: 'text/csv',
+  zip: 'application/zip',
+};
 
 type UploadPlanRequest = {
   boardType?: string;
@@ -72,6 +92,16 @@ function guessFileExtension(fileName: string, mimeType: string) {
   }
 
   return 'bin';
+}
+
+function normalizeUploadMimeType(fileName: string, mimeType: string) {
+  const rawMimeType = String(mimeType || '').trim().toLowerCase();
+  if (rawMimeType === 'image/jpg' || rawMimeType === 'image/pjpeg') return 'image/jpeg';
+  if (rawMimeType === 'image/x-png') return 'image/png';
+  if (rawMimeType && rawMimeType !== DEFAULT_CONTENT_TYPE) return rawMimeType;
+
+  const ext = guessFileExtension(fileName, '');
+  return MIME_BY_EXTENSION[ext] || rawMimeType || DEFAULT_CONTENT_TYPE;
 }
 
 function buildFallbackFileName(mimeType: string, ext: string) {
@@ -144,12 +174,55 @@ function validateUploadTarget(fileName: string, mimeType: string, fileSize: numb
   }
 }
 
+const MAGIC_BYTE_VERIFIED_MIME_TYPES = new Set([
+  'application/pdf',
+  'image/gif',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'video/mp4',
+]);
+
+function detectBoardUploadMimeType(buffer: ArrayBuffer): string | null {
+  const bytes = new Uint8Array(buffer.slice(0, 12));
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+    return 'image/png';
+  }
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return 'image/gif';
+  if (
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  ) return 'image/webp';
+  if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
+    return 'application/pdf';
+  }
+  if (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
+    return 'video/mp4';
+  }
+  return null;
+}
+
+function validateKnownFileContentType(mimeType: string, buffer: ArrayBuffer) {
+  if (!MAGIC_BYTE_VERIFIED_MIME_TYPES.has(mimeType)) return;
+  if (detectBoardUploadMimeType(buffer) !== mimeType) {
+    throw new Error('파일 형식이 올바르지 않습니다.');
+  }
+}
+
 async function createSignedUploadPlan(
   supabase: ReturnType<typeof getAdminClient>,
   payload: UploadPlanRequest,
 ) {
-  const mimeType = String(payload.mimeType || 'application/octet-stream').trim() || 'application/octet-stream';
-  const fileName = normalizeUploadFileName(String(payload.fileName || '').trim(), mimeType);
+  const rawFileName = String(payload.fileName || '').trim();
+  const mimeType = normalizeUploadMimeType(rawFileName, payload.mimeType || DEFAULT_CONTENT_TYPE);
+  const fileName = normalizeUploadFileName(rawFileName, mimeType);
   const fileSize = Number(payload.fileSize || 0);
 
   validateUploadTarget(fileName, mimeType, fileSize);
@@ -172,8 +245,6 @@ async function createSignedUploadPlan(
     }
   }
 
-  let lastError: unknown = null;
-
   for (const bucket of BOARD_BUCKET_CANDIDATES) {
     const { data, error } = await supabase.storage.from(bucket).createSignedUploadUrl(filePath);
 
@@ -192,18 +263,15 @@ async function createSignedUploadPlan(
       return NextResponse.json(response);
     }
 
-    lastError = error;
     if (!isMissingBucketError(error, bucket)) {
       return NextResponse.json(
-        { error: error?.message || '파일 업로드 준비에 실패했습니다.' },
+        { error: '파일 업로드 준비에 실패했습니다.' },
         { status: 500 },
       );
     }
   }
 
-  const message =
-    (lastError as { message?: string })?.message || '게시판 첨부 업로드용 Storage 버킷을 찾지 못했습니다.';
-  return NextResponse.json({ error: message }, { status: 500 });
+  return NextResponse.json({ error: '게시판 첨부 업로드용 Storage 버킷을 찾지 못했습니다.' }, { status: 500 });
 }
 
 export async function POST(request: NextRequest) {
@@ -253,12 +321,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '업로드할 파일이 없습니다.' }, { status: 400 });
     }
 
-    const mimeType = file.type || 'application/octet-stream';
-    const normalizedFileName = normalizeUploadFileName(String(file.name || '').trim(), mimeType);
+    const rawFileName = String(file.name || '').trim();
+    const mimeType = normalizeUploadMimeType(rawFileName, file.type || DEFAULT_CONTENT_TYPE);
+    const normalizedFileName = normalizeUploadFileName(rawFileName, mimeType);
     validateUploadTarget(normalizedFileName, mimeType, file.size);
 
     const filePath = buildSafeFilePath(normalizedFileName, mimeType);
     const arrayBuffer = await file.arrayBuffer();
+    validateKnownFileContentType(mimeType, arrayBuffer);
 
     if (isR2ChatStorageEnabled()) {
       const uploaded = await uploadChatAttachmentToR2(filePath, Buffer.from(arrayBuffer), mimeType);
@@ -272,8 +342,6 @@ export async function POST(request: NextRequest) {
         url: uploaded.url,
       });
     }
-
-    let lastError: unknown = null;
 
     for (const bucket of BOARD_BUCKET_CANDIDATES) {
       const { error } = await supabase.storage.from(bucket).upload(filePath, Buffer.from(arrayBuffer), {
@@ -295,15 +363,12 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      lastError = error;
       if (!isMissingBucketError(error, bucket)) {
-        return NextResponse.json({ error: error.message || '파일 업로드에 실패했습니다.' }, { status: 500 });
+        return NextResponse.json({ error: '파일 업로드에 실패했습니다.' }, { status: 500 });
       }
     }
 
-    const message =
-      (lastError as { message?: string })?.message || '게시판 첨부 업로드용 Storage 버킷을 찾지 못했습니다.';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: '게시판 첨부 업로드용 Storage 버킷을 찾지 못했습니다.' }, { status: 500 });
   } catch (error) {
     const message = error instanceof Error ? error.message : '게시판 첨부 업로드 중 오류가 발생했습니다.';
     return NextResponse.json({ error: message }, { status: 500 });

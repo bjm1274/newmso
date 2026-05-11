@@ -1,10 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { buildResponseContentDisposition, isAllowedPublicStorageUrl } from '@/lib/object-storage';
+import { readSessionFromRequest } from '@/lib/server-session';
 
 
 export const dynamic = 'force-dynamic';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+
+function buildContentDisposition(fileName: string, inline: boolean): string {
+  const value = buildResponseContentDisposition(fileName);
+  return inline ? value.replace(/^attachment/i, 'inline') : value;
+}
+
+function parseSupabaseStorageUrl(url: string): { bucket: string; path: string } | null {
+  if (!SUPABASE_URL) return null;
+
+  try {
+    const parsed = new URL(url);
+    const base = new URL(SUPABASE_URL);
+    if (parsed.hostname !== base.hostname || !parsed.pathname.startsWith('/storage/v1/object/')) {
+      return null;
+    }
+
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    const objectIndex = parts.findIndex((part) => part === 'object');
+    const objectParts = objectIndex >= 0 ? parts.slice(objectIndex + 1) : [];
+    const scope = objectParts[0] || '';
+    const hasScope = scope === 'public' || scope === 'sign' || scope === 'authenticated';
+    const bucketIndex = hasScope ? 1 : 0;
+    const bucket = objectParts[bucketIndex] || '';
+    const path = objectParts
+      .slice(bucketIndex + 1)
+      .map((part) => decodeURIComponent(part))
+      .join('/');
+
+    if (!bucket || !path) return null;
+    return { bucket, path };
+  } catch {
+    return null;
+  }
+}
+
+function getAdminClient() {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!SUPABASE_URL || !serviceKey) return null;
+  return createClient(SUPABASE_URL, serviceKey);
+}
 
 function isAllowedUrl(url: string): boolean {
   if (!url) return false;
@@ -30,6 +72,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl;
     const fileUrl = String(searchParams.get('url') ?? '').trim();
     const fileName = String(searchParams.get('name') ?? '').trim() || 'download';
+    const inline = searchParams.get('inline') === '1';
 
     if (!fileUrl) {
       return NextResponse.json({ error: 'url 파라미터가 필요합니다' }, { status: 400 });
@@ -41,15 +84,42 @@ export async function GET(request: NextRequest) {
 
     const upstream = await fetch(fileUrl, {
       signal: AbortSignal.timeout(30_000),
-    });
+    }).catch(() => null);
 
-    if (!upstream.ok || !upstream.body) {
+    if (!upstream?.ok || !upstream.body) {
+      const supabaseTarget = parseSupabaseStorageUrl(fileUrl);
+      const admin = supabaseTarget ? getAdminClient() : null;
+
+      if (supabaseTarget && admin) {
+        const session = await readSessionFromRequest(request);
+        if (!session?.user?.id) {
+          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const { data, error } = await admin.storage
+          .from(supabaseTarget.bucket)
+          .download(supabaseTarget.path);
+
+        if (!error && data) {
+          const headers = new Headers();
+          headers.set('Content-Type', data.type || 'application/octet-stream');
+          headers.set('Content-Disposition', buildContentDisposition(fileName, inline));
+          headers.set('Cache-Control', 'private, max-age=3600');
+          headers.set('X-Content-Type-Options', 'nosniff');
+
+          return new NextResponse(data.stream(), {
+            status: 200,
+            headers,
+          });
+        }
+      }
+
       return NextResponse.json({ error: '파일을 찾을 수 없습니다.' }, { status: 404 });
     }
 
     const headers = new Headers();
     headers.set('Content-Type', upstream.headers.get('content-type') || 'application/octet-stream');
-    headers.set('Content-Disposition', buildResponseContentDisposition(fileName));
+    headers.set('Content-Disposition', buildContentDisposition(fileName, inline));
     headers.set('Cache-Control', 'private, max-age=3600');
     headers.set('X-Content-Type-Options', 'nosniff');
 
