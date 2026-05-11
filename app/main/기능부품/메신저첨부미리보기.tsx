@@ -355,7 +355,6 @@ export function ChatAttachmentPreviewModal({ controller }: ChatAttachmentPreview
             )
           }
           download={activeItem.name ?? 'download'}
-          target="_blank"
           rel="noopener noreferrer"
           className="h-11 inline-flex items-center justify-center rounded-full bg-white/15 hover:bg-white/30 px-4 text-white text-xs font-semibold transition-colors"
           aria-label="다운로드"
