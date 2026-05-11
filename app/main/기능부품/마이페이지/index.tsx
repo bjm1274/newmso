@@ -1,6 +1,10 @@
 ﻿'use client';
 import { toast } from '@/lib/toast';
-import { useState, useEffect, memo, useMemo } from 'react';
+import { useState, useEffect, useCallback, memo, useMemo } from 'react';
+import {
+  calculateMonthlyAttendance,
+  type MonthlyAttendance,
+} from './출퇴근기록/attendance-utils';
 
 // 기능 컴포넌트 불러오기
 import MyTodoList from './나의할일';
@@ -153,6 +157,9 @@ function MyPageMain({
   const [pendingContract, setPendingContract] = useState<EmploymentContractRecord | null>(null);
   const [latestContract, setLatestContract] = useState<EmploymentContractRecord | null>(null);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
+
+  // 이번 달 근태 실 데이터
+  const [monthlyAttendance, setMonthlyAttendance] = useState<MonthlyAttendance | null>(null);
   const favoritesKey = useMemo(() => {
     const userId = String(user?.id || user?.auth_user_id || user?.employee_no || user?.name || '').trim();
     return userId ? `${FAVORITES_KEY}:${userId}` : FAVORITES_KEY;
@@ -197,6 +204,31 @@ function MyPageMain({
     };
     void checkPendingContracts();
   }, [user?.id]);
+
+  // 이번 달 근태 실 데이터 fetch (mount 1회, JM2: realtime 없음)
+  const fetchMonthlyAttendanceSummary = useCallback(async () => {
+    const userId = user?.id;
+    if (!userId) return; // JM5: user.id 없으면 skip
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('en-CA');
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toLocaleDateString('en-CA');
+    try {
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('check_in, check_out, status, date, displayStatus, isVirtual')
+        .eq('staff_id', userId as string)
+        .gte('date', firstDay)
+        .lte('date', lastDay);
+      if (error || !data) return; // JM3: 실패 시 silent — 집계 중 유지
+      setMonthlyAttendance(calculateMonthlyAttendance(data));
+    } catch {
+      // silent fallback: 집계 중 표시 유지
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    void fetchMonthlyAttendanceSummary();
+  }, [fetchMonthlyAttendanceSummary]);
 
   const handleSignComplete = async (signatureDataUrl: string, contractText: string) => {
     const currentUserId = typeof user?.id === 'string' ? user.id : null;
@@ -628,19 +660,19 @@ function MyPageMain({
     Math.max(0, Number(user.annual_leave_total || 15) - Number(user.annual_leave_used || 0)) ||
     8.5;
   const pendingApprovalCount = Math.max(0, Number(user.pending_approval_count ?? 0));
-  const attendanceTotal = Number(user.current_month_work_days ?? user.attendance_total ?? 7);
-  const attendancePresent = Number(user.current_month_present_days ?? user.attendance_present ?? 1);
-  const attendanceLate = Number(user.current_month_late_count ?? user.attendance_late ?? 0);
-  const attendanceAbsent = Number(user.current_month_absent_count ?? user.attendance_absent ?? 0);
-  const attendanceValue = attendanceTotal > 0 ? `${attendancePresent}/${attendanceTotal}` : '—';
-  const attendanceNote =
-    attendanceTotal <= 0
-      ? '집계 중'
-      : attendanceAbsent > 0
-        ? `결근 ${attendanceAbsent}일`
-        : attendanceLate > 0
-          ? `지각 ${attendanceLate}회`
-          : '개근';
+  // 이번 달 근태: 실 데이터(monthlyAttendance) 우선, 없으면 '집계 중'
+  const attendanceValue = monthlyAttendance
+    ? `${monthlyAttendance.present}/${monthlyAttendance.total}`
+    : '—';
+  const attendanceNote = !monthlyAttendance
+    ? '집계 중'
+    : monthlyAttendance.absent > 0
+      ? `결근 ${monthlyAttendance.absent}일`
+      : monthlyAttendance.late > 0
+        ? `지각 ${monthlyAttendance.late}회`
+        : monthlyAttendance.present > 0
+          ? '개근'
+          : '집계 중';
   const profileQuickCards = [
     {
       label: '이번 달 근태',
