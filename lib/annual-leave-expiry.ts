@@ -70,6 +70,50 @@ export async function processStaffLeaveExpiry(
 }
 
 /**
+ * 미사용 연차 금전 보상 기록
+ * companies.unused_leave_compensation=TRUE 인 회사의 직원에 대해
+ * 소멸 잔여일수 × 통상임금/일을 staff_members.annual_leave_pay에 기록
+ */
+export async function recordUnusedLeaveCompensation(
+  supabase: SupabaseClient,
+  staffId: string,
+  expiredDays: number,
+): Promise<void> {
+  if (expiredDays <= 0) return;
+
+  // 통상임금/일 = 기본급 / 근무일수(월 평균 21.75일)
+  const { data: staffData } = await supabase
+    .from('staff_members')
+    .select('base_salary, company_id')
+    .eq('id', staffId)
+    .single();
+
+  if (!staffData) return;
+
+  const baseSalary = Number((staffData as Record<string, unknown>).base_salary) || 0;
+  const companyId = (staffData as Record<string, unknown>).company_id as string | null;
+  if (!companyId) return;
+
+  // 회사 설정 확인
+  const { data: companyData } = await supabase
+    .from('companies')
+    .select('unused_leave_compensation')
+    .eq('id', companyId)
+    .single();
+
+  const compensation = (companyData as Record<string, unknown> | null)?.unused_leave_compensation;
+  if (!compensation) return;
+
+  const dailyWage = Math.round(baseSalary / 21.75);
+  const compensationAmount = dailyWage * expiredDays;
+
+  await supabase
+    .from('staff_members')
+    .update({ annual_leave_pay: compensationAmount })
+    .eq('id', staffId);
+}
+
+/**
  * 전체 직원 대상 일괄 소멸 처리 (크론용)
  */
 export async function batchProcessExpiredLeaves(

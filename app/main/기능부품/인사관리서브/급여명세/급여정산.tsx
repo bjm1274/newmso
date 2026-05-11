@@ -959,6 +959,9 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
 
       const scheduledWorkDaysByStaff: Record<string, number> = {};
       try {
+        // shift_assignments: 일별 배정 근무유형 (shift_id = 근태기록 기준 shift_id).
+        // 다중 근무유형 전환 후에도 각 날짜별 shift_id는 shift_assignments에 유지되므로 로직 변경 불필요.
+        // 추가 배정 근무유형은 staff_shift_assignments 테이블에서 관리.
         const { data: shiftAssignments, error: shiftAssignmentsError } = await supabase
           .from('shift_assignments')
           .select('staff_id, work_date, shift_id')

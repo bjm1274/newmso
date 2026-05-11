@@ -1,0 +1,2414 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MSO 메뉴 통일 작업 지시서</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f8f8f9;
+  --card: #ffffff;
+  --border: #e9e9ec;
+  --border-subtle: #f0f0f2;
+  --fg: #18181b;
+  --fg-muted: #71717a;
+  --fg-subtle: #a1a1aa;
+  --accent: #2563eb;
+  --accent-light: #eff6ff;
+  --danger: #ef4444;
+  --danger-light: #fef2f2;
+  --warning: #f59e0b;
+  --warning-light: #fffbeb;
+  --success: #10b981;
+  --success-light: #ecfdf5;
+  --purple: #7c3aed;
+  --purple-light: #f3f0ff;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --sidebar-w: 240px;
+}
+html, body { height: 100%; }
+body {
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px; line-height: 1.6;
+  background: var(--bg); color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.01em;
+}
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+code { font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas, monospace; font-size: 0.92em; background: var(--bg); padding: 1px 5px; border-radius: 4px; color: #be185d; }
+.layout { display: flex; min-height: 100dvh; }
+
+/* Sidebar */
+.sidebar {
+  width: var(--sidebar-w); min-width: var(--sidebar-w);
+  background: var(--card); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  padding: 22px 0;
+  position: sticky; top: 0; height: 100dvh; overflow-y: auto;
+}
+.sidebar-header { padding: 0 18px 18px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-mark {
+  width: 32px; height: 32px; border-radius: 9px;
+  background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 12px; letter-spacing: -0.04em;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+.brand-name { font-size: 13px; font-weight: 800; letter-spacing: -0.03em; }
+.brand-sub { font-size: 11px; color: var(--fg-muted); margin-top: 2px; font-weight: 500; }
+
+.nav-group { padding: 0 10px; margin-bottom: 6px; }
+.nav-group-label {
+  font-size: 10px; font-weight: 700; color: var(--fg-subtle);
+  letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 8px 8px 4px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px; border-radius: 8px;
+  font-size: 12.5px; font-weight: 500; color: var(--fg-muted);
+  cursor: pointer; transition: all 0.12s;
+  width: 100%; text-align: left;
+}
+.nav-item:hover { background: var(--bg); color: var(--fg); }
+.nav-item.active { background: var(--accent-light); color: var(--accent); font-weight: 700; }
+.nav-item .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.nav-item .count {
+  margin-left: auto; font-size: 10px; font-weight: 700;
+  background: var(--bg); color: var(--fg-muted);
+  padding: 1px 7px; border-radius: 99px;
+}
+.nav-item.active .count { background: var(--accent); color: #fff; }
+
+/* Main */
+.main { flex: 1; min-width: 0; padding: 32px 44px 100px; }
+@media (max-width: 900px) {
+  .layout { flex-direction: column; }
+  .sidebar { width: 100%; height: auto; position: static; padding: 14px 0; }
+  .sidebar-header { padding: 0 16px 12px; }
+  .nav-group { display: none; }
+  .main { padding: 22px 18px 60px; }
+}
+
+/* Hero */
+.hero { margin-bottom: 30px; }
+.hero-eyebrow {
+  font-size: 11px; font-weight: 700; color: var(--accent);
+  letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px;
+}
+.hero-title {
+  font-size: 30px; font-weight: 800; letter-spacing: -0.045em;
+  line-height: 1.15; margin-bottom: 12px;
+}
+.hero-lead { font-size: 14px; color: var(--fg-muted); max-width: 720px; line-height: 1.6; }
+.hero-meta {
+  display: flex; gap: 18px; flex-wrap: wrap;
+  font-size: 12px; color: var(--fg-muted);
+  margin-top: 16px;
+}
+.hero-meta span { display: inline-flex; align-items: center; gap: 5px; }
+
+/* Section */
+.section { margin-bottom: 52px; scroll-margin-top: 24px; }
+.section-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 6px;
+  background: var(--accent); color: #fff;
+  font-size: 11px; font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.section-head { margin-bottom: 18px; }
+.section-title {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 20px; font-weight: 800; letter-spacing: -0.035em;
+  margin-bottom: 6px;
+}
+.section-desc { font-size: 13px; color: var(--fg-muted); max-width: 760px; }
+
+/* Cards */
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px 22px;
+}
+.card + .card { margin-top: 12px; }
+
+/* Token grid */
+.token-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.token {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 14px;
+}
+.token-label { font-size: 10px; font-weight: 700; color: var(--fg-subtle); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+.token-value { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.token-sub { font-size: 11px; color: var(--fg-muted); margin-top: 3px; }
+.swatch {
+  width: 100%; height: 38px; border-radius: 7px;
+  margin-bottom: 8px; border: 1px solid var(--border-subtle);
+}
+
+/* Reference preview blocks */
+.preview-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+  margin-bottom: 20px;
+}
+@media (max-width: 1100px) { .preview-grid { grid-template-columns: 1fr; } }
+.preview {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); overflow: hidden;
+}
+.preview-frame {
+  background: #fafafa; padding: 14px;
+  border-bottom: 1px solid var(--border);
+  min-height: 200px;
+  display: flex; align-items: center; justify-content: center;
+}
+.preview-body { padding: 14px 16px; }
+.preview-name { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.preview-note { font-size: 11.5px; color: var(--fg-muted); line-height: 1.5; }
+
+/* Mini visuals */
+.mini-sidebar {
+  width: 56px; background: #fff; border-radius: 10px;
+  border: 1px solid var(--border);
+  padding: 8px 6px; display: flex; flex-direction: column; gap: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.mini-brand {
+  width: 30px; height: 30px; border-radius: 8px; margin: 0 auto 6px;
+  background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 10px; font-weight: 800;
+}
+.mini-item {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 2px; border-radius: 7px;
+  font-size: 8px; color: var(--fg-muted); font-weight: 600;
+}
+.mini-item.active { background: var(--accent); color: #fff; }
+.mini-icon {
+  width: 14px; height: 14px; border-radius: 3px;
+  background: currentColor; opacity: 0.7;
+}
+.mini-item.active .mini-icon { opacity: 1; }
+
+.mini-myinfo {
+  width: 240px; background: #fff; border-radius: 10px;
+  border: 1px solid var(--border); padding: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.mini-header-card {
+  display: flex; gap: 10px; align-items: center;
+  padding-bottom: 12px; border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+.mini-avatar {
+  width: 42px; height: 42px; border-radius: 50%;
+  background: linear-gradient(135deg, #2563eb22, #2563eb44);
+  border: 1.5px solid #2563eb33;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--accent); font-weight: 700; font-size: 14px;
+}
+.mini-name { font-size: 13px; font-weight: 700; }
+.mini-role { font-size: 10px; color: var(--fg-muted); margin-top: 1px; }
+.mini-tabs { display: flex; gap: 4px; padding: 3px; background: #f4f4f5; border-radius: 7px; margin-bottom: 10px; }
+.mini-tab { flex: 1; padding: 5px 0; text-align: center; font-size: 9px; font-weight: 600; color: var(--fg-muted); border-radius: 5px; }
+.mini-tab.active { background: #fff; color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+.mini-row { display: flex; justify-content: space-between; font-size: 10px; padding: 4px 0; }
+.mini-row .l { color: var(--fg-muted); }
+.mini-row .r { font-weight: 700; }
+
+.mini-quickgrid {
+  width: 240px; background: #fff; border-radius: 10px;
+  border: 1px solid var(--border); padding: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.mini-grid-title { font-size: 11px; font-weight: 700; margin-bottom: 8px; }
+.mini-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.mini-grid-cell {
+  aspect-ratio: 1; border-radius: 8px;
+  background: var(--bg); border: 1px solid var(--border-subtle);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+}
+.mini-grid-dot { width: 12px; height: 12px; border-radius: 4px; background: var(--accent); opacity: 0.6; }
+.mini-grid-label { font-size: 7px; color: var(--fg-muted); font-weight: 600; }
+
+/* Menu task cards */
+.menu-task {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px 22px;
+  margin-bottom: 14px;
+  border-left: 3px solid var(--accent);
+}
+.menu-task-head {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 4px; flex-wrap: wrap;
+}
+.menu-task-id {
+  display: inline-block;
+  font-family: 'SF Mono', monospace; font-size: 10px; font-weight: 700;
+  background: var(--bg); color: var(--fg-muted);
+  padding: 2px 7px; border-radius: 5px;
+}
+.menu-task-title { font-size: 16px; font-weight: 800; letter-spacing: -0.025em; }
+.menu-task-sub { font-size: 12.5px; color: var(--fg-muted); margin-bottom: 14px; }
+
+.priority-pill {
+  display: inline-flex; align-items: center; padding: 2px 9px;
+  border-radius: 99px; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.p-p1 { background: var(--danger-light); color: var(--danger); }
+.p-p2 { background: var(--warning-light); color: var(--warning); }
+.p-p3 { background: var(--purple-light); color: var(--purple); }
+
+.subtask-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.subtask {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 9px 12px;
+  background: var(--bg); border-radius: 8px;
+  font-size: 12px; line-height: 1.55;
+}
+.subtask-check {
+  flex-shrink: 0; width: 16px; height: 16px; border-radius: 4px;
+  border: 1.5px solid var(--fg-subtle); margin-top: 1px;
+}
+.subtask-body { flex: 1; min-width: 0; color: var(--fg); }
+.subtask-body strong { font-weight: 700; }
+.subtask-meta { font-size: 10.5px; color: var(--fg-muted); margin-top: 3px; }
+.file-tag {
+  font-size: 10px; font-weight: 600; font-family: 'SF Mono', monospace;
+  background: #fff; border: 1px solid var(--border);
+  color: var(--fg-muted); padding: 1px 6px; border-radius: 4px;
+  margin-right: 4px; display: inline-block;
+}
+
+/* compare boxes */
+.compare {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0;
+}
+@media (max-width: 700px) { .compare { grid-template-columns: 1fr; } }
+.compare-box { border-radius: 8px; padding: 12px 14px; font-size: 12px; }
+.cb-bad { background: var(--danger-light); border: 1px solid #fecaca; color: var(--fg); }
+.cb-good { background: var(--success-light); border: 1px solid #a7f3d0; color: var(--fg); }
+.cb-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+.cb-bad .cb-label { color: var(--danger); }
+.cb-good .cb-label { color: var(--success); }
+
+/* Mobile cards */
+.mobile-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;
+}
+@media (max-width: 800px) { .mobile-grid { grid-template-columns: 1fr; } }
+
+/* Claude prompt blocks */
+.prompt-block {
+  background: #0f0f12; color: #e4e4e7;
+  border-radius: var(--radius-lg); padding: 18px 20px;
+  margin-bottom: 14px;
+  border: 1px solid #27272a;
+}
+.prompt-head {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+  font-size: 12px; color: #a1a1aa; font-weight: 600;
+}
+.prompt-step {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--accent); color: #fff;
+  font-size: 10px; font-weight: 800;
+  padding: 3px 9px; border-radius: 5px;
+  letter-spacing: 0.06em;
+}
+.prompt-est { margin-left: auto; color: #71717a; font-size: 11px; }
+.prompt-body {
+  background: #18181b; border-radius: 8px;
+  padding: 12px 14px;
+  font-family: 'SF Mono', 'JetBrains Mono', monospace;
+  font-size: 11.5px; line-height: 1.65;
+  color: #e4e4e7; overflow-x: auto;
+  white-space: pre-wrap; word-break: break-word;
+}
+.prompt-body .k { color: #93c5fd; }
+.prompt-body .c { color: #6b7280; }
+.prompt-body .v { color: #fbbf24; }
+.prompt-body .f { color: #34d399; }
+
+/* Misc */
+.divider { height: 1px; background: var(--border); margin: 36px 0; }
+.callout {
+  background: var(--accent-light); border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0; padding: 14px 16px;
+  font-size: 12.5px; color: var(--fg); line-height: 1.6;
+  margin: 14px 0;
+}
+.callout strong { font-weight: 700; color: var(--accent); }
+.callout.warn { background: var(--warning-light); border-color: var(--warning); }
+.callout.warn strong { color: #b45309; }
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ───────── Sidebar ───────── -->
+<nav class="sidebar">
+  <div class="sidebar-header">
+    <div class="brand">
+      <div class="brand-mark">SY</div>
+      <div>
+        <div class="brand-name">메뉴 통일 브리프</div>
+        <div class="brand-sub">v1.0 · 2026.05.11</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-label">개요</div>
+    <a class="nav-item active" href="#overview"><span class="dot" style="background:#2563eb"></span>작업 개요</a>
+    <a class="nav-item" href="#scan"><span class="dot" style="background:#2563eb"></span>전체 메뉴 스캔</a>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-label">기준 디자인</div>
+    <a class="nav-item" href="#reference"><span class="dot" style="background:#10b981"></span>레퍼런스 3종</a>
+    <a class="nav-item" href="#tokens"><span class="dot" style="background:#10b981"></span>디자인 토큰</a>
+    <a class="nav-item" href="#patterns"><span class="dot" style="background:#10b981"></span>공통 패턴</a>
+    <a class="nav-item" href="#repo-findings"><span class="dot" style="background:#1E40AF"></span>실 리포 분석 결과</a>
+    <a class="nav-item" href="#screenshot-findings"><span class="dot" style="background:#DC2626"></span>실 스크린샷 분석<span class="count">15</span></a>
+    <a class="nav-item" href="#submenu-matrix"><span class="dot" style="background:#db2777"></span>서브 화면 매트릭스<span class="count">53</span></a>
+    <a class="nav-item" href="#submenu-patterns"><span class="dot" style="background:#db2777"></span>서브 화면 패턴 6종</a>
+    <a class="nav-item" href="#overlay-patterns"><span class="dot" style="background:#db2777"></span>모달·Toast·Empty</a>
+    <a class="nav-item" href="#common-components"><span class="dot" style="background:#db2777"></span>공통 컴포넌트 4종</a>
+    <a class="nav-item" href="#todo-coverage"><span class="dot" style="background:#f59e0b"></span>보강 필요 항목</a>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-label">메뉴별 작업</div>
+    <a class="nav-item" href="#m-chat"><span class="dot" style="background:#ef4444"></span>채팅<span class="count">5</span></a>
+    <a class="nav-item" href="#m-board"><span class="dot" style="background:#ef4444"></span>게시판<span class="count">4</span></a>
+    <a class="nav-item" href="#m-approval"><span class="dot" style="background:#f59e0b"></span>전자결재<span class="count">4</span></a>
+    <a class="nav-item" href="#m-hr"><span class="dot" style="background:#f59e0b"></span>인사관리<span class="count">6</span></a>
+    <a class="nav-item" href="#m-inv"><span class="dot" style="background:#7c3aed"></span>재고관리<span class="count">5</span></a>
+    <a class="nav-item" href="#m-admin"><span class="dot" style="background:#7c3aed"></span>관리자<span class="count">5</span></a>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-label">모바일 / 실행</div>
+    <a class="nav-item" href="#mobile"><span class="dot" style="background:#2563eb"></span>모바일 통일안</a>
+    <a class="nav-item" href="#prompts"><span class="dot" style="background:#10b981"></span>Claude 작업 지시문</a>
+    <a class="nav-item" href="#checklist"><span class="dot" style="background:#10b981"></span>완료 체크리스트</a>
+  </div>
+</nav>
+
+<!-- ───────── Main ───────── -->
+<main class="main">
+
+<!-- Hero -->
+<section class="hero" id="overview">
+  <div class="hero-eyebrow">Menu Unification Brief</div>
+  <h1 class="hero-title">메인메뉴 · 내정보 · 추가기능을<br/>기준으로 한 전체 메뉴 통일 + 모바일 개선 지시서</h1>
+  <p class="hero-lead">
+    현재 MSO ERP의 좌측 메인 메뉴 바, <strong>내정보(My Page)</strong>, <strong>추가기능(QuickAdd)</strong> 화면은
+    가장 잘 정돈된 기준점입니다. 나머지 6개 메뉴 영역(채팅·게시판·전자결재·인사관리·재고관리·관리자)은
+    이 세 기준의 토큰·간격·아이콘·헤더 패턴을 그대로 따르도록 통일하고, 모바일 환경에서 동일 UX를 보장하도록 개선합니다.
+  </p>
+  <div class="hero-meta">
+    <span>📦 대상 레포 <code>bjm1274/newmso</code></span>
+    <span>🎯 6개 메뉴 영역 · 약 30개 화면</span>
+    <span>⏱ 총 예상 작업 ~ 18시간</span>
+    <span>📱 모바일 대응 동시 진행</span>
+  </div>
+</section>
+
+<!-- 전체 스캔 -->
+<section class="section" id="scan">
+  <div class="section-head">
+    <div class="section-title"><span class="section-num">01</span>전체 메뉴 스캔 결과</div>
+    <div class="section-desc">8개 최상위 메뉴와 그 하위 화면을 스캔했습니다. <strong>기준 그룹 ✅</strong>은 디자인이 정돈되어 있어 손대지 않고 그대로 따라가야 하는 영역입니다.</div>
+  </div>
+
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <table style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+      <thead>
+        <tr style="background: var(--bg); border-bottom: 1px solid var(--border);">
+          <th style="text-align: left; padding: 12px 18px; font-size: 11px; font-weight: 700; color: var(--fg-muted); letter-spacing: 0.04em; text-transform: uppercase;">메뉴</th>
+          <th style="text-align: left; padding: 12px 18px; font-size: 11px; font-weight: 700; color: var(--fg-muted); letter-spacing: 0.04em; text-transform: uppercase;">하위 화면 수</th>
+          <th style="text-align: left; padding: 12px 18px; font-size: 11px; font-weight: 700; color: var(--fg-muted); letter-spacing: 0.04em; text-transform: uppercase;">현재 상태</th>
+          <th style="text-align: left; padding: 12px 18px; font-size: 11px; font-weight: 700; color: var(--fg-muted); letter-spacing: 0.04em; text-transform: uppercase;">분류</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom: 1px solid var(--border-subtle); background: var(--success-light);">
+          <td style="padding: 11px 18px; font-weight: 700;">내정보</td><td style="padding: 11px 18px;">6 (상단 탭 구조)</td><td style="padding: 11px 18px;">탭바 + 카드 그리드 + 즐겨찾기 정돈됨</td>
+          <td style="padding: 11px 18px;"><span class="priority-pill" style="background:#fff; color: var(--success); border:1px solid #a7f3d0">✅ 기준</span></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border-subtle); background: var(--success-light);">
+          <td style="padding: 11px 18px; font-weight: 700;">추가기능 (QuickAdd)</td><td style="padding: 11px 18px;">단일 그리드</td><td style="padding: 11px 18px;">아이콘 4×N 그리드 카드 정돈됨</td>
+          <td style="padding: 11px 18px;"><span class="priority-pill" style="background:#fff; color: var(--success); border:1px solid #a7f3d0">✅ 기준</span></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border-subtle); background: var(--success-light);">
+          <td style="padding: 11px 18px; font-weight: 700;">메인 메뉴 바 (Sidebar)</td><td style="padding: 11px 18px;">8 항목</td><td style="padding: 11px 18px;">72px 폭 · Lucide 아이콘 · 배지·active 패턴 정돈됨</td>
+          <td style="padding: 11px 18px;"><span class="priority-pill" style="background:#fff; color: var(--success); border:1px solid #a7f3d0">✅ 기준</span></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border-subtle);">
+          <td style="padding: 11px 18px; font-weight: 700;">채팅</td><td style="padding: 11px 18px;">사이드바 + 메시지 화면</td>
+          <td style="padding: 11px 18px;">zinc-800 활성방·이모지 아이콘·dark: 클래스 혼용</td>
+          <td style="padding: 11px 18px;"><span class="priority-pill p-p1">P1 긴급</span></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border-subtle);">
+          <td style="padding: 11px 18px; font-weight: 700;">게시판</td><td style="padding: 11px 18px;">6 (공지·자유·경조사·수술일정·MRI·업무공유)</td>
+          <td style="padding: 11px 18px;">label에 이모지 중복·PageHeader 별도 구현</td>
+          <td style="padding: 11px 18px;"><span class="priority-pill p-p1">P1 긴급</span></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border-subtle);">
+          <td style="padding: 11px 18px; font-weight: 700;">전자결재</td><td style="padding: 11px 18px;">4 (기안·결재·참조·작성)</td>
+          <td style="padding: 11px 18px;">상태배지 emerald/rose 하드코딩·테이블 밀도 불일치</td>
+          <td style="padding: 11px 18px;"><span class="priority-pill p-p2">P2 중간</span></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border-subtle);">
+          <td style="padding: 11px 18px; font-weight: 700;">인사관리</td><td style="padding: 11px 18px;">12 (구성원·근태·급여·계약 등)</td>
+          <td style="padding: 11px 18px;">InfoItem 15px·border-l-4·emerald 직접사용 등 다수 위반</td>
+          <td style="padding: 11px 18px;"><span class="priority-pill p-p2">P2 중간</span></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border-subtle);">
+          <td style="padding: 11px 18px; font-weight: 700;">재고관리</td><td style="padding: 11px 18px;">16 (4 그룹: 조회·입출고·발주문서·설정)</td>
+          <td style="padding: 11px 18px;">서브메뉴 그룹 분리는 잘 됨. 본문 카드 패턴 비통일</td>
+          <td style="padding: 11px 18px;"><span class="priority-pill p-p3">P3 권고</span></td>
+        </tr>
+        <tr>
+          <td style="padding: 11px 18px; font-weight: 700;">관리자</td><td style="padding: 11px 18px;">10 (경영분석·권한·운영·감사 등)</td>
+          <td style="padding: 11px 18px;">탭 이모지·slate-800 배너·font-black 남용</td>
+          <td style="padding: 11px 18px;"><span class="priority-pill p-p3">P3 권고</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 기준 디자인 -->
+<section class="section" id="reference">
+  <div class="section-head">
+    <div class="section-title"><span class="section-num">02</span>기준 디자인 3종 (Reference)</div>
+    <div class="section-desc">아래 세 화면은 디자인 시스템의 정답지입니다. 나머지 메뉴들은 이 세 화면과 시각적으로 한 가족처럼 보여야 합니다.</div>
+  </div>
+
+  <div class="preview-grid">
+    <!-- Reference: Sidebar -->
+    <div class="preview">
+      <div class="preview-frame">
+        <div class="mini-sidebar">
+          <div class="mini-brand">SY</div>
+          <div class="mini-item active"><div class="mini-icon"></div>내정보</div>
+          <div class="mini-item"><div class="mini-icon"></div>추가</div>
+          <div class="mini-item"><div class="mini-icon"></div>채팅</div>
+          <div class="mini-item"><div class="mini-icon"></div>게시판</div>
+          <div class="mini-item"><div class="mini-icon"></div>결재</div>
+          <div class="mini-item"><div class="mini-icon"></div>인사</div>
+          <div class="mini-item"><div class="mini-icon"></div>재고</div>
+          <div class="mini-item"><div class="mini-icon"></div>관리자</div>
+        </div>
+      </div>
+      <div class="preview-body">
+        <div class="preview-name">① 메인 메뉴 바</div>
+        <div class="preview-note">72px 폭 · 18px Lucide 아이콘 + 10px 한글 레이블 · 활성: <code>accent</code> 단색 + 흰 텍스트 · 채팅 배지 동그라미 · 종 아이콘 + 빨간 점은 최상단.</div>
+      </div>
+    </div>
+
+    <!-- Reference: My Info -->
+    <div class="preview">
+      <div class="preview-frame">
+        <div class="mini-myinfo">
+          <div class="mini-header-card">
+            <div class="mini-avatar">박</div>
+            <div>
+              <div class="mini-name">박지민</div>
+              <div class="mini-role">개발팀 · 책임</div>
+            </div>
+          </div>
+          <div class="mini-tabs">
+            <div class="mini-tab active">기본</div>
+            <div class="mini-tab">근태</div>
+            <div class="mini-tab">결재</div>
+            <div class="mini-tab">알림</div>
+          </div>
+          <div class="mini-row"><span class="l">사번</span><span class="r">EMP-2024-031</span></div>
+          <div class="mini-row"><span class="l">입사일</span><span class="r">2024.03.02</span></div>
+          <div class="mini-row"><span class="l">연차 잔여</span><span class="r" style="color:#10b981">12일</span></div>
+        </div>
+      </div>
+      <div class="preview-body">
+        <div class="preview-name">② 내정보 (My Page)</div>
+        <div class="preview-note">상단 프로필 헤더 카드(아바타 + 이름·소속) → 세그먼티드 탭 → InfoItem 행. <strong>모든 디테일 화면은 이 3-Layer 구조</strong>를 따른다.</div>
+      </div>
+    </div>
+
+    <!-- Reference: QuickAdd -->
+    <div class="preview">
+      <div class="preview-frame">
+        <div class="mini-quickgrid">
+          <div class="mini-grid-title">추가기능</div>
+          <div class="mini-grid">
+            <div class="mini-grid-cell"><div class="mini-grid-dot" style="background:#2563eb"></div><div class="mini-grid-label">결재</div></div>
+            <div class="mini-grid-cell"><div class="mini-grid-dot" style="background:#10b981"></div><div class="mini-grid-label">휴가</div></div>
+            <div class="mini-grid-cell"><div class="mini-grid-dot" style="background:#f59e0b"></div><div class="mini-grid-label">비용</div></div>
+            <div class="mini-grid-cell"><div class="mini-grid-dot" style="background:#7c3aed"></div><div class="mini-grid-label">메모</div></div>
+            <div class="mini-grid-cell"><div class="mini-grid-dot" style="background:#ec4899"></div><div class="mini-grid-label">일정</div></div>
+            <div class="mini-grid-cell"><div class="mini-grid-dot" style="background:#06b6d4"></div><div class="mini-grid-label">발주</div></div>
+            <div class="mini-grid-cell"><div class="mini-grid-dot" style="background:#84cc16"></div><div class="mini-grid-label">교대</div></div>
+            <div class="mini-grid-cell"><div class="mini-grid-dot" style="background:#6366f1"></div><div class="mini-grid-label">스캔</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="preview-body">
+        <div class="preview-name">③ 추가기능 (QuickAdd)</div>
+        <div class="preview-note">4열 그리드 · 정사각 카드 · 액센트 아이콘 + 한 줄 한글 레이블. <strong>"빠른 동작" UI는 모두 이 그리드</strong>로 통일 (게시판 목록 페이지의 빠른 글쓰기, 인사관리의 빠른 메뉴 등).</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 디자인 토큰 -->
+<section class="section" id="tokens">
+  <div class="section-head">
+    <div class="section-title"><span class="section-num">03</span>디자인 토큰 — 다른 메뉴들이 따라야 할 값</div>
+    <div class="section-desc">기준 3종에서 사용 중인 토큰들입니다. 모든 메뉴는 아래 값만 사용하고, Tailwind 고정 컬러(slate-*, zinc-*, emerald-* 등)와 인라인 hex는 금지.</div>
+  </div>
+
+  <h3 style="font-size:13px; font-weight:700; margin-bottom:10px;">색상</h3>
+  <div class="token-grid" style="margin-bottom:20px;">
+    <div class="token"><div class="swatch" style="background:#2563eb"></div><div class="token-label">Accent</div><div class="token-value">var(--accent)</div><div class="token-sub">#2563eb</div></div>
+    <div class="token"><div class="swatch" style="background:#eff6ff"></div><div class="token-label">Accent Light</div><div class="token-value">var(--accent-light)</div><div class="token-sub">활성 배경·hover</div></div>
+    <div class="token"><div class="swatch" style="background:#10b981"></div><div class="token-label">Success</div><div class="token-value">var(--success)</div><div class="token-sub">승인·잔여연차</div></div>
+    <div class="token"><div class="swatch" style="background:#f59e0b"></div><div class="token-label">Warning</div><div class="token-value">var(--warning)</div><div class="token-sub">대기·주의</div></div>
+    <div class="token"><div class="swatch" style="background:#ef4444"></div><div class="token-label">Danger</div><div class="token-value">var(--danger)</div><div class="token-sub">반려·로그아웃·삭제</div></div>
+    <div class="token"><div class="swatch" style="background:#18181b"></div><div class="token-label">Foreground</div><div class="token-value">var(--fg)</div><div class="token-sub">제목·본문 강조</div></div>
+    <div class="token"><div class="swatch" style="background:#71717a"></div><div class="token-label">FG Muted</div><div class="token-value">var(--fg-muted)</div><div class="token-sub">레이블·보조 텍스트</div></div>
+    <div class="token"><div class="swatch" style="background:#ffffff; border:1px solid #e9e9ec;"></div><div class="token-label">Card / Bg</div><div class="token-value">var(--card)</div><div class="token-sub">카드 배경 (다크모드: #111113)</div></div>
+  </div>
+
+  <h3 style="font-size:13px; font-weight:700; margin-bottom:10px;">타이포</h3>
+  <div class="token-grid" style="margin-bottom:20px;">
+    <div class="token"><div class="token-label">페이지 제목</div><div class="token-value" style="font-size:20px">20 / 800</div><div class="token-sub">letter-spacing -0.035em</div></div>
+    <div class="token"><div class="token-label">섹션 제목</div><div class="token-value" style="font-size:15px">15 / 700</div><div class="token-sub">heading-premium 클래스</div></div>
+    <div class="token"><div class="token-label">카드 제목</div><div class="token-value" style="font-size:13px">13 / 700</div><div class="token-sub">기본 카드 헤더</div></div>
+    <div class="token"><div class="token-label">본문</div><div class="token-value" style="font-size:13px">13 / 500</div><div class="token-sub">InfoItem value 포함</div></div>
+    <div class="token"><div class="token-label">레이블 / 캡션</div><div class="token-value" style="font-size:11px">11 / 600</div><div class="token-sub">tracking 0.04em · UPPER</div></div>
+    <div class="token"><div class="token-label">메뉴 레이블</div><div class="token-value" style="font-size:12px">12 / 500</div><div class="token-sub">서브메뉴 · 13/700 활성</div></div>
+  </div>
+
+  <h3 style="font-size:13px; font-weight:700; margin-bottom:10px;">간격 · 라디우스 · 그림자</h3>
+  <div class="token-grid">
+    <div class="token"><div class="token-label">Sidebar W</div><div class="token-value">72 px</div><div class="token-sub">아이콘+레이블 세로</div></div>
+    <div class="token"><div class="token-label">Submenu W</div><div class="token-value">192 px</div><div class="token-sub">긴 한글도 한 줄</div></div>
+    <div class="token"><div class="token-label">Card Radius</div><div class="token-value">14 px</div><div class="token-sub">--radius-lg</div></div>
+    <div class="token"><div class="token-label">Button Radius</div><div class="token-value">10 px</div><div class="token-sub">--radius</div></div>
+    <div class="token"><div class="token-label">Card Padding</div><div class="token-value">20 / 22 px</div><div class="token-sub">데스크탑 기본</div></div>
+    <div class="token"><div class="token-label">Card Padding · 모바일</div><div class="token-value">16 / 18 px</div><div class="token-sub">≤ 768 px</div></div>
+    <div class="token"><div class="token-label">Gap · 카드 사이</div><div class="token-value">12 px</div><div class="token-sub">flex/grid gap</div></div>
+    <div class="token"><div class="token-label">Hit Target · 모바일</div><div class="token-value">≥ 44 px</div><div class="token-sub">탭바 / 버튼</div></div>
+  </div>
+</section>
+
+<!-- 공통 패턴 -->
+<section class="section" id="patterns">
+  <div class="section-head">
+    <div class="section-title"><span class="section-num">04</span>공통 패턴 — 모든 메뉴에서 동일하게 구현</div>
+    <div class="section-desc">기준 3종에서 검증된 7개 공통 패턴. 새 PR마다 이 패턴 외에 새로운 변형을 추가하지 말 것.</div>
+  </div>
+
+  <div class="card">
+    <div style="display:grid; grid-template-columns: 28px 1fr; gap: 14px 16px; font-size: 12.5px; line-height:1.65;">
+      <strong style="color: var(--accent); font-weight:800;">①</strong>
+      <div><strong>PageHeader 컴포넌트</strong> — 모든 화면 최상단은 <code>&lt;PageHeader title subtitle actions /&gt;</code>로 통일. title 20/800, subtitle 12/500 muted, actions는 오른쪽 정렬 버튼 슬롯. 화면별 별도 JSX 금지.</div>
+
+      <strong style="color: var(--accent); font-weight:800;">②</strong>
+      <div><strong>Lucide 아이콘만 사용</strong> — 이모지(👤📋💬 등) 전면 제거. 메뉴/탭/상태/장식 어디서든 <code>lucide-react</code>의 컴포넌트만 사용. 크기는 메뉴 18px, 서브메뉴 13px, 인라인 본문 14px, 데코 카드 20px.</div>
+
+      <strong style="color: var(--accent); font-weight:800;">③</strong>
+      <div><strong>섹션 헤더 — 캡션 스타일</strong> — <code>border-l-4 + accent</code> 패턴 폐기. 대신 <code>10/700 uppercase tracking-wider, color: fg-subtle</code> 캡션 라벨로 통일.</div>
+
+      <strong style="color: var(--accent); font-weight:800;">④</strong>
+      <div><strong>탭바 — segmented control</strong> — 내정보의 <code>p-1 bg-bg rounded-xl</code> + 활성 <code>bg-card shadow-sm</code> 패턴을 게시판/전자결재/관리자에도 동일하게 적용. 탭마다 Lucide 아이콘 + 한글 라벨.</div>
+
+      <strong style="color: var(--accent); font-weight:800;">⑤</strong>
+      <div><strong>InfoItem 행</strong> — <code>label(11/600 muted) ┃ value(13/600 fg)</code> 좌우 정렬. value는 절대 15px 이상 금지(기준 위반).</div>
+
+      <strong style="color: var(--accent); font-weight:800;">⑥</strong>
+      <div><strong>상태 배지(.badge)</strong> — globals.css의 <code>.badge.badge-green / -red / -yellow / -blue / -gray</code>만 사용. emerald/rose/amber Tailwind 클래스 직접 사용 금지.</div>
+
+      <strong style="color: var(--accent); font-weight:800;">⑦</strong>
+      <div><strong>QuickAction 그리드</strong> — 추가기능과 동일 4열(모바일 3열) 정사각 카드. 아이콘 컨테이너 38×38 <code>bg: accent×8% opacity</code>, 한 줄 한글 레이블. 게시판 새 글쓰기·인사관리 결재 빠른메뉴 등에 재사용.</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ───────── 실 리포 분석 결과 (bjm1274/newmso) ───────── -->
+<section class="section" id="repo-findings">
+  <div class="section-head">
+    <div class="section-title">
+      <span class="section-num" style="background:#dbeafe; color:#1E40AF;">＊</span>
+      실 리포 분석 결과 — <code style="font-size:14px;">bjm1274/newmso</code>
+    </div>
+    <div class="section-desc">
+      GitHub 리포 접근 확인 (commit <code>cd0618e</code>, 500 commits, public). 핵심 파일 트리 + 디자인 토큰을 실측해 보고서의 추정치들을 교정합니다.
+    </div>
+  </div>
+
+  <div class="card" style="background:#fef2f2; border-color:#fecaca; margin-bottom:14px;">
+    <div style="font-size:12px; font-weight:800; color:#991b1b; text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px;">⚠ 중요 발견 — 보고서 전체에 영향</div>
+    <div style="font-size:13px; line-height:1.65; color:#7f1d1d;">
+      <code>app/globals.css</code>가 정의한 실 디자인 토큰은 <strong>오렌지/accent 계열이 아니라 블루(#1E40AF Primary)</strong>입니다. 보고서 초반의 토큰 섹션(03)에 적힌 accent 컬러는 <code>newmso-redesign.html</code> 목업에서 가져온 값이라 실제와 다릅니다. Claude Code 지시문 실행 시 아래의 실 토큰을 정답으로 사용해야 합니다.
+    </div>
+  </div>
+
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
+    <div class="card">
+      <div style="font-size:11px; font-weight:800; color:var(--fg-muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px;">실 컬러 토큰 (globals.css)</div>
+      <div style="display:grid; grid-template-columns: 28px 1fr; gap:8px 12px; font-size:12px; align-items:center;">
+        <div style="width:28px; height:20px; background:#1E40AF; border-radius:4px; border:1px solid var(--border);"></div><div><code>--primary: #1E40AF</code> — 메인 액션</div>
+        <div style="width:28px; height:20px; background:#EFF6FF; border-radius:4px; border:1px solid var(--border);"></div><div><code>--primary-light: #EFF6FF</code></div>
+        <div style="width:28px; height:20px; background:#7C3AED; border-radius:4px; border:1px solid var(--border);"></div><div><code>--secondary: #7C3AED</code> — 보조</div>
+        <div style="width:28px; height:20px; background:#059669; border-radius:4px; border:1px solid var(--border);"></div><div><code>--success: #059669</code></div>
+        <div style="width:28px; height:20px; background:#EA580C; border-radius:4px; border:1px solid var(--border);"></div><div><code>--warning: #EA580C</code></div>
+        <div style="width:28px; height:20px; background:#DC2626; border-radius:4px; border:1px solid var(--border);"></div><div><code>--danger: #DC2626</code></div>
+        <div style="width:28px; height:20px; background:#F8FAFC; border-radius:4px; border:1px solid var(--border);"></div><div><code>--background: #F8FAFC</code></div>
+        <div style="width:28px; height:20px; background:#0F172A; border-radius:4px; border:1px solid var(--border);"></div><div><code>--foreground: #0F172A</code></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:11px; font-weight:800; color:var(--fg-muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px;">스택 & 핵심 사실</div>
+      <div style="font-size:12.5px; line-height:1.7; color:var(--fg);">
+        · Next.js 16 (App Router) + React 19 + Tailwind v4<br/>
+        · 폰트: <code>Pretendard Variable</code> (한글 최적화) ✓<br/>
+        · letter-spacing 전역 <code>-0.02em</code><br/>
+        · 다크모드: <code>.dark</code> 클래스 + CSS 변수 오버라이드<br/>
+        · 라운드: 1rem/1.5rem/2.25rem (xl/2xl/3xl)<br/>
+        · 한국어 파일명 규칙 (메뉴 컴포넌트 전부 한글)<br/>
+        · 메뉴 라우터: <code>조직도서브/조직도본문.tsx</code> (dynamic import)
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px;">
+    <div style="font-size:11px; font-weight:800; color:var(--fg-muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px;">실 파일 경로 — 매트릭스의 "file-tag" 값 교정</div>
+    <div style="font-family: ui-monospace, monospace; font-size:11.5px; line-height:1.75; color: var(--fg); background: var(--bg-subtle); border-radius:8px; padding:14px; white-space:pre; overflow-x:auto;">메인 메뉴 컴포넌트 (모두 app/main/기능부품/ 아래):
+  · 메신저.tsx                     (+ MessengerLayout.tsx, MessengerConversationPanel.tsx,
+                                     MessengerDrawerSections.tsx, 메신저사이드바.tsx 등 40+ 파일)
+  · 게시판.tsx                     (160KB — 대형, 분리 진행 중)
+    └ 게시판서브/BoardComposer.tsx, BoardPostList.tsx, BoardScheduleCalendar.tsx,
+                  useBoardDataSource.ts, useBoardReadStatus.ts, 업무가이드.tsx
+  · 게시판메뉴.ts                  ← 매트릭스 BRD-01의 라벨 이모지 prefix 수정 대상
+  · 전자결재.tsx
+    └ 전자결재서브/approval-constants.ts, approval-utils.ts
+  · 인사관리.tsx
+    └ 인사관리서브/  (급여, 근태, 연차, 인사기록)
+    └ 근무현황.tsx, 근무표자동편성-engine-*.ts, roster/ 디렉토리
+  · 재고관리통합.tsx               ← 매트릭스 INV 16개 화면 전부 여기서 통합
+    └ 재고관리서브/  (UDI, 발주, 스캔)
+  · 관리자전용.tsx
+    └ 관리자전용서브/  (시스템마스터, 팝업관리, 경영대시보드)
+  · 추가기능.tsx
+  · 마이페이지/                    ← 내정보 (기준 ✅)
+  · 알림인박스.tsx, 알림센터.tsx, 알림시스템.tsx, 알림토스트.tsx
+  · OP체크.tsx (185KB!), ESL관리.tsx, 공유캘린더.tsx
+  · 권한요청모달.tsx               ← P-G 모달 패턴 참조
+
+공통 컴포넌트 (app/components/):
+  · GlobalSearch.tsx, ActionDialog.tsx, AppLogo.tsx, ErrorBoundary.tsx,
+    OfflineStatusBanner.tsx, ProfilePhotoThumbnail.tsx, PwaBootstrap.tsx,
+    ThemeToggle.tsx, useActionDialog.tsx</div>
+  </div>
+
+  <div class="card" style="margin-top:14px; background:#f0f9ff; border-color:#bae6fd;">
+    <div style="font-size:12px; font-weight:800; color:#075985; margin-bottom:6px;">📌 다음 정밀 분석 패스에서 import할 핵심 파일 (15개)</div>
+    <div style="font-size:12px; line-height:1.7; color:#0c4a6e;">
+      <code>app/globals.css</code> · <code>app/components/GlobalSearch.tsx</code> · <code>app/components/ActionDialog.tsx</code> ·
+      <code>app/main/기능부품/게시판메뉴.ts</code> · <code>게시판서브/BoardPostList.tsx</code> ·
+      <code>전자결재.tsx</code> · <code>전자결재서브/approval-utils.ts</code> ·
+      <code>근무현황.tsx</code> · <code>인사관리서브/급여.tsx</code> ·
+      <code>재고관리통합.tsx</code> · <code>관리자전용.tsx</code> · <code>관리자전용서브/경영대시보드.tsx</code> ·
+      <code>마이페이지/index.tsx</code> · <code>알림토스트.tsx</code> · <code>권한요청모달.tsx</code>.<br/>
+      이 15개를 import해서 라인 단위 grep하면 매트릭스 53행의 "현재 문제" 칸을 모두 실측 코드 인용으로 교체 가능.
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ───────── 실 스크린샷 분석 (15장 라이트모드) ───────── -->
+<section class="section" id="screenshot-findings">
+  <div class="section-head">
+    <div class="section-title">
+      <span class="section-num" style="background:#fee2e2; color:#DC2626;">＊</span>
+      실 스크린샷 분석 — 15장 (라이트 모드) 기반 확정된 불일치 12종
+    </div>
+    <div class="section-desc">
+      2026-05-11 사용자 첨부 스크린샷 15장(채팅 2 · 게시판 3 · 전자결재 2 · 인사관리 3 · 재고관리 3 · 관리자 2)을 픽셀 비교한 결과. 추정이 아닌 <strong>실측 발견사항</strong>이며, 매트릭스의 “현재 문제” 칸은 이 결과로 교체됩니다.
+    </div>
+  </div>
+
+  <!-- 발견사항 12종 -->
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+
+    <div class="card" style="border-color:#fca5a5;">
+      <div style="font-size:11px; font-weight:800; color:#991b1b; margin-bottom:6px;">F-01 · 페이지 헤더 3가지 패턴 공존 <span style="background:#fee2e2; color:#991b1b; border-radius:4px; padding:1px 6px; font-size:10px;">치명</span></div>
+      <div style="font-size:12px; line-height:1.65; color:var(--fg);">
+        ① 텍스트만 — 채팅·게시판·재고 “재고 현황·구매/발주”<br/>
+        ② 텍스트 + 배지 — 전자결재 “결재함 [0건]”, 인사관리 “실시간 구성원 현황 [전체]”<br/>
+        ③ <strong>아이콘 박스 + 텍스트 + 배지</strong> — 인사관리 “전문 근태 통합 관리” (보라/푸른 그라데이션 박스)<br/>
+        <span style="color:#991b1b;">→ 같은 메뉴 안의 인력관리·근태·급여 세 화면조차 헤더 패턴이 다름.</span>
+      </div>
+    </div>
+
+    <div class="card" style="border-color:#fca5a5;">
+      <div style="font-size:11px; font-weight:800; color:#991b1b; margin-bottom:6px;">F-02 · 버튼 색상 의미 깨짐 <span style="background:#fee2e2; color:#991b1b; border-radius:4px; padding:1px 6px; font-size:10px;">치명</span></div>
+      <div style="font-size:12px; line-height:1.65; color:var(--fg);">
+        한 화면(인사관리 구성원 테이블) 안에서 5색 액션 버튼이 의미 없이 혼재:<br/>
+        · <span style="background:#1E40AF; color:#fff; padding:1px 8px; border-radius:4px; font-size:10px;">신규 직원 등록</span> = primary<br/>
+        · <span style="background:#111; color:#fff; padding:1px 8px; border-radius:4px; font-size:10px;">수정</span> = ??? (왜 검정?)<br/>
+        · <span style="background:#fecaca; color:#991b1b; padding:1px 8px; border-radius:4px; font-size:10px;">삭제</span> = danger soft<br/>
+        · <span style="background:#fff; color:#111; padding:1px 8px; border-radius:4px; font-size:10px; border:1px solid #e5e7eb;">문서</span> = secondary<br/>
+        · 재고관리 <span style="background:#DC2626; color:#fff; padding:1px 8px; border-radius:4px; font-size:10px;">발주 처리</span> = 또 다른 danger
+      </div>
+    </div>
+
+    <div class="card" style="border-color:#fca5a5;">
+      <div style="font-size:11px; font-weight:800; color:#991b1b; margin-bottom:6px;">F-03 · 빈 상태(Empty) 3가지 패턴 <span style="background:#fef3c7; color:#92400e; border-radius:4px; padding:1px 6px; font-size:10px;">높음</span></div>
+      <div style="font-size:12px; line-height:1.65; color:var(--fg);">
+        · 채팅 메인: 아이콘 + “채팅방을 선택하세요.” 회색<br/>
+        · 채팅 박민지: 아이콘 + “대화 내용이 없습니다.” (사이즈/위치 다름)<br/>
+        · 전자결재: <strong>배지 “빈 상태” + 제목 + 부제 2줄</strong> (완전 다른 패턴)<br/>
+        · 게시판·재고: 빈 상태 자체 부재
+      </div>
+    </div>
+
+    <div class="card" style="border-color:#fca5a5;">
+      <div style="font-size:11px; font-weight:800; color:#991b1b; margin-bottom:6px;">F-04 · 검색 위치·형태 4종 <span style="background:#fef3c7; color:#92400e; border-radius:4px; padding:1px 6px; font-size:10px;">높음</span></div>
+      <div style="font-size:12px; line-height:1.65; color:var(--fg);">
+        · 채팅 상단: 돋보기 아이콘 버튼만 (모달 트리거)<br/>
+        · 인사관리: 우측 “직원 검색” input + 별도 “검색” 버튼<br/>
+        · 재고관리: 전체 너비 input + 부가 dropdown 2개<br/>
+        · 전자결재: 필터 4종(전체 문서/전체/주간별/검색) 한 줄<br/>
+        <span style="color:#991b1b;">→ 글로벌 검색이 메인 앱바에 없음. <code>GlobalSearch.tsx</code>가 있는데도 화면별 자체 검색 4종.</span>
+      </div>
+    </div>
+
+    <div class="card" style="border-color:#fca5a5;">
+      <div style="font-size:11px; font-weight:800; color:#991b1b; margin-bottom:6px;">F-05 · 좌측 sub-nav 그룹화 3종</div>
+      <div style="font-size:12px; line-height:1.65; color:var(--fg);">
+        · 게시판·전자결재: 평평한 메뉴 (그룹 없음)<br/>
+        · 인사관리: <strong>큰 박스 + 배지(ESS/퇴사 검토, 급여 확정 검토 등)</strong> + 안에 sub-nav<br/>
+        · 재고관리·관리자: 소문자 회색 그룹 라벨(“운영/기준/마감”) + 단순 리스트<br/>
+        → 통일 후보: 인사관리 패턴은 너무 과함, 재고·관리자 패턴이 표준에 적합
+      </div>
+    </div>
+
+    <div class="card" style="border-color:#fca5a5;">
+      <div style="font-size:11px; font-weight:800; color:#991b1b; margin-bottom:6px;">F-06 · KPI 카드 3가지 변형</div>
+      <div style="font-size:12px; line-height:1.65; color:var(--fg);">
+        · 전자결재 결재함: 우측 상단 아이콘만 (대기중/이번달 승인/반려)<br/>
+        · 재고 현황: <strong>좌측 컬러 강조선 + 우측 상단 아이콘</strong><br/>
+        · 구매/발주: 좌측 컬러 강조선만<br/>
+        · 관리자 경영분석: 우측 상단 아이콘만 (재고 현황과 다름)<br/>
+        → 같은 도메인(재고관리) 안에서 두 패턴 공존
+      </div>
+    </div>
+
+    <div class="card" style="border-color:#fca5a5;">
+      <div style="font-size:11px; font-weight:800; color:#991b1b; margin-bottom:6px;">F-07 · 탭·세그먼트 5종</div>
+      <div style="font-size:12px; line-height:1.65; color:var(--fg);">
+        ① 채팅 “채팅/조직도” pill 2개<br/>
+        ② 게시판 작성 “기본/옵션/첨부/일정” 큰 pill 4개 (active 푸른 배경)<br/>
+        ③ 입출고 “직접 등록/일괄 업로드/명세서 추출” <strong>큰 박스 탭</strong> (active 흰 + 푸른 외곽)<br/>
+        ④ 재고현황 “1 대상 확인 → 2 → 3” <strong>번호 스텝퍼</strong> (활성/대기 색깔 다름)<br/>
+        ⑤ 관리자 경영분석 “경영대시보드 외 6개” 작은 pill (active 푸른 채움)
+      </div>
+    </div>
+
+    <div class="card" style="border-color:#fca5a5;">
+      <div style="font-size:11px; font-weight:800; color:#991b1b; margin-bottom:6px;">F-08 · 안내문구 3가지 처리</div>
+      <div style="font-size:12px; line-height:1.65; color:var(--fg);">
+        · 게시판 작성: 작은 회색 1줄 (“비워두면 즉시 게시되고…”)<br/>
+        · 전자결재 결재함: <strong>푸른 안내 박스 (아이콘 + 제목 + 본문)</strong> “권한 스코프…”<br/>
+        · 재고관리: 페이지 부제목으로 (“자동 발주 승인안과 일반 발주서를…”)<br/>
+        → 같은 “설명 텍스트” 의미인데 시각적 무게가 3단계로 다름
+      </div>
+    </div>
+
+    <div class="card" style="border-color:#fca5a5;">
+      <div style="font-size:11px; font-weight:800; color:#991b1b; margin-bottom:6px;">F-09 · 배지 색·모양 6종 이상</div>
+      <div style="font-size:12px; line-height:1.65; color:var(--fg);">
+        · 푸른 solid “4명/0건/참여 4/필수/최근 작성” — 5가지 다른 톤<br/>
+        · 빨간 solid “중요/긴급 처리 필요/품절”<br/>
+        · 노란 solid “권한 필요” — 다른 화면엔 없는 톤<br/>
+        · 그린 soft “재직”<br/>
+        · 회색 soft “상근/정규직/병동3교대/D”<br/>
+        · 채팅: <strong>“고정/숨김”은 배지가 아닌 작은 회색 텍스트</strong> (다른 화면은 배지)
+      </div>
+    </div>
+
+    <div class="card" style="border-color:#fca5a5;">
+      <div style="font-size:11px; font-weight:800; color:#991b1b; margin-bottom:6px;">F-10 · 모달·임시저장 표시기 비표준</div>
+      <div style="font-size:12px; line-height:1.65; color:var(--fg);">
+        · 게시판 상세 모달: X 닫기 버튼 없고 텍스트 “닫기/수정/읽음 확인/좋아요 0” 4개가 우측 상단에 평등 나열<br/>
+        · 입출고관리만 <strong>우측 하단 floating “임시저장됨 13:15”</strong> 표시 (다른 화면엔 같은 패턴 없음)<br/>
+        · Toast/Notification 통일된 위치·z-index 정의 부재
+      </div>
+    </div>
+
+    <div class="card" style="border-color:#fca5a5;">
+      <div style="font-size:11px; font-weight:800; color:#991b1b; margin-bottom:6px;">F-11 · 글로벌 앱바·우측 액션 자리 부재</div>
+      <div style="font-size:12px; line-height:1.65; color:var(--fg);">
+        · 상단 가로 앱바 자체가 없음 → 글로벌 검색·알림 belling·테마 토글·내 프로필 자리 미정의<br/>
+        · 알림은 좌측 메인 nav 안 “알림(빨간 점)”에 의존, <strong>NotificationBell의 표준 위치 미정</strong><br/>
+        · 우측 하단 “N” 아이콘이 “내정보”인지 알림인지 화면별로 다른 의미일 가능성
+      </div>
+    </div>
+
+    <div class="card" style="border-color:#fca5a5;">
+      <div style="font-size:11px; font-weight:800; color:#991b1b; margin-bottom:6px;">F-12 · 리스트 row 높이·패딩 4종</div>
+      <div style="font-size:12px; line-height:1.65; color:var(--fg);">
+        · 채팅 list: 약 72px 높음 (avatar 40 + 패딩 16)<br/>
+        · 게시판 list: 약 56px<br/>
+        · 인사관리 table: 약 64px (avatar 없음, 다중 라인 셀)<br/>
+        · 재고 row: 약 44px (가장 빽빽)<br/>
+        → 같은 “리스트” 의미인데 density 정책이 메뉴별 자유 — 통일 토큰 필요
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 통일 권고 -->
+  <div class="card" style="margin-top:18px; background:linear-gradient(180deg, #fef2f2 0%, #fff 100%); border-color:#fca5a5;">
+    <div style="font-size:13px; font-weight:800; color:#991b1b; margin-bottom:10px;">🎯 스크린샷 발견 기반 — 통일안 우선순위</div>
+    <ol style="margin:0; padding-left:20px; font-size:12.5px; line-height:1.85; color:var(--fg);">
+      <li><strong>P1 — F-02 버튼 색상 의미 재정의:</strong> primary(blue) / secondary(white outline) / danger(red, “돌이킬 수 없는 작업만”) / ghost. <strong>검정 버튼·핑크 “삭제 soft” 전면 제거.</strong></li>
+      <li><strong>P1 — F-01 PageHeader 단일 컴포넌트화:</strong> 53개 서브 화면 모두 같은 <code>&lt;PageHeader title subtitle badge actions /&gt;</code>. 아이콘 박스는 옵션 prop, 기본 off.</li>
+      <li><strong>P1 — F-11 글로벌 앱바 신설:</strong> 상단 56px 가로 바에 좌(로고)·중(GlobalSearch)·우(NotificationBell + ThemeToggle + ProfileMenu). 좌측 nav는 메뉴 전환 전용으로 단순화.</li>
+      <li><strong>P2 — F-07 탭 패턴 2개로 축소:</strong> (a) “섹션 전환용 segment pill” (b) “단계용 stepper”. 큰 박스 탭(③)·작은 pill(⑤)은 (a)로 통합.</li>
+      <li><strong>P2 — F-06 KPI 카드 1패턴 고정:</strong> 좌측 강조선 4px + 우측 상단 아이콘 + 큰 숫자 + 라벨/부제. 강조선 색깔이 의미(긴급=red, 정상=blue).</li>
+      <li><strong>P2 — F-03 EmptyState 컴포넌트:</strong> 64px 아이콘 + 제목(18px) + 부제(13px) + 옵션 CTA. 배지 “빈 상태”는 제거.</li>
+      <li><strong>P3 — F-08, F-09, F-10, F-12</strong>: 디자인 토큰화하면 자동으로 일관성 확보 (info-banner, badge variants, modal, density tokens).</li>
+    </ol>
+  </div>
+
+  <div class="card" style="margin-top:14px; background:#ecfdf5; border-color:#86efac;">
+    <div style="font-size:12px; font-weight:800; color:#065f46; margin-bottom:6px;">✅ 스크린샷에서 잘 되어 있는 점 (유지 권장)</div>
+    <ul style="margin:0; padding-left:20px; font-size:12px; line-height:1.7; color:#064e3b;">
+      <li>좌측 메인 nav의 아이콘 + 라벨 구조와 active 상태(푸른 배경 + 흰 아이콘) — <strong>이미 일관됨, 유지</strong></li>
+      <li>Avatar 원형 + 그린 status dot 처리 — 채팅/게시판 작성자 동일 패턴, 유지</li>
+      <li>Primary blue(#1E40AF)가 거의 모든 “주요 액션” 버튼에 일관 적용 — 토큰 정의는 정확, 사용처가 어긋났을 뿐</li>
+      <li>입력 폼의 라벨 위치(상단 좌측)·placeholder 회색 톤 — 일관</li>
+      <li>한글 폰트 Pretendard Variable 일관 적용</li>
+    </ul>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ───────── NEW: 서브 화면 전체 매트릭스 ───────── -->
+<section class="section" id="submenu-matrix">
+  <div class="section-head">
+    <div class="section-title">
+      <span class="section-num" style="background:#fce7f3; color:#be185d;">＋</span>
+      서브 화면 매트릭스 — 6개 메뉴 안의 53개 서브 화면 전수 조사
+    </div>
+    <div class="section-desc">
+      메인 메뉴 카드만으로는 “안에 있는 화면들”의 디자인 일관성은 보장되지 않습니다. <br/>
+      좌측 사이드바 정의(<code>nb-sidebar.jsx</code> &amp; 실 코드 <code>app/main/기능부품/*</code>)에서 추출한 모든 서브 화면을 표 형태로 적시하고, 각각이 어느 공통 패턴(P-A ~ P-F)을 따라야 하는지를 못 박습니다.
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="card" style="margin-bottom:18px;">
+    <div style="font-size:11px; font-weight:700; color:var(--fg-muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px;">서브 화면 6대 패턴 (Pattern Library)</div>
+    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap:10px; font-size:12px;">
+      <div style="border:1px solid var(--border); border-radius:10px; padding:11px 13px;">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+          <span style="background:#dbeafe; color:#1e40af; font-weight:800; font-size:10px; border-radius:5px; padding:2px 6px;">P-A</span>
+          <strong style="font-size:12px;">목록 + 필터 + 테이블</strong>
+        </div>
+        <div style="color:var(--fg-muted); line-height:1.55;">PageHeader → StatCard 줄 → 검색/필터 바 → DataTable. 대부분 “현황·이력·구성원·결재함·발주” 류.</div>
+      </div>
+      <div style="border:1px solid var(--border); border-radius:10px; padding:11px 13px;">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+          <span style="background:#d1fae5; color:#065f46; font-weight:800; font-size:10px; border-radius:5px; padding:2px 6px;">P-B</span>
+          <strong style="font-size:12px;">대시보드 (지표 + 차트)</strong>
+        </div>
+        <div style="color:var(--fg-muted); line-height:1.55;">상단 KPI 4-stat, 좌 차트 / 우 알림 2-column. 모바일 1-column 자동.</div>
+      </div>
+      <div style="border:1px solid var(--border); border-radius:10px; padding:11px 13px;">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+          <span style="background:#fef3c7; color:#92400e; font-weight:800; font-size:10px; border-radius:5px; padding:2px 6px;">P-C</span>
+          <strong style="font-size:12px;">작성/등록 폼</strong>
+        </div>
+        <div style="color:var(--fg-muted); line-height:1.55;">PageHeader actions에 [저장/취소], 본문은 InfoItem 라벨–입력 12px 그리드 2-col, 모바일 1-col.</div>
+      </div>
+      <div style="border:1px solid var(--border); border-radius:10px; padding:11px 13px;">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+          <span style="background:#ede9fe; color:#5b21b6; font-weight:800; font-size:10px; border-radius:5px; padding:2px 6px;">P-D</span>
+          <strong style="font-size:12px;">캘린더/스케줄</strong>
+        </div>
+        <div style="color:var(--fg-muted); line-height:1.55;">월/주/일 토글 segmented, 이벤트 칩은 .badge 컬러만. 빨간 점, 보라색 그라데이션 금지.</div>
+      </div>
+      <div style="border:1px solid var(--border); border-radius:10px; padding:11px 13px;">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+          <span style="background:#fee2e2; color:#991b1b; font-weight:800; font-size:10px; border-radius:5px; padding:2px 6px;">P-E</span>
+          <strong style="font-size:12px;">상세/뷰어 (read-only)</strong>
+        </div>
+        <div style="color:var(--fg-muted); line-height:1.55;">상단 메타 행 + InfoItem 그리드 + 본문(에디터 출력) + 하단 액션 바. 결재 상세, 게시글 상세, 직원 상세 공용.</div>
+      </div>
+      <div style="border:1px solid var(--border); border-radius:10px; padding:11px 13px;">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+          <span style="background:#e0f2fe; color:#075985; font-weight:800; font-size:10px; border-radius:5px; padding:2px 6px;">P-F</span>
+          <strong style="font-size:12px;">설정/마스터 (key-value)</strong>
+        </div>
+        <div style="color:var(--fg-muted); line-height:1.55;">좌측 카테고리 nav 1/3 + 우측 InfoItem 토글/입력 2/3. 모바일은 카테고리를 상단 가로 스크롤 칩으로.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Matrix Table -->
+  <style>
+    .matrix { width:100%; border-collapse: separate; border-spacing: 0; font-size:12px; background: var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+    .matrix thead th { background: var(--bg-subtle); color: var(--fg-muted); font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; padding:10px 12px; text-align:left; border-bottom:1px solid var(--border); }
+    .matrix tbody td { padding:9px 12px; border-bottom:1px solid var(--border-subtle); vertical-align: top; }
+    .matrix tbody tr:last-child td { border-bottom:none; }
+    .matrix tbody tr.group-head td { background: var(--bg-subtle); font-size:11px; font-weight:800; color: var(--fg); letter-spacing:.02em; padding:8px 12px; border-bottom:1px solid var(--border); }
+    .pat-pill { display:inline-block; font-size:10px; font-weight:800; padding:2px 6px; border-radius:5px; letter-spacing:.02em; }
+    .pat-A { background:#dbeafe; color:#1e40af; }
+    .pat-B { background:#d1fae5; color:#065f46; }
+    .pat-C { background:#fef3c7; color:#92400e; }
+    .pat-D { background:#ede9fe; color:#5b21b6; }
+    .pat-E { background:#fee2e2; color:#991b1b; }
+    .pat-F { background:#e0f2fe; color:#075985; }
+    .sev-1 { background:#fee2e2; color:#991b1b; }
+    .sev-2 { background:#fef3c7; color:#92400e; }
+    .sev-3 { background:#e5e7eb; color:#374151; }
+    .sev-ok { background:#d1fae5; color:#065f46; }
+    .sev-pill { display:inline-block; font-size:10px; font-weight:800; padding:2px 6px; border-radius:5px; }
+    .matrix code { font-size:10.5px; background: var(--bg-subtle); padding:1px 5px; border-radius:4px; color: var(--fg); }
+    .matrix td.name { font-weight:700; color: var(--fg); white-space:nowrap; }
+    .matrix td.issue { color: var(--fg-muted); line-height:1.55; }
+  </style>
+
+  <div style="overflow-x:auto;">
+  <table class="matrix">
+    <thead>
+      <tr>
+        <th style="width:140px;">서브 화면</th>
+        <th style="width:60px;">패턴</th>
+        <th>현재 문제</th>
+        <th style="width:200px;">기준 디자인이 요구하는 것</th>
+        <th style="width:60px;">심각도</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- ─── 채팅 ─── -->
+      <tr class="group-head"><td colspan="5">💬 채팅 (2 sub-views) — 활성방 색·아이콘만 정리되면 끝</td></tr>
+      <tr>
+        <td class="name">채팅방 목록</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">활성방 <code>bg-zinc-800</code> 검정, PIN/HIDE 텍스트 버튼, 📢💬▼ 이모지 라벨. <code>dark:</code> 42개 직접 클래스.</td>
+        <td>좌 3px <code>border-l accent</code> + <code>accent/10</code> 배경, Pin/EyeOff icon-btn, Megaphone/MessageSquare Lucide.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">메시지 입력창</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">전송 버튼 보라색 그라데이션, glass 효과, 첨부 아이콘 위치 불일치.</td>
+        <td>내정보 패턴 — 단색 accent 채움, 첨부는 Paperclip 좌측, 전송은 Send 36×36 우측.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+
+      <!-- ─── 게시판 ─── -->
+      <tr class="group-head"><td colspan="5">📋 게시판 (6 sub-menus + 상세/에디터 = 8 화면)</td></tr>
+      <tr>
+        <td class="name">공지사항 목록</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">라벨 <code>'📢 공지사항'</code> + icon 이모지 중복. 핀 게시물 표시가 빨강 배경.</td>
+        <td>label 한글만, icon=<code>Megaphone</code>. 핀은 <code>.badge.badge-blue</code> + Pin 12px.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">자유게시판</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">목록 카드 그림자 강함(0 4 20). 작성자 아바타 32px(기준 28px).</td>
+        <td>border 1px only, 아바타 28×28 round-full, 본문 13/400.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+      <tr>
+        <td class="name">경조사</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">하트 이모지 ❤️, 카테고리 컬러 7종 임의 사용.</td>
+        <td>icon=<code>Heart</code>, 카테고리 → green/yellow/blue/gray 4종 .badge로 한정.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+      <tr>
+        <td class="name">수술일정</td>
+        <td><span class="pat-pill pat-D">P-D</span></td>
+        <td class="issue">자체 캘린더 라이브러리 직접 스타일링, 색이 형광 빨강.</td>
+        <td>P-D 캘린더 패턴 적용, 이벤트 칩은 <code>.badge.badge-red/-yellow</code>만.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">MRI일정</td>
+        <td><span class="pat-pill pat-D">P-D</span></td>
+        <td class="issue">수술일정과 같은 캘린더인데 별도 컴포넌트로 복붙됨.</td>
+        <td>공용 <code>&lt;ScheduleCalendar type="mri" /&gt;</code>로 통합.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">업무가이드</td>
+        <td><span class="pat-pill pat-E">P-E</span></td>
+        <td class="issue">에디터 출력 prose 스타일이 본문 폰트와 다름(serif 섞임).</td>
+        <td>tailwind-typography <code>prose-zinc</code> + 본문 폰트 강제.</td>
+        <td><span class="sev-pill sev-3">P3</span></td>
+      </tr>
+      <tr>
+        <td class="name">게시글 상세</td>
+        <td><span class="pat-pill pat-E">P-E</span></td>
+        <td class="issue">댓글 영역 인덴트 24px, 답글 토글 아이콘이 ▶ 화살표.</td>
+        <td>인덴트 32px, <code>CornerDownRight</code> 12 fg-muted.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+      <tr>
+        <td class="name">글쓰기 에디터</td>
+        <td><span class="pat-pill pat-C">P-C</span></td>
+        <td class="issue">툴바가 화면별 다른 위치(상단/하단 고정 혼재). 미리보기 버튼 누락.</td>
+        <td>PageHeader actions=[임시저장/미리보기/등록], 툴바는 본문 상단 sticky.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+
+      <!-- ─── 전자결재 ─── -->
+      <tr class="group-head"><td colspan="5">✅ 전자결재 (4 sub-menus + 작성/상세 = 6 화면)</td></tr>
+      <tr>
+        <td class="name">기안함</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">상태가 텍스트(“대기중”) 그대로 노출, 컬러 없음.</td>
+        <td><code>.badge.badge-yellow/-green/-red</code> 매핑 (대기/승인/반려).</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+      <tr>
+        <td class="name">결재함</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">행 클릭 시 별도 모달(전체화면 cover)로 떠서 컨텍스트 손실.</td>
+        <td>우측 슬라이드 인 Drawer 480px (모바일 풀스크린).</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">참조 문서함</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">기안함/결재함과 컬럼이 다름(읽음 여부 누락).</td>
+        <td>3개 함 컬럼 통일 — 제목 / 기안자 / 유형 / 일시 / 상태 / 액션.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+      <tr>
+        <td class="name">작성하기</td>
+        <td><span class="pat-pill pat-C">P-C</span></td>
+        <td class="issue">결재선 지정 UI가 select 4개 나열. 드래그 정렬 불가.</td>
+        <td>승인자 칩 가로 배열 + <code>GripVertical</code>로 reorder, 추가 버튼 점선 박스.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">결재 상세</td>
+        <td><span class="pat-pill pat-E">P-E</span></td>
+        <td class="issue">결재선 타임라인이 단색 dot, 누가 결재했는지 시각화 약함.</td>
+        <td>좌측 vertical timeline — 완료 = accent fill check, 대기 = border dashed, 반려 = red x.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">양식 관리(관리자)</td>
+        <td><span class="pat-pill pat-F">P-F</span></td>
+        <td class="issue">필드 추가 UI가 prompt() 사용.</td>
+        <td>P-F 패턴, 필드 카드 + 드래그 정렬 + 미리보기 우측 분할.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+
+      <!-- ─── 인사관리 ─── -->
+      <tr class="group-head"><td colspan="5">👥 인사관리 (11 sub-menus, 4 그룹) — 그룹별로 패턴 일관성 점검</td></tr>
+      <tr>
+        <td class="name">구성원 [인력관리]</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">테이블 + 카드 뷰 토글이 있지만 카드 뷰가 자체 디자인(아바타 64).</td>
+        <td>아바타 40, 카드 = StatCard 변형, 모바일에선 무조건 카드 뷰 강제.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">인사변동 [인력관리]</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">변동 유형(승진/이동/퇴사)에 자체 컬러 7종.</td>
+        <td>blue/green/yellow/red 4 .badge로 매핑.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+      <tr>
+        <td class="name">입퇴사·교육센터 [인력관리]</td>
+        <td><span class="pat-pill pat-E">P-E</span></td>
+        <td class="issue">탭이 4개인데 segmented가 아니라 underline tab(다른 화면과 불일치).</td>
+        <td>P-04(공통 패턴 ④) segmented control로 교체.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">근태 [근태/급여]</td>
+        <td><span class="pat-pill pat-B">P-B</span></td>
+        <td class="issue">상단 KPI 카드가 6개(과밀), 출퇴근 시각 표시가 12hr/24hr 혼재.</td>
+        <td>KPI 4개로 압축, 시간은 <code>HH:mm</code> 24hr 고정 + <code>tabular-nums</code>.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">교대근무 [근태/급여]</td>
+        <td><span class="pat-pill pat-D">P-D</span></td>
+        <td class="issue">간트 차트가 캔버스 직접 드로잉, 색 9종.</td>
+        <td>HTML 그리드로 재구현, 시프트 = .badge 컬러 3종(주/야/휴).</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">연차/휴가 [근태/급여]</td>
+        <td><span class="pat-pill pat-D">P-D</span></td>
+        <td class="issue">잔여 연차 표시가 큰 도넛 차트 + 회사 로고 중앙.</td>
+        <td>StatCard “8.5일 / 사용 5.5일” + 작은 미니 progress bar(기준 패턴).</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+      <tr>
+        <td class="name">급여 [근태/급여]</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">금액 컬럼이 <code>'4,280,000원'</code> 문자열, 정렬 안 됨.</td>
+        <td>숫자만 + <code>font-variant-numeric: tabular-nums</code> + 우측 정렬, 단위는 헤더에 “(원)”.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">경조사 [복무/복지]</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">게시판/경조사와 데이터는 같은데 다른 컴포넌트.</td>
+        <td>공용 <code>&lt;CelebrationFeed scope="hr"&gt;</code> 사용, 필터만 다르게.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+      <tr>
+        <td class="name">자격·안전센터 [복무/복지]</td>
+        <td><span class="pat-pill pat-E">P-E</span></td>
+        <td class="issue">만료일 임박 카드가 빨간 배경 + 깜빡임 애니메이션.</td>
+        <td>border-l 3px red + .badge-red 텍스트만, 애니메이션 제거.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">계약 [문서/기타]</td>
+        <td><span class="pat-pill pat-E">P-E</span></td>
+        <td class="issue">PDF 미리보기 iframe 비율이 화면을 깨뜨림.</td>
+        <td>aspect-[3/4] container + 모바일에선 “PDF 열기” 버튼만.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+      <tr>
+        <td class="name">문서센터 [문서/기타]</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">파일 트리가 좌측 25% 고정 — 모바일에서 본문이 안 보임.</td>
+        <td>모바일에선 트리 → Drawer로 이동, 본문이 풀폭.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">캘린더 [문서/기타]</td>
+        <td><span class="pat-pill pat-D">P-D</span></td>
+        <td class="issue">추가기능의 “공유 캘린더”와 중복 코드(2벌 유지중).</td>
+        <td>하나로 통합 + 진입 경로만 두 곳에 노출.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+
+      <!-- ─── 재고관리 ─── -->
+      <tr class="group-head"><td colspan="5">📦 재고관리 (16 sub-menus, 4 그룹) — 화면 수 최다, 그룹별 패턴 일관성이 핵심</td></tr>
+      <tr>
+        <td class="name">현황 [조회]</td>
+        <td><span class="pat-pill pat-B">P-B</span></td>
+        <td class="issue">KPI 카드 위에 거대 로고 배너, 차트가 화면별 다른 라이브러리.</td>
+        <td>P-B 패턴, recharts 단일 라이브러리, 색은 accent + neutral만.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">이력 [조회]</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">검색 바가 헤더 위/아래/내부 3가지 위치로 화면마다 다름.</td>
+        <td>PageHeader 바로 아래 sticky 필터 바로 통일(이력/현황/구성원 동일).</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">수요예측 [조회]</td>
+        <td><span class="pat-pill pat-B">P-B</span></td>
+        <td class="issue">예측 신뢰도가 형광 그라데이션 바.</td>
+        <td>회색 트랙 + accent 채움, 라벨은 <code>%</code> tabular-nums.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+      <tr>
+        <td class="name">내 부서 재고 [조회]</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">현황 화면과 99% 동일한데 별도 컴포넌트.</td>
+        <td>현황 화면 + <code>filter=myDept</code> prop으로 통합.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+      <tr>
+        <td class="name">등록 [입출고]</td>
+        <td><span class="pat-pill pat-C">P-C</span></td>
+        <td class="issue">모달 폼이 800×900px 고정 — 모바일에서 짤림.</td>
+        <td>모바일 풀스크린 시트, 데스크탑 max-w-[640px] + scroll.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">스캔 [입출고]</td>
+        <td><span class="pat-pill pat-C">P-C</span></td>
+        <td class="issue">카메라 영역이 데스크탑/모바일 같은 비율, 모바일에서 작음.</td>
+        <td>모바일 100vh−chrome 카메라 풀뷰, 결과는 하단 sheet로 슬라이드 인.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">재고실사 [입출고]</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">차이값 컬럼 색이 +초록 / −주황(빨강 아님).</td>
+        <td>+green / −red <code>.badge</code> 또는 컬러 텍스트.</td>
+        <td><span class="sev-pill sev-3">P3</span></td>
+      </tr>
+      <tr>
+        <td class="name">이관 [입출고]</td>
+        <td><span class="pat-pill pat-C">P-C</span></td>
+        <td class="issue">“출발 부서 → 도착 부서” 표현이 텍스트로만.</td>
+        <td><code>ArrowRight</code> 14 accent + 부서 칩 양옆.</td>
+        <td><span class="sev-pill sev-3">P3</span></td>
+      </tr>
+      <tr>
+        <td class="name">발주 [발주문서]</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">발주 상태 컬러 6종 + 자체 아이콘 4개.</td>
+        <td>.badge 4종(작성/송부/접수/완료) + 결재함과 동일 컬러 매핑.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">납품확인서 [발주문서]</td>
+        <td><span class="pat-pill pat-E">P-E</span></td>
+        <td class="issue">출력용 view가 별도 라우트 + 자체 폰트 임포트.</td>
+        <td>모달 안 print preview, 공용 폰트 사용, <code>@media print</code>로 처리.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+      <tr>
+        <td class="name">UDI [발주문서]</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">바코드/QR 이미지가 inline base64로 컬럼에 박혀 row 높이 60px.</td>
+        <td>이미지는 hover popover, 컬럼은 코드 텍스트만.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+      <tr>
+        <td class="name">자산 [설정]</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">상태 “사용중/보관/폐기”에 자체 컬러.</td>
+        <td>green/gray/red .badge.</td>
+        <td><span class="sev-pill sev-3">P3</span></td>
+      </tr>
+      <tr>
+        <td class="name">비품대여 [설정]</td>
+        <td><span class="pat-pill pat-F">P-F</span></td>
+        <td class="issue">설정 항목이 한 페이지에 평탄 나열.</td>
+        <td>P-F 좌 카테고리 + 우 InfoItem 토글 그리드.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+      <tr>
+        <td class="name">거래처 [설정]</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">검색 결과 아바타가 거래처 로고 — 로고 없는 곳은 깨진 이미지.</td>
+        <td>이니셜 아바타 fallback + 28×28 표준.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+      <tr>
+        <td class="name">카테고리 [설정]</td>
+        <td><span class="pat-pill pat-F">P-F</span></td>
+        <td class="issue">트리 들여쓰기 indent 24px / 부모-자식 라인 점선 → 어지러움.</td>
+        <td>indent 16px + <code>border-l-1 subtle</code>만.</td>
+        <td><span class="sev-pill sev-3">P3</span></td>
+      </tr>
+      <tr>
+        <td class="name">월마감 [설정]</td>
+        <td><span class="pat-pill pat-C">P-C</span></td>
+        <td class="issue">위험 액션이 평범한 회색 버튼.</td>
+        <td>destructive 변형 — border red, hover bg-red-50, <code>Lock</code> 14 빨강 아이콘.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+
+      <!-- ─── 관리자 ─── -->
+      <tr class="group-head"><td colspan="5">⚙️ 관리자 (10 sub-menus, 5 그룹) — 권한·감사·시스템 영역 패턴 분리</td></tr>
+      <tr>
+        <td class="name">경영 분석</td>
+        <td><span class="pat-pill pat-B">P-B</span></td>
+        <td class="issue">대시보드 위젯 6개가 4×2 강제 그리드, 모바일에서 좁아짐.</td>
+        <td>자동 grid auto-fill min(280px,1fr), 위젯별 height 자유.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">회사 / 조직</td>
+        <td><span class="pat-pill pat-F">P-F</span></td>
+        <td class="issue">조직도 SVG 직접 드로잉, 노드 클릭 시 alert().</td>
+        <td>HTML 트리(reactflow 또는 ul/li) + 우측 InfoItem panel.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">직원 권한</td>
+        <td><span class="pat-pill pat-F">P-F</span></td>
+        <td class="issue">권한 매트릭스 체크박스가 50×50 시안색.</td>
+        <td>표준 24×24 체크박스 + 행 hover bg-muted, sticky 헤더.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">운영 설정</td>
+        <td><span class="pat-pill pat-F">P-F</span></td>
+        <td class="issue">설정 27개가 한 페이지에 평탄.</td>
+        <td>P-F 좌 카테고리(보안/알림/외부연동/UI) + 우 InfoItem.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">문서 양식</td>
+        <td><span class="pat-pill pat-C">P-C</span></td>
+        <td class="issue">전자결재 양식과 별도 에디터.</td>
+        <td>전자결재 작성하기와 동일 에디터 + scope=form 모드.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+      <tr>
+        <td class="name">엑셀 일괄 등록</td>
+        <td><span class="pat-pill pat-C">P-C</span></td>
+        <td class="issue">파일 업로드 영역이 input file 기본 스타일.</td>
+        <td>drop-zone 점선 + UploadCloud 32 accent + 모바일에선 “파일 선택” 버튼만.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">백업 / 복원</td>
+        <td><span class="pat-pill pat-C">P-C</span></td>
+        <td class="issue">“복원” 버튼이 일반 primary, 위험 표시 없음.</td>
+        <td>destructive 버튼 + confirm 입력 모달(“DELETE” 타이핑).</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">데이터 초기화</td>
+        <td><span class="pat-pill pat-C">P-C</span></td>
+        <td class="issue">동일.</td>
+        <td>위와 동일 destructive 패턴 공용 컴포넌트화.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">감사 센터</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">로그 행 글꼴이 본문 폰트(가독성 낮음), 시간 컬럼 정렬 X.</td>
+        <td>로그 행 monospace 12px + 시간 <code>tabular-nums</code>, 필터 칩 상단 sticky.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">시스템 마스터</td>
+        <td><span class="pat-pill pat-F">P-F</span></td>
+        <td class="issue">설정 카테고리 18개가 사이드바로 빠져 메인 사이드바와 겹침.</td>
+        <td>인페이지 좌측 nav(P-F), 모바일은 상단 가로 스크롤 칩.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+
+      <!-- ─── 추가기능 ─── -->
+      <tr class="group-head"><td colspan="5">＋ 추가기능 (6 entries) — 진입 그리드는 기준 ✅, 안의 화면들이 산만함</td></tr>
+      <tr>
+        <td class="name">공유 캘린더</td>
+        <td><span class="pat-pill pat-D">P-D</span></td>
+        <td class="issue">인사관리 캘린더와 코드 중복.</td>
+        <td>공용 <code>&lt;Calendar /&gt;</code>로 통합.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">ESL 관리</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">전자가격표 미리보기 SVG가 화면 절반.</td>
+        <td>thumbnail 80×40 + 클릭 시 모달 확대.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+      <tr>
+        <td class="name">OP 체크</td>
+        <td><span class="pat-pill pat-C">P-C</span></td>
+        <td class="issue">체크리스트 항목이 native checkbox, 점수 합계가 큰 빨간 숫자.</td>
+        <td>커스텀 체크박스(24×24 accent) + 합계 StatCard.</td>
+        <td><span class="sev-pill sev-1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="name">로스터</td>
+        <td><span class="pat-pill pat-A">P-A</span></td>
+        <td class="issue">인사관리 구성원과 데이터 99% 동일.</td>
+        <td>구성원 화면 + <code>view=roster</code>로 재사용.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+      <tr>
+        <td class="name">통계</td>
+        <td><span class="pat-pill pat-B">P-B</span></td>
+        <td class="issue">차트 라이브러리 chart.js, 다른 화면(recharts)과 혼재.</td>
+        <td>recharts 단일화.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+      <tr>
+        <td class="name">공문서</td>
+        <td><span class="pat-pill pat-E">P-E</span></td>
+        <td class="issue">PDF 뷰어가 신규 탭 열림 — 모바일 UX 끊김.</td>
+        <td>인페이지 PDF.js + 다운로드 보조 버튼.</td>
+        <td><span class="sev-pill sev-2">P2</span></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <!-- Summary stats -->
+  <div style="margin-top:18px; display:grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap:10px;">
+    <div class="card" style="padding:14px; text-align:center;">
+      <div style="font-size:11px; font-weight:700; color:var(--fg-muted); text-transform:uppercase; letter-spacing:.08em;">총 서브 화면</div>
+      <div style="font-size:26px; font-weight:800; letter-spacing:-0.02em; margin-top:4px;">53</div>
+      <div style="font-size:11px; color:var(--fg-muted); margin-top:2px;">메인 메뉴 8 + 서브 53</div>
+    </div>
+    <div class="card" style="padding:14px; text-align:center;">
+      <div style="font-size:11px; font-weight:700; color:#991b1b; text-transform:uppercase; letter-spacing:.08em;">P1 화면</div>
+      <div style="font-size:26px; font-weight:800; letter-spacing:-0.02em; margin-top:4px; color:#991b1b;">26</div>
+      <div style="font-size:11px; color:var(--fg-muted); margin-top:2px;">즉시 수정 — 1~2주</div>
+    </div>
+    <div class="card" style="padding:14px; text-align:center;">
+      <div style="font-size:11px; font-weight:700; color:#92400e; text-transform:uppercase; letter-spacing:.08em;">P2 화면</div>
+      <div style="font-size:26px; font-weight:800; letter-spacing:-0.02em; margin-top:4px; color:#92400e;">19</div>
+      <div style="font-size:11px; color:var(--fg-muted); margin-top:2px;">통일 — 3~4주</div>
+    </div>
+    <div class="card" style="padding:14px; text-align:center;">
+      <div style="font-size:11px; font-weight:700; color:#374151; text-transform:uppercase; letter-spacing:.08em;">P3 화면</div>
+      <div style="font-size:26px; font-weight:800; letter-spacing:-0.02em; margin-top:4px; color:#374151;">8</div>
+      <div style="font-size:11px; color:var(--fg-muted); margin-top:2px;">폴리시 — 시간 날 때</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ───────── NEW: 6대 서브 화면 패턴 상세 스펙 ───────── -->
+<section class="section" id="submenu-patterns">
+  <div class="section-head">
+    <div class="section-title">
+      <span class="section-num" style="background:#fce7f3; color:#be185d;">＋</span>
+      서브 화면 6대 패턴 — 픽셀 스펙
+    </div>
+    <div class="section-desc">위 매트릭스에서 참조하는 P-A ~ P-F 패턴의 실제 레이아웃과 픽셀 값. Claude Code가 이 스펙대로 컴포넌트 6개를 만들면 53개 화면이 자동으로 통일됩니다.</div>
+  </div>
+
+  <div style="display:grid; gap:14px;">
+    <!-- P-A -->
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+        <span class="pat-pill pat-A" style="font-size:11px; padding:3px 8px;">P-A</span>
+        <strong style="font-size:14px;">목록 + 필터 + 테이블</strong>
+        <span style="font-size:11px; color:var(--fg-muted); margin-left:auto;">적용: 26개 화면 (전체 49%)</span>
+      </div>
+      <div style="font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; font-size:11.5px; line-height:1.7; color: var(--fg); background: var(--bg-subtle); border-radius: 8px; padding: 14px; white-space: pre; overflow-x:auto;">┌─────────────────────────────────────────────────────────┐
+│  PageHeader                                              │  64px
+│  ┌─ title 20/800 ─┐         [Action] [Action]            │
+│  └─ subtitle 12 muted ┘                                  │
+├─────────────────────────────────────────────────────────┤
+│  StatCard | StatCard | StatCard | StatCard               │  96px, gap 10
+├─────────────────────────────────────────────────────────┤
+│  🔍 [search 검색................]  [필터▾] [정렬▾] [⊞ 뷰]  │  44px sticky
+├─────────────────────────────────────────────────────────┤
+│  ┌─ DataTable ────────────────────────────────────────┐  │
+│  │  th 11/600 caps · row 12.5/400 · py-9px           │  │  rows 38px
+│  │  hover bg-muted · border-b subtle                  │  │
+│  └────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────┘
+모바일 (≤768px):
+  · StatCard 가로 스크롤 (snap)
+  · DataTable → 카드 리스트 자동 변환
+  · 필터 바 → "필터" 단일 버튼 → bottom sheet</div>
+    </div>
+
+    <!-- P-B -->
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+        <span class="pat-pill pat-B" style="font-size:11px; padding:3px 8px;">P-B</span>
+        <strong style="font-size:14px;">대시보드 (지표 + 차트)</strong>
+        <span style="font-size:11px; color:var(--fg-muted); margin-left:auto;">적용: 6개 화면</span>
+      </div>
+      <div style="font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; font-size:11.5px; line-height:1.7; color: var(--fg); background: var(--bg-subtle); border-radius: 8px; padding: 14px; white-space: pre; overflow-x:auto;">┌──────────────────────────────────────────────────────┐
+│  PageHeader                                            │
+├──────────────────────────────────────────────────────┤
+│  Stat | Stat | Stat | Stat        (auto-fit 200px)    │
+├──────────────────────────────────────────────────────┤
+│  ┌─ 차트 (Recharts) ─────┐  ┌─ 사이드 패널 ─────┐    │
+│  │  60% width             │  │  40%              │    │
+│  │  line/bar/area only    │  │  최근 활동/알림    │    │
+│  │  색 = accent + neutral │  │                    │    │
+│  └────────────────────────┘  └────────────────────┘    │
+└──────────────────────────────────────────────────────┘
+규칙: recharts 단일, 차트 색은 accent + var(--fg-muted) 두 가지만.
+     ※ 형광 무지개 절대 금지.</div>
+    </div>
+
+    <!-- P-C -->
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+        <span class="pat-pill pat-C" style="font-size:11px; padding:3px 8px;">P-C</span>
+        <strong style="font-size:14px;">작성/등록 폼</strong>
+        <span style="font-size:11px; color:var(--fg-muted); margin-left:auto;">적용: 9개 화면</span>
+      </div>
+      <div style="font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; font-size:11.5px; line-height:1.7; color: var(--fg); background: var(--bg-subtle); border-radius: 8px; padding: 14px; white-space: pre; overflow-x:auto;">┌──────────────────────────────────────────────────────┐
+│  PageHeader            [임시저장] [취소] [저장(accent)] │
+├──────────────────────────────────────────────────────┤
+│  ┌─ Section 캡션 11/700 caps ────────────────────────┐│
+│  │  label 11/600        │  input h-36 border             ││
+│  │  label 11/600        │  textarea min-h-120            ││
+│  │  label 11/600        │  [select▾] [select▾]           ││
+│  └──────────────────────────────────────────────────┘│
+│  ┌─ Section ────────────────────────────────────────┐│
+│  │ ... 2-col 그리드, 모바일 1-col ...                 ││
+│  └──────────────────────────────────────────────────┘│
+├──────────────────────────────────────────────────────┤
+│  [취소]                                  [저장(accent)] │  sticky bottom
+└──────────────────────────────────────────────────────┘
+파괴적 폼(데이터 초기화/백업복원): 저장 버튼 → destructive 변형
+  · border #ef4444, hover bg-red-50, text-red-700
+  · confirm 모달에 "DELETE" 타이핑 입력 요구</div>
+    </div>
+
+    <!-- P-D -->
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+        <span class="pat-pill pat-D" style="font-size:11px; padding:3px 8px;">P-D</span>
+        <strong style="font-size:14px;">캘린더/스케줄</strong>
+        <span style="font-size:11px; color:var(--fg-muted); margin-left:auto;">적용: 6개 화면</span>
+      </div>
+      <div style="font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; font-size:11.5px; line-height:1.7; color: var(--fg); background: var(--bg-subtle); border-radius: 8px; padding: 14px; white-space: pre; overflow-x:auto;">┌──────────────────────────────────────────────────────┐
+│  PageHeader  [◀] 2025년 4월 [▶]   [월│주│일] [+ 일정]  │
+├──────────────────────────────────────────────────────┤
+│  월  화  수  목  금  토  일                            │
+│  ┌──┬──┬──┬──┬──┬──┬──┐                              │
+│  │ 1│ 2│ 3│ 4│ 5│ 6│ 7│   day cell min-h 96 / 모바일 48│
+│  │■■│  │● │  │■■│  │  │   이벤트 칩 = .badge 색만     │
+│  └──┴──┴──┴──┴──┴──┴──┘                              │
+└──────────────────────────────────────────────────────┘
+모바일: 월 뷰 → "일정 목록" 뷰로 토글, 또는 day-cell tap → 하단 sheet 일정.
+컬러: 카테고리당 .badge 컬러 하나 (수술=red, MRI=blue, 회의=yellow, 휴가=gray).</div>
+    </div>
+
+    <!-- P-E -->
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+        <span class="pat-pill pat-E" style="font-size:11px; padding:3px 8px;">P-E</span>
+        <strong style="font-size:14px;">상세/뷰어 (read-only)</strong>
+        <span style="font-size:11px; color:var(--fg-muted); margin-left:auto;">적용: 6개 화면</span>
+      </div>
+      <div style="font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; font-size:11.5px; line-height:1.7; color: var(--fg); background: var(--bg-subtle); border-radius: 8px; padding: 14px; white-space: pre; overflow-x:auto;">┌──────────────────────────────────────────────────────┐
+│  ← 뒤로    문서/게시글 제목 18/700      [공유] [⋯]     │
+├──────────────────────────────────────────────────────┤
+│  메타 행: 작성자 · 부서 · 일시 · .badge 상태            │
+├────────────────────┬─────────────────────────────────┤
+│  본문 (prose-zinc)  │  사이드: 결재선 timeline /         │
+│  서체 13.5/400      │  메타데이터 InfoItem               │
+│  line-height 1.75   │  관련 문서 링크                    │
+│                     │                                  │
+│  prose img max-w    │                                  │
+│  rounded            │                                  │
+└────────────────────┴─────────────────────────────────┘
+모바일: 사이드 → 본문 위 collapsible 패널로 이동.
+       하단 sticky 액션 바 ("결재/반려/회수" 또는 "댓글 작성").</div>
+    </div>
+
+    <!-- P-F -->
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+        <span class="pat-pill pat-F" style="font-size:11px; padding:3px 8px;">P-F</span>
+        <strong style="font-size:14px;">설정/마스터 (key-value)</strong>
+        <span style="font-size:11px; color:var(--fg-muted); margin-left:auto;">적용: 6개 화면</span>
+      </div>
+      <div style="font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; font-size:11.5px; line-height:1.7; color: var(--fg); background: var(--bg-subtle); border-radius: 8px; padding: 14px; white-space: pre; overflow-x:auto;">┌──────────────────────────────────────────────────────┐
+│  PageHeader                                            │
+├────────────┬─────────────────────────────────────────┤
+│  카테고리   │  Section 캡션 11/700 caps                │
+│  · 일반    │  ┌─────────────────────────────────────┐ │
+│  · 보안 ◉  │  │  설정 라벨 13/600  ····  [토글]    │ │
+│  · 알림    │  │  설명 11 muted                       │ │
+│  · 외부연동 │  ├─────────────────────────────────────┤ │
+│  · UI/언어 │  │  설정 라벨            [input/select]  │ │
+│  · 백업    │  │  설명                                  │ │
+│  240px     │  └─────────────────────────────────────┘ │
+└────────────┴─────────────────────────────────────────┘
+모바일: 좌측 카테고리 → 상단 가로 스크롤 칩 (snap), 본문 풀폭.
+       토글/입력 행 최소 높이 56px.</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px; background: var(--bg-subtle); border-style: dashed;">
+    <div style="font-size:12.5px; line-height:1.65; color: var(--fg);">
+      <strong style="color:#be185d;">실행 메모 —</strong>
+      Claude Code에게 이 6개 패턴을
+      <code>app/components/patterns/PListA.tsx · PDashboardB.tsx · PFormC.tsx · PCalendarD.tsx · PDetailE.tsx · PSettingsF.tsx</code>
+      파일로 만들게 한 뒤, 53개 서브 화면을 <strong>해당 패턴으로 감싸기만</strong> 하면 됩니다.
+      비즈니스 로직(데이터 fetch, 검증)은 유지하고 wrapper만 교체 — 평균 1화면당 30분, 총 약 27시간 작업.
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- 메뉴별 작업 -->
+<section class="section" id="m-chat">
+  <div class="section-head">
+    <div class="section-title"><span class="section-num">05</span>메뉴별 통일 작업 — 채팅</div>
+    <div class="section-desc">현재 가장 일탈이 심한 영역. 활성 채팅방의 <code>bg-zinc-800</code>이 라이트모드에서 검정으로 튀는 게 최우선 수정.</div>
+  </div>
+
+  <div class="menu-task">
+    <div class="menu-task-head">
+      <span class="menu-task-id">CHAT-01</span>
+      <span class="menu-task-title">활성 채팅방 스타일을 기준 시스템으로 정규화</span>
+      <span class="priority-pill p-p1">P1 긴급</span>
+    </div>
+    <div class="menu-task-sub">현재 zinc-800 검정 배경 + 흰 글자가 라이트모드에서 튀고, 사이드바 active(accent)와도 불일치.</div>
+    <div class="compare">
+      <div class="compare-box cb-bad">
+        <div class="cb-label">현재</div>
+        <code>bg-zinc-800 border-zinc-700 text-white</code><br/>
+        → 라이트모드 검정 박스, 다크에선 흐릿
+      </div>
+      <div class="compare-box cb-good">
+        <div class="cb-label">개선</div>
+        <code>bg-[var(--accent)]/10 border-[var(--accent)]/25 text-[var(--accent)]</code><br/>
+        → 좌측 3px <code>border-l accent</code> 추가, ChevronRight 14 fg-muted
+      </div>
+    </div>
+    <div class="subtask-list">
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">메신저사이드바 활성방 클래스 일괄 교체 <span class="file-tag">메신저사이드바.tsx:119–126</span></div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">공지방 📢, 기본방 💬, ▼ 화살표를 <strong>Megaphone / MessageSquare / ChevronDown</strong> Lucide로 교체</div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">PIN/HIDE 텍스트 → <strong>Pin / EyeOff</strong> 아이콘 버튼 (icon-btn 클래스)</div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">탭 전환 <code>glass</code> 제거 → 내정보 segmented 탭 패턴으로 교체</div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body"><code>dark:</code> 42개 직접 클래스 제거 → CSS 변수만 사용</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="m-board">
+  <div class="section-head">
+    <div class="section-title"><span class="section-num">06</span>메뉴별 통일 작업 — 게시판</div>
+    <div class="section-desc">서브메뉴 label에 이모지가 중복 포함되어 있고, 각 게시판마다 PageHeader가 별도 JSX. 새 글쓰기 버튼이 화면마다 다른 위치/스타일.</div>
+  </div>
+
+  <div class="menu-task">
+    <div class="menu-task-head">
+      <span class="menu-task-id">BRD-01</span>
+      <span class="menu-task-title">게시판 메뉴 정의에서 이모지 제거 + Lucide 매핑</span>
+      <span class="priority-pill p-p1">P1 긴급</span>
+    </div>
+    <div class="menu-task-sub">현재 <code>label: '📢 공지사항', icon: '📢'</code>처럼 label에 이모지가 prefix로 박혀 있어 사이드바에서 이모지가 두 번 뜸.</div>
+    <div class="subtask-list">
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">label에서 이모지 prefix 제거 (공지사항, 자유게시판, 경조사, 수술일정, MRI일정, 업무공유) <span class="file-tag">게시판메뉴.ts:4–11</span></div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">icon 필드를 Lucide 컴포넌트명 문자열로: <strong>Megaphone / MessageSquare / Heart / Calendar / Activity / FileText</strong></div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">렌더링부에서 동적 import로 처리 (<code>const Icon = LucideIcons[iconName]</code>)</div></div>
+    </div>
+  </div>
+
+  <div class="menu-task">
+    <div class="menu-task-head">
+      <span class="menu-task-id">BRD-02</span>
+      <span class="menu-task-title">게시판 PageHeader 통일 + 새 글쓰기 위치 표준화</span>
+      <span class="priority-pill p-p2">P2 중간</span>
+    </div>
+    <div class="menu-task-sub">6개 게시판이 각각 자체 헤더를 그림. 새 글쓰기 버튼 위치도 우상단/플로팅/하단 등 제각각.</div>
+    <div class="subtask-list">
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">공통 <code>app/components/PageHeader.tsx</code> 사용 — title=게시판명, subtitle=설명, actions=[검색버튼, 새글쓰기]</div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">새 글쓰기는 <strong>모든 게시판 우상단</strong>(<code>btn-premium-primary</code>)으로 고정. 모바일에선 우하단 FAB 56×56 대신 헤더 액션 그대로 유지 + sticky</div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">리스트 카드 padding 20px, gap 8px, 마지막 행 border 제거</div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">검색바: 헤더 actions 영역의 아이콘 버튼 → 클릭시 인라인 펼침 (44px 높이)</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="m-approval">
+  <div class="section-head">
+    <div class="section-title"><span class="section-num">07</span>메뉴별 통일 작업 — 전자결재</div>
+    <div class="section-desc">기안함/결재함/참조함은 거의 동일한 테이블 구조인데 각각 따로 구현. 상태 배지가 emerald/rose 하드코딩.</div>
+  </div>
+
+  <div class="menu-task">
+    <div class="menu-task-head">
+      <span class="menu-task-id">APV-01</span>
+      <span class="menu-task-title">결재함 공통 DocumentTable 컴포넌트화</span>
+      <span class="priority-pill p-p2">P2 중간</span>
+    </div>
+    <div class="subtask-list">
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body"><code>app/components/DocumentTable.tsx</code> 신설 — props: rows, columns, emptyState. 3개 함을 모두 이걸로 렌더링</div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">행 높이 44px, 좌우 padding 16px, 호버 <code>bg-bg</code>, 클릭 영역 전체</div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">상태 컬럼은 <code>.badge.badge-green/yellow/red/gray</code> 사용 — emerald-50/rose-50 클래스 전부 교체</div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">모바일에서는 테이블 → 카드 리스트 자동 전환 (<code>@media (max-width: 720px)</code>)</div></div>
+    </div>
+  </div>
+
+  <div class="menu-task">
+    <div class="menu-task-head">
+      <span class="menu-task-id">APV-02</span>
+      <span class="menu-task-title">"작성하기" 화면을 추가기능 그리드 패턴으로 재구성</span>
+      <span class="priority-pill p-p2">P2 중간</span>
+    </div>
+    <div class="menu-task-sub">결재 양식 선택 화면이 긴 리스트로 되어 있어 한 화면에 안 들어옴. 추가기능 4×N 그리드로 카드화하면 6–8 종류가 한 화면에 들어감.</div>
+    <div class="subtask-list">
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">기준 ③(QuickAdd) 4열 카드 적용. 카테고리(휴가/지출/일반)별 섹션 캡션 (10/700 uppercase)</div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">자주 쓰는 양식 3개는 상단 별도 "최근/즐겨찾기" 행</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="m-hr">
+  <div class="section-head">
+    <div class="section-title"><span class="section-num">08</span>메뉴별 통일 작업 — 인사관리</div>
+    <div class="section-desc">가장 화면이 많은 메뉴(12개). 프로필카드의 InfoItem 15px 폰트, border-l-4 패턴, emerald 직접사용이 모두 여기서 발견됨.</div>
+  </div>
+
+  <div class="menu-task">
+    <div class="menu-task-head">
+      <span class="menu-task-id">HR-01</span>
+      <span class="menu-task-title">구성원 상세 = 내정보 화면과 동일 레이아웃으로 통일</span>
+      <span class="priority-pill p-p1">P1 긴급</span>
+    </div>
+    <div class="menu-task-sub">"다른 사람의 내정보"라는 멘탈 모델이 맞으므로, 동일한 ProfileHeader + 탭바 + InfoItem 구조 사용. 관리자는 "편집 모드" 토글만 추가.</div>
+    <div class="subtask-list">
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">ProfileHeaderSummary 28px 이름 → <strong>20px</strong>, 고정 128px → <strong>min-h-100 h-auto</strong> <span class="file-tag">마이페이지공통섹션.tsx:52</span></div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">InfoItem value 15/700 → <strong>13/600</strong>, 강조 필요한 값만 13/700 <span class="file-tag">프로필카드.tsx:489</span></div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">border-l-4 섹션 헤더 → 캡션 스타일 (10/700 uppercase tracking-wider)</div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">아바타 fallback 👤 이모지 → 이름 첫 글자 이니셜 + <code>accent×15%</code> 배경</div></div>
+    </div>
+  </div>
+
+  <div class="menu-task">
+    <div class="menu-task-head">
+      <span class="menu-task-id">HR-02</span>
+      <span class="menu-task-title">근태/연차 - emerald 직접 사용 제거</span>
+      <span class="priority-pill p-p2">P2 중간</span>
+    </div>
+    <div class="subtask-list">
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body"><code>text-emerald-600 / bg-emerald-50</code> → <code>var(--success) / var(--success-light)</code> 일괄 교체 <span class="file-tag">프로필카드.tsx:516</span></div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">잔여연차 큰 숫자(36/800) + 단위(11/500 muted) 패턴으로 시각 위계 명확화</div></div>
+    </div>
+  </div>
+
+  <div class="menu-task">
+    <div class="menu-task-head">
+      <span class="menu-task-id">HR-03</span>
+      <span class="menu-task-title">로그아웃 / 강제 로그아웃 버튼 danger 토큰화</span>
+      <span class="priority-pill p-p1">P1 긴급</span>
+    </div>
+    <div class="subtask-list">
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">로그아웃 <code>bg-[var(--accent)]</code> → <code>bg-[var(--danger)]</code> + hover --danger-hover</div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">강제 로그아웃의 <code>window.confirm</code> → ActionDialog의 <code>openConfirm({tone:'danger'})</code> 사용</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="m-inv">
+  <div class="section-head">
+    <div class="section-title"><span class="section-num">09</span>메뉴별 통일 작업 — 재고관리</div>
+    <div class="section-desc">서브메뉴 4 그룹 분리는 잘 되어 있음. 본문 KPI 카드와 테이블 밀도, 모바일 스캔 UI 통일이 과제.</div>
+  </div>
+
+  <div class="menu-task">
+    <div class="menu-task-head">
+      <span class="menu-task-id">INV-01</span>
+      <span class="menu-task-title">KPI 카드 패턴 — 경영대시보드 양식과 통일</span>
+      <span class="priority-pill p-p3">P3 권고</span>
+    </div>
+    <div class="menu-task-sub">현황 화면의 상단 4개 숫자 카드. 현재 폰트 굵기·아이콘 배치·색상이 경영대시보드와 다름.</div>
+    <div class="subtask-list">
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">카드: padding 16/20, radius 14, value 28/800 tabular-nums, label 12/500 muted, 우상단 32×32 Lucide 아이콘 컨테이너(<code>accent×10%</code>)</div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">"안전재고 미달" 같은 위험 지표만 value 색상 <code>var(--danger)</code> 적용</div></div>
+    </div>
+  </div>
+
+  <div class="menu-task">
+    <div class="menu-task-head">
+      <span class="menu-task-id">INV-02</span>
+      <span class="menu-task-title">모바일 스캔 UI — 풀스크린 카메라 모드</span>
+      <span class="priority-pill p-p2">P2 중간</span>
+    </div>
+    <div class="subtask-list">
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">데스크탑은 현행 입력 박스 유지, 모바일에서는 카메라 미리보기 전체화면 + 하단 결과 카드 시트(60vh)</div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">탭바 위에 떠 있는 56×56 카메라 FAB로 진입 (단, FAB는 스캔 화면 한정)</div></div>
+    </div>
+  </div>
+
+  <div class="menu-task">
+    <div class="menu-task-head">
+      <span class="menu-task-id">INV-03</span>
+      <span class="menu-task-title">테이블 → 모바일 카드 리스트 자동 전환</span>
+      <span class="priority-pill p-p2">P2 중간</span>
+    </div>
+    <div class="subtask-list">
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">현황·이력·발주 테이블이 모바일에서 가로 스크롤되어 가독성 없음 → 768px 이하에서 <code>DataCard</code> 컴포넌트로 자동 전환</div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">DataCard: 좌상단 제목 + 우상단 상태배지, 본문 좌 2열 라벨/값, 우 1열 액션 아이콘</div></div>
+    </div>
+  </div>
+
+  <div class="menu-task">
+    <div class="menu-task-head">
+      <span class="menu-task-id">INV-04</span>
+      <span class="menu-task-title">서브메뉴 192px 폭 + 그룹 캡션 통일</span>
+      <span class="priority-pill p-p3">P3 권고</span>
+    </div>
+    <div class="subtask-list">
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body"><code>--submenu-width: 160 → 192</code>, 그룹 캡션 10/700 uppercase + 그룹 아이콘(eye, package 등) 10px 좌측</div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">"비품대여 설정", "납품확인서" 같은 긴 레이블 잘림 해소 확인</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="m-admin">
+  <div class="section-head">
+    <div class="section-title"><span class="section-num">10</span>메뉴별 통일 작업 — 관리자</div>
+    <div class="section-desc">경영대시보드의 slate-800 배너, font-black 남용, InnerTabBar 이모지가 대표 이슈.</div>
+  </div>
+
+  <div class="menu-task">
+    <div class="menu-task-head">
+      <span class="menu-task-id">ADM-01</span>
+      <span class="menu-task-title">경영대시보드 색상·타이포 토큰화</span>
+      <span class="priority-pill p-p1">P1 긴급</span>
+    </div>
+    <div class="subtask-list">
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">하단 배너 <code>bg-slate-800</code> → <code>bg-[var(--foreground)]</code> (다크모드 대응)</div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">이직률 <code>text-orange-500</code> → <code>text-[var(--warning)]</code></div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">배경 장식 이모지(💰📊 opacity-10) 제거 → 32×32 아이콘 컨테이너로 대체</div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body"><code>font-black</code>(900) 전수 검색 → 14px 이상만 font-bold(700) 유지, 그 외 font-semibold(600)</div></div>
+    </div>
+  </div>
+
+  <div class="menu-task">
+    <div class="menu-task-head">
+      <span class="menu-task-id">ADM-02</span>
+      <span class="menu-task-title">InnerTabBar 이모지 → Lucide 아이콘</span>
+      <span class="priority-pill p-p2">P2 중간</span>
+    </div>
+    <div class="subtask-list">
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">ADMIN_ANALYSIS_TABS / AUDIT_TABS / OPERATIONS_TABS의 icon 필드를 Lucide 컴포넌트명 문자열로 교체 <span class="file-tag">admin-menu-config.ts:42–62</span></div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">InnerTabBar 렌더링부에서 동적 import로 아이콘 매핑 (게시판과 동일 패턴)</div></div>
+    </div>
+  </div>
+
+  <div class="menu-task">
+    <div class="menu-task-head">
+      <span class="menu-task-id">ADM-03</span>
+      <span class="menu-task-title">직원권한 — 모바일 직원 목록 UX 재설계</span>
+      <span class="priority-pill p-p2">P2 중간</span>
+    </div>
+    <div class="subtask-list">
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">데스크탑은 좌 패널 sticky 유지. 모바일에서는 상단 검색 + 드롭다운 선택자(<code>&lt;select&gt;</code> 또는 sheet) 패턴으로 변경 <span class="file-tag">직원권한통합.tsx:237</span></div></div>
+      <div class="subtask"><div class="subtask-check"></div><div class="subtask-body">선택된 직원의 권한 카드는 풀폭으로 자연스럽게 펼쳐지도록 grid → flex-col 전환</div></div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ───────── NEW: 추가 패턴 P-G/P-H/P-I + 공통 컴포넌트 + 상태 ───────── -->
+<section class="section" id="overlay-patterns">
+  <div class="section-head">
+    <div class="section-title">
+      <span class="section-num" style="background:#fce7f3; color:#be185d;">＋</span>
+      추가 패턴 — 모달 · Toast · Empty/Error/Loading
+    </div>
+    <div class="section-desc">53개 라우트 화면 외에 화면마다 뜨는 오버레이/상태 UI가 메뉴별로 제각각. P-G ~ P-I 3개 패턴을 추가 공용 컴포넌트로 못 박습니다.</div>
+  </div>
+
+  <div style="display:grid; gap:14px;">
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+        <span style="background:#fde68a; color:#78350f; font-weight:800; font-size:10px; border-radius:5px; padding:2px 6px;">P-G</span>
+        <strong style="font-size:14px;">모달 / Drawer / Bottom Sheet</strong>
+        <span style="font-size:11px; color:var(--fg-muted); margin-left:auto;">현재 alert·confirm·prompt 8건, 자체 모달 14종</span>
+      </div>
+      <div style="font-family: ui-monospace, monospace; font-size:11.5px; line-height:1.7; background: var(--bg-subtle); border-radius:8px; padding:14px; white-space:pre; overflow-x:auto;">데스크탑      Drawer (우측 슬라이드) 480 / 640 / 800px
+              · header h-56 (제목 16/700 + 닫기 X)
+              · body padding 20, overflow-y auto
+              · footer sticky h-64 [취소][저장(accent)]
+모바일        풀스크린 시트 — 위 16px 라운드, 슬라이드 업
+              · 헤더 좌측 ← 뒤로 / 우측 저장
+              · 본문 풀스크롤, 하단 safe-area-inset
+컨펌(파괴적)   "DELETE" 타이핑 확인 모달, accent → destructive 변형
+교체 대상     window.alert/confirm/prompt 전부 → useDialog() 훅
+              + 결재 모달, 입출고 모달 등 14종 자체 모달</div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+        <span style="background:#bae6fd; color:#075985; font-weight:800; font-size:10px; border-radius:5px; padding:2px 6px;">P-H</span>
+        <strong style="font-size:14px;">Toast · Notification · Snackbar</strong>
+        <span style="font-size:11px; color:var(--fg-muted); margin-left:auto;">현재 toast 라이브러리 2종 혼재</span>
+      </div>
+      <div style="font-family: ui-monospace, monospace; font-size:11.5px; line-height:1.7; background: var(--bg-subtle); border-radius:8px; padding:14px; white-space:pre; overflow-x:auto;">위치          데스크탑 우하단 / 모바일 상단 (safe-area 위)
+구조          [icon 16] [title 12/700] [desc 11 muted]   [X]
+              max-w 360 / 모바일 calc(100vw - 32)
+유형          success(green) / error(red) / warning(yellow) / info(accent)
+              .toast.toast-{type} — 좌측 3px border 컬러만 변경
+자동 닫힘     success 3s · info 4s · error 6s · 수동 닫기 항상
+스택          최대 3개, 초과 시 오래된 것 페이드아웃
+교체 대상     react-toastify + react-hot-toast 혼재 → sonner 단일화
+              + GlobalNotificationBell의 알림과 시각 일관</div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+        <span style="background:#e9d5ff; color:#581c87; font-weight:800; font-size:10px; border-radius:5px; padding:2px 6px;">P-I</span>
+        <strong style="font-size:14px;">Empty · Error · Loading 상태</strong>
+        <span style="font-size:11px; color:var(--fg-muted); margin-left:auto;">53화면 × 3상태 = 159개 — 현재 거의 미구현</span>
+      </div>
+      <div style="font-family: ui-monospace, monospace; font-size:11.5px; line-height:1.7; background: var(--bg-subtle); border-radius:8px; padding:14px; white-space:pre; overflow-x:auto;">Empty         아이콘 40 fg-subtle · 제목 14/700 · 설명 12 muted
+              · primary CTA (옵션) — "+ 새 항목 등록" 등
+              · 화면 중앙 정렬, padding-y 64
+Error         아이콘 AlertCircle 40 #ef4444 · 제목 14/700
+              · 설명 12 muted (가능하면 사유 일반화)
+              · [다시 시도] secondary 버튼
+Loading       skeleton — bg var(--bg-subtle), shimmer 1.4s
+              · 테이블 row 5개, 카드 그리드 6개, 차트 = 회색 박스
+              · ❌ Spinner 단독 사용 금지 (구조 미리 보이게)
+공용 컴포넌트  &lt;EmptyState icon title desc cta /&gt;
+              &lt;ErrorState onRetry /&gt;
+              &lt;Skeleton variant="table|card|chart" /&gt;
+적용         53개 화면의 fetch hook에 if (loading/error/empty) 분기 강제</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- 공통 컴포넌트 -->
+<section class="section" id="common-components">
+  <div class="section-head">
+    <div class="section-title">
+      <span class="section-num" style="background:#fce7f3; color:#be185d;">＋</span>
+      공통 컴포넌트 — 53화면 모두에 노출
+    </div>
+    <div class="section-desc">GlobalSearch · NotificationBell · AppLogo · ActionDialog — 헤더/사이드바에 박혀 있어 모든 화면에서 보이는 공용 요소. 기준 디자인과 어긋난 부분만 정리.</div>
+  </div>
+
+  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap:12px;">
+    <div class="card">
+      <strong style="font-size:13px;">GlobalSearch</strong>
+      <div style="font-size:11.5px; color:var(--fg-muted); margin-top:6px; line-height:1.6;">
+        · ⌘K 단축키 모달, 현재는 결과 그룹 헤더가 컬러바.<br/>
+        · 결과 행 36px h, icon 14 + label 12.5 + ↵ enter hint.<br/>
+        · 그룹 헤더 = 캡션 10/700 caps fg-subtle, 컬러바 제거.<br/>
+        · 모바일: 풀스크린, 키보드 위 결과 영역.
+      </div>
+    </div>
+    <div class="card">
+      <strong style="font-size:13px;">GlobalNotificationBell</strong>
+      <div style="font-size:11.5px; color:var(--fg-muted); margin-top:6px; line-height:1.6;">
+        · 종 아이콘 + dot 4px red.<br/>
+        · 클릭 시 우측 Drawer 400px (P-G 패턴 재사용).<br/>
+        · 알림 행 = .toast 행과 시각 동일하게 통일.<br/>
+        · 읽음/안읽음 = font-weight 600 vs 400만 차이.
+      </div>
+    </div>
+    <div class="card">
+      <strong style="font-size:13px;">AppLogo</strong>
+      <div style="font-size:11.5px; color:var(--fg-muted); margin-top:6px; line-height:1.6;">
+        · 사이드바 32×32 라운드 9, accent 배경 + 화이트 글자.<br/>
+        · 로그인/로딩 화면에서만 풀 로고 사용.<br/>
+        · 인쇄 시 무채색 변형 강제.
+      </div>
+    </div>
+    <div class="card">
+      <strong style="font-size:13px;">ActionDialog</strong>
+      <div style="font-size:11.5px; color:var(--fg-muted); margin-top:6px; line-height:1.6;">
+        · 현재 14종 자체 모달 → 본 컴포넌트로 전부 흡수.<br/>
+        · 변형: <code>info / confirm / destructive</code>.<br/>
+        · 본문 max-w 480, 모바일 풀스크린 시트.<br/>
+        · 버튼 배치: 좌취소 우확정, 키보드 Enter=확정 Esc=취소.
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- 보강 필요 항목 -->
+<section class="section" id="todo-coverage">
+  <div class="section-head">
+    <div class="section-title">
+      <span class="section-num" style="background:#fef3c7; color:#92400e;">!</span>
+      보강이 필요한 항목 — 사용자 입력 대기
+    </div>
+    <div class="section-desc">서버 인증 보호로 인해 직접 확인 불가한 항목. 아래 자료가 들어오면 매트릭스의 "현재 문제" 칸을 추정치 → 실측치로 교체합니다.</div>
+  </div>
+
+  <div style="display:grid; gap:10px;">
+    <div class="card" style="display:flex; gap:14px; align-items:flex-start;">
+      <div style="background:#fee2e2; color:#991b1b; font-weight:800; font-size:11px; border-radius:6px; padding:4px 8px; white-space:nowrap;">필요 #1</div>
+      <div style="font-size:12.5px; line-height:1.6;">
+        <strong>GitHub 리포 또는 코드 import</strong><br/>
+        <span style="color:var(--fg-muted);">→ <code>app/main/기능부품/*</code> 실 파일의 정확한 라인·클래스명·import 구조 인용 가능.<br/>
+        현재 매트릭스의 파일 경로는 <code>MSO_Detailed_Design_Spec.md</code> 기반 추정치.</span>
+      </div>
+    </div>
+    <div class="card" style="display:flex; gap:14px; align-items:flex-start;">
+      <div style="background:#fef3c7; color:#92400e; font-weight:800; font-size:11px; border-radius:6px; padding:4px 8px; white-space:nowrap;">필요 #2</div>
+      <div style="font-size:12.5px; line-height:1.6;">
+        <strong>로그인 후 각 메뉴 스크린샷</strong> (라이트/다크 모드 모두)<br/>
+        <span style="color:var(--fg-muted);">→ 채팅·게시판·전자결재·인사관리·재고관리·관리자 메인 + 핵심 서브 각 1장씩, 총 ~30장.<br/>
+        다크모드 회귀 검증 + "현재 문제" 칸 실측 가능.</span>
+      </div>
+    </div>
+    <div class="card" style="display:flex; gap:14px; align-items:flex-start;">
+      <div style="background:#dcfce7; color:#166534; font-weight:800; font-size:11px; border-radius:6px; padding:4px 8px; white-space:nowrap;">완료 ✓</div>
+      <div style="font-size:12.5px; line-height:1.6;">
+        <strong>모달/Toast/Empty 패턴 (P-G·P-H·P-I)</strong> + 공통 컴포넌트 4종 + 상태 159개 가이드<br/>
+        <span style="color:var(--fg-muted);">→ 위 섹션에서 처리 완료.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px; background: var(--bg-subtle); border-style: dashed;">
+    <div style="font-size:12px; line-height:1.65;">
+      <strong style="color:#be185d;">남은 항목(차후 패스):</strong>
+      권한별 화면 차이 · i18n 다국어 · 인쇄(@media print) · 접근성(a11y, 명도대비, 포커스링) — 모두 위 #1·#2 자료가 들어와야 정확한 작업이 가능합니다.
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- 모바일 통일안 -->
+<section class="section" id="mobile">
+  <div class="section-head">
+    <div class="section-title"><span class="section-num">11</span>모바일 통일안 — 6개 메뉴 공통 규칙</div>
+    <div class="section-desc">메뉴별로 따로 다루지 말고, 다음 7개 규칙을 모든 화면에 일괄 적용한다.</div>
+  </div>
+
+  <div class="mobile-grid">
+    <div class="card">
+      <div style="font-size:11px; font-weight:700; color:var(--accent); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px;">M1 · Navigation</div>
+      <div style="font-size:14px; font-weight:700; margin-bottom:6px;">하단 탭바 단일화</div>
+      <div style="font-size:12.5px; color:var(--fg-muted); line-height:1.6;">
+        모바일(≤767px)에서 좌측 사이드바 숨김 → 하단 8칸 탭바(<code>MobileTabBar</code>). 높이 56px, 아이콘 20px + 레이블 9.5px, 활성색 accent. 채팅 배지 그대로. 서브메뉴는 진입 후 상단 횡스크롤 칩으로 표현.
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:11px; font-weight:700; color:var(--accent); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px;">M2 · Header</div>
+      <div style="font-size:14px; font-weight:700; margin-bottom:6px;">Sticky 페이지 헤더</div>
+      <div style="font-size:12.5px; color:var(--fg-muted); line-height:1.6;">
+        PageHeader가 스크롤 시 상단 고정. 높이 52px, 좌측 ← 뒤로/햄버거, 중앙 화면 제목(15/700 + 줄임표), 우측 액션 1개(검색/필터/+추가). 액션 2개 이상 필요 시 더보기 메뉴.
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:11px; font-weight:700; color:var(--accent); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px;">M3 · Table</div>
+      <div style="font-size:14px; font-weight:700; margin-bottom:6px;">테이블 → 카드 자동 변환</div>
+      <div style="font-size:12.5px; color:var(--fg-muted); line-height:1.6;">
+        ≤720px에서 모든 DataTable은 카드 리스트(<code>DataCard</code>)로 자동 전환. 가로 스크롤 테이블 절대 금지. 카드: 16px padding, 12px gap, radius 12, 상단 제목·우측 상태배지.
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:11px; font-weight:700; color:var(--accent); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px;">M4 · Hit Target</div>
+      <div style="font-size:14px; font-weight:700; margin-bottom:6px;">최소 44×44 터치 영역</div>
+      <div style="font-size:12.5px; color:var(--fg-muted); line-height:1.6;">
+        모든 인터랙티브(버튼·체크박스·아이콘 버튼·탭)는 최소 44×44px. 시각적으로 작게 보여야 한다면 padding으로 영역만 확장. icon-btn 클래스 모바일 변형 추가.
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:11px; font-weight:700; color:var(--accent); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px;">M5 · Bottom Sheet</div>
+      <div style="font-size:14px; font-weight:700; margin-bottom:6px;">상세 / 액션은 시트로</div>
+      <div style="font-size:12.5px; color:var(--fg-muted); line-height:1.6;">
+        모바일에서 모달(<code>ActionDialog</code> 포함)은 화면 하단에서 올라오는 시트 형태로 전환. 최대 90vh, 상단 핸들바 36×4, 외부 탭/스와이프로 닫기. 데스크탑은 센터 모달 유지.
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:11px; font-weight:700; color:var(--accent); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px;">M6 · Form</div>
+      <div style="font-size:14px; font-weight:700; margin-bottom:6px;">폼 입력 단일 컬럼</div>
+      <div style="font-size:12.5px; color:var(--fg-muted); line-height:1.6;">
+        2~3 컬럼 폼은 모바일에서 1 컬럼으로 자동 스택. 라벨은 입력 위 (좌측 라벨 금지). 입력 높이 44px, 14px 폰트(iOS 자동확대 방지). 키보드와 겹치는 영역은 <code>scroll-padding-bottom</code>로 보정.
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:11px; font-weight:700; color:var(--accent); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px;">M7 · Density</div>
+      <div style="font-size:14px; font-weight:700; margin-bottom:6px;">간격 ÷ 1.15 자동 적용</div>
+      <div style="font-size:12.5px; color:var(--fg-muted); line-height:1.6;">
+        카드 padding 20→16, 카드 gap 12→10, 페이지 padding 32→18. CSS 변수 <code>--space-*</code>를 <code>@media (max-width:767px)</code>에서 일괄 축소. 폰트 크기는 변경하지 않음.
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:11px; font-weight:700; color:var(--accent); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px;">M8 · Safe Area</div>
+      <div style="font-size:14px; font-weight:700; margin-bottom:6px;">노치/홈인디케이터 대응</div>
+      <div style="font-size:12.5px; color:var(--fg-muted); line-height:1.6;">
+        탭바 하단 padding <code>env(safe-area-inset-bottom)</code> 추가. sticky 헤더 상단 <code>env(safe-area-inset-top)</code>. 100vh 대신 100dvh 사용으로 iOS 주소창 변동 대응.
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>모바일 ↔ 데스크탑 동등성 원칙</strong> — 같은 메뉴는 모바일에서도 데스크탑과 <em>동일한 기능</em>을 제공해야 합니다. 모바일이라는 이유로 기능을 빼지 말 것. 화면 폭이 좁으면 카드/시트/스택으로 표현 형태만 바꿉니다.
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- Claude 작업 지시문 -->
+<section class="section" id="prompts">
+  <div class="section-head">
+    <div class="section-title"><span class="section-num">12</span>Claude Code 작업 지시문 (복붙용)</div>
+    <div class="section-desc">아래 6단계를 순서대로 Claude Code에 붙여 넣으세요. 단계마다 git commit 후 다음 단계로 진행합니다.</div>
+  </div>
+
+  <div class="prompt-block">
+    <div class="prompt-head">
+      <span class="prompt-step">STEP 1</span>
+      <span>공통 컴포넌트 + 토큰 정비 (기반 작업)</span>
+      <span class="prompt-est">예상 4시간</span>
+    </div>
+    <div class="prompt-body"><span class="c"># 목표: 모든 메뉴가 공유할 공통 컴포넌트와 CSS 변수 정비</span>
+
+<span class="k">npm install</span> lucide-react
+
+<span class="c"># 1. globals.css 토큰 확정</span>
+- <span class="v">--submenu-width</span>: 160 → <span class="f">192</span>
+- <span class="v">--sidebar-width</span>: 64 → <span class="f">72</span>
+- <span class="v">--space-card-padding</span>: 20px (모바일 16px)
+- <span class="v">--space-card-gap</span>: 12px (모바일 10px)
+- .badge.badge-green/red/yellow/blue/gray 누락 컬러 보완
+
+<span class="c"># 2. 공통 컴포넌트 신설</span>
+- app/components/<span class="f">PageHeader.tsx</span> (title/subtitle/actions/back)
+- app/components/<span class="f">Button.tsx</span> (variant: primary|secondary|danger|ghost, size: sm|md|lg)
+- app/components/<span class="f">DocumentTable.tsx</span> (rows/columns/emptyState/onRowClick)
+- app/components/<span class="f">DataCard.tsx</span> (모바일 테이블 대체)
+- app/components/<span class="f">QuickActionGrid.tsx</span> (4열 정사각 카드)
+- app/components/<span class="f">SegmentedTabs.tsx</span> (내정보 탭바 패턴)
+- app/components/<span class="f">BottomSheet.tsx</span> (모바일 시트, 데스크탑은 ActionDialog 위임)
+
+<span class="c"># 3. Lucide 아이콘 매퍼</span>
+- app/components/<span class="f">DynamicIcon.tsx</span> — props: name (string) → 해당 Lucide 컴포넌트 렌더
+- 메뉴 정의 파일들의 icon 필드를 모두 컴포넌트명 문자열로 통일
+
+<span class="c"># 4. PR 분리: feat/design-tokens-and-primitives</span></div>
+  </div>
+
+  <div class="prompt-block">
+    <div class="prompt-head">
+      <span class="prompt-step">STEP 2</span>
+      <span>채팅 메뉴 통일 (P1 — CHAT-01)</span>
+      <span class="prompt-est">예상 2시간</span>
+    </div>
+    <div class="prompt-body"><span class="c"># 메신저사이드바.tsx 일괄 작업</span>
+
+1. 활성 채팅방 클래스 교체
+   - <span class="v">bg-zinc-800 border-zinc-700 text-white</span>
+   → <span class="f">bg-[var(--accent)]/10 border-[var(--accent)]/25 text-[var(--accent)]</span>
+   + 좌측 <span class="f">border-l-[3px] border-[var(--accent)]</span>
+
+2. 아이콘 교체 (이모지 → Lucide)
+   - 공지방 📢 → <span class="f">&lt;Megaphone size=&#123;14&#125; /&gt;</span>
+   - 기본방 💬 → <span class="f">&lt;MessageSquare size=&#123;14&#125; /&gt;</span>
+   - 부서 펼치기 ▼ → <span class="f">&lt;ChevronDown size=&#123;10&#125; /&gt;</span> + rotate -90 (접힘)
+   - 검색버튼 커스텀 SVG → <span class="f">&lt;Search size=&#123;15&#125; /&gt;</span>
+
+3. PIN/HIDE 텍스트 → 아이콘 버튼
+   - <span class="f">&lt;Pin size=&#123;11&#125; /&gt;</span>, <span class="f">&lt;EyeOff size=&#123;11&#125; /&gt;</span>
+   - aria-label="채팅방 고정" / "숨김 해제" 통일
+
+4. <span class="v">dark:</span> 클래스 일괄 제거 (42개)
+   - grep "dark:" 후 CSS 변수(--card, --border, --tab-bg)로 교체
+
+5. 탭 전환 glass 클래스 → SegmentedTabs 컴포넌트로 교체
+
+<span class="c"># PR: feat/chat-menu-unification</span></div>
+  </div>
+
+  <div class="prompt-block">
+    <div class="prompt-head">
+      <span class="prompt-step">STEP 3</span>
+      <span>게시판 + 전자결재 통일 (P1/P2)</span>
+      <span class="prompt-est">예상 3시간</span>
+    </div>
+    <div class="prompt-body"><span class="c"># 1. 게시판메뉴.ts 이모지 prefix 제거</span>
+- label: '📢 공지사항' → '공지사항'
+- icon: '📢' → 'Megaphone' (문자열)
+- 6개 모두 동일 패턴 (Megaphone/MessageSquare/Heart/Calendar/Activity/FileText)
+
+<span class="c"># 2. 6개 게시판 화면에 PageHeader 적용</span>
+- 자체 헤더 JSX 모두 제거
+- &lt;PageHeader title=&#123;name&#125; subtitle="..." actions=&#123;[검색, 새글]&#125; /&gt;
+- 새 글쓰기 버튼은 우상단 고정, 모바일도 동일
+
+<span class="c"># 3. 전자결재 - DocumentTable 적용</span>
+- 기안함/결재함/참조함 3개 화면을 동일 DocumentTable로 교체
+- 상태 배지: emerald-50/rose-50/amber-50 → .badge.badge-green/red/yellow
+- 768px 이하에서 DataCard로 자동 전환
+
+<span class="c"># 4. 전자결재 작성하기 → QuickActionGrid</span>
+- 결재 양식 선택 화면을 4열 카드 그리드로 재구성
+- 카테고리(휴가/지출/일반)별 섹션 캡션
+
+<span class="c"># PR: feat/board-and-approval-unification</span></div>
+  </div>
+
+  <div class="prompt-block">
+    <div class="prompt-head">
+      <span class="prompt-step">STEP 4</span>
+      <span>인사관리 통일 (P1/P2 — HR-01~03)</span>
+      <span class="prompt-est">예상 4시간</span>
+    </div>
+    <div class="prompt-body"><span class="c"># 1. 프로필카드/마이페이지공통섹션 — 폰트·간격 정상화</span>
+- ProfileHeaderSummary 이름 28px → <span class="f">20px</span>
+- ProfileHeaderSummary 높이 128px 고정 → <span class="f">min-h-100 h-auto</span>
+- InfoItem value 15/700 → <span class="f">13/600</span> (강조만 13/700)
+- border-l-4 섹션 헤더 → 캡션 (10/700 uppercase tracking-wider color: fg-subtle)
+- 아바타 fallback 👤 → 이름 첫 글자 + accent×15% bg
+
+<span class="c"># 2. 색상 토큰화</span>
+- text-emerald-600 → text-[var(--success)]
+- bg-emerald-50 → bg-[var(--success-light)]
+- 로그아웃 bg-[var(--accent)] → bg-[var(--danger)] + hover --danger-hover
+
+<span class="c"># 3. 구성원 상세를 내정보와 동일 구조로 정렬</span>
+- 동일 PageHeader + ProfileHeader + SegmentedTabs + InfoItem 사용
+- 관리자에게만 "편집" 토글 노출 (권한 체크)
+
+<span class="c"># 4. window.confirm 제거</span>
+- 강제 로그아웃 confirm → ActionDialog.openConfirm({tone:'danger', confirmText:'강제 로그아웃'})
+
+<span class="c"># 5. 12개 하위 화면 (구성원/근태/연차/급여/계약 등)</span>
+- 모두 PageHeader 적용 + 테이블은 DocumentTable 사용
+- 모바일에서 좌패널 max-h-34vh → 드롭다운 선택자
+
+<span class="c"># PR: feat/hr-menu-unification</span></div>
+  </div>
+
+  <div class="prompt-block">
+    <div class="prompt-head">
+      <span class="prompt-step">STEP 5</span>
+      <span>재고관리 + 관리자 통일 (P2/P3)</span>
+      <span class="prompt-est">예상 3시간</span>
+    </div>
+    <div class="prompt-body"><span class="c"># 재고관리</span>
+- KPI 카드 패턴 통일 (28/800 value + 32×32 아이콘 컨테이너)
+- DocumentTable → 모바일 DataCard 자동 전환
+- 모바일 스캔: 카메라 풀스크린 + 하단 결과 시트
+- 서브메뉴 192px 폭, 그룹 캡션 + 그룹 아이콘
+
+<span class="c"># 관리자</span>
+- 경영대시보드:
+  bg-slate-800 → bg-[var(--foreground)]
+  text-orange-500 → text-[var(--warning)]
+  bg-orange-400 → bg-[var(--warning)]
+  배경 장식 💰📊 이모지 제거 → 32×32 Lucide 컨테이너
+  font-black 전수 검색: 14px 이상만 700 유지, 그 외 600
+
+- admin-menu-config.ts ADMIN_*_TABS icon 필드 → Lucide 컴포넌트명
+- InnerTabBar DynamicIcon 적용
+
+- 직원권한 모바일: 좌 sticky → 상단 검색+드롭다운
+
+<span class="c"># PR: feat/inventory-and-admin-unification</span></div>
+  </div>
+
+  <div class="prompt-block">
+    <div class="prompt-head">
+      <span class="prompt-step">STEP 6</span>
+      <span>모바일 공통 규칙 8개 일괄 적용</span>
+      <span class="prompt-est">예상 2시간</span>
+    </div>
+    <div class="prompt-body"><span class="c"># globals.css — 모바일 미디어쿼리 추가</span>
+
+@media (max-width: 767px) {
+  :root {
+    --space-card-padding: 16px;
+    --space-card-gap: 10px;
+    --space-page-padding: 18px;
+  }
+}
+
+<span class="c"># 1. 100vh → 100dvh 전수 교체</span>
+   grep -rn "100vh" app/
+
+<span class="c"># 2. Safe area</span>
+   - MobileTabBar: padding-bottom: max(8px, env(safe-area-inset-bottom))
+   - sticky 헤더: padding-top: env(safe-area-inset-top)
+
+<span class="c"># 3. Bottom Sheet 적용</span>
+   - ActionDialog 내부에서 isMobile 체크 → BottomSheet 렌더
+   - 외부 호출자는 변경 없음 (호환성 유지)
+
+<span class="c"># 4. 폼 input 14px (iOS 자동확대 방지)</span>
+   - .input-base font-size: 14px (모바일), 13px (데스크탑)
+
+<span class="c"># 5. 접근성 보강</span>
+   - 모든 icon-btn 클래스에 aria-label 필수화 (ESLint rule 추가)
+   - 모든 이모지 잔여물에 aria-hidden="true"
+
+<span class="c"># 6. 회귀 점검 시나리오 (수동 QA)</span>
+   - iPhone 13 (390×844), iPhone SE (375×667), Galaxy S22 (360×800)
+   - 각 메뉴 진입 → 서브메뉴 → 상세 → 액션 시트 → 폼 입력 → 저장 흐름
+
+<span class="c"># PR: feat/mobile-common-rules</span></div>
+  </div>
+</section>
+
+<!-- 체크리스트 -->
+<section class="section" id="checklist">
+  <div class="section-head">
+    <div class="section-title"><span class="section-num">13</span>완료 체크리스트</div>
+    <div class="section-desc">모든 작업이 끝났는지 확인하는 최종 점검표. 항목별로 grep / 시각 확인을 수행합니다.</div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex; flex-direction:column; gap: 10px; font-size: 12.5px;">
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;"><input type="checkbox" style="width:16px; height:16px;"/> <span>이모지 0개: <code>grep -rn "[\u{1F300}-\u{1FAFF}]" app/main/</code> 결과 비어있음</span></label>
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;"><input type="checkbox" style="width:16px; height:16px;"/> <span>Tailwind 고정 컬러 0개: <code>slate-/zinc-/emerald-/rose-/amber-/orange-</code> 검색 결과 0건</span></label>
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;"><input type="checkbox" style="width:16px; height:16px;"/> <span><code>dark:</code> 직접 클래스 0개 (CSS 변수로 모두 대체)</span></label>
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;"><input type="checkbox" style="width:16px; height:16px;"/> <span><code>window.confirm</code> / <code>window.alert</code> 0회 사용</span></label>
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;"><input type="checkbox" style="width:16px; height:16px;"/> <span>모든 페이지가 PageHeader 컴포넌트 사용 (자체 header JSX 없음)</span></label>
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;"><input type="checkbox" style="width:16px; height:16px;"/> <span>모든 테이블이 DocumentTable + 모바일 DataCard 자동 전환</span></label>
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;"><input type="checkbox" style="width:16px; height:16px;"/> <span>모바일 탭바·헤더에 safe-area-inset 적용</span></label>
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;"><input type="checkbox" style="width:16px; height:16px;"/> <span>iOS Safari / Chrome Android 실기기에서 6개 메뉴 진입·상세·저장 정상 동작</span></label>
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;"><input type="checkbox" style="width:16px; height:16px;"/> <span>다크모드 토글 → 라이트 ↔ 다크 깨짐 없는 화면 0건</span></label>
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;"><input type="checkbox" style="width:16px; height:16px;"/> <span>aria-label 미설정 icon-btn 0건 (ESLint 통과)</span></label>
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;"><input type="checkbox" style="width:16px; height:16px;"/> <span>한국어 한 줄에 들어가야 할 레이블 잘림 0건 (서브메뉴 192px 적용 확인)</span></label>
+    </div>
+  </div>
+
+  <div class="callout warn" style="margin-top:18px;">
+    <strong>주의</strong> — 이 브리프는 <em>프로젝트 소스 파일 기반</em>으로 작성되었습니다. 라이브 사이트(erp.pchos.kr)에 추가로 도입된 화면이 있다면 같은 7개 공통 패턴 + 8개 모바일 규칙으로 통일하시고, 필요 시 본 문서의 메뉴별 작업 카드 형식을 그대로 복제해 추가하면 됩니다.
+  </div>
+</section>
+
+</main>
+</div>
+
+<script>
+// Sidebar active state sync on scroll
+const sections = document.querySelectorAll('section.section, section.hero');
+const links = document.querySelectorAll('.nav-item');
+const linkMap = {};
+links.forEach(l => {
+  const href = l.getAttribute('href');
+  if (href) linkMap[href.slice(1)] = l;
+});
+
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const id = e.target.id;
+      if (linkMap[id]) {
+        links.forEach(l => l.classList.remove('active'));
+        linkMap[id].classList.add('active');
+      }
+    }
+  });
+}, { rootMargin: '-30% 0px -60% 0px' });
+
+sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>

@@ -4,6 +4,7 @@ import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
+import { recalculateLeaveBalance } from '@/lib/annual-leave-balance';
 import { logAudit, readClientAuditActor } from '@/lib/audit';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import AnnualLeavePromotion from './연차촉진시스템';
@@ -70,6 +71,7 @@ export default function LeaveManagement({
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<LeaveManagementTabId>((initialTab as LeaveManagementTabId) ?? '연차/휴가 신청내역');
   const [leaveConfig, setLeaveConfig] = useState<'입사일 기준' | '회계연도 기준'>('입사일 기준');
+  const [leaveConfigLoading, setLeaveConfigLoading] = useState(false);
   const staffList = Array.isArray(staffs) ? staffs : [];
   const [currentUser, setCurrentUser] = useState<Record<string, unknown> | null>(null);
   const [showPendingModal, setShowPendingModal] = useState(false);
@@ -118,6 +120,28 @@ export default function LeaveManagement({
     fetchLeaves();
   }, [selectedCo, staffs]);
 
+  // 선택된 회사의 leave_policy 조회
+  useEffect(() => {
+    const coName = selectedCo as string;
+    if (!coName || coName === '전체') return;
+    setLeaveConfigLoading(true);
+    void Promise.resolve(
+      supabase
+        .from('companies')
+        .select('leave_policy')
+        .eq('name', coName)
+        .maybeSingle()
+    ).then(({ data }) => {
+      if (data?.leave_policy === '회계연도') {
+        setLeaveConfig('회계연도 기준');
+      } else {
+        setLeaveConfig('입사일 기준');
+      }
+    }).catch((err: unknown) => {
+      console.error('[LeaveManagement] 회사 정책 조회 실패:', err);
+    }).finally(() => setLeaveConfigLoading(false));
+  }, [selectedCo]);
+
   useEffect(() => {
     if (initialTab && availableTabs.some((tab) => tab.id === initialTab)) {
       setActiveTab(initialTab as LeaveManagementTabId);
@@ -163,6 +187,11 @@ export default function LeaveManagement({
       let recalculatedUsedDays: number | null = null;
       if (targetLeave?.staff_id) {
         recalculatedUsedDays = await syncAnnualLeaveUsedForStaff(targetLeave.staff_id);
+        // leave_balances 정합성 갱신 (JM3: 실패해도 메인 흐름 차단 안 함)
+        recalculateLeaveBalance(targetLeave.staff_id).catch((err) => {
+          console.error('[handleStatusUpdate] recalculateLeaveBalance 실패:', err);
+          toast('연차 잔액 갱신에 실패했습니다. 잔액이 일시적으로 부정확할 수 있습니다.', 'warning');
+        });
       }
 
       const actor = readClientAuditActor();
@@ -200,26 +229,40 @@ export default function LeaveManagement({
   };
 
   const runAnnualLeaveAutoGrant = async () => {
+    const policyLabel = leaveConfig === '회계연도 기준' ? '회계연도(1월 1일)' : '입사일';
     const confirmed = await openConfirm({
       title: '전 직원 연차 재계산',
-      description: '전 직원의 연차를 입사일 기준으로 재계산합니다.\n기존 연차 총량이 갱신될 수 있습니다.',
+      description: `전 직원의 연차를 ${policyLabel} 기준으로 재계산합니다.\n기존 연차 총량이 갱신될 수 있습니다.`,
       confirmText: '재계산',
       tone: 'danger',
     });
     if (!confirmed) return;
     setLoading(true);
     try {
+      const now = new Date();
       for (const s of staffList) {
-        const joinDate = s.joined_at || s.join_date;
+        const joinDate = (s as Record<string, unknown>).joined_at || (s as Record<string, unknown>).join_date;
         if (!joinDate) continue;
         const join = new Date(joinDate as string);
-        const now = new Date();
         const years = (now.getTime() - join.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+
         let total = 0;
-        if (years >= 1) total = 15;
-        if (years >= 3) total = Math.min(25, 15 + Math.floor((years - 1) / 2));
-        if (years < 1) total = Math.min(11, Math.floor((new Date(now).getTime() - join.getTime()) / (30 * 24 * 60 * 60 * 1000)));
-        await supabase.from('staff_members').update({ annual_leave_total: total }).eq('id', s.id);
+        if (leaveConfig === '회계연도 기준') {
+          // 회계연도: 올해 1월 1일 기준 근속연수로 산정
+          const fiscalYears = now.getFullYear() - join.getFullYear();
+          if (fiscalYears >= 1) total = Math.min(25, 15 + Math.floor((fiscalYears - 1) / 2));
+          else total = Math.min(11, now.getMonth() + 1); // 입사 연도는 월 비례
+        } else {
+          // 입사일 기준
+          if (years >= 1) total = Math.min(25, 15 + Math.floor((years - 1) / 2));
+          else total = Math.min(11, Math.floor((now.getTime() - join.getTime()) / (30 * 24 * 60 * 60 * 1000)));
+        }
+
+        await supabase.from('staff_members').update({ annual_leave_total: total }).eq('id', (s as Record<string, unknown>).id);
+        // leave_balances 동기화
+        recalculateLeaveBalance(String((s as Record<string, unknown>).id)).catch((err) => {
+          console.error('[runAnnualLeaveAutoGrant] recalculateLeaveBalance 실패:', err, (s as Record<string, unknown>).id);
+        });
       }
       toast('연차 자동 부여가 완료되었습니다.', 'success');
       if (onRefresh) (onRefresh as () => void)();
@@ -395,7 +438,7 @@ export default function LeaveManagement({
             <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">연차 자동 부여 로직 설정</h3>
             <p className="text-sm text-[var(--toss-gray-3)] font-bold mb-4 leading-relaxed">
               근로기준법에 따른 연차 산정 방식을 선택해 주세요.<br />
-              현재 설정: <span className="text-[var(--accent)] font-semibold underline underline-offset-4">{leaveConfig}</span>
+              현재 설정: <span className="text-[var(--accent)] font-semibold underline underline-offset-4">{leaveConfigLoading ? '로딩 중...' : leaveConfig}</span>
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <button

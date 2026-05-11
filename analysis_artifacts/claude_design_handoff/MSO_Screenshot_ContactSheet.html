@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MSO 스크린샷 라벨링 (96장)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Pretendard', -apple-system, sans-serif;
+  background: #f8fafc; color: #0f172a;
+  padding: 20px;
+  letter-spacing: -0.01em;
+}
+.head { max-width: 1500px; margin: 0 auto 16px; }
+h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.04em; }
+.lead { font-size: 12.5px; color: #64748b; margin-top: 6px; line-height: 1.55; }
+.lead b { color: #1e40af; }
+.bar { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
+.btn {
+  font-size: 11px; font-weight: 700;
+  padding: 6px 12px; border-radius: 6px;
+  background: #fff; border: 1px solid #e2e8f0;
+  cursor: pointer; color: #1e40af;
+}
+.btn:hover { background: #eff6ff; }
+.btn.active { background: #1e40af; color: #fff; border-color: #1e40af; }
+.btn.danger { color: #dc2626; border-color: #fecaca; }
+.btn.danger:hover { background: #fef2f2; }
+input[type=text] {
+  flex: 1; min-width: 200px; max-width: 320px;
+  padding: 7px 12px; border: 1px solid #e2e8f0; border-radius: 6px;
+  font-family: inherit; font-size: 12px;
+}
+.progress {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; color: #059669;
+  padding: 5px 10px; background: #ecfdf5; border-radius: 6px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px; max-width: 1500px; margin: 0 auto;
+}
+.card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+  overflow: hidden; transition: all 0.15s;
+  display: flex; flex-direction: column;
+}
+.card.labeled { border-color: #86efac; background: #f0fdf4; }
+.thumbwrap {
+  width: 100%; aspect-ratio: 16/10;
+  overflow: hidden; background: #f1f5f9;
+  position: relative; cursor: zoom-in;
+}
+.thumb {
+  position: absolute; top: 0; left: 0;
+  width: 200%; height: 100%;
+  object-fit: cover; object-position: top left;
+  display: block;
+  pointer-events: none;
+}
+.thumbwrap::after {
+  content: '🔍 클릭 확대';
+  position: absolute; top: 6px; right: 6px;
+  background: rgba(15, 23, 42, 0.7); color: #fff;
+  font-size: 10px; font-weight: 600;
+  padding: 3px 8px; border-radius: 4px;
+  opacity: 0; transition: opacity 0.15s;
+  pointer-events: none;
+}
+.thumbwrap:hover::after { opacity: 1; }
+.meta {
+  padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.row { display: flex; align-items: center; gap: 8px; }
+.num {
+  font-size: 11px; font-weight: 800; color: #1e40af;
+  background: #eff6ff; padding: 2px 7px; border-radius: 4px;
+}
+.lin {
+  flex: 1;
+  padding: 6px 9px;
+  border: 1px solid #e2e8f0; border-radius: 6px;
+  font-family: inherit; font-size: 12px;
+  color: #0f172a; background: #fff;
+  outline: none;
+  min-width: 0;
+}
+.lin:focus { border-color: #1e40af; box-shadow: 0 0 0 2px #dbeafe; }
+.card.labeled .lin { background: #fff; border-color: #86efac; }
+.quick {
+  display: flex; gap: 4px; flex-wrap: wrap;
+}
+.qchip {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 7px; border-radius: 4px;
+  background: #f1f5f9; color: #475569;
+  cursor: pointer; border: 1px solid transparent;
+}
+.qchip:hover { background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
+
+/* Lightbox */
+.lb {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.94); z-index: 100;
+  align-items: center; justify-content: center;
+  padding: 32px;
+}
+.lb.open { display: flex; }
+.lbwrap {
+  width: 70vw; max-width: 1400px; height: 88vh;
+  overflow: hidden;
+  position: relative;
+  margin: 0 auto;
+  background: #000;
+}
+.lbwrap img {
+  display: block;
+  position: absolute;
+  top: 50%; left: 0;
+  transform: translateY(-50%);
+  width: 200%;
+  height: auto;
+  max-width: none;
+}
+.lbb {
+  position: fixed; color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  border: none;
+}
+.lbb:hover { background: rgba(255, 255, 255, 0.3); }
+.lbc { top: 20px; right: 20px; width: 44px; height: 44px; font-size: 24px; }
+.lbp, .lbn { top: 50%; transform: translateY(-50%); width: 52px; height: 52px; font-size: 28px; }
+.lbp { left: 20px; }
+.lbn { right: 20px; }
+.lbi {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  color: #fff; background: rgba(15, 23, 42, 0.9);
+  padding: 10px 18px; border-radius: 10px;
+  font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; gap: 10px;
+}
+.lbi input {
+  background: #1e293b; color: #fff;
+  border: 1px solid #334155; border-radius: 6px;
+  padding: 6px 10px; font-family: inherit; font-size: 12px;
+  min-width: 240px; outline: none;
+}
+.lbi input:focus { border-color: #3b82f6; }
+.lbi .hint { font-size: 10px; color: #94a3b8; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>📸 MSO ERP — 스크린샷 라벨링 (96장)</h1>
+  <div class="lead">
+    1. 카드 입력란에 직접 라벨 입력 (예: <b>채팅-메인</b>, <b>인사관리-급여-기본급</b>)<br/>
+    2. <b>🔍 클릭 확대</b> 영역만 클릭하면 라이트박스 열림 — 라벨 입력란/카드 다른 곳은 안 열림<br/>
+    3. 자주 쓰는 메뉴는 라벨 칩 클릭으로 한 번에 입력 · 자동 저장 (localStorage)
+  </div>
+  <div class="bar">
+    <button class="btn active" data-f="all">전체 (96)</button>
+    <button class="btn" data-f="채팅">채팅</button>
+    <button class="btn" data-f="게시판">게시판</button>
+    <button class="btn" data-f="결재">결재</button>
+    <button class="btn" data-f="인사">인사</button>
+    <button class="btn" data-f="재고">재고</button>
+    <button class="btn" data-f="관리자">관리자</button>
+    <button class="btn" data-f="추가">추가</button>
+    <button class="btn" data-f="내정보">내정보</button>
+    <button class="btn" data-f="unlabeled">미라벨</button>
+    <input type="text" id="q" placeholder="검색..." />
+    <span class="progress" id="progress">0 / 96</span>
+    <button class="btn" id="exportBtn">📋 내보내기</button>
+    <button class="btn danger" id="clearBtn">전체 초기화</button>
+  </div>
+</div>
+
+<div class="grid" id="g"></div>
+
+<div class="lb" id="lb">
+  <button class="lbb lbc" id="lbc" title="닫기 (Esc)">×</button>
+  <button class="lbb lbp" id="lbp" title="이전 (←)">‹</button>
+  <button class="lbb lbn" id="lbn" title="다음 (→)">›</button>
+  <div class="lbwrap"><img id="lbimg" src="" alt="" /></div>
+  <div class="lbi">
+    <span id="lbtxt">#01</span>
+    <input type="text" id="lbInput" placeholder="여기서도 라벨 입력 가능" />
+    <span class="hint">Esc 닫기 · ← → 이동 · Enter 저장+다음</span>
+  </div>
+</div>
+
+<script>
+// Build items list
+const items = [];
+for (let i = 1; i <= 47; i++) {
+  items.push({ p: `shots/${encodeURIComponent(`스크린샷(${i}).png`)}`, n: `스크린샷(${i})`, idx: i });
+}
+for (let i = 48; i <= 96; i++) {
+  items.push({ p: `shots2/${encodeURIComponent(`스크린샷(${i}).png`)}`, n: `스크린샷(${i})`, idx: i });
+}
+
+const LS_KEY = 'mso-shot-labels-v2';
+const labels = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+
+const QUICK_CHIPS = ['채팅', '게시판', '전자결재', '인사관리', '재고관리', '관리자', '추가기능', '내정보'];
+
+const grid = document.getElementById('g');
+
+// Render cards
+items.forEach((f, i) => {
+  const card = document.createElement('div');
+  card.className = 'card' + (labels[i] ? ' labeled' : '');
+  card.dataset.i = i;
+
+  const thumbWrap = document.createElement('div');
+  thumbWrap.className = 'thumbwrap';
+  thumbWrap.dataset.i = i;
+  const img = document.createElement('img');
+  img.className = 'thumb';
+  img.src = f.p;
+  img.loading = 'lazy';
+  img.alt = f.n;
+  thumbWrap.appendChild(img);
+
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+
+  const row1 = document.createElement('div');
+  row1.className = 'row';
+  row1.innerHTML = `<span class="num">#${String(f.idx).padStart(2, '0')}</span>`;
+  const inp = document.createElement('input');
+  inp.className = 'lin';
+  inp.type = 'text';
+  inp.dataset.i = i;
+  inp.value = labels[i] || '';
+  inp.placeholder = '메뉴-서브화면';
+  row1.appendChild(inp);
+
+  const quick = document.createElement('div');
+  quick.className = 'quick';
+  QUICK_CHIPS.forEach(c => {
+    const chip = document.createElement('span');
+    chip.className = 'qchip';
+    chip.textContent = c;
+    chip.dataset.value = c;
+    chip.dataset.i = i;
+    quick.appendChild(chip);
+  });
+
+  meta.appendChild(row1);
+  meta.appendChild(quick);
+  card.appendChild(thumbWrap);
+  card.appendChild(meta);
+  grid.appendChild(card);
+});
+
+function saveLabel(i, value) {
+  if (value) labels[i] = value;
+  else delete labels[i];
+  localStorage.setItem(LS_KEY, JSON.stringify(labels));
+  const card = document.querySelector(`.card[data-i="${i}"]`);
+  if (card) card.classList.toggle('labeled', !!value);
+  updateProgress();
+}
+
+function updateProgress() {
+  const n = Object.values(labels).filter(v => v && v.trim()).length;
+  document.getElementById('progress').textContent = `${n} / 96`;
+}
+updateProgress();
+
+// Input handlers
+grid.addEventListener('input', (e) => {
+  if (e.target.classList.contains('lin')) {
+    saveLabel(e.target.dataset.i, e.target.value);
+  }
+});
+
+// Quick chip click
+grid.addEventListener('click', (e) => {
+  if (e.target.classList.contains('qchip')) {
+    const i = e.target.dataset.i;
+    const v = e.target.dataset.value;
+    const inp = document.querySelector(`.lin[data-i="${i}"]`);
+    inp.value = inp.value ? inp.value + '-' + v : v;
+    saveLabel(i, inp.value);
+    inp.focus();
+    return;
+  }
+  // Only open lightbox if clicking thumbwrap area
+  if (e.target.classList.contains('thumbwrap') || e.target.classList.contains('thumb')) {
+    const tw = e.target.closest('.thumbwrap');
+    if (tw) openLB(+tw.dataset.i);
+  }
+});
+
+// Lightbox
+const lb = document.getElementById('lb');
+const lbimg = document.getElementById('lbimg');
+const lbtxt = document.getElementById('lbtxt');
+const lbInput = document.getElementById('lbInput');
+let cur = 0;
+let isOpen = false;
+
+function openLB(i) {
+  cur = i;
+  lbimg.src = items[i].p;
+  lbtxt.textContent = '#' + String(items[i].idx).padStart(2, '0');
+  lbInput.value = labels[i] || '';
+  lb.classList.add('open');
+  isOpen = true;
+  setTimeout(() => lbInput.focus(), 50);
+}
+function closeLB() {
+  lb.classList.remove('open');
+  isOpen = false;
+}
+
+document.getElementById('lbc').onclick = closeLB;
+document.getElementById('lbp').onclick = () => openLB((cur - 1 + items.length) % items.length);
+document.getElementById('lbn').onclick = () => openLB((cur + 1) % items.length);
+
+lb.addEventListener('click', (e) => {
+  if (e.target === lb) closeLB();
+});
+
+lbInput.addEventListener('input', () => {
+  saveLabel(cur, lbInput.value);
+  const cardInput = document.querySelector(`.lin[data-i="${cur}"]`);
+  if (cardInput) cardInput.value = lbInput.value;
+});
+
+lbInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    openLB((cur + 1) % items.length);
+  }
+});
+
+window.addEventListener('keydown', (e) => {
+  if (!isOpen) return;
+  if (e.target === lbInput) {
+    if (e.key === 'Escape') {
+      lbInput.blur();
+      closeLB();
+    }
+    return;
+  }
+  if (e.key === 'Escape') closeLB();
+  if (e.key === 'ArrowLeft') openLB((cur - 1 + items.length) % items.length);
+  if (e.key === 'ArrowRight') openLB((cur + 1) % items.length);
+});
+
+// Filter
+document.querySelectorAll('[data-f]').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('[data-f]').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    const f = b.dataset.f;
+    document.querySelectorAll('.card').forEach(card => {
+      const i = card.dataset.i;
+      const l = labels[i] || '';
+      let show = true;
+      if (f === 'unlabeled') show = !l;
+      else if (f !== 'all') show = l.includes(f);
+      card.style.display = show ? '' : 'none';
+    });
+  };
+});
+
+document.getElementById('q').addEventListener('input', e => {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll('.card').forEach(c => {
+    const i = c.dataset.i;
+    const l = (labels[i] || '').toLowerCase();
+    c.style.display = l.includes(q) ? '' : 'none';
+  });
+});
+
+// Export
+document.getElementById('exportBtn').onclick = () => {
+  const out = items.map((f, i) => `#${String(f.idx).padStart(2, '0')}\t${labels[i] || ''}`).join('\n');
+  // Show in a modal textarea so user can manually copy
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center;padding:32px';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:12px;padding:20px;width:600px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3 style="font-size:16px;font-weight:800">📋 라벨 내보내기 (${Object.values(labels).filter(v=>v).length}/96)</h3>
+        <button id="mdcl" style="border:none;background:#f1f5f9;width:32px;height:32px;border-radius:6px;cursor:pointer;font-size:18px">×</button>
+      </div>
+      <p style="font-size:12px;color:#475569">아래 텍스트 박스를 <b>전체 선택 (Ctrl+A) → 복사 (Ctrl+C)</b>해서 채팅창에 붙여넣어 주세요.</p>
+      <textarea id="mdtxt" style="flex:1;min-height:400px;font-family:monospace;font-size:12px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;resize:vertical">${out}</textarea>
+      <button id="mdcp" style="padding:10px;background:#1e40af;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">📋 전체 선택 + 복사 시도</button>
+    </div>`;
+  document.body.appendChild(modal);
+  const txt = modal.querySelector('#mdtxt');
+  txt.focus();
+  txt.select();
+  modal.querySelector('#mdcl').onclick = () => modal.remove();
+  modal.querySelector('#mdcp').onclick = () => {
+    txt.select();
+    try { document.execCommand('copy'); } catch(e) {}
+    try { navigator.clipboard.writeText(out); } catch(e) {}
+  };
+  modal.addEventListener('click', e => { if(e.target === modal) modal.remove(); });
+};
+
+// Clear
+document.getElementById('clearBtn').onclick = () => {
+  if (confirm('모든 라벨을 초기화할까요?')) {
+    localStorage.removeItem(LS_KEY);
+    location.reload();
+  }
+};
+</script>
+</body>
+</html>

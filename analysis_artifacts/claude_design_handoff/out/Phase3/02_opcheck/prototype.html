@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OP체크 실시간 보드 — Prototype (PC/Mobile/Dark 토글)</title>
+<style>
+@import url('https://cdn.jsdelivr.net/npm/pretendard@latest/dist/web/static/pretendard.css');
+
+/* ── 루트 토큰 ── */
+:root {
+  --background:#FFFFFF;--foreground:#09090B;--page-bg:#F8F8F9;
+  --tab-bg:#F1F1F3;--accent:#2563EB;--accent-light:#EFF6FF;
+  --accent-hover:#1D4ED8;--muted:#F1F1F3;--muted-foreground:#71717A;
+  --border:#E9E9EC;--card:#FFFFFF;
+  --danger:#EF4444;--danger-light:#FEF2F2;
+  --success:#10B981;--success-light:#F0FDF4;
+  --warning:#F59E0B;--warning-light:#FFFBEB;
+  --radius-md:8px;--radius-lg:12px;--radius-xl:16px;
+  --shadow-sm:0 1px 3px rgba(0,0,0,.06);
+  --shadow-md:0 4px 8px rgba(0,0,0,.06),0 2px 4px rgba(0,0,0,.04);
+  --shadow-lg:0 8px 24px rgba(0,0,0,.1);
+  --transition-base:150ms ease;
+  --bottomtab-height:60px;
+}
+.dark {
+  --background:#09090B;--foreground:#FAFAFA;--page-bg:#111113;
+  --tab-bg:#1C1C1F;--card:#18181B;--muted:#27272A;
+  --muted-foreground:#A1A1AA;--border:#27272A;
+  --accent-light:rgba(37,99,235,.18);--danger-light:rgba(239,68,68,.12);
+  --success-light:rgba(16,185,129,.12);--warning-light:rgba(245,158,11,.12);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Pretendard',system-ui,sans-serif;background:#1a1a2e;color:#e2e8f0;font-size:14px;min-height:100vh}
+
+/* ── 프로토타입 컨트롤 바 ── */
+.proto-bar{background:#0f0f1a;border-bottom:1px solid #2d2d4e;padding:12px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:9999}
+.proto-title{font-size:13px;font-weight:700;color:#a78bfa;letter-spacing:.04em;flex:0 0 auto}
+.proto-divider{width:1px;height:20px;background:#2d2d4e}
+.toggle-group{display:flex;gap:4px;background:#1e1e30;border-radius:var(--radius-md);padding:3px}
+.toggle-btn{height:30px;padding:0 12px;border-radius:6px;border:none;background:transparent;color:#94a3b8;font-size:12px;font-weight:600;cursor:pointer;transition:all var(--transition-base);white-space:nowrap}
+.toggle-btn.active{background:#a78bfa;color:#1a1a2e}
+.proto-hint{font-size:11px;color:#64748b;margin-left:auto}
+.proto-hint strong{color:#a78bfa}
+
+/* ── 프레임 래퍼 ── */
+.frame-wrap{display:flex;justify-content:center;align-items:flex-start;padding:24px 16px;min-height:calc(100vh - 57px)}
+.device-frame{position:relative;background:var(--page-bg);overflow:hidden;transition:all 300ms ease;border-radius:var(--radius-xl);box-shadow:0 0 0 1px #2d2d4e, 0 20px 60px rgba(0,0,0,.5)}
+
+/* PC 모드 */
+.device-frame.mode-pc{width:100%;max-width:1200px;min-height:700px;border-radius:var(--radius-lg)}
+/* Mobile 모드 */
+.device-frame.mode-mobile{width:375px;min-height:720px;border-radius:24px;box-shadow:0 0 0 8px #1a1a2e, 0 0 0 9px #2d2d4e, 0 20px 60px rgba(0,0,0,.5)}
+
+/* ── PC 레이아웃 내부 ── */
+.pc-layout{display:flex;height:100%;min-height:700px}
+.pc-sidebar{width:64px;background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:4px}
+.pc-logo{width:36px;height:36px;background:var(--accent);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px;margin-bottom:8px}
+.sidebar-ico{width:44px;height:44px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted-foreground);transition:background var(--transition-base)}
+.sidebar-ico:hover,.sidebar-ico.active{background:var(--accent-light);color:var(--accent)}
+.sidebar-ico svg{width:20px;height:20px}
+
+.pc-main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.pc-topbar{height:52px;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:10px}
+.pc-topbar-title{font-size:15px;font-weight:700;color:var(--foreground)}
+.live-dot{width:7px;height:7px;border-radius:50%;background:#10B981;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.85)}}
+.pc-topbar-badge{background:var(--accent-light);color:var(--accent);font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px}
+.pc-topbar-spacer{flex:1}
+.pc-btn{height:32px;padding:0 12px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--card);color:var(--foreground);font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background var(--transition-base)}
+.pc-btn:hover{background:var(--muted)}
+.pc-btn svg{width:13px;height:13px}
+
+.pc-content{flex:1;display:flex;overflow:hidden}
+.board-area{flex:1;padding:16px;overflow-y:auto}
+
+/* 필터 */
+.filter-row{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.filter-chip{height:30px;padding:0 12px;border-radius:20px;border:1px solid var(--border);background:var(--card);color:var(--muted-foreground);font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:4px;transition:all var(--transition-base)}
+.filter-chip:hover{background:var(--muted)}
+.filter-chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.filter-chip svg{width:12px;height:12px}
+.chip-cnt{font-size:10px;font-weight:700;background:rgba(255,255,255,.25);border-radius:8px;padding:0 4px}
+.filter-chip:not(.active) .chip-cnt{background:var(--muted);color:var(--foreground)}
+
+/* 섹션 */
+.board-section{margin-bottom:16px}
+.sec-hdr{display:flex;align-items:center;gap:6px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--muted-foreground);text-transform:uppercase;letter-spacing:.04em}
+.sec-hdr svg{width:13px;height:13px}
+.sec-cnt{border-radius:8px;padding:0 6px;font-size:10px;font-weight:700;background:var(--muted);color:var(--muted-foreground)}
+
+/* 카드 그리드 */
+.card-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:900px){.card-grid{grid-template-columns:repeat(2,1fr)}}
+
+/* 환자 카드 */
+.pt-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:12px 12px 10px 16px;cursor:pointer;position:relative;outline:none;transition:all var(--transition-base)}
+.pt-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.pt-card:focus-visible{box-shadow:0 0 0 3px rgba(37,99,235,.35);border-color:var(--accent)}
+.pt-card.selected{border-color:var(--accent);box-shadow:0 0 0 2px rgba(37,99,235,.2)}
+.pt-card::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 2px 2px 0}
+.pt-card[data-status="waiting"]::before{background:var(--muted-foreground)}
+.pt-card[data-status="ready"]::before{background:var(--accent)}
+.pt-card[data-status="operating"]::before{background:var(--warning)}
+.pt-card[data-status="done"]::before{background:var(--success)}
+
+.c-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;gap:6px}
+.c-name{font-size:14px;font-weight:700;color:var(--foreground)}
+.c-room{font-size:11px;color:var(--muted-foreground)}
+.s-badge{display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:12px;font-size:10px;font-weight:600;flex-shrink:0}
+.s-badge svg{width:10px;height:10px}
+.waiting .s-badge{background:var(--muted);color:var(--muted-foreground)}
+.ready .s-badge{background:var(--accent-light);color:var(--accent)}
+.operating .s-badge{background:var(--warning-light);color:#92400E}
+.done .s-badge{background:var(--success-light);color:#065F46}
+
+.c-meta{font-size:11px;color:var(--muted-foreground);margin-bottom:8px;display:flex;flex-direction:column;gap:3px}
+.c-meta-row{display:flex;align-items:center;gap:4px}
+.c-meta-row svg{width:11px;height:11px;flex-shrink:0}
+
+.c-foot{display:flex;align-items:center;justify-content:space-between;padding-top:8px;border-top:1px solid var(--border)}
+.prog-wrap{display:flex;align-items:center;gap:5px}
+.prog-bar{width:50px;height:3px;background:var(--muted);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;border-radius:2px;background:var(--accent);transition:width .3s}
+.prog-text{font-size:10px;color:var(--muted-foreground)}
+.time-tag{font-size:10px;color:var(--muted-foreground);display:flex;align-items:center;gap:3px}
+.time-tag svg{width:10px;height:10px}
+.time-tag.warn{color:var(--warning)}
+
+/* 사이드 패널 */
+.side-panel{width:320px;background:var(--card);border-left:1px solid var(--border);display:flex;flex-direction:column;transition:width var(--transition-base);overflow:hidden}
+.side-panel.closed{width:0}
+.panel-hdr{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--card)}
+.panel-name{font-size:14px;font-weight:700;color:var(--foreground)}
+.panel-sub{font-size:11px;color:var(--muted-foreground)}
+.close-btn{width:30px;height:30px;border-radius:var(--radius-md);border:none;background:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--foreground)}
+.close-btn svg{width:14px;height:14px}
+.panel-body{flex:1;overflow-y:auto;padding:14px 16px}
+.p-sec-title{font-size:10px;font-weight:700;color:var(--muted-foreground);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.i-grid{display:grid;grid-template-columns:auto 1fr;gap:5px 10px;font-size:12px;margin-bottom:16px}
+.i-label{color:var(--muted-foreground)}
+.i-value{color:var(--foreground);font-weight:600}
+
+.ck-item{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)}
+.ck-item:last-child{border-bottom:none}
+.ck-box{width:22px;height:22px;border-radius:6px;border:2px solid var(--border);background:var(--card);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;transition:all var(--transition-base)}
+.ck-box.on{border-color:var(--success);background:var(--success)}
+.ck-box svg{width:11px;height:11px;color:#fff}
+.ck-text{font-size:12px;color:var(--foreground)}
+.ck-text.done{text-decoration:line-through;color:var(--muted-foreground)}
+
+.panel-actions{padding:12px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px;position:sticky;bottom:0;background:var(--card)}
+.act-btn{height:40px;border-radius:var(--radius-md);border:none;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all var(--transition-base)}
+.act-btn svg{width:14px;height:14px}
+.btn-blue{background:var(--accent);color:#fff}
+.btn-blue:hover{background:var(--accent-hover)}
+.btn-orange{background:var(--warning);color:#fff}
+.btn-orange:hover{background:#D97706}
+.btn-green{background:var(--success);color:#fff}
+.btn-green:hover{background:#059669}
+.btn-gray{background:var(--muted);color:var(--foreground)}
+.btn-gray:hover{background:var(--border)}
+
+/* 패널 빈 상태 */
+.panel-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 16px;text-align:center;color:var(--muted-foreground)}
+.panel-empty svg{width:36px;height:36px;margin-bottom:10px;opacity:.3}
+.panel-empty p{font-size:13px;font-weight:600;margin-bottom:3px}
+.panel-empty span{font-size:11px}
+
+/* ── 모바일 레이아웃 ── */
+.mobile-layout{display:flex;flex-direction:column;height:100%;min-height:720px;background:var(--page-bg)}
+.mob-topbar{height:52px;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:8px;position:sticky;top:0;z-index:50}
+.mob-title{font-size:15px;font-weight:700;flex:1;color:var(--foreground)}
+.mob-badge{background:var(--accent-light);color:var(--accent);font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px}
+.mob-icon-btn{width:40px;height:40px;border-radius:var(--radius-md);border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--foreground)}
+.mob-icon-btn svg{width:18px;height:18px}
+
+.mob-filter{overflow-x:auto;scrollbar-width:none;padding:10px 14px;background:var(--card);border-bottom:1px solid var(--border)}
+.mob-filter::-webkit-scrollbar{display:none}
+.mob-filter-row{display:flex;gap:5px;width:max-content}
+.mob-chip{height:32px;padding:0 12px;border-radius:16px;border:1.5px solid var(--border);background:var(--card);color:var(--muted-foreground);font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;transition:all var(--transition-base)}
+.mob-chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.mob-chip svg{width:11px;height:11px}
+.mob-cnt{font-size:10px;background:rgba(255,255,255,.25);border-radius:8px;padding:0 4px}
+.mob-chip:not(.active) .mob-cnt{background:var(--muted);color:var(--foreground)}
+
+.mob-list{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:8px;padding-bottom:calc(var(--bottomtab-height)+16px)}
+.mob-sec-label{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--muted-foreground);text-transform:uppercase;letter-spacing:.05em;padding:2px 0 4px}
+.mob-sec-label svg{width:11px;height:11px}
+.mob-sec-cnt{border-radius:8px;padding:0 5px;font-size:9px;font-weight:700;background:var(--muted);color:var(--muted-foreground)}
+
+.mob-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:12px 12px 10px 16px;cursor:pointer;position:relative;display:flex;flex-direction:column;gap:6px;transition:background var(--transition-base)}
+.mob-card:active{background:var(--muted)}
+.mob-card::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:4px;border-radius:0 3px 3px 0}
+.mob-card[data-status="waiting"]::before{background:var(--muted-foreground)}
+.mob-card[data-status="ready"]::before{background:var(--accent)}
+.mob-card[data-status="operating"]::before{background:var(--warning)}
+.mob-card[data-status="done"]::before{background:var(--success)}
+.mob-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.mob-card-name{font-size:15px;font-weight:700;color:var(--foreground)}
+.mob-card-sub{font-size:11px;color:var(--muted-foreground)}
+.mob-s-pill{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:600;flex-shrink:0}
+.mob-s-pill svg{width:11px;height:11px}
+.mob-waiting .mob-s-pill{background:var(--muted);color:var(--muted-foreground)}
+.mob-ready .mob-s-pill{background:var(--accent-light);color:var(--accent)}
+.mob-operating .mob-s-pill{background:var(--warning-light);color:#92400E}
+.mob-done .mob-s-pill{background:var(--success-light);color:#065F46}
+.mob-card-foot{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--muted-foreground)}
+.mob-prog{display:flex;align-items:center;gap:5px}
+.mob-prog-bar{width:36px;height:3px;background:var(--muted);border-radius:2px;overflow:hidden}
+.mob-prog-fill{height:100%;border-radius:2px;background:var(--accent)}
+
+.mob-bottomnav{height:var(--bottomtab-height);background:var(--card);border-top:1px solid var(--border);display:flex;align-items:stretch;position:sticky;bottom:0;z-index:50}
+.mob-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:none;background:transparent;cursor:pointer;color:var(--muted-foreground);font-size:9px;font-weight:600}
+.mob-nav-item.active{color:var(--accent)}
+.mob-nav-item svg{width:20px;height:20px}
+
+/* 바텀시트 */
+.mob-overlay{position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:200;opacity:0;pointer-events:none;transition:opacity var(--transition-base)}
+.mob-overlay.vis{opacity:1;pointer-events:all}
+.mob-sheet{position:absolute;bottom:0;left:0;right:0;background:var(--card);border-radius:16px 16px 0 0;z-index:201;transform:translateY(100%);transition:transform 300ms cubic-bezier(.32,0,.67,0);max-height:88%;display:flex;flex-direction:column}
+.mob-sheet.open{transform:translateY(0);transition:transform 340ms cubic-bezier(.34,1.56,.64,1)}
+.mob-handle{width:32px;height:4px;background:var(--border);border-radius:2px;margin:10px auto 0;flex-shrink:0}
+.mob-sheet-hdr{padding:10px 16px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.mob-sheet-title{font-size:17px;font-weight:700;color:var(--foreground)}
+.mob-sheet-sub{font-size:12px;color:var(--muted-foreground)}
+.mob-sheet-close{width:40px;height:40px;border-radius:var(--radius-md);border:none;background:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--foreground)}
+.mob-sheet-close svg{width:16px;height:16px}
+.mob-sheet-body{flex:1;overflow-y:auto;padding:14px 16px}
+.mob-i-grid{display:grid;grid-template-columns:auto 1fr;gap:7px 10px;font-size:13px;margin-bottom:14px}
+.mob-i-label{color:var(--muted-foreground)}
+.mob-i-value{color:var(--foreground);font-weight:600}
+.mob-ck-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.mob-ck-item:last-child{border-bottom:none}
+.mob-ck-box{width:26px;height:26px;border-radius:var(--radius-md);border:2px solid var(--border);background:var(--card);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;transition:all var(--transition-base)}
+.mob-ck-box.on{border-color:var(--success);background:var(--success)}
+.mob-ck-box svg{width:13px;height:13px;color:#fff}
+.mob-ck-text{font-size:13px;color:var(--foreground);flex:1}
+.mob-ck-text.done{text-decoration:line-through;color:var(--muted-foreground)}
+.mob-sheet-actions{padding:10px 16px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px}
+.mob-act-btn{height:48px;border-radius:var(--radius-md);border:none;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all var(--transition-base);width:100%}
+.mob-act-btn svg{width:16px;height:16px}
+.mob-act-btn:active{opacity:.85;transform:scale(.98)}
+
+/* ── 상태 전환 스텝 표시 ── */
+.status-flow{display:flex;align-items:center;gap:4px;margin-bottom:12px;flex-wrap:wrap}
+.flow-step{display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;border:1.5px solid var(--border);color:var(--muted-foreground)}
+.flow-step.current{border-color:var(--accent);color:var(--accent);background:var(--accent-light)}
+.flow-step svg{width:11px;height:11px}
+.flow-arrow{color:var(--muted-foreground);font-size:12px}
+
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+</style>
+</head>
+<body>
+
+<!-- 프로토타입 컨트롤 바 -->
+<div class="proto-bar" role="toolbar" aria-label="프로토타입 컨트롤">
+  <span class="proto-title">ops_op_check_board</span>
+  <div class="proto-divider" aria-hidden="true"></div>
+
+  <div class="toggle-group" role="group" aria-label="뷰 모드 선택">
+    <button class="toggle-btn active" data-mode="pc" aria-pressed="true">PC 1280px</button>
+    <button class="toggle-btn" data-mode="mobile" aria-pressed="false">Mobile 375px</button>
+  </div>
+
+  <div class="proto-divider" aria-hidden="true"></div>
+
+  <div class="toggle-group" role="group" aria-label="테마 선택">
+    <button class="toggle-btn active" data-theme="light" aria-pressed="true">Light</button>
+    <button class="toggle-btn" data-theme="dark" aria-pressed="false">Dark</button>
+  </div>
+
+  <span class="proto-hint"><strong>카드 클릭</strong> → 상태 전환 데모 (대기→준비→수술중→완료)</span>
+</div>
+
+<!-- 디바이스 프레임 -->
+<div class="frame-wrap">
+  <div class="device-frame mode-pc" id="deviceFrame">
+
+    <!-- ===== PC 레이아웃 ===== -->
+    <div class="pc-layout" id="pcLayout">
+      <nav class="pc-sidebar" aria-label="사이드바">
+        <div class="pc-logo" aria-hidden="true">M</div>
+        <div class="sidebar-ico active" aria-label="OP체크" title="OP체크">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+        </div>
+        <div class="sidebar-ico" aria-label="스케줄" title="수술 스케줄">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+        <div class="sidebar-ico" aria-label="환자" title="환자 목록">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        </div>
+      </nav>
+      <div class="pc-main">
+        <div class="pc-topbar">
+          <span class="live-dot" aria-label="실시간 연결 중" title="실시간 연결 중"></span>
+          <span class="pc-topbar-title">OP체크 실시간 보드</span>
+          <span class="pc-topbar-badge" aria-live="polite">오늘 12건</span>
+          <div class="pc-topbar-spacer"></div>
+          <button class="pc-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            새로고침
+          </button>
+        </div>
+        <div class="pc-content">
+          <div class="board-area" id="pcBoard">
+            <div class="filter-row" role="group" aria-label="상태 필터" id="pcFilterRow"></div>
+            <div id="pcSections"></div>
+          </div>
+          <aside class="side-panel" id="pcPanel" aria-label="환자 상세">
+            <div id="pcPanelContent">
+              <div class="panel-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <p>환자를 선택하세요</p>
+                <span>카드 클릭 시 상세 표시</span>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 모바일 레이아웃 ===== -->
+    <div class="mobile-layout" id="mobileLayout" style="display:none">
+      <div class="mob-topbar">
+        <span class="mob-title">OP체크 보드</span>
+        <span class="mob-badge" aria-live="polite">12건</span>
+        <button class="mob-icon-btn" aria-label="더 보기">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+        </button>
+      </div>
+      <div class="mob-filter" role="group" aria-label="상태 필터">
+        <div class="mob-filter-row" id="mobFilterRow"></div>
+      </div>
+      <div class="mob-list" id="mobList"></div>
+      <nav class="mob-bottomnav" aria-label="하단 내비게이션">
+        <button class="mob-nav-item active" aria-label="OP체크" aria-current="page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+          OP체크
+        </button>
+        <button class="mob-nav-item" aria-label="스케줄">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          스케줄
+        </button>
+        <button class="mob-nav-item" aria-label="환자 목록">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          환자
+        </button>
+        <button class="mob-nav-item" aria-label="내 정보">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+          내 정보
+        </button>
+      </nav>
+      <!-- 바텀시트 -->
+      <div class="mob-overlay" id="mobOverlay" aria-hidden="true"></div>
+      <div class="mob-sheet" id="mobSheet" role="dialog" aria-modal="true" aria-label="환자 상세" aria-hidden="true">
+        <div class="mob-handle" aria-hidden="true"></div>
+        <div id="mobSheetContent"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ── 데이터 ── */
+const PATIENTS = [
+  {id:'p1',name:'환자A',room:'수술실 1호',doctor:'김철수 원장',op:'백내장 제거',time:'09:00',status:'waiting',elapsed:'24분 대기',checks:[{label:'마취 동의서 확인',done:true},{label:'금식 확인',done:false},{label:'수술 부위 표시',done:false}]},
+  {id:'p2',name:'환자B',room:'수술실 2호',doctor:'이영희 원장',op:'망막 검사',time:'09:30',status:'waiting',elapsed:'8분 대기',checks:[{label:'마취 동의서 확인',done:false},{label:'금식 확인',done:false},{label:'수술 부위 표시',done:false}]},
+  {id:'p3',name:'환자C',room:'수술실 1호',doctor:'박민준 원장',op:'녹내장 수술',time:'10:00',status:'waiting',elapsed:'45분 대기',checks:[{label:'마취 동의서 확인',done:true},{label:'금식 확인',done:true},{label:'수술 부위 표시',done:false}]},
+  {id:'p4',name:'환자D',room:'수술실 3호',doctor:'김철수 원장',op:'레이저 교정',time:'10:30',status:'waiting',elapsed:'예약 전',checks:[{label:'마취 동의서 확인',done:false},{label:'금식 확인',done:false},{label:'수술 부위 표시',done:false}]},
+  {id:'p5',name:'환자E',room:'수술실 2호',doctor:'이영희 원장',op:'각막 이식',time:'11:00',status:'ready',elapsed:'준비 5분',checks:[{label:'마취 동의서 확인',done:true},{label:'금식 확인',done:true},{label:'수술 부위 표시',done:true}]},
+  {id:'p6',name:'환자F',room:'수술실 3호',doctor:'박민준 원장',op:'비문증 수술',time:'11:30',status:'ready',elapsed:'준비 12분',checks:[{label:'마취 동의서 확인',done:true},{label:'금식 확인',done:true},{label:'수술 부위 표시',done:true}]},
+  {id:'p7',name:'환자G',room:'수술실 1호',doctor:'김철수 원장',op:'황반 수술',time:'12:00',status:'ready',elapsed:'준비 28분',checks:[{label:'마취 동의서 확인',done:true},{label:'금식 확인',done:true},{label:'수술 부위 표시',done:true}]},
+  {id:'p8',name:'환자H',room:'수술실 2호',doctor:'이영희 원장',op:'렌즈 삽입술',time:'08:45',status:'operating',elapsed:'경과 45분',checks:[{label:'마취 동의서 확인',done:true},{label:'금식 확인',done:true},{label:'수술 부위 표시',done:true}]},
+  {id:'p9',name:'환자I',room:'수술실 3호',doctor:'박민준 원장',op:'망막 수술',time:'09:10',status:'operating',elapsed:'경과 78분',checks:[{label:'마취 동의서 확인',done:true},{label:'금식 확인',done:true},{label:'수술 부위 표시',done:true}]},
+  {id:'p10',name:'환자J',room:'수술실 1호',doctor:'김철수 원장',op:'당뇨 망막증',time:'09:30',status:'operating',elapsed:'경과 32분',checks:[{label:'마취 동의서 확인',done:true},{label:'금식 확인',done:true},{label:'수술 부위 표시',done:true}]},
+  {id:'p11',name:'환자K',room:'수술실 2호',doctor:'이영희 원장',op:'백내장 제거',time:'08:30',status:'done',elapsed:'소요 35분',checks:[{label:'마취 동의서 확인',done:true},{label:'금식 확인',done:true},{label:'수술 부위 표시',done:true}]},
+  {id:'p12',name:'환자L',room:'수술실 1호',doctor:'박민준 원장',op:'녹내장 수술',time:'08:55',status:'done',elapsed:'소요 52분',checks:[{label:'마취 동의서 확인',done:true},{label:'금식 확인',done:true},{label:'수술 부위 표시',done:true}]}
+];
+
+const STATUS_LABELS = {waiting:'대기',ready:'준비완료',operating:'수술중',done:'수술완료'};
+const STATUS_NEXT = {waiting:'ready',ready:'operating',operating:'done',done:null};
+const STATUS_BTN_LABELS = {waiting:'준비완료로 전환',ready:'수술 시작',operating:'수술 완료',done:null};
+const STATUS_SECTIONS = [
+  {key:'waiting',label:'대기',color:'#71717A',cntStyle:''},
+  {key:'ready',label:'준비완료',color:'#2563EB',cntStyle:'background:var(--accent-light);color:var(--accent)'},
+  {key:'operating',label:'수술중',color:'#F59E0B',cntStyle:'background:var(--warning-light);color:#92400E'},
+  {key:'done',label:'수술완료',color:'#10B981',cntStyle:'background:var(--success-light);color:#065F46'}
+];
+const STATUS_ICONS = {
+  waiting:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  ready:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
+  operating:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+  done:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>`
+};
+
+let currentMode = 'pc';
+let currentFilter = 'all';
+let selectedId = null;
+let mobOpenId = null;
+
+/* ── 공통 헬퍼 ── */
+function getPatient(id) { return PATIENTS.find(p => p.id === id); }
+function byStatus(status) { return PATIENTS.filter(p => p.status === status); }
+function doneCount(p) { return p.checks.filter(c => c.done).length; }
+function progPct(p) { return Math.round(doneCount(p)/p.checks.length*100); }
+
+function statusFlowHtml(current) {
+  const steps = ['waiting','ready','operating','done'];
+  const labels = ['대기','준비','수술중','완료'];
+  return `<div class="status-flow" aria-label="상태 흐름">
+    ${steps.map((s,i) => `
+      <span class="flow-step ${s===current?'current':''}" aria-current="${s===current?'step':'false'}">
+        ${STATUS_ICONS[s]} ${labels[i]}
+      </span>
+      ${i<steps.length-1?'<span class="flow-arrow" aria-hidden="true">→</span>':''}
+    `).join('')}
+  </div>`;
+}
+
+/* ── PC 렌더 ── */
+function renderPC() {
+  renderPCFilters();
+  renderPCSections();
+}
+
+function renderPCFilters() {
+  const filters = [{key:'all',label:'전체'}, ...STATUS_SECTIONS.map(s=>({key:s.key,label:s.label}))];
+  document.getElementById('pcFilterRow').innerHTML = filters.map(f => {
+    const cnt = f.key==='all' ? PATIENTS.length : byStatus(f.key).length;
+    return `<button class="filter-chip ${currentFilter===f.key?'active':''}" data-filter="${f.key}" aria-pressed="${currentFilter===f.key}">
+      ${f.key!=='all'?STATUS_ICONS[f.key]:''}
+      ${f.label} <span class="chip-cnt">${cnt}</span>
+    </button>`;
+  }).join('');
+  document.querySelectorAll('#pcFilterRow .filter-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentFilter = btn.dataset.filter;
+      renderPC();
+    });
+  });
+}
+
+function renderPCSections() {
+  const sections = STATUS_SECTIONS.filter(s => currentFilter==='all' || currentFilter===s.key);
+  document.getElementById('pcSections').innerHTML = sections.map(sec => {
+    const pts = byStatus(sec.key);
+    if (!pts.length) return '';
+    return `<div class="board-section">
+      <div class="sec-hdr">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${sec.color}" stroke-width="2" aria-hidden="true">${STATUS_ICONS[sec.key].replace(/<svg[^>]*>/,'').replace('</svg>','')}</svg>
+        <span style="color:${sec.color}">${sec.label}</span>
+        <span class="sec-cnt" style="${sec.cntStyle||''}">${pts.length}</span>
+      </div>
+      <div class="card-grid">
+        ${pts.map(p => pcCardHtml(p)).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.pt-card').forEach(card => {
+    card.setAttribute('tabindex','0');
+    card.setAttribute('role','button');
+    card.addEventListener('click', () => selectPCCard(card.dataset.id));
+    card.addEventListener('keydown', e => {
+      if (e.key==='Enter'||e.key===' ') { e.preventDefault(); selectPCCard(card.dataset.id); }
+    });
+  });
+}
+
+function pcCardHtml(p) {
+  const pct = progPct(p);
+  const progBg = p.status==='done'?'var(--success)':p.status==='operating'?'var(--warning)':'var(--accent)';
+  return `<article class="pt-card ${p.status} ${p.id===selectedId?'selected':''}" data-id="${p.id}" data-status="${p.status}" aria-label="${p.name} ${STATUS_LABELS[p.status]}">
+    <div class="c-top">
+      <div><div class="c-name">${p.name}</div><div class="c-room">${p.room}</div></div>
+      <span class="s-badge" aria-label="${STATUS_LABELS[p.status]}">${STATUS_ICONS[p.status]}${STATUS_LABELS[p.status]}</span>
+    </div>
+    <div class="c-meta">
+      <div class="c-meta-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        ${p.op}
+      </div>
+      <div class="c-meta-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        ${p.doctor}
+      </div>
+    </div>
+    <div class="c-foot">
+      <div class="prog-wrap">
+        <div class="prog-bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="체크리스트 ${doneCount(p)}/${p.checks.length} 완료">
+          <div class="prog-fill" style="width:${pct}%;background:${progBg}"></div>
+        </div>
+        <span class="prog-text">${doneCount(p)}/${p.checks.length}</span>
+      </div>
+      <span class="time-tag ${p.elapsed.includes('45분')&&p.status==='waiting'?'warn':''}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        ${p.elapsed}
+      </span>
+    </div>
+  </article>`;
+}
+
+function selectPCCard(id) {
+  selectedId = id;
+  renderPC();
+  renderPCPanel(id);
+  document.getElementById('pcPanel').classList.remove('closed');
+}
+
+function renderPCPanel(id) {
+  const p = getPatient(id);
+  if (!p) return;
+  const next = STATUS_NEXT[p.status];
+  const btnLabel = STATUS_BTN_LABELS[p.status];
+  const btnCls = next==='ready'?'btn-blue':next==='operating'?'btn-orange':'btn-green';
+  document.getElementById('pcPanelContent').innerHTML = `
+    <div class="panel-hdr">
+      <div><div class="panel-name">${p.name}</div><div class="panel-sub">${p.room}</div></div>
+      <button class="close-btn" onclick="closePCPanel()" aria-label="패널 닫기">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="panel-body">
+      ${statusFlowHtml(p.status)}
+      <div class="p-sec-title">기본 정보</div>
+      <div class="i-grid">
+        <span class="i-label">담당의</span><span class="i-value">${p.doctor}</span>
+        <span class="i-label">수술명</span><span class="i-value">${p.op}</span>
+        <span class="i-label">시간</span><span class="i-value">${p.time}</span>
+        <span class="i-label">경과</span><span class="i-value">${p.elapsed}</span>
+      </div>
+      <div class="p-sec-title">체크리스트 (${doneCount(p)}/${p.checks.length})</div>
+      ${p.checks.map((c,i) => `
+        <div class="ck-item">
+          <button class="ck-box ${c.done?'on':''}" onclick="pcToggleCheck('${id}',${i})" aria-label="${c.label} ${c.done?'완료':'미완료'}" aria-pressed="${c.done}">
+            ${c.done?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>':''}
+          </button>
+          <span class="ck-text ${c.done?'done':''}">${c.label}</span>
+        </div>
+      `).join('')}
+    </div>
+    <div class="panel-actions">
+      ${next ? `<button class="act-btn ${btnCls}" onclick="pcAdvance('${id}')" aria-label="${btnLabel}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        ${btnLabel}
+      </button>` : `<div style="text-align:center;color:var(--success);font-size:12px;font-weight:700;padding:6px">수술 완료됨</div>`}
+      <button class="act-btn btn-gray" onclick="closePCPanel()">닫기</button>
+    </div>`;
+}
+
+function pcToggleCheck(id, idx) {
+  const p = getPatient(id);
+  p.checks[idx].done = !p.checks[idx].done;
+  renderPC(); renderPCPanel(id);
+}
+
+function pcAdvance(id) {
+  const p = getPatient(id);
+  const next = STATUS_NEXT[p.status];
+  if (!next) return;
+  p.status = next;
+  renderPC(); renderPCPanel(id);
+}
+
+function closePCPanel() {
+  selectedId = null;
+  document.getElementById('pcPanel').classList.add('closed');
+  document.getElementById('pcPanelContent').innerHTML = `
+    <div class="panel-empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <p>환자를 선택하세요</p>
+      <span>카드 클릭 시 상세 표시</span>
+    </div>`;
+  renderPC();
+}
+
+/* ── 모바일 렌더 ── */
+function renderMobile() {
+  renderMobFilters();
+  renderMobList();
+}
+
+function renderMobFilters() {
+  const filters = [{key:'all',label:'전체'}, ...STATUS_SECTIONS.map(s=>({key:s.key,label:s.label}))];
+  document.getElementById('mobFilterRow').innerHTML = filters.map(f => {
+    const cnt = f.key==='all' ? PATIENTS.length : byStatus(f.key).length;
+    return `<button class="mob-chip ${currentFilter===f.key?'active':''}" data-filter="${f.key}" aria-pressed="${currentFilter===f.key}">
+      ${f.key!=='all'?STATUS_ICONS[f.key]:''}
+      ${f.label} <span class="mob-cnt">${cnt}</span>
+    </button>`;
+  }).join('');
+  document.querySelectorAll('#mobFilterRow .mob-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentFilter = btn.dataset.filter;
+      renderMobile();
+    });
+  });
+}
+
+function renderMobList() {
+  const sections = STATUS_SECTIONS.filter(s => currentFilter==='all'||currentFilter===s.key);
+  document.getElementById('mobList').innerHTML = sections.map(sec => {
+    const pts = byStatus(sec.key);
+    if (!pts.length) return '';
+    return `
+      <div class="mob-sec-label" style="color:${sec.color}">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="${sec.color}" stroke-width="2" aria-hidden="true">${STATUS_ICONS[sec.key].replace(/<svg[^>]*>/,'').replace('</svg>','')}</svg>
+        ${sec.label} <span class="mob-sec-cnt" style="${sec.cntStyle}">${pts.length}</span>
+      </div>
+      ${pts.map(p => mobCardHtml(p)).join('')}`;
+  }).join('');
+  document.querySelectorAll('.mob-card').forEach(card => {
+    card.addEventListener('click', () => openMobSheet(card.dataset.id));
+    card.setAttribute('tabindex','0');
+    card.setAttribute('role','button');
+    card.addEventListener('keydown', e => {
+      if (e.key==='Enter'||e.key===' ') { e.preventDefault(); openMobSheet(card.dataset.id); }
+    });
+  });
+}
+
+function mobCardHtml(p) {
+  const pct = progPct(p);
+  const progBg = p.status==='done'?'var(--success)':p.status==='operating'?'var(--warning)':'var(--accent)';
+  return `<article class="mob-card mob-${p.status}" data-id="${p.id}" data-status="${p.status}" aria-label="${p.name} ${STATUS_LABELS[p.status]} — 탭하여 상세 보기">
+    <div class="mob-card-top">
+      <div>
+        <div class="mob-card-name">${p.name}</div>
+        <div class="mob-card-sub">${p.room} · ${p.time} · ${p.doctor}</div>
+      </div>
+      <span class="mob-s-pill" aria-label="${STATUS_LABELS[p.status]}">${STATUS_ICONS[p.status]}${STATUS_LABELS[p.status]}</span>
+    </div>
+    <div class="mob-card-foot">
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted-foreground)">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        ${p.op}
+      </div>
+      <div class="mob-prog" aria-label="체크리스트 ${doneCount(p)}/${p.checks.length} 완료">
+        <div class="mob-prog-bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100">
+          <div class="mob-prog-fill" style="width:${pct}%;background:${progBg}"></div>
+        </div>
+        <span style="font-size:10px;color:var(--muted-foreground)">${doneCount(p)}/${p.checks.length}</span>
+      </div>
+    </div>
+  </article>`;
+}
+
+function openMobSheet(id) {
+  mobOpenId = id;
+  renderMobSheet(id);
+  const overlay = document.getElementById('mobOverlay');
+  const sheet = document.getElementById('mobSheet');
+  overlay.classList.add('vis'); overlay.setAttribute('aria-hidden','false');
+  sheet.setAttribute('aria-hidden','false');
+  requestAnimationFrame(() => sheet.classList.add('open'));
+  document.getElementById('mobList').style.overflow = 'hidden';
+}
+
+function closeMobSheet() {
+  const overlay = document.getElementById('mobOverlay');
+  const sheet = document.getElementById('mobSheet');
+  sheet.classList.remove('open');
+  overlay.classList.remove('vis'); overlay.setAttribute('aria-hidden','true');
+  sheet.setAttribute('aria-hidden','true');
+  document.getElementById('mobList').style.overflow = '';
+  mobOpenId = null;
+}
+
+function renderMobSheet(id) {
+  const p = getPatient(id);
+  if (!p) return;
+  const next = STATUS_NEXT[p.status];
+  const btnLabel = STATUS_BTN_LABELS[p.status];
+  const btnCls = next==='ready'?'btn-blue':next==='operating'?'btn-orange':'btn-green';
+  document.getElementById('mobSheetContent').innerHTML = `
+    <div class="mob-sheet-hdr">
+      <div>
+        <div class="mob-sheet-title">${p.name}</div>
+        <div class="mob-sheet-sub">${p.room} · ${p.doctor}</div>
+      </div>
+      <button class="mob-sheet-close" onclick="closeMobSheet()" aria-label="닫기">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="mob-sheet-body">
+      ${statusFlowHtml(p.status)}
+      <div class="mob-i-grid">
+        <span class="mob-i-label">수술명</span><span class="mob-i-value">${p.op}</span>
+        <span class="mob-i-label">시간</span><span class="mob-i-value">${p.time}</span>
+        <span class="mob-i-label">경과</span><span class="mob-i-value">${p.elapsed}</span>
+      </div>
+      <div style="font-size:10px;font-weight:700;color:var(--muted-foreground);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">체크리스트 (${doneCount(p)}/${p.checks.length})</div>
+      ${p.checks.map((c,i) => `
+        <div class="mob-ck-item">
+          <button class="mob-ck-box ${c.done?'on':''}" onclick="mobToggleCheck('${id}',${i})" aria-label="${c.label} ${c.done?'완료':'미완료'}" aria-pressed="${c.done}">
+            ${c.done?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>':''}
+          </button>
+          <span class="mob-ck-text ${c.done?'done':''}">${c.label}</span>
+        </div>
+      `).join('')}
+    </div>
+    <div class="mob-sheet-actions">
+      ${next ? `<button class="mob-act-btn ${btnCls}" onclick="mobAdvance('${id}')" aria-label="${btnLabel}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        ${btnLabel}
+      </button>` : `<div style="text-align:center;padding:8px;color:var(--success);font-size:14px;font-weight:700">수술 완료됨</div>`}
+      <button class="mob-act-btn btn-gray" onclick="closeMobSheet()">닫기</button>
+    </div>`;
+}
+
+function mobToggleCheck(id, idx) {
+  const p = getPatient(id);
+  p.checks[idx].done = !p.checks[idx].done;
+  renderMobSheet(id);
+}
+
+function mobAdvance(id) {
+  const p = getPatient(id);
+  const next = STATUS_NEXT[p.status];
+  if (!next) return;
+  p.status = next;
+  renderMobile();
+  renderMobSheet(id);
+}
+
+document.getElementById('mobOverlay').addEventListener('click', closeMobSheet);
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape' && mobOpenId) closeMobSheet();
+  if (e.key==='Escape' && selectedId) closePCPanel();
+});
+
+/* ── 모드 & 테마 토글 ── */
+document.querySelectorAll('[data-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-mode]').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed','false'); });
+    btn.classList.add('active'); btn.setAttribute('aria-pressed','true');
+    currentMode = btn.dataset.mode;
+    currentFilter = 'all';
+    selectedId = null;
+    const frame = document.getElementById('deviceFrame');
+    frame.className = `device-frame mode-${currentMode}`;
+    document.getElementById('pcLayout').style.display = currentMode==='pc' ? 'flex' : 'none';
+    document.getElementById('mobileLayout').style.display = currentMode==='mobile' ? 'flex' : 'none';
+    if (currentMode==='pc') renderPC(); else renderMobile();
+  });
+});
+
+document.querySelectorAll('[data-theme]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-theme]').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed','false'); });
+    btn.classList.add('active'); btn.setAttribute('aria-pressed','true');
+    const frame = document.getElementById('deviceFrame');
+    if (btn.dataset.theme==='dark') frame.classList.add('dark');
+    else frame.classList.remove('dark');
+  });
+});
+
+/* ── 초기 렌더 ── */
+renderPC();
+</script>
+</body>
+</html>

@@ -29,6 +29,13 @@ export function createEmptyStaffForm(selectedCompany?: string) {
     ins_national: true, ins_health: true, ins_employment: true, ins_injury: true, is_basic_living: false, other_welfare: '',
     ins_duru_nuri: false, duru_nuri_start: '', duru_nuri_end: '', is_medical_benefit: false,
     working_hours_per_week: 40, working_days_per_week: 5,
+    // ── 다중 입력 (개편) ──────────────────────────────────────────────
+    /** 면허/자격증 다중 rows */
+    licenses: [] as import('./staff-registration-types').LicenseRow[],
+    /** 직종 다중 선택 */
+    jobCategories: [] as import('./staff-registration-types').SelectedJobCategory[],
+    /** 근무유형 다중 배정 */
+    shiftAssignments: [] as import('./staff-registration-types').SelectedShiftAssignment[],
   };
 }
 

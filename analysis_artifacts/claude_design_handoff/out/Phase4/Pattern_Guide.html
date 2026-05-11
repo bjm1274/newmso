@@ -1,0 +1,1496 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MSO ERP — Phase 4 반복 UX 패턴 가이드</title>
+<style>
+/* ─── 디자인 토큰 ─────────────────────────────── */
+:root {
+  --accent:       #2563EB;
+  --accent-light: #EFF6FF;
+  --danger:       #DC2626;
+  --danger-light: #FEF2F2;
+  --warning:      #D97706;
+  --warning-light:#FFFBEB;
+  --success:      #16A34A;
+  --success-light:#F0FDF4;
+  --info:         #0891B2;
+  --info-light:   #ECFEFF;
+  --foreground:   #111827;
+  --muted:        #F3F4F6;
+  --muted-text:   #6B7280;
+  --border:       #E5E7EB;
+  --card:         #FFFFFF;
+  --radius-sm:    4px;
+  --radius-md:    8px;
+  --radius-lg:    12px;
+  --radius-xl:    16px;
+  --touch-target: 44px;
+  --sidebar-width:64px;
+  --submenu-width:156px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  color: var(--foreground);
+  line-height: 1.6;
+}
+
+/* ─── 레이아웃 ───────────────────────────────── */
+body { margin: 0; background: #F9FAFB; }
+.page-header {
+  background: var(--accent);
+  color: #fff;
+  padding: 28px 40px;
+}
+.page-header h1 { margin: 0 0 4px; font-size: 22px; font-weight: 700; }
+.page-header p  { margin: 0; opacity: .8; font-size: 13px; }
+
+nav.toc {
+  position: sticky;
+  top: 0;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 0 40px;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  z-index: 100;
+}
+nav.toc a {
+  display: inline-block;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted-text);
+  text-decoration: none;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+}
+nav.toc a:hover,
+nav.toc a:focus { color: var(--accent); border-bottom-color: var(--accent); }
+
+main { max-width: 1100px; margin: 0 auto; padding: 40px; }
+
+/* ─── 섹션 ───────────────────────────────────── */
+section.pattern { margin-bottom: 72px; }
+section.pattern > h2 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pattern-number {
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius-md);
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .05em;
+}
+section.pattern > p.intro {
+  color: var(--muted-text);
+  margin: 8px 0 24px;
+}
+
+/* ─── 변형 그리드 ─────────────────────────────── */
+.variants {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+@media (max-width: 720px) { .variants { grid-template-columns: 1fr; } }
+
+.variant-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.variant-header {
+  padding: 12px 16px;
+  background: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.device-tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--border);
+  color: var(--muted-text);
+}
+.device-tag.mobile { background: #EDE9FE; color: #7C3AED; }
+.device-tag.pc     { background: #DBEAFE; color: #1D4ED8; }
+
+.variant-body { padding: 16px; }
+
+/* ─── 시각 예시 컨테이너 ─────────────────────── */
+.preview-box {
+  background: #F8FAFC;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  margin-bottom: 12px;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* 모바일 프레임 */
+.mobile-frame {
+  width: 320px;
+  max-width: 100%;
+  margin: 0 auto;
+  background: var(--card);
+  border: 2px solid #374151;
+  border-radius: var(--radius-xl);
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.12);
+}
+
+/* ─── 가이드라인 박스 ─────────────────────────── */
+.rules {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 16px 0;
+}
+@media (max-width: 600px) { .rules { grid-template-columns: 1fr; } }
+.rule-box {
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.rule-box.do   { background: var(--success-light); border-left: 3px solid var(--success); }
+.rule-box.dont { background: var(--danger-light);  border-left: 3px solid var(--danger); }
+.rule-box strong { display: block; font-size: 11px; font-weight: 700; margin-bottom: 4px; }
+.rule-box li { margin: 2px 0; }
+.rule-box ul { margin: 0; padding-left: 16px; }
+
+/* ─── 코드 스니펫 ─────────────────────────────── */
+details.code-block {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+details.code-block summary {
+  padding: 8px 14px;
+  background: #1E293B;
+  color: #94A3B8;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+details.code-block summary::before {
+  content: "▶";
+  font-size: 9px;
+  transition: transform .2s;
+}
+details.code-block[open] summary::before { transform: rotate(90deg); }
+details.code-block pre {
+  margin: 0;
+  background: #0F172A;
+  color: #E2E8F0;
+  padding: 16px;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-x: auto;
+  tab-size: 2;
+}
+details.code-block code { font-family: "Fira Code", Consolas, monospace; }
+
+/* ─── 접근성 체크 인라인 ─────────────────────── */
+.a11y-checks {
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin-top: 12px;
+}
+.a11y-checks p {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--success);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.a11y-checks ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: #166534;
+  line-height: 1.8;
+}
+
+/* ─── UI 컴포넌트 (예시용) ────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 16px;
+  height: var(--touch-target);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: opacity .15s;
+  text-decoration: none;
+}
+.btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-danger  { background: var(--danger); color: #fff; }
+.btn-ghost   { background: transparent; color: var(--muted-text); border: 1px solid var(--border); }
+.btn:hover   { opacity: .88; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.spinner {
+  display: inline-block;
+  width: 20px; height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; border-top-color: var(--accent); opacity: .6; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #F1F5F9 25%, #E2E8F0 50%, #F1F5F9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: var(--radius-sm);
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; background: #F1F5F9; }
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+}
+.badge-blue    { background: var(--accent-light); color: var(--accent); }
+.badge-green   { background: var(--success-light); color: var(--success); }
+.badge-red     { background: var(--danger-light); color: var(--danger); }
+.badge-yellow  { background: var(--warning-light); color: var(--warning); }
+.badge-gray    { background: var(--muted); color: var(--muted-text); }
+
+/* ─── 토스트 ──────────────────────────────────── */
+.toast-demo { display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(0,0,0,.1);
+  background: var(--card);
+  border: 1px solid var(--border);
+  max-width: 360px;
+}
+.toast-icon { font-size: 16px; line-height: 1; margin-top: 1px; flex-shrink: 0; }
+.toast .close { margin-left: auto; background: none; border: none; cursor: pointer;
+  color: var(--muted-text); font-size: 16px; padding: 0; line-height: 1;
+  min-width: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm); }
+.toast .close:focus-visible { outline: 2px solid var(--accent); }
+.toast.info    { border-left: 3px solid var(--info); }
+.toast.success { border-left: 3px solid var(--success); }
+.toast.warning { border-left: 3px solid var(--warning); }
+.toast.error   { border-left: 3px solid var(--danger); }
+
+/* ─── 모달 ────────────────────────────────────── */
+.modal-demo {
+  background: rgba(0,0,0,.35);
+  padding: 24px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal-box {
+  background: var(--card);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.18);
+}
+.modal-box h3 { margin: 0 0 8px; font-size: 16px; }
+.modal-box p  { margin: 0 0 20px; font-size: 13px; color: var(--muted-text); }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* ─── 폼 입력 ─────────────────────────────────── */
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: 12px; font-weight: 600; color: #374151; }
+.form-group input {
+  padding: 0 12px;
+  height: var(--touch-target);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  color: var(--foreground);
+  background: var(--card);
+  outline: none;
+  transition: border-color .15s;
+}
+.form-group input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+.form-group input[aria-invalid="true"] { border-color: var(--danger); }
+.form-error { font-size: 12px; color: var(--danger); display: flex; align-items: center; gap: 4px; }
+
+/* ─── 바텀시트 ────────────────────────────────── */
+.bottomsheet {
+  background: var(--card);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  padding: 16px 20px 24px;
+  box-shadow: 0 -4px 16px rgba(0,0,0,.12);
+}
+.bottomsheet-handle {
+  width: 36px; height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 0 auto 16px;
+}
+.bottomsheet h3 { margin: 0 0 12px; font-size: 15px; font-weight: 700; }
+
+/* ─── 진행률 바 ───────────────────────────────── */
+.progress-track {
+  height: 6px;
+  background: var(--muted);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width .4s ease;
+}
+
+/* ─── Empty state ─────────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px 20px;
+  text-align: center;
+}
+.empty-icon { font-size: 36px; line-height: 1; }
+.empty-title { font-size: 15px; font-weight: 700; color: var(--foreground); margin: 0; }
+.empty-desc  { font-size: 13px; color: var(--muted-text); margin: 0; max-width: 280px; }
+
+/* ─── OTP 입력 ────────────────────────────────── */
+.otp-row { display: flex; gap: 8px; justify-content: center; }
+.otp-input {
+  width: 44px; height: 52px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  outline: none;
+  transition: border-color .15s;
+}
+.otp-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+.otp-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ─── 알림 배너 ───────────────────────────────── */
+.banner {
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.banner.info    { background: var(--info-light); border: 1px solid #A5F3FC; color: #164E63; }
+.banner.warning { background: var(--warning-light); border: 1px solid #FDE68A; color: #92400E; }
+.banner.error   { background: var(--danger-light); border: 1px solid #FECACA; color: #991B1B; }
+
+/* ─── 인라인 에러 ─────────────────────────────── */
+.inline-error {
+  padding: 10px 14px;
+  background: var(--danger-light);
+  border: 1px solid #FECACA;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: #991B1B;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.inline-error a { color: #DC2626; font-weight: 600; }
+
+/* ─── 벨 배지 ─────────────────────────────────── */
+.bell-btn {
+  position: relative;
+  width: 40px; height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+.bell-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bell-badge {
+  position: absolute;
+  top: -4px; right: -4px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 18px; height: 18px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  border: 2px solid var(--card);
+}
+
+/* ─── 유틸 ────────────────────────────────────── */
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px;
+  background: var(--accent-light);
+  color: var(--accent);
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+.text-muted { color: var(--muted-text); }
+.text-sm    { font-size: 12px; }
+.gap-2 { display: flex; gap: 8px; }
+.flex-col { flex-direction: column; }
+</style>
+</head>
+<body>
+
+<header class="page-header" role="banner">
+  <h1>MSO ERP — Phase 4 반복 UX 패턴 가이드</h1>
+  <p>버전 1.0 · 2026-05-11 · PC + Mobile 양쪽 변형 · JM6 접근성 준수</p>
+</header>
+
+<nav class="toc" aria-label="패턴 목차">
+  <a href="#pat1">P1 빈 상태</a>
+  <a href="#pat2">P2 로딩</a>
+  <a href="#pat3">P3 에러</a>
+  <a href="#pat4">P4 확인 모달</a>
+  <a href="#pat5">P5 알림</a>
+  <a href="#pat6">P6 확인 입력</a>
+</nav>
+
+<main>
+
+<!-- ════════════════════════════════════════════
+     P1 — 빈 상태 (Empty State)
+════════════════════════════════════════════ -->
+<section class="pattern" id="pat1" aria-labelledby="pat1-title">
+  <h2 id="pat1-title"><span class="pattern-number">P1</span> 빈 상태 (Empty State)</h2>
+  <p class="intro">
+    콘텐츠가 없을 때 사용자에게 이유와 다음 행동을 안내하는 패턴.
+    아이콘 + 제목 + 설명 + (선택) 액션 버튼의 4-레이어 구조를 기본으로 한다.
+  </p>
+
+  <div class="variants">
+    <!-- PC 변형 -->
+    <article class="variant-card" aria-label="PC 빈 상태 변형">
+      <div class="variant-header">
+        4가지 변형 <span class="device-tag pc">PC</span>
+      </div>
+      <div class="variant-body">
+        <div class="preview-box" role="img" aria-label="PC 빈 상태 예시 4종">
+          <!-- 신규 사용자 -->
+          <div class="empty-state" style="border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;">
+            <div class="empty-icon" aria-hidden="true">📋</div>
+            <p class="empty-title">아직 데이터가 없습니다</p>
+            <p class="empty-desc">첫 번째 항목을 추가해 시작하세요.</p>
+            <button class="btn btn-primary" style="margin-top:8px;">+ 새로 추가</button>
+          </div>
+          <!-- 검색 결과 없음 -->
+          <div class="empty-state" style="border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;">
+            <div class="empty-icon" aria-hidden="true">🔍</div>
+            <p class="empty-title">검색 결과가 없습니다</p>
+            <p class="empty-desc">"홍길동"과 일치하는 항목을 찾지 못했습니다.</p>
+            <button class="btn btn-ghost" style="margin-top:8px;">검색어 지우기</button>
+          </div>
+          <!-- 권한 없음 -->
+          <div class="empty-state" style="border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;">
+            <div class="empty-icon" aria-hidden="true">🔒</div>
+            <p class="empty-title">접근 권한이 없습니다</p>
+            <p class="empty-desc">이 메뉴를 보려면 관리자에게 권한을 요청하세요.</p>
+          </div>
+          <!-- 오류 -->
+          <div class="empty-state" style="border:1px dashed var(--danger);border-radius:var(--radius-lg);padding:24px;background:var(--danger-light);">
+            <div class="empty-icon" aria-hidden="true">⚠️</div>
+            <p class="empty-title" style="color:var(--danger);">데이터를 불러오지 못했습니다</p>
+            <p class="empty-desc">잠시 후 다시 시도해주세요.</p>
+            <button class="btn btn-danger" style="margin-top:8px;">다시 시도</button>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- Mobile 변형 -->
+    <article class="variant-card" aria-label="Mobile 빈 상태 변형">
+      <div class="variant-header">
+        신규 사용자 변형 <span class="device-tag mobile">Mobile</span>
+      </div>
+      <div class="variant-body">
+        <div class="preview-box">
+          <div class="mobile-frame">
+            <div class="empty-state" style="padding:32px 16px;">
+              <div class="empty-icon" aria-hidden="true">📋</div>
+              <p class="empty-title">아직 데이터가 없습니다</p>
+              <p class="empty-desc" style="font-size:12px;">첫 번째 항목을 추가해 시작하세요.</p>
+              <button class="btn btn-primary" style="margin-top:12px;width:100%;max-width:240px;">
+                + 새로 추가
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <div class="rules">
+    <div class="rule-box do">
+      <strong>✅ 사용해야 할 때</strong>
+      <ul>
+        <li>목록·테이블에 행이 0개일 때</li>
+        <li>검색 결과가 없을 때</li>
+        <li>RBAC으로 데이터 접근 차단 시</li>
+        <li>API 에러로 데이터 로드 실패 시</li>
+      </ul>
+    </div>
+    <div class="rule-box dont">
+      <strong>🚫 사용 금지</strong>
+      <ul>
+        <li>로딩 중 — 스켈레톤/스피너 사용</li>
+        <li>부분 데이터가 있는데 적용 (P3 에러 사용)</li>
+        <li>아이콘 없이 텍스트만 표시</li>
+        <li>액션 없는 오류 빈 상태 (재시도 버튼 필수)</li>
+      </ul>
+    </div>
+  </div>
+
+  <details class="code-block">
+    <summary>코드 스니펫 — EmptyState 컴포넌트</summary>
+    <pre><code>// components/ui/EmptyState.tsx
+'use client';
+import type { ReactNode } from 'react';
+
+type EmptyVariant = 'default' | 'search' | 'permission' | 'error';
+
+// error 변형은 role="alert" — 스크린 리더 즉시 읽음
+const ROLE_MAP: Record&lt;EmptyVariant, string&gt; = {
+  default: 'region', search: 'region', permission: 'region', error: 'alert',
+};
+
+export function EmptyState({
+  variant, icon, title, description, action, className,
+}: {
+  variant: EmptyVariant; icon: string; title: string;
+  description?: string; action?: ReactNode; className?: string;
+}) {
+  return (
+    &lt;div role={ROLE_MAP[variant]} aria-label={title}
+      className={`empty-state ${className ?? ''}`}&gt;
+      &lt;span aria-hidden="true" className="empty-icon"&gt;{icon}&lt;/span&gt;
+      &lt;p className="empty-title"&gt;{title}&lt;/p&gt;
+      {description &amp;&amp; &lt;p className="empty-desc"&gt;{description}&lt;/p&gt;}
+      {action}
+    &lt;/div&gt;
+  );
+}
+// 사용 예: &lt;EmptyState variant="error" icon="⚠️" title="로드 실패"
+//   action={&lt;button className="btn btn-danger" onClick={retry}&gt;다시 시도&lt;/button&gt;} /&gt;</code></pre>
+  </details>
+
+  <div class="a11y-checks" role="note" aria-label="접근성 체크">
+    <p>♿ 접근성 체크 (JM6)</p>
+    <ul>
+      <li>에러 변형은 <code>role="alert"</code> — 스크린 리더가 즉시 읽음</li>
+      <li>장식 아이콘에 <code>aria-hidden="true"</code> 필수</li>
+      <li>액션 버튼은 <code>&lt;button&gt;</code> 태그, 설명적인 텍스트 포함</li>
+      <li>빈 상태 컨테이너에 <code>aria-label</code>로 문맥 제공</li>
+      <li>모바일 액션 버튼 터치 타깃 ≥ 44px (height: var(--touch-target))</li>
+    </ul>
+  </div>
+</section>
+
+<hr class="divider" aria-hidden="true">
+
+<!-- ════════════════════════════════════════════
+     P2 — 로딩 (Loading)
+════════════════════════════════════════════ -->
+<section class="pattern" id="pat2" aria-labelledby="pat2-title">
+  <h2 id="pat2-title"><span class="pattern-number">P2</span> 로딩 (Loading)</h2>
+  <p class="intro">
+    비동기 작업 진행 중임을 알리는 패턴. 인라인(컴포넌트 내) vs 전체화면,
+    스피너 vs 스켈레톤 vs 프로그레스 선택 기준이 핵심이다.
+  </p>
+
+  <div class="variants">
+    <article class="variant-card" aria-label="PC 로딩 패턴">
+      <div class="variant-header">스피너 · 스켈레톤 · 프로그레스 <span class="device-tag pc">PC</span></div>
+      <div class="variant-body">
+        <div class="preview-box" role="img" aria-label="PC 로딩 예시">
+          <!-- 스피너 인라인 -->
+          <div style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-md);">
+            <div class="spinner" role="status" aria-label="로딩 중"></div>
+            <span style="font-size:13px;color:var(--muted-text);">데이터 불러오는 중…</span>
+          </div>
+
+          <!-- 스켈레톤 카드 -->
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;display:flex;gap:12px;" aria-busy="true" aria-label="콘텐츠 로딩 중">
+            <div class="skeleton" style="width:40px;height:40px;border-radius:50%;flex-shrink:0;"></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:8px;">
+              <div class="skeleton" style="height:14px;width:60%;"></div>
+              <div class="skeleton" style="height:12px;width:85%;"></div>
+              <div class="skeleton" style="height:12px;width:40%;"></div>
+            </div>
+          </div>
+
+          <!-- 프로그레스 바 -->
+          <div style="padding:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-md);">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:12px;">
+              <span>파일 업로드 중…</span><span style="color:var(--accent);">67%</span>
+            </div>
+            <div class="progress-track" role="progressbar" aria-valuenow="67" aria-valuemin="0" aria-valuemax="100" aria-label="파일 업로드 진행률">
+              <div class="progress-fill" style="width:67%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="variant-card" aria-label="Mobile 로딩 패턴">
+      <div class="variant-header">전체화면 로딩 <span class="device-tag mobile">Mobile</span></div>
+      <div class="variant-body">
+        <div class="preview-box">
+          <div class="mobile-frame">
+            <!-- 전체화면 스피너 -->
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 20px;gap:14px;" role="status" aria-label="페이지 로딩 중">
+              <div class="spinner" style="width:36px;height:36px;border-width:3px;"></div>
+              <p style="margin:0;font-size:13px;color:var(--muted-text);">로딩 중입니다…</p>
+            </div>
+            <!-- 스켈레톤 리스트 (모바일) -->
+            <div aria-busy="true" aria-label="목록 로딩 중">
+              <div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border);">
+                <div class="skeleton" style="width:36px;height:36px;border-radius:50%;flex-shrink:0;"></div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+                  <div class="skeleton" style="height:12px;width:50%;"></div>
+                  <div class="skeleton" style="height:11px;width:75%;"></div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border);">
+                <div class="skeleton" style="width:36px;height:36px;border-radius:50%;flex-shrink:0;"></div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+                  <div class="skeleton" style="height:12px;width:65%;"></div>
+                  <div class="skeleton" style="height:11px;width:40%;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <div class="rules">
+    <div class="rule-box do">
+      <strong>✅ 선택 기준</strong>
+      <ul>
+        <li><strong>스피너</strong>: 버튼 액션, 짧은 대기(&lt;2s)</li>
+        <li><strong>스켈레톤</strong>: 목록·카드 초기 로드</li>
+        <li><strong>프로그레스</strong>: 파일 업로드, 장시간 처리</li>
+        <li><strong>전체화면</strong>: 초기 앱/페이지 로드만</li>
+      </ul>
+    </div>
+    <div class="rule-box dont">
+      <strong>🚫 사용 금지</strong>
+      <ul>
+        <li>스피너 + 스켈레톤 동시 사용</li>
+        <li>전체화면 스피너를 인라인 액션에 사용</li>
+        <li>진행률 없이 프로그레스 바 사용</li>
+        <li>로딩 상태에서 인터랙션 허용 (disabled 처리)</li>
+      </ul>
+    </div>
+  </div>
+
+  <details class="code-block">
+    <summary>코드 스니펫 — Spinner · Skeleton · ProgressBar</summary>
+    <pre><code>// components/ui/Loading.tsx
+'use client';
+import { useId } from 'react';
+
+/** 인라인 스피너 — role="status" aria-label 필수 */
+export function Spinner({ label = '로딩 중' }: { label?: string }) {
+  return &lt;span role="status" aria-label={label} className="spinner" /&gt;;
+}
+
+/** 스켈레톤 블록 — aria-hidden, 부모에 aria-busy="true" */
+export function Skeleton({ width, height = 14, className }: {
+  width?: string; height?: number; className?: string;
+}) {
+  return (
+    &lt;div aria-hidden="true" className={`skeleton ${className ?? ''}`}
+      style={{ width: width ?? '100%', height }} /&gt;
+  );
+}
+
+/** 진행률 표시 — role="progressbar" + aria-valuenow/min/max */
+export function ProgressBar({ value, label }: { value: number; label: string }) {
+  const id = useId();
+  return (
+    &lt;div&gt;
+      &lt;div id={id} className="text-sm text-muted"&gt;{label} {value}%&lt;/div&gt;
+      &lt;div role="progressbar" aria-valuenow={value}
+        aria-valuemin={0} aria-valuemax={100} aria-labelledby={id}
+        className="progress-track"&gt;
+        &lt;div className="progress-fill" style={{ width: `${value}%` }} /&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}
+
+/** 스켈레톤 래퍼 */
+export function SkeletonCard({ children }: { children: React.ReactNode }) {
+  return &lt;div aria-busy="true" aria-label="콘텐츠 로딩 중"&gt;{children}&lt;/div&gt;;
+}</code></pre>
+  </details>
+
+  <div class="a11y-checks" role="note" aria-label="접근성 체크">
+    <p>♿ 접근성 체크 (JM6)</p>
+    <ul>
+      <li>스피너: <code>role="status"</code> + <code>aria-label="로딩 중"</code></li>
+      <li>스켈레톤 컨테이너: <code>aria-busy="true"</code>, 개별 블록은 <code>aria-hidden="true"</code></li>
+      <li>프로그레스: <code>role="progressbar"</code> + <code>aria-valuenow/min/max</code> 필수</li>
+      <li><code>prefers-reduced-motion</code>: 애니메이션 비활성화 CSS 적용</li>
+      <li>로딩 중 버튼에 <code>disabled</code> + <code>aria-disabled="true"</code></li>
+    </ul>
+  </div>
+</section>
+
+<hr class="divider" aria-hidden="true">
+
+<!-- ════════════════════════════════════════════
+     P3 — 에러 (Error)
+════════════════════════════════════════════ -->
+<section class="pattern" id="pat3" aria-labelledby="pat3-title">
+  <h2 id="pat3-title"><span class="pattern-number">P3</span> 에러 (Error)</h2>
+  <p class="intro">
+    인라인(폼 필드·섹션) / 페이지 수준 / 토스트 3가지 범위로 나뉜다.
+    복구 가능 에러는 재시도 액션을, 치명적 에러는 홈/로그아웃 유도를 포함한다.
+  </p>
+
+  <div class="variants">
+    <article class="variant-card" aria-label="PC 에러 패턴">
+      <div class="variant-header">인라인 · 페이지 에러 <span class="device-tag pc">PC</span></div>
+      <div class="variant-body">
+        <div class="preview-box" role="img" aria-label="PC 에러 예시">
+          <!-- 인라인 에러 -->
+          <div class="inline-error" role="alert">
+            <span aria-hidden="true">⚠️</span>
+            <div>
+              <strong style="display:block;font-size:13px;margin-bottom:2px;">데이터 로드 실패</strong>
+              <span style="font-size:12px;">네트워크 오류가 발생했습니다. <a href="#" class="inline-error a">다시 시도</a></span>
+            </div>
+          </div>
+          <!-- 페이지 에러 (500) -->
+          <div class="empty-state" style="border:1px solid var(--danger);border-radius:var(--radius-lg);padding:24px;background:var(--danger-light);">
+            <div class="empty-icon" aria-hidden="true">🔥</div>
+            <p class="empty-title" style="color:var(--danger);">서버 오류가 발생했습니다</p>
+            <p class="empty-desc">잠시 후 다시 시도하거나 관리자에게 문의하세요. (코드: 500)</p>
+            <div class="gap-2" style="margin-top:12px;">
+              <button class="btn btn-ghost">홈으로</button>
+              <button class="btn btn-danger">다시 시도</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="variant-card" aria-label="Mobile 에러 패턴">
+      <div class="variant-header">토스트 에러 + 바텀시트 <span class="device-tag mobile">Mobile</span></div>
+      <div class="variant-body">
+        <div class="preview-box">
+          <div class="mobile-frame">
+            <!-- 토스트 에러 -->
+            <div class="toast error" role="alert" aria-live="assertive" aria-atomic="true" style="max-width:100%;">
+              <span class="toast-icon" aria-hidden="true">❌</span>
+              <div>
+                <strong style="display:block;font-size:12px;">저장 실패</strong>
+                <span style="font-size:11px;color:var(--muted-text);">잠시 후 다시 시도해주세요.</span>
+              </div>
+              <button class="close" aria-label="알림 닫기">✕</button>
+            </div>
+            <!-- 인라인 폼 에러 -->
+            <div style="margin-top:16px;" class="form-group">
+              <label for="err-field">이름</label>
+              <input
+                id="err-field"
+                type="text"
+                value="홍"
+                aria-invalid="true"
+                aria-describedby="err-field-msg"
+              >
+              <span id="err-field-msg" class="form-error" role="alert">
+                <span aria-hidden="true">⚠</span> 2자 이상 입력해주세요.
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <div class="rules">
+    <div class="rule-box do">
+      <strong>✅ 범위별 사용 기준</strong>
+      <ul>
+        <li><strong>인라인</strong>: 섹션·폼 단위 부분 오류</li>
+        <li><strong>토스트</strong>: 일시적·복구 가능 오류 (3–5초)</li>
+        <li><strong>페이지</strong>: 404·500·권한 차단 전체 화면</li>
+        <li>치명적 오류: 재시도 + 홈으로 버튼 모두 제공</li>
+      </ul>
+    </div>
+    <div class="rule-box dont">
+      <strong>🚫 사용 금지</strong>
+      <ul>
+        <li>에러 코드를 사용자에게 그대로 노출</li>
+        <li>console.log에 민감 정보(토큰·ID) 출력</li>
+        <li>에러만 표시하고 복구 경로 미제공</li>
+        <li>토스트를 치명적 오류에 사용 (묻힐 수 있음)</li>
+      </ul>
+    </div>
+  </div>
+
+  <details class="code-block">
+    <summary>코드 스니펫 — InlineError · ErrorPage</summary>
+    <pre><code>// components/ui/ErrorDisplay.tsx
+'use client';
+
+interface InlineErrorProps {
+  message: string;
+  onRetry?: () => void;
+}
+
+/** 섹션 단위 에러 — role="alert"로 즉시 읽힘 */
+export function InlineError({ message, onRetry }: InlineErrorProps) {
+  return (
+    &lt;div role="alert" className="inline-error"&gt;
+      &lt;span aria-hidden="true"&gt;⚠️&lt;/span&gt;
+      &lt;div&gt;
+        &lt;strong&gt;오류&lt;/strong&gt;
+        &lt;p style={{ margin: '2px 0 0' }}&gt;{message}&lt;/p&gt;
+      &lt;/div&gt;
+      {onRetry &amp;&amp; (
+        &lt;button
+          className="btn btn-ghost"
+          onClick={onRetry}
+          style={{ marginLeft: 'auto', height: 32 }}
+        &gt;
+          다시 시도
+        &lt;/button&gt;
+      )}
+    &lt;/div&gt;
+  );
+}
+
+/** 페이지 수준 에러 — Next.js error.tsx에서 사용 */
+export function ErrorPage({
+  title = '오류가 발생했습니다',
+  description,
+  onRetry,
+}: {
+  title?: string;
+  description?: string;
+  onRetry?: () => void;
+}) {
+  return (
+    &lt;main
+      role="main"
+      aria-labelledby="err-title"
+      className="empty-state"
+      style={{ minHeight: '60vh' }}
+    &gt;
+      &lt;span aria-hidden="true" className="empty-icon"&gt;⚠️&lt;/span&gt;
+      &lt;h1 id="err-title" className="empty-title"&gt;{title}&lt;/h1&gt;
+      {description &amp;&amp; &lt;p className="empty-desc"&gt;{description}&lt;/p&gt;}
+      &lt;div className="gap-2" style={{ marginTop: 16 }}&gt;
+        &lt;a href="/" className="btn btn-ghost"&gt;홈으로&lt;/a&gt;
+        {onRetry &amp;&amp; (
+          &lt;button className="btn btn-danger" onClick={onRetry}&gt;
+            다시 시도
+          &lt;/button&gt;
+        )}
+      &lt;/div&gt;
+    &lt;/main&gt;
+  );
+}
+
+// ⚠ JM5: 에러 로그에 토큰·비밀번호·주민번호 절대 포함 금지
+// 사용자 메시지와 개발자 로그는 반드시 분리 (JM3)</code></pre>
+  </details>
+
+  <div class="a11y-checks" role="note" aria-label="접근성 체크">
+    <p>♿ 접근성 체크 (JM6)</p>
+    <ul>
+      <li>인라인·토스트 에러: <code>role="alert"</code> 또는 <code>aria-live="assertive"</code></li>
+      <li>폼 필드 에러: <code>aria-invalid="true"</code> + <code>aria-describedby</code> 연결</li>
+      <li>에러 메시지 ID는 안정적 (렌더링마다 변경 금지)</li>
+      <li>재시도 버튼: 포커스 이동 후 <code>aria-label</code>에 맥락 포함</li>
+      <li>색상만으로 에러 표현 금지 — 아이콘·텍스트 병행 필수</li>
+    </ul>
+  </div>
+</section>
+
+<hr class="divider" aria-hidden="true">
+
+<!-- ════════════════════════════════════════════
+     P4 — 확인 모달 (Confirm)
+════════════════════════════════════════════ -->
+<section class="pattern" id="pat4" aria-labelledby="pat4-title">
+  <h2 id="pat4-title"><span class="pattern-number">P4</span> 확인 모달 (Confirm)</h2>
+  <p class="intro">
+    사용자 의도를 재확인하는 패턴. 일반 / 파괴적(삭제) / 비가역 3단계로
+    위험도에 따라 디자인 강도를 높인다. PC는 다이얼로그 모달,
+    Mobile은 바텀시트로 표현한다.
+  </p>
+
+  <div class="variants">
+    <article class="variant-card" aria-label="PC 확인 모달 3종">
+      <div class="variant-header">일반 · 파괴적 · 비가역 <span class="device-tag pc">PC</span></div>
+      <div class="variant-body">
+        <div class="preview-box" role="img" aria-label="PC 확인 모달 예시">
+          <!-- 일반 -->
+          <div class="modal-demo" style="margin-bottom:12px;">
+            <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="cm-title-1">
+              <h3 id="cm-title-1">변경 사항을 저장할까요?</h3>
+              <p>저장하지 않으면 입력한 내용이 사라집니다.</p>
+              <div class="modal-actions">
+                <button class="btn btn-ghost">취소</button>
+                <button class="btn btn-primary">저장</button>
+              </div>
+            </div>
+          </div>
+          <!-- 파괴적 -->
+          <div class="modal-demo" style="margin-bottom:12px;">
+            <div class="modal-box" role="alertdialog" aria-modal="true" aria-labelledby="cm-title-2" aria-describedby="cm-desc-2">
+              <h3 id="cm-title-2" style="color:var(--danger);">항목을 삭제할까요?</h3>
+              <p id="cm-desc-2">삭제 후에도 30일간 휴지통에서 복원 가능합니다.</p>
+              <div class="modal-actions">
+                <button class="btn btn-ghost">취소</button>
+                <button class="btn btn-danger">삭제</button>
+              </div>
+            </div>
+          </div>
+          <!-- 비가역 -->
+          <div class="modal-demo">
+            <div class="modal-box" role="alertdialog" aria-modal="true" aria-labelledby="cm-title-3" aria-describedby="cm-desc-3" style="border:2px solid var(--danger);">
+              <h3 id="cm-title-3" style="color:var(--danger);">계정을 영구 삭제할까요?</h3>
+              <p id="cm-desc-3" style="color:var(--danger);font-weight:600;">이 작업은 되돌릴 수 없습니다. 모든 데이터가 삭제됩니다.</p>
+              <div class="form-group" style="margin:12px 0;">
+                <label for="irr-confirm">확인을 위해 <strong>DELETE</strong>를 입력하세요</label>
+                <input id="irr-confirm" type="text" placeholder="DELETE" autocomplete="off">
+              </div>
+              <div class="modal-actions">
+                <button class="btn btn-ghost">취소</button>
+                <button class="btn btn-danger" disabled>영구 삭제</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="variant-card" aria-label="Mobile 바텀시트 확인">
+      <div class="variant-header">파괴적 바텀시트 <span class="device-tag mobile">Mobile</span></div>
+      <div class="variant-body">
+        <div class="preview-box">
+          <div class="mobile-frame" style="padding:0;overflow:hidden;">
+            <div style="height:100px;background:rgba(0,0,0,.35);display:flex;align-items:flex-end;">
+              <div class="bottomsheet" role="alertdialog" aria-modal="true" aria-labelledby="bs-title-1" style="width:100%;box-sizing:border-box;">
+                <div class="bottomsheet-handle" aria-hidden="true"></div>
+                <h3 id="bs-title-1">항목을 삭제할까요?</h3>
+                <p style="font-size:12px;color:var(--muted-text);margin:0 0 16px;">이 작업은 휴지통에 이동됩니다.</p>
+                <button class="btn btn-danger" style="width:100%;margin-bottom:8px;">삭제</button>
+                <button class="btn btn-ghost" style="width:100%;">취소</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <div class="rules">
+    <div class="rule-box do">
+      <strong>✅ 단계별 선택 기준</strong>
+      <ul>
+        <li><strong>일반</strong>: 저장·변경 확인. 취소/확인 버튼</li>
+        <li><strong>파괴적</strong>: 삭제·초기화. <code>alertdialog</code> + 빨간 버튼</li>
+        <li><strong>비가역</strong>: 영구 삭제·계정 탈퇴. 텍스트 입력 재확인</li>
+        <li>Mobile: 바텀시트 + 취소를 항상 하단에</li>
+      </ul>
+    </div>
+    <div class="rule-box dont">
+      <strong>🚫 사용 금지</strong>
+      <ul>
+        <li>단순 정보 표시에 모달 사용 (인라인 메시지 사용)</li>
+        <li>파괴적 액션에 일반 파란 버튼 사용</li>
+        <li>ESC 키로 닫기 비활성화</li>
+        <li>스크롤 시 배경 콘텐츠 이동 허용</li>
+      </ul>
+    </div>
+  </div>
+
+  <details class="code-block">
+    <summary>코드 스니펫 — ConfirmModal (포커스 트랩 포함)</summary>
+    <pre><code>// components/ui/ConfirmModal.tsx
+'use client';
+import { useEffect, useRef, useState } from 'react';
+
+type ConfirmVariant = 'default' | 'destructive' | 'irreversible';
+
+export function ConfirmModal({
+  variant, title, description, confirmLabel,
+  onConfirm, onCancel, confirmText = 'DELETE', isOpen,
+}: {
+  variant: ConfirmVariant; title: string; description: string;
+  confirmLabel: string; onConfirm: () =&gt; void; onCancel: () =&gt; void;
+  confirmText?: string; isOpen: boolean;
+}) {
+  const dialogRef = useRef&lt;HTMLDialogElement&gt;(null);
+  const [typed, setTyped] = useState('');
+  const isDestructive = variant !== 'default';
+  const canConfirm = variant === 'irreversible' ? typed === confirmText : true;
+
+  // 포커스 트랩 + ESC 닫기 — &lt;dialog&gt; 네이티브가 기본 지원
+  useEffect(() =&gt; {
+    if (!isOpen) return;
+    dialogRef.current?.showModal?.();
+    const onKey = (e: KeyboardEvent) =&gt; { if (e.key === 'Escape') onCancel(); };
+    document.addEventListener('keydown', onKey);
+    return () =&gt; { document.removeEventListener('keydown', onKey); dialogRef.current?.close?.(); };
+  }, [isOpen, onCancel]);
+
+  if (!isOpen) return null;
+  return (
+    &lt;dialog ref={dialogRef}
+      role={isDestructive ? 'alertdialog' : 'dialog'}
+      aria-modal="true" aria-labelledby="cm-title" aria-describedby="cm-desc"
+      className="modal-box"
+    &gt;
+      &lt;h3 id="cm-title"&gt;{title}&lt;/h3&gt;
+      &lt;p id="cm-desc"&gt;{description}&lt;/p&gt;
+      {variant === 'irreversible' &amp;&amp; (
+        &lt;div className="form-group"&gt;
+          &lt;label htmlFor="irr-input"&gt;확인을 위해 &lt;strong&gt;{confirmText}&lt;/strong&gt; 입력&lt;/label&gt;
+          &lt;input id="irr-input" type="text" autoComplete="off"
+            value={typed} onChange={e =&gt; setTyped(e.target.value)} /&gt;
+        &lt;/div&gt;
+      )}
+      &lt;div className="modal-actions"&gt;
+        &lt;button className="btn btn-ghost" onClick={onCancel}&gt;취소&lt;/button&gt;
+        &lt;button className={`btn ${isDestructive ? 'btn-danger' : 'btn-primary'}`}
+          onClick={onConfirm} disabled={!canConfirm} aria-disabled={!canConfirm}&gt;
+          {confirmLabel}
+        &lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/dialog&gt;
+  );
+}</code></pre>
+  </details>
+
+  <div class="a11y-checks" role="note" aria-label="접근성 체크">
+    <p>♿ 접근성 체크 (JM6)</p>
+    <ul>
+      <li>일반 모달: <code>role="dialog" aria-modal="true"</code></li>
+      <li>파괴적/비가역: <code>role="alertdialog"</code> — 스크린 리더가 즉시 읽음</li>
+      <li>포커스 트랩: 모달 내 포커스가 순환, 배경 클릭·Tab 탈출 차단</li>
+      <li>ESC 키로 항상 닫을 수 있어야 함</li>
+      <li>닫힌 후 트리거 버튼으로 포커스 복귀</li>
+      <li><code>&lt;dialog&gt;</code> 네이티브 요소 사용 권장 (기본 포커스 트랩·ESC 지원)</li>
+    </ul>
+  </div>
+</section>
+
+<hr class="divider" aria-hidden="true">
+
+<!-- ════════════════════════════════════════════
+     P5 — 알림 (Notification)
+════════════════════════════════════════════ -->
+<section class="pattern" id="pat5" aria-labelledby="pat5-title">
+  <h2 id="pat5-title"><span class="pattern-number">P5</span> 알림 (Notification)</h2>
+  <p class="intro">
+    토스트(일시적·즉각), 배너(지속·전역), 벨 카운트(비동기·누적) 3종.
+    info / success / warning / error 4가지 심각도로 색상 + 아이콘을 구분한다.
+  </p>
+
+  <div class="variants">
+    <article class="variant-card" aria-label="PC 알림 패턴">
+      <div class="variant-header">토스트 4종 + 배너 <span class="device-tag pc">PC</span></div>
+      <div class="variant-body">
+        <div class="preview-box" role="img" aria-label="PC 알림 예시">
+          <div class="toast-demo" aria-label="토스트 알림 예시">
+            <div class="toast info" role="status" aria-live="polite" aria-atomic="true">
+              <span class="toast-icon" aria-hidden="true">ℹ️</span>
+              <div><strong style="display:block;font-size:12px;">안내</strong><span style="font-size:11px;">업데이트가 완료되었습니다.</span></div>
+              <button class="close" aria-label="안내 알림 닫기">✕</button>
+            </div>
+            <div class="toast success" role="status" aria-live="polite" aria-atomic="true">
+              <span class="toast-icon" aria-hidden="true">✅</span>
+              <div><strong style="display:block;font-size:12px;">저장 완료</strong><span style="font-size:11px;">변경 사항이 저장되었습니다.</span></div>
+              <button class="close" aria-label="저장 완료 알림 닫기">✕</button>
+            </div>
+            <div class="toast warning" role="status" aria-live="polite" aria-atomic="true">
+              <span class="toast-icon" aria-hidden="true">⚠️</span>
+              <div><strong style="display:block;font-size:12px;">주의</strong><span style="font-size:11px;">세션이 5분 후 만료됩니다.</span></div>
+              <button class="close" aria-label="주의 알림 닫기">✕</button>
+            </div>
+            <div class="toast error" role="alert" aria-live="assertive" aria-atomic="true">
+              <span class="toast-icon" aria-hidden="true">❌</span>
+              <div><strong style="display:block;font-size:12px;">오류</strong><span style="font-size:11px;">저장에 실패했습니다.</span></div>
+              <button class="close" aria-label="오류 알림 닫기">✕</button>
+            </div>
+          </div>
+          <div class="banner info" role="status" style="margin-top:12px;">
+            <span aria-hidden="true">📢</span>
+            <span>시스템 점검: 오늘 22:00–23:00 서비스가 일시 중단됩니다.</span>
+            <button class="close" aria-label="배너 닫기" style="margin-left:auto;">✕</button>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="variant-card" aria-label="Mobile 벨 카운트 + 모바일 토스트">
+      <div class="variant-header">벨 카운트 + 모바일 토스트 <span class="device-tag mobile">Mobile</span></div>
+      <div class="variant-body">
+        <div class="preview-box">
+          <div class="mobile-frame">
+            <!-- 헤더 벨 -->
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:16px;">
+              <span style="font-size:14px;font-weight:700;">MSO ERP</span>
+              <button
+                class="bell-btn"
+                aria-label="알림 3건 — 알림 목록 열기"
+              >
+                🔔
+                <span class="bell-badge" aria-hidden="true">3</span>
+              </button>
+            </div>
+            <!-- 모바일 토스트 (하단) -->
+            <div class="toast success" role="status" aria-live="polite" aria-atomic="true" style="position:relative;bottom:auto;max-width:100%;">
+              <span class="toast-icon" aria-hidden="true">✅</span>
+              <div><strong style="display:block;font-size:12px;">저장 완료</strong></div>
+              <button class="close" aria-label="알림 닫기">✕</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <div class="rules">
+    <div class="rule-box do">
+      <strong>✅ 유형별 선택 기준</strong>
+      <ul>
+        <li><strong>토스트</strong>: 사용자 액션 결과 즉각 피드백</li>
+        <li><strong>배너</strong>: 서비스 공지, 전역 경고, 미확인 상태</li>
+        <li><strong>벨 카운트</strong>: 비동기 이벤트(채팅·승인·알림)</li>
+        <li>error 토스트: <code>aria-live="assertive"</code></li>
+        <li>나머지: <code>aria-live="polite"</code></li>
+      </ul>
+    </div>
+    <div class="rule-box dont">
+      <strong>🚫 사용 금지</strong>
+      <ul>
+        <li>토스트로 중요한 오류 단독 표시 (묻힐 수 있음)</li>
+        <li>벨 카운트를 수동 새로고침으로만 갱신</li>
+        <li>동시에 4개 이상 토스트 표시</li>
+        <li>자동 닫기 없는 토스트 (3–5초)</li>
+      </ul>
+    </div>
+  </div>
+
+  <details class="code-block">
+    <summary>코드 스니펫 — Toast 훅 + BellBadge</summary>
+    <pre><code>// hooks/useToast.ts
+'use client';
+import { useState, useCallback, useId } from 'react';
+
+type ToastVariant = 'info' | 'success' | 'warning' | 'error';
+interface Toast { id: string; variant: ToastVariant; title: string; message?: string; }
+
+export function useToast() {
+  const [toasts, setToasts] = useState&lt;Toast[]&gt;([]);
+  const baseId = useId();
+
+  const dismiss = useCallback((id: string) =&gt;
+    setToasts(prev =&gt; prev.filter(t =&gt; t.id !== id)), []);
+
+  const show = useCallback((variant: ToastVariant, title: string, message?: string) =&gt; {
+    const id = `${baseId}-${Date.now()}`;
+    setToasts(prev =&gt; [...prev.slice(-3), { id, variant, title, message }]);
+    if (variant !== 'error') setTimeout(() =&gt; dismiss(id), 4000); // error는 수동 닫기
+  }, [baseId, dismiss]);
+
+  return { toasts, show, dismiss };
+}
+
+// components/ui/BellButton.tsx — aria-label에 카운트 포함 (badge는 aria-hidden)
+export function BellButton({ count, onClick }: { count: number; onClick: () =&gt; void }) {
+  return (
+    &lt;button className="bell-btn" onClick={onClick}
+      aria-label={count &gt; 0 ? `알림 ${count}건 — 알림 목록 열기` : '알림 — 알림 목록 열기'}&gt;
+      🔔
+      {count &gt; 0 &amp;&amp; &lt;span className="bell-badge" aria-hidden="true"&gt;{count &gt; 99 ? '99+' : count}&lt;/span&gt;}
+    &lt;/button&gt;
+  );
+}</code></pre>
+  </details>
+
+  <div class="a11y-checks" role="note" aria-label="접근성 체크">
+    <p>♿ 접근성 체크 (JM6)</p>
+    <ul>
+      <li>error 알림: <code>role="alert"</code> + <code>aria-live="assertive"</code></li>
+      <li>나머지 알림: <code>role="status"</code> + <code>aria-live="polite"</code></li>
+      <li><code>aria-atomic="true"</code>: 내용 전체를 한 번에 읽음</li>
+      <li>벨 버튼: 카운트를 <code>aria-label</code>에 포함 — <code>aria-hidden</code> 뱃지는 보조</li>
+      <li>닫기 버튼: 설명적 <code>aria-label</code> ("저장 완료 알림 닫기")</li>
+      <li>토스트 컨테이너: <code>position: fixed</code>, <code>z-index</code> 최상위, 키보드로 접근 가능</li>
+    </ul>
+  </div>
+</section>
+
+<hr class="divider" aria-hidden="true">
+
+<!-- ════════════════════════════════════════════
+     P6 — 확인 입력 (Verification)
+════════════════════════════════════════════ -->
+<section class="pattern" id="pat6" aria-labelledby="pat6-title">
+  <h2 id="pat6-title"><span class="pattern-number">P6</span> 확인 입력 (Verification)</h2>
+  <p class="intro">
+    비밀번호 재입력, OTP(일회용 코드) 등 사용자 신원·의도를 재확인하는 패턴.
+    JM5: 비밀번호는 항상 마스킹, timing-safe 비교, 평문 로그 절대 금지.
+  </p>
+
+  <div class="variants">
+    <article class="variant-card" aria-label="PC 비밀번호 확인">
+      <div class="variant-header">비밀번호 재입력 <span class="device-tag pc">PC</span></div>
+      <div class="variant-body">
+        <div class="preview-box" role="img" aria-label="PC 비밀번호 재확인 예시">
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;max-width:380px;">
+            <h3 style="margin:0 0 4px;font-size:15px;">본인 확인</h3>
+            <p style="margin:0 0 20px;font-size:12px;color:var(--muted-text);">
+              계속하려면 현재 비밀번호를 입력하세요.
+            </p>
+            <fieldset style="border:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px;">
+              <legend style="font-size:12px;font-weight:700;margin-bottom:8px;padding:0;">현재 비밀번호</legend>
+              <div class="form-group">
+                <label for="pw-current">비밀번호</label>
+                <input
+                  id="pw-current"
+                  type="password"
+                  autocomplete="current-password"
+                  placeholder="비밀번호 입력"
+                  aria-required="true"
+                >
+                <!-- ⚠ JM5: type="password" 필수. 절대 type="text"로 전환하는 "보이기" 토글 없이 평문 저장·로그 금지 -->
+              </div>
+              <button class="btn btn-primary" style="width:100%;margin-top:4px;">확인</button>
+            </fieldset>
+            <p style="font-size:11px;color:var(--muted-text);margin-top:12px;text-align:center;">
+              비밀번호를 잊으셨나요? <a href="#" style="color:var(--accent);">재설정</a>
+            </p>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="variant-card" aria-label="Mobile OTP 입력">
+      <div class="variant-header">OTP 6자리 <span class="device-tag mobile">Mobile</span></div>
+      <div class="variant-body">
+        <div class="preview-box">
+          <div class="mobile-frame">
+            <h3 style="margin:0 0 4px;font-size:14px;text-align:center;">인증 코드 입력</h3>
+            <p style="margin:0 0 20px;font-size:11px;color:var(--muted-text);text-align:center;">
+              등록된 휴대폰으로 발송된 6자리 코드를 입력하세요.<br>
+              <strong style="color:var(--foreground);">홍길동 *** 4567</strong>
+            </p>
+            <fieldset style="border:none;padding:0;margin:0 0 16px;">
+              <legend class="text-sm" style="margin-bottom:12px;display:block;text-align:center;">
+                인증 코드 6자리
+              </legend>
+              <div class="otp-row" role="group" aria-label="6자리 인증 코드 입력">
+                <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1"
+                  aria-label="인증 코드 1번째 자리" autocomplete="one-time-code">
+                <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1"
+                  aria-label="인증 코드 2번째 자리">
+                <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1"
+                  aria-label="인증 코드 3번째 자리">
+                <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1"
+                  aria-label="인증 코드 4번째 자리">
+                <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1"
+                  aria-label="인증 코드 5번째 자리">
+                <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1"
+                  aria-label="인증 코드 6번째 자리">
+              </div>
+            </fieldset>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <button class="btn btn-primary" style="width:100%;">확인</button>
+              <button class="btn btn-ghost" style="width:100%;font-size:12px;">코드 재발송 (59초)</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <div class="rules">
+    <div class="rule-box do">
+      <strong>✅ 보안 필수 사항 (JM5)</strong>
+      <ul>
+        <li><code>type="password"</code> 필수, 마스킹 유지</li>
+        <li>서버에서 timing-safe 비교 (timingSafeEqual)</li>
+        <li>OTP 만료: 5분, 재발송 쿨다운: 60초</li>
+        <li><code>autocomplete="one-time-code"</code> (자동완성 지원)</li>
+        <li>실패 횟수 제한(5회) + 잠금 처리</li>
+      </ul>
+    </div>
+    <div class="rule-box dont">
+      <strong>🚫 절대 금지 (JM5)</strong>
+      <ul>
+        <li>비밀번호 평문 로그 출력</li>
+        <li>URL 파라미터에 OTP/토큰 포함</li>
+        <li>클라이언트에서 비밀번호 비교</li>
+        <li>OTP를 만료 없이 재사용 허용</li>
+      </ul>
+    </div>
+  </div>
+
+  <details class="code-block">
+    <summary>코드 스니펫 — OtpInput 컴포넌트</summary>
+    <pre><code>// components/ui/OtpInput.tsx
+'use client';
+import { useRef } from 'react';
+
+export function OtpInput({
+  length = 6, value, onChange, disabled,
+}: { length?: number; value: string[]; onChange: (v: string[]) =&gt; void; disabled?: boolean }) {
+  const refs = useRef&lt;(HTMLInputElement | null)[]&gt;([]);
+  const move = (i: number) =&gt; refs.current[i]?.focus();
+
+  const handleChange = (i: number, char: string) =&gt; {
+    const digit = char.replace(/\D/g, '').slice(-1);
+    const next = [...value]; next[i] = digit; onChange(next);
+    if (digit &amp;&amp; i &lt; length - 1) move(i + 1);
+  };
+  const handleKeyDown = (i: number, e: React.KeyboardEvent) =&gt; {
+    if (e.key === 'Backspace'  &amp;&amp; !value[i] &amp;&amp; i &gt; 0) move(i - 1);
+    if (e.key === 'ArrowLeft'  &amp;&amp; i &gt; 0)              move(i - 1);
+    if (e.key === 'ArrowRight' &amp;&amp; i &lt; length - 1)     move(i + 1);
+  };
+  const handlePaste = (e: React.ClipboardEvent) =&gt; {
+    e.preventDefault();
+    const digits = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, length);
+    const next = Array(length).fill('');
+    digits.split('').forEach((d, i) =&gt; { next[i] = d; });
+    onChange(next); move(Math.min(digits.length, length - 1));
+  };
+
+  return (
+    &lt;div role="group" aria-label={`${length}자리 인증 코드 입력`} className="otp-row"&gt;
+      {Array.from({ length }, (_, i) =&gt; (
+        &lt;input key={i} ref={el =&gt; { refs.current[i] = el; }}
+          className="otp-input" type="text" inputMode="numeric"
+          pattern="[0-9]" maxLength={1} value={value[i] ?? ''} disabled={disabled}
+          autoComplete={i === 0 ? 'one-time-code' : 'off'}
+          aria-label={`인증 코드 ${i + 1}번째 자리`}
+          onChange={e =&gt; handleChange(i, e.target.value)}
+          onKeyDown={e =&gt; handleKeyDown(i, e)}
+          onPaste={i === 0 ? handlePaste : undefined}
+        /&gt;
+      ))}
+    &lt;/div&gt;
+  );
+}
+// ⚠ JM5: OTP 검증은 반드시 서버 API에서만 수행. 클라이언트 비교 절대 금지.</code></pre>
+  </details>
+
+  <div class="a11y-checks" role="note" aria-label="접근성 체크">
+    <p>♿ 접근성 체크 (JM6)</p>
+    <ul>
+      <li>OTP 그룹: <code>role="group"</code> + <code>aria-label</code> + 각 칸 개별 <code>aria-label</code></li>
+      <li>비밀번호 필드: <code>&lt;label&gt;</code> 필수 연결, <code>aria-required="true"</code></li>
+      <li>붙여넣기 지원: 첫 번째 칸에 <code>onPaste</code> 핸들러</li>
+      <li><code>inputmode="numeric"</code>: 모바일 숫자 키패드 자동 표시</li>
+      <li>실패 메시지: <code>aria-invalid="true"</code> + <code>aria-describedby</code></li>
+      <li>재발송 버튼: 쿨다운 시간 <code>aria-label</code>에 포함</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer role="contentinfo" style="background:var(--card);border-top:1px solid var(--border);padding:20px 40px;font-size:12px;color:var(--muted-text);">
+  MSO ERP Phase 4 패턴 가이드 · v1.0 · 2026-05-11 ·
+  <a href="../Phase4/A11y_Checklist.md" style="color:var(--accent);">A11y 체크리스트 보기</a>
+</footer>
+
+<script>
+'use strict';
+// 토스트 닫기 버튼 (데모용)
+document.querySelectorAll('.toast .close').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const toast = this.closest('.toast');
+    if (toast) {
+      toast.setAttribute('aria-hidden', 'true');
+      toast.style.display = 'none';
+    }
+  });
+});
+</script>
+</body>
+</html>

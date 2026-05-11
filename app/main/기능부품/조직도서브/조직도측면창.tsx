@@ -1,6 +1,17 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  User,
+  LayoutGrid,
+  MessageSquare,
+  ClipboardList,
+  FileCheck,
+  Briefcase,
+  Package,
+  Shield,
+  type LucideProps,
+} from 'lucide-react';
 import { canAccessMainMenu } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
@@ -76,15 +87,22 @@ export const SUB_MENUS: Record<string, SubMenuItem[]> = {
   관리자: ADMIN_SIDEBAR_ITEMS,
 };
 
-const MAIN_MENUS = [
-  { id: '내정보', icon: 'user', label: '내정보', testId: 'sidebar-menu-home' },
-  { id: '추가기능', icon: 'plus', label: '추가기능', testId: 'sidebar-menu-extra' },
-  { id: '채팅', icon: 'chat', label: '채팅', testId: 'sidebar-menu-chat' },
-  { id: '게시판', icon: 'board', label: '게시판', testId: 'sidebar-menu-board' },
-  { id: '전자결재', icon: 'approval', label: '전자결재', testId: 'sidebar-menu-approval' },
-  { id: '인사관리', icon: 'hr', label: '인사관리', testId: 'sidebar-menu-hr' },
-  { id: '재고관리', icon: 'inventory', label: '재고관리', testId: 'sidebar-menu-inventory' },
-  { id: '관리자', icon: 'admin', label: '관리자', testId: 'sidebar-menu-admin' },
+type MainMenuLucideIcon = React.ComponentType<LucideProps>;
+
+const MAIN_MENUS: {
+  id: string;
+  LucideIcon: MainMenuLucideIcon;
+  label: string;
+  testId: string;
+}[] = [
+  { id: '내정보', LucideIcon: User, label: '내정보', testId: 'sidebar-menu-home' },
+  { id: '추가기능', LucideIcon: LayoutGrid, label: '추가기능', testId: 'sidebar-menu-extra' },
+  { id: '채팅', LucideIcon: MessageSquare, label: '채팅', testId: 'sidebar-menu-chat' },
+  { id: '게시판', LucideIcon: ClipboardList, label: '게시판', testId: 'sidebar-menu-board' },
+  { id: '전자결재', LucideIcon: FileCheck, label: '전자결재', testId: 'sidebar-menu-approval' },
+  { id: '인사관리', LucideIcon: Briefcase, label: '인사관리', testId: 'sidebar-menu-hr' },
+  { id: '재고관리', LucideIcon: Package, label: '재고관리', testId: 'sidebar-menu-inventory' },
+  { id: '관리자', LucideIcon: Shield, label: '관리자', testId: 'sidebar-menu-admin' },
 ];
 
 const ICON_PATHS: Record<string, React.ReactNode> = {
@@ -466,6 +484,19 @@ const ICON_PATHS: Record<string, React.ReactNode> = {
     <>
       <path d="M4 6h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4z" />
       <path d="m16 10 5-3v10l-5-3" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="3" y="11" width="18" height="11" rx="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </>
+  ),
+  lightbulb: (
+    <>
+      <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
+      <path d="M9 18h6" />
+      <path d="M10 22h4" />
     </>
   ),
 };
@@ -940,6 +971,7 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
         <div className="no-scrollbar flex w-full flex-1 flex-col items-center gap-2 overflow-y-auto px-2">
           {visibleMenus.map((menu) => {
             const isActive = mainMenu === menu.id;
+            const { LucideIcon } = menu;
             return (
               <button
                 key={menu.id}
@@ -948,13 +980,19 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
                 onClick={() => handleMenuClick(menu.id)}
                 onMouseEnter={() => prefetchMenuModule(menu.id)}
                 onFocus={() => prefetchMenuModule(menu.id)}
+                aria-label={menu.label}
                 aria-current={isActive ? 'page' : undefined}
                 className={`app-shell-menu-item relative flex min-h-[58px] w-14 flex-col items-center justify-center px-1.5 py-2 ${
                   isActive ? 'is-active' : ''
                 }`}
               >
                 <span className="relative leading-none">
-                  <MenuIcon name={menu.icon} className="h-[22px] w-[22px]" />
+                  <LucideIcon
+                    size={22}
+                    strokeWidth={isActive ? 2.0 : 1.75}
+                    aria-hidden="true"
+                    focusable="false"
+                  />
                   {menu.id === '채팅' && chatUnreadCount > 0 && (
                     <span
                       data-testid="sidebar-menu-chat-badge"
@@ -993,19 +1031,26 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
           <div className="no-scrollbar flex min-w-0 flex-1 items-stretch gap-0.5 overflow-x-auto">
             {visibleMenus.map((menu) => {
               const isActive = mainMenu === menu.id;
+              const { LucideIcon } = menu;
               return (
                 <button
                   key={menu.id}
                   type="button"
                   data-testid={`${menu.testId}-mobile`}
                   onClick={() => handleMenuClick(menu.id)}
+                  aria-label={menu.label}
                   aria-current={isActive ? 'page' : undefined}
                   className={`flex min-h-[56px] min-w-[64px] flex-none touch-manipulation flex-col items-center justify-center rounded-[var(--radius-md)] px-1 py-1.5 transition-all duration-150 ${
                     isActive ? 'text-[var(--accent)]' : 'text-[var(--toss-gray-3)]'
                   }`}
                 >
                   <span className="relative leading-none">
-                    <MenuIcon name={menu.icon} className="h-[22px] w-[22px]" />
+                    <LucideIcon
+                      size={22}
+                      strokeWidth={isActive ? 2.0 : 1.75}
+                      aria-hidden="true"
+                      focusable="false"
+                    />
                     {menu.id === '채팅' && chatUnreadCount > 0 && (
                       <span
                         data-testid="sidebar-menu-chat-badge-mobile"

@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Phase 3 · 05 관리자 설정 — PC Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+/* ── 디자인 토큰 ─────────────────────────────── */
+:root {
+  --accent:       #2563EB;
+  --accent-hover: #1D4ED8;
+  --foreground:   #111827;
+  --muted:        #F3F4F6;
+  --muted-text:   #6B7280;
+  --card:         #FFFFFF;
+  --border:       #E5E7EB;
+  --danger:       #EF4444;
+  --success:      #10B981;
+  --warning:      #F59E0B;
+  --radius-sm:    4px;
+  --radius-md:    8px;
+  --radius-lg:    12px;
+  --radius-xl:    16px;
+  --sidebar-w:    64px;
+  --submenu-w:    156px;
+  font-family: 'Pretendard', 'Apple SD Gothic Neo', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #F9FAFB; color: var(--foreground); font-size: 14px; }
+
+/* ── 공통 레이아웃 ────────────────────────────── */
+.shell { display: flex; height: 100vh; overflow: hidden; }
+
+/* 사이드바 */
+.sidebar {
+  width: var(--sidebar-w); background: #1E293B;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 12px 0; gap: 4px; flex-shrink: 0;
+}
+.sidebar-logo {
+  width: 36px; height: 36px; background: var(--accent);
+  border-radius: var(--radius-md); display: flex; align-items: center;
+  justify-content: center; color: #fff; font-weight: 700; font-size: 13px;
+  margin-bottom: 8px;
+}
+.sidebar-icon {
+  width: 40px; height: 40px; border-radius: var(--radius-md);
+  display: flex; align-items: center; justify-content: center;
+  color: #94A3B8; cursor: pointer; transition: background 0.15s;
+}
+.sidebar-icon:hover  { background: #334155; color: #fff; }
+.sidebar-icon.active { background: var(--accent); color: #fff; }
+
+/* 서브메뉴 */
+.submenu {
+  width: var(--submenu-w); background: var(--card); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; padding: 16px 0; gap: 2px; flex-shrink: 0;
+  overflow-y: auto;
+}
+.submenu-header { padding: 0 12px 8px; font-size: 11px; font-weight: 600; color: var(--muted-text); text-transform: uppercase; letter-spacing: 0.05em; }
+.submenu-item {
+  padding: 8px 12px; border-radius: var(--radius-md); cursor: pointer;
+  font-size: 13px; color: var(--muted-text); transition: background 0.12s, color 0.12s;
+  margin: 0 6px;
+}
+.submenu-item:hover  { background: var(--muted); color: var(--foreground); }
+.submenu-item.active { background: #EFF6FF; color: var(--accent); font-weight: 600; }
+
+/* 본문 */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.topbar {
+  height: 52px; background: var(--card); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 20px; gap: 12px;
+  flex-shrink: 0;
+}
+.topbar-title { font-size: 15px; font-weight: 600; }
+.topbar-badge {
+  padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  background: #FEE2E2; color: var(--danger);
+}
+.topbar-spacer { flex: 1; }
+.topbar-avatar {
+  width: 32px; height: 32px; border-radius: 50%; background: var(--accent);
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+}
+
+.content { flex: 1; overflow-y: auto; padding: 24px; }
+
+/* ── 유틸리티 ─────────────────────────────────── */
+.app-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); overflow: hidden;
+}
+.section-title { font-size: 13px; font-weight: 600; color: var(--muted-text); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+.form-label { font-size: 13px; font-weight: 500; color: var(--foreground); margin-bottom: 4px; display: block; }
+.form-input {
+  width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: var(--card); font-size: 14px; color: var(--foreground);
+  outline: none; transition: border-color 0.15s;
+}
+.form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+.form-select {
+  width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: var(--card); font-size: 14px; color: var(--foreground); cursor: pointer;
+}
+.form-row { display: grid; gap: 16px; }
+.form-row-2 { grid-template-columns: 1fr 1fr; }
+.form-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: var(--radius-md); font-size: 14px; font-weight: 500;
+  border: none; cursor: pointer; transition: background 0.15s;
+}
+.btn-primary   { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-secondary { background: var(--muted); color: var(--foreground); }
+.btn-secondary:hover { background: #E5E7EB; }
+.btn-danger    { background: #FEF2F2; color: var(--danger); }
+.btn-danger:hover { background: #FECACA; }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-icon { padding: 6px; border-radius: var(--radius-md); background: none; border: 1px solid var(--border); cursor: pointer; }
+.btn-icon:hover { background: var(--muted); }
+
+.badge { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.badge-blue  { background: #EFF6FF; color: var(--accent); }
+.badge-green { background: #ECFDF5; color: #059669; }
+.badge-red   { background: #FEF2F2; color: var(--danger); }
+.badge-gray  { background: var(--muted); color: var(--muted-text); }
+
+.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+/* 화면 전환 네비 */
+.screen-nav {
+  display: flex; gap: 8px; margin-bottom: 24px;
+}
+.screen-btn {
+  padding: 8px 20px; border-radius: var(--radius-md); font-size: 14px; font-weight: 500;
+  border: 1px solid var(--border); background: var(--card); cursor: pointer;
+  transition: all 0.15s; color: var(--muted-text);
+}
+.screen-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* 화면 패널 */
+.screen-panel { display: none; }
+.screen-panel.active { display: block; }
+
+/* ── 탭 시스템 ────────────────────────────────── */
+.tab-nav {
+  display: flex; border-bottom: 1px solid var(--border);
+  padding: 0 20px; background: var(--card);
+  overflow-x: auto;
+}
+.tab-btn {
+  padding: 14px 16px; font-size: 14px; font-weight: 500; color: var(--muted-text);
+  border: none; background: none; cursor: pointer; white-space: nowrap;
+  border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s;
+  position: relative; top: 1px;
+}
+.tab-btn:hover  { color: var(--foreground); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+.tab-panel { display: none; padding: 24px; }
+.tab-panel.active { display: block; }
+
+/* ── 테이블 ───────────────────────────────────── */
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data-table th {
+  text-align: left; padding: 10px 12px; background: var(--muted);
+  color: var(--muted-text); font-weight: 600; border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.data-table td {
+  padding: 11px 12px; border-bottom: 1px solid var(--border); vertical-align: middle;
+}
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: #F8FAFF; }
+
+/* ── 스위치 ───────────────────────────────────── */
+.switch-wrap { display: flex; align-items: center; gap: 8px; }
+.switch {
+  position: relative; width: 38px; height: 22px;
+  display: inline-block;
+}
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch-track {
+  position: absolute; inset: 0; background: #D1D5DB;
+  border-radius: 11px; cursor: pointer; transition: background 0.2s;
+}
+.switch-thumb {
+  position: absolute; top: 3px; left: 3px;
+  width: 16px; height: 16px; background: #fff;
+  border-radius: 50%; transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.switch input:checked + .switch-track { background: var(--accent); }
+.switch input:checked ~ .switch-thumb { transform: translateX(16px); }
+
+/* ── 카드 그리드 ──────────────────────────────── */
+.card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.template-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px; cursor: pointer;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+.template-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-color: var(--accent); }
+.template-card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+.template-icon {
+  width: 40px; height: 40px; border-radius: var(--radius-md);
+  background: #EFF6FF; display: flex; align-items: center; justify-content: center;
+}
+.template-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.template-desc { font-size: 12px; color: var(--muted-text); line-height: 1.5; }
+.template-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+/* ── 권한 매트릭스 ────────────────────────────── */
+.perm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.perm-table th, .perm-table td {
+  padding: 10px 12px; border: 1px solid var(--border); text-align: center;
+}
+.perm-table th { background: var(--muted); font-weight: 600; }
+.perm-table td:first-child { text-align: left; }
+.perm-check { color: var(--success); font-size: 16px; }
+.perm-x     { color: var(--danger);  font-size: 16px; }
+
+/* ── 섹션 박스 ────────────────────────────────── */
+.section-box {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); margin-bottom: 16px; overflow: hidden;
+}
+.section-box-header {
+  padding: 14px 20px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--card);
+}
+.section-box-title { font-size: 14px; font-weight: 600; }
+.section-box-body { padding: 20px; }
+
+/* ── 팝업 카드 ────────────────────────────────── */
+.popup-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; border: 1px solid var(--border);
+  border-radius: var(--radius-md); margin-bottom: 8px; background: var(--card);
+}
+.popup-thumb {
+  width: 80px; height: 48px; background: var(--muted);
+  border-radius: var(--radius-sm); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: var(--muted-text);
+}
+.popup-info { flex: 1; }
+.popup-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.popup-meta  { font-size: 11px; color: var(--muted-text); }
+
+/* ── 결재 양식 ────────────────────────────────── */
+.approval-chain {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.approval-step {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.approval-stamp {
+  width: 48px; height: 48px; border: 2px solid var(--border);
+  border-radius: var(--radius-md); display: flex; align-items: center;
+  justify-content: center; font-size: 11px; color: var(--muted-text);
+  background: var(--card);
+}
+.approval-stamp.filled { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.approval-label { font-size: 11px; color: var(--muted-text); }
+.approval-arrow { color: var(--border); font-size: 18px; align-self: center; }
+
+/* ── 반응형 힌트 ──────────────────────────────── */
+.rwd-note {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; background: #FFFBEB; border: 1px solid #FDE68A;
+  border-radius: 20px; font-size: 11px; color: #92400E; margin-bottom: 16px;
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     화면 전환 네비 (데모용)
+══════════════════════════════════════ -->
+<div style="background:#1E293B;padding:10px 16px;display:flex;align-items:center;gap:8px;">
+  <span style="color:#94A3B8;font-size:12px;">Phase 3 · 05 관리자 설정 · PC</span>
+  <span style="color:#475569;margin:0 4px;">|</span>
+  <button class="screen-btn active" onclick="showScreen('company')" id="nav-company" style="padding:5px 14px;font-size:12px;">① 회사정보</button>
+  <button class="screen-btn" onclick="showScreen('operation')" id="nav-operation" style="padding:5px 14px;font-size:12px;">② 운영설정</button>
+  <button class="screen-btn" onclick="showScreen('template')" id="nav-template" style="padding:5px 14px;font-size:12px;">③ 템플릿 라이브러리</button>
+</div>
+
+<!-- ══════════════════════════════════════
+     SCREEN ① settings_company — 회사정보
+══════════════════════════════════════ -->
+<div id="screen-company" class="screen-panel active">
+<div class="shell">
+
+  <!-- 사이드바 -->
+  <nav class="sidebar" aria-label="주 메뉴">
+    <div class="sidebar-logo">M</div>
+    <div class="sidebar-icon" title="홈">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    </div>
+    <div class="sidebar-icon" title="인사관리">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </div>
+    <div class="sidebar-icon" title="급여">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+    </div>
+    <div class="sidebar-icon active" title="설정">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+    </div>
+  </nav>
+
+  <!-- 서브메뉴 -->
+  <aside class="submenu" aria-label="설정 메뉴">
+    <div class="submenu-header">회사관리</div>
+    <div class="submenu-item active" role="menuitem">회사정보</div>
+    <div class="submenu-item" role="menuitem">운영설정</div>
+    <div class="submenu-item" role="menuitem">템플릿 라이브러리</div>
+    <hr style="margin:8px 6px;border:none;border-top:1px solid var(--border);" />
+    <div class="submenu-header">시스템</div>
+    <div class="submenu-item" role="menuitem">로그 조회</div>
+    <div class="submenu-item" role="menuitem">백업/복원</div>
+  </aside>
+
+  <!-- 본문 -->
+  <div class="main">
+    <header class="topbar">
+      <span class="topbar-title">회사정보 관리</span>
+      <span class="badge badge-red">관리자 전용</span>
+      <span class="topbar-spacer"></span>
+      <button class="btn btn-primary btn-sm">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        전체 저장
+      </button>
+      <div class="topbar-avatar" aria-label="관리자">관</div>
+    </header>
+
+    <div class="content">
+      <!-- 탭 네비 -->
+      <div class="app-card" style="margin-bottom:24px;">
+        <nav class="tab-nav" role="tablist" aria-label="회사정보 탭">
+          <button class="tab-btn active" role="tab" aria-selected="true"  aria-controls="tp-basic"    id="tab-basic"    onclick="switchTab('company','basic')">기본정보</button>
+          <button class="tab-btn"        role="tab" aria-selected="false" aria-controls="tp-work"     id="tab-work"     onclick="switchTab('company','work')">근무형태</button>
+          <button class="tab-btn"        role="tab" aria-selected="false" aria-controls="tp-card"     id="tab-card"     onclick="switchTab('company','card')">법인카드</button>
+          <button class="tab-btn"        role="tab" aria-selected="false" aria-controls="tp-contract" id="tab-contract" onclick="switchTab('company','contract')">계약템플릿</button>
+          <button class="tab-btn"        role="tab" aria-selected="false" aria-controls="tp-holiday"  id="tab-holiday"  onclick="switchTab('company','holiday')">휴가/공휴일</button>
+          <button class="tab-btn"        role="tab" aria-selected="false" aria-controls="tp-salary"   id="tab-salary"   onclick="switchTab('company','salary')">급여기준</button>
+          <button class="tab-btn"        role="tab" aria-selected="false" aria-controls="tp-doc"      id="tab-doc"      onclick="switchTab('company','doc')">문서보관</button>
+        </nav>
+
+        <!-- ─ 탭: 기본정보 (#78) ─ -->
+        <div class="tab-panel active" id="tp-basic" role="tabpanel" aria-labelledby="tab-basic">
+          <div class="section-title">기본정보 — #78</div>
+          <div class="form-row form-row-2" style="margin-bottom:16px;">
+            <div class="form-group">
+              <label class="form-label" for="ci-name">병원/기관명 <span style="color:var(--danger)">*</span></label>
+              <input class="form-input" id="ci-name" type="text" value="샘플병원" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ci-bizno">사업자등록번호</label>
+              <input class="form-input" id="ci-bizno" type="text" placeholder="000-00-00000" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ci-ceo">대표자</label>
+              <input class="form-input" id="ci-ceo" type="text" placeholder="홍길동" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ci-tel">대표번호</label>
+              <input class="form-input" id="ci-tel" type="tel" placeholder="02-0000-0000" />
+            </div>
+            <div class="form-group" style="grid-column:1/-1;">
+              <label class="form-label" for="ci-addr">주소</label>
+              <input class="form-input" id="ci-addr" type="text" placeholder="서울시 강남구 테헤란로 123" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ci-type">의료기관 종별</label>
+              <select class="form-select" id="ci-type">
+                <option>상급종합병원</option>
+                <option>종합병원</option>
+                <option selected>병원</option>
+                <option>의원</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ci-dept">주요진료과</label>
+              <input class="form-input" id="ci-dept" type="text" placeholder="내과, 외과, 정형외과" />
+            </div>
+          </div>
+          <hr class="divider" />
+          <div class="section-title">로고 / 직인</div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;">
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <span class="form-label">병원 로고</span>
+              <div style="width:120px;height:80px;border:2px dashed var(--border);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;color:var(--muted-text);font-size:12px;cursor:pointer;">+ 업로드</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <span class="form-label">직인 이미지</span>
+              <div style="width:80px;height:80px;border:2px dashed var(--border);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;color:var(--muted-text);font-size:12px;cursor:pointer;">+ 업로드</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ─ 탭: 근무형태 (#79) ─ -->
+        <div class="tab-panel" id="tp-work" role="tabpanel" aria-labelledby="tab-work">
+          <div class="section-title">근무형태 — #79</div>
+          <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+            <button class="btn btn-primary btn-sm">+ 근무형태 추가</button>
+          </div>
+          <div class="app-card">
+            <table class="data-table" aria-label="근무형태 목록">
+              <thead>
+                <tr>
+                  <th>근무명</th>
+                  <th>시작시간</th>
+                  <th>종료시간</th>
+                  <th>휴게(분)</th>
+                  <th>야간수당</th>
+                  <th>교대형태</th>
+                  <th>상태</th>
+                  <th style="width:80px;">관리</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>주간 8시간</strong></td>
+                  <td>09:00</td><td>18:00</td><td>60</td>
+                  <td><span class="badge badge-gray">없음</span></td>
+                  <td>고정</td>
+                  <td><span class="badge badge-green">사용중</span></td>
+                  <td><button class="btn btn-secondary btn-sm">편집</button></td>
+                </tr>
+                <tr>
+                  <td><strong>야간 8시간</strong></td>
+                  <td>22:00</td><td>06:00</td><td>60</td>
+                  <td><span class="badge badge-blue">150%</span></td>
+                  <td>교대</td>
+                  <td><span class="badge badge-green">사용중</span></td>
+                  <td><button class="btn btn-secondary btn-sm">편집</button></td>
+                </tr>
+                <tr>
+                  <td><strong>단시간 4시간</strong></td>
+                  <td>14:00</td><td>18:00</td><td>0</td>
+                  <td><span class="badge badge-gray">없음</span></td>
+                  <td>고정</td>
+                  <td><span class="badge badge-gray">미사용</span></td>
+                  <td><button class="btn btn-secondary btn-sm">편집</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ─ 탭: 법인카드 (#80) ─ -->
+        <div class="tab-panel" id="tp-card" role="tabpanel" aria-labelledby="tab-card">
+          <div class="section-title">법인카드 — #80</div>
+          <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+            <button class="btn btn-primary btn-sm">+ 카드 등록</button>
+          </div>
+          <div class="app-card">
+            <table class="data-table" aria-label="법인카드 목록">
+              <thead>
+                <tr>
+                  <th>카드명</th>
+                  <th>카드번호(마스킹)</th>
+                  <th>발급은행</th>
+                  <th>담당자</th>
+                  <th>한도</th>
+                  <th>이번달 사용</th>
+                  <th>상태</th>
+                  <th style="width:80px;">관리</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>일반경비 카드</strong></td>
+                  <td style="font-family:monospace;">****-****-****-1234</td>
+                  <td>국민은행</td>
+                  <td>김관리</td>
+                  <td>500만원</td>
+                  <td><span style="color:var(--accent);font-weight:600;">234만원</span></td>
+                  <td><span class="badge badge-green">활성</span></td>
+                  <td><button class="btn btn-secondary btn-sm">편집</button></td>
+                </tr>
+                <tr>
+                  <td><strong>교육·연수 카드</strong></td>
+                  <td style="font-family:monospace;">****-****-****-5678</td>
+                  <td>신한은행</td>
+                  <td>이원장</td>
+                  <td>100만원</td>
+                  <td><span>18만원</span></td>
+                  <td><span class="badge badge-green">활성</span></td>
+                  <td><button class="btn btn-secondary btn-sm">편집</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ─ 탭: 계약템플릿 (#81) ─ -->
+        <div class="tab-panel" id="tp-contract" role="tabpanel" aria-labelledby="tab-contract">
+          <div class="section-title">계약템플릿 — #81</div>
+          <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+            <button class="btn btn-primary btn-sm">+ 템플릿 추가</button>
+          </div>
+          <div class="app-card">
+            <table class="data-table" aria-label="계약템플릿 목록">
+              <thead>
+                <tr><th>템플릿명</th><th>직종 대상</th><th>계약유형</th><th>최종수정</th><th style="width:100px;">관리</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>정규직 표준 근로계약서</strong></td>
+                  <td>전 직종</td>
+                  <td><span class="badge badge-blue">정규</span></td>
+                  <td>2026-04-10</td>
+                  <td style="display:flex;gap:4px;">
+                    <button class="btn btn-secondary btn-sm">미리보기</button>
+                    <button class="btn btn-secondary btn-sm">편집</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>간호사 계약직 계약서</strong></td>
+                  <td>간호직</td>
+                  <td><span class="badge badge-gray">계약</span></td>
+                  <td>2026-03-22</td>
+                  <td style="display:flex;gap:4px;">
+                    <button class="btn btn-secondary btn-sm">미리보기</button>
+                    <button class="btn btn-secondary btn-sm">편집</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>파트타임 고용계약서</strong></td>
+                  <td>행정·기타</td>
+                  <td><span class="badge badge-gray">파트</span></td>
+                  <td>2026-01-05</td>
+                  <td style="display:flex;gap:4px;">
+                    <button class="btn btn-secondary btn-sm">미리보기</button>
+                    <button class="btn btn-secondary btn-sm">편집</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ─ 탭: 휴가/공휴일 (#82) ─ -->
+        <div class="tab-panel" id="tp-holiday" role="tabpanel" aria-labelledby="tab-holiday">
+          <div class="section-title">휴가기준 및 공휴일 — #82</div>
+          <div class="form-row form-row-2" style="margin-bottom:20px;">
+            <div class="form-group">
+              <label class="form-label">연차 산정 기준</label>
+              <select class="form-select">
+                <option selected>입사일 기준</option>
+                <option>회계연도(1월) 기준</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">최초 연차 발생 (소정근로일수)</label>
+              <input class="form-input" type="number" value="80" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">1년 미만 월차 지급</label>
+              <select class="form-select">
+                <option selected>매월 1일</option>
+                <option>분기별</option>
+                <option>없음</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">연차 최대 한도 (일)</label>
+              <input class="form-input" type="number" value="25" />
+            </div>
+          </div>
+          <hr class="divider" />
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <span class="section-title" style="margin-bottom:0;">공휴일 목록 (2026)</span>
+            <button class="btn btn-secondary btn-sm">공공데이터 동기화</button>
+          </div>
+          <div class="app-card">
+            <table class="data-table" aria-label="공휴일 목록">
+              <thead><tr><th>날짜</th><th>공휴일명</th><th>유급여부</th><th>대체공휴일</th></tr></thead>
+              <tbody>
+                <tr><td>2026-01-01</td><td>신정</td><td><span class="badge badge-green">유급</span></td><td>-</td></tr>
+                <tr><td>2026-01-28~30</td><td>설날 연휴</td><td><span class="badge badge-green">유급</span></td><td>2026-01-31</td></tr>
+                <tr><td>2026-03-01</td><td>삼일절</td><td><span class="badge badge-green">유급</span></td><td>-</td></tr>
+                <tr><td>2026-05-05</td><td>어린이날</td><td><span class="badge badge-green">유급</span></td><td>-</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ─ 탭: 급여기준 (#83) ─ -->
+        <div class="tab-panel" id="tp-salary" role="tabpanel" aria-labelledby="tab-salary">
+          <div class="section-title">급여기준 — #83</div>
+          <div class="form-row form-row-2" style="margin-bottom:20px;">
+            <div class="form-group">
+              <label class="form-label">급여 지급일</label>
+              <select class="form-select">
+                <option>매월 10일</option>
+                <option selected>매월 25일</option>
+                <option>매월 말일</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">급여 계산 기준 월</label>
+              <select class="form-select">
+                <option selected>전월 1일 ~ 말일</option>
+                <option>당월 1일 ~ 말일</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">최저임금 (2026, 시간)</label>
+              <input class="form-input" type="number" value="10030" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">야간수당 기준 (배율)</label>
+              <select class="form-select">
+                <option selected>1.5배 (법정)</option>
+                <option>1.3배 (단체협약)</option>
+              </select>
+            </div>
+          </div>
+          <hr class="divider" />
+          <div class="section-title">공제 항목</div>
+          <div class="app-card">
+            <table class="data-table" aria-label="공제 항목">
+              <thead><tr><th>항목</th><th>직원 부담률</th><th>사용자 부담률</th><th>자동계산</th></tr></thead>
+              <tbody>
+                <tr><td>국민연금</td><td>4.5%</td><td>4.5%</td><td><span class="badge badge-green">자동</span></td></tr>
+                <tr><td>건강보험</td><td>3.545%</td><td>3.545%</td><td><span class="badge badge-green">자동</span></td></tr>
+                <tr><td>장기요양보험</td><td>0.4591%</td><td>0.4591%</td><td><span class="badge badge-green">자동</span></td></tr>
+                <tr><td>고용보험</td><td>0.9%</td><td>1.15%</td><td><span class="badge badge-green">자동</span></td></tr>
+                <tr><td>소득세</td><td>간이세액표</td><td>-</td><td><span class="badge badge-green">자동</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ─ 탭: 문서보관 (#84) ─ -->
+        <div class="tab-panel" id="tp-doc" role="tabpanel" aria-labelledby="tab-doc">
+          <div class="section-title">문서보관 정책 — #84</div>
+          <div class="form-row form-row-2" style="margin-bottom:20px;">
+            <div class="form-group">
+              <label class="form-label">근로계약서 보관 기간</label>
+              <select class="form-select">
+                <option>3년</option>
+                <option selected>5년</option>
+                <option>10년</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">급여대장 보관 기간</label>
+              <select class="form-select">
+                <option>3년</option>
+                <option selected>5년</option>
+                <option>10년</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">자동 삭제</label>
+              <div style="display:flex;align-items:center;gap:8px;padding-top:6px;">
+                <label class="switch" aria-label="자동 삭제 토글">
+                  <input type="checkbox" />
+                  <span class="switch-track"></span>
+                  <span class="switch-thumb"></span>
+                </label>
+                <span style="font-size:13px;color:var(--muted-text)">보관기간 초과 시 자동 삭제</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">삭제 전 알림 (일 전)</label>
+              <input class="form-input" type="number" value="30" />
+            </div>
+          </div>
+          <hr class="divider" />
+          <div class="section-title">저장 위치</div>
+          <div class="form-row form-row-2">
+            <div class="form-group" style="grid-column:1/-1;">
+              <label class="form-label">Supabase Storage 버킷명</label>
+              <input class="form-input" type="text" value="hospital-docs" />
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /.app-card (탭 컨테이너) -->
+    </div><!-- /.content -->
+  </div><!-- /.main -->
+
+</div><!-- /.shell -->
+</div><!-- /#screen-company -->
+
+
+<!-- ══════════════════════════════════════
+     SCREEN ② settings_operation — 운영설정
+══════════════════════════════════════ -->
+<div id="screen-operation" class="screen-panel">
+<div class="shell">
+  <nav class="sidebar" aria-label="주 메뉴">
+    <div class="sidebar-logo">M</div>
+    <div class="sidebar-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+    <div class="sidebar-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
+    <div class="sidebar-icon active"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg></div>
+  </nav>
+  <aside class="submenu" aria-label="설정 메뉴">
+    <div class="submenu-header">회사관리</div>
+    <div class="submenu-item" role="menuitem">회사정보</div>
+    <div class="submenu-item active" role="menuitem">운영설정</div>
+    <div class="submenu-item" role="menuitem">템플릿 라이브러리</div>
+    <hr style="margin:8px 6px;border:none;border-top:1px solid var(--border);" />
+    <div class="submenu-header">시스템</div>
+    <div class="submenu-item" role="menuitem">로그 조회</div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <span class="topbar-title">운영설정</span>
+      <span class="badge badge-red">관리자 전용</span>
+      <span class="topbar-spacer"></span>
+      <button class="btn btn-primary btn-sm">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+        저장
+      </button>
+      <div class="topbar-avatar">관</div>
+    </header>
+
+    <div class="content">
+
+      <!-- 섹션 A: 직원 권한 (#85) -->
+      <div class="section-box">
+        <div class="section-box-header">
+          <span class="section-box-title">직원 권한 매트릭스 — #85</span>
+          <button class="btn btn-secondary btn-sm">권한 복사</button>
+        </div>
+        <div class="section-box-body">
+          <div class="rwd-note">⚠ 변경 즉시 전 직원에게 적용됩니다. 신중히 설정하세요.</div>
+          <div style="overflow-x:auto;">
+            <table class="perm-table" aria-label="권한 매트릭스">
+              <thead>
+                <tr>
+                  <th style="text-align:left;">기능</th>
+                  <th>원장/관리자</th>
+                  <th>팀장</th>
+                  <th>일반직원</th>
+                  <th>파트타임</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>급여명세서 조회</td><td class="perm-check">✓</td><td class="perm-check">✓</td><td class="perm-check">✓</td><td class="perm-x">✗</td></tr>
+                <tr><td>타인 급여 조회</td><td class="perm-check">✓</td><td class="perm-x">✗</td><td class="perm-x">✗</td><td class="perm-x">✗</td></tr>
+                <tr><td>연차 신청</td><td class="perm-check">✓</td><td class="perm-check">✓</td><td class="perm-check">✓</td><td class="perm-check">✓</td></tr>
+                <tr><td>연차 승인</td><td class="perm-check">✓</td><td class="perm-check">✓</td><td class="perm-x">✗</td><td class="perm-x">✗</td></tr>
+                <tr><td>근태 수정</td><td class="perm-check">✓</td><td class="perm-check">✓</td><td class="perm-x">✗</td><td class="perm-x">✗</td></tr>
+                <tr><td>계약서 발행</td><td class="perm-check">✓</td><td class="perm-x">✗</td><td class="perm-x">✗</td><td class="perm-x">✗</td></tr>
+                <tr><td>채팅 사용</td><td class="perm-check">✓</td><td class="perm-check">✓</td><td class="perm-check">✓</td><td class="perm-check">✓</td></tr>
+                <tr><td>공지사항 작성</td><td class="perm-check">✓</td><td class="perm-check">✓</td><td class="perm-x">✗</td><td class="perm-x">✗</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 섹션 B: 일반 운영설정 (#86) -->
+      <div class="section-box">
+        <div class="section-box-header">
+          <span class="section-box-title">일반 운영설정 — #86</span>
+        </div>
+        <div class="section-box-body">
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);">
+              <div>
+                <div style="font-size:14px;font-weight:500;">신입직원 자동 온보딩</div>
+                <div style="font-size:12px;color:var(--muted-text);margin-top:2px;">입사 후 7일간 온보딩 태스크 자동 생성</div>
+              </div>
+              <label class="switch" aria-label="자동 온보딩">
+                <input type="checkbox" checked />
+                <span class="switch-track"></span>
+                <span class="switch-thumb"></span>
+              </label>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);">
+              <div>
+                <div style="font-size:14px;font-weight:500;">초과근무 자동 승인</div>
+                <div style="font-size:12px;color:var(--muted-text);margin-top:2px;">2시간 이하 초과근무 자동 승인 처리</div>
+              </div>
+              <label class="switch" aria-label="초과근무 자동 승인">
+                <input type="checkbox" />
+                <span class="switch-track"></span>
+                <span class="switch-thumb"></span>
+              </label>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);">
+              <div>
+                <div style="font-size:14px;font-weight:500;">푸시 알림 전송</div>
+                <div style="font-size:12px;color:var(--muted-text);margin-top:2px;">급여명세서 발행, 근태 변경 시 앱 푸시 발송</div>
+              </div>
+              <label class="switch" aria-label="푸시 알림">
+                <input type="checkbox" checked />
+                <span class="switch-track"></span>
+                <span class="switch-thumb"></span>
+              </label>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;">
+              <div>
+                <div style="font-size:14px;font-weight:500;">개인정보 마스킹</div>
+                <div style="font-size:12px;color:var(--muted-text);margin-top:2px;">목록 화면에서 주민번호·계좌번호 자동 마스킹</div>
+              </div>
+              <label class="switch" aria-label="개인정보 마스킹">
+                <input type="checkbox" checked />
+                <span class="switch-track"></span>
+                <span class="switch-thumb"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 섹션 C: 팝업 관리 -->
+      <div class="section-box">
+        <div class="section-box-header">
+          <span class="section-box-title">팝업 관리</span>
+          <button class="btn btn-primary btn-sm">+ 팝업 추가</button>
+        </div>
+        <div class="section-box-body">
+          <div class="popup-item">
+            <div class="popup-thumb">미리보기</div>
+            <div class="popup-info">
+              <div class="popup-title">5월 급여 지급 안내</div>
+              <div class="popup-meta">2026-05-20 ~ 2026-05-25 · 전체 직원 · <span class="badge badge-green" style="font-size:10px;">노출중</span></div>
+            </div>
+            <button class="btn btn-secondary btn-sm">편집</button>
+            <button class="btn btn-danger btn-sm">삭제</button>
+          </div>
+          <div class="popup-item">
+            <div class="popup-thumb">미리보기</div>
+            <div class="popup-info">
+              <div class="popup-title">하계 워크샵 일정 공지</div>
+              <div class="popup-meta">2026-06-01 ~ 2026-06-07 · 전체 직원 · <span class="badge badge-gray" style="font-size:10px;">예약</span></div>
+            </div>
+            <button class="btn btn-secondary btn-sm">편집</button>
+            <button class="btn btn-danger btn-sm">삭제</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 섹션 D: 결재양식 -->
+      <div class="section-box">
+        <div class="section-box-header">
+          <span class="section-box-title">결재양식 관리</span>
+          <button class="btn btn-primary btn-sm">+ 결재선 추가</button>
+        </div>
+        <div class="section-box-body">
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <!-- 연차신청 결재선 -->
+            <div style="padding:16px;border:1px solid var(--border);border-radius:var(--radius-md);">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                <div>
+                  <span style="font-size:14px;font-weight:600;">연차 신청</span>
+                  <span class="badge badge-blue" style="margin-left:8px;">3단계</span>
+                </div>
+                <button class="btn btn-secondary btn-sm">편집</button>
+              </div>
+              <div class="approval-chain" role="list" aria-label="연차신청 결재선">
+                <div class="approval-step" role="listitem">
+                  <div class="approval-stamp filled">신청자</div>
+                  <div class="approval-label">기안</div>
+                </div>
+                <div class="approval-arrow">→</div>
+                <div class="approval-step" role="listitem">
+                  <div class="approval-stamp filled">팀장</div>
+                  <div class="approval-label">검토</div>
+                </div>
+                <div class="approval-arrow">→</div>
+                <div class="approval-step" role="listitem">
+                  <div class="approval-stamp filled">원장</div>
+                  <div class="approval-label">최종승인</div>
+                </div>
+              </div>
+            </div>
+            <!-- 초과근무 결재선 -->
+            <div style="padding:16px;border:1px solid var(--border);border-radius:var(--radius-md);">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                <div>
+                  <span style="font-size:14px;font-weight:600;">초과근무 신청</span>
+                  <span class="badge badge-gray" style="margin-left:8px;">2단계</span>
+                </div>
+                <button class="btn btn-secondary btn-sm">편집</button>
+              </div>
+              <div class="approval-chain" role="list" aria-label="초과근무 결재선">
+                <div class="approval-step" role="listitem">
+                  <div class="approval-stamp filled">신청자</div>
+                  <div class="approval-label">기안</div>
+                </div>
+                <div class="approval-arrow">→</div>
+                <div class="approval-step" role="listitem">
+                  <div class="approval-stamp filled">팀장</div>
+                  <div class="approval-label">승인</div>
+                </div>
+                <div class="approval-step" style="margin-left:4px;">
+                  <div style="font-size:11px;color:var(--muted-text);padding:4px 8px;border:1px dashed var(--border);border-radius:var(--radius-sm);">+ 단계 추가</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /.content -->
+  </div><!-- /.main -->
+</div><!-- /.shell -->
+</div><!-- /#screen-operation -->
+
+
+<!-- ══════════════════════════════════════
+     SCREEN ③ settings_template_library
+══════════════════════════════════════ -->
+<div id="screen-template" class="screen-panel">
+<div class="shell">
+  <nav class="sidebar" aria-label="주 메뉴">
+    <div class="sidebar-logo">M</div>
+    <div class="sidebar-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+    <div class="sidebar-icon active"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg></div>
+  </nav>
+  <aside class="submenu" aria-label="설정 메뉴">
+    <div class="submenu-header">회사관리</div>
+    <div class="submenu-item" role="menuitem">회사정보</div>
+    <div class="submenu-item" role="menuitem">운영설정</div>
+    <div class="submenu-item active" role="menuitem">템플릿 라이브러리</div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <span class="topbar-title">템플릿 라이브러리</span>
+      <span class="topbar-spacer"></span>
+      <!-- 검색 -->
+      <div style="position:relative;">
+        <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted-text);" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="search" placeholder="템플릿 검색..." aria-label="템플릿 검색"
+          style="padding:7px 12px 7px 32px;border:1px solid var(--border);border-radius:var(--radius-md);font-size:13px;background:var(--card);outline:none;width:220px;" />
+      </div>
+      <button class="btn btn-primary btn-sm">+ 새 템플릿</button>
+      <div class="topbar-avatar">관</div>
+    </header>
+
+    <div class="content">
+
+      <!-- 카테고리 필터 -->
+      <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;" role="group" aria-label="카테고리 필터">
+        <button class="btn btn-primary btn-sm" id="filter-all" onclick="filterTemplate('all')">전체</button>
+        <button class="btn btn-secondary btn-sm" id="filter-employment" onclick="filterTemplate('employment')">고용/계약</button>
+        <button class="btn btn-secondary btn-sm" id="filter-salary" onclick="filterTemplate('salary')">급여/세금</button>
+        <button class="btn btn-secondary btn-sm" id="filter-leave" onclick="filterTemplate('leave')">휴가/근태</button>
+        <button class="btn btn-secondary btn-sm" id="filter-certificate" onclick="filterTemplate('certificate')">증명서</button>
+        <button class="btn btn-secondary btn-sm" id="filter-notice" onclick="filterTemplate('notice')">공지/안내</button>
+      </div>
+
+      <!-- 카드 그리드 — #87/88/89 통합 -->
+      <div class="card-grid" id="template-grid" role="list">
+
+        <!-- 고용/계약 -->
+        <div class="template-card" data-cat="employment" role="listitem" tabindex="0">
+          <div class="template-card-header">
+            <div class="template-icon">
+              <svg width="20" height="20" fill="none" stroke="#2563EB" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </div>
+            <span class="badge badge-blue">고용/계약</span>
+          </div>
+          <div class="template-title">표준 근로계약서</div>
+          <div class="template-desc">정규직 대상 표준 근로계약서. 4대보험·급여·근무시간 포함.</div>
+          <div class="template-footer">
+            <span style="font-size:11px;color:var(--muted-text);">최종수정 2026-04-10</span>
+            <div style="display:flex;gap:4px;">
+              <button class="btn btn-secondary btn-sm">미리보기</button>
+              <button class="btn btn-primary btn-sm">사용</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="template-card" data-cat="employment" role="listitem" tabindex="0">
+          <div class="template-card-header">
+            <div class="template-icon">
+              <svg width="20" height="20" fill="none" stroke="#2563EB" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            </div>
+            <span class="badge badge-blue">고용/계약</span>
+          </div>
+          <div class="template-title">계약직 근로계약서</div>
+          <div class="template-desc">기간제 근로자 대상. 계약기간·갱신조건 조항 포함.</div>
+          <div class="template-footer">
+            <span style="font-size:11px;color:var(--muted-text);">최종수정 2026-03-22</span>
+            <div style="display:flex;gap:4px;">
+              <button class="btn btn-secondary btn-sm">미리보기</button>
+              <button class="btn btn-primary btn-sm">사용</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 급여/세금 -->
+        <div class="template-card" data-cat="salary" role="listitem" tabindex="0">
+          <div class="template-card-header">
+            <div class="template-icon">
+              <svg width="20" height="20" fill="none" stroke="#059669" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            </div>
+            <span class="badge badge-green">급여/세금</span>
+          </div>
+          <div class="template-title">급여명세서 (표준)</div>
+          <div class="template-desc">지급·공제 항목 표준 레이아웃. PDF 출력 최적화.</div>
+          <div class="template-footer">
+            <span style="font-size:11px;color:var(--muted-text);">최종수정 2026-05-01</span>
+            <div style="display:flex;gap:4px;">
+              <button class="btn btn-secondary btn-sm">미리보기</button>
+              <button class="btn btn-primary btn-sm">사용</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="template-card" data-cat="salary" role="listitem" tabindex="0">
+          <div class="template-card-header">
+            <div class="template-icon">
+              <svg width="20" height="20" fill="none" stroke="#059669" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <span class="badge badge-green">급여/세금</span>
+          </div>
+          <div class="template-title">연말정산 안내문</div>
+          <div class="template-desc">연말정산 일정·필요서류 직원 안내 템플릿.</div>
+          <div class="template-footer">
+            <span style="font-size:11px;color:var(--muted-text);">최종수정 2025-12-15</span>
+            <div style="display:flex;gap:4px;">
+              <button class="btn btn-secondary btn-sm">미리보기</button>
+              <button class="btn btn-primary btn-sm">사용</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 휴가/근태 -->
+        <div class="template-card" data-cat="leave" role="listitem" tabindex="0">
+          <div class="template-card-header">
+            <div class="template-icon">
+              <svg width="20" height="20" fill="none" stroke="#7C3AED" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:#F3E8FF;color:#7C3AED;">휴가/근태</span>
+          </div>
+          <div class="template-title">연차사용 촉진 통보서</div>
+          <div class="template-desc">근로기준법 제61조 기반 연차사용 촉진 법정 양식.</div>
+          <div class="template-footer">
+            <span style="font-size:11px;color:var(--muted-text);">최종수정 2026-02-10</span>
+            <div style="display:flex;gap:4px;">
+              <button class="btn btn-secondary btn-sm">미리보기</button>
+              <button class="btn btn-primary btn-sm">사용</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 증명서 -->
+        <div class="template-card" data-cat="certificate" role="listitem" tabindex="0">
+          <div class="template-card-header">
+            <div class="template-icon">
+              <svg width="20" height="20" fill="none" stroke="#D97706" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>
+            </div>
+            <span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:#FFFBEB;color:#92400E;">증명서</span>
+          </div>
+          <div class="template-title">재직증명서</div>
+          <div class="template-desc">직인 날인 포함 표준 재직증명서 양식. 용도 자유기재.</div>
+          <div class="template-footer">
+            <span style="font-size:11px;color:var(--muted-text);">최종수정 2026-01-20</span>
+            <div style="display:flex;gap:4px;">
+              <button class="btn btn-secondary btn-sm">미리보기</button>
+              <button class="btn btn-primary btn-sm">사용</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="template-card" data-cat="certificate" role="listitem" tabindex="0">
+          <div class="template-card-header">
+            <div class="template-icon">
+              <svg width="20" height="20" fill="none" stroke="#D97706" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            </div>
+            <span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:#FFFBEB;color:#92400E;">증명서</span>
+          </div>
+          <div class="template-title">경력증명서</div>
+          <div class="template-desc">입퇴사일·직위·담당업무 기재 경력증명서.</div>
+          <div class="template-footer">
+            <span style="font-size:11px;color:var(--muted-text);">최종수정 2026-01-20</span>
+            <div style="display:flex;gap:4px;">
+              <button class="btn btn-secondary btn-sm">미리보기</button>
+              <button class="btn btn-primary btn-sm">사용</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 공지/안내 -->
+        <div class="template-card" data-cat="notice" role="listitem" tabindex="0">
+          <div class="template-card-header">
+            <div class="template-icon">
+              <svg width="20" height="20" fill="none" stroke="#EF4444" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            </div>
+            <span class="badge badge-red">공지/안내</span>
+          </div>
+          <div class="template-title">전직원 공지 양식</div>
+          <div class="template-desc">긴급/일반 공지사항 표준 양식. 수신확인 서명란 포함.</div>
+          <div class="template-footer">
+            <span style="font-size:11px;color:var(--muted-text);">최종수정 2026-03-05</span>
+            <div style="display:flex;gap:4px;">
+              <button class="btn btn-secondary btn-sm">미리보기</button>
+              <button class="btn btn-primary btn-sm">사용</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="template-card" data-cat="notice" role="listitem" tabindex="0">
+          <div class="template-card-header">
+            <div class="template-icon">
+              <svg width="20" height="20" fill="none" stroke="#EF4444" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <span class="badge badge-red">공지/안내</span>
+          </div>
+          <div class="template-title">개인정보 수집·이용 동의서</div>
+          <div class="template-desc">입사 시 개인정보 수집·이용·제3자제공 동의 양식.</div>
+          <div class="template-footer">
+            <span style="font-size:11px;color:var(--muted-text);">최종수정 2026-04-01</span>
+            <div style="display:flex;gap:4px;">
+              <button class="btn btn-secondary btn-sm">미리보기</button>
+              <button class="btn btn-primary btn-sm">사용</button>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /.card-grid -->
+    </div><!-- /.content -->
+  </div><!-- /.main -->
+</div><!-- /.shell -->
+</div><!-- /#screen-template -->
+
+
+<!-- ══════════════════════════════════════
+     JS — 탭 · 화면전환 · 카테고리 필터
+══════════════════════════════════════ -->
+<script>
+/* ── 화면 전환 ───────────────────────────── */
+function showScreen(name) {
+  document.querySelectorAll('.screen-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  document.querySelectorAll('[id^="nav-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('nav-' + name).classList.add('active');
+}
+
+/* ── 회사정보 탭 전환 (JM2: CSS display 토글) ─ */
+function switchTab(group, name) {
+  // 탭 버튼
+  const nav = document.querySelector('#screen-' + group + ' .tab-nav');
+  if (!nav) return;
+  nav.querySelectorAll('.tab-btn').forEach(btn => {
+    const active = btn.id === 'tab-' + name;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  // 탭 패널
+  document.querySelectorAll('#screen-' + group + ' .tab-panel').forEach(panel => {
+    panel.classList.remove('active');
+  });
+  const target = document.getElementById('tp-' + name);
+  if (target) target.classList.add('active');
+}
+
+/* ── 키보드 탭 네비 (ArrowLeft/Right) ────── */
+document.addEventListener('keydown', function(e) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+  const focused = document.activeElement;
+  if (!focused || !focused.classList.contains('tab-btn')) return;
+  const nav = focused.closest('.tab-nav');
+  if (!nav) return;
+  const tabs = [...nav.querySelectorAll('.tab-btn')];
+  const idx = tabs.indexOf(focused);
+  let next = idx;
+  if (e.key === 'ArrowRight') next = (idx + 1) % tabs.length;
+  if (e.key === 'ArrowLeft')  next = (idx - 1 + tabs.length) % tabs.length;
+  if (e.key === 'Home') next = 0;
+  if (e.key === 'End')  next = tabs.length - 1;
+  tabs[next].focus();
+  tabs[next].click();
+  e.preventDefault();
+});
+
+/* ── 템플릿 카테고리 필터 ─────────────────── */
+function filterTemplate(cat) {
+  const cards = document.querySelectorAll('#template-grid .template-card');
+  cards.forEach(card => {
+    const show = cat === 'all' || card.dataset.cat === cat;
+    card.style.display = show ? 'flex' : 'none';
+    card.style.flexDirection = show ? 'column' : '';
+  });
+  // 버튼 active 상태
+  document.querySelectorAll('[id^="filter-"]').forEach(btn => {
+    btn.className = btn.id === 'filter-' + cat
+      ? 'btn btn-primary btn-sm'
+      : 'btn btn-secondary btn-sm';
+  });
+}
+
+/* ── 초기화 ──────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  showScreen('company');
+  // 템플릿 카드 flex 컬럼 초기화
+  document.querySelectorAll('.template-card').forEach(c => { c.style.flexDirection = 'column'; });
+});
+</script>
+</body>
+</html>

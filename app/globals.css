@@ -90,6 +90,34 @@
   --nav-hover: #F4F6FA;
   --nav-active: #2563EB;
   --nav-active-subtle: #EBF2FF;
+
+  /* === Phase 4 확장 토큰 (2026-05-11) === */
+  /* 터치 타깃 — JM6 접근성 WCAG 2.5.5 */
+  --touch-target: 44px;
+  --touch-target-sm: 40px;
+
+  /* 모바일 spacing */
+  --mobile-padding-x: 16px;
+  --mobile-padding-y: 12px;
+  --mobile-section-gap: 20px;
+  --mobile-bottomtab-height: 60px;
+  --mobile-bottomsheet-radius: 16px 16px 0 0;
+
+  /* 인쇄 전용 — 인쇄용 bg-white 허용 (JM 메모리) */
+  --print-foreground: #000000;
+  --print-background: #ffffff;
+  --print-border: #cccccc;
+  --print-muted: #666666;
+
+  /* z-index 표준화 */
+  --z-dropdown: 50;
+  --z-sticky: 100;
+  --z-fixed: 200;
+  --z-modal-backdrop: 900;
+  --z-modal: 1000;
+  --z-bottomsheet: 1100;
+  --z-toast: 1200;
+  --z-tooltip: 1300;
 }
 
 :root.dark {
@@ -145,6 +173,14 @@
   --nav-hover: #18181B;
   --nav-active: #3B82F6;
   --nav-active-subtle: rgba(59,130,246,0.14);
+
+  /* === Phase 4 확장 토큰 다크 변형 === */
+  /* 인쇄는 다크모드에서도 항상 검정/백색 */
+  --print-foreground: #000000;
+  --print-background: #ffffff;
+  --print-border: #cccccc;
+  --print-muted: #666666;
+  /* touch-target, mobile, z-index, transition은 다크모드와 무관 — 라이트 값 그대로 상속 */
 }
 
 @theme inline {
@@ -1181,3 +1217,16 @@ button, a, [role="button"] {
   animation-fill-mode: forwards;
   transform-origin: left center;
 }
+
+/* ── Print media — Phase 4 (2026-05-11) ─────────────── */
+@media print {
+  :root {
+    --foreground: var(--print-foreground);
+    --background: var(--print-background);
+    --border: var(--print-border);
+    --muted-foreground: var(--print-muted);
+  }
+  .no-print { display: none !important; }
+  .print-only { display: block; }
+}
+.print-only { display: none; }

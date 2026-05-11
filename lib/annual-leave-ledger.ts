@@ -18,15 +18,29 @@ export function isAnnualLeaveType(value: unknown): boolean {
 }
 
 export function isHalfLeaveType(value: unknown): boolean {
-  const normalized = String(value ?? '').trim().toLowerCase();
-  if (!normalized) return false;
+  return getLeaveUnit(value) === 0.5;
+}
 
-  return (
+/**
+ * \ud734\uac00 \uc720\ud615\ubcc4 1\ud68c\ub2f9 \uc18c\ubaa8 \uc77c\uc218 \ub2e8\uc704 \ubc18\ud658
+ * - \ubc18\ucc28(\uc624\uc804/\uc624\ud6c4 \ud3ec\ud568): 0.5
+ * - \uadf8 \uc678 \uc5f0\ucc28/\uacf5\uac00 \ub4f1 \ud480\ub370\uc774: 1.0
+ * \uc8fc\uc758: \ubc18\ubc18\ucc28(0.25)\ub294 \uc774 \uc2dc\uc2a4\ud15c\uc5d0\uc11c \uc9c0\uc6d0\ud558\uc9c0 \uc54a\uc74c
+ */
+export function getLeaveUnit(value: unknown): 0.5 | 1.0 {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (!normalized) return 1.0;
+
+  const isHalf =
     normalized === 'half_leave' ||
     normalized === 'half-day' ||
     normalized === '\ubc18\ucc28' ||
-    normalized.includes('\ubc18\ucc28')
-  );
+    normalized === '\uc624\uc804\ubc18\ucc28' ||
+    normalized === '\uc624\ud6c4\ubc18\ucc28' ||
+    normalized.startsWith('\ubc18\ucc28') ||
+    normalized.endsWith('\ubc18\ucc28');
+
+  return isHalf ? 0.5 : 1.0;
 }
 
 export function isApprovedLeaveStatus(value: unknown): boolean {
@@ -240,9 +254,22 @@ export async function syncAnnualLeaveUsedForStaff(staffId: string, client: Supab
   if (error) throw error;
 
   const approvedAnnualLeaveDays = (data || []).reduce((sum, row) => {
-    if (!isApprovedLeaveStatus(row?.status) || !isAnnualLeaveType(row?.leave_type)) {
+    if (!isApprovedLeaveStatus(row?.status)) {
       return sum;
     }
+
+    const unit = getLeaveUnit(row?.leave_type);
+
+    // 반차(0.5단위): 단일 날짜에 0.5일 소모
+    if (unit === 0.5) {
+      return sum + 0.5;
+    }
+
+    // 풀데이 연차만 날짜 범위 계산
+    if (!isAnnualLeaveType(row?.leave_type)) {
+      return sum;
+    }
+
     return sum + calculateLeaveDays(row?.start_date, row?.end_date);
   }, 0);
 

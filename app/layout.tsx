@@ -4,6 +4,8 @@ import "./globals.css";
 import { ThemeProvider } from "@/lib/ThemeContext";
 import ErrorBoundary from "@/app/components/ErrorBoundary";
 import PwaBootstrap from "@/app/components/PwaBootstrap";
+import ApiCounterBadge from "@/app/components/dev/ApiCounterBadge";
+import WebVitalsInit from "@/app/components/dev/WebVitalsInit";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -68,7 +70,9 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <PwaBootstrap />
+          <WebVitalsInit />
           <ErrorBoundary>{children}</ErrorBoundary>
+          <ApiCounterBadge />
         </ThemeProvider>
       </body>
     </html>

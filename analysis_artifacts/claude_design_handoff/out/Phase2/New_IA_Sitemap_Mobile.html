@@ -1,0 +1,1379 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MSO ERP — Phase 2 IA 사이트맵 (Mobile)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --accent: #2563EB;
+    --accent-light: #EFF6FF;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --foreground: #111827;
+    --card: #FFFFFF;
+    --muted: #F3F4F6;
+    --border: #E5E7EB;
+    --toss-gray-3: #9CA3AF;
+    --toss-gray-4: #6B7280;
+    --toss-gray-5: #374151;
+    --badge-blue-bg: #DBEAFE;
+    --badge-blue-fg: #1D4ED8;
+    --badge-green-bg: #D1FAE5;
+    --badge-green-fg: #065F46;
+    --badge-red-bg: #FEE2E2;
+    --badge-red-fg: #991B1B;
+    --badge-yellow-bg: #FEF3C7;
+    --badge-yellow-fg: #92400E;
+    --badge-gray-bg: #F3F4F6;
+    --badge-gray-fg: #374151;
+    --badge-purple-bg: #EDE9FE;
+    --badge-purple-fg: #5B21B6;
+    --mobile-frame-w: 375px;
+    --bottom-tab-h: 64px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 13px;
+    color: var(--foreground);
+    background: #E8EDF5;
+    min-height: 100vh;
+  }
+
+  /* ── 페이지 헤더 ── */
+  .page-header {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 28px 14px;
+    position: sticky;
+    top: 0; z-index: 300;
+  }
+  .page-header-inner { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+  .page-title { font-size: 18px; font-weight: 700; }
+  .page-subtitle { font-size: 12px; color: var(--toss-gray-4); margin-top: 3px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  }
+  .badge-blue  { background: var(--badge-blue-bg);   color: var(--badge-blue-fg); }
+  .badge-green { background: var(--badge-green-bg);  color: var(--badge-green-fg); }
+  .badge-yellow{ background: var(--badge-yellow-bg); color: var(--badge-yellow-fg); }
+  .badge-purple{ background: var(--badge-purple-bg); color: var(--badge-purple-fg); }
+  .badge-gray  { background: var(--badge-gray-bg);   color: var(--badge-gray-fg); }
+  .badge-red   { background: var(--badge-red-bg);    color: var(--badge-red-fg); }
+
+  /* ── 컨트롤 바 ── */
+  .control-bar {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 28px;
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    position: sticky; top: 83px; z-index: 299;
+  }
+  .control-group { display: flex; align-items: center; gap: 8px; }
+  .control-label { font-size: 11px; font-weight: 600; color: var(--toss-gray-4); }
+  .toggle-btn {
+    padding: 4px 12px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--card);
+    color: var(--toss-gray-5);
+    font-family: inherit; font-size: 11px; font-weight: 500;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .toggle-btn:hover { background: var(--muted); }
+  .toggle-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .toggle-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ── 알림 배너 ── */
+  .info-banner {
+    background: var(--badge-blue-bg);
+    border-bottom: 1px solid #BFDBFE;
+    padding: 10px 28px;
+    font-size: 12px;
+    color: var(--badge-blue-fg);
+    font-weight: 500;
+  }
+
+  /* ── 메인 레이아웃 ── */
+  .main-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 28px 16px 40px;
+    gap: 28px;
+  }
+
+  /* ── 탭 선택 바 (데스크톱용 뷰어) ── */
+  .tab-selector {
+    display: flex;
+    gap: 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    width: 100%;
+    max-width: 700px;
+  }
+  .tab-selector button {
+    flex: 1;
+    padding: 10px 8px;
+    border: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--toss-gray-4);
+    cursor: pointer;
+    transition: all 0.15s;
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+  }
+  .tab-selector button:last-child { border-right: none; }
+  .tab-selector button:hover { background: var(--muted); color: var(--foreground); }
+  .tab-selector button.active {
+    background: var(--accent-light);
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .tab-selector button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .tab-icon { font-size: 18px; line-height: 1; }
+  .tab-badge-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #EF4444;
+    margin-top: -2px;
+  }
+
+  /* ── 콘텐츠 컨테이너 ── */
+  .content-container {
+    display: flex;
+    gap: 24px;
+    width: 100%;
+    max-width: 900px;
+    align-items: flex-start;
+  }
+
+  /* ── 모바일 프레임 ── */
+  .mobile-frame-wrap {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .frame-label {
+    font-size: 11px; font-weight: 600; color: var(--toss-gray-4);
+  }
+  .mobile-frame {
+    width: var(--mobile-frame-w);
+    background: var(--card);
+    border-radius: 32px;
+    border: 8px solid #1E293B;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    overflow: hidden;
+    position: relative;
+    min-height: 640px;
+  }
+  .frame-notch {
+    width: 100px; height: 24px;
+    background: #1E293B;
+    border-radius: 0 0 14px 14px;
+    margin: 0 auto;
+    position: relative; z-index: 10;
+  }
+
+  /* 프레임 내부 */
+  .frame-inner {
+    display: flex;
+    flex-direction: column;
+    height: 580px;
+    position: relative;
+  }
+  .frame-status-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 16px 0;
+    font-size: 11px; font-weight: 600; color: var(--foreground);
+    background: var(--card);
+  }
+
+  /* 프레임 스크린 */
+  .frame-screen {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+  .frame-screen-inner {
+    padding: 12px 14px;
+    height: 100%;
+    overflow-y: auto;
+  }
+  .frame-screen-title {
+    font-size: 15px; font-weight: 700; margin-bottom: 10px;
+    color: var(--foreground);
+  }
+
+  /* 화면 카드 목록 */
+  .screen-list { display: flex; flex-direction: column; gap: 6px; }
+  .screen-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 8px 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .screen-card-icon { font-size: 16px; flex-shrink: 0; }
+  .screen-card-text { flex: 1; }
+  .screen-card-name { font-size: 11px; font-weight: 600; color: var(--foreground); }
+  .screen-card-sub  { font-size: 10px; color: var(--toss-gray-4); margin-top: 1px; }
+  .screen-card-arrow { font-size: 11px; color: var(--toss-gray-3); }
+
+  .priority-first {
+    border-left: 3px solid var(--accent);
+  }
+  .priority-second {
+    border-left: 3px solid #10B981;
+  }
+  .priority-more {
+    border-left: 3px solid var(--toss-gray-3);
+    opacity: 0.7;
+  }
+
+  /* 바텀탭 */
+  .bottom-tab-bar {
+    display: flex;
+    height: var(--bottom-tab-h);
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+  }
+  .bottom-tab {
+    flex: 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px;
+    background: transparent; border: none;
+    font-family: inherit; font-size: 10px; font-weight: 500;
+    color: var(--toss-gray-4);
+    cursor: pointer;
+    transition: all 0.12s;
+    padding: 0;
+    min-height: 44px;
+    position: relative;
+  }
+  .bottom-tab:hover { color: var(--accent); }
+  .bottom-tab.active { color: var(--accent); font-weight: 700; }
+  .bottom-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .bottom-tab-icon { font-size: 20px; line-height: 1; }
+  .bottom-tab-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #EF4444;
+    position: absolute; top: 6px; right: 50%;
+    transform: translateX(8px);
+  }
+
+  /* ── 트리 패널 ── */
+  .tree-panel {
+    flex: 1;
+    min-width: 0;
+  }
+  .tree-section { display: none; }
+  .tree-section.visible { display: block; }
+
+  .tree-block {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .tree-block-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px;
+    background: var(--muted);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+  }
+  .tree-block-header:hover { background: #ECEFF3; }
+  .tree-block-header:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .tree-block-title { font-size: 12px; font-weight: 700; flex: 1; }
+  .tree-block-meta { display: flex; gap: 5px; align-items: center; }
+  .chevron { font-size: 11px; color: var(--toss-gray-4); transition: transform 0.15s; }
+  .tree-block.collapsed .chevron { transform: rotate(-90deg); }
+  .tree-block-body { padding: 6px 0; }
+  .tree-block.collapsed .tree-block-body { display: none; }
+
+  /* 트리 노드 */
+  .tnode {
+    display: flex; align-items: flex-start; gap: 0;
+    padding: 4px 14px;
+  }
+  .tnode-indent { flex-shrink: 0; }
+  .tnode-line {
+    display: flex; align-items: center;
+    flex: 1; gap: 6px;
+    flex-wrap: wrap;
+  }
+  .tnode-connector { color: var(--border); font-size: 10px; flex-shrink: 0; }
+  .tnode-name { font-size: 11px; font-weight: 500; color: var(--foreground); }
+  .depth-badge {
+    font-size: 9px; font-weight: 700;
+    padding: 1px 5px; border-radius: 3px; border: 1px solid;
+  }
+  .depth-1 { background: #EFF6FF; color: #1D4ED8; border-color: #BFDBFE; }
+  .depth-2 { background: #F0FDF4; color: #166534; border-color: #BBF7D0; }
+  .depth-3 { background: #FFFBEB; color: #92400E; border-color: #FDE68A; }
+
+  .priority-tag {
+    font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 3px;
+  }
+  .p-first  { background: #DBEAFE; color: #1D4ED8; }
+  .p-second { background: #D1FAE5; color: #065F46; }
+  .p-more   { background: #F3F4F6; color: #374151; }
+  .p-hidden { background: #FEE2E2; color: #991B1B; }
+
+  .pattern-tag {
+    font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 3px;
+  }
+  .pattern-bottom { background: #EDE9FE; color: #5B21B6; }
+  .pattern-push   { background: #FEF3C7; color: #92400E; }
+  .pattern-sheet  { background: #D1FAE5; color: #065F46; }
+  .pattern-search { background: #DBEAFE; color: #1D4ED8; }
+
+  .screen-ref { font-size: 9px; color: var(--toss-gray-3); }
+
+  /* ── 구조 비교 설명 ── */
+  .diff-note {
+    background: var(--badge-yellow-bg);
+    border: 1px solid #FDE68A;
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    font-size: 11px;
+    color: var(--badge-yellow-fg);
+    font-weight: 500;
+    line-height: 1.6;
+  }
+  .diff-note strong { font-weight: 700; }
+
+  /* ── 통계 footer ── */
+  .summary-footer {
+    width: 100%; max-width: 900px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 20px;
+  }
+  .summary-title { font-size: 12px; font-weight: 700; margin-bottom: 10px; }
+  .summary-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .summary-table th, .summary-table td {
+    padding: 5px 10px; border: 1px solid var(--border); text-align: left;
+  }
+  .summary-table th { background: var(--muted); font-weight: 700; }
+  .summary-table tr:nth-child(even) { background: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- ── 페이지 헤더 ── -->
+<header class="page-header" role="banner">
+  <div class="page-header-inner">
+    <div>
+      <h1 class="page-title">MSO ERP — IA 사이트맵 (Mobile)</h1>
+      <p class="page-subtitle">Phase 2 산출물 · 바텀탭 5개 · 375px 프레임 · PC 트리의 단순 축소가 아닌 별도 구조</p>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+      <span class="badge badge-purple">Mobile 375px</span>
+      <span class="badge badge-green">Mobile First 우선</span>
+      <span class="badge badge-gray">2026-05-11</span>
+    </div>
+  </div>
+</header>
+
+<!-- ── 컨트롤 바 ── -->
+<nav class="control-bar" aria-label="탭 필터">
+  <div class="control-group">
+    <span class="control-label">바텀탭 선택</span>
+    <button class="toggle-btn active" id="ctrl-home"    onclick="switchTab('home')"    aria-pressed="true" >🏠 홈</button>
+    <button class="toggle-btn"        id="ctrl-work"    onclick="switchTab('work')"    aria-pressed="false">📋 업무</button>
+    <button class="toggle-btn"        id="ctrl-myinfo"  onclick="switchTab('myinfo')"  aria-pressed="false">👤 내정보</button>
+    <button class="toggle-btn"        id="ctrl-notify"  onclick="switchTab('notify')"  aria-pressed="false">🔔 알림</button>
+    <button class="toggle-btn"        id="ctrl-more"    onclick="switchTab('more')"    aria-pressed="false">☰ 더보기</button>
+  </div>
+  <div class="control-group">
+    <span class="control-label">트리</span>
+    <button class="toggle-btn" onclick="expandAllBlocks()" aria-label="전체 펼치기">▼ 펼치기</button>
+    <button class="toggle-btn" onclick="collapseAllBlocks()" aria-label="전체 접기">▶ 접기</button>
+  </div>
+</nav>
+
+<!-- ── 알림 배너 ── -->
+<div class="info-banner" role="note">
+  <strong>모바일 IA 원칙</strong> — 바텀탭은 PC 사이드바의 단순 축소가 아닙니다.
+  「홈·업무·내정보·알림·더보기」로 <strong>작업 빈도·터치 동선</strong> 기준 재편.
+  깊은 관리자 화면은 「더보기 &gt; 검색」으로 도달. 바텀탭 미노출 화면 수: <strong id="hidden-count">13개</strong>
+</div>
+
+<!-- ── 메인 ── -->
+<main class="main-layout" id="main-content">
+
+  <!-- 탭 선택 바 (뷰어용) -->
+  <div class="tab-selector" role="tablist" aria-label="모바일 바텀탭 미리보기">
+    <button role="tab" id="tab-home"   onclick="switchTab('home')"   class="active" aria-selected="true"  aria-controls="tree-home">
+      <span class="tab-icon" aria-hidden="true">🏠</span>홈
+    </button>
+    <button role="tab" id="tab-work"   onclick="switchTab('work')"   aria-selected="false" aria-controls="tree-work">
+      <span class="tab-icon" aria-hidden="true">📋</span>업무
+    </button>
+    <button role="tab" id="tab-myinfo" onclick="switchTab('myinfo')" aria-selected="false" aria-controls="tree-myinfo">
+      <span class="tab-icon" aria-hidden="true">👤</span>내정보
+    </button>
+    <button role="tab" id="tab-notify" onclick="switchTab('notify')" aria-selected="false" aria-controls="tree-notify">
+      <span class="tab-icon" aria-hidden="true">🔔</span>알림
+      <span class="tab-badge-dot" aria-label="새 알림 있음"></span>
+    </button>
+    <button role="tab" id="tab-more"   onclick="switchTab('more')"   aria-selected="false" aria-controls="tree-more">
+      <span class="tab-icon" aria-hidden="true">☰</span>더보기
+    </button>
+  </div>
+
+  <!-- 콘텐츠 컨테이너 -->
+  <div class="content-container">
+
+    <!-- ── 모바일 프레임 ── -->
+    <div class="mobile-frame-wrap" aria-hidden="true">
+      <div class="frame-label">375px 프레임 mockup</div>
+      <div class="mobile-frame" role="img" aria-label="모바일 화면 미리보기">
+        <div class="frame-notch"></div>
+        <div class="frame-inner">
+          <div class="frame-status-bar">
+            <span>9:41</span>
+            <span>●●● ▲ 100%</span>
+          </div>
+
+          <!-- 홈 프레임 -->
+          <div class="frame-screen" id="frame-home">
+            <div class="frame-screen-inner">
+              <div class="frame-screen-title">홈</div>
+              <div class="screen-list">
+                <div class="screen-card priority-first">
+                  <span class="screen-card-icon">🔍</span>
+                  <div class="screen-card-text">
+                    <div class="screen-card-name">글로벌 검색</div>
+                    <div class="screen-card-sub">화면·기능 즉시 접근</div>
+                  </div>
+                </div>
+                <div class="screen-card priority-first">
+                  <span class="screen-card-icon">✅</span>
+                  <div class="screen-card-text">
+                    <div class="screen-card-name">오늘 할일</div>
+                    <div class="screen-card-sub">미완료 3건</div>
+                  </div>
+                  <span class="screen-card-arrow">›</span>
+                </div>
+                <div class="screen-card priority-first">
+                  <span class="screen-card-icon">🕐</span>
+                  <div class="screen-card-text">
+                    <div class="screen-card-name">출퇴근 현황</div>
+                    <div class="screen-card-sub">오늘 09:02 출근</div>
+                  </div>
+                  <span class="screen-card-arrow">›</span>
+                </div>
+                <div class="screen-card priority-second">
+                  <span class="screen-card-icon">📝</span>
+                  <div class="screen-card-text">
+                    <div class="screen-card-name">결재 대기</div>
+                    <div class="screen-card-sub">2건 승인 필요</div>
+                  </div>
+                  <span class="screen-card-arrow">›</span>
+                </div>
+                <div class="screen-card priority-second">
+                  <span class="screen-card-icon">💬</span>
+                  <div class="screen-card-text">
+                    <div class="screen-card-name">채팅</div>
+                    <div class="screen-card-sub">새 메시지 5건</div>
+                  </div>
+                  <span class="screen-card-arrow">›</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 업무 프레임 -->
+          <div class="frame-screen" id="frame-work" style="display:none;">
+            <div class="frame-screen-inner">
+              <div class="frame-screen-title">업무</div>
+              <div class="screen-list">
+                <div class="screen-card priority-first">
+                  <span class="screen-card-icon">💬</span>
+                  <div class="screen-card-text">
+                    <div class="screen-card-name">채팅</div>
+                    <div class="screen-card-sub">실시간 메신저</div>
+                  </div>
+                  <span class="screen-card-arrow">›</span>
+                </div>
+                <div class="screen-card priority-first">
+                  <span class="screen-card-icon">✅</span>
+                  <div class="screen-card-text">
+                    <div class="screen-card-name">할일</div>
+                    <div class="screen-card-sub">3건 미완료</div>
+                  </div>
+                  <span class="screen-card-arrow">›</span>
+                </div>
+                <div class="screen-card priority-second">
+                  <span class="screen-card-icon">📝</span>
+                  <div class="screen-card-text">
+                    <div class="screen-card-name">전자결재</div>
+                    <div class="screen-card-sub">기안·수신 탭</div>
+                  </div>
+                  <span class="screen-card-arrow">›</span>
+                </div>
+                <div class="screen-card priority-second">
+                  <span class="screen-card-icon">📢</span>
+                  <div class="screen-card-text">
+                    <div class="screen-card-name">게시판</div>
+                    <div class="screen-card-sub">공지·자유 탭</div>
+                  </div>
+                  <span class="screen-card-arrow">›</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 내정보 프레임 -->
+          <div class="frame-screen" id="frame-myinfo" style="display:none;">
+            <div class="frame-screen-inner">
+              <div class="frame-screen-title">내정보</div>
+              <div class="screen-list">
+                <div class="screen-card priority-first">
+                  <span class="screen-card-icon">🕐</span>
+                  <div class="screen-card-text">
+                    <div class="screen-card-name">출퇴근 기록</div>
+                    <div class="screen-card-sub">이번달 22일 출근</div>
+                  </div>
+                  <span class="screen-card-arrow">›</span>
+                </div>
+                <div class="screen-card priority-first">
+                  <span class="screen-card-icon">🌴</span>
+                  <div class="screen-card-text">
+                    <div class="screen-card-name">내 연차 현황</div>
+                    <div class="screen-card-sub">잔여 8일</div>
+                  </div>
+                  <span class="screen-card-arrow">›</span>
+                </div>
+                <div class="screen-card priority-second">
+                  <span class="screen-card-icon">💰</span>
+                  <div class="screen-card-text">
+                    <div class="screen-card-name">급여명세서</div>
+                    <div class="screen-card-sub">4월 정산 완료</div>
+                  </div>
+                  <span class="screen-card-arrow">›</span>
+                </div>
+                <div class="screen-card priority-second">
+                  <span class="screen-card-icon">📄</span>
+                  <div class="screen-card-text">
+                    <div class="screen-card-name">서류 제출</div>
+                    <div class="screen-card-sub">계약서·증명서</div>
+                  </div>
+                  <span class="screen-card-arrow">›</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 알림 프레임 -->
+          <div class="frame-screen" id="frame-notify" style="display:none;">
+            <div class="frame-screen-inner">
+              <div class="frame-screen-title">알림</div>
+              <div class="screen-list">
+                <div class="screen-card priority-first">
+                  <span class="screen-card-icon">📝</span>
+                  <div class="screen-card-text">
+                    <div class="screen-card-name">결재 요청</div>
+                    <div class="screen-card-sub">김철수님이 기안 제출</div>
+                  </div>
+                  <span class="screen-card-arrow">›</span>
+                </div>
+                <div class="screen-card priority-first">
+                  <span class="screen-card-icon">💬</span>
+                  <div class="screen-card-text">
+                    <div class="screen-card-name">채팅 메시지</div>
+                    <div class="screen-card-sub">운영팀 · 5분 전</div>
+                  </div>
+                  <span class="screen-card-arrow">›</span>
+                </div>
+                <div class="screen-card priority-second">
+                  <span class="screen-card-icon">📢</span>
+                  <div class="screen-card-text">
+                    <div class="screen-card-name">공지사항</div>
+                    <div class="screen-card-sub">5월 급여 일정 안내</div>
+                  </div>
+                  <span class="screen-card-arrow">›</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 더보기 프레임 -->
+          <div class="frame-screen" id="frame-more" style="display:none;">
+            <div class="frame-screen-inner">
+              <div class="frame-screen-title">더보기</div>
+              <div class="screen-list">
+                <div class="screen-card priority-first">
+                  <span class="screen-card-icon">🔍</span>
+                  <div class="screen-card-text">
+                    <div class="screen-card-name">전체 메뉴 검색</div>
+                    <div class="screen-card-sub">화면·기능명으로 찾기</div>
+                  </div>
+                </div>
+                <div class="screen-card priority-second">
+                  <span class="screen-card-icon">📦</span>
+                  <div class="screen-card-text">
+                    <div class="screen-card-name">재고 현황</div>
+                    <div class="screen-card-sub">부서별 물품</div>
+                  </div>
+                  <span class="screen-card-arrow">›</span>
+                </div>
+                <div class="screen-card priority-second">
+                  <span class="screen-card-icon">🩺</span>
+                  <div class="screen-card-text">
+                    <div class="screen-card-name">OP체크 보드</div>
+                    <div class="screen-card-sub">실시간 수술 현황</div>
+                  </div>
+                  <span class="screen-card-arrow">›</span>
+                </div>
+                <div class="screen-card priority-more">
+                  <span class="screen-card-icon">⚙️</span>
+                  <div class="screen-card-text">
+                    <div class="screen-card-name">설정</div>
+                    <div class="screen-card-sub">권한·회사 관리</div>
+                  </div>
+                  <span class="screen-card-arrow">›</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 바텀탭 바 -->
+          <nav class="bottom-tab-bar" aria-label="바텀탭">
+            <button class="bottom-tab active" id="ftab-home" onclick="switchFrameTab('home')" aria-current="true" aria-label="홈">
+              <span class="bottom-tab-icon" aria-hidden="true">🏠</span>
+              <span>홈</span>
+            </button>
+            <button class="bottom-tab" id="ftab-work" onclick="switchFrameTab('work')" aria-label="업무">
+              <span class="bottom-tab-icon" aria-hidden="true">📋</span>
+              <span>업무</span>
+            </button>
+            <button class="bottom-tab" id="ftab-myinfo" onclick="switchFrameTab('myinfo')" aria-label="내정보">
+              <span class="bottom-tab-icon" aria-hidden="true">👤</span>
+              <span>내정보</span>
+            </button>
+            <button class="bottom-tab" id="ftab-notify" onclick="switchFrameTab('notify')" aria-label="알림, 새 알림 있음">
+              <span class="bottom-tab-dot" aria-hidden="true"></span>
+              <span class="bottom-tab-icon" aria-hidden="true">🔔</span>
+              <span>알림</span>
+            </button>
+            <button class="bottom-tab" id="ftab-more" onclick="switchFrameTab('more')" aria-label="더보기">
+              <span class="bottom-tab-icon" aria-hidden="true">☰</span>
+              <span>더보기</span>
+            </button>
+          </nav>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--toss-gray-4);text-align:center;">
+        바텀탭 높이 64px · 터치 타깃 ≥ 44px
+      </div>
+    </div>
+
+    <!-- ── 트리 패널 ── -->
+    <div class="tree-panel">
+
+      <!-- PC와 구조 차이 안내 -->
+      <div class="diff-note" role="note">
+        <strong>모바일 IA ≠ PC 트리 축소</strong><br>
+        PC: 5개 사이드바 메뉴 (업무/인사·근태·급여/운영/경영/설정)<br>
+        Mobile: <strong>작업 빈도·터치 동선</strong> 기준 5개 바텀탭 (홈·업무·내정보·알림·더보기)<br>
+        관리자 전용 깊은 화면(경영·설정)은 <strong>더보기 → 검색</strong>으로 도달.
+        바텀탭 직접 노출 화면: <strong>25개</strong> / 더보기 햄버거 진입 화면: <strong>13개</strong>
+      </div>
+
+      <!-- 홈 트리 -->
+      <div class="tree-section visible" id="tree-home" role="tabpanel" aria-labelledby="tab-home">
+        <article class="tree-block" id="blk-home-main">
+          <div class="tree-block-header" onclick="toggleBlock('blk-home-main')" tabindex="0" role="button" aria-expanded="true" onkeydown="keyToggleBlk(event,'blk-home-main')">
+            <span aria-hidden="true">🏠</span>
+            <span class="tree-block-title">홈 탭 — 퀵 액세스 대시보드</span>
+            <div class="tree-block-meta">
+              <span class="badge badge-purple">Mobile First</span>
+            </div>
+            <span class="chevron" aria-hidden="true">▾</span>
+          </div>
+          <div class="tree-block-body" role="tree">
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:0"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">글로벌 검색 (상단 고정)</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-first">1순위</span>
+                <span class="pattern-tag pattern-search">검색</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:16px"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">오늘 할일 위젯</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-first">1순위</span>
+                <span class="screen-ref">#03 #05</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:16px"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">출퇴근 현황 위젯</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-first">1순위</span>
+                <span class="screen-ref">#02</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:16px"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">결재 대기 위젯</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-second">2순위</span>
+                <span class="screen-ref">#25</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:16px"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">채팅 미리보기 위젯</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-second">2순위</span>
+                <span class="pattern-tag pattern-sheet">바텀시트</span>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <!-- 업무 트리 -->
+      <div class="tree-section" id="tree-work" role="tabpanel" aria-labelledby="tab-work">
+        <article class="tree-block" id="blk-work-chat">
+          <div class="tree-block-header" onclick="toggleBlock('blk-work-chat')" tabindex="0" role="button" aria-expanded="true" onkeydown="keyToggleBlk(event,'blk-work-chat')">
+            <span aria-hidden="true">💬</span>
+            <span class="tree-block-title">채팅</span>
+            <div class="tree-block-meta">
+              <span class="badge badge-purple">Mobile First</span>
+            </div>
+            <span class="chevron" aria-hidden="true">▾</span>
+          </div>
+          <div class="tree-block-body" role="tree">
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:0"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">채팅 목록 (풀스크린)</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-first">1순위</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:16px"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">채팅방 상세 (풀스크린 푸시)</span>
+                <span class="depth-badge depth-2">D2</span>
+                <span class="priority-tag p-first">1순위</span>
+                <span class="pattern-tag pattern-push">푸시</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="tree-block" id="blk-work-todo">
+          <div class="tree-block-header" onclick="toggleBlock('blk-work-todo')" tabindex="0" role="button" aria-expanded="true" onkeydown="keyToggleBlk(event,'blk-work-todo')">
+            <span aria-hidden="true">✅</span>
+            <span class="tree-block-title">할일</span>
+            <div class="tree-block-meta">
+              <span class="badge badge-purple">Mobile First</span>
+            </div>
+            <span class="chevron" aria-hidden="true">▾</span>
+          </div>
+          <div class="tree-block-body" role="tree">
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:0"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">할일 목록</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-first">1순위</span>
+                <span class="screen-ref">#03 #05</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:16px"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">할일 상세 (바텀시트)</span>
+                <span class="depth-badge depth-2">D2</span>
+                <span class="priority-tag p-first">1순위</span>
+                <span class="pattern-tag pattern-sheet">바텀시트</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="tree-block" id="blk-work-approval">
+          <div class="tree-block-header" onclick="toggleBlock('blk-work-approval')" tabindex="0" role="button" aria-expanded="true" onkeydown="keyToggleBlk(event,'blk-work-approval')">
+            <span aria-hidden="true">📝</span>
+            <span class="tree-block-title">전자결재</span>
+            <div class="tree-block-meta"></div>
+            <span class="chevron" aria-hidden="true">▾</span>
+          </div>
+          <div class="tree-block-body" role="tree">
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:0"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">결재함 (기안·수신 탭)</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-second">2순위</span>
+                <span class="screen-ref">#25</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:16px"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">결재 작성 (풀스크린 모달)</span>
+                <span class="depth-badge depth-2">D2</span>
+                <span class="priority-tag p-second">2순위</span>
+                <span class="pattern-tag pattern-push">풀스크린</span>
+                <span class="screen-ref">#26</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="tree-block" id="blk-work-board">
+          <div class="tree-block-header" onclick="toggleBlock('blk-work-board')" tabindex="0" role="button" aria-expanded="true" onkeydown="keyToggleBlk(event,'blk-work-board')">
+            <span aria-hidden="true">📢</span>
+            <span class="tree-block-title">게시판</span>
+            <div class="tree-block-meta"></div>
+            <span class="chevron" aria-hidden="true">▾</span>
+          </div>
+          <div class="tree-block-body" role="tree">
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:0"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">게시판 (공지·자유 탭)</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-second">2순위</span>
+                <span class="screen-ref">#23 #24</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:16px"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">게시글 상세 (풀스크린 푸시)</span>
+                <span class="depth-badge depth-2">D2</span>
+                <span class="priority-tag p-second">2순위</span>
+                <span class="pattern-tag pattern-push">푸시</span>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <!-- 내정보 트리 -->
+      <div class="tree-section" id="tree-myinfo" role="tabpanel" aria-labelledby="tab-myinfo">
+        <article class="tree-block" id="blk-myinfo-main">
+          <div class="tree-block-header" onclick="toggleBlock('blk-myinfo-main')" tabindex="0" role="button" aria-expanded="true" onkeydown="keyToggleBlk(event,'blk-myinfo-main')">
+            <span aria-hidden="true">👤</span>
+            <span class="tree-block-title">내정보 메인페이지</span>
+            <div class="tree-block-meta">
+              <span class="badge badge-purple">Mobile First</span>
+            </div>
+            <span class="chevron" aria-hidden="true">▾</span>
+          </div>
+          <div class="tree-block-body" role="tree">
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:0"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">출퇴근 기록</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-first">1순위</span>
+                <span class="screen-ref">#02</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:0"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">내 연차 현황</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-first">1순위</span>
+                <span class="screen-ref">#35</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:0"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">급여명세서 조회</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-second">2순위</span>
+                <span class="screen-ref">#42 일부</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:0"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">서류 제출</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-second">2순위</span>
+                <span class="screen-ref">#04 #63</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:16px"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">계약서 서명 (바텀시트)</span>
+                <span class="depth-badge depth-2">D2</span>
+                <span class="priority-tag p-second">2순위</span>
+                <span class="pattern-tag pattern-sheet">바텀시트</span>
+                <span class="screen-ref">#06</span>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <!-- 알림 트리 -->
+      <div class="tree-section" id="tree-notify" role="tabpanel" aria-labelledby="tab-notify">
+        <article class="tree-block" id="blk-notify-main">
+          <div class="tree-block-header" onclick="toggleBlock('blk-notify-main')" tabindex="0" role="button" aria-expanded="true" onkeydown="keyToggleBlk(event,'blk-notify-main')">
+            <span aria-hidden="true">🔔</span>
+            <span class="tree-block-title">알림 센터</span>
+            <div class="tree-block-meta">
+              <span class="badge badge-purple">Mobile First</span>
+            </div>
+            <span class="chevron" aria-hidden="true">▾</span>
+          </div>
+          <div class="tree-block-body" role="tree">
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:0"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">결재 알림 (VAPID 푸시 수신)</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-first">1순위</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:0"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">채팅 메시지 알림</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-first">1순위</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:0"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">공지·업무 알림</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-second">2순위</span>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <!-- 더보기 트리 -->
+      <div class="tree-section" id="tree-more" role="tabpanel" aria-labelledby="tab-more">
+
+        <div class="diff-note" style="margin-bottom:10px;">
+          <strong>더보기 = 검색 우선 + 관리자 전용 깊은 화면 진입점</strong><br>
+          바텀탭에 노출되지 않는 <strong>13개 화면</strong>은 「더보기 → 전체 메뉴 검색」으로 도달합니다.<br>
+          PC의 인사·근태·급여 / 경영 / 설정 메뉴 대부분이 여기에 포함됩니다.
+        </div>
+
+        <!-- 검색 -->
+        <article class="tree-block" id="blk-more-search">
+          <div class="tree-block-header" onclick="toggleBlock('blk-more-search')" tabindex="0" role="button" aria-expanded="true" onkeydown="keyToggleBlk(event,'blk-more-search')">
+            <span aria-hidden="true">🔍</span>
+            <span class="tree-block-title">전체 메뉴 검색 (최상단 고정)</span>
+            <div class="tree-block-meta">
+              <span class="badge badge-blue">검색 우선</span>
+            </div>
+            <span class="chevron" aria-hidden="true">▾</span>
+          </div>
+          <div class="tree-block-body" role="tree">
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:0"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">화면·기능명 검색 → 즉시 이동</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-first">1순위</span>
+                <span class="pattern-tag pattern-search">GlobalSearch</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- 현장 바로가기 -->
+        <article class="tree-block" id="blk-more-quick">
+          <div class="tree-block-header" onclick="toggleBlock('blk-more-quick')" tabindex="0" role="button" aria-expanded="true" onkeydown="keyToggleBlk(event,'blk-more-quick')">
+            <span aria-hidden="true">⚡</span>
+            <span class="tree-block-title">현장 바로가기 (2순위 노출)</span>
+            <div class="tree-block-meta"></div>
+            <span class="chevron" aria-hidden="true">▾</span>
+          </div>
+          <div class="tree-block-body" role="tree">
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:0"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">재고 현황</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-second">2순위</span>
+                <span class="screen-ref">#07 #64 #65</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:0"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">OP체크 보드</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-second">2순위</span>
+                <span class="screen-ref">#08~#12</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:0"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">병동인계</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-second">2순위</span>
+                <span class="screen-ref">#13</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- 햄버거(더보기) 안 깊은 화면 — 13개 -->
+        <article class="tree-block" id="blk-more-hidden">
+          <div class="tree-block-header" onclick="toggleBlock('blk-more-hidden')" tabindex="0" role="button" aria-expanded="true" onkeydown="keyToggleBlk(event,'blk-more-hidden')">
+            <span aria-hidden="true">🗂️</span>
+            <span class="tree-block-title">관리자 전용 — 더보기 안 진입 (13개)</span>
+            <div class="tree-block-meta">
+              <span class="badge badge-red">바텀탭 미노출</span>
+            </div>
+            <span class="chevron" aria-hidden="true">▾</span>
+          </div>
+          <div class="tree-block-body" role="tree">
+            <!-- 인사·근태·급여 -->
+            <div class="tnode" style="padding-top:6px;" role="treeitem">
+              <div class="tnode-indent" style="width:0"></div>
+              <div class="tnode-line">
+                <span style="font-size:10px;font-weight:700;color:var(--toss-gray-4);">▸ 인사·근태·급여 (관리자)</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:16px"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">구성원 목록 / 인사발령</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-hidden">더보기</span>
+                <span class="screen-ref">#27 #28</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:16px"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">근태 대시보드 · 근무표</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-hidden">더보기</span>
+                <span class="screen-ref">#30~#34</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:16px"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">급여 워크센터 (전체)</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-hidden">더보기</span>
+                <span class="screen-ref">#41~#53</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:16px"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">계약·문서·경조사</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-hidden">더보기</span>
+                <span class="screen-ref">#54~#63</span>
+              </div>
+            </div>
+            <!-- 운영 (관리자) -->
+            <div class="tnode" style="padding-top:6px;" role="treeitem">
+              <div class="tnode-indent" style="width:0"></div>
+              <div class="tnode-line">
+                <span style="font-size:10px;font-weight:700;color:var(--toss-gray-4);">▸ 운영 (관리자)</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:16px"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">입출고·발주·품목자산</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-hidden">더보기</span>
+                <span class="screen-ref">#66~#70</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:16px"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">퇴원심사 워크플로우</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-hidden">더보기</span>
+                <span class="screen-ref">#17~#22</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:16px"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">마감보고 / 직원평가</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-hidden">더보기</span>
+                <span class="screen-ref">#14 #15 #16</span>
+              </div>
+            </div>
+            <!-- 경영 -->
+            <div class="tnode" style="padding-top:6px;" role="treeitem">
+              <div class="tnode-indent" style="width:0"></div>
+              <div class="tnode-line">
+                <span style="font-size:10px;font-weight:700;color:var(--toss-gray-4);">▸ 경영 (원장·관리자)</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:16px"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">경영·재무 대시보드</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-hidden">더보기</span>
+                <span class="screen-ref">#71 #72</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:16px"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">예산·경영분석·통합보고서</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-hidden">더보기</span>
+                <span class="screen-ref">#73~#77</span>
+              </div>
+            </div>
+            <!-- 설정 -->
+            <div class="tnode" style="padding-top:6px;" role="treeitem">
+              <div class="tnode-indent" style="width:0"></div>
+              <div class="tnode-line">
+                <span style="font-size:10px;font-weight:700;color:var(--toss-gray-4);">▸ 설정 (관리자·원장)</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:16px"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">회사 관리 · 권한 · 운영설정</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-hidden">더보기</span>
+                <span class="screen-ref">#78~#92</span>
+              </div>
+            </div>
+            <div class="tnode" role="treeitem">
+              <div class="tnode-indent" style="width:16px"></div>
+              <div class="tnode-line">
+                <span class="tnode-connector">└─</span>
+                <span class="tnode-name">시스템·감사·백업</span>
+                <span class="depth-badge depth-1">D1</span>
+                <span class="priority-tag p-hidden">더보기</span>
+                <span class="screen-ref">#93~#96</span>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div><!-- /tree-more -->
+
+    </div><!-- /tree-panel -->
+  </div><!-- /content-container -->
+
+  <!-- ── 요약 footer ── -->
+  <div class="summary-footer" role="complementary" aria-label="구조 요약">
+    <div class="summary-title">모바일 IA 요약 — 바텀탭 5개 × 화면 분류</div>
+    <table class="summary-table">
+      <thead>
+        <tr>
+          <th>탭</th>
+          <th>직접 노출 화면</th>
+          <th>원본 스크린 참조</th>
+          <th>PC 메뉴 대응</th>
+          <th>최대 depth</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>🏠 홈</td>
+          <td>위젯 5개 (새 화면)</td>
+          <td>#02 #03 #05 #25 + 채팅</td>
+          <td>— (모바일 전용)</td>
+          <td>D1</td>
+        </tr>
+        <tr>
+          <td>📋 업무</td>
+          <td>채팅·할일·결재·게시판</td>
+          <td>#03~#05, #23~#26</td>
+          <td>업무</td>
+          <td>D2</td>
+        </tr>
+        <tr>
+          <td>👤 내정보</td>
+          <td>출퇴근·연차·급여명세·서류</td>
+          <td>#02 #04 #06 #35 #42 #63</td>
+          <td>업무(내정보) + 인사 일부</td>
+          <td>D2</td>
+        </tr>
+        <tr>
+          <td>🔔 알림</td>
+          <td>결재·채팅·공지 알림</td>
+          <td>VAPID/Firebase 연동</td>
+          <td>— (모바일 전용)</td>
+          <td>D1</td>
+        </tr>
+        <tr>
+          <td>☰ 더보기</td>
+          <td>검색 + 현장 3개 + 관리자 13그룹</td>
+          <td>#07~#22 #27~#96 일부</td>
+          <td>인사·근태·급여 / 운영 / 경영 / 설정</td>
+          <td>D2</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="margin-top:10px;font-size:11px;color:var(--toss-gray-4);">
+      바텀탭 직접 노출: <strong style="color:var(--foreground);">25개</strong> 화면 /
+      더보기 햄버거 진입: <strong style="color:var(--badge-red-fg);">13개 그룹 (관리자 전용 깊은 화면)</strong> /
+      모든 depth ≤ D2 (3 depth 룰 충족)
+    </div>
+  </div>
+
+</main>
+
+<script>
+'use strict';
+
+/* ── 탭 전환 (뷰어 탭 + 트리 + 프레임 동시) ── */
+function switchTab(key) {
+  /* 탭 선택 바 */
+  ['home','work','myinfo','notify','more'].forEach(k => {
+    const btn = document.getElementById('tab-' + k);
+    if (!btn) return;
+    const isActive = k === key;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-selected', String(isActive));
+  });
+
+  /* 컨트롤 바 */
+  ['home','work','myinfo','notify','more'].forEach(k => {
+    const btn = document.getElementById('ctrl-' + k);
+    if (!btn) return;
+    btn.classList.toggle('active', k === key);
+    btn.setAttribute('aria-pressed', String(k === key));
+  });
+
+  /* 트리 섹션 */
+  document.querySelectorAll('.tree-section').forEach(s => s.classList.remove('visible'));
+  const tree = document.getElementById('tree-' + key);
+  if (tree) tree.classList.add('visible');
+
+  /* 프레임 스크린 */
+  switchFrameTab(key);
+}
+
+/* ── 프레임 스크린 전환 ── */
+function switchFrameTab(key) {
+  ['home','work','myinfo','notify','more'].forEach(k => {
+    const screen = document.getElementById('frame-' + k);
+    if (screen) screen.style.display = k === key ? 'block' : 'none';
+    const ftab = document.getElementById('ftab-' + k);
+    if (!ftab) return;
+    ftab.classList.toggle('active', k === key);
+    ftab.setAttribute('aria-current', k === key ? 'true' : 'false');
+  });
+}
+
+/* ── 트리 블록 접기/펼치기 ── */
+function toggleBlock(id) {
+  const block = document.getElementById(id);
+  if (!block) return;
+  const isCollapsed = block.classList.toggle('collapsed');
+  const header = block.querySelector('.tree-block-header');
+  if (header) header.setAttribute('aria-expanded', String(!isCollapsed));
+}
+
+function keyToggleBlk(event, id) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    toggleBlock(id);
+  }
+}
+
+function expandAllBlocks() {
+  document.querySelectorAll('.tree-block').forEach(b => {
+    b.classList.remove('collapsed');
+    const h = b.querySelector('.tree-block-header');
+    if (h) h.setAttribute('aria-expanded', 'true');
+  });
+}
+
+function collapseAllBlocks() {
+  document.querySelectorAll('.tree-block').forEach(b => {
+    b.classList.add('collapsed');
+    const h = b.querySelector('.tree-block-header');
+    if (h) h.setAttribute('aria-expanded', 'false');
+  });
+}
+</script>
+</body>
+</html>

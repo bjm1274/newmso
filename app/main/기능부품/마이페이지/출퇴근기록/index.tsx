@@ -8,6 +8,7 @@ resolveAssignedShift,
 type ShiftAssignmentReference,
 type ShiftLookupRecord,
 } from '@/lib/shift-resolution';
+import { getStaffShifts, type StaffShiftEntry } from '@/lib/staff-shift-resolver';
 import { getStaffLikeId,normalizeStaffLike,resolveStaffLike } from '@/lib/staff-identity';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
@@ -204,6 +205,8 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     capturedAt: number;
   } | null>(null);
 
+  const [staffShifts, setStaffShifts] = useState<StaffShiftEntry[]>([]);
+  const [staffShiftNames, setStaffShiftNames] = useState<Map<string, string>>(new Map());
   const [historyView, setHistoryView] = useState<'list' | 'calendar'>('list');
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [showCheckInSuccess, setShowCheckInSuccess] = useState(false);
@@ -216,6 +219,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     workedMinutes: number;
   } | null>(null);
   const checkOutSuccessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastLocationRefreshAtRef = useRef<number>(0);
   const activeTodayLog =
     todayLog && String((todayLog as Record<string, unknown>)?.date || '').slice(0, 10) === currentDateKey
       ? todayLog
@@ -251,23 +255,49 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     }
 
     try {
-      // 근무유형은 로그인 세션보다 staff_members 최신값이 더 정확할 수 있어 항상 DB를 우선 본다.
-      const { data: staffRow } = await supabase
-        .from('staff_members')
-        .select('shift_id, department, company')
-        .eq('id', userId)
-        .maybeSingle();
+      // 1. staff_shift_assignments에서 다중 근무유형 조회 (is_primary 우선)
+      const [shifts, staffRow] = await Promise.all([
+        getStaffShifts(userId),
+        supabase
+          .from('staff_members')
+          .select('shift_id, department, company')
+          .eq('id', userId)
+          .maybeSingle()
+          .then((r) => r.data as Record<string, unknown> | null | undefined),
+      ]);
+
+      // 조회 결과 저장 (UI chip 표시용) + shift 이름 배치 조회
+      if (shifts.length > 0) {
+        setStaffShifts(shifts);
+        const shiftIds = shifts.map((e) => e.shiftId);
+        void Promise.resolve(
+          supabase
+            .from('work_shifts')
+            .select('id, name')
+            .in('id', shiftIds)
+        ).then(({ data: shiftRows }) => {
+          if (Array.isArray(shiftRows)) {
+            const nameMap = new Map<string, string>(
+              (shiftRows as Array<{ id: string; name: string | null }>).map((r) => [r.id, r.name ?? r.id]),
+            );
+            setStaffShiftNames(nameMap);
+          }
+        }).catch(() => {});
+      }
+
+      // 주근무유형 ID 결정: is_primary → staff_members.shift_id(legacy)
+      const primaryEntry = shifts.find((e) => e.isPrimary) ?? shifts[0] ?? null;
+      const resolvedShiftId =
+        primaryEntry?.shiftId ||
+        String(staffRow?.shift_id || '').trim() ||
+        fallbackShiftId;
 
       return {
-        shiftId:
-          String((staffRow as Record<string, unknown> | null | undefined)?.shift_id || '').trim() ||
-          fallbackShiftId,
+        shiftId: resolvedShiftId,
         department:
-          String((staffRow as Record<string, unknown> | null | undefined)?.department || '').trim() ||
-          fallbackDepartment,
+          String(staffRow?.department || '').trim() || fallbackDepartment,
         company:
-          String((staffRow as Record<string, unknown> | null | undefined)?.company || '').trim() ||
-          fallbackCompany,
+          String(staffRow?.company || '').trim() || fallbackCompany,
       };
     } catch (error) {
       logger.warn('최신 근무유형 조회 실패:', error);
@@ -294,10 +324,12 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   }, []);
 
   useEffect(() => {
+    // JM2: focus + visibilitychange 단일 핸들러로 통합, 30초 throttle + hidden skip
     const refreshLocation = () => {
-      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
-        return;
-      }
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - lastLocationRefreshAtRef.current < 30_000) return;
+      lastLocationRefreshAtRef.current = now;
       void resolveCurrentLocation({ showErrors: false, preferCached: false });
     };
 
@@ -1094,6 +1126,30 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
             if (checkOutSuccessTimerRef.current) clearTimeout(checkOutSuccessTimerRef.current);
           }}
         />
+      )}
+
+      {/* 담당 근무유형 chip (다중 근무유형 표시) */}
+      {staffShifts.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">담당 근무유형</span>
+          <div role="list" aria-label="담당 근무유형 목록" className="flex flex-wrap gap-1.5">
+            {staffShifts.map((entry) => (
+              <span
+                key={entry.shiftId}
+                role="listitem"
+                tabIndex={0}
+                aria-label={`${entry.isPrimary ? '주근무' : '부근무'}: ${staffShiftNames.get(entry.shiftId) ?? entry.shiftId}`}
+                className={`rounded-[var(--radius-md)] border px-2.5 py-1 text-[11px] font-bold outline-none focus:ring-1 focus:ring-[var(--accent)] ${
+                  entry.isPrimary
+                    ? 'border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)]'
+                    : 'border-[var(--border)] bg-[var(--muted)] text-[var(--toss-gray-3)]'
+                }`}
+              >
+                {entry.isPrimary ? '★ ' : ''}{staffShiftNames.get(entry.shiftId) ?? entry.shiftId}
+              </span>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* 통계 */}

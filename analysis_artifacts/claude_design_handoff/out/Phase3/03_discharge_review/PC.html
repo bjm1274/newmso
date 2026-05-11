@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>퇴원심사 — PC (ops_discharge_review_list / detail)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── 디자인 토큰 ── */
+:root {
+  --accent: #2563EB;
+  --accent-light: #EFF6FF;
+  --accent-hover: #1D4ED8;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --sidebar-width: 64px;
+  --card: #ffffff;
+  --foreground: #111827;
+  --muted: #F3F4F6;
+  --border: #E5E7EB;
+  --toss-gray-3: #6B7280;
+  --toss-gray-4: #9CA3AF;
+  --toss-gray-5: #D1D5DB;
+  --shadow-xs: 0 1px 3px rgba(0,0,0,.08);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,.10);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --card: #1F2937;
+    --foreground: #F9FAFB;
+    --muted: #374151;
+    --border: #374151;
+    --toss-gray-3: #9CA3AF;
+    --toss-gray-4: #6B7280;
+    --toss-gray-5: #4B5563;
+    --accent-light: #1E3A5F;
+  }
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Pretendard', -apple-system, sans-serif;
+  font-size: 14px;
+  color: var(--foreground);
+  background: var(--muted);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+}
+
+/* ── 사이드바 ── */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.sidebar-logo {
+  width: 36px; height: 36px;
+  background: var(--accent);
+  border-radius: var(--radius-md);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 700; font-size: 15px;
+  margin-bottom: 8px;
+}
+.sidebar-icon {
+  width: 40px; height: 40px;
+  border-radius: var(--radius-md);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--toss-gray-3); font-size: 18px;
+  transition: background .15s;
+}
+.sidebar-icon:hover { background: var(--muted); }
+.sidebar-icon.active { background: var(--accent-light); color: var(--accent); }
+
+/* ── 메인 레이아웃 ── */
+.main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ── 목록 패널 ── */
+.list-panel {
+  width: 360px;
+  flex-shrink: 0;
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.panel-header {
+  padding: 20px 16px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.panel-title {
+  font-size: 17px; font-weight: 700;
+  color: var(--foreground);
+  margin-bottom: 12px;
+}
+.search-row {
+  display: flex; gap: 8px;
+}
+.search-input {
+  flex: 1;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0 12px;
+  font-size: 13px;
+  background: var(--muted);
+  color: var(--foreground);
+  outline: none;
+  transition: border-color .15s;
+}
+.search-input:focus { border-color: var(--accent); }
+.btn-icon {
+  width: 36px; height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--toss-gray-3);
+  transition: background .15s;
+}
+.btn-icon:hover { background: var(--muted); }
+
+/* 탭 필터 */
+.tab-bar {
+  display: flex; gap: 4px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.tab {
+  padding: 5px 12px;
+  border-radius: var(--radius-md);
+  font-size: 13px; font-weight: 500;
+  cursor: pointer;
+  border: none; background: transparent;
+  color: var(--toss-gray-3);
+  transition: background .15s, color .15s;
+}
+.tab:hover { background: var(--muted); }
+.tab.active { background: var(--accent); color: #fff; }
+
+/* 카드 목록 */
+.card-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.card-list::-webkit-scrollbar { width: 4px; }
+.card-list::-webkit-scrollbar-thumb { background: var(--toss-gray-5); border-radius: 2px; }
+
+.patient-card {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--card);
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+  position: relative;
+}
+.patient-card:hover { border-color: var(--accent); box-shadow: var(--shadow-xs); }
+.patient-card.selected { border-color: var(--accent); background: var(--accent-light); }
+.patient-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.card-top {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 4px;
+}
+.patient-name { font-weight: 600; font-size: 14px; }
+.badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px; border-radius: var(--radius-sm);
+  font-size: 11px; font-weight: 600;
+}
+.badge-gray { background: #F3F4F6; color: #6B7280; }
+.badge-blue { background: #EFF6FF; color: #2563EB; }
+.badge-green { background: #F0FDF4; color: #16A34A; }
+.badge-red { background: #FEF2F2; color: #DC2626; }
+@media (prefers-color-scheme: dark) {
+  .badge-gray { background: #374151; color: #9CA3AF; }
+  .badge-blue { background: #1E3A5F; color: #60A5FA; }
+  .badge-green { background: #14532D; color: #4ADE80; }
+  .badge-red { background: #7F1D1D; color: #FCA5A5; }
+}
+.card-info { font-size: 12px; color: var(--toss-gray-3); margin-top: 2px; }
+.card-date { font-size: 11px; color: var(--toss-gray-4); margin-top: 4px; }
+
+/* 새 심사 버튼 */
+.fab {
+  margin: 12px;
+  height: 40px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+.fab:hover { background: var(--accent-hover); }
+.fab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ── 상세 패널 ── */
+.detail-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--muted);
+  overflow: hidden;
+}
+
+/* 상세 헤더 */
+.detail-header {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 24px;
+  display: flex; align-items: center; gap: 16px;
+}
+.detail-patient-info { flex: 1; }
+.detail-patient-name { font-size: 18px; font-weight: 700; }
+.detail-patient-sub { font-size: 13px; color: var(--toss-gray-3); margin-top: 2px; }
+.header-actions { display: flex; gap: 8px; }
+
+.btn {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--radius-md);
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  transition: background .15s;
+  display: flex; align-items: center; gap: 6px;
+}
+.btn:hover { background: var(--muted); }
+.btn-primary {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 스텝 인디케이터 */
+.step-bar {
+  background: var(--card);
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+}
+.steps {
+  display: flex; gap: 0;
+}
+.step {
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 16px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  color: var(--toss-gray-3);
+  font-size: 13px; font-weight: 500;
+  transition: color .15s, border-color .15s;
+  white-space: nowrap;
+}
+.step:hover { color: var(--accent); }
+.step.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.step.done { color: #16A34A; }
+.step-num {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700;
+  background: var(--toss-gray-5); color: #fff;
+  flex-shrink: 0;
+}
+.step.active .step-num { background: var(--accent); }
+.step.done .step-num { background: #16A34A; }
+.step-arrow { color: var(--toss-gray-5); font-size: 12px; padding: 0 4px; }
+
+/* 스텝 본문 */
+.step-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+.step-body::-webkit-scrollbar { width: 6px; }
+.step-body::-webkit-scrollbar-thumb { background: var(--toss-gray-5); border-radius: 3px; }
+
+.step-section { display: none; }
+.step-section.active { display: block; }
+
+/* 섹션 카드 */
+.section-card {
+  background: var(--card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-xs);
+}
+.section-title {
+  font-size: 14px; font-weight: 700;
+  margin-bottom: 14px;
+  display: flex; align-items: center; gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.section-icon { font-size: 16px; }
+
+/* 폼 그리드 */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px 16px;
+}
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group.full { grid-column: 1 / -1; }
+label {
+  font-size: 12px; font-weight: 600;
+  color: var(--toss-gray-3);
+}
+.form-input, .form-select, .form-textarea {
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  background: var(--muted);
+  color: var(--foreground);
+  outline: none;
+  transition: border-color .15s;
+  font-family: inherit;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: var(--accent);
+  background: var(--card);
+}
+.form-textarea { height: 80px; padding: 10px 12px; resize: vertical; }
+.form-input[aria-invalid="true"],
+.form-select[aria-invalid="true"] {
+  border-color: #DC2626;
+}
+.error-msg {
+  font-size: 11px; color: #DC2626; margin-top: 2px;
+}
+
+/* 체크리스트 */
+.checklist { display: flex; flex-direction: column; gap: 10px; }
+.check-item {
+  display: flex; align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  gap: 12px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.check-item:hover { background: var(--muted); }
+.check-item input[type="checkbox"] {
+  width: 18px; height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer; flex-shrink: 0;
+}
+.check-item-label { flex: 1; }
+.check-item-title { font-size: 13px; font-weight: 500; }
+.check-item-desc { font-size: 11px; color: var(--toss-gray-3); margin-top: 1px; }
+.check-item-status { flex-shrink: 0; }
+.check-item.checked { background: var(--accent-light); border-color: var(--accent); }
+
+.template-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px;
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-md);
+  font-size: 12px; font-weight: 500; color: var(--accent);
+  background: transparent; cursor: pointer;
+  transition: background .15s;
+  margin-bottom: 12px;
+}
+.template-btn:hover { background: var(--accent-light); }
+.template-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 결재 섹션 */
+.approval-row {
+  display: flex; gap: 12px; margin-bottom: 12px;
+}
+.approver-card {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  text-align: center;
+}
+.approver-role { font-size: 11px; color: var(--toss-gray-3); font-weight: 600; margin-bottom: 4px; }
+.approver-name { font-size: 13px; font-weight: 600; }
+.approver-status { margin-top: 6px; }
+
+/* 하단 버튼 */
+.bottom-nav {
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex; justify-content: space-between; align-items: center;
+  flex-shrink: 0;
+}
+.bottom-nav-info { font-size: 12px; color: var(--toss-gray-3); }
+
+/* 빈 상태 */
+.empty-state {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  color: var(--toss-gray-4);
+  gap: 8px;
+}
+.empty-icon { font-size: 48px; }
+.empty-text { font-size: 14px; }
+.empty-sub { font-size: 12px; color: var(--toss-gray-4); }
+
+/* 모달 오버레이 */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.45);
+  display: none; align-items: center; justify-content: center;
+  z-index: 100;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--card);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  width: 480px;
+  max-width: 90vw;
+  box-shadow: var(--shadow-sm);
+}
+.modal-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.template-list { display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; }
+.template-item {
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.template-item:hover { border-color: var(--accent); background: var(--accent-light); }
+.template-item.selected { border-color: var(--accent); background: var(--accent-light); }
+.template-name { font-size: 13px; font-weight: 500; }
+.template-meta { font-size: 11px; color: var(--toss-gray-3); }
+
+/* 인쇄 스타일 */
+@media print {
+  .sidebar, .list-panel, .step-bar, .bottom-nav, .header-actions { display: none !important; }
+  .detail-panel { background: #fff; }
+  .section-card { border: 1px solid #ddd; box-shadow: none; }
+  .step-section { display: block !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- 사이드바 -->
+<nav class="sidebar" aria-label="전역 메뉴">
+  <div class="sidebar-logo" aria-label="MSO ERP">M</div>
+  <button class="sidebar-icon" aria-label="대시보드" title="대시보드">🏠</button>
+  <button class="sidebar-icon" aria-label="인사관리" title="인사관리">👥</button>
+  <button class="sidebar-icon active" aria-label="운영관리" title="운영관리">🏥</button>
+  <button class="sidebar-icon" aria-label="재고관리" title="재고관리">📦</button>
+  <button class="sidebar-icon" aria-label="설정" title="설정" style="margin-top:auto;">⚙️</button>
+</nav>
+
+<!-- 메인 -->
+<main class="main">
+
+  <!-- 목록 패널 (ops_discharge_review_list) -->
+  <section class="list-panel" aria-label="퇴원심사 목록">
+    <div class="panel-header">
+      <h1 class="panel-title">퇴원심사</h1>
+      <div class="search-row">
+        <label for="search-input" class="sr-only">환자 검색</label>
+        <input id="search-input" class="search-input" type="search"
+          placeholder="환자명 · 병실 검색" aria-label="환자명 또는 병실로 검색">
+        <button class="btn-icon" aria-label="필터">⚙️</button>
+      </div>
+    </div>
+
+    <div class="tab-bar" role="tablist" aria-label="심사 상태 필터">
+      <button class="tab active" role="tab" aria-selected="true" onclick="filterTab(this,'all')">전체</button>
+      <button class="tab" role="tab" aria-selected="false" onclick="filterTab(this,'wait')">대기</button>
+      <button class="tab" role="tab" aria-selected="false" onclick="filterTab(this,'progress')">진행</button>
+      <button class="tab" role="tab" aria-selected="false" onclick="filterTab(this,'done')">완료</button>
+      <button class="tab" role="tab" aria-selected="false" onclick="filterTab(this,'reject')">반려</button>
+    </div>
+
+    <ul class="card-list" role="listbox" aria-label="환자 목록">
+      <li role="option" aria-selected="true" tabindex="0"
+          class="patient-card selected" onclick="selectCard(this,0)"
+          onkeydown="if(event.key==='Enter')selectCard(this,0)">
+        <div class="card-top">
+          <span class="patient-name">환자 A (45세, 여)</span>
+          <span class="badge badge-blue">진행</span>
+        </div>
+        <div class="card-info">정형외과 · 201호 · 퇴원 예정: 2026-05-13</div>
+        <div class="card-date">심사 요청: 2026-05-11 09:12 · 담당: 김의사</div>
+      </li>
+      <li role="option" aria-selected="false" tabindex="0"
+          class="patient-card" onclick="selectCard(this,1)"
+          onkeydown="if(event.key==='Enter')selectCard(this,1)">
+        <div class="card-top">
+          <span class="patient-name">환자 B (62세, 남)</span>
+          <span class="badge badge-gray">대기</span>
+        </div>
+        <div class="card-info">내과 · 305호 · 퇴원 예정: 2026-05-14</div>
+        <div class="card-date">심사 요청: 2026-05-11 10:30 · 담당: 이의사</div>
+      </li>
+      <li role="option" aria-selected="false" tabindex="0"
+          class="patient-card" onclick="selectCard(this,2)"
+          onkeydown="if(event.key==='Enter')selectCard(this,2)">
+        <div class="card-top">
+          <span class="patient-name">환자 C (38세, 남)</span>
+          <span class="badge badge-green">완료</span>
+        </div>
+        <div class="card-info">신경외과 · 112호 · 퇴원: 2026-05-10</div>
+        <div class="card-date">완료: 2026-05-10 16:45 · 담당: 박의사</div>
+      </li>
+      <li role="option" aria-selected="false" tabindex="0"
+          class="patient-card" onclick="selectCard(this,3)"
+          onkeydown="if(event.key==='Enter')selectCard(this,3)">
+        <div class="card-top">
+          <span class="patient-name">환자 D (71세, 여)</span>
+          <span class="badge badge-red">반려</span>
+        </div>
+        <div class="card-info">순환기내과 · 408호 · 재심사 필요</div>
+        <div class="card-date">반려: 2026-05-11 11:00 · 담당: 최의사</div>
+      </li>
+      <li role="option" aria-selected="false" tabindex="0"
+          class="patient-card" onclick="selectCard(this,4)"
+          onkeydown="if(event.key==='Enter')selectCard(this,4)">
+        <div class="card-top">
+          <span class="patient-name">환자 E (29세, 여)</span>
+          <span class="badge badge-gray">대기</span>
+        </div>
+        <div class="card-info">산부인과 · 502호 · 퇴원 예정: 2026-05-12</div>
+        <div class="card-date">심사 요청: 2026-05-11 13:00 · 담당: 정의사</div>
+      </li>
+    </ul>
+
+    <button class="fab" onclick="openModal()" aria-label="새 퇴원심사 등록">
+      ＋ 새 심사 등록
+    </button>
+  </section>
+
+  <!-- 상세 패널 (ops_discharge_review_detail) -->
+  <div class="detail-panel" id="detail-panel">
+
+    <!-- 빈 상태 — 카드 미선택 시 -->
+    <div class="empty-state" id="empty-state" style="display:none;" aria-live="polite">
+      <div class="empty-icon">📋</div>
+      <div class="empty-text">환자를 선택하면 심사 상세가 표시됩니다</div>
+      <div class="empty-sub">좌측 목록에서 환자 카드를 클릭하세요</div>
+    </div>
+
+    <!-- 상세 내용 -->
+    <div id="detail-content">
+      <!-- 헤더 -->
+      <header class="detail-header">
+        <div class="detail-patient-info">
+          <div class="detail-patient-name">환자 A · 45세 · 여성</div>
+          <div class="detail-patient-sub">정형외과 · 201호 · 입원: 2026-05-01 · 퇴원 예정: 2026-05-13</div>
+        </div>
+        <div class="header-actions">
+          <button class="btn" onclick="window.print()" aria-label="심사 결과서 인쇄">🖨 인쇄</button>
+          <button class="btn btn-primary" onclick="submitReview()" aria-label="심사 제출">제출</button>
+        </div>
+      </header>
+
+      <!-- 스텝 인디케이터 -->
+      <nav class="step-bar" aria-label="심사 단계">
+        <div class="steps" role="tablist">
+          <button class="step active" role="tab" aria-selected="true" id="step-tab-1"
+            onclick="goStep(1)" aria-controls="step-1">
+            <span class="step-num" aria-hidden="true">1</span> 기본 정보
+          </button>
+          <span class="step-arrow" aria-hidden="true">›</span>
+          <button class="step" role="tab" aria-selected="false" id="step-tab-2"
+            onclick="goStep(2)" aria-controls="step-2">
+            <span class="step-num" aria-hidden="true">2</span> 항목 체크
+          </button>
+          <span class="step-arrow" aria-hidden="true">›</span>
+          <button class="step" role="tab" aria-selected="false" id="step-tab-3"
+            onclick="goStep(3)" aria-controls="step-3">
+            <span class="step-num" aria-hidden="true">3</span> 결재
+          </button>
+        </div>
+      </nav>
+
+      <!-- 스텝 본문 -->
+      <div class="step-body">
+
+        <!-- STEP 1: 기본 정보 (#17 퇴원심사 메인 + #18 새심사(a)) -->
+        <section id="step-1" class="step-section active" role="tabpanel" aria-labelledby="step-tab-1">
+
+          <div class="section-card">
+            <div class="section-title">
+              <span class="section-icon" aria-hidden="true">👤</span> 환자 기본 정보
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="patient-id">환자 번호</label>
+                <input id="patient-id" class="form-input" value="PT-2026-0511" readonly>
+              </div>
+              <div class="form-group">
+                <label for="patient-name">환자명</label>
+                <input id="patient-name" class="form-input" value="환자 A" readonly>
+              </div>
+              <div class="form-group">
+                <label for="dept">진료과</label>
+                <input id="dept" class="form-input" value="정형외과" readonly>
+              </div>
+              <div class="form-group">
+                <label for="room">병실</label>
+                <input id="room" class="form-input" value="201호" readonly>
+              </div>
+              <div class="form-group">
+                <label for="admit-date">입원일</label>
+                <input id="admit-date" class="form-input" type="date" value="2026-05-01" readonly>
+              </div>
+              <div class="form-group">
+                <label for="discharge-date">퇴원 예정일</label>
+                <input id="discharge-date" class="form-input" type="date" value="2026-05-13"
+                  aria-describedby="discharge-date-error">
+                <span id="discharge-date-error" class="error-msg" role="alert" aria-live="polite"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- #18 새심사(a) + #19 새심사(b) 내용 흡수 -->
+          <div class="section-card">
+            <div class="section-title">
+              <span class="section-icon" aria-hidden="true">🩺</span> 진단 및 퇴원 계획
+            </div>
+            <div class="form-grid">
+              <div class="form-group full">
+                <label for="diagnosis">주요 진단명</label>
+                <input id="diagnosis" class="form-input" value="요추 추간판 탈출증 (L4-L5)"
+                  placeholder="주요 진단명 입력" required aria-required="true">
+              </div>
+              <div class="form-group full">
+                <label for="discharge-reason">퇴원 사유</label>
+                <select id="discharge-reason" class="form-select">
+                  <option>완치 퇴원</option>
+                  <option>자의 퇴원</option>
+                  <option>전원</option>
+                  <option>사망</option>
+                  <option>기타</option>
+                </select>
+              </div>
+              <div class="form-group full">
+                <label for="discharge-plan">퇴원 후 계획</label>
+                <textarea id="discharge-plan" class="form-textarea"
+                  placeholder="외래 추적 일정, 투약 계획, 재활 계획 등을 입력하세요">물리치료 2주 후 외래 추적, NSAIDs 처방 7일분</textarea>
+              </div>
+              <div class="form-group full">
+                <label for="special-note">특이 사항</label>
+                <textarea id="special-note" class="form-textarea"
+                  placeholder="보호자 동반 여부, 이동 수단, 기타 특이 사항"></textarea>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- STEP 2: 항목 체크 (#19 새심사(b) + #20 기본항목설정) -->
+        <section id="step-2" class="step-section" role="tabpanel" aria-labelledby="step-tab-2">
+
+          <div class="section-card">
+            <div class="section-title">
+              <span class="section-icon" aria-hidden="true">✅</span> 퇴원 체크리스트
+            </div>
+
+            <!-- #21 템플릿 목록 + #22 템플릿 수정 흡수 -->
+            <button class="template-btn" onclick="openModal()" aria-label="저장된 템플릿 적용">
+              📋 템플릿 적용
+            </button>
+
+            <fieldset>
+              <legend class="sr-only">퇴원 체크리스트 항목</legend>
+              <ul class="checklist" id="checklist">
+                <li>
+                  <label class="check-item" id="ci-1">
+                    <input type="checkbox" checked aria-describedby="ci-1-desc"
+                      onchange="toggleCheck(this)">
+                    <div class="check-item-label">
+                      <div class="check-item-title">처방 약품 수령 확인</div>
+                      <div class="check-item-desc" id="ci-1-desc">퇴원 처방전 및 약품 수령 여부</div>
+                    </div>
+                    <span class="check-item-status badge badge-green">완료</span>
+                  </label>
+                </li>
+                <li>
+                  <label class="check-item" id="ci-2">
+                    <input type="checkbox" checked aria-describedby="ci-2-desc"
+                      onchange="toggleCheck(this)">
+                    <div class="check-item-label">
+                      <div class="check-item-title">퇴원 동의서 서명</div>
+                      <div class="check-item-desc" id="ci-2-desc">환자 및 보호자 서명 완료</div>
+                    </div>
+                    <span class="check-item-status badge badge-green">완료</span>
+                  </label>
+                </li>
+                <li>
+                  <label class="check-item" id="ci-3">
+                    <input type="checkbox" aria-describedby="ci-3-desc"
+                      onchange="toggleCheck(this)">
+                    <div class="check-item-label">
+                      <div class="check-item-title">간호 교육 완료</div>
+                      <div class="check-item-desc" id="ci-3-desc">투약 방법, 주의사항 교육</div>
+                    </div>
+                    <span class="check-item-status badge badge-gray">미완료</span>
+                  </label>
+                </li>
+                <li>
+                  <label class="check-item" id="ci-4">
+                    <input type="checkbox" aria-describedby="ci-4-desc"
+                      onchange="toggleCheck(this)">
+                    <div class="check-item-label">
+                      <div class="check-item-title">의료비 정산</div>
+                      <div class="check-item-desc" id="ci-4-desc">입원비 정산 및 영수증 발급</div>
+                    </div>
+                    <span class="check-item-status badge badge-gray">미완료</span>
+                  </label>
+                </li>
+                <li>
+                  <label class="check-item" id="ci-5">
+                    <input type="checkbox" aria-describedby="ci-5-desc"
+                      onchange="toggleCheck(this)">
+                    <div class="check-item-label">
+                      <div class="check-item-title">병실 물품 반납</div>
+                      <div class="check-item-desc" id="ci-5-desc">병원 지급 물품 회수 확인</div>
+                    </div>
+                    <span class="check-item-status badge badge-gray">미완료</span>
+                  </label>
+                </li>
+                <li>
+                  <label class="check-item" id="ci-6">
+                    <input type="checkbox" aria-describedby="ci-6-desc"
+                      onchange="toggleCheck(this)">
+                    <div class="check-item-label">
+                      <div class="check-item-title">외래 예약 확인</div>
+                      <div class="check-item-desc" id="ci-6-desc">2주 후 추적 외래 예약 완료</div>
+                    </div>
+                    <span class="check-item-status badge badge-gray">미완료</span>
+                  </label>
+                </li>
+              </ul>
+            </fieldset>
+
+            <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border);">
+              <span style="font-size:12px; color:var(--toss-gray-3);" aria-live="polite" id="check-progress">
+                진행률: 2 / 6 완료
+              </span>
+            </div>
+          </div>
+
+          <!-- #20 기본항목설정 흡수 — 항목 추가 -->
+          <div class="section-card">
+            <div class="section-title">
+              <span class="section-icon" aria-hidden="true">⚙️</span> 항목 설정
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <label for="new-item-input" class="sr-only">새 항목 입력</label>
+              <input id="new-item-input" class="form-input" style="flex:1;"
+                placeholder="새 체크 항목 입력" aria-label="새 체크 항목 이름">
+              <button class="btn btn-primary" style="height:36px;" onclick="addCheckItem()">추가</button>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- STEP 3: 결재 -->
+        <section id="step-3" class="step-section" role="tabpanel" aria-labelledby="step-tab-3">
+
+          <div class="section-card">
+            <div class="section-title">
+              <span class="section-icon" aria-hidden="true">📝</span> 결재 요약
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>환자명</label>
+                <input class="form-input" value="환자 A" readonly>
+              </div>
+              <div class="form-group">
+                <label>퇴원 예정일</label>
+                <input class="form-input" value="2026-05-13" readonly>
+              </div>
+              <div class="form-group">
+                <label>체크리스트</label>
+                <input class="form-input" value="2 / 6 완료" readonly id="summary-check">
+              </div>
+              <div class="form-group">
+                <label>심사 상태</label>
+                <input class="form-input" value="진행 중" readonly>
+              </div>
+              <div class="form-group full">
+                <label for="final-opinion">최종 의견</label>
+                <textarea id="final-opinion" class="form-textarea"
+                  placeholder="결재자 의견을 입력하세요 (선택 사항)"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="section-title">
+              <span class="section-icon" aria-hidden="true">✍️</span> 결재선
+            </div>
+            <div class="approval-row">
+              <div class="approver-card">
+                <div class="approver-role">담당 간호사</div>
+                <div class="approver-name">간호사 김○○</div>
+                <div class="approver-status"><span class="badge badge-blue">서명 대기</span></div>
+              </div>
+              <div class="approver-card">
+                <div class="approver-role">담당 의사</div>
+                <div class="approver-name">김의사</div>
+                <div class="approver-status"><span class="badge badge-blue">서명 대기</span></div>
+              </div>
+              <div class="approver-card">
+                <div class="approver-role">과장</div>
+                <div class="approver-name">정형외과 과장</div>
+                <div class="approver-status"><span class="badge badge-gray">미도달</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="submit-error" role="alert" aria-live="assertive"
+            style="display:none; padding:12px; background:#FEF2F2; border-radius:var(--radius-md);
+                   color:#DC2626; font-size:13px; margin-bottom:16px;">
+          </div>
+
+        </section>
+
+      </div><!-- /step-body -->
+
+      <!-- 하단 네비게이션 -->
+      <footer class="bottom-nav">
+        <span class="bottom-nav-info" id="step-info" aria-live="polite">1 / 3 단계</span>
+        <div style="display:flex; gap:8px;">
+          <button class="btn" id="btn-prev" onclick="prevStep()" disabled aria-label="이전 단계">← 이전</button>
+          <button class="btn btn-primary" id="btn-next" onclick="nextStep()" aria-label="다음 단계">다음 →</button>
+        </div>
+      </footer>
+    </div><!-- /detail-content -->
+  </div><!-- /detail-panel -->
+
+</main>
+
+<!-- 템플릿 선택 모달 (#21 템플릿 목록 + #22 템플릿 수정 흡수) -->
+<div class="modal-overlay" id="template-modal" role="dialog"
+     aria-modal="true" aria-labelledby="modal-title"
+     onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h2 class="modal-title" id="modal-title">📋 템플릿 선택</h2>
+    <p style="font-size:12px;color:var(--toss-gray-3);margin-bottom:12px;">
+      적용할 체크리스트 템플릿을 선택하세요
+    </p>
+    <div class="template-list" role="listbox" aria-label="템플릿 목록">
+      <div class="template-item" role="option" tabindex="0"
+           onclick="selectTemplate(this,'정형외과 기본 퇴원')"
+           onkeydown="if(event.key==='Enter')selectTemplate(this,'정형외과 기본 퇴원')">
+        <div>
+          <div class="template-name">정형외과 기본 퇴원</div>
+          <div class="template-meta">6개 항목 · 마지막 수정: 2026-04-10</div>
+        </div>
+        <span class="badge badge-blue">추천</span>
+      </div>
+      <div class="template-item" role="option" tabindex="0"
+           onclick="selectTemplate(this,'내과 일반 퇴원')"
+           onkeydown="if(event.key==='Enter')selectTemplate(this,'내과 일반 퇴원')">
+        <div>
+          <div class="template-name">내과 일반 퇴원</div>
+          <div class="template-meta">5개 항목 · 마지막 수정: 2026-03-22</div>
+        </div>
+      </div>
+      <div class="template-item" role="option" tabindex="0"
+           onclick="selectTemplate(this,'수술 후 퇴원 (표준)')"
+           onkeydown="if(event.key==='Enter')selectTemplate(this,'수술 후 퇴원 (표준)')">
+        <div>
+          <div class="template-name">수술 후 퇴원 (표준)</div>
+          <div class="template-meta">8개 항목 · 마지막 수정: 2026-04-01</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">취소</button>
+      <button class="btn btn-primary" onclick="applyTemplate()" id="apply-btn" disabled>
+        적용
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+</style>
+
+<script>
+/* ── 상태 ── */
+let currentStep = 1;
+const totalSteps = 3;
+let selectedTemplate = null;
+let checkCount = 2;
+const totalChecks = 6;
+
+/* ── 카드 선택 ── */
+function selectCard(el, idx) {
+  document.querySelectorAll('.patient-card').forEach(c => {
+    c.classList.remove('selected');
+    c.setAttribute('aria-selected', 'false');
+  });
+  el.classList.add('selected');
+  el.setAttribute('aria-selected', 'true');
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('detail-content').style.display = '';
+}
+
+/* ── 탭 필터 ── */
+function filterTab(btn, status) {
+  document.querySelectorAll('.tab').forEach(t => {
+    t.classList.remove('active');
+    t.setAttribute('aria-selected', 'false');
+  });
+  btn.classList.add('active');
+  btn.setAttribute('aria-selected', 'true');
+}
+
+/* ── 스텝 이동 ── */
+function goStep(n) {
+  currentStep = n;
+  updateStepUI();
+}
+
+function nextStep() {
+  if (currentStep < totalSteps) {
+    currentStep++;
+    updateStepUI();
+  }
+}
+
+function prevStep() {
+  if (currentStep > 1) {
+    currentStep--;
+    updateStepUI();
+  }
+}
+
+function updateStepUI() {
+  /* 섹션 */
+  document.querySelectorAll('.step-section').forEach((s, i) => {
+    s.classList.toggle('active', i + 1 === currentStep);
+  });
+  /* 탭 */
+  document.querySelectorAll('.step').forEach((s, i) => {
+    s.classList.toggle('active', i + 1 === currentStep);
+    s.setAttribute('aria-selected', i + 1 === currentStep ? 'true' : 'false');
+  });
+  /* 버튼 */
+  const prev = document.getElementById('btn-prev');
+  const next = document.getElementById('btn-next');
+  prev.disabled = currentStep === 1;
+  if (currentStep === totalSteps) {
+    next.textContent = '제출';
+    next.onclick = submitReview;
+  } else {
+    next.textContent = '다음 →';
+    next.onclick = nextStep;
+  }
+  document.getElementById('step-info').textContent = currentStep + ' / ' + totalSteps + ' 단계';
+}
+
+/* ── 체크 토글 ── */
+function toggleCheck(cb) {
+  const item = cb.closest('.check-item');
+  const statusBadge = item.querySelector('.check-item-status');
+  if (cb.checked) {
+    item.classList.add('checked');
+    statusBadge.textContent = '완료';
+    statusBadge.className = 'check-item-status badge badge-green';
+    checkCount++;
+  } else {
+    item.classList.remove('checked');
+    statusBadge.textContent = '미완료';
+    statusBadge.className = 'check-item-status badge badge-gray';
+    checkCount--;
+  }
+  const prog = document.getElementById('check-progress');
+  if (prog) prog.textContent = '진행률: ' + checkCount + ' / ' + totalChecks + ' 완료';
+}
+
+/* ── 항목 추가 ── */
+function addCheckItem() {
+  const input = document.getElementById('new-item-input');
+  const val = input.value.trim();
+  if (!val) { input.focus(); return; }
+  const list = document.getElementById('checklist');
+  const li = document.createElement('li');
+  li.innerHTML = '<label class="check-item"><input type="checkbox" onchange="toggleCheck(this)">' +
+    '<div class="check-item-label"><div class="check-item-title">' + val + '</div></div>' +
+    '<span class="check-item-status badge badge-gray">미완료</span></label>';
+  list.appendChild(li);
+  input.value = '';
+  input.focus();
+}
+
+/* ── 모달 ── */
+function openModal() {
+  const modal = document.getElementById('template-modal');
+  modal.classList.add('open');
+  modal.querySelector('[tabindex="0"]').focus();
+}
+
+function closeModal() {
+  document.getElementById('template-modal').classList.remove('open');
+  selectedTemplate = null;
+  document.querySelectorAll('.template-item').forEach(i => i.classList.remove('selected'));
+  document.getElementById('apply-btn').disabled = true;
+}
+
+function selectTemplate(el, name) {
+  document.querySelectorAll('.template-item').forEach(i => {
+    i.classList.remove('selected');
+    i.setAttribute('aria-selected', 'false');
+  });
+  el.classList.add('selected');
+  el.setAttribute('aria-selected', 'true');
+  selectedTemplate = name;
+  document.getElementById('apply-btn').disabled = false;
+}
+
+function applyTemplate() {
+  if (!selectedTemplate) return;
+  closeModal();
+}
+
+/* ── 제출 ── */
+function submitReview() {
+  const errEl = document.getElementById('submit-error');
+  if (checkCount < totalChecks) {
+    errEl.textContent = '⚠ 체크리스트 미완료 항목이 있습니다. 모든 항목을 확인 후 제출하세요.';
+    errEl.style.display = 'block';
+    goStep(2);
+    return;
+  }
+  errEl.style.display = 'none';
+  alert('퇴원심사가 제출되었습니다.');
+}
+
+/* ── 키보드: modal ESC 닫기 ── */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
+</script>
+
+</body>
+</html>

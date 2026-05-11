@@ -1,18 +1,19 @@
 export type BoardMenuItem = {
   id: string;
   label: string;
+  /** 조직도측면창 ICON_PATHS 키와 동일한 string 식별자 */
   icon: string;
 };
 
 export const BOARD_MENU_ITEMS: BoardMenuItem[] = [
-  { id: '공지사항', label: '📢 공지사항', icon: '📢' },
-  { id: '자유게시판', label: '💬 자유게시판', icon: '💬' },
-  { id: '익명소리함', label: '💌 익명 소리함', icon: '💌' },
-  { id: '경조사', label: '🎉 경조사 소식', icon: '🎉' },
-  { id: '수술일정', label: '🏥 수술일정표', icon: '🏥' },
-  { id: 'MRI일정', label: '🔬 MRI일정표', icon: '🔬' },
-  { id: '직원제안함', label: '💡 직원 제안함', icon: '💡' },
-  { id: '업무가이드', label: '📚 업무공유', icon: '📚' },
+  { id: '공지사항', label: '공지사항', icon: 'bell' },
+  { id: '자유게시판', label: '자유게시판', icon: 'chat' },
+  { id: '익명소리함', label: '익명 소리함', icon: 'lock' },
+  { id: '경조사', label: '경조사 소식', icon: 'bell' },
+  { id: '수술일정', label: '수술일정표', icon: 'calendar' },
+  { id: 'MRI일정', label: 'MRI일정표', icon: 'scan' },
+  { id: '직원제안함', label: '직원 제안함', icon: 'lightbulb' },
+  { id: '업무가이드', label: '업무공유', icon: 'folder' },
 ];
 
 export const BOARD_META_MAP: Record<string, { title: string; description: string }> = {

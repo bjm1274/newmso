@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { batchProcessExpiredLeaves } from '@/lib/annual-leave-expiry';
+import { batchProcessExpiredLeaves, recordUnusedLeaveCompensation } from '@/lib/annual-leave-expiry';
+import { recalculateLeaveBalance } from '@/lib/annual-leave-balance';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,6 +22,23 @@ export async function GET(request: Request) {
 
     const { processed, results } = await batchProcessExpiredLeaves(supabase);
 
+    // 소멸 처리된 직원의 leave_balances 정합성 갱신 + 미사용 연차 보상 기록
+    const balanceErrors: string[] = [];
+    for (const r of results) {
+      // 금전 보상 기록 (companies.unused_leave_compensation=TRUE 인 경우)
+      recordUnusedLeaveCompensation(supabase, r.staffId, r.expiredDays).catch((compErr) => {
+        console.error('[annual-leave-expiry cron] recordUnusedLeaveCompensation 실패:', r.staffId, compErr);
+      });
+
+      try {
+        await recalculateLeaveBalance(r.staffId, new Date(r.expiryDate).getFullYear(), supabase);
+      } catch (balanceErr) {
+        const msg = balanceErr instanceof Error ? balanceErr.message : String(balanceErr);
+        console.error('[annual-leave-expiry cron] recalculateLeaveBalance 실패:', r.staffId, msg);
+        balanceErrors.push(`${r.staffId}: ${msg}`);
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       processed,
@@ -30,6 +48,7 @@ export async function GET(request: Request) {
         expiredDays: r.expiredDays,
         expiryDate: r.expiryDate,
       })),
+      balanceErrors: balanceErrors.length > 0 ? balanceErrors : undefined,
     });
   } catch (err) {
     console.error('연차 소멸 크론 실패:', err);

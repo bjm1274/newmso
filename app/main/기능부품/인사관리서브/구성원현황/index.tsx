@@ -50,6 +50,18 @@ STAFF_MUTATION_WORK_CONDITION_COLUMNS,
 TAXABLE_SALARY_FIELDS,
 TAXFREE_SALARY_FIELDS,
 } from './staff-form-utils';
+import LicenseSection from './LicenseSection';
+import JobCategorySection from './JobCategorySection';
+import ShiftAssignmentSection from './ShiftAssignmentSection';
+import {
+  validateStaffRegistration,
+  isEmptyLicenseRow,
+  createEmptyLicenseRow,
+  type LicenseRow,
+  type SelectedJobCategory,
+  type SelectedShiftAssignment,
+} from './staff-registration-types';
+import { calculateAnnualLeaveExpiryDate } from '@/lib/annual-leave-promotion';
 
 const formatWon = (amount: number) => libFormatWon(Math.round(amount || 0));
 
@@ -657,7 +669,13 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
     프로필사진미리보기설정(null);
     추가근무형태ID설정('');
     새근무형태표시설정(false);
-    신규직원설정({ ...createEmptyStaffForm(defaultCompany), 팀: defaultTeam });
+    신규직원설정({
+      ...createEmptyStaffForm(defaultCompany),
+      팀: defaultTeam,
+      licenses: [createEmptyLicenseRow(true)],
+      jobCategories: [],
+      shiftAssignments: [],
+    });
   }, [창상태, 편집모드, 선택사업체, 팀목록캐시]);
 
   const findDuplicateStaffMember = async (staffName: string, residentNo: string, excludeId?: string | number | null) => {
@@ -680,6 +698,19 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
       return toast('신규 직원 등록 권한이 없습니다.', 'error');
     }
     if (!신규직원.성명 || !신규직원.입사일 || 신규직원.입사일 === '0000-00-00' || 신규직원.입사일 === '') return toast('성함과 실제 입사일은 필수 입력 사항입니다.', 'warning');
+
+    // 폼 검증
+    const validationResult = validateStaffRegistration({
+      성명: 신규직원.성명,
+      입사일: 신규직원.입사일,
+      이메일: 신규직원.이메일,
+      licenses: 신규직원.licenses,
+      jobCategories: 신규직원.jobCategories,
+      shiftAssignments: 신규직원.shiftAssignments,
+    });
+    if (!validationResult.ok) {
+      return toast(validationResult.message, 'warning');
+    }
     try {
       const actor = readClientAuditActor();
       let 프로필사진업로드경고: string | null = null;
@@ -830,6 +861,86 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
           [...STAFF_MUTATION_ALLOWANCE_COLUMNS, ...STAFF_MUTATION_WORK_CONDITION_COLUMNS],
         );
         if (updateErr) throw updateErr;
+
+        // ── 수정 시 서브 테이블 diff 처리 ──────────────────────────────────────
+        const editStaffId = String(afterStaff.id || '');
+        if (editStaffId) {
+          // 면허 — 기존 rows 전체 delete 후 re-insert (단순 전략)
+          const filledLicensesEdit = (신규직원.licenses ?? []).filter(
+            (l: LicenseRow) => !isEmptyLicenseRow(l),
+          );
+          // is_primary 면허 → staff_members 호환 컬럼 업데이트
+          const primaryLicenseEdit = filledLicensesEdit.find((l: LicenseRow) => l.is_primary) ?? filledLicensesEdit[0];
+          if (primaryLicenseEdit) {
+            await supabase.from('staff_members').update({
+              license: String(primaryLicenseEdit.license_name || primaryLicenseEdit.license_type || ''),
+              permissions: {
+                ...(typeof afterStaff.permissions === 'object' && afterStaff.permissions !== null ? afterStaff.permissions as Record<string, unknown> : {}),
+                license_no: primaryLicenseEdit.license_number || null,
+                license_date: primaryLicenseEdit.issued_date || null,
+                license_note: primaryLicenseEdit.memo || null,
+              },
+            }).eq('id', editStaffId);
+          }
+          // DB id가 없는 row (_key=UUID 임시값) = 신규, id 있는 row = 업데이트
+          const { error: licDelErr } = await supabase
+            .from('staff_licenses')
+            .delete()
+            .eq('staff_id', editStaffId);
+          if (licDelErr) logger.warn('면허 기존 삭제 실패:', licDelErr);
+          if (filledLicensesEdit.length > 0) {
+            const { error: licInsErr } = await supabase.from('staff_licenses').insert(
+              filledLicensesEdit.map((l: LicenseRow) => ({
+                staff_id: editStaffId,
+                license_type: l.license_type ?? null,
+                license_name: l.license_name ?? null,
+                license_number: l.license_number ?? null,
+                issued_date: l.issued_date || null,
+                expiry_date: l.expiry_date || null,
+                issuing_body: l.issuing_body ?? null,
+                memo: l.memo ?? null,
+                is_primary: l.is_primary,
+              })),
+            );
+            if (licInsErr) logger.warn('면허 재삽입 실패:', licInsErr);
+          }
+
+          // 직종 — upsert + 체크 해제된 것 delete
+          const editJobCats = (신규직원.jobCategories ?? []) as SelectedJobCategory[];
+          if (editJobCats.length > 0) {
+            const { error: jobUpsErr } = await supabase.from('staff_job_categories').upsert(
+              editJobCats.map((j) => ({
+                staff_id: editStaffId,
+                job_category_id: j.job_category_id,
+                is_primary: j.is_primary,
+              })),
+              { onConflict: 'staff_id,job_category_id' },
+            );
+            if (jobUpsErr) logger.warn('직종 upsert 실패:', jobUpsErr);
+          }
+
+          // 근무유형 — upsert + is_primary 반영 + staff_members.shift_id 호환
+          const editShiftAsgns = (신규직원.shiftAssignments ?? []) as SelectedShiftAssignment[];
+          if (editShiftAsgns.length > 0) {
+            const { error: shiftUpsErr } = await supabase.from('staff_shift_assignments').upsert(
+              editShiftAsgns.map((s) => ({
+                staff_id: editStaffId,
+                shift_id: s.shift_id,
+                is_primary: s.is_primary,
+                priority: s.priority,
+              })),
+              { onConflict: 'staff_id,shift_id' },
+            );
+            if (shiftUpsErr) logger.warn('근무유형 배정 upsert 실패:', shiftUpsErr);
+            const primaryShiftEdit = editShiftAsgns.find((s) => s.is_primary) ?? editShiftAsgns[0];
+            if (primaryShiftEdit) {
+              await supabase.from('staff_members')
+                .update({ shift_id: primaryShiftEdit.shift_id })
+                .eq('id', editStaffId);
+            }
+          }
+        }
+
         await logAudit(
           '직원정보수정', 'staff_member', String(선택된직원ID),
           {
@@ -880,50 +991,176 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
           while (existingEmployeeNos.has(String(nextNo))) { nextNo += 1; }
           newEmployeeNo = String(nextNo);
         }
-        const insertPayload = {
+        // ── 면허 호환 (is_primary row → staff_members.license* 컬럼에 병기) ──────
+        const filledLicenses = (신규직원.licenses ?? []).filter(
+          (l: LicenseRow) => !isEmptyLicenseRow(l),
+        );
+        const primaryLicense = filledLicenses.find((l: LicenseRow) => l.is_primary) ?? filledLicenses[0];
+
+        // ── 근무형태 호환 (is_primary → staff_members.shift_id 병기) ─────────────
+        const primaryShiftAssign = (신규직원.shiftAssignments ?? []).find(
+          (s: SelectedShiftAssignment) => s.is_primary,
+        ) ?? (신규직원.shiftAssignments ?? [])[0];
+
+        const staffPayload: Record<string, unknown> = {
           ...commonData,
           employee_no: newEmployeeNo,
           role: 'staff',
-          password: '',
           join_date: dateOrNull(신규직원.입사일),
+          // 면허 호환: is_primary 면허 → 기존 컬럼 병기
+          ...(primaryLicense ? {
+            license: String(primaryLicense.license_name || primaryLicense.license_type || ''),
+            permissions: {
+              ...(typeof commonData.permissions === 'object' && commonData.permissions !== null
+                ? commonData.permissions as Record<string, unknown>
+                : {}),
+              license_no: primaryLicense.license_number || null,
+              license_date: primaryLicense.issued_date || null,
+              license_note: primaryLicense.memo || null,
+            },
+          } : {}),
+          // 근무유형 호환: is_primary → shift_id 컬럼 병기
+          ...(primaryShiftAssign ? { shift_id: primaryShiftAssign.shift_id } : {}),
         };
-        const insertOmittedColumns = new Set<string>(
-          hasFractionalValue(insertPayload.working_hours_per_week) ? ['working_hours_per_week'] : [],
+
+        // ── leave_balances total_days 계산 ──────────────────────────────────────
+        const hireDate = dateOrNull(신규직원.입사일);
+        const leaveYear = new Date().getFullYear();
+        const leaveExpiryDate = hireDate
+          ? calculateAnnualLeaveExpiryDate(hireDate)
+          : new Date(leaveYear, 11, 31);
+        // 입사일~만료일 기간(일) 기반 비례 부여 (간단 계산, 정밀 계산은 별도 모듈)
+        const msPerDay = 86_400_000;
+        const hireMs = hireDate ? new Date(hireDate).getTime() : Date.now();
+        const expiryMs = leaveExpiryDate.getTime();
+        const daysUntilExpiry = Math.max(0, Math.ceil((expiryMs - hireMs) / msPerDay));
+        const leaveTotalDays = Math.min(15, Math.round((daysUntilExpiry / 365) * 15 * 10) / 10);
+
+        // ── RPC 호출 (트랜잭션 보장) ────────────────────────────────────────────
+        const { data: rpcResult, error: rpcErr } = await supabase.rpc(
+          'register_staff_full',
+          {
+            p_staff: staffPayload,
+            p_licenses: filledLicenses.map((l: LicenseRow) => ({
+              license_type: l.license_type ?? null,
+              license_name: l.license_name ?? null,
+              license_number: l.license_number ?? null,
+              issued_date: l.issued_date ?? null,
+              expiry_date: l.expiry_date ?? null,
+              issuing_body: l.issuing_body ?? null,
+              memo: l.memo ?? null,
+              is_primary: l.is_primary,
+            })),
+            p_job_cats: (신규직원.jobCategories ?? []).map((j: SelectedJobCategory) => ({
+              job_category_id: j.job_category_id,
+              is_primary: j.is_primary,
+            })),
+            p_shift_asgns: (신규직원.shiftAssignments ?? []).map((s: SelectedShiftAssignment) => ({
+              shift_id: s.shift_id,
+              is_primary: s.is_primary,
+              priority: s.priority,
+            })),
+            p_leave_year: leaveYear,
+            p_leave_total: leaveTotalDays,
+          },
         );
-        let { error: insertErr, data: insertedStaff } = await supabase
-          .from('staff_members')
-          .insert([buildStaffMutationPayload(insertPayload, insertOmittedColumns)])
-          .select()
-          .single();
-        if (
-          insertErr &&
-          hasFractionalValue(insertPayload.working_hours_per_week) &&
-          isInvalidIntegerInputError(insertErr, insertPayload.working_hours_per_week)
-        ) {
-          ({ error: insertErr, data: insertedStaff } = await supabase
+
+        // RPC 실패 → 폴백: 기존 방식으로 staff_members만 INSERT
+        let insertedStaffId: string | null = null;
+        if (rpcErr || !rpcResult?.staff_id) {
+          logger.warn('register_staff_full RPC 실패, 폴백 INSERT 시도:', rpcErr);
+          const insertPayload = { ...staffPayload };
+          const insertOmittedColumns = new Set<string>(
+            hasFractionalValue(insertPayload.working_hours_per_week) ? ['working_hours_per_week'] : [],
+          );
+          let { error: insertErr, data: insertedStaff } = await supabase
             .from('staff_members')
-            .insert([buildStaffMutationPayload(insertPayload, new Set(['working_hours_per_week']))])
-            .select()
-            .single());
+            .insert([buildStaffMutationPayload(insertPayload, insertOmittedColumns)])
+            .select('id, joined_at, join_date')
+            .single();
+          if (
+            insertErr &&
+            hasFractionalValue(insertPayload.working_hours_per_week) &&
+            isInvalidIntegerInputError(insertErr, insertPayload.working_hours_per_week)
+          ) {
+            ({ error: insertErr, data: insertedStaff } = await supabase
+              .from('staff_members')
+              .insert([buildStaffMutationPayload(insertPayload, new Set(['working_hours_per_week']))])
+              .select('id, joined_at, join_date')
+              .single());
+          }
+          if (insertErr) {
+            return toast('직원 등록 실패: ' + (insertErr.message || 'DB 오류'), 'error');
+          }
+          insertedStaffId = String(insertedStaff?.id ?? '');
+
+          // 폴백: 서브 테이블들을 순차 INSERT (클라이언트 보상 패턴)
+          if (insertedStaffId) {
+            // 면허
+            if (filledLicenses.length > 0) {
+              const { error: licErr } = await supabase.from('staff_licenses').insert(
+                filledLicenses.map((l: LicenseRow) => ({
+                  staff_id: insertedStaffId,
+                  license_type: l.license_type ?? null,
+                  license_name: l.license_name ?? null,
+                  license_number: l.license_number ?? null,
+                  issued_date: l.issued_date || null,
+                  expiry_date: l.expiry_date || null,
+                  issuing_body: l.issuing_body ?? null,
+                  memo: l.memo ?? null,
+                  is_primary: l.is_primary,
+                })),
+              );
+              if (licErr) logger.warn('면허 저장 실패 (폴백):', licErr);
+            }
+            // 직종
+            if ((신규직원.jobCategories ?? []).length > 0) {
+              const { error: jobErr } = await supabase.from('staff_job_categories').insert(
+                (신규직원.jobCategories ?? []).map((j: SelectedJobCategory) => ({
+                  staff_id: insertedStaffId,
+                  job_category_id: j.job_category_id,
+                  is_primary: j.is_primary,
+                })),
+              );
+              if (jobErr) logger.warn('직종 저장 실패 (폴백):', jobErr);
+            }
+            // 근무유형
+            if ((신규직원.shiftAssignments ?? []).length > 0) {
+              const { error: shiftErr } = await supabase.from('staff_shift_assignments').insert(
+                (신규직원.shiftAssignments ?? []).map((s: SelectedShiftAssignment) => ({
+                  staff_id: insertedStaffId,
+                  shift_id: s.shift_id,
+                  is_primary: s.is_primary,
+                  priority: s.priority,
+                })),
+              );
+              if (shiftErr) logger.warn('근무유형 배정 저장 실패 (폴백):', shiftErr);
+            }
+            // leave_balances
+            const { error: lvErr } = await supabase.from('leave_balances').insert({
+              staff_id: insertedStaffId,
+              year: leaveYear,
+              total_days: leaveTotalDays,
+              used_days: 0,
+              remaining_days: leaveTotalDays,
+              expiry_date: leaveExpiryDate.toISOString().slice(0, 10),
+            });
+            if (lvErr) logger.warn('leave_balances 초기화 실패 (폴백):', lvErr);
+          }
+        } else {
+          insertedStaffId = String(rpcResult.staff_id);
         }
-        if (insertErr) {
-          return toast('직원 등록 실패: ' + (insertErr.message || 'DB 오류'), 'error');
-        }
+
         let onboardingChecklistInitFailed = false;
-        if (insertedStaff?.id) {
+        if (insertedStaffId) {
           const { error: onboardingInitError } = await supabase
             .from('onboarding_checklists')
             .upsert(
               {
-                staff_id: insertedStaff.id,
+                staff_id: insertedStaffId,
                 checklist_type: '입사',
                 items: getDefaultChecklist('입사'),
-                target_date: getChecklistTargetDate(
-                  '입사',
-                  (insertedStaff.joined_at as string) ||
-                    (insertedStaff.join_date as string) ||
-                    dateOrNull(신규직원.입사일),
-                ),
+                target_date: getChecklistTargetDate('입사', dateOrNull(신규직원.입사일)),
                 completed_at: null,
               },
               { onConflict: 'staff_id,checklist_type' },
@@ -934,17 +1171,20 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
           }
         }
         await logAudit(
-          '직원등록', 'staff_member', String(insertedStaff?.id || newEmployeeNo),
+          '직원등록', 'staff_member', String(insertedStaffId || newEmployeeNo),
           {
             staff_name: 신규직원.성명,
             employee_no: newEmployeeNo,
-            created_fields: buildAuditDiff({}, insertedStaff || commonData, Object.keys(commonData)).after,
+            created_fields: buildAuditDiff({}, commonData, Object.keys(commonData)).after,
+            licenses_count: filledLicenses.length,
+            job_categories_count: (신규직원.jobCategories ?? []).length,
+            shift_assignments_count: (신규직원.shiftAssignments ?? []).length,
           },
           actor.userId, actor.userName
         );
-        if (프로필사진파일 && insertedStaff?.id) {
+        if (프로필사진파일 && insertedStaffId) {
           try {
-            await 프로필사진업로드(insertedStaff.id, 프로필사진파일, insertedStaff as Record<string, unknown>);
+            await 프로필사진업로드(insertedStaffId, 프로필사진파일);
           } catch (photoError) {
             console.error('신규 직원 프로필 사진 업로드 실패:', photoError);
             프로필사진업로드경고 = '직원은 등록되었지만 프로필 사진 업로드는 실패했습니다.';
@@ -1011,9 +1251,49 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
       duru_nuri_end: (ins.duru_nuri_end as string) || '',
       other_welfare: (직원.permissions?.other_welfare as string) || '',
       working_hours_per_week: resolveWeeklyWorkingHours(직원, 40),
-      working_days_per_week: resolveWorkingDaysPerWeek(직원, 5)
+      working_days_per_week: resolveWorkingDaysPerWeek(직원, 5),
+      licenses: [],
+      jobCategories: [],
+      shiftAssignments: [],
     });
     편집모드설정(true);
+
+    // 서브 테이블 데이터 비동기 로드
+    const staffId = String(직원.id);
+    Promise.all([
+      supabase.from('staff_licenses').select('*').eq('staff_id', staffId).order('is_primary', { ascending: false }),
+      supabase.from('staff_job_categories').select('*').eq('staff_id', staffId),
+      supabase.from('staff_shift_assignments').select('*').eq('staff_id', staffId).order('priority'),
+    ]).then(([licRes, jobRes, shiftRes]) => {
+      const loadedLicenses: LicenseRow[] = (licRes.data ?? []).map((r: Record<string, unknown>) => ({
+        _key: String(r.id ?? crypto.randomUUID()),
+        license_type: (r.license_type as LicenseRow['license_type']) ?? null,
+        license_name: String(r.license_name ?? ''),
+        license_number: String(r.license_number ?? ''),
+        issued_date: String(r.issued_date ?? ''),
+        expiry_date: String(r.expiry_date ?? ''),
+        issuing_body: String(r.issuing_body ?? ''),
+        memo: String(r.memo ?? ''),
+        is_primary: Boolean(r.is_primary),
+      }));
+      const loadedJobs: SelectedJobCategory[] = (jobRes.data ?? []).map((r: Record<string, unknown>) => ({
+        job_category_id: String(r.job_category_id),
+        is_primary: Boolean(r.is_primary),
+      }));
+      const loadedShifts: SelectedShiftAssignment[] = (shiftRes.data ?? []).map((r: Record<string, unknown>) => ({
+        shift_id: String(r.shift_id),
+        is_primary: Boolean(r.is_primary),
+        priority: Number(r.priority ?? 0),
+      }));
+      신규직원설정((prev) => ({
+        ...prev,
+        licenses: loadedLicenses.length > 0 ? loadedLicenses : [createEmptyLicenseRow(true)],
+        jobCategories: loadedJobs,
+        shiftAssignments: loadedShifts,
+      }));
+    }).catch((err) => {
+      logger.warn('수정 모달 서브 테이블 로드 실패:', err);
+    });
   };
 
   const 닫기함수 = () => {
@@ -1026,6 +1306,9 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
     신규직원설정({
       ...createEmptyStaffForm(defaultCompany),
       팀: 팀목록가져오기(defaultCompany)[0] ?? '원무팀',
+      licenses: [createEmptyLicenseRow(true)],
+      jobCategories: [],
+      shiftAssignments: [],
     });
     창닫기?.();
   };
@@ -1478,36 +1761,10 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
                         <label className="text-[12px] font-bold text-[var(--toss-gray-4)] ml-1">내선번호</label>
                         <input type="text" value={신규직원.내선번호} onChange={e => 신규직원설정({ ...신규직원, 내선번호: e.target.value })} placeholder="1234" className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30" />
                       </div>
-                      <div className="p-5 bg-amber-50 rounded-[var(--radius-xl)] border border-amber-100 space-y-4">
-                        <h5 className="text-[11px] font-extrabold text-amber-800 flex items-center gap-1.5">📜 면허/자격 사항</h5>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-bold text-amber-700 ml-1">자격 명칭</label>
-                            <input type="text" placeholder="간호사 등" value={신규직원.면허사항} onChange={e => 신규직원설정({ ...신규직원, 면허사항: e.target.value })} className="w-full p-3 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-300" />
-                          </div>
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-bold text-amber-700 ml-1">면허 번호</label>
-                            <input type="text" placeholder="번호 입력" value={신규직원.면허번호} onChange={e => 신규직원설정({ ...신규직원, 면허번호: e.target.value })} className="w-full p-3 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-300" />
-                          </div>
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-bold text-amber-700 ml-1">취득 일자</label>
-                          <SmartDatePicker
-                            value={신규직원.취득일자}
-                            onChange={val => 신규직원설정({ ...신규직원, 취득일자: val })}
-                            inputClassName="w-full p-3 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-300"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-bold text-amber-700 ml-1">기타 내용</label>
-                          <textarea
-                            value={신규직원.면허기타내용}
-                            onChange={e => 신규직원설정({ ...신규직원, 면허기타내용: e.target.value })}
-                            placeholder="발급기관, 세부 자격 범위, 특이사항 등을 자유롭게 입력"
-                            className="min-h-[88px] w-full resize-none p-3 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-300"
-                          />
-                        </div>
-                      </div>
+                      <LicenseSection
+                        rows={신규직원.licenses}
+                        onChange={rows => 신규직원설정(prev => ({ ...prev, licenses: rows }))}
+                      />
                     </div>
                   </div>
                 )}
@@ -1727,6 +1984,31 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
                           </div>
                         )}
                       </div>
+                    </div>
+
+                    {/* ── 직종 다중 선택 ── */}
+                    <div className="md:col-span-2 space-y-2">
+                      <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
+                        <span className="w-1.5 h-4 bg-emerald-500 rounded-full" />
+                        직종
+                      </h4>
+                      <JobCategorySection
+                        selected={신규직원.jobCategories}
+                        onChange={cats => 신규직원설정(prev => ({ ...prev, jobCategories: cats }))}
+                      />
+                    </div>
+
+                    {/* ── 근무유형 다중 배정 ── */}
+                    <div className="md:col-span-2 space-y-2">
+                      <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
+                        <span className="w-1.5 h-4 bg-blue-500 rounded-full" />
+                        근무유형 배정 (신규)
+                      </h4>
+                      <ShiftAssignmentSection
+                        companyName={신규직원.사업체}
+                        selected={신규직원.shiftAssignments}
+                        onChange={asgns => 신규직원설정(prev => ({ ...prev, shiftAssignments: asgns }))}
+                      />
                     </div>
                   </div>
                 )}
