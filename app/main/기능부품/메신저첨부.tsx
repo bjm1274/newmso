@@ -11,7 +11,6 @@ import {
   buildStorageInlineUrl,
   buildStorageDownloadUrl,
   extractStorageUrlExtension,
-  shouldUseManagedBrowserDownload,
   triggerManagedBrowserDownload,
 } from '@/lib/object-storage-url';
 import type { ChatMessage } from '@/types';
@@ -135,22 +134,18 @@ export async function handleStorageDownloadLinkClick(
   fileUrl: string,
   fileName: string,
 ) {
+  event.preventDefault();
   event.stopPropagation();
   const downloadUrl = buildDownloadUrl(fileUrl, fileName);
   if (!downloadUrl) {
-    event.preventDefault();
     toast('다운로드 주소를 만들지 못했습니다.', 'error');
     return;
   }
-  if (!shouldUseManagedBrowserDownload()) {
-    return;
-  }
-  event.preventDefault();
   try {
     await triggerManagedBrowserDownload(downloadUrl, fileName);
   } catch (error) {
-    logger.error('managed download failed', error);
-    toast('모바일 다운로드에 실패했습니다. 다시 시도해 주세요.', 'error');
+    logger.error('download failed', error);
+    toast('파일 다운로드에 실패했습니다. 다시 시도해 주세요.', 'error');
   }
 }
 
@@ -367,7 +362,6 @@ export function AttachmentQuickActions({
         href={buildDownloadUrl(url, name)}
         onClick={(event) => void handleStorageDownloadLinkClick(event, url, name)}
         download={name}
-        target="_blank"
         rel="noopener noreferrer"
         className={downloadClassByVariant[variant]}
       >
