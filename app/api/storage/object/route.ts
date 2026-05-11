@@ -34,11 +34,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'This bucket is not available' }, { status: 403 });
     }
 
-    const signedUrl = await createR2DownloadUrl(
-      bucket,
-      objectKey,
-      download ? { downloadFileName: fileName } : undefined,
-    );
+    const signedUrl = await createR2DownloadUrl(bucket, objectKey);
     if (!signedUrl) {
       return NextResponse.json({ error: 'Cloudflare R2 is not configured' }, { status: 500 });
     }
