@@ -100,9 +100,19 @@ export default function ContractPreview({
           tmpl = data;
         }
 
-        const resolvedSealUrl =
+        let resolvedSealUrl: string | null | undefined =
           sealUrlOverride !== undefined ? sealUrlOverride : tmpl?.seal_url;
-        setCompany({ ...companyInfo, seal_url: resolvedSealUrl });
+
+        if (!resolvedSealUrl && companyName && companyName !== '전체') {
+          const { data: fallbackTmpl } = await supabase
+            .from('contract_templates')
+            .select('seal_url')
+            .eq('company_name', '전체')
+            .maybeSingle();
+          resolvedSealUrl = fallbackTmpl?.seal_url ?? undefined;
+        }
+
+        setCompany({ ...companyInfo, seal_url: resolvedSealUrl ?? (companyInfo as any)?.seal_url });
 
         let templateText = '';
         if (!hasTemplateOverride) {

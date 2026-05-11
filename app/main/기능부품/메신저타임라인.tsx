@@ -465,6 +465,7 @@ function MessengerTimelineComponent({
         ref={messageListRef}
         data-testid="chat-message-list"
         onScroll={onMessageListScroll}
+        onClick={onCloseMessageActions}
         className="flex-1 min-h-0 overflow-y-auto px-2 py-0.5 pb-1 md:px-4 md:py-2 md:pb-2 space-y-0 custom-scrollbar"
       >
         {!selectedRoomId ? (

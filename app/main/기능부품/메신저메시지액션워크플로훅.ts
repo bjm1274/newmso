@@ -62,9 +62,13 @@ export function useChatMessageWorkflow({
   triggerChatPush,
 }: UseChatMessageWorkflowParams) {
   const openMessageActions = useCallback((message: ChatMessage) => {
+    if (activeActionMsg && String(activeActionMsg.id) === String(message.id)) {
+      setActiveActionMsg(null);
+      return;
+    }
     void markMessageRead(message);
     setActiveActionMsg(message);
-  }, [markMessageRead, setActiveActionMsg]);
+  }, [activeActionMsg, markMessageRead, setActiveActionMsg]);
 
   const addTaskFromMessage = useCallback(async (message: ChatMessage) => {
     if (!effectiveTodoUserId) {
