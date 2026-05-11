@@ -66,8 +66,7 @@ export function useChatMessageWorkflow({
     setActiveActionMsg(message);
   }, [markMessageRead, setActiveActionMsg]);
 
-  const handleAddTaskFromAction = useCallback(async () => {
-    if (!activeActionMsg) return;
+  const addTaskFromMessage = useCallback(async (message: ChatMessage) => {
     if (!effectiveTodoUserId) {
       toast('연결된 직원 계정을 찾지 못했습니다.');
       setActiveActionMsg(null);
@@ -76,9 +75,9 @@ export function useChatMessageWorkflow({
 
     const content =
       getMessageDisplayText(
-        activeActionMsg.content,
-        activeActionMsg.file_name,
-        activeActionMsg.file_url,
+        message.content,
+        message.file_name,
+        message.file_url,
       ) || '첨부 파일 확인';
 
     const { error } = await supabase.from('todos').insert([{
@@ -86,8 +85,8 @@ export function useChatMessageWorkflow({
       content: `[채팅] ${content}`,
       is_complete: false,
       task_date: getKoreanTodayString(),
-      source_message_id: activeActionMsg.id,
-      source_room_id: activeActionMsg.room_id,
+      source_message_id: message.id,
+      source_room_id: message.room_id,
     }]);
 
     if (!error) {
@@ -98,7 +97,12 @@ export function useChatMessageWorkflow({
     }
 
     setActiveActionMsg(null);
-  }, [activeActionMsg, effectiveTodoUserId, onRefresh, setActiveActionMsg]);
+  }, [effectiveTodoUserId, onRefresh, setActiveActionMsg]);
+
+  const handleAddTaskFromAction = useCallback(async () => {
+    if (!activeActionMsg) return;
+    await addTaskFromMessage(activeActionMsg);
+  }, [activeActionMsg, addTaskFromMessage]);
 
   const startReplyToMessage = useCallback((message: ChatMessage) => {
     setReplyTo(message);
@@ -162,6 +166,7 @@ export function useChatMessageWorkflow({
 
   return {
     openMessageActions,
+    addTaskFromMessage,
     handleAddTaskFromAction,
     startReplyToMessage,
     startForwardMessage,
