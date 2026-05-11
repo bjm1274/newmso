@@ -79,7 +79,22 @@ export function useChatSidebarState({
       }
     }
 
-    return Array.from(dedupedRooms.values());
+    const accessibleRooms = Array.from(dedupedRooms.values());
+    const hasAccessibleConversation = accessibleRooms.some((room) => String(room.id) !== NOTICE_ROOM_ID);
+    const hasAnyConversation = chatRooms.some((room) => room?.id && String(room.id) !== NOTICE_ROOM_ID);
+    if (hasAccessibleConversation || !hasAnyConversation || chatRooms.length === 0) {
+      return accessibleRooms;
+    }
+
+    const fallbackRooms = new Map<string, ChatRoom>();
+    chatRooms.forEach((room) => {
+      if (!room?.id) return;
+      const roomKey = getDirectRoomMembersKey(room) || `room:${room.id}`;
+      if (!fallbackRooms.has(roomKey)) {
+        fallbackRooms.set(roomKey, room);
+      }
+    });
+    return Array.from(fallbackRooms.values());
   }, [chatRooms, isRoomAccessibleToCurrentUser]);
 
   useEffect(() => {

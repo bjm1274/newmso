@@ -1,7 +1,11 @@
 'use client';
 
 import { supabase } from '@/lib/supabase';
-import { CHAT_ROOM_SELECT } from '@/lib/chat-query-columns';
+import {
+  CHAT_ROOM_OPTIONAL_COLUMNS,
+  buildChatRoomSelect,
+} from '@/lib/chat-query-columns';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import type { ChatRoom } from '@/types';
 
 const CHAT_ROOMS_CACHE_KEY = 'newmso:chat-rooms:v1';
@@ -16,14 +20,33 @@ type FetchAllChatRoomsOptions = {
 let chatRoomsFetchInFlight: Promise<ChatRoomsFetchResult> | null = null;
 let chatRoomsFetchCache: { data: ChatRoom[]; error: unknown; fetchedAt: number } | null = null;
 
+function normalizeChatRoomForClient(room: ChatRoom): ChatRoom {
+  const dynamicRoom = room as ChatRoom & { members?: unknown; member_ids?: unknown };
+  if (Array.isArray(dynamicRoom.members)) return room;
+  if (!Array.isArray(dynamicRoom.member_ids)) return room;
+  return {
+    ...room,
+    members: dynamicRoom.member_ids,
+  };
+}
+
+export function normalizeChatRoomsForClient(rooms: ChatRoom[]): ChatRoom[] {
+  if (!Array.isArray(rooms)) return [];
+  return rooms
+    .filter((room): room is ChatRoom => Boolean(room?.id))
+    .map(normalizeChatRoomForClient);
+}
+
 function normalizeCachedChatRooms(value: unknown): ChatRoom[] {
   if (!Array.isArray(value)) return [];
-  return value
-    .filter((room): room is ChatRoom => {
-      if (!room || typeof room !== 'object') return false;
-      return Boolean((room as Partial<ChatRoom>).id);
-    })
-    .slice(0, CHAT_ROOMS_CACHE_LIMIT);
+  return normalizeChatRoomsForClient(
+    value
+      .filter((room): room is ChatRoom => {
+        if (!room || typeof room !== 'object') return false;
+        return Boolean((room as Partial<ChatRoom>).id);
+      })
+      .slice(0, CHAT_ROOMS_CACHE_LIMIT),
+  );
 }
 
 /**
@@ -51,12 +74,17 @@ export async function fetchAllChatRooms(
   }
 
   chatRoomsFetchInFlight = (async () => {
-    const result = (await supabase.from('chat_rooms').select(CHAT_ROOM_SELECT)) as {
-      data: ChatRoom[] | null;
-      error: unknown;
-    };
+    const result = await withMissingColumnsFallback<ChatRoom[]>(
+      (omittedColumns) =>
+        supabase.from('chat_rooms').select(buildChatRoomSelect(omittedColumns)) as PromiseLike<{
+          data: ChatRoom[] | null;
+          error: unknown;
+        }>,
+      [...CHAT_ROOM_OPTIONAL_COLUMNS],
+      { cacheKey: 'chat:rooms:select' },
+    );
     const nextResult = {
-      data: result.data || [],
+      data: normalizeChatRoomsForClient(result.data || []),
       error: result.error ?? null,
     };
     chatRoomsFetchCache = {
@@ -93,7 +121,7 @@ export function readCachedChatRooms(): ChatRoom[] {
 }
 
 export function writeCachedChatRooms(rooms: ChatRoom[]) {
-  const normalizedRooms = normalizeCachedChatRooms(rooms);
+  const normalizedRooms = normalizeChatRoomsForClient(rooms).slice(0, CHAT_ROOMS_CACHE_LIMIT);
   chatRoomsFetchCache = {
     data: [...normalizedRooms],
     error: null,
