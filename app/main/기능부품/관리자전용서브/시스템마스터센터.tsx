@@ -395,6 +395,7 @@ export default function SystemMasterCenter({
   const [opsActionLoading, setOpsActionLoading] = useState<string>('');
   const [chatJumpTarget, setChatJumpTarget] = useState<{ messageId: string; roomId: string } | null>(null);
   const chatMessageRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+  const lastFetchedAtRef = useRef<number>(0);
 
   const systemMasterUser =
     typeof user === 'object' && user !== null ? (user as SystemMasterUser) : null;
@@ -447,6 +448,7 @@ export default function SystemMasterCenter({
       });
       const payload = await readJson<SystemMasterOperationsPayload>(`/api/admin/system-master?${query.toString()}`);
       setOperations(payload || null);
+      lastFetchedAtRef.current = Date.now();
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : '운영 대시보드를 불러오지 못했습니다.');
     } finally {
@@ -542,22 +544,48 @@ export default function SystemMasterCenter({
   useEffect(() => {
     if (!isSystemMaster || activeTab !== '운영대시보드') return;
 
-    const intervalId = window.setInterval(() => {
-      void loadOperations(true);
-    }, 30000);
+    const THROTTLE_MS = 60_000;
+
+    let intervalId: number | undefined;
+
+    const startPolling = () => {
+      intervalId = window.setInterval(() => {
+        if (!document.hidden) void loadOperations(true);
+      }, 60000);
+    };
+
+    const stopPolling = () => {
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId);
+        intervalId = undefined;
+      }
+    };
 
     const handleFocus = () => {
-      if (document.visibilityState === 'hidden') return;
+      if (document.hidden) return;
+      if (Date.now() - lastFetchedAtRef.current < THROTTLE_MS) return;
       void loadOperations(true);
     };
 
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        if (Date.now() - lastFetchedAtRef.current >= THROTTLE_MS) {
+          void loadOperations(true);
+        }
+        startPolling();
+      }
+    };
+
+    startPolling();
     window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      window.clearInterval(intervalId);
+      stopPolling();
       window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [activeTab, isSystemMaster, loadOperations]);
 

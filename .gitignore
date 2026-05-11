@@ -73,3 +73,12 @@ backups/
 # local editor/build caches
 .vscode/
 android-twa/.gradle/
+
+# Large analysis artifacts (review locally, not in repo)
+analysis_artifacts/claude_design_handoff/shots/
+analysis_artifacts/claude_design_handoff/shots2/
+analysis_artifacts/claude_design_handoff/uploads/
+
+# Backup zips inside source
+app/main/*.Zip
+app/main/*.zip

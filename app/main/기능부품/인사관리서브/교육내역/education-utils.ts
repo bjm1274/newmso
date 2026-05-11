@@ -1,90 +1,53 @@
 import { isMissingColumnError } from '@/lib/supabase-compat';
 export { getScopedActiveStaffs } from '@/lib/active-staff';
 
-export type EducationCategory = 'hospital' | 'company' | 'common';
+// 타입 및 상수는 education-types.ts 에서 관리
+export type {
+  EducationCategory,
+  ObligationType,
+  EducationItem,
+  EducationCompletionEntry,
+  EducationCompletionLikeRow,
+  EducationAlert,
+  EducationSummary,
+  LicenseLikeRow,
+} from './education-types';
 
-export interface EducationItem {
-  name: string;
-  category: EducationCategory;
-}
+export {
+  EDUCATION_ITEMS,
+  EDUCATION_DEADLINES,
+} from './education-types';
 
-export interface EducationCompletionEntry {
-  is_completed: boolean;
-  certificate_url?: string | null;
-}
+import type {
+  SupabaseLike,
+  SupabaseError,
+  EducationCompletionLikeRow,
+  EducationRecordRow,
+  LicenseLikeRow,
+  StaffLike,
+  StaffMemberLike,
+} from './education-types';
 
-export interface EducationCompletionLikeRow {
-  staff_id: string | number;
-  education_name: string;
-  certificate_url?: string | null;
-}
+import {
+  EDUCATION_ITEMS,
+  EDUCATION_DEADLINES,
+} from './education-types';
 
-export interface EducationAlert {
-  id: string | number;
-  name: string;
-  education: string;
-  dueDate: string;
-  daysLeft: number;
-  type: 'URGENT' | 'PENDING';
-}
-
-export interface EducationSummary {
-  totalStaffCount: number;
-  totalRequiredCount: number;
-  completedCount: number;
-  pendingAssignmentCount: number;
-  pendingStaffCount: number;
-  urgentStaffCount: number;
-  completionRate: number;
-  focusItems: Array<{ name: string; count: number }>;
-}
-
-export interface LicenseLikeRow {
-  id: string | number;
-  staff_id: string | number;
-  license_name: string;
-  license_number?: string | null;
-  issued_date?: string | null;
-  expiry_date?: string | null;
-  issuing_body?: string | null;
-  memo?: string | null;
-  source?: 'staff_licenses' | 'staff_members';
-}
-
-const MEDICAL_COMPANY_PATTERN = /병원|의원|정형외과|내과|소아과|치과|한의원|요양|재활|산부인과|피부과|성형외과|외과|안과/i;
-
-export const EDUCATION_ITEMS: EducationItem[] = [
-  { name: '성희롱예방', category: 'common' },
-  { name: '개인정보보호', category: 'common' },
-  { name: '직장 내 장애인 인식개선', category: 'company' },
-  { name: '직장 내 괴롭힘 방지', category: 'company' },
-  { name: '산업안전보건(일반)', category: 'company' },
-  { name: '감염관리 교육', category: 'hospital' },
-  { name: '환자안전·의료사고 예방', category: 'hospital' },
-  { name: '의료법·의료윤리 교육', category: 'hospital' },
-  { name: '마약류 취급자 교육(해당자)', category: 'hospital' },
-  { name: '아동학대신고', category: 'hospital' },
-  { name: '노인학대신고', category: 'hospital' },
-];
-
-export const EDUCATION_DEADLINES: Record<string, { month: number; day: number }> = {
-  성희롱예방: { month: 6, day: 30 },
-  개인정보보호: { month: 6, day: 30 },
-  '직장 내 장애인 인식개선': { month: 6, day: 30 },
-  '직장 내 괴롭힘 방지': { month: 6, day: 30 },
-  '산업안전보건(일반)': { month: 9, day: 30 },
-  '감염관리 교육': { month: 3, day: 31 },
-  '환자안전·의료사고 예방': { month: 3, day: 31 },
-  '의료법·의료윤리 교육': { month: 3, day: 31 },
-  '마약류 취급자 교육(해당자)': { month: 5, day: 31 },
-  아동학대신고: { month: 3, day: 31 },
-  노인학대신고: { month: 3, day: 31 },
-};
+// ──────────────────────────────────────────────────────────────
+// 회사명 기반 의료기관 판별
+// ──────────────────────────────────────────────────────────────
+const MEDICAL_COMPANY_PATTERN =
+  /병원|의원|정형외과|내과|소아과|치과|한의원|요양|재활|산부인과|피부과|성형외과|외과|안과/i;
 
 export function isMedicalCompany(companyName?: string) {
-  return MEDICAL_COMPANY_PATTERN.test(companyName || '');
+  return MEDICAL_COMPANY_PATTERN.test(companyName ?? '');
 }
 
+/**
+ * 회사명 기반 교육 항목 필터링.
+ * @deprecated 직종 코드 기반 분류(getEducationItemsForJobCategories)로 이전 예정.
+ * 기존 호출부 호환을 위해 유지.
+ */
 export function getApplicableEducationItems(companyName?: string) {
   const medicalCompany = isMedicalCompany(companyName);
   return EDUCATION_ITEMS.filter((item) => {
@@ -93,55 +56,53 @@ export function getApplicableEducationItems(companyName?: string) {
   });
 }
 
-export function getEducationCompletionKey(staffId: string | number | null | undefined, educationName: string) {
+/**
+ * 직종 코드 배열에 해당하는 교육 항목 반환.
+ * - appliesTo === 'all' 인 항목은 항상 포함.
+ * - appliesTo 가 string[] 이면 codes 와 교집합이 있으면 포함.
+ *
+ * @param codes - job_categories.code 배열 (예: ['nurse', 'nurse_assistant'])
+ */
+export function getEducationItemsForJobCategories(codes: string[]) {
+  const codeSet = new Set(codes);
+  return EDUCATION_ITEMS.filter((item) => {
+    if (item.appliesTo === 'all') return true;
+    return item.appliesTo.some((c) => codeSet.has(c));
+  });
+}
+
+// ──────────────────────────────────────────────────────────────
+// 교육 완료 맵 유틸
+// ──────────────────────────────────────────────────────────────
+export function getEducationCompletionKey(
+  staffId: string | number | null | undefined,
+  educationName: string,
+) {
   return `${String(staffId ?? '')}_${educationName}`;
 }
 
-export function buildEducationCompletionMap(rows: any[] = []) {
-  const next: Record<string, EducationCompletionEntry> = {};
-
-  rows.forEach((row) => {
-    next[getEducationCompletionKey(row?.staff_id, row?.education_name)] = {
+export function buildEducationCompletionMap(
+  rows: EducationCompletionLikeRow[] = [],
+) {
+  const next: Record<string, { is_completed: boolean; certificate_url: string | null }> = {};
+  for (const row of rows) {
+    next[getEducationCompletionKey(row.staff_id, row.education_name)] = {
       is_completed: true,
-      certificate_url: row?.certificate_url ?? null,
+      certificate_url: row.certificate_url ?? null,
     };
-  });
-
+  }
   return next;
 }
 
-function hasMeaningfulDate(value: unknown) {
-  if (typeof value !== 'string') return false;
-  const normalized = value.trim();
-  if (!normalized) return false;
-  return !Number.isNaN(new Date(normalized).getTime());
-}
-
-function isEducationRecordCompleted(row: any) {
-  if (hasMeaningfulDate(row?.completed_at)) return true;
-
-  const normalizedStatus = String(row?.status ?? '')
-    .trim()
-    .toLowerCase();
-
-  if (!normalizedStatus) return false;
-
-  return (
-    normalizedStatus.includes('완료') ||
-    normalizedStatus.includes('수료') ||
-    normalizedStatus.includes('이수') ||
-    normalizedStatus.includes('complete') ||
-    normalizedStatus.includes('completed') ||
-    normalizedStatus.includes('done')
-  );
-}
-
-export function isEducationCompletionQueryRecoverableError(error: any) {
-  if (!error) return false;
-
-  const code = String(error?.code || '').toUpperCase();
-  const message = `${String(error?.message || '')} ${String(error?.details || '')} ${String(error?.hint || '')}`.toLowerCase();
-
+// ──────────────────────────────────────────────────────────────
+// 에러 처리 유틸
+// ──────────────────────────────────────────────────────────────
+export function isEducationCompletionQueryRecoverableError(error: unknown) {
+  if (!error || typeof error !== 'object') return false;
+  const err = error as SupabaseError;
+  const code = String(err.code ?? '').toUpperCase();
+  const message =
+    `${String(err.message ?? '')} ${String(err.details ?? '')} ${String(err.hint ?? '')}`.toLowerCase();
   return (
     code === 'PGRST205' ||
     code === '42P01' ||
@@ -154,17 +115,36 @@ export function isEducationCompletionQueryRecoverableError(error: any) {
   );
 }
 
-export function serializeEducationQueryError(error: any) {
+export function serializeEducationQueryError(error: unknown): SupabaseError | unknown {
   if (!error || typeof error !== 'object') return error;
+  const err = error as SupabaseError;
   return {
-    code: error?.code ?? null,
-    message: error?.message ?? null,
-    details: error?.details ?? null,
-    hint: error?.hint ?? null,
+    code: err.code ?? null,
+    message: err.message ?? null,
+    details: err.details ?? null,
+    hint: err.hint ?? null,
   };
 }
 
-export async function selectEducationCompletionRowsWithFallback(supabase: any) {
+// ──────────────────────────────────────────────────────────────
+// 교육 완료 데이터 Supabase 패치/upsert/삭제 (폴백 포함)
+// ──────────────────────────────────────────────────────────────
+function hasMeaningfulDate(value: unknown) {
+  if (typeof value !== 'string') return false;
+  const normalized = value.trim();
+  return normalized !== '' && !Number.isNaN(new Date(normalized).getTime());
+}
+
+function isEducationRecordCompleted(row: EducationRecordRow) {
+  if (hasMeaningfulDate(row.completed_at)) return true;
+  const s = String(row.status ?? '').trim().toLowerCase();
+  return (
+    s.includes('완료') || s.includes('수료') || s.includes('이수') ||
+    s.includes('complete') || s.includes('completed') || s.includes('done')
+  );
+}
+
+export async function selectEducationCompletionRowsWithFallback(supabase: SupabaseLike) {
   let completionQuery = await supabase
     .from('education_completions')
     .select('staff_id, education_name, certificate_url');
@@ -176,11 +156,12 @@ export async function selectEducationCompletionRowsWithFallback(supabase: any) {
   }
 
   if (!completionQuery.error) {
+    const rows = (completionQuery.data ?? []) as EducationRecordRow[];
     return {
-      rows: (completionQuery.data || []).map((row: any) => ({
-        staff_id: row.staff_id,
-        education_name: row.education_name,
-        certificate_url: row.certificate_url ?? null,
+      rows: rows.map((r) => ({
+        staff_id: r.staff_id,
+        education_name: r.education_name,
+        certificate_url: r.certificate_url ?? null,
       })) as EducationCompletionLikeRow[],
       error: null,
       source: 'education_completions' as const,
@@ -188,11 +169,7 @@ export async function selectEducationCompletionRowsWithFallback(supabase: any) {
   }
 
   if (!isEducationCompletionQueryRecoverableError(completionQuery.error)) {
-    return {
-      rows: [] as EducationCompletionLikeRow[],
-      error: completionQuery.error,
-      source: null,
-    };
+    return { rows: [] as EducationCompletionLikeRow[], error: completionQuery.error, source: null };
   }
 
   const fallbackQuery = await supabase
@@ -200,19 +177,16 @@ export async function selectEducationCompletionRowsWithFallback(supabase: any) {
     .select('staff_id, education_name, status, completed_at');
 
   if (fallbackQuery.error) {
-    return {
-      rows: [] as EducationCompletionLikeRow[],
-      error: fallbackQuery.error,
-      source: 'education_records' as const,
-    };
+    return { rows: [] as EducationCompletionLikeRow[], error: fallbackQuery.error, source: 'education_records' as const };
   }
 
+  const fallbackRows = (fallbackQuery.data ?? []) as EducationRecordRow[];
   return {
-    rows: (fallbackQuery.data || [])
-      .filter((row: any) => isEducationRecordCompleted(row))
-      .map((row: any) => ({
-        staff_id: row.staff_id,
-        education_name: row.education_name,
+    rows: fallbackRows
+      .filter((r) => isEducationRecordCompleted(r))
+      .map((r) => ({
+        staff_id: r.staff_id,
+        education_name: r.education_name,
         certificate_url: null,
       })) as EducationCompletionLikeRow[],
     error: null,
@@ -221,39 +195,30 @@ export async function selectEducationCompletionRowsWithFallback(supabase: any) {
 }
 
 export async function upsertEducationCompletionWithFallback(
-  supabase: any,
+  supabase: SupabaseLike,
   payload: EducationCompletionLikeRow,
 ) {
-  let upsertResult = await supabase
-    .from('education_completions')
-    .upsert([
-      {
-        staff_id: payload.staff_id,
-        education_name: payload.education_name,
-        certificate_url: payload.certificate_url ?? null,
-      },
-    ]);
+  let upsertResult = await supabase.from('education_completions').upsert([
+    {
+      staff_id: payload.staff_id,
+      education_name: payload.education_name,
+      certificate_url: payload.certificate_url ?? null,
+    },
+  ]);
 
   if (isMissingColumnError(upsertResult.error, 'certificate_url')) {
-    upsertResult = await supabase
-      .from('education_completions')
-      .upsert([
-        {
-          staff_id: payload.staff_id,
-          education_name: payload.education_name,
-        },
-      ]);
+    upsertResult = await supabase.from('education_completions').upsert([
+      { staff_id: payload.staff_id, education_name: payload.education_name },
+    ]);
   }
 
-  if (!upsertResult.error) {
-    return { error: null, source: 'education_completions' as const };
-  }
+  if (!upsertResult.error) return { error: null, source: 'education_completions' as const };
 
   if (!isEducationCompletionQueryRecoverableError(upsertResult.error)) {
     return { error: upsertResult.error, source: null };
   }
 
-  const existingRecordQuery = await supabase
+  const existing = await supabase
     .from('education_records')
     .select('id')
     .eq('staff_id', payload.staff_id)
@@ -261,8 +226,8 @@ export async function upsertEducationCompletionWithFallback(
     .limit(1)
     .maybeSingle();
 
-  if (existingRecordQuery.error && !isEducationCompletionQueryRecoverableError(existingRecordQuery.error)) {
-    return { error: existingRecordQuery.error, source: 'education_records' as const };
+  if (existing.error && !isEducationCompletionQueryRecoverableError(existing.error)) {
+    return { error: existing.error, source: 'education_records' as const };
   }
 
   const completedPayload = {
@@ -272,24 +237,20 @@ export async function upsertEducationCompletionWithFallback(
     completed_at: new Date().toISOString().slice(0, 10),
   };
 
-  if (existingRecordQuery.data?.id) {
+  if (existing.data?.id) {
     const updateResult = await supabase
       .from('education_records')
       .update(completedPayload)
-      .eq('id', existingRecordQuery.data.id);
-
+      .eq('id', existing.data.id);
     return { error: updateResult.error, source: 'education_records' as const };
   }
 
-  const insertResult = await supabase
-    .from('education_records')
-    .insert([completedPayload]);
-
+  const insertResult = await supabase.from('education_records').insert([completedPayload]);
   return { error: insertResult.error, source: 'education_records' as const };
 }
 
 export async function removeEducationCompletionWithFallback(
-  supabase: any,
+  supabase: SupabaseLike,
   staffId: string,
   educationName: string,
 ) {
@@ -299,9 +260,7 @@ export async function removeEducationCompletionWithFallback(
     .eq('staff_id', staffId)
     .eq('education_name', educationName);
 
-  if (!deleteResult.error) {
-    return { error: null, source: 'education_completions' as const };
-  }
+  if (!deleteResult.error) return { error: null, source: 'education_completions' as const };
 
   if (!isEducationCompletionQueryRecoverableError(deleteResult.error)) {
     return { error: deleteResult.error, source: null };
@@ -316,48 +275,56 @@ export async function removeEducationCompletionWithFallback(
   return { error: fallbackDelete.error, source: 'education_records' as const };
 }
 
+// ──────────────────────────────────────────────────────────────
+// 교육 마감일
+// ──────────────────────────────────────────────────────────────
 export function getEducationDueDate(educationName: string, year = new Date().getFullYear()) {
   const deadline = EDUCATION_DEADLINES[educationName];
   if (!deadline) return null;
   return new Date(year, deadline.month - 1, deadline.day);
 }
 
-export function getStaffDepartment(staff: any) {
+// ──────────────────────────────────────────────────────────────
+// 직원 부서/직책 추출
+// ──────────────────────────────────────────────────────────────
+export function getStaffDepartment(staff: StaffLike | null | undefined) {
   return staff?.department || staff?.team || staff?.부서 || '부서 미지정';
 }
 
-export function getStaffPosition(staff: any) {
+export function getStaffPosition(staff: StaffLike | null | undefined) {
   return staff?.position || staff?.job_title || staff?.직함 || '';
 }
 
+// ──────────────────────────────────────────────────────────────
+// 면허 폴백 유틸
+// ──────────────────────────────────────────────────────────────
 function normalizeOptionalText(value: unknown) {
   if (typeof value !== 'string') return null;
-  const normalized = value.trim();
-  return normalized || null;
+  const t = value.trim();
+  return t || null;
 }
 
 function normalizeOptionalDate(value: unknown) {
   if (typeof value !== 'string') return null;
-  const normalized = value.trim();
-  if (!normalized) return null;
-  return normalized.slice(0, 10);
+  const t = value.trim();
+  return t ? t.slice(0, 10) : null;
 }
 
-export function buildFallbackLicenseRows(staffs: any[] = []): LicenseLikeRow[] {
+export function buildFallbackLicenseRows(staffs: StaffMemberLike[] = []): LicenseLikeRow[] {
   return staffs.flatMap((staff) => {
-    const permissions = staff?.permissions || {};
+    const perms = staff?.permissions ?? {};
     const licenseName = normalizeOptionalText(staff?.license);
-    const licenseNumber = normalizeOptionalText(permissions.license_no);
-    const issuedDate = normalizeOptionalDate(permissions.license_date);
+    const licenseNumber = normalizeOptionalText(perms.license_no);
+    const issuedDate = normalizeOptionalDate(perms.license_date);
     const expiryDate =
-      normalizeOptionalDate(permissions.license_expiry_date) ||
-      normalizeOptionalDate(permissions.license_expiry) ||
+      normalizeOptionalDate(perms.license_expiry_date) ||
+      normalizeOptionalDate(perms.license_expiry) ||
       normalizeOptionalDate(staff?.license_expiry_date);
     const issuingBody =
-      normalizeOptionalText(permissions.license_issuer) ||
-      normalizeOptionalText(permissions.license_org) ||
+      normalizeOptionalText(perms.license_issuer) ||
+      normalizeOptionalText(perms.license_org) ||
       normalizeOptionalText(staff?.license_issuer);
-    const memo = normalizeOptionalText(permissions.license_note);
+    const memo = normalizeOptionalText(perms.license_note);
 
     if (!licenseName && !licenseNumber && !issuedDate && !expiryDate && !issuingBody && !memo) {
       return [];
@@ -367,24 +334,24 @@ export function buildFallbackLicenseRows(staffs: any[] = []): LicenseLikeRow[] {
       {
         id: `staff-${String(staff?.id ?? '')}-license`,
         staff_id: String(staff?.id ?? ''),
-        license_name: licenseName || '면허/자격',
+        license_name: licenseName ?? '면허/자격',
         license_number: licenseNumber,
         issued_date: issuedDate,
         expiry_date: expiryDate,
         issuing_body: issuingBody,
         memo,
-        source: 'staff_members',
+        source: 'staff_members' as const,
       },
     ];
   });
 }
 
-export function isLicenseQueryRecoverableError(error: any) {
-  if (!error) return false;
-
-  const code = String(error?.code || '').toUpperCase();
-  const message = `${String(error?.message || '')} ${String(error?.details || '')} ${String(error?.hint || '')}`.toLowerCase();
-
+export function isLicenseQueryRecoverableError(error: unknown) {
+  if (!error || typeof error !== 'object') return false;
+  const err = error as SupabaseError;
+  const code = String(err.code ?? '').toUpperCase();
+  const message =
+    `${String(err.message ?? '')} ${String(err.details ?? '')} ${String(err.hint ?? '')}`.toLowerCase();
   return (
     code === 'PGRST205' ||
     code === '42P01' ||

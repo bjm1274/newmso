@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>경영 인사이트 프로토타입 - 대화형</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
+
+    :root {
+      --accent: #2563eb;
+      --success: #10b981;
+      --danger: #ef4444;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --foreground: #1f2937;
+      --card: #ffffff;
+      --muted: #f3f4f6;
+      --border: #e5e7eb;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --foreground: #f3f4f6;
+        --card: #1f2937;
+        --muted: #374151;
+        --border: #4b5563;
+      }
+    }
+
+    body {
+      font-family: Pretendard, sans-serif;
+      background-color: var(--muted);
+      color: var(--foreground);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 16px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      font-size: 26px;
+      font-weight: 700;
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .widget-selector {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.2s;
+      color: var(--foreground);
+    }
+
+    button:hover {
+      border-color: var(--accent);
+    }
+
+    button.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    .btn-reset {
+      padding: 6px 12px;
+      background: #f3f4f6;
+      border: 1px solid var(--border);
+      font-size: 11px;
+    }
+
+    .btn-reset:hover {
+      background: var(--muted);
+    }
+
+    .dashboard {
+      display: grid;
+      gap: 20px;
+    }
+
+    .section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      display: none;
+    }
+
+    .section.active {
+      display: block;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: var(--foreground);
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    .kpi-card {
+      background: var(--muted);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .kpi-card:hover {
+      background: #e5e7eb;
+      transform: translateY(-2px);
+    }
+
+    .kpi-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: #6b7280;
+      margin-bottom: 6px;
+    }
+
+    .kpi-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--foreground);
+      margin-bottom: 6px;
+    }
+
+    .kpi-trend {
+      font-size: 11px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .kpi-trend.up {
+      color: var(--success);
+    }
+
+    .kpi-trend.down {
+      color: var(--danger);
+    }
+
+    .chart-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+    }
+
+    .mini-chart {
+      background: var(--muted);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      height: 160px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-around;
+    }
+
+    .mini-bar {
+      width: 24px;
+      background: var(--accent);
+      border-radius: var(--radius-md) var(--radius-md) 0 0;
+      position: relative;
+    }
+
+    .mini-bar-label {
+      position: absolute;
+      bottom: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      color: #6b7280;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    thead {
+      background: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      padding: 10px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--foreground);
+    }
+
+    td {
+      padding: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 500;
+    }
+
+    .badge-success {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .badge-warning {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .badge-info {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .info-box {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: var(--radius-md);
+      padding: 12px;
+      font-size: 12px;
+      color: #1e40af;
+      margin-top: 12px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .info-box {
+        background: #0c2340;
+        border-color: #1e3a5f;
+        color: #93c5fd;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .chart-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .kpi-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .controls {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .widget-selector {
+        flex-direction: column;
+      }
+
+      button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>경영 인사이트 - 프로토타입</h1>
+      <div class="controls">
+        <div class="widget-selector" role="group" aria-label="위젯 선택">
+          <button class="active" onclick="showSection('kpi')" aria-pressed="true">KPI</button>
+          <button onclick="showSection('revenue')" aria-pressed="false">매출</button>
+          <button onclick="showSection('patients')" aria-pressed="false">환자</button>
+          <button onclick="showSection('budget')" aria-pressed="false">예산</button>
+          <button onclick="showSection('details')" aria-pressed="false">상세</button>
+        </div>
+        <button class="btn-reset" onclick="resetPreferences()">초기화</button>
+      </div>
+    </header>
+
+    <div class="dashboard">
+      <!-- KPI Section -->
+      <section class="section active" id="kpi-section">
+        <h2 class="section-title">핵심 지표</h2>
+        <div class="kpi-grid">
+          <div class="kpi-card" onclick="showDetail('revenue-total')">
+            <div class="kpi-label">월 누적 매출</div>
+            <div class="kpi-value">₩245.8M</div>
+            <div class="kpi-trend up">↑ 12.5% YoY</div>
+          </div>
+          <div class="kpi-card" onclick="showDetail('profit')">
+            <div class="kpi-label">영업이익</div>
+            <div class="kpi-value">₩38.2M</div>
+            <div class="kpi-trend up">↑ 8.3% YoY</div>
+          </div>
+          <div class="kpi-card" onclick="showDetail('occupancy')">
+            <div class="kpi-label">입원율</div>
+            <div class="kpi-value">72.4%</div>
+            <div class="kpi-trend down">↓ 2.1% YoY</div>
+          </div>
+          <div class="kpi-card" onclick="showDetail('budget-rate')">
+            <div class="kpi-label">예산 대비</div>
+            <div class="kpi-value">94.2%</div>
+            <div class="kpi-trend up">정상 범위</div>
+          </div>
+          <div class="kpi-card" onclick="showDetail('margin')">
+            <div class="kpi-label">이익률</div>
+            <div class="kpi-value">15.5%</div>
+            <div class="kpi-trend up">↑ 0.7% MoM</div>
+          </div>
+          <div class="kpi-card" onclick="showDetail('patients-total')">
+            <div class="kpi-label">누적 환자</div>
+            <div class="kpi-value">1,707</div>
+            <div class="kpi-trend up">↑ 5.2% YoY</div>
+          </div>
+        </div>
+        <div class="info-box">
+          💡 카드를 클릭하면 상세 정보를 볼 수 있습니다. 관리자만 접근 가능합니다.
+        </div>
+      </section>
+
+      <!-- Revenue Section -->
+      <section class="section" id="revenue-section">
+        <h2 class="section-title">매출·이익 현황</h2>
+        <div class="chart-grid">
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 12px; font-weight: 600;">월별 매출</div>
+            <div class="mini-chart">
+              <div class="mini-bar" style="height: 65%"><div class="mini-bar-label">1월</div></div>
+              <div class="mini-bar" style="height: 72%"><div class="mini-bar-label">2월</div></div>
+              <div class="mini-bar" style="height: 78%"><div class="mini-bar-label">3월</div></div>
+              <div class="mini-bar" style="height: 85%"><div class="mini-bar-label">4월</div></div>
+              <div class="mini-bar" style="height: 92%"><div class="mini-bar-label">5월</div></div>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 12px; font-weight: 600;">이익률 추이</div>
+            <div class="mini-chart">
+              <div class="mini-bar" style="height: 52%"><div class="mini-bar-label">13%</div></div>
+              <div class="mini-bar" style="height: 57%"><div class="mini-bar-label">14%</div></div>
+              <div class="mini-bar" style="height: 61%"><div class="mini-bar-label">15%</div></div>
+              <div class="mini-bar" style="height: 64%"><div class="mini-bar-label">16%</div></div>
+              <div class="mini-bar" style="height: 62%"><div class="mini-bar-label">15%</div></div>
+            </div>
+          </div>
+        </div>
+        <table style="margin-top: 16px;">
+          <thead>
+            <tr>
+              <th>월</th>
+              <th>매출(M)</th>
+              <th>이익(M)</th>
+              <th>이익률</th>
+              <th>상태</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1월</td>
+              <td>₩180</td>
+              <td>₩23.4</td>
+              <td>13.0%</td>
+              <td><span class="badge badge-success">정상</span></td>
+            </tr>
+            <tr>
+              <td>2월</td>
+              <td>₩195</td>
+              <td>₩27.7</td>
+              <td>14.2%</td>
+              <td><span class="badge badge-success">정상</span></td>
+            </tr>
+            <tr>
+              <td>3월</td>
+              <td>₩210</td>
+              <td>₩31.7</td>
+              <td>15.1%</td>
+              <td><span class="badge badge-success">정상</span></td>
+            </tr>
+            <tr>
+              <td>4월</td>
+              <td>₩225</td>
+              <td>₩35.6</td>
+              <td>15.8%</td>
+              <td><span class="badge badge-success">정상</span></td>
+            </tr>
+            <tr>
+              <td>5월</td>
+              <td>₩246</td>
+              <td>₩38.2</td>
+              <td>15.5%</td>
+              <td><span class="badge badge-success">정상</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Patients Section -->
+      <section class="section" id="patients-section">
+        <h2 class="section-title">환자 현황</h2>
+        <div class="chart-grid">
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 12px; font-weight: 600;">입원·외래 비율</div>
+            <div class="mini-chart">
+              <div class="mini-bar" style="height: 72.4%; flex: 2.6;"><div class="mini-bar-label">입원</div></div>
+              <div class="mini-bar" style="height: 27.6%; flex: 1; background: #93c5fd;"><div class="mini-bar-label">외래</div></div>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 12px; font-weight: 600;">부서별 환자</div>
+            <div class="mini-chart">
+              <div class="mini-bar" style="height: 78%"><div class="mini-bar-label">내과</div></div>
+              <div class="mini-bar" style="height: 65%"><div class="mini-bar-label">외과</div></div>
+              <div class="mini-bar" style="height: 45%"><div class="mini-bar-label">정형</div></div>
+              <div class="mini-bar" style="height: 29%"><div class="mini-bar-label">신경</div></div>
+            </div>
+          </div>
+        </div>
+        <table style="margin-top: 16px;">
+          <thead>
+            <tr>
+              <th>부서</th>
+              <th>입원</th>
+              <th>외래</th>
+              <th>총계</th>
+              <th>점유율</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>내과</td>
+              <td>280</td>
+              <td>60</td>
+              <td>340</td>
+              <td>19.9%</td>
+            </tr>
+            <tr>
+              <td>외과</td>
+              <td>245</td>
+              <td>40</td>
+              <td>285</td>
+              <td>16.7%</td>
+            </tr>
+            <tr>
+              <td>정형</td>
+              <td>165</td>
+              <td>30</td>
+              <td>195</td>
+              <td>11.4%</td>
+            </tr>
+            <tr>
+              <td>신경과</td>
+              <td>110</td>
+              <td>17</td>
+              <td>127</td>
+              <td>7.4%</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Budget Section -->
+      <section class="section" id="budget-section">
+        <h2 class="section-title">예산 현황</h2>
+        <div class="chart-grid">
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 12px; font-weight: 600;">예산 집행률</div>
+            <div class="mini-chart">
+              <div class="mini-bar" style="height: 94.2%;"><div class="mini-bar-label">집행</div></div>
+            </div>
+            <div style="font-size: 11px; color: #6b7280; margin-top: 12px;">
+              예산 ₩250M / 집행 ₩235.5M
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 12px; font-weight: 600;">예산 항목별</div>
+            <div class="mini-chart">
+              <div class="mini-bar" style="height: 85%"><div class="mini-bar-label">인건</div></div>
+              <div class="mini-bar" style="height: 39%"><div class="mini-bar-label">의약</div></div>
+              <div class="mini-bar" style="height: 32%"><div class="mini-bar-label">시설</div></div>
+              <div class="mini-bar" style="height: 21%"><div class="mini-bar-label">기타</div></div>
+            </div>
+          </div>
+        </div>
+        <table style="margin-top: 16px;">
+          <thead>
+            <tr>
+              <th>항목</th>
+              <th>예산(M)</th>
+              <th>집행(M)</th>
+              <th>잔액(M)</th>
+              <th>집행율</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>인건비</td>
+              <td>₩120</td>
+              <td>₩112.8</td>
+              <td>₩7.2</td>
+              <td><span class="badge badge-success">94%</span></td>
+            </tr>
+            <tr>
+              <td>의약품</td>
+              <td>₩55</td>
+              <td>₩51.7</td>
+              <td>₩3.3</td>
+              <td><span class="badge badge-success">94%</span></td>
+            </tr>
+            <tr>
+              <td>시설</td>
+              <td>₩45</td>
+              <td>₩42.3</td>
+              <td>₩2.7</td>
+              <td><span class="badge badge-success">94%</span></td>
+            </tr>
+            <tr>
+              <td>기타</td>
+              <td>₩30</td>
+              <td>₩28.7</td>
+              <td>₩1.3</td>
+              <td><span class="badge badge-success">96%</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Details Section -->
+      <section class="section" id="details-section">
+        <h2 class="section-title">법인·부서별 상세</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>법인</th>
+              <th>부서</th>
+              <th>매출(M)</th>
+              <th>이익(M)</th>
+              <th>환자(명)</th>
+              <th>이익률</th>
+              <th>상태</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>본원</td>
+              <td>내과</td>
+              <td>₩85.2</td>
+              <td>₩12.8</td>
+              <td>340</td>
+              <td>15.0%</td>
+              <td><span class="badge badge-success">정상</span></td>
+            </tr>
+            <tr>
+              <td>본원</td>
+              <td>외과</td>
+              <td>₩72.5</td>
+              <td>₩10.9</td>
+              <td>285</td>
+              <td>15.0%</td>
+              <td><span class="badge badge-success">정상</span></td>
+            </tr>
+            <tr>
+              <td>본원</td>
+              <td>정형</td>
+              <td>₩62.1</td>
+              <td>₩9.3</td>
+              <td>195</td>
+              <td>15.0%</td>
+              <td><span class="badge badge-success">정상</span></td>
+            </tr>
+            <tr>
+              <td>지점1</td>
+              <td>신경과</td>
+              <td>₩15.8</td>
+              <td>₩2.0</td>
+              <td>127</td>
+              <td>12.6%</td>
+              <td><span class="badge badge-warning">주의</span></td>
+            </tr>
+            <tr>
+              <td>지점1</td>
+              <td>응급실</td>
+              <td>₩12.2</td>
+              <td>₩1.5</td>
+              <td>98</td>
+              <td>12.3%</td>
+              <td><span class="badge badge-warning">주의</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'mgmt-insights-prefs';
+
+    function showSection(sectionId) {
+      // Hide all sections
+      document.querySelectorAll('.section').forEach((s) => {
+        s.classList.remove('active');
+      });
+
+      // Update buttons
+      document.querySelectorAll('.widget-selector button').forEach((btn) => {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-pressed', 'false');
+      });
+
+      // Show selected section
+      const section = document.getElementById(`${sectionId}-section`);
+      if (section) {
+        section.classList.add('active');
+      }
+
+      // Update button state
+      event.target.classList.add('active');
+      event.target.setAttribute('aria-pressed', 'true');
+
+      // Save preference
+      savePreference(sectionId);
+    }
+
+    function showDetail(detailId) {
+      alert(`상세 정보: ${detailId}\n(실제 구현에서는 모달이나 드로어로 표시됩니다)`);
+    }
+
+    function savePreference(section) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ lastSection: section }));
+    }
+
+    function loadPreference() {
+      const pref = localStorage.getItem(STORAGE_KEY);
+      if (pref) {
+        try {
+          const { lastSection } = JSON.parse(pref);
+          if (lastSection && lastSection !== 'kpi') {
+            const btn = document.querySelector(
+              `.widget-selector button[onclick*="${lastSection}"]`
+            );
+            if (btn) {
+              btn.click();
+            }
+          }
+        } catch (e) {
+          console.error('Failed to load preferences', e);
+        }
+      }
+    }
+
+    function resetPreferences() {
+      localStorage.removeItem(STORAGE_KEY);
+      location.reload();
+    }
+
+    // Load saved preference on page load
+    window.addEventListener('DOMContentLoaded', loadPreference);
+  </script>
+</body>
+</html>

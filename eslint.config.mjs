@@ -6,6 +6,27 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   {
+    // lib/** 자체는 raw supabase 직접 호출이 허용되는 영역
+    files: ["lib/**/*.ts", "lib/**/*.tsx"],
+    rules: {},
+  },
+  {
+    // app/** 및 components/** 에서 supabase.from() 직접 호출 경고
+    // 신규 코드는 lib/fetcher.ts 또는 lib/hooks/useCachedQuery 를 사용하세요.
+    // 기존 코드는 점진적으로 마이그레이션 중이므로 warn 수준으로만 설정합니다.
+    files: ["app/**/*.ts", "app/**/*.tsx", "components/**/*.ts", "components/**/*.tsx"],
+    rules: {
+      "no-restricted-syntax": [
+        "warn",
+        {
+          selector: "CallExpression[callee.property.name='from'][callee.object.name='supabase']",
+          message:
+            "raw supabase 호출 대신 lib/fetcher.ts 또는 lib/hooks/useCachedQuery 를 사용하세요. 기존 코드는 단계적으로 마이그레이션 중.",
+        },
+      ],
+    },
+  },
+  {
     rules: {
       // Keep legacy migration-heavy code lintable without blocking local development.
       "@typescript-eslint/no-explicit-any": "off",

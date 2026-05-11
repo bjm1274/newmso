@@ -275,7 +275,7 @@ export default function MessengerOperationsCenter({
 
   const presenceRows = useMemo(() => {
     const attendanceMap = new Map(attendanceRows.map((row: Record<string, unknown>) => [String(row.staff_id), row.status]));
-    const shiftMap = new Map(shiftAssignments.map((row: Record<string, unknown>) => [String(row.staff_id), row.shift_id]));
+    const shiftMap = new Map(shiftAssignments.map((row: Record<string, unknown>) => [String(row.staff_id), String(row.shift_id || '').trim()]));
 
     return activeStaffs.map((staff) => {
       const attendanceStatus = attendanceMap.get(String(staff.id));

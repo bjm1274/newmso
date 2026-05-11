@@ -10,6 +10,7 @@ import {
   triggerManagedBrowserDownload,
 } from '@/lib/object-storage-url';
 import { supabase } from '@/lib/supabase';
+import { subscribeRealtime } from '@/lib/realtime-bus';
 import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { toast } from '@/lib/toast';
 import type { AttachmentItem, BoardPost, StaffMember } from '@/types';
@@ -714,22 +715,17 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
   }, [loadGuideWorkspace]);
 
   useEffect(() => {
-    const channel = supabase
-      .channel('guide-workspace-board-posts')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'board_posts' }, () => {
-        void loadGuideWorkspace();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'org_teams' }, () => {
-        void loadGuideWorkspace();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_members' }, () => {
-        void loadGuideWorkspace();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    const unsubscribe = subscribeRealtime(
+      'guide-workspace',
+      [
+        { table: 'board_posts', event: '*' },
+        { table: 'org_teams', event: '*' },
+        { table: 'staff_members', event: '*' },
+      ],
+      () => { void loadGuideWorkspace(); },
+      { batchWindowMs: 1000 },
+    );
+    return unsubscribe;
   }, [loadGuideWorkspace]);
 
   const staffSeed = useMemo<OrgStaffRow[]>(() => {

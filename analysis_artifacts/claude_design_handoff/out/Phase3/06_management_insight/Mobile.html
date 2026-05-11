@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>경영 인사이트 대시보드 (모바일)</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
+
+    :root {
+      --accent: #2563eb;
+      --success: #10b981;
+      --danger: #ef4444;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --foreground: #1f2937;
+      --card: #ffffff;
+      --muted: #f3f4f6;
+      --border: #e5e7eb;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --foreground: #f3f4f6;
+        --card: #1f2937;
+        --muted: #374151;
+        --border: #4b5563;
+      }
+    }
+
+    body {
+      font-family: Pretendard, sans-serif;
+      background-color: var(--muted);
+      color: var(--foreground);
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 16px 12px;
+    }
+
+    header {
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .update-time {
+      font-size: 11px;
+      color: #6b7280;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .kpi-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .kpi-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: #6b7280;
+    }
+
+    .kpi-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--foreground);
+    }
+
+    .kpi-change {
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .kpi-change.positive {
+      color: var(--success);
+    }
+
+    .kpi-change.negative {
+      color: var(--danger);
+    }
+
+    .chart-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .chart-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--foreground);
+    }
+
+    .bar-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      height: 140px;
+      margin-bottom: 8px;
+    }
+
+    .bar {
+      flex: 1;
+      background: var(--accent);
+      border-radius: var(--radius-md) var(--radius-md) 0 0;
+      position: relative;
+      min-height: 15px;
+    }
+
+    .bar-label {
+      position: absolute;
+      bottom: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      white-space: nowrap;
+      color: #6b7280;
+    }
+
+    .bar-value {
+      position: absolute;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--foreground);
+    }
+
+    .line-chart {
+      width: 100%;
+      height: 140px;
+      position: relative;
+      margin-bottom: 8px;
+    }
+
+    .line {
+      width: 100%;
+      height: 100%;
+      border-left: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+
+    .line-point {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      border: 2px solid white;
+      transform: translate(-3px, -3px);
+    }
+
+    .chart-legend {
+      display: flex;
+      gap: 12px;
+      font-size: 11px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .legend-color {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+    }
+
+    .table-section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      overflow-x: auto;
+      margin-bottom: 20px;
+    }
+
+    .table-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--foreground);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    thead {
+      background: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      padding: 8px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--foreground);
+    }
+
+    td {
+      padding: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 6px;
+      border-radius: var(--radius-md);
+      font-size: 10px;
+      font-weight: 500;
+    }
+
+    .badge-green {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .badge-blue {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    @media (min-width: 768px) {
+      .container {
+        max-width: 720px;
+        padding: 24px 16px;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+
+      .kpi-grid {
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 14px;
+      }
+
+      .kpi-card {
+        padding: 16px;
+      }
+
+      .chart-card {
+        padding: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>경영 인사이트</h1>
+      <p class="update-time">마지막 업데이트: 2026-05-11 14:30</p>
+    </header>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <span class="kpi-label">월 누적 매출</span>
+        <span class="kpi-value">245.8M</span>
+        <span class="kpi-change positive">↑ 12.5%</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">영업이익</span>
+        <span class="kpi-value">38.2M</span>
+        <span class="kpi-change positive">↑ 8.3%</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">입원율</span>
+        <span class="kpi-value">72.4%</span>
+        <span class="kpi-change negative">↓ 2.1%</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">환자수</span>
+        <span class="kpi-value">1,707</span>
+        <span class="kpi-change positive">↑ 5.2%</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">예산집행률</span>
+        <span class="kpi-value">94.2%</span>
+        <span class="kpi-change positive">정상</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">이익률</span>
+        <span class="kpi-value">15.5%</span>
+        <span class="kpi-change positive">↑ 0.7%</span>
+      </div>
+    </div>
+
+    <!-- Revenue Chart -->
+    <div class="chart-card">
+      <h3 class="chart-title">월별 매출</h3>
+      <figure>
+        <div class="bar-chart" role="img" aria-label="월별 매출: 1월 180M, 2월 195M, 3월 210M, 4월 225M, 5월 246M">
+          <div class="bar" style="height: 65%">
+            <span class="bar-value">180M</span>
+            <span class="bar-label">1월</span>
+          </div>
+          <div class="bar" style="height: 72%">
+            <span class="bar-value">195M</span>
+            <span class="bar-label">2월</span>
+          </div>
+          <div class="bar" style="height: 78%">
+            <span class="bar-value">210M</span>
+            <span class="bar-label">3월</span>
+          </div>
+          <div class="bar" style="height: 85%">
+            <span class="bar-value">225M</span>
+            <span class="bar-label">4월</span>
+          </div>
+          <div class="bar" style="height: 92%">
+            <span class="bar-value">246M</span>
+            <span class="bar-label">5월</span>
+          </div>
+        </div>
+        <figcaption style="font-size: 10px; color: #6b7280; margin-top: 24px;">
+          최근 5개월 월별 매출
+        </figcaption>
+      </figure>
+    </div>
+
+    <!-- Profit Margin Chart -->
+    <div class="chart-card">
+      <h3 class="chart-title">이익률 추이</h3>
+      <figure>
+        <div class="line-chart" role="img" aria-label="이익률: 1월 13%, 2월 14.2%, 3월 15.1%, 4월 15.8%, 5월 15.5%">
+          <div class="line">
+            <div class="line-point" style="left: 5%; bottom: 52.5%;"></div>
+            <div class="line-point" style="left: 30%; bottom: 57%;"></div>
+            <div class="line-point" style="left: 55%; bottom: 60.5%;"></div>
+            <div class="line-point" style="left: 80%; bottom: 63.5%;"></div>
+            <div class="line-point" style="left: 95%; bottom: 62.5%;"></div>
+          </div>
+        </div>
+        <figcaption style="font-size: 10px; color: #6b7280; margin-top: 24px;">
+          월별 이익률 추이
+        </figcaption>
+      </figure>
+    </div>
+
+    <!-- Patient Ratio Chart -->
+    <div class="chart-card">
+      <h3 class="chart-title">입원·외래 비율</h3>
+      <figure>
+        <div style="display: flex; gap: 16px; align-items: center; height: 120px;">
+          <div style="flex: 1; display: flex; align-items: flex-end; gap: 6px; height: 100%;">
+            <div class="bar" style="flex: 2; height: 72.4%;">
+              <span class="bar-value" style="top: -20px;">72.4%</span>
+            </div>
+            <div class="bar" style="flex: 1; height: 27.6%; background: #93c5fd;">
+              <span class="bar-value" style="top: -20px;">27.6%</span>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top: 24px;" role="doc-subtitle">
+          <div class="chart-legend">
+            <div class="legend-item">
+              <div class="legend-color" style="background: var(--accent);"></div>
+              입원 1,245
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background: #93c5fd;"></div>
+              외래 462
+            </div>
+          </div>
+        </div>
+        <figcaption style="font-size: 10px; color: #6b7280; margin-top: 12px;">
+          당월 환자 현황
+        </figcaption>
+      </figure>
+    </div>
+
+    <!-- Department Patients -->
+    <div class="chart-card">
+      <h3 class="chart-title">부서별 환자수</h3>
+      <figure>
+        <div class="bar-chart" role="img" aria-label="부서별 환자: 내과 340, 외과 285, 정형 195, 신경 127">
+          <div class="bar" style="height: 78%">
+            <span class="bar-value">340</span>
+            <span class="bar-label">내과</span>
+          </div>
+          <div class="bar" style="height: 65%">
+            <span class="bar-value">285</span>
+            <span class="bar-label">외과</span>
+          </div>
+          <div class="bar" style="height: 45%">
+            <span class="bar-value">195</span>
+            <span class="bar-label">정형</span>
+          </div>
+          <div class="bar" style="height: 29%">
+            <span class="bar-value">127</span>
+            <span class="bar-label">신경</span>
+          </div>
+        </div>
+        <figcaption style="font-size: 10px; color: #6b7280; margin-top: 24px;">
+          주요 부서별 환자수
+        </figcaption>
+      </figure>
+    </div>
+
+    <!-- Budget Section -->
+    <div class="chart-card">
+      <h3 class="chart-title">예산 집행률</h3>
+      <figure>
+        <div style="display: flex; gap: 12px; align-items: center; height: 120px;">
+          <div style="flex: 1; display: flex; align-items: flex-end; height: 100%;">
+            <div class="bar" style="width: 100%; height: 94.2%; background: var(--success);">
+              <span class="bar-value" style="top: -20px;">94.2%</span>
+            </div>
+          </div>
+          <div style="flex: 1; font-size: 12px; line-height: 1.8;">
+            <div style="margin-bottom: 6px;">예산</div>
+            <div style="font-weight: 600; margin-bottom: 12px;">₩250M</div>
+            <div style="margin-bottom: 6px;">집행</div>
+            <div style="font-weight: 600; color: var(--success);">₩235.5M</div>
+          </div>
+        </div>
+        <figcaption style="font-size: 10px; color: #6b7280; margin-top: 20px;">
+          연간 예산 집행 현황
+        </figcaption>
+      </figure>
+    </div>
+
+    <!-- Summary Table -->
+    <div class="table-section">
+      <h3 class="table-title">주요 부서 현황</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>부서</th>
+            <th>매출(M)</th>
+            <th>이익</th>
+            <th>상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>내과</td>
+            <td>₩85.2</td>
+            <td>15.0%</td>
+            <td><span class="badge badge-green">정상</span></td>
+          </tr>
+          <tr>
+            <td>외과</td>
+            <td>₩72.5</td>
+            <td>15.0%</td>
+            <td><span class="badge badge-green">정상</span></td>
+          </tr>
+          <tr>
+            <td>정형</td>
+            <td>₩62.1</td>
+            <td>15.0%</td>
+            <td><span class="badge badge-green">정상</span></td>
+          </tr>
+          <tr>
+            <td>신경과</td>
+            <td>₩15.8</td>
+            <td>12.6%</td>
+            <td><span class="badge badge-blue">주의</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

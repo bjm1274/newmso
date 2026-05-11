@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { resolveWeeklyWorkingHours, resolveWorkingDaysPerWeek } from '@/lib/payroll-working-hours';
 import { getStaffProbationMonths, toIntegerOrFallback } from '@/lib/staff-meta';
+import { getPrimaryShiftBatch } from '@/lib/staff-shift-resolver';
 import ContractList from './계약문서/계약서명단';
 import ContractPreview from './계약문서/계약서미리보기';
 import ContractTemplateEditor from './계약문서/계약서양식편집';
@@ -115,17 +116,17 @@ export default function ContractMain({
       const includeTaxFree = activeTab === '연봉계약갱신' || activeTab === '신규/변경계약서';
       const contractType = getContractType();
 
-      // 선택된 직원들의 shift_id로 근무형태 데이터 일괄 조회
-      const shiftIds = [...new Set(checkedIds.map((staffId: number) => {
-        const s = (staffs as any[])?.find((x: any) => x.id === staffId);
-        return s?.shift_id;
-      }).filter(Boolean))];
+      // 선택된 직원들의 주근무유형 배치 조회 (staff_shift_assignments.is_primary → staff_members.shift_id 폴백)
+      const checkedStaffIds = checkedIds.map((id: number) => String(id));
+      const primaryShiftByStaff = await getPrimaryShiftBatch(checkedStaffIds);
+
+      const resolvedShiftIds = [...new Set([...primaryShiftByStaff.values()].filter(Boolean))] as string[];
       let shiftMap: Record<string, any> = {};
-      if (shiftIds.length > 0) {
+      if (resolvedShiftIds.length > 0) {
         const { data: shiftRows } = await supabase
           .from('work_shifts')
           .select('id, start_time, end_time, break_start_time, break_end_time')
-          .in('id', shiftIds);
+          .in('id', resolvedShiftIds);
         if (shiftRows) shiftMap = Object.fromEntries(shiftRows.map((sh: any) => [sh.id, sh]));
       }
 
@@ -146,8 +147,9 @@ export default function ContractMain({
           conditionsAppDate = d.toISOString().split('T')[0];
         }
 
-        // 직원에게 지정된 근무형태 데이터 (없으면 salaryInfo 폼 값 사용)
-        const staffShift = shiftMap[s?.shift_id];
+        // 직원의 주근무유형 ID (staff_shift_assignments.is_primary → staff_members.shift_id)
+        const resolvedShiftId = primaryShiftByStaff.get(String(staffId)) ?? s?.shift_id ?? null;
+        const staffShift = shiftMap[resolvedShiftId as string] ?? null;
 
         const pay = includeTaxFree
           ? {
@@ -177,7 +179,7 @@ export default function ContractMain({
           contract_type: contractType,
           working_hours_per_week: resolveWeeklyWorkingHours(s, salaryInfo.working_hours_per_week || 40),
           working_days_per_week: workingDaysPerWeek,
-          shift_id: s?.shift_id || null,
+          shift_id: resolvedShiftId,
           shift_start_time: staffShift ? String(staffShift.start_time).slice(0, 5) : salaryInfo.shift_start_time,
           shift_end_time: staffShift ? String(staffShift.end_time).slice(0, 5) : salaryInfo.shift_end_time,
           break_start_time: staffShift ? String(staffShift.break_start_time || '12:00').slice(0, 5) : salaryInfo.break_start_time,

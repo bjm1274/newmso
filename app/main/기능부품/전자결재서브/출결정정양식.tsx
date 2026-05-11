@@ -4,6 +4,7 @@ import { toast } from '@/lib/toast';
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { isMissingColumnError } from '@/lib/supabase-compat';
+import { getPrimaryShift } from '@/lib/staff-shift-resolver';
 
 type ProblemReason = '미체크' | '지각' | '조퇴' | '결근' | '미출근';
 
@@ -119,8 +120,9 @@ export default function AttendanceCorrectionForm({
         { data: attendanceRows },
         { data: attendancesRows },
         { data: myCorrections },
-        { data: staffRow },
         { data: assignmentRows },
+        // staff_shift_assignments(is_primary) → staff_members.shift_id 폴백
+        primaryShiftId,
       ] = await Promise.all([
         supabase.from('attendance').select('date, check_in, check_out, status').eq('staff_id', user.id).gte('date', startStr).lte('date', endStr),
         supabase.from('attendances').select('work_date, status').eq('staff_id', user.id).gte('work_date', startStr).lte('work_date', endStr),
@@ -128,8 +130,8 @@ export default function AttendanceCorrectionForm({
           () => supabase.from('attendance_corrections').select('attendance_date, original_date').eq('staff_id', user.id),
           () => supabase.from('attendance_corrections').select('original_date').eq('staff_id', user.id),
         ).then((r) => r),
-        supabase.from('staff_members').select('id, shift_id').eq('id', user.id).maybeSingle(),
         supabase.from('shift_assignments').select('work_date, shift_id').eq('staff_id', user.id).gte('work_date', startStr).lte('work_date', endStr),
+        getPrimaryShift(String(user.id)),
       ]);
 
       /* ── 날짜별 배정 Map ── */
@@ -138,7 +140,7 @@ export default function AttendanceCorrectionForm({
       );
 
       /* ── 관련된 shift_id 목록 수집 → work_shifts 조회 ── */
-      const defaultShiftId: string | null = (staffRow as any)?.shift_id ?? null;
+      const defaultShiftId: string | null = primaryShiftId;
       const shiftIdSet = new Set<string>(
         [...(assignmentRows || []).map((a: any) => a.shift_id).filter(Boolean), defaultShiftId].filter(Boolean) as string[]
       );

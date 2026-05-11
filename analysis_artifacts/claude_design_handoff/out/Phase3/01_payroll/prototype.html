@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>급여 워크센터 — Prototype Demo</title>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet">
+<style>
+:root {
+  --accent:    #2563eb;
+  --card:      #ffffff;
+  --muted:     #f1f5f9;
+  --border:    #e2e8f0;
+  --fg:        #0f172a;
+  --fg-2:      #475569;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  font-family: 'Pretendard', system-ui, sans-serif;
+}
+[data-theme="dark"] {
+  --card:   #1e293b;
+  --muted:  #0f172a;
+  --border: #334155;
+  --fg:     #f1f5f9;
+  --fg-2:   #94a3b8;
+}
+
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--muted); color:var(--fg); font-size:14px; min-height:100vh; }
+
+/* ── 컨트롤 바 ─────────────────────────── */
+.ctrl-bar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 16px;
+  height: 52px;
+  overflow-x: auto;
+}
+.ctrl-bar__brand {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  margin-right: 16px;
+  color: var(--accent);
+}
+
+.seg-group {
+  display: flex;
+  background: var(--muted);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  gap: 2px;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+.seg-btn {
+  padding: 5px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-2);
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+  white-space: nowrap;
+  min-height: 32px;
+  transition: all .12s;
+}
+.seg-btn:hover { background: var(--card); color: var(--fg); }
+.seg-btn.active { background: var(--card); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+.seg-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.ctrl-sep { width: 1px; height: 24px; background: var(--border); margin: 0 8px; flex-shrink:0; }
+
+.dark-toggle {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  background: var(--muted);
+  font-size: 12px; font-weight: 600;
+  cursor: pointer; border: none; font-family: inherit; color: var(--fg);
+  white-space: nowrap; flex-shrink: 0;
+  min-height: 32px;
+  transition: background .12s;
+}
+.dark-toggle:hover { background: var(--border); }
+.dark-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.ctrl-spacer { flex: 1; }
+
+.legend {
+  font-size: 11px;
+  color: var(--fg-2);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── 프레임 래퍼 ────────────────────────── */
+.frame-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 24px 20px 40px;
+  min-height: calc(100vh - 52px);
+}
+
+.device-frame {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.device-frame.active { display: flex; }
+
+.frame-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--fg-2);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+/* PC 프레임 */
+.pc-shell {
+  background: #1e1e1e;
+  border-radius: 12px;
+  padding: 10px 10px 0;
+  box-shadow: 0 20px 60px rgba(0,0,0,.35);
+}
+.pc-shell__notch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 0 4px;
+}
+.pc-dot { width: 10px; height: 10px; border-radius: 50%; }
+.pc-dot.red  { background: #ff5f56; }
+.pc-dot.yel  { background: #ffbd2e; }
+.pc-dot.grn  { background: #27c93f; }
+.pc-shell__bar {
+  background: #2d2d2d;
+  border-radius: 4px;
+  flex: 1;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 10px;
+  color: #888;
+}
+.pc-iframe-wrap {
+  border-radius: 4px 4px 0 0;
+  overflow: hidden;
+  line-height: 0;
+}
+
+/* 모바일 프레임 */
+.mobile-shell {
+  background: #1a1a2e;
+  border-radius: 36px;
+  padding: 12px 8px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.4);
+  position: relative;
+}
+.mobile-shell__notch {
+  width: 100px;
+  height: 24px;
+  background: #0d0d1a;
+  border-radius: 0 0 14px 14px;
+  margin: 0 auto 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.mob-cam { width: 8px; height: 8px; border-radius: 50%; background: #333; }
+.mob-speaker { width: 30px; height: 4px; border-radius: 2px; background: #2a2a3e; }
+.mobile-iframe-wrap {
+  border-radius: 16px;
+  overflow: hidden;
+  line-height: 0;
+}
+.mobile-shell__home {
+  width: 48px; height: 5px;
+  background: #444;
+  border-radius: 3px;
+  margin: 10px auto 0;
+}
+
+/* ── 다크 오버레이 설명 ───────────────────── */
+.info-strip {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto 20px;
+  font-size: 13px;
+  color: var(--fg-2);
+  line-height: 1.6;
+}
+.info-strip strong { color: var(--fg); }
+
+.frame-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  gap: 16px;
+}
+</style>
+</head>
+<body>
+
+<!-- 컨트롤 바 -->
+<div class="ctrl-bar" role="toolbar" aria-label="프로토타입 뷰 전환">
+  <span class="ctrl-bar__brand">급여 워크센터 Prototype</span>
+
+  <div class="seg-group" role="group" aria-label="디바이스 선택">
+    <button class="seg-btn active" data-device="pc" aria-pressed="true">🖥 PC 1280px</button>
+    <button class="seg-btn" data-device="mobile" aria-pressed="false">📱 Mobile 375px</button>
+  </div>
+
+  <div class="ctrl-sep" aria-hidden="true"></div>
+
+  <button class="dark-toggle" id="darkToggle" aria-pressed="false" aria-label="다크모드 전환">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+    다크모드
+  </button>
+
+  <div class="ctrl-spacer"></div>
+  <span class="legend">hr_payroll_workcenter · Phase 3 Group ①</span>
+</div>
+
+<!-- 메인 콘텐츠 -->
+<div class="frame-wrapper">
+  <div class="frame-container">
+
+    <div class="info-strip" role="note" aria-label="프로토타입 안내">
+      <strong>hr_payroll_workcenter</strong> — #41~#53 (13개 화면) 통합 워크센터 프로토타입입니다.
+      상단에서 <strong>PC / Mobile</strong>을 전환하거나 <strong>다크모드</strong>를 토글하세요.
+      PC 뷰에서는 좌측 단계 네비(정산→대장→검증→출력)와 우측 시뮬레이터 패널이 활성화됩니다.
+      Mobile 뷰는 <strong>조회 전용</strong>으로, 내 명세서·현황·내역 3탭을 제공합니다.
+    </div>
+
+    <!-- PC 프레임 -->
+    <div class="device-frame active" id="frame-pc" aria-label="PC 1280px 프레임">
+      <div class="frame-label">Desktop — 1280 × 800</div>
+      <div class="pc-shell">
+        <div class="pc-shell__notch" aria-hidden="true">
+          <div class="pc-dot red"></div>
+          <div class="pc-dot yel"></div>
+          <div class="pc-dot grn"></div>
+          <div class="pc-shell__bar">erp.pchos.kr/hr/payroll</div>
+        </div>
+        <div class="pc-iframe-wrap">
+          <iframe
+            id="pcIframe"
+            src="PC.html"
+            width="1280"
+            height="800"
+            title="급여 워크센터 PC 뷰"
+            aria-label="PC 뷰 프리뷰"
+            style="display:block;border:none;transform-origin:top left;"
+          ></iframe>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile 프레임 -->
+    <div class="device-frame" id="frame-mobile" aria-label="Mobile 375px 프레임">
+      <div class="frame-label">Mobile — 375 × 812 (조회 전용)</div>
+      <div class="mobile-shell" aria-hidden="false">
+        <div class="mobile-shell__notch" aria-hidden="true">
+          <div class="mob-cam"></div>
+          <div class="mob-speaker"></div>
+          <div class="mob-cam"></div>
+        </div>
+        <div class="mobile-iframe-wrap">
+          <iframe
+            id="mobileIframe"
+            src="Mobile.html"
+            width="375"
+            height="812"
+            title="급여 워크센터 Mobile 뷰"
+            aria-label="모바일 뷰 프리뷰"
+            style="display:block;border:none;"
+          ></iframe>
+        </div>
+        <div class="mobile-shell__home" aria-hidden="true"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── 디바이스 전환 ──────────────────────────
+const segBtns   = document.querySelectorAll('.seg-btn');
+const framePC   = document.getElementById('frame-pc');
+const frameMob  = document.getElementById('frame-mobile');
+
+segBtns.forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    segBtns.forEach(function(b) { b.classList.remove('active'); b.setAttribute('aria-pressed','false'); });
+    this.classList.add('active');
+    this.setAttribute('aria-pressed','true');
+
+    const device = this.getAttribute('data-device');
+    if (device === 'pc') {
+      framePC.classList.add('active');
+      frameMob.classList.remove('active');
+    } else {
+      frameMob.classList.add('active');
+      framePC.classList.remove('active');
+    }
+  });
+});
+
+// ── 다크모드 (wrapper + iframe 연동) ────────
+const darkToggle = document.getElementById('darkToggle');
+let isDark = false;
+
+darkToggle.addEventListener('click', function() {
+  isDark = !isDark;
+  this.setAttribute('aria-pressed', String(isDark));
+
+  // wrapper 자체 다크
+  document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+
+  // iframe 내부 다크
+  ['pcIframe','mobileIframe'].forEach(function(id) {
+    const frame = document.getElementById(id);
+    if (!frame || !frame.contentDocument) { return; }
+    frame.contentDocument.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  });
+});
+
+// ── PC iframe 스케일 (화면 폭에 맞게) ───────
+function scalePcIframe() {
+  const iframe = document.getElementById('pcIframe');
+  const wrap   = iframe.parentElement;
+  const avail  = Math.min(window.innerWidth - 80, 1280);
+  const scale  = avail / 1280;
+  iframe.style.transform = 'scale(' + scale + ')';
+  wrap.style.width  = Math.round(1280 * scale) + 'px';
+  wrap.style.height = Math.round(800  * scale) + 'px';
+}
+scalePcIframe();
+window.addEventListener('resize', scalePcIframe);
+
+// ── 키보드: 세그먼트 Arrow 지원 ──────────────
+const segGroup = document.querySelector('.seg-group');
+segGroup.addEventListener('keydown', function(e) {
+  const tabs = Array.from(document.querySelectorAll('.seg-btn'));
+  const idx  = tabs.indexOf(document.activeElement);
+  if (idx === -1) { return; }
+  if (e.key === 'ArrowRight') { tabs[(idx+1) % tabs.length].focus(); e.preventDefault(); }
+  if (e.key === 'ArrowLeft')  { tabs[(idx-1+tabs.length) % tabs.length].focus(); e.preventDefault(); }
+  if (e.key === 'Enter' || e.key === ' ') { document.activeElement.click(); e.preventDefault(); }
+});
+</script>
+</body>
+</html>

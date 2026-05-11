@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { isNamedSystemMasterAccount } from '@/lib/system-master';
+import { recalculateLeaveBalance } from '@/lib/annual-leave-balance';
 
 type ManualGrantUpdate = {
   staffId: string;
@@ -117,6 +118,11 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
       actualUpdated += 1;
+
+      // leave_balances 정합성 갱신 (JM3: 실패해도 메인 응답 차단 안 함)
+      recalculateLeaveBalance(update.staffId, undefined, supabase).catch((balanceErr) => {
+        console.error('[manual-grant] recalculateLeaveBalance 실패:', balanceErr, update.staffId);
+      });
     }
 
     return NextResponse.json({

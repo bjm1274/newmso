@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { isActiveStaff } from '@/lib/active-staff';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import { buildShiftLookup, resolveAssignedShift } from '@/lib/shift-resolution';
+import { getStaffShiftsBatch, type StaffShiftEntry } from '@/lib/staff-shift-resolver';
 
 type WorkShiftRow = {
   id?: string | null;
@@ -206,6 +207,8 @@ function WorkStatus({ user }: { user?: any }) {
   const [staffs, setStaffs] = useState<StaffRow[]>([]);
   const [assignments, setAssignments] = useState<ShiftAssignmentRow[]>([]);
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRow[]>([]);
+  // staff_shift_assignments 배치 조회 결과 (직원 ID → 근무유형 목록)
+  const [staffShiftMap, setStaffShiftMap] = useState<Map<string, StaffShiftEntry[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [departmentFilter, setDepartmentFilter] = useState('전체');
@@ -214,6 +217,8 @@ function WorkStatus({ user }: { user?: any }) {
   const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null);
 
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastRefreshAtRef = useRef<number>(0);
+  const isRealtimeActiveRef = useRef<boolean>(false);
 
   const today = useMemo(() => new Date(), []);
   const todayKey = useMemo(() => toDateKey(today), [today]);
@@ -272,11 +277,24 @@ function WorkStatus({ user }: { user?: any }) {
             ? (shiftRes.value.data as WorkShiftRow[])
             : [],
         );
-        setStaffs(
+        const loadedStaffs =
           staffRes.status === 'fulfilled' && Array.isArray(staffRes.value.data)
             ? (staffRes.value.data as StaffRow[])
-            : [],
-        );
+            : [];
+        setStaffs(loadedStaffs);
+
+        // 직원 목록 확정 후 다중 근무유형 배치 조회 (N+1 방지)
+        if (loadedStaffs.length > 0) {
+          const staffIds = loadedStaffs.map((s) => s.id);
+          getStaffShiftsBatch(staffIds)
+            .then((batchMap) => {
+              if (!cancelled) setStaffShiftMap(batchMap);
+            })
+            .catch(() => {
+              // 테이블 미존재 시 기존 shift_id 폴백으로 계속 동작
+            });
+        }
+
         setAssignments(
           assignmentRes.status === 'fulfilled' && Array.isArray(assignmentRes.value.data)
             ? (assignmentRes.value.data as ShiftAssignmentRow[])
@@ -328,32 +346,49 @@ function WorkStatus({ user }: { user?: any }) {
 
   useEffect(() => {
     const scheduleRefresh = () => {
+      // JM2: 30초 throttle — 직전 fetch로부터 30초 미만이면 skip
+      const now = Date.now();
+      if (now - lastRefreshAtRef.current < 30_000) return;
+      lastRefreshAtRef.current = now;
+
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
       refreshTimerRef.current = setTimeout(() => setRefreshNonce((current) => current + 1), 250);
     };
 
+    isRealtimeActiveRef.current = true;
     const channel = supabase
       .channel(`work-status-live-${user?.id || 'guest'}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'attendances' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_assignments' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_shift_assignments' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_members' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'work_shifts' }, scheduleRefresh)
       .subscribe();
 
+    // JM2: realtime 활성 시 focus/visibilitychange는 noop (realtime이 이미 커버)
+    //       hidden 상태에서도 fetch skip
     const handleVisible = () => {
-      if (document.visibilityState === 'visible') scheduleRefresh();
+      if (isRealtimeActiveRef.current) return;
+      if (document.visibilityState !== 'visible') return;
+      scheduleRefresh();
+    };
+    const handleFocus = () => {
+      if (isRealtimeActiveRef.current) return;
+      if (document.hidden) return;
+      scheduleRefresh();
     };
 
-    window.addEventListener('focus', scheduleRefresh);
+    window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleVisible);
 
     return () => {
+      isRealtimeActiveRef.current = false;
       if (refreshTimerRef.current) {
         clearTimeout(refreshTimerRef.current);
         refreshTimerRef.current = null;
       }
-      window.removeEventListener('focus', scheduleRefresh);
+      window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisible);
       void supabase.removeChannel(channel);
     };
@@ -408,6 +443,20 @@ function WorkStatus({ user }: { user?: any }) {
   const shiftLookup = useMemo(() => buildShiftLookup(workShifts), [workShifts]);
   const staffMap = useMemo(() => new Map(filteredStaffs.map((staff) => [staff.id, staff])), [filteredStaffs]);
 
+  /** 직원이 보유한 추가 근무유형 chip 목록 (주근무유형 제외 나머지) */
+  const getExtraShiftChips = (staffId: string): Array<{ shiftId: string; name: string; isPrimary: boolean }> => {
+    const entries = staffShiftMap.get(staffId);
+    if (!entries || entries.length === 0) return [];
+    return entries.map((entry) => {
+      const shift = workShifts.find((ws) => ws.id === entry.shiftId);
+      return {
+        shiftId: entry.shiftId,
+        name: shift?.name ?? entry.shiftId,
+        isPrimary: entry.isPrimary,
+      };
+    });
+  };
+
   const resolveAssignmentDisplay = (
     assignment: ShiftAssignmentRow | undefined,
     fallbackShiftId?: string | null,
@@ -452,16 +501,23 @@ function WorkStatus({ user }: { user?: any }) {
       if (!staff) return;
 
       const assignment = assignmentMap.get(record.staff_id);
-      const display = resolveAssignmentDisplay(assignment, staff.shift_id);
+      // 폴백: staff_shift_assignments is_primary → staff_members.shift_id
+      const primaryEntry = staffShiftMap.get(staff.id)?.find((e) => e.isPrimary);
+      const fallbackShiftId = primaryEntry?.shiftId ?? staff.shift_id;
+      const display = resolveAssignmentDisplay(assignment, fallbackShiftId);
       if (!grouped.has(display.shiftId)) grouped.set(display.shiftId, []);
       grouped.get(display.shiftId)?.push({ staff, attendance: record });
     });
 
     return Array.from(grouped.entries())
       .map(([shiftId, items]) => {
+        const firstStaff = items[0]?.staff;
+        const primaryEntryForFirst = firstStaff
+          ? (staffShiftMap.get(firstStaff.id)?.find((e) => e.isPrimary)?.shiftId ?? firstStaff.shift_id)
+          : undefined;
         const display = resolveAssignmentDisplay(
           assignmentMap.get(items[0]?.staff.id),
-          items[0]?.staff.shift_id,
+          primaryEntryForFirst,
         );
         const shift = { name: display.shiftName };
         return {
@@ -480,11 +536,17 @@ function WorkStatus({ user }: { user?: any }) {
         }
         return right.items.length - left.items.length;
       });
-  }, [assignments, shiftLookup, staffMap, todayAttendance, todayKey]);
+  }, [assignments, shiftLookup, staffMap, staffShiftMap, todayAttendance, todayKey]);
 
   const assignmentCountsByDate = useMemo(() => {
     const counts = new Map<string, DayShiftCounts>();
-    const staffShiftById = new Map(filteredStaffs.map((staff) => [staff.id, staff.shift_id]));
+    // 폴백 우선순위: staff_shift_assignments(is_primary) → staff_members.shift_id
+    const staffPrimaryShiftById = new Map(
+      filteredStaffs.map((staff) => {
+        const primary = staffShiftMap.get(staff.id)?.find((e) => e.isPrimary);
+        return [staff.id, primary?.shiftId ?? staff.shift_id ?? null];
+      }),
+    );
 
     assignments.forEach((assignment) => {
       const key = assignment.work_date;
@@ -493,13 +555,13 @@ function WorkStatus({ user }: { user?: any }) {
       const current = counts.get(key)!;
       current.total += 1;
 
-      const band = resolveAssignmentDisplay(assignment, staffShiftById.get(assignment.staff_id)).band;
+      const band = resolveAssignmentDisplay(assignment, staffPrimaryShiftById.get(assignment.staff_id)).band;
       if (band === 'D' || band === 'E' || band === 'N') current[band] += 1;
       else current.OTHER += 1;
     });
 
     return counts;
-  }, [assignments, filteredStaffs, shiftLookup]);
+  }, [assignments, filteredStaffs, shiftLookup, staffShiftMap]);
 
   const staffNamesByDate = useMemo(() => {
     const grouped = new Map<string, string[]>();
@@ -537,7 +599,10 @@ function WorkStatus({ user }: { user?: any }) {
       selectedAssignments.forEach((assignment) => {
         const staff = staffMap.get(assignment.staff_id);
         if (!staff) return;
-        const display = resolveAssignmentDisplay(assignment, staff.shift_id);
+        // 폴백: staff_shift_assignments is_primary → staff_members.shift_id
+        const primaryEntry = staffShiftMap.get(staff.id)?.find((e) => e.isPrimary);
+        const fallbackShiftId = primaryEntry?.shiftId ?? staff.shift_id;
+        const display = resolveAssignmentDisplay(assignment, fallbackShiftId);
         if (!grouped.has(display.shiftId)) {
           grouped.set(display.shiftId, { staffs: [], display });
         }
@@ -603,7 +668,7 @@ function WorkStatus({ user }: { user?: any }) {
       counts: visibleCounts,
       activeStaffCount: activeStaffIds.size,
     };
-  }, [assignmentCountsByDate, assignments, selectedDateKey, shiftLookup, showActiveOnly, staffMap, todayAttendance, todayKey]);
+  }, [assignmentCountsByDate, assignments, selectedDateKey, shiftLookup, showActiveOnly, staffMap, staffShiftMap, todayAttendance, todayKey]);
 
   return (
     <div className="space-y-5" data-testid="work-status-view">
@@ -730,17 +795,39 @@ function WorkStatus({ user }: { user?: any }) {
                   </span>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {group.items.map(({ staff, attendance }) => (
-                    <div
-                      key={staff.id}
-                      className="rounded-[var(--radius-lg)] border border-white/80 bg-[var(--card)]/90 px-3 py-2 shadow-sm"
-                    >
-                      <p className="text-[12px] font-bold text-[var(--foreground)]">{staff.name || '이름 없음'}</p>
-                      <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
-                        {[staff.position, staff.department].filter(Boolean).join(' · ') || '근무중'} · 출근 {formatClockLabel(attendance.check_in || attendance.check_in_time) || '--:--'}
-                      </p>
-                    </div>
-                  ))}
+                  {group.items.map(({ staff, attendance }) => {
+                    const extraChips = getExtraShiftChips(staff.id);
+                    return (
+                      <div
+                        key={staff.id}
+                        className="rounded-[var(--radius-lg)] border border-white/80 bg-[var(--card)]/90 px-3 py-2 shadow-sm"
+                      >
+                        <p className="text-[12px] font-bold text-[var(--foreground)]">{staff.name || '이름 없음'}</p>
+                        <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                          {[staff.position, staff.department].filter(Boolean).join(' · ') || '근무중'} · 출근 {formatClockLabel(attendance.check_in || attendance.check_in_time) || '--:--'}
+                        </p>
+                        {extraChips.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-1" role="list" aria-label="담당 근무유형">
+                            {extraChips.map((chip) => (
+                              <span
+                                key={chip.shiftId}
+                                role="listitem"
+                                tabIndex={0}
+                                aria-label={`${chip.isPrimary ? '주근무' : '부근무'}: ${chip.name}`}
+                                className={`rounded-[var(--radius-md)] border px-1.5 py-0.5 text-[10px] font-bold outline-none focus:ring-1 focus:ring-[var(--accent)] ${
+                                  chip.isPrimary
+                                    ? 'border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)]'
+                                    : 'border-[var(--border)] bg-[var(--muted)] text-[var(--toss-gray-3)]'
+                                }`}
+                              >
+                                {chip.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))
@@ -903,6 +990,7 @@ function WorkStatus({ user }: { user?: any }) {
                       <div className="mt-4 flex flex-wrap gap-2">
                         {row.staffs.map((staff) => {
                           const isActiveNow = selectedDateKey === todayKey && row.activeStaffIds.has(staff.id);
+                          const extraChips = getExtraShiftChips(staff.id);
                           return (
                             <div
                               key={staff.id}
@@ -923,6 +1011,25 @@ function WorkStatus({ user }: { user?: any }) {
                               <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
                                 {[staff.department, staff.position].filter(Boolean).join(' · ') || '근무 정보'}
                               </p>
+                              {extraChips.length > 0 && (
+                                <div className="mt-1.5 flex flex-wrap gap-1" role="list" aria-label="담당 근무유형">
+                                  {extraChips.map((chip) => (
+                                    <span
+                                      key={chip.shiftId}
+                                      role="listitem"
+                                      tabIndex={0}
+                                      aria-label={`${chip.isPrimary ? '주근무' : '부근무'}: ${chip.name}`}
+                                      className={`rounded-[var(--radius-md)] border px-1.5 py-0.5 text-[10px] font-bold outline-none focus:ring-1 focus:ring-[var(--accent)] ${
+                                        chip.isPrimary
+                                          ? 'border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)]'
+                                          : 'border-[var(--border)] bg-[var(--muted)] text-[var(--toss-gray-3)]'
+                                      }`}
+                                    >
+                                      {chip.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           );
                         })}

@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>OP체크 실시간 보드 — PC (1280px)</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net/npm/pretendard@latest/dist/web/static/">
+<style>
+@import url('https://cdn.jsdelivr.net/npm/pretendard@latest/dist/web/static/pretendard.css');
+
+/* ── CSS 토큰 (globals.css 미러) ── */
+:root {
+  --background:#FFFFFF;--foreground:#09090B;--page-bg:#F8F8F9;
+  --tab-bg:#F1F1F3;--accent:#2563EB;--accent-light:#EFF6FF;
+  --accent-hover:#1D4ED8;--muted:#F1F1F3;--muted-foreground:#71717A;
+  --border:#E9E9EC;--card:#FFFFFF;
+  --danger:#EF4444;--danger-light:#FEF2F2;
+  --success:#10B981;--success-light:#F0FDF4;
+  --warning:#F59E0B;--warning-light:#FFFBEB;
+  --radius-md:8px;--radius-lg:12px;--radius-xl:16px;
+  --shadow-sm:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:0 4px 8px rgba(0,0,0,.06),0 2px 4px rgba(0,0,0,.04);
+  --shadow-dropdown:0 4px 6px -1px rgba(0,0,0,.07),0 10px 24px -4px rgba(0,0,0,.08),0 0 0 1px rgba(0,0,0,.04);
+  --sidebar-width:72px;--submenu-width:192px;
+  --transition-base:150ms ease;
+}
+.dark {
+  --background:#09090B;--foreground:#FAFAFA;--page-bg:#111113;
+  --tab-bg:#1C1C1F;--card:#18181B;--muted:#27272A;
+  --muted-foreground:#A1A1AA;--border:#27272A;
+  --accent-light:rgba(37,99,235,.15);--danger-light:rgba(239,68,68,.12);
+  --success-light:rgba(16,185,129,.12);--warning-light:rgba(245,158,11,.12);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Pretendard',system-ui,sans-serif;background:var(--page-bg);color:var(--foreground);font-size:14px;line-height:1.5;min-height:100vh;display:flex}
+
+/* ── 레이아웃 ── */
+.sidebar{width:var(--sidebar-width);background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:4px;position:fixed;top:0;left:0;height:100vh;z-index:100}
+.sidebar-logo{width:36px;height:36px;background:var(--accent);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;margin-bottom:8px}
+.sidebar-icon{width:44px;height:44px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background var(--transition-base);color:var(--muted-foreground)}
+.sidebar-icon:hover{background:var(--muted)}
+.sidebar-icon.active{background:var(--accent-light);color:var(--accent)}
+.sidebar-icon svg{width:20px;height:20px}
+
+.main-wrap{margin-left:var(--sidebar-width);flex:1;display:flex;flex-direction:column;min-height:100vh}
+.topbar{height:56px;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px;position:sticky;top:0;z-index:50}
+.topbar-title{font-size:16px;font-weight:700;color:var(--foreground)}
+.topbar-badge{background:var(--accent-light);color:var(--accent);font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px}
+.topbar-spacer{flex:1}
+.topbar-btn{height:36px;padding:0 14px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--card);color:var(--foreground);font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background var(--transition-base)}
+.topbar-btn:hover{background:var(--muted)}
+.topbar-btn svg{width:15px;height:15px}
+
+.content-area{flex:1;display:flex;overflow:hidden}
+.board-wrap{flex:1;padding:20px;overflow-y:auto}
+
+/* ── 필터 바 ── */
+.filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.filter-btn{height:32px;padding:0 12px;border-radius:20px;border:1px solid var(--border);background:var(--card);color:var(--muted-foreground);font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all var(--transition-base)}
+.filter-btn:hover{background:var(--muted)}
+.filter-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.filter-btn svg{width:13px;height:13px}
+.filter-count{background:rgba(255,255,255,.25);border-radius:10px;padding:0 5px;font-size:11px;font-weight:700}
+.filter-btn:not(.active) .filter-count{background:var(--muted);color:var(--foreground);border-radius:10px;padding:0 5px;font-size:11px;font-weight:700}
+
+/* ── 카드 그리드 ── */
+.card-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:1100px){.card-grid{grid-template-columns:repeat(3,1fr)}}
+
+/* ── 환자 카드 ── */
+.patient-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:14px;cursor:pointer;transition:all var(--transition-base);position:relative;outline:none}
+.patient-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.patient-card:focus-visible{box-shadow:0 0 0 3px rgba(37,99,235,.35);border-color:var(--accent)}
+.patient-card.selected{border-color:var(--accent);box-shadow:0 0 0 2px rgba(37,99,235,.2)}
+
+/* 상태별 카드 좌측 인디케이터 */
+.patient-card::before{content:'';position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:0 2px 2px 0;background:var(--border)}
+.patient-card[data-status="waiting"]::before{background:var(--muted-foreground)}
+.patient-card[data-status="ready"]::before{background:var(--accent)}
+.patient-card[data-status="operating"]::before{background:var(--warning)}
+.patient-card[data-status="done"]::before{background:var(--success)}
+
+.card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
+.card-name{font-size:15px;font-weight:700;color:var(--foreground)}
+.card-room{font-size:12px;color:var(--muted-foreground);margin-top:1px}
+.status-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;flex-shrink:0}
+.status-badge svg{width:11px;height:11px}
+
+.status-waiting .status-badge{background:var(--muted);color:var(--muted-foreground)}
+.status-ready .status-badge{background:var(--accent-light);color:var(--accent)}
+.status-operating .status-badge{background:var(--warning-light);color:#92400E}
+.status-done .status-badge{background:var(--success-light);color:#065F46}
+
+.card-meta{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted-foreground)}
+.card-meta-row{display:flex;align-items:center;gap:5px}
+.card-meta-row svg{width:13px;height:13px;flex-shrink:0;color:var(--muted-foreground)}
+.card-meta-label{color:var(--muted-foreground);min-width:44px}
+.card-meta-value{color:var(--foreground);font-weight:500}
+
+.card-footer{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-checklist-summary{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted-foreground)}
+.checklist-bar{width:60px;height:4px;background:var(--muted);border-radius:2px;overflow:hidden}
+.checklist-bar-fill{height:100%;border-radius:2px;background:var(--accent);transition:width .3s ease}
+.card-time-elapsed{font-size:11px;color:var(--muted-foreground);display:flex;align-items:center;gap:4px}
+.card-time-elapsed svg{width:12px;height:12px}
+.time-warn{color:var(--warning)}
+.time-danger{color:var(--danger)}
+
+/* 섹션 구분 */
+.board-section{margin-bottom:20px}
+.section-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.section-title{font-size:13px;font-weight:700;color:var(--muted-foreground);text-transform:uppercase;letter-spacing:.04em}
+.section-count{background:var(--muted);color:var(--muted-foreground);font-size:11px;font-weight:700;padding:1px 7px;border-radius:10px}
+
+/* ── 우측 사이드 패널 ── */
+.side-panel{width:360px;background:var(--card);border-left:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto;flex-shrink:0;transition:width var(--transition-base)}
+.side-panel.collapsed{width:0;overflow:hidden;border-left:none}
+.panel-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--card);z-index:10}
+.panel-title{font-size:15px;font-weight:700}
+.panel-close-btn{width:32px;height:32px;border-radius:var(--radius-md);border:none;background:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--foreground);transition:background var(--transition-base)}
+.panel-close-btn:hover{background:var(--border)}
+.panel-close-btn svg{width:16px;height:16px}
+
+.panel-body{padding:16px 20px;flex:1;overflow-y:auto}
+.panel-section{margin-bottom:20px}
+.panel-section-title{font-size:11px;font-weight:700;color:var(--muted-foreground);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+
+.info-grid{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:13px}
+.info-label{color:var(--muted-foreground);white-space:nowrap}
+.info-value{color:var(--foreground);font-weight:500}
+
+/* 체크리스트 */
+.checklist-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.checklist-item:last-child{border-bottom:none}
+.checklist-checkbox{width:20px;height:20px;border-radius:var(--radius-sm);border:2px solid var(--border);background:var(--card);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all var(--transition-base)}
+.checklist-checkbox.checked{border-color:var(--success);background:var(--success)}
+.checklist-checkbox svg{width:12px;height:12px;color:#fff}
+.checklist-label{flex:1;color:var(--foreground)}
+.checklist-label.done{text-decoration:line-through;color:var(--muted-foreground)}
+
+/* 액션 버튼 */
+.action-area{padding:16px 20px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;position:sticky;bottom:0;background:var(--card)}
+.action-btn{height:44px;border-radius:var(--radius-md);border:none;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all var(--transition-base)}
+.action-btn svg{width:16px;height:16px}
+.action-btn-primary{background:var(--accent);color:#fff}
+.action-btn-primary:hover{background:var(--accent-hover)}
+.action-btn-secondary{background:var(--muted);color:var(--foreground)}
+.action-btn-secondary:hover{background:var(--border)}
+.action-btn-success{background:var(--success);color:#fff}
+.action-btn-success:hover{background:#059669}
+.action-btn-warning{background:var(--warning);color:#fff}
+.action-btn-warning:hover{background:#D97706}
+
+/* 빈 상태 */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center;color:var(--muted-foreground)}
+.empty-icon{width:48px;height:48px;margin-bottom:12px;opacity:.4}
+.empty-text{font-size:14px;margin-bottom:4px}
+.empty-sub{font-size:12px;opacity:.7}
+
+/* 패널 미선택 상태 */
+.panel-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:40px 20px;text-align:center;color:var(--muted-foreground)}
+.panel-empty svg{width:40px;height:40px;margin-bottom:12px;opacity:.3}
+
+/* 스크롤바 */
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+
+<!-- 사이드바 -->
+<nav class="sidebar" aria-label="메인 내비게이션">
+  <div class="sidebar-logo" aria-label="MSO ERP">M</div>
+  <button class="sidebar-icon active" aria-label="OP체크" aria-current="page" title="OP체크">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/>
+    </svg>
+  </button>
+  <button class="sidebar-icon" aria-label="스케줄" title="수술 스케줄">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+    </svg>
+  </button>
+  <button class="sidebar-icon" aria-label="환자 목록" title="환자 목록">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </svg>
+  </button>
+</nav>
+
+<div class="main-wrap">
+  <!-- 탑바 -->
+  <header class="topbar">
+    <h1 class="topbar-title">OP체크 실시간 보드</h1>
+    <span class="topbar-badge" aria-live="polite">오늘 12건</span>
+    <div class="topbar-spacer"></div>
+    <button class="topbar-btn" aria-label="보기 설정">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      보기 설정
+    </button>
+    <button class="topbar-btn" aria-label="새로고침" id="refreshBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      새로고침
+    </button>
+  </header>
+
+  <div class="content-area">
+    <!-- 보드 영역 -->
+    <main class="board-wrap" id="boardWrap">
+
+      <!-- 필터 바 -->
+      <div class="filter-bar" role="group" aria-label="상태 필터">
+        <button class="filter-btn active" data-filter="all" aria-pressed="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/></svg>
+          전체 <span class="filter-count">12</span>
+        </button>
+        <button class="filter-btn" data-filter="waiting" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          대기 <span class="filter-count">4</span>
+        </button>
+        <button class="filter-btn" data-filter="ready" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          준비완료 <span class="filter-count">3</span>
+        </button>
+        <button class="filter-btn" data-filter="operating" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          수술중 <span class="filter-count">3</span>
+        </button>
+        <button class="filter-btn" data-filter="done" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+          완료 <span class="filter-count">2</span>
+        </button>
+      </div>
+
+      <!-- 대기 섹션 -->
+      <section class="board-section" id="section-waiting">
+        <div class="section-header">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#71717A" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <h2 class="section-title">대기</h2>
+          <span class="section-count">4</span>
+        </div>
+        <div class="card-grid">
+
+          <article class="patient-card status-waiting" data-id="p1" data-status="waiting" tabindex="0" role="button" aria-label="환자A — 대기 상태. 수술실 1호, 9시 예약">
+            <div class="card-header">
+              <div>
+                <div class="card-name">환자A</div>
+                <div class="card-room">수술실 1호</div>
+              </div>
+              <span class="status-badge" aria-label="대기">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                대기
+              </span>
+            </div>
+            <div class="card-meta">
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span class="card-meta-label">담당의</span>
+                <span class="card-meta-value">김철수 원장</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                <span class="card-meta-label">수술명</span>
+                <span class="card-meta-value">백내장 제거</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span class="card-meta-label">예약시간</span>
+                <span class="card-meta-value">09:00</span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <div class="card-checklist-summary">
+                <div class="checklist-bar" role="progressbar" aria-valuenow="33" aria-valuemin="0" aria-valuemax="100" aria-label="체크리스트 33% 완료">
+                  <div class="checklist-bar-fill" style="width:33%"></div>
+                </div>
+                <span>1/3 완료</span>
+              </div>
+              <span class="card-time-elapsed">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                대기 24분
+              </span>
+            </div>
+          </article>
+
+          <article class="patient-card status-waiting" data-id="p2" data-status="waiting" tabindex="0" role="button" aria-label="환자B — 대기 상태. 수술실 2호, 9시30분 예약">
+            <div class="card-header">
+              <div>
+                <div class="card-name">환자B</div>
+                <div class="card-room">수술실 2호</div>
+              </div>
+              <span class="status-badge" aria-label="대기">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                대기
+              </span>
+            </div>
+            <div class="card-meta">
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span class="card-meta-label">담당의</span>
+                <span class="card-meta-value">이영희 원장</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                <span class="card-meta-label">수술명</span>
+                <span class="card-meta-value">망막 검사</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span class="card-meta-label">예약시간</span>
+                <span class="card-meta-value">09:30</span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <div class="card-checklist-summary">
+                <div class="checklist-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="체크리스트 0% 완료">
+                  <div class="checklist-bar-fill" style="width:0%"></div>
+                </div>
+                <span>0/3 완료</span>
+              </div>
+              <span class="card-time-elapsed">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                대기 8분
+              </span>
+            </div>
+          </article>
+
+          <article class="patient-card status-waiting" data-id="p3" data-status="waiting" tabindex="0" role="button" aria-label="환자C — 대기 상태">
+            <div class="card-header">
+              <div>
+                <div class="card-name">환자C</div>
+                <div class="card-room">수술실 1호</div>
+              </div>
+              <span class="status-badge" aria-label="대기">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                대기
+              </span>
+            </div>
+            <div class="card-meta">
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span class="card-meta-label">담당의</span>
+                <span class="card-meta-value">박민준 원장</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                <span class="card-meta-label">수술명</span>
+                <span class="card-meta-value">녹내장 수술</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span class="card-meta-label">예약시간</span>
+                <span class="card-meta-value">10:00</span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <div class="card-checklist-summary">
+                <div class="checklist-bar" role="progressbar" aria-valuenow="66" aria-valuemin="0" aria-valuemax="100" aria-label="체크리스트 66% 완료">
+                  <div class="checklist-bar-fill" style="width:66%"></div>
+                </div>
+                <span>2/3 완료</span>
+              </div>
+              <span class="card-time-elapsed time-warn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                대기 45분
+              </span>
+            </div>
+          </article>
+
+          <article class="patient-card status-waiting" data-id="p4" data-status="waiting" tabindex="0" role="button" aria-label="환자D — 대기 상태">
+            <div class="card-header">
+              <div>
+                <div class="card-name">환자D</div>
+                <div class="card-room">수술실 3호</div>
+              </div>
+              <span class="status-badge" aria-label="대기">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                대기
+              </span>
+            </div>
+            <div class="card-meta">
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span class="card-meta-label">담당의</span>
+                <span class="card-meta-value">김철수 원장</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                <span class="card-meta-label">수술명</span>
+                <span class="card-meta-value">레이저 교정</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span class="card-meta-label">예약시간</span>
+                <span class="card-meta-value">10:30</span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <div class="card-checklist-summary">
+                <div class="checklist-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="체크리스트 0% 완료">
+                  <div class="checklist-bar-fill" style="width:0%"></div>
+                </div>
+                <span>0/3 완료</span>
+              </div>
+              <span class="card-time-elapsed">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                예약 전
+              </span>
+            </div>
+          </article>
+
+        </div>
+      </section>
+
+      <!-- 준비완료 섹션 -->
+      <section class="board-section" id="section-ready">
+        <div class="section-header">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <h2 class="section-title" style="color:var(--accent)">준비완료</h2>
+          <span class="section-count" style="background:var(--accent-light);color:var(--accent)">3</span>
+        </div>
+        <div class="card-grid">
+          <article class="patient-card status-ready" data-id="p5" data-status="ready" tabindex="0" role="button" aria-label="환자E — 준비완료 상태">
+            <div class="card-header">
+              <div>
+                <div class="card-name">환자E</div>
+                <div class="card-room">수술실 2호</div>
+              </div>
+              <span class="status-badge" aria-label="준비완료">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                준비완료
+              </span>
+            </div>
+            <div class="card-meta">
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span class="card-meta-label">담당의</span>
+                <span class="card-meta-value">이영희 원장</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                <span class="card-meta-label">수술명</span>
+                <span class="card-meta-value">각막 이식</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span class="card-meta-label">예약시간</span>
+                <span class="card-meta-value">11:00</span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <div class="card-checklist-summary">
+                <div class="checklist-bar" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" aria-label="체크리스트 완료">
+                  <div class="checklist-bar-fill" style="width:100%;background:var(--success)"></div>
+                </div>
+                <span>3/3 완료</span>
+              </div>
+              <span class="card-time-elapsed">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                준비 5분
+              </span>
+            </div>
+          </article>
+          <article class="patient-card status-ready" data-id="p6" data-status="ready" tabindex="0" role="button" aria-label="환자F — 준비완료 상태">
+            <div class="card-header">
+              <div>
+                <div class="card-name">환자F</div>
+                <div class="card-room">수술실 3호</div>
+              </div>
+              <span class="status-badge" aria-label="준비완료">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                준비완료
+              </span>
+            </div>
+            <div class="card-meta">
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span class="card-meta-label">담당의</span>
+                <span class="card-meta-value">박민준 원장</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                <span class="card-meta-label">수술명</span>
+                <span class="card-meta-value">비문증 수술</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span class="card-meta-label">예약시간</span>
+                <span class="card-meta-value">11:30</span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <div class="card-checklist-summary">
+                <div class="checklist-bar" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" aria-label="체크리스트 완료">
+                  <div class="checklist-bar-fill" style="width:100%;background:var(--success)"></div>
+                </div>
+                <span>3/3 완료</span>
+              </div>
+              <span class="card-time-elapsed">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                준비 12분
+              </span>
+            </div>
+          </article>
+          <article class="patient-card status-ready" data-id="p7" data-status="ready" tabindex="0" role="button" aria-label="환자G — 준비완료 상태">
+            <div class="card-header">
+              <div>
+                <div class="card-name">환자G</div>
+                <div class="card-room">수술실 1호</div>
+              </div>
+              <span class="status-badge" aria-label="준비완료">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                준비완료
+              </span>
+            </div>
+            <div class="card-meta">
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span class="card-meta-label">담당의</span>
+                <span class="card-meta-value">김철수 원장</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                <span class="card-meta-label">수술명</span>
+                <span class="card-meta-value">황반 수술</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span class="card-meta-label">예약시간</span>
+                <span class="card-meta-value">12:00</span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <div class="card-checklist-summary">
+                <div class="checklist-bar" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" aria-label="체크리스트 완료">
+                  <div class="checklist-bar-fill" style="width:100%;background:var(--success)"></div>
+                </div>
+                <span>3/3 완료</span>
+              </div>
+              <span class="card-time-elapsed time-warn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                준비 28분 (지연)
+              </span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- 수술중 섹션 -->
+      <section class="board-section" id="section-operating">
+        <div class="section-header">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <h2 class="section-title" style="color:#92400E">수술중</h2>
+          <span class="section-count" style="background:var(--warning-light);color:#92400E">3</span>
+        </div>
+        <div class="card-grid">
+          <article class="patient-card status-operating" data-id="p8" data-status="operating" tabindex="0" role="button" aria-label="환자H — 수술중 상태">
+            <div class="card-header">
+              <div>
+                <div class="card-name">환자H</div>
+                <div class="card-room">수술실 2호</div>
+              </div>
+              <span class="status-badge" aria-label="수술중">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                수술중
+              </span>
+            </div>
+            <div class="card-meta">
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span class="card-meta-label">담당의</span>
+                <span class="card-meta-value">이영희 원장</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                <span class="card-meta-label">수술명</span>
+                <span class="card-meta-value">렌즈 삽입술</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span class="card-meta-label">시작시간</span>
+                <span class="card-meta-value">08:45</span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <div class="card-checklist-summary">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <span style="color:#92400E;font-weight:600">진행 중</span>
+              </div>
+              <span class="card-time-elapsed">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                경과 45분
+              </span>
+            </div>
+          </article>
+          <article class="patient-card status-operating" data-id="p9" data-status="operating" tabindex="0" role="button" aria-label="환자I — 수술중 상태">
+            <div class="card-header">
+              <div>
+                <div class="card-name">환자I</div>
+                <div class="card-room">수술실 3호</div>
+              </div>
+              <span class="status-badge" aria-label="수술중">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                수술중
+              </span>
+            </div>
+            <div class="card-meta">
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span class="card-meta-label">담당의</span>
+                <span class="card-meta-value">박민준 원장</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                <span class="card-meta-label">수술명</span>
+                <span class="card-meta-value">망막 수술</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span class="card-meta-label">시작시간</span>
+                <span class="card-meta-value">09:10</span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <div class="card-checklist-summary">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <span style="color:#92400E;font-weight:600">진행 중</span>
+              </div>
+              <span class="card-time-elapsed time-warn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                경과 78분 (초과)
+              </span>
+            </div>
+          </article>
+          <article class="patient-card status-operating" data-id="p10" data-status="operating" tabindex="0" role="button" aria-label="환자J — 수술중 상태">
+            <div class="card-header">
+              <div>
+                <div class="card-name">환자J</div>
+                <div class="card-room">수술실 1호</div>
+              </div>
+              <span class="status-badge" aria-label="수술중">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                수술중
+              </span>
+            </div>
+            <div class="card-meta">
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span class="card-meta-label">담당의</span>
+                <span class="card-meta-value">김철수 원장</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                <span class="card-meta-label">수술명</span>
+                <span class="card-meta-value">당뇨 망막증</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span class="card-meta-label">시작시간</span>
+                <span class="card-meta-value">09:30</span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <div class="card-checklist-summary">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <span style="color:#92400E;font-weight:600">진행 중</span>
+              </div>
+              <span class="card-time-elapsed">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                경과 32분
+              </span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- 완료 섹션 -->
+      <section class="board-section" id="section-done">
+        <div class="section-header">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+          <h2 class="section-title" style="color:#065F46">완료</h2>
+          <span class="section-count" style="background:var(--success-light);color:#065F46">2</span>
+        </div>
+        <div class="card-grid">
+          <article class="patient-card status-done" data-id="p11" data-status="done" tabindex="0" role="button" aria-label="환자K — 수술완료 상태">
+            <div class="card-header">
+              <div>
+                <div class="card-name">환자K</div>
+                <div class="card-room">수술실 2호</div>
+              </div>
+              <span class="status-badge" aria-label="수술완료">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+                수술완료
+              </span>
+            </div>
+            <div class="card-meta">
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span class="card-meta-label">담당의</span>
+                <span class="card-meta-value">이영희 원장</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                <span class="card-meta-label">수술명</span>
+                <span class="card-meta-value">백내장 제거</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span class="card-meta-label">완료시간</span>
+                <span class="card-meta-value">08:30</span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <div class="card-checklist-summary">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+                <span style="color:#065F46;font-weight:600">완료됨</span>
+              </div>
+              <span class="card-time-elapsed">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                소요 35분
+              </span>
+            </div>
+          </article>
+          <article class="patient-card status-done" data-id="p12" data-status="done" tabindex="0" role="button" aria-label="환자L — 수술완료 상태">
+            <div class="card-header">
+              <div>
+                <div class="card-name">환자L</div>
+                <div class="card-room">수술실 1호</div>
+              </div>
+              <span class="status-badge" aria-label="수술완료">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+                수술완료
+              </span>
+            </div>
+            <div class="card-meta">
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span class="card-meta-label">담당의</span>
+                <span class="card-meta-value">박민준 원장</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                <span class="card-meta-label">수술명</span>
+                <span class="card-meta-value">녹내장 수술</span>
+              </div>
+              <div class="card-meta-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span class="card-meta-label">완료시간</span>
+                <span class="card-meta-value">08:55</span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <div class="card-checklist-summary">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+                <span style="color:#065F46;font-weight:600">완료됨</span>
+              </div>
+              <span class="card-time-elapsed">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                소요 52분
+              </span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- 우측 사이드 패널 -->
+    <aside class="side-panel" id="sidePanel" aria-label="환자 상세 정보" aria-live="polite">
+      <div id="panelContent">
+        <div class="panel-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <p style="font-size:14px;font-weight:600;margin-bottom:4px">환자를 선택하세요</p>
+          <p style="font-size:12px">카드를 클릭하면 상세 정보와<br>상태 전환 버튼이 표시됩니다</p>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const PATIENTS = {
+  p1:{name:'환자A',room:'수술실 1호',doctor:'김철수 원장',op:'백내장 제거',time:'09:00',status:'waiting',checks:[{label:'마취 동의서 확인',done:true},{label:'금식 확인',done:false},{label:'수술 부위 표시',done:false}]},
+  p2:{name:'환자B',room:'수술실 2호',doctor:'이영희 원장',op:'망막 검사',time:'09:30',status:'waiting',checks:[{label:'마취 동의서 확인',done:false},{label:'금식 확인',done:false},{label:'수술 부위 표시',done:false}]},
+  p3:{name:'환자C',room:'수술실 1호',doctor:'박민준 원장',op:'녹내장 수술',time:'10:00',status:'waiting',checks:[{label:'마취 동의서 확인',done:true},{label:'금식 확인',done:true},{label:'수술 부위 표시',done:false}]},
+  p4:{name:'환자D',room:'수술실 3호',doctor:'김철수 원장',op:'레이저 교정',time:'10:30',status:'waiting',checks:[{label:'마취 동의서 확인',done:false},{label:'금식 확인',done:false},{label:'수술 부위 표시',done:false}]},
+  p5:{name:'환자E',room:'수술실 2호',doctor:'이영희 원장',op:'각막 이식',time:'11:00',status:'ready',checks:[{label:'마취 동의서 확인',done:true},{label:'금식 확인',done:true},{label:'수술 부위 표시',done:true}]},
+  p6:{name:'환자F',room:'수술실 3호',doctor:'박민준 원장',op:'비문증 수술',time:'11:30',status:'ready',checks:[{label:'마취 동의서 확인',done:true},{label:'금식 확인',done:true},{label:'수술 부위 표시',done:true}]},
+  p7:{name:'환자G',room:'수술실 1호',doctor:'김철수 원장',op:'황반 수술',time:'12:00',status:'ready',checks:[{label:'마취 동의서 확인',done:true},{label:'금식 확인',done:true},{label:'수술 부위 표시',done:true}]},
+  p8:{name:'환자H',room:'수술실 2호',doctor:'이영희 원장',op:'렌즈 삽입술',time:'08:45',status:'operating',checks:[{label:'마취 동의서 확인',done:true},{label:'금식 확인',done:true},{label:'수술 부위 표시',done:true}]},
+  p9:{name:'환자I',room:'수술실 3호',doctor:'박민준 원장',op:'망막 수술',time:'09:10',status:'operating',checks:[{label:'마취 동의서 확인',done:true},{label:'금식 확인',done:true},{label:'수술 부위 표시',done:true}]},
+  p10:{name:'환자J',room:'수술실 1호',doctor:'김철수 원장',op:'당뇨 망막증',time:'09:30',status:'operating',checks:[{label:'마취 동의서 확인',done:true},{label:'금식 확인',done:true},{label:'수술 부위 표시',done:true}]},
+  p11:{name:'환자K',room:'수술실 2호',doctor:'이영희 원장',op:'백내장 제거',time:'08:30',status:'done',checks:[{label:'마취 동의서 확인',done:true},{label:'금식 확인',done:true},{label:'수술 부위 표시',done:true}]},
+  p12:{name:'환자L',room:'수술실 1호',doctor:'박민준 원장',op:'녹내장 수술',time:'08:55',status:'done',checks:[{label:'마취 동의서 확인',done:true},{label:'금식 확인',done:true},{label:'수술 부위 표시',done:true}]}
+};
+
+const STATUS_NEXT = {waiting:'ready', ready:'operating', operating:'done', done:null};
+const STATUS_LABELS = {waiting:'대기', ready:'준비완료', operating:'수술중', done:'수술완료'};
+const STATUS_NEXT_LABELS = {waiting:'준비완료로 전환', ready:'수술 시작', operating:'수술 완료', done:null};
+
+let selectedId = null;
+
+function selectCard(id) {
+  selectedId = id;
+  document.querySelectorAll('.patient-card').forEach(c => c.classList.remove('selected'));
+  const card = document.querySelector(`[data-id="${id}"]`);
+  if (card) card.classList.add('selected');
+  renderPanel(id);
+}
+
+function renderPanel(id) {
+  const p = PATIENTS[id];
+  if (!p) return;
+  const nextStatus = STATUS_NEXT[p.status];
+  const nextLabel = STATUS_NEXT_LABELS[p.status];
+  const doneCount = p.checks.filter(c => c.done).length;
+  const panel = document.getElementById('panelContent');
+
+  panel.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">${p.name}</div>
+        <div style="font-size:12px;color:var(--muted-foreground);margin-top:2px">${p.room}</div>
+      </div>
+      <button class="panel-close-btn" onclick="closePanel()" aria-label="패널 닫기">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="panel-body">
+      <div class="panel-section">
+        <div class="panel-section-title">기본 정보</div>
+        <div class="info-grid">
+          <span class="info-label">담당의</span><span class="info-value">${p.doctor}</span>
+          <span class="info-label">수술명</span><span class="info-value">${p.op}</span>
+          <span class="info-label">예약시간</span><span class="info-value">${p.time}</span>
+          <span class="info-label">현재 상태</span><span class="info-value">${STATUS_LABELS[p.status]}</span>
+        </div>
+      </div>
+      <div class="panel-section">
+        <div class="panel-section-title">OP 체크리스트 (${doneCount}/${p.checks.length})</div>
+        <div id="checklist-${id}">
+          ${p.checks.map((c,i) => `
+            <div class="checklist-item">
+              <button class="checklist-checkbox ${c.done?'checked':''}" onclick="toggleCheck('${id}',${i})" aria-label="${c.label} ${c.done?'완료':'미완료'}" aria-pressed="${c.done}">
+                ${c.done?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>':''}
+              </button>
+              <span class="checklist-label ${c.done?'done':''}">${c.label}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="action-area">
+      ${nextStatus ? `<button class="action-btn ${nextStatus==='ready'?'action-btn-primary':nextStatus==='operating'?'action-btn-warning':'action-btn-success'}" onclick="advanceStatus('${id}')" aria-label="${nextLabel}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        ${nextLabel}
+      </button>` : '<div style="text-align:center;color:var(--success);font-size:13px;font-weight:600;padding:8px">수술이 완료되었습니다</div>'}
+      <button class="action-btn action-btn-secondary" onclick="closePanel()" aria-label="닫기">닫기</button>
+    </div>
+  `;
+}
+
+function toggleCheck(id, idx) {
+  PATIENTS[id].checks[idx].done = !PATIENTS[id].checks[idx].done;
+  renderPanel(id);
+}
+
+function advanceStatus(id) {
+  const p = PATIENTS[id];
+  const next = STATUS_NEXT[p.status];
+  if (!next) return;
+  p.status = next;
+  const card = document.querySelector(`[data-id="${id}"]`);
+  if (card) {
+    card.dataset.status = next;
+    card.className = `patient-card status-${next} selected`;
+    card.setAttribute('aria-label', `${p.name} — ${STATUS_LABELS[next]} 상태`);
+    const badge = card.querySelector('.status-badge');
+    if (badge) badge.setAttribute('aria-label', STATUS_LABELS[next]);
+    const badgeText = badge ? badge.lastChild : null;
+    if (badgeText) badgeText.textContent = STATUS_LABELS[next];
+  }
+  renderPanel(id);
+}
+
+function closePanel() {
+  selectedId = null;
+  document.querySelectorAll('.patient-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('panelContent').innerHTML = `
+    <div class="panel-empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <p style="font-size:14px;font-weight:600;margin-bottom:4px">환자를 선택하세요</p>
+      <p style="font-size:12px">카드를 클릭하면 상세 정보와<br>상태 전환 버튼이 표시됩니다</p>
+    </div>`;
+}
+
+// 카드 클릭 & 키보드 처리
+document.querySelectorAll('.patient-card').forEach(card => {
+  card.addEventListener('click', () => selectCard(card.dataset.id));
+  card.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectCard(card.dataset.id); }
+  });
+});
+
+// 필터
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed','false'); });
+    btn.classList.add('active'); btn.setAttribute('aria-pressed','true');
+    const f = btn.dataset.filter;
+    document.querySelectorAll('.patient-card').forEach(card => {
+      card.style.display = (f==='all' || card.dataset.status===f) ? '' : 'none';
+    });
+  });
+});
+</script>
+</body>
+</html>

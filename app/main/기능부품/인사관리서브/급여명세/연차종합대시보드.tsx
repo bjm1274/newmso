@@ -3,23 +3,105 @@ import { toast } from '@/lib/toast';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 
-type DeptStat = { dept: string; company?: string; total: number; used: number; remain: number; expiring: number };
+// ─── 타입 ─────────────────────────────────────────────────────────────────────
 
-export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }: Record<string, unknown>) {
+type DeptStat = {
+  dept: string;
+  company?: string;
+  total: number;
+  used: number;
+  remain: number;
+  expiring: number;
+};
+
+type PromotionLog = {
+  staff_id: string;
+  stage: number;
+  plan_submitted_at: string | null;
+  expiry_date: string | null;
+  notified_at: string | null;
+};
+
+// 5단계 촉진 상태
+type PromotionStatus = '미통보' | '1차통보' | '2차통보' | '계획서제출' | '소멸';
+
+// ─── 헬퍼 ────────────────────────────────────────────────────────────────────
+
+function resolvePromotionStatus(
+  staffId: string,
+  remainingDays: number,
+  logs: PromotionLog[],
+): PromotionStatus {
+  const staffLogs = logs.filter((l) => l.staff_id === staffId);
+  if (staffLogs.length === 0) return '미통보';
+
+  const hasExpired = staffLogs.some((l) => l.stage === 3);
+  if (hasExpired) return '소멸';
+
+  const hasPlan = staffLogs.some((l) => l.plan_submitted_at != null);
+  if (hasPlan) return '계획서제출';
+
+  const hasStage2 = staffLogs.some((l) => l.stage === 2);
+  if (hasStage2) return '2차통보';
+
+  const hasStage1 = staffLogs.some((l) => l.stage === 1);
+  if (hasStage1) return '1차통보';
+
+  return '미통보';
+}
+
+type PromotionBadgeProps = { status: PromotionStatus };
+
+function PromotionBadge({ status }: PromotionBadgeProps) {
+  const map: Record<PromotionStatus, string> = {
+    미통보: 'badge badge-gray',
+    '1차통보': 'badge badge-yellow',
+    '2차통보': 'badge badge-red',
+    계획서제출: 'badge badge-blue',
+    소멸: 'badge',
+  };
+  const somelClass = status === '소멸' ? 'badge bg-[var(--muted)] text-[var(--toss-gray-3)]' : map[status];
+  return <span className={somelClass}>{status}</span>;
+}
+
+// ─── 컴포넌트 ─────────────────────────────────────────────────────────────────
+
+export default function LeaveDashboard({
+  staffs = [],
+  selectedCo,
+  currentUser,
+}: Record<string, unknown>) {
   const _staffs = (staffs as Record<string, unknown>[]) ?? [];
   const [byDept, setByDept] = useState<DeptStat[]>([]);
+  const [promotionLogs, setPromotionLogs] = useState<PromotionLog[]>([]);
+  const [logsLoaded, setLogsLoaded] = useState(false);
+
+  // 촉진 로그 조회
+  useEffect(() => {
+    void Promise.resolve(
+      supabase
+        .from('annual_leave_promotion_logs')
+        .select('staff_id, stage, plan_submitted_at, expiry_date, notified_at')
+    ).then(({ data }) => {
+      if (data) setPromotionLogs(data as PromotionLog[]);
+    }).catch((err: unknown) => {
+      console.error('[LeaveDashboard] 촉진 로그 조회 실패:', err);
+    }).finally(() => setLogsLoaded(true));
+  }, []);
 
   useEffect(() => {
-    const filtered = selectedCo === '전체' ? _staffs : _staffs.filter((s: any) => s.company === selectedCo);
+    const filtered =
+      selectedCo === '전체' ? _staffs : _staffs.filter((s) => (s as Record<string, unknown>).company === selectedCo);
     const map: Record<string, { total: number; used: number; company?: string }> = {};
-    filtered.forEach((s: any) => {
-      const dept = s.department || '미지정';
-      const company = s.company || '미지정';
+    filtered.forEach((s) => {
+      const ss = s as Record<string, unknown>;
+      const dept = (ss.department as string) || '미지정';
+      const company = (ss.company as string) || '미지정';
       const key = selectedCo === '전체' ? `${company} - ${dept}` : dept;
 
       if (!map[key]) map[key] = { total: 0, used: 0, company };
-      map[key].total += s.annual_leave_total ?? 0;
-      map[key].used += s.annual_leave_used ?? 0;
+      map[key].total += (ss.annual_leave_total as number) ?? 0;
+      map[key].used += (ss.annual_leave_used as number) ?? 0;
     });
     setByDept(
       Object.entries(map).map(([key, v]) => ({
@@ -29,7 +111,7 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
         used: v.used,
         remain: Math.max(0, v.total - v.used),
         expiring: 0,
-      }))
+      })),
     );
   }, [_staffs, selectedCo]);
 
@@ -40,24 +122,29 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
   const [submitting, setSubmitting] = useState(false);
 
   const filteredStaffs = useMemo(
-    () => (selectedCo === '전체' ? _staffs : _staffs.filter((s: any) => s.company === selectedCo)),
-    [_staffs, selectedCo]
+    () =>
+      selectedCo === '전체'
+        ? _staffs
+        : _staffs.filter((s) => (s as Record<string, unknown>).company === selectedCo),
+    [_staffs, selectedCo],
   );
 
-  const submitLeavePlan = async (staff: any, remain: number) => {
+  const submitLeavePlan = async (staff: Record<string, unknown>, remain: number) => {
     if (!planDates.trim()) return toast('사용 예정일(계획)을 입력해주세요.', 'warning');
     setSubmitting(true);
     try {
-      await supabase.from('approvals').insert([{
-        sender_id: staff.id,
-        sender_name: staff.name,
-        sender_company: staff.company || '미지정',
-        type: '연차사용계획',
-        title: `[제출] ${staff.name} 연차 사용 계획서`,
-        content: `미사용 연차 ${remain}일에 대한 사용 계획서입니다.\n\n사용 예정일/계획:\n${planDates}\n\n비고:\n${planReason}`,
-        status: '대기',
-        meta_data: { type: 'annual_leave_plan', remaining: remain }
-      }]);
+      await supabase.from('approvals').insert([
+        {
+          sender_id: staff.id,
+          sender_name: staff.name,
+          sender_company: staff.company || '미지정',
+          type: '연차사용계획',
+          title: `[제출] ${staff.name} 연차 사용 계획서`,
+          content: `미사용 연차 ${remain}일에 대한 사용 계획서입니다.\n\n사용 예정일/계획:\n${planDates}\n\n비고:\n${planReason}`,
+          status: '대기',
+          meta_data: { type: 'annual_leave_plan', remaining: remain },
+        },
+      ]);
       toast('연차 사용 계획서가 성공적으로 제출되었습니다. (전자결재 상신)', 'success');
       setShowPlanModal(false);
       setPlanDates('');
@@ -70,14 +157,17 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
   };
 
   const personalList = useMemo(() => {
-    // 팀장/관리자는 팀 전체, 일반 직원은 본인만 기본 표시
     const _cu = currentUser as Record<string, unknown> | undefined;
-    const isManager = ['팀장', '실장', '부장', '원장', '병원장', '대표이사'].includes((_cu?.position as string) || '');
+    const isManager = ['팀장', '실장', '부장', '원장', '병원장', '대표이사'].includes(
+      (_cu?.position as string) || '',
+    );
     if (isManager && _cu?.department) {
-      return filteredStaffs.filter((s: any) => s.department === (_cu.department as string));
+      return filteredStaffs.filter(
+        (s) => (s as Record<string, unknown>).department === (_cu.department as string),
+      );
     }
     if (_cu?.id) {
-      return filteredStaffs.filter((s: any) => s.id === (_cu.id as string));
+      return filteredStaffs.filter((s) => (s as Record<string, unknown>).id === (_cu.id as string));
     }
     return filteredStaffs;
   }, [filteredStaffs, currentUser]);
@@ -87,22 +177,32 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--border)]">
         <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
           연차 종합 대시보드
-          {selectedCo !== '전체' && <span className="px-2 py-0.5 bg-blue-500/10 text-[var(--accent)] text-[10px] rounded-[var(--radius-md)]">{selectedCo as string}</span>}
+          {selectedCo !== '전체' && (
+            <span className="px-2 py-0.5 bg-blue-500/10 text-[var(--accent)] text-[10px] rounded-[var(--radius-md)]">
+              {selectedCo as string}
+            </span>
+          )}
         </h3>
         <div className="flex gap-0.5 bg-[var(--tab-bg)] rounded-[var(--radius-md)] p-0.5">
           <button
             type="button"
             onClick={() => setViewMode('dept')}
-            className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${viewMode === 'dept' ? 'bg-[var(--foreground)] text-white' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
-              }`}
+            className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+              viewMode === 'dept'
+                ? 'bg-[var(--foreground)] text-white'
+                : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
+            }`}
           >
             팀별
           </button>
           <button
             type="button"
             onClick={() => setViewMode('personal')}
-            className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${viewMode === 'personal' ? 'bg-[var(--foreground)] text-white' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
-              }`}
+            className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+              viewMode === 'personal'
+                ? 'bg-[var(--foreground)] text-white'
+                : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
+            }`}
           >
             개인별
           </button>
@@ -112,14 +212,55 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
       {/* 요약 카드 */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
         {[
-          { label: '인원', val: filteredStaffs.length, unit: '명', color: 'text-[var(--foreground)]' },
-          { label: '총 연차', val: filteredStaffs.reduce((acc: number, s: any) => acc + (s.annual_leave_total ?? 0), 0), unit: '일', color: 'text-[var(--accent)]' },
-          { label: '사용', val: filteredStaffs.reduce((acc: number, s: any) => acc + (s.annual_leave_used ?? 0), 0), unit: '일', color: 'text-amber-600' },
-          { label: '잔여', val: filteredStaffs.reduce((acc: number, s: any) => acc + Math.max(0, (s.annual_leave_total ?? 0) - (s.annual_leave_used ?? 0)), 0), unit: '일', color: 'text-emerald-600' },
+          {
+            label: '인원',
+            val: filteredStaffs.length,
+            unit: '명',
+            color: 'text-[var(--foreground)]',
+          },
+          {
+            label: '총 연차',
+            val: filteredStaffs.reduce(
+              (acc, s) => acc + ((s as Record<string, unknown>).annual_leave_total as number ?? 0),
+              0,
+            ),
+            unit: '일',
+            color: 'text-[var(--accent)]',
+          },
+          {
+            label: '사용',
+            val: filteredStaffs.reduce(
+              (acc, s) => acc + ((s as Record<string, unknown>).annual_leave_used as number ?? 0),
+              0,
+            ),
+            unit: '일',
+            color: 'text-amber-600',
+          },
+          {
+            label: '잔여',
+            val: filteredStaffs.reduce(
+              (acc, s) =>
+                acc +
+                Math.max(
+                  0,
+                  ((s as Record<string, unknown>).annual_leave_total as number ?? 0) -
+                    ((s as Record<string, unknown>).annual_leave_used as number ?? 0),
+                ),
+              0,
+            ),
+            unit: '일',
+            color: 'text-emerald-600',
+          },
         ].map((stat, i) => (
-          <div key={i} className="bg-[var(--muted)]/50 p-2.5 rounded-[var(--radius-md)] border border-[var(--border)] text-center">
+          <div
+            key={i}
+            className="bg-[var(--muted)]/50 p-2.5 rounded-[var(--radius-md)] border border-[var(--border)] text-center"
+          >
             <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-0.5">{stat.label}</p>
-            <p className={`text-sm font-bold ${stat.color}`}>{stat.val}{stat.unit}</p>
+            <p className={`text-sm font-bold ${stat.color}`}>
+              {stat.val}
+              {stat.unit}
+            </p>
           </div>
         ))}
       </div>
@@ -127,7 +268,10 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
       {viewMode === 'dept' ? (
         <div className="space-y-3">
           {byDept.map((x) => (
-            <div key={x.dept} className="p-3 bg-[var(--page-bg)] rounded-[var(--radius-md)] border border-[var(--border)]">
+            <div
+              key={x.dept}
+              className="p-3 bg-[var(--page-bg)] rounded-[var(--radius-md)] border border-[var(--border)]"
+            >
               <p className="text-sm font-semibold text-[var(--foreground)] mb-2">{x.dept}</p>
               <div className="grid grid-cols-3 gap-2 text-xs">
                 <div>
@@ -154,37 +298,50 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
         </div>
       ) : (
         <div className="space-y-3 max-h-[320px] overflow-y-auto custom-scrollbar pr-1">
-          {personalList.map((s: any) => {
-            const total = s.annual_leave_total ?? 0;
-            const used = s.annual_leave_used ?? 0;
+          {personalList.map((s) => {
+            const ss = s as Record<string, unknown>;
+            const total = (ss.annual_leave_total as number) ?? 0;
+            const used = (ss.annual_leave_used as number) ?? 0;
             const remain = Math.max(0, total - used);
+            const staffId = String(ss.id);
+            const promotionStatus = logsLoaded
+              ? resolvePromotionStatus(staffId, remain, promotionLogs)
+              : null;
+
             return (
               <div
-                key={s.id}
+                key={staffId}
                 className="p-4 bg-[var(--page-bg)] rounded-[var(--radius-md)] border border-[var(--border)] flex flex-col gap-3"
               >
                 <div className="flex items-center justify-between text-xs">
                   <div>
                     <p className="font-semibold text-[var(--foreground)] flex items-center gap-1.5">
-                      {s.name}{' '}
+                      {ss.name as string}{' '}
                       <span className="text-[11px] text-[var(--toss-gray-3)] font-normal">
-                        ({s.department || '미지정'})
+                        ({(ss.department as string) || '미지정'})
                       </span>
                       {selectedCo === '전체' && (
                         <span className="px-1.5 py-0.5 bg-[var(--muted)] text-[var(--toss-gray-3)] text-[9px] rounded-md font-bold">
-                          {s.company}
+                          {ss.company as string}
                         </span>
                       )}
                     </p>
                     <p className="text-[11px] text-[var(--toss-gray-3)] mt-0.5">
-                      총 {total}일 · 사용 {used}일 · <span className="text-[var(--foreground)]">잔여 <span className="font-semibold text-emerald-600">{remain}일</span></span>
+                      총 {total}일 · 사용 {used}일 ·{' '}
+                      <span className="text-[var(--foreground)]">
+                        잔여 <span className="font-semibold text-emerald-600">{remain}일</span>
+                      </span>
                     </p>
                   </div>
-                  <div className="w-24 h-1.5 bg-[var(--muted)] rounded-full overflow-hidden shrink-0">
-                    <div
-                      className="h-full bg-emerald-500 rounded-full transition-all"
-                      style={{ width: `${total ? (remain / total) * 100 : 0}%` }}
-                    />
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* 촉진 진행 상태 배지 */}
+                    {promotionStatus && <PromotionBadge status={promotionStatus} />}
+                    <div className="w-20 h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-emerald-500 rounded-full transition-all"
+                        style={{ width: `${total ? (remain / total) * 100 : 0}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -193,21 +350,29 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
                   <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4">
                     <div className="w-full max-w-md bg-[var(--card)] rounded-[var(--radius-lg)] shadow-sm overflow-hidden border border-[var(--border)] animate-in fade-in slide-in-from-bottom-4">
                       <div className="p-4 border-b border-[var(--border)]">
-                        <h3 className="text-lg font-bold text-[var(--foreground)] tracking-tight">연차 사용 계획서 제출</h3>
-                        <p className="text-xs text-red-500 font-semibold mt-1">잔여 연차 {remain}일에 대한 사용 계획을 등록합니다.</p>
+                        <h3 className="text-lg font-bold text-[var(--foreground)] tracking-tight">
+                          연차 사용 계획서 제출
+                        </h3>
+                        <p className="text-xs text-red-500 font-semibold mt-1">
+                          잔여 연차 {remain}일에 대한 사용 계획을 등록합니다.
+                        </p>
                       </div>
                       <div className="p-4 space-y-4">
                         <div className="flex flex-col gap-2">
-                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-widest">사용 목표 일정 (월/일)</label>
+                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-widest">
+                            사용 목표 일정 (월/일)
+                          </label>
                           <textarea
                             value={planDates}
                             onChange={(e) => setPlanDates(e.target.value)}
-                            placeholder="예: \n8월 15일, 16일 (2일)\n9월 추석 연휴 전후 (3일)\n11월 개인일정 (남은 일수)"
+                            placeholder={'예: \n8월 15일, 16일 (2일)\n9월 추석 연휴 전후 (3일)'}
                             className="w-full h-24 p-3 text-sm font-medium border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--page-bg)] focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none resize-none"
                           />
                         </div>
                         <div className="flex flex-col gap-2">
-                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-widest">추가 메모 (선택)</label>
+                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-widest">
+                            추가 메모 (선택)
+                          </label>
                           <input
                             type="text"
                             value={planReason}
@@ -227,7 +392,7 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
                         </button>
                         <button
                           type="button"
-                          onClick={() => submitLeavePlan(s, remain)}
+                          onClick={() => submitLeavePlan(ss, remain)}
                           disabled={submitting}
                           className="px-4 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-xs font-bold hover:opacity-90 disabled:opacity-50"
                         >
@@ -238,22 +403,26 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
                   </div>
                 )}
 
-                {/* 연차 촉진 알림 연동 배너 (개인별 뷰에서 잔여 연차가 있을 때) */}
-                {remain > 0 && s.id && (currentUser as Record<string, unknown> | undefined)?.id === (s.id as string) && (
-                  <div className="px-4 py-3 bg-red-500/10/50 border-t border-red-100 flex items-center justify-between text-xs mt-3 rounded-[var(--radius-md)]">
-                    <div>
-                      <span className="font-semibold text-red-600">🚨 연차 사용 촉진 안내</span>
-                      <p className="text-[11px] text-red-500 font-medium mt-0.5">미사용 연차 {remain}일에 대해 연차사용계획서를 의무 제출해야 합니다.</p>
+                {/* 연차 촉진 알림 연동 배너 */}
+                {remain > 0 &&
+                  Boolean(ss.id) &&
+                  (currentUser as Record<string, unknown> | undefined)?.id === staffId && (
+                    <div className="px-4 py-3 bg-red-500/10/50 border-t border-red-100 flex items-center justify-between text-xs mt-3 rounded-[var(--radius-md)]">
+                      <div>
+                        <span className="font-semibold text-red-600">연차 사용 촉진 안내</span>
+                        <p className="text-[11px] text-red-500 font-medium mt-0.5">
+                          미사용 연차 {remain}일에 대해 연차사용계획서를 의무 제출해야 합니다.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowPlanModal(true)}
+                        className="px-3 py-1.5 bg-red-600 text-white font-semibold rounded-lg text-[11px] hover:bg-red-700 transition-colors shrink-0 shadow-sm"
+                      >
+                        계획서 제출
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowPlanModal(true)}
-                      className="px-3 py-1.5 bg-red-600 text-white font-semibold rounded-lg text-[11px] hover:bg-red-700 transition-colors shrink-0 shadow-sm"
-                    >
-                      계획서 제출
-                    </button>
-                  </div>
-                )}
+                  )}
               </div>
             );
           })}

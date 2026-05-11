@@ -2,6 +2,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { isMissingColumnError } from '@/lib/supabase-compat';
+import { getPrimaryShift } from '@/lib/staff-shift-resolver';
 import { LucideIcon } from '../조직도서브/조직도측면창';
 
 export type ProblemReason = '미체크' | '지각' | '조퇴' | '결근' | '미출근';
@@ -78,8 +79,9 @@ export async function loadAttendanceProblemDates(userId: unknown): Promise<Probl
     { data: attendanceRows },
     { data: attendancesRows },
     { data: myCorrections },
-    { data: staffRow },
     { data: assignmentRows },
+    // 폴백 우선순위: staff_shift_assignments(is_primary) → staff_members.shift_id
+    defaultShiftId,
   ] = await Promise.all([
     supabase.from('attendance').select('date, check_in, check_out, status').eq('staff_id', userId).gte('date', startStr).lte('date', endStr),
     supabase.from('attendances').select('work_date, status').eq('staff_id', userId).gte('work_date', startStr).lte('work_date', endStr),
@@ -87,15 +89,13 @@ export async function loadAttendanceProblemDates(userId: unknown): Promise<Probl
       () => supabase.from('attendance_corrections').select('attendance_date, original_date').eq('staff_id', userId),
       () => supabase.from('attendance_corrections').select('original_date').eq('staff_id', userId),
     ),
-    supabase.from('staff_members').select('id, shift_id').eq('id', userId).maybeSingle(),
     supabase.from('shift_assignments').select('work_date, shift_id').eq('staff_id', userId).gte('work_date', startStr).lte('work_date', endStr),
+    getPrimaryShift(String(userId)),
   ]);
 
   const assignmentByDate = new Map<string, string | null>(
     (assignmentRows || []).map((assignment: any) => [String(assignment.work_date).slice(0, 10), assignment.shift_id ?? null]),
   );
-
-  const defaultShiftId: string | null = (staffRow as any)?.shift_id ?? null;
   const shiftIdSet = new Set<string>(
     [...(assignmentRows || []).map((assignment: any) => assignment.shift_id).filter(Boolean), defaultShiftId].filter(Boolean) as string[],
   );
