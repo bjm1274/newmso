@@ -6,26 +6,37 @@ import TaxInsuranceRatesPanel from './급여명세/세율보험요율관리';
 import PayrollLockPanel from './급여명세/급여월마감잠금';
 import ShiftPatternManager from './급여명세/교대제스케줄관리';
 
+type MenuId = 'policy' | 'tax' | 'shift' | 'lock';
+
 export default function IntegratedHRSettings({
     companyName,
     showLockMenu = true,
+    enabledMenus,
 }: {
     companyName: string;
     showLockMenu?: boolean;
+    enabledMenus?: MenuId[];
 }) {
-    const [activeMenu, setActiveMenu] = useState('policy');
-    const menus = [
+    const [activeMenu, setActiveMenu] = useState<MenuId>('policy');
+
+    const allMenus: { id: MenuId; icon: string; label: string }[] = [
         { id: 'policy', icon: '📝', label: '인사 정책 및 룰 (Rules)' },
         { id: 'tax', icon: '💳', label: '세법 및 비과세 기준' },
         { id: 'shift', icon: '⏰', label: '스케줄 및 근무제형' },
-        ...(showLockMenu ? [{ id: 'lock', icon: '🔒', label: '급여 마감 및 잠금' }] : []),
+        { id: 'lock', icon: '🔒', label: '급여 마감 및 잠금' },
     ];
 
+    const menus = enabledMenus
+        ? allMenus.filter(m => enabledMenus.includes(m.id))
+        : allMenus.filter(m => m.id !== 'lock' || showLockMenu);
+
     useEffect(() => {
-        if (!showLockMenu && activeMenu === 'lock') {
-            setActiveMenu('policy');
+        if (menus.length > 0 && !menus.some(m => m.id === activeMenu)) {
+            setActiveMenu(menus[0].id);
         }
-    }, [activeMenu, showLockMenu]);
+    // menus 배열 자체가 렌더마다 재생성되므로 직렬화된 key로 비교
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [enabledMenus?.join(','), showLockMenu]);
 
     return (
         <div className="flex h-full min-w-0 flex-col overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--page-bg)] shadow-sm">
@@ -80,7 +91,7 @@ export default function IntegratedHRSettings({
                         </div>
                     </div>
                 )}
-                {showLockMenu && activeMenu === 'lock' && (
+                {menus.some(m => m.id === 'lock') && activeMenu === 'lock' && (
                     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-2xl">
                         <div className="flex flex-col gap-1 mb-3">
                             <h2 className="text-base font-bold text-[var(--foreground)] tracking-tight">급여 마감 및 잠금</h2>

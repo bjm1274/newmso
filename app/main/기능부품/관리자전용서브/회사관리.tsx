@@ -13,8 +13,7 @@ import ShiftManagement from '../인사관리서브/근무형태관리';
 import AttendanceDeductionRules from './근태차감규칙설정';
 import LeaveManagement from '../인사관리서브/휴가신청/휴가관리메인';
 import IntegratedHRSettings from '../인사관리서브/인사통합설정';
-import PayrollAdvancedCenter from '../인사관리서브/급여명세/급여고도화센터';
-import DocumentRepository from '../인사관리서브/문서보관함';
+import PayrollComplianceCheck from '../인사관리서브/급여명세/급여기준점검';
 
 const COMPANY_COLUMNS = [
   'id',
@@ -46,8 +45,7 @@ type CompanyManagerTabId =
   | 'card'
   | 'contract'
   | 'leavePolicy'
-  | 'payrollPolicy'
-  | 'documentPolicy';
+  | 'payrollPolicy';
 
 type FormState = {
   name: string;
@@ -67,7 +65,6 @@ const COMPANY_TABS: { id: CompanyManagerTabId; label: string }[] = [
   { id: 'contract', label: '계약 템플릿' },
   { id: 'leavePolicy', label: '휴가 기준/공휴일' },
   { id: 'payrollPolicy', label: '급여 기준' },
-  { id: 'documentPolicy', label: '문서보관 정책' },
 ];
 
 function createEmptyForm(): FormState {
@@ -150,7 +147,6 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
   const [msoId, setMsoId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<CompanyManagerTabId>('company');
   const [policyCompany, setPolicyCompany] = useState('전체');
-  const [policyYearMonth, setPolicyYearMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const companyFormScope = (editing?.name || form.name).trim();
 
   const companyOptions = useMemo(() => {
@@ -585,37 +581,14 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
             companyOptions={companyOptions}
             selectedCompany={policyCompany}
             onCompanyChange={setPolicyCompany}
-            yearMonth={policyYearMonth}
-            onYearMonthChange={setPolicyYearMonth}
           />
-          <div className="grid gap-4 2xl:grid-cols-[minmax(520px,620px)_minmax(0,1fr)]">
-            <IntegratedHRSettings companyName={policyCompany} showLockMenu={false} />
-            <PayrollAdvancedCenter
-              staffs={staffs}
-              selectedCo={policyCompany}
-              yearMonth={policyYearMonth}
-              showWorkflowCards
-              onRefresh={onRefresh}
-            />
+          <IntegratedHRSettings companyName={policyCompany} enabledMenus={['tax']} />
+          <div className="bg-[var(--card)] p-4 rounded-[var(--radius-xl)] border border-[var(--border)] shadow-sm">
+            <PayrollComplianceCheck staffs={staffs ?? []} selectedCo={policyCompany} user={user as Record<string, unknown>} />
           </div>
         </div>
       )}
 
-      {activeTab === 'documentPolicy' && (
-        <div className="space-y-4">
-          <PolicyScopeControls
-            companyOptions={companyOptions}
-            selectedCompany={policyCompany}
-            onCompanyChange={setPolicyCompany}
-          />
-          <DocumentRepository
-            user={user as any}
-            selectedCo={policyCompany}
-            canManageDocuments
-            title="문서보관 정책"
-          />
-        </div>
-      )}
     </div>
   );
 }

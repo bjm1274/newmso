@@ -275,7 +275,6 @@ function getWorkspaceForHrMenu(menuId: HrMenuId): HrWorkspaceId {
 function getPayrollMainInitialTab(menuId?: string | null): string {
   if (menuId === '원천징수파일') return '원천징수파일';
   if (menuId === '4대보험') return '4대보험EDI';
-  if (menuId === '최저임금' || menuId === '비과세체크') return '급여기준체크';
   return '대시보드';
 }
 
@@ -950,7 +949,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
               />
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {activeDocumentCenterTab === '문서보관함' && (
-                  <문서보관함 user={user} selectedCo={선택사업체} linkedTarget={문서연결대상} canManageDocuments={false} />
+                  <문서보관함 user={user} selectedCo={선택사업체} linkedTarget={문서연결대상} canManageDocuments={isAdminUser(user)} />
                 )}
                 {activeDocumentCenterTab === '증명서' && (
                   <div className="p-3 md:p-4">

@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import TaxInsuranceRatesPanel from './세율보험요율관리';
 import PayrollLockPanel from './급여월마감잠금';
-import InterimSettlement from './중간정산';
+
 import { fetchTaxFreeSettings, DEFAULT_SETTINGS, type TaxFreeSettings } from '@/lib/use-tax-free-settings';
 import {
   fetchTaxInsuranceRates,
@@ -397,9 +397,8 @@ export default function PayrollAdvancedCenter({
   const [previousMonthRecords, setPreviousMonthRecords] = useState<PayrollRecordSummaryRow[]>([]);
   const [policyVersions, setPolicyVersions] = useState<PayrollPolicyVersionRow[]>([]);
   const [policyVersionNote, setPolicyVersionNote] = useState('');
-  const [workflowFocus, setWorkflowFocus] = useState<'lock' | 'interim' | null>(null);
+  const [workflowFocus, setWorkflowFocus] = useState<'lock' | null>(null);
   const payrollLockSectionRef = useRef<HTMLDivElement | null>(null);
-  const interimSettlementSectionRef = useRef<HTMLDivElement | null>(null);
 
   const companyScope = selectedCo && selectedCo.trim() ? selectedCo : '전체';
   const filteredStaffs = useMemo(
@@ -587,21 +586,19 @@ export default function PayrollAdvancedCenter({
   const monthCount = getMonthDiff(retroForm.startMonth, retroForm.endMonth);
   const retroPreviewTotal = Math.max(0, (retroForm.afterBase - retroForm.beforeBase) * monthCount);
 
-  const focusWorkflowSection = useCallback((section: 'lock' | 'interim') => {
+  const focusWorkflowSection = useCallback((section: 'lock') => {
     setWorkflowFocus(section);
-    const target =
-      section === 'lock' ? payrollLockSectionRef.current : interimSettlementSectionRef.current;
-    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    payrollLockSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
 
-  const getWorkflowCardClassName = (section: 'lock' | 'interim') =>
+  const getWorkflowCardClassName = (section: 'lock') =>
     `group flex h-full flex-col items-start rounded-[var(--radius-xl)] border bg-[var(--card)] p-4 text-left transition-all ${
       workflowFocus === section
         ? 'border-[var(--accent)] shadow-sm ring-2 ring-[var(--accent)]/15'
         : 'border-[var(--border)] hover:border-[var(--accent)] hover:shadow-sm'
     }`;
 
-  const getWorkflowSectionClassName = (section: 'lock' | 'interim') =>
+  const getWorkflowSectionClassName = (section: 'lock') =>
     workflowFocus === section
       ? 'rounded-[calc(var(--radius-xl)+4px)] ring-2 ring-[var(--accent)]/15'
       : '';
@@ -845,7 +842,7 @@ export default function PayrollAdvancedCenter({
                 </div>
               )}
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="max-w-xs">
                 <button
                   type="button"
                   data-testid="admin-payroll-lock-card"
@@ -858,21 +855,6 @@ export default function PayrollAdvancedCenter({
                   <h3 className="text-lg font-bold text-[var(--foreground)]">급여 마감 및 잠금</h3>
                   <p className="mt-2 text-xs leading-relaxed text-[var(--toss-gray-3)]">
                     {yearMonth} 급여의 마감 잠금, 재오픈 요청, 검토 상태를 한 번에 관리합니다.
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  data-testid="admin-payroll-interim-card"
-                  onClick={() => focusWorkflowSection('interim')}
-                  className={getWorkflowCardClassName('interim')}
-                >
-                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-[var(--radius-xl)] bg-amber-50 text-2xl text-amber-500 shadow-inner transition-transform group-hover:scale-110">
-                    👋
-                  </div>
-                  <h3 className="text-lg font-bold text-[var(--foreground)]">중도 퇴사자 정산</h3>
-                  <p className="mt-2 text-xs leading-relaxed text-[var(--toss-gray-3)]">
-                    월중 퇴사자 급여를 일할 계산하고 퇴직 정산까지 이어서 처리합니다.
                   </p>
                 </button>
               </div>
@@ -1211,19 +1193,9 @@ export default function PayrollAdvancedCenter({
                       onLockChange={onRefresh}
                     />
                   </div>
-                  <div
-                    ref={interimSettlementSectionRef}
-                    data-testid="admin-payroll-interim-section"
-                    className={getWorkflowSectionClassName('interim')}
-                  >
-                    <InterimSettlement staffs={staffs} selectedCo={selectedCo} onRefresh={onRefresh} />
-                  </div>
                 </div>
               ) : (
-                <>
-                  <PayrollLockPanel yearMonth={yearMonth} companyName={selectedCo} onLockChange={onRefresh} />
-                  <InterimSettlement staffs={staffs} selectedCo={selectedCo} onRefresh={onRefresh} />
-                </>
+                <PayrollLockPanel yearMonth={yearMonth} companyName={selectedCo} onLockChange={onRefresh} />
               )}
             </div>
           </div>

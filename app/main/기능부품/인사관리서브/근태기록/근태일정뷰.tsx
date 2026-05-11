@@ -55,7 +55,6 @@ export type AttendanceScheduleViewProps = {
   handleApproveSwap: (req: any) => void;
   handleRejectSwap: (req: any, reason: string) => void;
   handleSubmitApproval: () => void;
-  setShowShiftWizard: (show: boolean) => void;
 };
 
 export default function AttendanceScheduleView({
@@ -89,9 +88,8 @@ export default function AttendanceScheduleView({
   handleApproveSwap,
   handleRejectSwap,
   handleSubmitApproval,
-  setShowShiftWizard,
 }: AttendanceScheduleViewProps) {
-  const { dialog, openConfirm, openPrompt } = useActionDialog();
+  const { dialog, openPrompt } = useActionDialog();
 
   return (
     <>
@@ -116,57 +114,6 @@ export default function AttendanceScheduleView({
                 ? <option value="전체">교대근무자 없음</option>
                 : teamList.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
-            {canCreateRoster && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setShowShiftWizard(true)}
-                  className="px-4 py-2 bg-purple-500/10 text-purple-600 border border-purple-500/20 font-bold text-[11px] rounded-[var(--radius-lg)] shadow-sm hover:bg-purple-500/20 transition-all shrink-0 flex items-center gap-2"
-                >
-                  <LucideIcon name="Wand2" size={15} strokeWidth={2.2} />
-                  3교대 마법사
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const standardShift = visibleWorkShifts.find((sh: any) => sh.name.includes('통상') || sh.name.includes('일반') || sh.name.includes('주간') || sh.name.includes('9to6'));
-                    if (!standardShift) {
-                      toast('통상/일반/주간 이라는 이름이 포함된 근무형태가 부재합니다.', 'warning');
-                      return;
-                    }
-                    const weekdayCount = daysArray.filter((d) => {
-                      const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
-                      const dayOfWeek = new Date(dStr).getDay();
-                      return dayOfWeek !== 0 && dayOfWeek !== 6;
-                    }).length;
-                    const confirmed = await openConfirm({
-                      title: '통상근무를 일괄 적용할까요?',
-                      description: [
-                        `${selectedMonth} ${rosterTeam} 범위의 평일 근무를 "${standardShift.name}"으로 채웁니다.`,
-                        `대상: ${rosterFiltered.length}명 · ${weekdayCount}일 · 최대 ${rosterFiltered.length * weekdayCount}칸`,
-                        '이미 입력된 평일 배정도 덮어쓸 수 있습니다.',
-                      ].join('\n'),
-                      confirmText: '일괄 적용',
-                      tone: 'accent',
-                    });
-                    if (!confirmed) return;
-                    rosterFiltered.forEach((s: LocalStaffMember) => {
-                      daysArray.forEach((d) => {
-                        const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
-                        const dayOfWeek = new Date(dStr).getDay();
-                        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-                          setAssignment(s.id, dStr, standardShift.id);
-                        }
-                      });
-                    });
-                  }}
-                  className="px-4 py-2 bg-blue-500/10 text-blue-600 border border-blue-500/20 font-bold text-[11px] rounded-[var(--radius-lg)] shadow-sm hover:bg-blue-500/20 transition-all shrink-0 flex items-center gap-2"
-                >
-                  <LucideIcon name="Building2" size={15} strokeWidth={2.2} />
-                  통상근무 일괄
-                </button>
-              </>
-            )}
           </div>
         </div>
 

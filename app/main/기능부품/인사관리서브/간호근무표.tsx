@@ -5,13 +5,6 @@ import { supabase } from '@/lib/supabase';
 import { isActiveStaff } from '@/lib/active-staff';
 
 // ─────────────────────── 타입 ───────────────────────
-type WorkShift = {
-  id: string;
-  name: string;
-  start_time?: string | null;
-  end_time?: string | null;
-  company_name?: string | null;
-};
 type StaffMember = {
   id: string;
   name?: string | null;
@@ -25,11 +18,8 @@ type StaffMember = {
 type ShiftRole = 'D' | 'E' | 'N' | 'OFF' | 'LEAVE' | 'TRAINING';
 type StaffShiftType = 'rotation' | 'day_fixed' | 'evening_fixed' | 'night_fixed';
 type Violation = 'N_THEN_D' | 'CONSECUTIVE_N';
-type StaffConfig = { staffId: string; shiftType: StaffShiftType; preferredOffDays: number[] };
 type MinStaffConfig = { D: number; E: number; N: number };
-type GenerationRules = { maxNightShifts: number; minOffDays: number };
 type ScheduleMap = Record<string, Record<number, ShiftRole>>;
-type WizardStep = 1 | 2 | 3 | 4;
 
 // ─────────────────────── 상수 ───────────────────────
 const ROLE_META: Record<ShiftRole, { label: string; short: string; bg: string; text: string; hours: number }> = {
@@ -41,42 +31,7 @@ const ROLE_META: Record<ShiftRole, { label: string; short: string; bg: string; t
   TRAINING: { label: '교육',   short: '교육', bg: 'bg-yellow-400',   text: 'text-yellow-900',         hours: 0 },
 };
 
-const SHIFT_TYPE_OPTIONS: Array<{ value: StaffShiftType; label: string; desc: string }> = [
-  { value: 'rotation',      label: '순환',  desc: 'D/E/N/OFF 가변 블록으로 자동 순환' },
-  { value: 'day_fixed',     label: 'D전담', desc: '데이 근무 고정 (희망 오프만 쉼)' },
-  { value: 'evening_fixed', label: 'E전담', desc: '이브닝 고정 (희망 오프만 쉼)' },
-  { value: 'night_fixed',   label: 'N전담', desc: 'N 블록 + 회복 OFF 위주로 반복' },
-];
-
-const ROTATION_PATTERNS_WITH_N: ShiftRole[][] = [
-  ['D', 'E', 'N', 'OFF', 'OFF'],
-  ['D', 'D', 'E', 'N', 'OFF', 'OFF'],
-  ['D', 'E', 'E', 'N', 'OFF', 'OFF'],
-  ['D', 'D', 'E', 'E', 'N', 'OFF', 'OFF'],
-  ['D', 'E', 'N', 'N', 'OFF', 'OFF'],
-  ['D', 'D', 'E', 'N', 'N', 'OFF', 'OFF'],
-  ['D', 'E', 'E', 'N', 'N', 'OFF', 'OFF'],
-  ['D', 'E', 'N', 'N', 'N', 'OFF', 'OFF', 'OFF'],
-];
-const ROTATION_PATTERNS_NO_N: ShiftRole[][] = [
-  ['D', 'E', 'OFF', 'OFF'],
-  ['D', 'D', 'E', 'OFF', 'OFF'],
-  ['D', 'E', 'E', 'OFF', 'OFF'],
-  ['D', 'D', 'E', 'E', 'OFF', 'OFF'],
-  ['D', 'E', 'OFF', 'OFF', 'OFF'],
-];
-const NIGHT_FIXED_PATTERNS: ShiftRole[][] = [
-  ['N', 'N', 'OFF', 'OFF'],
-  ['N', 'N', 'N', 'OFF', 'OFF', 'OFF'],
-];
 const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
-
-const WIZARD_STEPS = [
-  { num: 1, title: '대상 병동', desc: '3교대 적용 병동 선택' },
-  { num: 2, title: '근무 매핑', desc: 'D/E/N 근무유형 연결' },
-  { num: 3, title: '인력 설정', desc: '근무유형 및 희망 오프' },
-  { num: 4, title: '생성 규칙', desc: '최소 인원과 OFF/Night 기준' },
-];
 
 // ─────────────────────── 유틸 ───────────────────────
 function getDaysInMonth(year: number, month: number) { return new Date(year, month, 0).getDate(); }
@@ -92,272 +47,6 @@ function normalizeShiftCode(code: string): ShiftRole {
   return 'OFF';
 }
 function getInitials(name?: string | null) { return name ? name.slice(0, 1) : '?'; }
-function countRoleInPattern(pattern: ShiftRole[], role: ShiftRole) {
-  return pattern.reduce((count, current) => count + (current === role ? 1 : 0), 0);
-}
-function splitPatternSegments(pattern: ShiftRole[]) {
-  const segments: ShiftRole[][] = [];
-  pattern.forEach((role) => {
-    const last = segments[segments.length - 1];
-    if (last && last[0] === role) {
-      last.push(role);
-    } else {
-      segments.push([role]);
-    }
-  });
-  return segments;
-}
-function rotatePatternBySegments(pattern: ShiftRole[], segmentOffset: number) {
-  const segments = splitPatternSegments(pattern);
-  if (segments.length <= 1) return pattern;
-  const safeOffset = ((segmentOffset % segments.length) + segments.length) % segments.length;
-  return [...segments.slice(safeOffset), ...segments.slice(0, safeOffset)].flat();
-}
-function hashSeed(value: string) {
-  let hash = 2166136261;
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-function seededIndex(seed: number, salt: number, length: number) {
-  if (length <= 0) return 0;
-  const mixed = Math.imul(seed ^ Math.imul(salt + 1, 1597334677), 2246822519) >>> 0;
-  return mixed % length;
-}
-function buildRotationPattern(seed: number, cycleIndex: number, remainingNightAllowance: number) {
-  const sourcePatterns = remainingNightAllowance > 0 ? ROTATION_PATTERNS_WITH_N : ROTATION_PATTERNS_NO_N;
-  const eligiblePatterns = sourcePatterns.filter(
-    (pattern) => countRoleInPattern(pattern, 'N') <= remainingNightAllowance
-  );
-  const basePatternPool = eligiblePatterns.length > 0 ? eligiblePatterns : sourcePatterns;
-  const basePattern = basePatternPool[seededIndex(seed, cycleIndex * 5 + 1, basePatternPool.length)];
-  const rotatedPattern = rotatePatternBySegments(
-    basePattern,
-    seededIndex(seed, cycleIndex * 5 + 2, splitPatternSegments(basePattern).length)
-  );
-  return rotatedPattern;
-}
-function buildNightFixedPattern(seed: number, cycleIndex: number, remainingNightAllowance: number) {
-  const eligiblePatterns = NIGHT_FIXED_PATTERNS.filter(
-    (pattern) => countRoleInPattern(pattern, 'N') <= remainingNightAllowance
-  );
-  const basePatternPool = eligiblePatterns.length > 0 ? eligiblePatterns : NIGHT_FIXED_PATTERNS;
-  return basePatternPool[seededIndex(seed, cycleIndex * 3 + 1, basePatternPool.length)];
-}
-function countAssignedRole(row: Record<number, ShiftRole>, role: ShiftRole) {
-  return Object.values(row).reduce((count, current) => count + (current === role ? 1 : 0), 0);
-}
-function buildDailyRoleCounts(schedule: ScheduleMap, staffIds: string[], days: number) {
-  return Array.from({ length: days + 1 }, (_, day) => {
-    if (day === 0) {
-      return { D: 0, E: 0, N: 0 };
-    }
-    const counts = { D: 0, E: 0, N: 0 };
-    staffIds.forEach((sid) => {
-      const role = schedule[sid]?.[day];
-      if (role === 'D' || role === 'E' || role === 'N') {
-        counts[role] += 1;
-      }
-    });
-    return counts;
-  });
-}
-
-// ─────────────────────── 자동생성 엔진 ───────────────────────
-function generateSchedule(params: {
-  staffs: StaffMember[];
-  staffConfigs: StaffConfig[];
-  year: number; month: number; days: number;
-  minStaff: MinStaffConfig;
-  rules: GenerationRules;
-}): ScheduleMap {
-  const { staffs, staffConfigs, year, month, days, minStaff, rules } = params;
-  const schedule: ScheduleMap = {};
-  const configMap = new Map(staffConfigs.map(c => [c.staffId, c]));
-  const allStaffIds = staffs.map((staff) => String(staff.id));
-  const rotationSids: string[] = [];
-  const maxNightShifts = Math.max(0, Math.floor(rules.maxNightShifts || 0));
-  const minOffDays = Math.max(0, Math.floor(rules.minOffDays || 0));
-
-  for (const staff of staffs) {
-    const sid = String(staff.id);
-    const cfg = configMap.get(sid) ?? { staffId: sid, shiftType: 'rotation' as StaffShiftType, preferredOffDays: [] };
-    schedule[sid] = {};
-    if (cfg.shiftType === 'day_fixed') {
-      for (let d = 1; d <= days; d++) schedule[sid][d] = cfg.preferredOffDays.includes(d) ? 'OFF' : 'D';
-    } else if (cfg.shiftType === 'evening_fixed') {
-      for (let d = 1; d <= days; d++) schedule[sid][d] = cfg.preferredOffDays.includes(d) ? 'OFF' : 'E';
-    } else if (cfg.shiftType === 'night_fixed') {
-      const seed = hashSeed(`${sid}-${year}-${month}-night`);
-      let assignedNightCount = 0;
-      let dayCursor = 1;
-      let cycleIndex = 0;
-
-      while (dayCursor <= days) {
-        const pattern = buildNightFixedPattern(
-          seed,
-          cycleIndex,
-          Math.max(0, maxNightShifts - assignedNightCount)
-        );
-
-        for (const role of pattern) {
-          if (dayCursor > days) break;
-          if (cfg.preferredOffDays.includes(dayCursor)) {
-            schedule[sid][dayCursor] = 'OFF';
-            dayCursor += 1;
-            continue;
-          }
-
-          const nextRole =
-            role === 'N' && assignedNightCount >= maxNightShifts
-              ? 'OFF'
-              : role;
-
-          schedule[sid][dayCursor] = nextRole;
-          if (nextRole === 'N') assignedNightCount += 1;
-          dayCursor += 1;
-        }
-
-        cycleIndex += 1;
-      }
-    } else {
-      rotationSids.push(sid);
-    }
-  }
-
-  rotationSids.forEach((sid, idx) => {
-    const cfg = configMap.get(sid) ?? { staffId: sid, shiftType: 'rotation' as StaffShiftType, preferredOffDays: [] };
-    const seed = hashSeed(`${sid}-${year}-${month}-${idx}`);
-    let assignedNightCount = 0;
-    let dayCursor = 1;
-    let cycleIndex = 0;
-
-    while (dayCursor <= days) {
-      const pattern = buildRotationPattern(
-        seed,
-        cycleIndex,
-        Math.max(0, maxNightShifts - assignedNightCount)
-      );
-
-      for (const role of pattern) {
-        if (dayCursor > days) break;
-        if (cfg.preferredOffDays.includes(dayCursor)) {
-          schedule[sid][dayCursor] = 'OFF';
-          dayCursor += 1;
-          continue;
-        }
-
-        const nextRole =
-          role === 'N' && assignedNightCount >= maxNightShifts
-            ? 'OFF'
-            : role;
-
-        schedule[sid][dayCursor] = nextRole;
-        if (nextRole === 'N') assignedNightCount += 1;
-        dayCursor += 1;
-      }
-
-      cycleIndex += 1;
-    }
-  });
-
-  for (const sid of rotationSids) {
-    for (let d = 2; d <= days; d++) {
-      if (schedule[sid][d - 1] === 'N' && schedule[sid][d] === 'D') schedule[sid][d] = 'OFF';
-    }
-    let consN = 0;
-    for (let d = 1; d <= days; d++) {
-      if (schedule[sid][d] === 'N') { consN++; if (consN >= 4) schedule[sid][d] = 'OFF'; }
-      else consN = 0;
-    }
-  }
-
-  const dailyCounts = buildDailyRoleCounts(schedule, allStaffIds, days);
-  const setScheduledRole = (sid: string, day: number, nextRole: ShiftRole) => {
-    const previousRole = schedule[sid]?.[day] ?? 'OFF';
-    if (previousRole === nextRole) return;
-    if (previousRole === 'D' || previousRole === 'E' || previousRole === 'N') {
-      dailyCounts[day][previousRole] = Math.max(0, dailyCounts[day][previousRole] - 1);
-    }
-    if (nextRole === 'D' || nextRole === 'E' || nextRole === 'N') {
-      dailyCounts[day][nextRole] += 1;
-    }
-    schedule[sid][day] = nextRole;
-  };
-
-  const ensureMinimumOffDays = () => {
-    allStaffIds.forEach((sid) => {
-      while (countAssignedRole(schedule[sid] ?? {}, 'OFF') < minOffDays) {
-        let bestDay = 0;
-        let bestScore = Number.POSITIVE_INFINITY;
-
-        for (let d = 1; d <= days; d++) {
-          const currentRole = schedule[sid]?.[d] ?? 'OFF';
-          if (currentRole !== 'D' && currentRole !== 'E' && currentRole !== 'N') continue;
-          if (dailyCounts[d][currentRole] <= minStaff[currentRole]) continue;
-
-          const prevRole = d > 1 ? (schedule[sid]?.[d - 1] ?? 'OFF') : 'OFF';
-          const nextRole = d < days ? (schedule[sid]?.[d + 1] ?? 'OFF') : 'OFF';
-          const margin = dailyCounts[d][currentRole] - minStaff[currentRole];
-
-          let score = 20 - margin * 4;
-          if (currentRole === 'N') score += 6;
-          if (prevRole === 'OFF') score -= 3;
-          if (nextRole === 'OFF') score -= 3;
-          if (prevRole === 'N') score -= 2;
-          if (nextRole === 'N') score += 2;
-
-          if (score < bestScore) {
-            bestScore = score;
-            bestDay = d;
-          }
-        }
-
-        if (bestDay === 0) break;
-        setScheduledRole(sid, bestDay, 'OFF');
-      }
-    });
-  };
-
-  const ensureMinimumCoverage = () => {
-    for (let d = 1; d <= days; d++) {
-      for (const role of ['D', 'E', 'N'] as const) {
-        let shortage = minStaff[role] - dailyCounts[d][role];
-        if (shortage <= 0) continue;
-
-        const candidates = rotationSids.filter(sid => {
-          if (schedule[sid][d] !== 'OFF') return false;
-          const cfg = configMap.get(sid);
-          if (cfg?.preferredOffDays.includes(d)) return false;
-          if (role === 'D' && d > 1 && schedule[sid][d - 1] === 'N') return false;
-          if (role === 'N' && d < days && schedule[sid][d + 1] === 'D') return false;
-          if (role === 'N' && countAssignedRole(schedule[sid], 'N') >= maxNightShifts) return false;
-          return true;
-        }).sort((leftSid, rightSid) => {
-          const leftRow = schedule[leftSid] ?? {};
-          const rightRow = schedule[rightSid] ?? {};
-          const leftTargetCount = countAssignedRole(leftRow, role);
-          const rightTargetCount = countAssignedRole(rightRow, role);
-          if (leftTargetCount !== rightTargetCount) return leftTargetCount - rightTargetCount;
-          return countAssignedRole(leftRow, 'N') - countAssignedRole(rightRow, 'N');
-        });
-
-        for (const candidateSid of candidates) {
-          if (shortage <= 0) break;
-          setScheduledRole(candidateSid, d, role);
-          shortage -= 1;
-        }
-      }
-    }
-  };
-
-  ensureMinimumOffDays();
-  ensureMinimumCoverage();
-  ensureMinimumOffDays();
-  return schedule;
-}
 
 function getViolations(row: Record<number, ShiftRole>, days: number): Record<number, Violation[]> {
   const v: Record<number, Violation[]> = {};
@@ -438,421 +127,6 @@ function ShiftBlock({
   );
 }
 
-// ─────────────────────── 마법사 (전체화면 오버레이) ───────────────────────
-function WizardOverlay({
-  step, setStep, wizardDept, setWizardDept, availableDepts, wardDepts,
-  wizardShifts, wizardDShiftId, setWizardDShiftId,
-  wizardEShiftId, setWizardEShiftId, wizardNShiftId, setWizardNShiftId,
-  wizardStaffs, staffConfigs, setStaffConfigs,
-  preferredOffStaffId, setPreferredOffStaffId,
-  wizardMinStaff, setWizardMinStaff, wizardRules, setWizardRules, generating,
-  onGenerate, onClose, year, month,
-}: {
-  step: WizardStep; setStep: (s: WizardStep) => void;
-  wizardDept: string; setWizardDept: (d: string) => void;
-  availableDepts: string[]; wardDepts: string[];
-  wizardShifts: WorkShift[];
-  wizardDShiftId: string; setWizardDShiftId: (s: string) => void;
-  wizardEShiftId: string; setWizardEShiftId: (s: string) => void;
-  wizardNShiftId: string; setWizardNShiftId: (s: string) => void;
-  wizardStaffs: StaffMember[];
-  staffConfigs: StaffConfig[]; setStaffConfigs: (c: StaffConfig[]) => void;
-  preferredOffStaffId: string; setPreferredOffStaffId: (s: string) => void;
-  wizardMinStaff: MinStaffConfig; setWizardMinStaff: (m: MinStaffConfig) => void;
-  wizardRules: GenerationRules; setWizardRules: (rules: GenerationRules) => void;
-  generating: boolean; onGenerate: () => void; onClose: () => void;
-  year: number; month: number;
-}) {
-  const days = getDaysInMonth(year, month);
-  const selStaffCfg = staffConfigs.find(c => c.staffId === preferredOffStaffId);
-
-  const toggleOffDay = (day: number) => {
-    setStaffConfigs(staffConfigs.map(c =>
-      c.staffId !== preferredOffStaffId ? c : {
-        ...c,
-        preferredOffDays: c.preferredOffDays.includes(day)
-          ? c.preferredOffDays.filter(d => d !== day)
-          : [...c.preferredOffDays, day],
-      }
-    ));
-  };
-
-  const updateShiftType = (staffId: string, shiftType: StaffShiftType) => {
-    setStaffConfigs(staffConfigs.map(c => c.staffId === staffId ? { ...c, shiftType } : c));
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex bg-black/60 backdrop-blur-sm">
-      {/* 왼쪽: 스텝 사이드바 */}
-      <div className="w-64 shrink-0 bg-[var(--foreground)] text-[var(--card)] flex flex-col py-10 px-6">
-        <div className="mb-10">
-          <p className="text-[11px] font-black tracking-[0.15em] uppercase opacity-50 mb-1">3교대 마법사</p>
-          <p className="text-lg font-black leading-snug">병동 근무표<br/>자동 생성</p>
-        </div>
-        <div className="flex flex-col gap-1 flex-1">
-          {WIZARD_STEPS.map((s, i) => {
-            const isDone = step > s.num;
-            const isCurrent = step === s.num;
-            return (
-              <div key={s.num} className="flex gap-3 items-start py-3 relative">
-                {i < WIZARD_STEPS.length - 1 && (
-                  <div className={`absolute left-[15px] top-[40px] w-px h-full ${isDone ? 'bg-[var(--card)]' : 'bg-white/20'}`} />
-                )}
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-black shrink-0 transition-colors
-                  ${isCurrent ? 'bg-[var(--accent)] text-white' : isDone ? 'bg-white text-[var(--foreground)]' : 'bg-white/10 text-white/40'}`}>
-                  {isDone ? '✓' : s.num}
-                </div>
-                <div className={`pt-1 transition-opacity ${isCurrent ? 'opacity-100' : isDone ? 'opacity-70' : 'opacity-30'}`}>
-                  <p className="text-[13px] font-bold leading-tight">{s.title}</p>
-                  <p className="text-[11px] opacity-60 mt-0.5">{s.desc}</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <button
-          type="button" onClick={onClose}
-          className="mt-6 text-[11px] text-white/40 hover:text-white/70 font-bold transition-colors text-left"
-        >
-          ✕ 닫기
-        </button>
-      </div>
-
-      {/* 오른쪽: 콘텐츠 */}
-      <div className="flex-1 bg-[var(--card)] flex flex-col overflow-hidden">
-        <div className="flex-1 overflow-y-auto p-8 md:p-12">
-
-          {/* STEP 1: 대상 병동 선택 */}
-          {step === 1 && (
-            <div className="max-w-xl">
-              <h2 className="text-2xl font-black text-[var(--foreground)] mb-1">대상 병동을 선택하세요</h2>
-              <p className="text-sm text-[var(--toss-gray-3)] mb-8">
-                3교대 근무표를 생성할 병동(팀)을 선택합니다. 병동 계열 부서만 표시됩니다.
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                {wardDepts.map(d => {
-                  const isSelected = wizardDept === d;
-                  return (
-                    <button
-                      key={d} type="button"
-                      onClick={() => setWizardDept(d)}
-                      className={`flex items-center gap-3 p-4 rounded-xl border-2 text-left transition-all
-                        ${isSelected
-                          ? 'border-[var(--accent)] bg-blue-50 dark:bg-blue-950/30'
-                          : 'border-[var(--border)] bg-[var(--tab-bg)] hover:border-[var(--accent)]/40'}`}
-                    >
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0
-                        ${isSelected ? 'bg-[var(--accent)] text-white' : 'bg-[var(--card)]'}`}>
-                        🏥
-                      </div>
-                      <div>
-                        <p className="font-black text-[13px] text-[var(--foreground)]">{d}</p>
-                        <p className="text-[11px] text-emerald-600 mt-0.5 font-bold">✅ 병동 3교대 대상</p>
-                      </div>
-                    </button>
-                  );
-                })}
-                {wardDepts.length === 0 && (
-                  <div className="col-span-2 p-10 text-center text-[var(--toss-gray-3)] text-sm">
-                    <div className="text-4xl mb-3">🏥</div>
-                    <p className="font-bold mb-1">병동 계열 부서가 없습니다</p>
-                    <p className="text-[12px] opacity-70">
-                      인사관리 &gt; 직원정보에서 부서명에<br/>
-                      <span className="font-bold text-[var(--foreground)]">병동, ICU, 중환자, 응급, 간호, NICU, PICU</span> 등의<br/>
-                      키워드를 포함해 주세요.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* STEP 2: 근무유형 매핑 */}
-          {step === 2 && (
-            <div className="max-w-xl">
-              <h2 className="text-2xl font-black text-[var(--foreground)] mb-1">근무유형을 연결하세요</h2>
-              <p className="text-sm text-[var(--toss-gray-3)] mb-8">
-                시스템의 근무유형을 데이/이브닝/나이트 교대에 매핑합니다.
-              </p>
-              <div className="flex flex-col gap-4">
-                {[
-                  { label: '데이 (D)', color: 'bg-sky-500', time: '07:00 ~ 15:00', val: wizardDShiftId, set: setWizardDShiftId },
-                  { label: '이브닝 (E)', color: 'bg-amber-400', time: '15:00 ~ 23:00', val: wizardEShiftId, set: setWizardEShiftId },
-                  { label: '나이트 (N)', color: 'bg-indigo-700', time: '23:00 ~ 07:00', val: wizardNShiftId, set: setWizardNShiftId },
-                ].map(item => (
-                  <div key={item.label} className="flex items-center gap-4 p-4 rounded-xl bg-[var(--tab-bg)] border border-[var(--border)]">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-black text-base shrink-0 ${item.color}`}>
-                      {item.label.split(' ')[0]}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-[12px] font-black text-[var(--foreground)]">{item.label}</p>
-                      <p className="text-[11px] text-[var(--toss-gray-3)]">{item.time}</p>
-                    </div>
-                    <select
-                      value={item.val}
-                      onChange={e => item.set(e.target.value)}
-                      className="flex-1 min-w-[140px] border border-[var(--border)] rounded-lg px-3 py-2 text-[12px] font-bold bg-[var(--card)] text-[var(--foreground)]"
-                    >
-                      <option value="">-- 선택 --</option>
-                      {wizardShifts.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
-              </div>
-              {wizardShifts.length === 0 && (
-                <p className="mt-4 text-sm text-orange-500">
-                  ⚠ {wizardDept} 소속 근무유형이 없습니다. [근무형태] 메뉴에서 등록 후 다시 시도하세요.
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* STEP 3: 인력 설정 + 희망 오프 */}
-          {step === 3 && (
-            <div>
-              <h2 className="text-2xl font-black text-[var(--foreground)] mb-1">인력별 근무유형 설정</h2>
-              <p className="text-sm text-[var(--toss-gray-3)] mb-6">
-                각 직원의 교대 유형과 희망 오프 날짜를 설정합니다.
-              </p>
-              <div className="flex gap-6">
-                {/* 왼쪽: 직원 목록 */}
-                <div className="flex-1 flex flex-col gap-2 max-h-[60vh] overflow-y-auto pr-1">
-                  {wizardStaffs.map(staff => {
-                    const cfg = staffConfigs.find(c => c.staffId === String(staff.id));
-                    const shiftType = cfg?.shiftType ?? 'rotation';
-                    const offCount = cfg?.preferredOffDays.length ?? 0;
-                    const isSelected = preferredOffStaffId === String(staff.id);
-                    return (
-                      <div
-                        key={staff.id}
-                        onClick={() => setPreferredOffStaffId(isSelected ? '' : String(staff.id))}
-                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer
-                          ${isSelected ? 'border-[var(--accent)] bg-blue-50 dark:bg-blue-950/30' : 'border-[var(--border)] bg-[var(--tab-bg)] hover:border-[var(--accent)]/40'}`}
-                      >
-                        <div className="w-9 h-9 rounded-full bg-[var(--muted)] flex items-center justify-center shrink-0 font-black text-base text-[var(--toss-gray-4)]">
-                          {getInitials(staff.name)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-black text-[var(--foreground)] truncate">{staff.name}</p>
-                          <p className="text-[11px] text-[var(--toss-gray-3)] truncate">{staff.position || ''}</p>
-                        </div>
-                        <div className="flex flex-col items-end gap-1">
-                          <select
-                            value={shiftType}
-                            onClick={e => e.stopPropagation()}
-                            onChange={e => updateShiftType(String(staff.id), e.target.value as StaffShiftType)}
-                            className="text-[11px] font-bold border border-[var(--border)] rounded-lg px-2 py-1 bg-[var(--card)] text-[var(--foreground)]"
-                          >
-                            {SHIFT_TYPE_OPTIONS.map(o => (
-                              <option key={o.value} value={o.value}>{o.label}</option>
-                            ))}
-                          </select>
-                          {offCount > 0 && (
-                            <span className="text-[10px] text-[var(--accent)] font-bold">희망오프 {offCount}일</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {wizardStaffs.length === 0 && (
-                    <div className="p-8 text-center text-sm text-[var(--toss-gray-3)]">
-                      {wizardDept ? '해당 병동에 직원이 없습니다.' : '1단계에서 병동을 선택하세요.'}
-                    </div>
-                  )}
-                </div>
-
-                {/* 오른쪽: 희망 오프 달력 */}
-                {preferredOffStaffId && selStaffCfg && (
-                  <div className="w-72 shrink-0">
-                    <p className="text-[12px] font-black text-[var(--foreground)] mb-2">
-                      {wizardStaffs.find(s => String(s.id) === preferredOffStaffId)?.name}의 희망 오프
-                    </p>
-                    <div className="grid grid-cols-7 gap-0.5 text-[10px] font-bold text-center mb-1">
-                      {['일','월','화','수','목','금','토'].map(d => (
-                        <div key={d} className="text-[var(--toss-gray-3)] py-1">{d}</div>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-7 gap-0.5">
-                      {/* 첫째 날 요일 빈칸 */}
-                      {Array.from({ length: getDayOfWeek(year, month, 1) }).map((_, i) => <div key={i} />)}
-                      {Array.from({ length: days }, (_, i) => i + 1).map(d => {
-                        const isOff = selStaffCfg.preferredOffDays.includes(d);
-                        const dow = getDayOfWeek(year, month, d);
-                        return (
-                          <button
-                            key={d} type="button" onClick={() => toggleOffDay(d)}
-                            className={`h-8 w-full rounded-lg text-[11px] font-bold transition-all
-                              ${isOff ? 'bg-[var(--accent)] text-white' : `hover:bg-[var(--muted)] ${dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-[var(--foreground)]'}`}`}
-                          >
-                            {d}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <p className="mt-2 text-[10px] text-[var(--toss-gray-3)]">날짜를 클릭하면 희망 오프 지정/해제</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* STEP 4: 최소 인원 */}
-          {step === 4 && (
-            <div className="max-w-lg">
-              <h2 className="text-2xl font-black text-[var(--foreground)] mb-1">교대별 최소 투입 인원</h2>
-              <p className="text-sm text-[var(--toss-gray-3)] mb-8">
-                각 교대 시간대에 반드시 근무해야 하는 최소 인원입니다. 부족 시 자동 보정됩니다.
-              </p>
-              <div className="flex flex-col gap-4">
-                {(['D', 'E', 'N'] as const).map(role => {
-                  const meta = ROLE_META[role];
-                  return (
-                    <div key={role} className="flex items-center gap-5 p-5 rounded-xl bg-[var(--tab-bg)] border border-[var(--border)]">
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black shrink-0 ${meta.bg} ${meta.text}`}>
-                        {role}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-black text-[var(--foreground)] text-base">{meta.label}</p>
-                        <p className="text-[12px] text-[var(--toss-gray-3)]">
-                          {role === 'D' ? '07:00~15:00' : role === 'E' ? '15:00~23:00' : '23:00~07:00'}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setWizardMinStaff({ ...wizardMinStaff, [role]: Math.max(1, wizardMinStaff[role] - 1) })}
-                          className="w-9 h-9 rounded-xl border border-[var(--border)] bg-[var(--card)] text-lg font-black hover:bg-[var(--muted)] transition-colors"
-                        >−</button>
-                        <span className="w-10 text-center text-2xl font-black text-[var(--foreground)]">
-                          {wizardMinStaff[role]}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setWizardMinStaff({ ...wizardMinStaff, [role]: wizardMinStaff[role] + 1 })}
-                          className="w-9 h-9 rounded-xl border border-[var(--border)] bg-[var(--card)] text-lg font-black hover:bg-[var(--muted)] transition-colors"
-                        >+</button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="mt-5 p-5 rounded-xl bg-[var(--tab-bg)] border border-[var(--border)]">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black shrink-0 bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
-                    O
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-black text-[var(--foreground)] text-base">인당 최소 오프일</p>
-                    <p className="text-[12px] text-[var(--toss-gray-3)]">
-                      자동생성 후 각 직원에게 최소한 이 일수만큼 OFF를 확보하도록 보정합니다.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setWizardRules({ ...wizardRules, minOffDays: Math.max(0, wizardRules.minOffDays - 1) })}
-                      className="w-9 h-9 rounded-xl border border-[var(--border)] bg-[var(--card)] text-lg font-black hover:bg-[var(--muted)] transition-colors"
-                    >−</button>
-                    <span className="w-10 text-center text-2xl font-black text-[var(--foreground)]">
-                      {wizardRules.minOffDays}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setWizardRules({ ...wizardRules, minOffDays: wizardRules.minOffDays + 1 })}
-                      className="w-9 h-9 rounded-xl border border-[var(--border)] bg-[var(--card)] text-lg font-black hover:bg-[var(--muted)] transition-colors"
-                    >+</button>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-5 p-5 rounded-xl bg-[var(--tab-bg)] border border-[var(--border)]">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black shrink-0 bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
-                    N
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-black text-[var(--foreground)] text-base">인당 최대 나이트 수</p>
-                    <p className="text-[12px] text-[var(--toss-gray-3)]">
-                      자동생성 시 한 직원에게 배정할 수 있는 월간 Night 최대 횟수입니다.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setWizardRules({ ...wizardRules, maxNightShifts: Math.max(0, wizardRules.maxNightShifts - 1) })}
-                      className="w-9 h-9 rounded-xl border border-[var(--border)] bg-[var(--card)] text-lg font-black hover:bg-[var(--muted)] transition-colors"
-                    >−</button>
-                    <span className="w-10 text-center text-2xl font-black text-[var(--foreground)]">
-                      {wizardRules.maxNightShifts}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setWizardRules({ ...wizardRules, maxNightShifts: wizardRules.maxNightShifts + 1 })}
-                      className="w-9 h-9 rounded-xl border border-[var(--border)] bg-[var(--card)] text-lg font-black hover:bg-[var(--muted)] transition-colors"
-                    >+</button>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-8 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 text-[12px] text-blue-700 dark:text-blue-300">
-                <p className="font-black mb-1">⚙ 자동생성 규칙 안내</p>
-                <ul className="list-disc list-inside space-y-0.5 opacity-80">
-                  <li>순환자: D/E/N/OFF 블록 길이를 직원별로 다르게 섞어 고정 DDEENN 패턴을 줄입니다.</li>
-                  <li>나이트 전담도 N 2~3일 + 회복 OFF 중심으로 자동 배치합니다.</li>
-                  <li>직원별 최소 OFF 일수를 먼저 확보한 뒤 부족한 교대만 보정합니다.</li>
-                  <li>인당 최대 나이트 수를 넘기지 않도록 Night 배정을 제한합니다.</li>
-                  <li>N 다음날 D 배치 금지 (근기법 §54, 11시간 연속 휴식)</li>
-                  <li>3일 초과 연속 야간 배치 금지</li>
-                  <li>최소 인원 부족 시 OFF 인원 자동 차출</li>
-                </ul>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* 하단 네비게이션 */}
-        <div className="shrink-0 border-t border-[var(--border)] px-8 py-5 flex justify-between items-center bg-[var(--tab-bg)]">
-          <button
-            type="button"
-            onClick={() => step > 1 ? setStep((step - 1) as WizardStep) : onClose()}
-            className="px-5 py-2.5 rounded-xl border border-[var(--border)] text-[13px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] transition-colors"
-          >
-            {step === 1 ? '취소' : '← 이전'}
-          </button>
-          <div className="flex gap-1.5">
-            {WIZARD_STEPS.map(s => (
-              <div key={s.num} className={`h-1.5 rounded-full transition-all ${step === s.num ? 'w-6 bg-[var(--accent)]' : step > s.num ? 'w-3 bg-[var(--accent)]/40' : 'w-3 bg-[var(--border)]'}`} />
-            ))}
-          </div>
-          {step < 4 ? (
-            <button
-              type="button"
-              disabled={step === 1 && !wizardDept}
-              onClick={() => setStep((step + 1) as WizardStep)}
-              className="px-6 py-2.5 rounded-xl bg-[var(--accent)] text-white text-[13px] font-bold hover:opacity-90 disabled:opacity-40 transition-all"
-            >
-              다음 →
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onGenerate}
-              disabled={generating}
-              className="px-6 py-2.5 rounded-xl bg-[var(--accent)] text-white text-[13px] font-bold hover:opacity-90 disabled:opacity-60 transition-all flex items-center gap-2"
-            >
-              {generating ? (
-                <><span className="animate-spin">⏳</span> 생성 중...</>
-              ) : (
-                <>✨ 근무표 자동생성</>
-              )}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─────────────────────── 메인 컴포넌트 ───────────────────────
 export default function NurseSchedule({
   staffs = [],
@@ -866,24 +140,10 @@ export default function NurseSchedule({
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
   const [schedule, setSchedule] = useState<ScheduleMap>({});
-  const [workShifts, setWorkShifts] = useState<WorkShift[]>([]);
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [dept, setDept] = useState('');
   const [activeMinStaff, setActiveMinStaff] = useState<MinStaffConfig>({ D: 2, E: 2, N: 2 });
-  const [activeGenerationRules, setActiveGenerationRules] = useState<GenerationRules>({ maxNightShifts: 8, minOffDays: 8 });
-
-  const [wizardOpen, setWizardOpen] = useState(false);
-  const [wizardStep, setWizardStep] = useState<WizardStep>(1);
-  const [wizardDept, setWizardDept] = useState('');
-  const [wizardDShiftId, setWizardDShiftId] = useState('');
-  const [wizardEShiftId, setWizardEShiftId] = useState('');
-  const [wizardNShiftId, setWizardNShiftId] = useState('');
-  const [staffConfigs, setStaffConfigs] = useState<StaffConfig[]>([]);
-  const [wizardMinStaff, setWizardMinStaff] = useState<MinStaffConfig>({ D: 2, E: 2, N: 2 });
-  const [wizardRules, setWizardRules] = useState<GenerationRules>({ maxNightShifts: 8, minOffDays: 8 });
-  const [generating, setGenerating] = useState(false);
-  const [preferredOffStaffId, setPreferredOffStaffId] = useState('');
 
   const days = getDaysInMonth(year, month);
   const ym = `${year}-${String(month).padStart(2, '0')}`;
@@ -903,17 +163,14 @@ export default function NurseSchedule({
   const availableDepts = wardDepts.length > 0 ? wardDepts : allDepts;
 
   const visibleStaffs = useMemo(
-    () => scopedStaffs.filter(s => getStaffDept(s) === dept),
+    () => scopedStaffs.filter(s => {
+      if (getStaffDept(s) !== dept) return false;
+      const shiftType = s.shiftType as StaffShiftType | undefined;
+      if (shiftType === 'day_fixed') return false;
+      return true;
+    }),
     [scopedStaffs, dept]
   );
-  const wizardStaffs = useMemo(
-    () => scopedStaffs.filter(s => getStaffDept(s) === wizardDept),
-    [scopedStaffs, wizardDept]
-  );
-  const wizardShifts = useMemo(() => {
-    const companies = new Set(wizardStaffs.map(s => s.company).filter(Boolean));
-    return workShifts.filter(s => companies.size === 0 || companies.has(s.company_name ?? ''));
-  }, [workShifts, wizardStaffs]);
 
   const violationMap = useMemo(() => {
     const result: Record<string, Record<number, Violation[]>> = {};
@@ -967,30 +224,6 @@ export default function NurseSchedule({
     });
   }, [ym]);
 
-  useEffect(() => {
-    let q = supabase.from('work_shifts').select('id, name, start_time, end_time, company_name').eq('is_active', true);
-    if (selectedCo !== '전체') q = q.eq('company_name', selectedCo);
-    q.order('start_time').then(({ data }) => setWorkShifts((data ?? []) as WorkShift[]));
-  }, [selectedCo]);
-
-  useEffect(() => {
-    if (!wizardOpen) return;
-    setStaffConfigs(
-      wizardStaffs.map(s => ({
-        staffId: String(s.id),
-        shiftType: 'rotation' as StaffShiftType,
-        preferredOffDays: [],
-      }))
-    );
-    setPreferredOffStaffId('');
-    const autoD = wizardShifts.find(s => /데이|day|주간/i.test(s.name));
-    const autoE = wizardShifts.find(s => /이브|evening|eve|오후/i.test(s.name));
-    const autoN = wizardShifts.find(s => /나이트|night|야간/i.test(s.name));
-    setWizardDShiftId(prev => prev || autoD?.id || wizardShifts[0]?.id || '');
-    setWizardEShiftId(prev => prev || autoE?.id || wizardShifts[1]?.id || '');
-    setWizardNShiftId(prev => prev || autoN?.id || wizardShifts[2]?.id || '');
-  }, [wizardDept, wizardOpen, wizardShifts]);
-
   const saveSchedule = async () => {
     const staffIds = visibleStaffs.map(s => s.id).filter(Boolean);
     if (!staffIds.length) return;
@@ -1023,27 +256,6 @@ export default function NurseSchedule({
     }));
   };
 
-  const handleGenerate = async () => {
-    setGenerating(true);
-    await new Promise(r => setTimeout(r, 400));
-    const result = generateSchedule({
-      staffs: wizardStaffs,
-      staffConfigs,
-      year, month,
-      days: getDaysInMonth(year, month),
-      minStaff: wizardMinStaff,
-      rules: wizardRules,
-    });
-    setSchedule(prev => ({ ...prev, ...result }));
-    setDept(wizardDept);
-    setActiveMinStaff(wizardMinStaff);
-    setActiveGenerationRules(wizardRules);
-    setWizardOpen(false);
-    setWizardStep(1);
-    setGenerating(false);
-    toast(`${wizardDept} 근무표가 자동 생성되었습니다.`, 'success');
-  };
-
   const changeMonth = (offset: number) => {
     let m = month + offset;
     let y = year;
@@ -1056,27 +268,6 @@ export default function NurseSchedule({
 
   return (
     <div className="h-full flex flex-col overflow-hidden relative">
-      {/* 마법사 오버레이 (전체화면) */}
-      {wizardOpen && (
-        <WizardOverlay
-          step={wizardStep} setStep={setWizardStep}
-          wizardDept={wizardDept} setWizardDept={setWizardDept}
-          availableDepts={availableDepts} wardDepts={wardDepts}
-          wizardShifts={wizardShifts}
-          wizardDShiftId={wizardDShiftId} setWizardDShiftId={setWizardDShiftId}
-          wizardEShiftId={wizardEShiftId} setWizardEShiftId={setWizardEShiftId}
-          wizardNShiftId={wizardNShiftId} setWizardNShiftId={setWizardNShiftId}
-          wizardStaffs={wizardStaffs}
-          staffConfigs={staffConfigs} setStaffConfigs={setStaffConfigs}
-          preferredOffStaffId={preferredOffStaffId} setPreferredOffStaffId={setPreferredOffStaffId}
-          wizardMinStaff={wizardMinStaff} setWizardMinStaff={setWizardMinStaff}
-          wizardRules={wizardRules} setWizardRules={setWizardRules}
-          generating={generating} onGenerate={handleGenerate}
-          onClose={() => { setWizardOpen(false); setWizardStep(1); }}
-          year={year} month={month}
-        />
-      )}
-
       {/* 메인 레이아웃 */}
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
 
@@ -1095,12 +286,6 @@ export default function NurseSchedule({
             </div>
             {/* 뱃지 */}
             <div className="flex gap-2">
-              <span className="px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-200 text-[10px] font-black">
-                OFF 최소 {activeGenerationRules.minOffDays}
-              </span>
-              <span className="px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-200 text-[10px] font-black">
-                N 최대 {activeGenerationRules.maxNightShifts}
-              </span>
               {totalViolations > 0 && (
                 <span className="px-2.5 py-1 rounded-full bg-red-500 text-white text-[10px] font-black">
                   ⚠ 위반 {totalViolations}건
@@ -1114,18 +299,6 @@ export default function NurseSchedule({
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => {
-                setWizardDept(wardDepts.includes(dept) ? dept : (wardDepts[0] ?? ''));
-                setWizardRules(activeGenerationRules);
-                setWizardOpen(true);
-                setWizardStep(1);
-              }}
-              className="px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-[12px] font-bold hover:opacity-90 transition-all flex items-center gap-1.5"
-            >
-              ✨ 3교대 마법사
-            </button>
             {!editMode ? (
               <button
                 type="button" onClick={() => setEditMode(true)}
@@ -1169,6 +342,13 @@ export default function NurseSchedule({
           </div>
         )}
 
+        {/* ── 교대근무자 안내 ── */}
+        <div className="shrink-0 px-4 py-1.5 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-900">
+          <p className="text-[11px] text-blue-700 dark:text-blue-300 font-bold">
+            교대근무자(D/E/N 순환·야간전담·이브닝전담)만 표시됩니다. 상근직(day_fixed)은 근무유형대로 출퇴근하므로 근무표에서 제외됩니다.
+          </p>
+        </div>
+
         {/* ── 범례 + 편집 안내 ── */}
         <div className="shrink-0 flex items-center gap-4 px-4 py-2 bg-[var(--card)] border-b border-[var(--border)] flex-wrap">
           {(['D', 'E', 'N', 'OFF', 'LEAVE', 'TRAINING'] as ShiftRole[]).map(r => {
@@ -1199,18 +379,7 @@ export default function NurseSchedule({
                   ? '병동(ward) 계열 부서가 없습니다'
                   : `${dept} 에 소속된 직원이 없습니다`}
               </p>
-              <p className="text-sm">✨ 3교대 마법사로 근무표를 생성하거나, 인사관리에서 부서를 확인하세요.</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setWizardRules(activeGenerationRules);
-                  setWizardOpen(true);
-                  setWizardStep(1);
-                }}
-                className="mt-2 px-6 py-3 rounded-xl bg-[var(--accent)] text-white font-bold text-sm hover:opacity-90 transition-all"
-              >
-                ✨ 3교대 마법사 시작
-              </button>
+              <p className="text-sm">인사관리에서 직원의 부서와 근무유형을 확인하세요.</p>
             </div>
           ) : (
             <table className="w-full border-collapse" style={{ minWidth: `${200 + days * 40}px` }}>
