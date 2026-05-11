@@ -115,7 +115,12 @@ export function useChatSidebarState({
       if (!keyword) return true;
       return label.includes(keyword);
     });
-    return sortRoomsForSidebar(filtered, roomPrefs, pinnedRoomOrder);
+    const shouldShowHiddenFallback =
+      !showHiddenRooms &&
+      !keyword &&
+      visibleRooms.length > 0 &&
+      filtered.length === 0;
+    return sortRoomsForSidebar(shouldShowHiddenFallback ? visibleRooms : filtered, roomPrefs, pinnedRoomOrder);
   }, [deferredOmniSearch, pinnedRoomOrder, roomLabelMap, roomPrefs, showHiddenRooms, visibleRooms]);
 
   const effectivePinnedRoomOrder = useMemo(() => {
