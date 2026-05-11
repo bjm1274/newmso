@@ -285,54 +285,6 @@ function MessengerDrawerImpl({
               <div className={`absolute top-1 h-4 w-4 rounded-full bg-[var(--card)] transition-all ${roomNotifyOn ? 'right-1' : 'left-1'}`} />
             </button>
           </div>
-          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--card)] p-3 shadow-sm">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">방별 알림 방식</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {([
-                ['all', '전체'],
-                ['mention_only', '멘션만'],
-                ['keyword', '키워드'],
-                ['mute', '무음'],
-              ] as const).map(([mode, label]) => (
-                <button
-                  key={mode}
-                  type="button"
-                  data-testid={`chat-room-notify-mode-${mode}`}
-                  disabled={!roomNotifyOn && mode !== 'mute'}
-                  onClick={() => onSelectRoomNotificationMode(mode)}
-                  className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors ${
-                    roomNotificationMode === mode
-                      ? 'bg-[var(--accent)] text-white'
-                      : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)] hover:text-[var(--accent)]'
-                  } disabled:cursor-not-allowed disabled:opacity-50`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {roomNotificationMode === 'keyword' ? (
-              <div className="mt-3 space-y-2">
-                <input
-                  data-testid="chat-room-notify-keyword"
-                  value={roomNotificationKeyword}
-                  onChange={(event) => onRoomNotificationKeywordChange(event.target.value)}
-                  placeholder="예: 긴급, 수술, 환자명"
-                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2 text-xs font-semibold outline-none focus:border-[var(--accent)]"
-                />
-                <p className="text-[10px] text-[var(--toss-gray-3)]">
-                  키워드가 포함된 채팅만 알림을 표시합니다.
-                </p>
-              </div>
-            ) : (
-              <p className="mt-3 text-[10px] text-[var(--toss-gray-3)]">
-                {roomNotificationMode === 'mention_only'
-                  ? '@멘션이 있는 메시지만 알림을 표시합니다.'
-                  : roomNotificationMode === 'mute'
-                    ? '이 방의 실시간 알림을 모두 숨깁니다.'
-                    : '이 방의 모든 메시지 알림을 표시합니다.'}
-              </p>
-            )}
-          </div>
 
           <button
             type="button"
@@ -346,46 +298,10 @@ function MessengerDrawerImpl({
             </div>
             <span className="text-[10px] font-bold text-blue-400 transition-transform group-hover:translate-x-1">열기</span>
           </button>
-          {onOpenOpsCenter ? (
-            <button
-              type="button"
-              data-testid="chat-open-ops-center"
-              onClick={onOpenOpsCenter}
-              className="group flex w-full items-center justify-between rounded-2xl border border-emerald-100 bg-emerald-500/10 p-3.5 transition-colors hover:bg-emerald-500/20 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-lg">운영</span>
-                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">운영센터 열기</span>
-              </div>
-              <span className="text-[10px] font-bold text-emerald-500 transition-transform group-hover:translate-x-1">분석</span>
-            </button>
-          ) : null}
 
           <div className="space-y-3">
             <p className="px-1 text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">상단 공지</p>
             <div data-testid="chat-drawer-notice" className="rounded-2xl border border-orange-100 bg-orange-500/10 p-4 dark:border-orange-900/30 dark:bg-orange-950/20">
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <p className="text-xs font-bold text-orange-800 dark:text-orange-300">공지</p>
-                {hasNoticeMessage ? (
-                  <>
-                    <span
-                      data-testid="chat-notice-read-count"
-                      className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold text-emerald-700"
-                    >
-                      읽음 {noticeReadCount}
-                    </span>
-                    <span
-                      data-testid="chat-notice-unread-count"
-                      className="rounded-full bg-orange-500/10 px-2.5 py-1 text-[10px] font-bold text-orange-700"
-                    >
-                      미확인 {noticeUnreadCount}
-                    </span>
-                    <span className="rounded-full bg-white/60 px-2.5 py-1 text-[10px] font-bold text-orange-900/70">
-                      대상 {noticeRecipientCount}
-                    </span>
-                  </>
-                ) : null}
-              </div>
               <p className="whitespace-pre-wrap text-xs leading-relaxed text-orange-900/70 dark:text-orange-200/50">
                 {getMessageDisplayText(
                   currentNoticeMessage?.content,
@@ -394,35 +310,6 @@ function MessengerDrawerImpl({
                   '등록된 공지가 없습니다.',
                 )}
               </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  data-testid="chat-notice-jump-message"
-                  disabled={!hasNoticeMessage}
-                  onClick={onJumpToNoticeMessage}
-                  className="rounded-full border border-orange-200 bg-white/80 px-3 py-1.5 text-[11px] font-bold text-orange-800 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  공지 메시지로 이동
-                </button>
-                <button
-                  type="button"
-                  data-testid="chat-notice-open-read-status"
-                  disabled={!hasNoticeMessage}
-                  onClick={onOpenNoticeReadStatus}
-                  className="rounded-full border border-orange-200 bg-white/80 px-3 py-1.5 text-[11px] font-bold text-orange-800 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  읽음 현황 보기
-                </button>
-                <button
-                  type="button"
-                  data-testid="chat-notice-send-reminder"
-                  disabled={!hasNoticeMessage || noticeUnreadCount === 0 || noticeReminderBusy}
-                  onClick={() => void onSendNoticeReminder()}
-                  className="rounded-full border border-orange-300 bg-orange-500/10 px-3 py-1.5 text-[11px] font-bold text-orange-700 transition-colors hover:bg-orange-500/15 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {noticeReminderBusy ? '리마인드 전송 중' : '미확인자 리마인드'}
-                </button>
-              </div>
             </div>
           </div>
 
