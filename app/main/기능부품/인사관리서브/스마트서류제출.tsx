@@ -142,10 +142,7 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
     return (
         <div className="space-y-4 animate-in fade-in duration-500">
             {dialog}
-            <div className="flex justify-between items-end border-b border-[var(--border)] pb-3">
-                <div>
-                    <h2 className="text-base font-bold text-[var(--foreground)] tracking-tight">스마트 서류 제출</h2>
-                </div>
+            <div className="flex justify-end border-b border-[var(--border)] pb-3">
                 {isAdmin && (
                     <div className="flex gap-2">
                         <button onClick={() => setActiveTab('내제출')} className={`rounded-[var(--radius-md)] px-3 py-1.5 text-xs font-bold transition-colors ${activeTab === '내제출' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--foreground)] hover:bg-[var(--toss-gray-2)]'}`}>내 서류</button>

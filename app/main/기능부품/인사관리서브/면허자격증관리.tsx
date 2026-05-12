@@ -349,8 +349,7 @@ export default function LicenseManager({
       {/* 헤더 */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div>
-          <h2 className="text-base font-bold text-[var(--foreground)]">면허·자격증 관리</h2>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">직원별 면허·자격증 만료일을 추적합니다.</p>
+          <p className="text-xs text-[var(--toss-gray-3)]">직원별 면허·자격증 만료일을 추적합니다.</p>
         </div>
         <div className="flex items-center gap-2">
           <button

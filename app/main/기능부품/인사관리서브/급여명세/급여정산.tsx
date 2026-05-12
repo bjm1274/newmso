@@ -1566,8 +1566,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm overflow-hidden animate-in fade-in duration-300" data-testid="salary-settlement-view">
       <div className="bg-[var(--page-bg)] border-b border-[var(--border)] px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-[var(--foreground)]">급여 정산</h2>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">법적 비과세 한도 자동 반영</p>
+          <p className="text-xs text-[var(--toss-gray-3)]">법적 비과세 한도 자동 반영</p>
         </div>
         <div className="flex border border-[var(--border)] rounded-[var(--radius-md)] p-0.5 bg-[var(--card)]">
           {[

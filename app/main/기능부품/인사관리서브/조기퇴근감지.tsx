@@ -138,10 +138,7 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
   return (
     <div className="p-4 md:p-4 space-y-4" data-testid="attendance-analysis-early-leaving">
       {/* 헤더 */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-base font-bold text-[var(--foreground)]">조기 퇴근 감지</h2>
-        </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-3">
         <input
           type="month"
           value={yearMonth}

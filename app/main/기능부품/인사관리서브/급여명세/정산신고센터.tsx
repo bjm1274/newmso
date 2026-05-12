@@ -134,8 +134,7 @@ export default function SettlementReportingCenter({
             <LucideIcon name="FileCheck2" size={18} />
           </span>
           <div className="min-w-0">
-            <h2 className="truncate text-base font-black text-[var(--foreground)]">정산·신고센터</h2>
-            <p className="mt-0.5 text-xs font-medium text-[var(--zinc-500)]">
+            <p className="text-xs font-medium text-[var(--zinc-500)]">
               연말정산, 퇴직정산, 원천징수, 4대보험, 퇴직연금을 한곳에서 관리합니다.
             </p>
           </div>

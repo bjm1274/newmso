@@ -12,9 +12,6 @@ interface Props {
 export default function PayrollComplianceCheck({ staffs, selectedCo, user }: Props) {
   return (
     <div className="space-y-4 p-4 md:p-4" data-testid="payroll-compliance-check-view">
-      <div>
-        <h2 className="text-base font-bold text-[var(--foreground)]">최저임금·비과세 점검</h2>
-      </div>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
           <MinWageChecker staffs={staffs} selectedCo={selectedCo} user={user} />

@@ -65,9 +65,6 @@ export default function OrdinaryWageCalculator({ staffs, selectedCo, user }: Pro
 
   return (
     <div className="p-4 md:p-4 space-y-4 max-w-4xl mx-auto">
-      <div>
-        <h2 className="text-lg font-bold text-[var(--foreground)]">통상임금 자동 계산기</h2>
-      </div>
 
       {/* 직원 선택 */}
       <div>

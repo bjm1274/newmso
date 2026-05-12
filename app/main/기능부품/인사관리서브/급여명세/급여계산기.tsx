@@ -422,7 +422,6 @@ export default function PayrollCalculator({ staffs = [], selectedCo = '전체' }
             <LucideIcon name="Calculator" size={18} />
           </span>
           <div className="min-w-0">
-            <h2 className="truncate text-base font-black text-[var(--foreground)]">급여 계산기</h2>
             <p className="mt-0.5 text-xs font-medium text-[var(--zinc-500)]">
               실수령액과 통상임금 기준 수당을 한 화면에서 계산합니다.
             </p>

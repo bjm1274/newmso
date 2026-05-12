@@ -84,9 +84,6 @@ export default function TotalLaborCostForecast({ staffs, selectedCo, user }: Pro
 
   return (
     <div className="p-4 md:p-4 space-y-4 max-w-4xl mx-auto">
-      <div>
-        <h2 className="text-lg font-bold text-[var(--foreground)]">연간 총인건비 예측</h2>
-      </div>
 
       {/* 요약 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

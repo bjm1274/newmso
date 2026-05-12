@@ -19,10 +19,10 @@ export default function DeductionCalculator({ grossSalary: initialGross }: { gro
 
   return (
     <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
+      <div className="mb-3 flex items-center gap-2">
         <span className="h-4 w-1 rounded bg-red-500" />
-        법정 공제 계산기 (2026)
-      </h2>
+        <span className="text-sm font-semibold text-[var(--foreground)]">법정 공제 계산기 (2026)</span>
+      </div>
       <div className="mb-3 space-y-1">
         <label className="block text-xs font-medium text-[var(--toss-gray-4)]">월 총급여</label>
         <input

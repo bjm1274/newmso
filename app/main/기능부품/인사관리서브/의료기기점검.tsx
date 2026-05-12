@@ -119,10 +119,7 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
   return (
     <div className="p-4 md:p-5 space-y-5">
       {dialog}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div>
-          <h2 className="text-base font-bold text-[var(--foreground)]">의료기기 정기점검 관리</h2>
-        </div>
+      <div className="flex justify-end">
         <button onClick={openAddDevice} className="px-4 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-sm font-bold shadow-sm hover:opacity-90">+ 장비 등록</button>
       </div>
 

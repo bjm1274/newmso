@@ -239,8 +239,7 @@ export default function InsuranceEDI({
     <div className="space-y-5 p-4 md:p-4" data-testid="insurance-edi-view">
       <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h2 className="text-base font-bold text-[var(--foreground)]">4대보험 EDI 파일 자동 생성</h2>
-          <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
+          <p className="text-xs text-[var(--toss-gray-3)]">
             해당 월 급여가 확정된 직원만 포함합니다. 산재보험은 회사 업종 기준 사업주 부담으로 표시합니다.
           </p>
         </div>

@@ -294,9 +294,6 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
     <div className="mx-auto max-w-5xl space-y-5 p-4 md:p-4" data-testid="incident-report-view">
       {dialog}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-[var(--foreground)]">사고 보고서 관리</h2>
-        </div>
         <div className="flex gap-2">
           {(['목록', '작성', '통계'] as const).map((targetTab) => (
             <button

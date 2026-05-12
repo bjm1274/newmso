@@ -72,9 +72,6 @@ export default function TaxFreeLimitChecker({ staffs, selectedCo, user }: Props)
 
   return (
     <div className="p-4 md:p-4 space-y-5 max-w-5xl mx-auto">
-      <div>
-        <h2 className="text-lg font-bold text-[var(--foreground)]">비과세 한도 초과 경고</h2>
-      </div>
 
       <div className="flex flex-wrap gap-3 items-center">
         <div>

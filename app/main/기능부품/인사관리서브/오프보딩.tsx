@@ -557,9 +557,6 @@ export default function OffboardingView({
     <div className="max-w-6xl space-y-4" data-testid="offboarding-view">
       {dialog}
       <div className="flex flex-col gap-3 border-b border-[var(--border)] pb-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-[var(--foreground)]">인력 오프보딩 타임라인</h2>
-        </div>
         <div className="flex gap-2">
           {([
             ['active', '진행 중인 퇴사'],

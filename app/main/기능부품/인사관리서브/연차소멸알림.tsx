@@ -129,9 +129,6 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
   return (
     <div className="mx-auto max-w-4xl space-y-5 p-4 md:p-4" data-testid="attendance-analysis-leave-expiry">
       {dialog}
-      <div>
-        <h2 className="text-base font-bold text-[var(--foreground)]">연차 소멸 예정 알림</h2>
-      </div>
 
       <div className="flex flex-wrap gap-2">
         {FILTER_OPTIONS.map((option) => (

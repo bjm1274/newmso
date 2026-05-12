@@ -147,10 +147,7 @@ export default function GrossNetComparison({ staffs, selectedCo }: Props) {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 p-4 md:p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-[var(--foreground)]">세전·세후 비교 분석</h2>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <div className="flex items-center gap-2">
           <input
             type="month"
