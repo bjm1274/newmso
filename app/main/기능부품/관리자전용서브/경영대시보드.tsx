@@ -1,18 +1,24 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { fetchPendingApprovalCount } from '@/lib/data/dashboard-widgets';
 import { MenuIcon } from '../조직도서브/조직도측면창';
 
 export default function BusinessDashboard({ staffs = [], inventory = [] }: Record<string, unknown>) {
   const _staffs = (staffs as Record<string, unknown>[]) ?? [];
-  const [approvals, setApprovals] = useState<any[]>([]);
+  const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
 
   useEffect(() => {
-    const fetch = async () => {
-      const { data: appr } = await supabase.from('approvals').select('status').eq('status', '대기');
-      setApprovals(appr || []);
+    let cancelled = false;
+    fetchPendingApprovalCount()
+      .then((count) => {
+        if (!cancelled) setPendingApprovalCount(count);
+      })
+      .catch(() => {
+        if (!cancelled) setPendingApprovalCount(0);
+      });
+    return () => {
+      cancelled = true;
     };
-    fetch();
   }, []);
 
   const activeStaffs = _staffs.filter((staff: Record<string, unknown>) => String(staff.status ?? staff.상태 ?? '').trim() !== '퇴사');
@@ -43,8 +49,8 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
     },
     {
       label: '미결재 건수',
-      value: `${approvals.length}건`,
-      detail: approvals.length > 0 ? '검토 필요' : '정상',
+      value: `${pendingApprovalCount}건`,
+      detail: pendingApprovalCount > 0 ? '검토 필요' : '정상',
       icon: 'history',
       tone: 'text-[var(--warning)] bg-[var(--warning-light)]',
     },
@@ -59,7 +65,7 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
 
   const notices = [
     { label: '3월 급여 이상치 없음', detail: '2시간 전', icon: 'check', tone: 'text-[var(--success)] bg-[var(--success-light)]' },
-    { label: `결재 대기 ${approvals.length}건`, detail: '5분 전', icon: 'history', tone: 'text-[var(--warning)] bg-[var(--warning-light)]' },
+    { label: `결재 대기 ${pendingApprovalCount}건`, detail: '5분 전', icon: 'history', tone: 'text-[var(--warning)] bg-[var(--warning-light)]' },
     { label: '정서운 근무 이탈 감지', detail: '12분 전', icon: 'users', tone: 'text-[var(--warning)] bg-[var(--warning-light)]' },
   ];
 
