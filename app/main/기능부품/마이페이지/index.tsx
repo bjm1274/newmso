@@ -27,6 +27,7 @@ import { HR_TAB_KEY, INV_VIEW_KEY, MYPAGE_TAB_KEY } from '@/app/main/navigation-
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 import { LucideIcon } from '../조직도서브/조직도측면창';
 import ShortcutManager from './단축키관리';
+import BetaFeatureToggle from '@/app/components/BetaFeatureToggle';
 import {
   FAVORITES_KEY,
   buildMenuEntry,
@@ -1072,7 +1073,8 @@ function MyPageMain({
             </div>
           )}
           {activeTab === 'shortcuts' && (
-            <div data-testid="mypage-shortcuts-tab" className="animate-premium-fade pb-3">
+            <div data-testid="mypage-shortcuts-tab" className="animate-premium-fade pb-3 space-y-3">
+              <BetaFeatureToggle />
               <ShortcutManager user={user as Record<string, unknown> | null} />
             </div>
           )}
