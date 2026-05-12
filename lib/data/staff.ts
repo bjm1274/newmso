@@ -34,3 +34,35 @@ export async function fetchStaffsBasic(): Promise<StaffBasic[]> {
     { ttl: STAFF_TTL },
   );
 }
+
+/**
+ * audit_logs에서 user_id → user_name 매핑을 조회.
+ * 퇴직 등으로 staff_members에 없는 user_id의 historic 이름 복원용.
+ */
+export async function fetchHistoricalStaffNames(
+  unresolvedIds: string[],
+): Promise<Record<string, string>> {
+  if (!unresolvedIds.length) return {};
+  const sortedKey = [...unresolvedIds].sort().join(',');
+  return fetcher(
+    `staff:historical-names:${sortedKey}`,
+    async () => {
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('user_id, user_name, created_at')
+        .in('user_id', unresolvedIds)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+
+      const nextMap: Record<string, string> = {};
+      for (const row of data ?? []) {
+        const userId = typeof row.user_id === 'string' ? row.user_id.trim() : '';
+        const userName = typeof row.user_name === 'string' ? row.user_name.trim() : '';
+        if (!userId || !userName || nextMap[userId]) continue;
+        nextMap[userId] = userName;
+      }
+      return nextMap;
+    },
+    { ttl: STAFF_TTL },
+  );
+}

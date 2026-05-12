@@ -3,12 +3,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EmptyState, LoadingPanel } from '@/app/components/StatePanel';
 import { useActionDialog } from '@/app/components/useActionDialog';
-import { supabase } from '@/lib/supabase';
 import {
   buildOfficialDocumentApprovalContent,
   extractOfficialDocRequest,
   type OfficialDocRequest,
 } from '@/lib/official-document-approval';
+import {
+  deleteOfficialDoc,
+  fetchOfficialDocs,
+  fetchRecentApprovalsForOfficial,
+  updateOfficialDoc,
+} from '@/lib/data/official-docs';
 
 interface Props {
   staffs: any[];
@@ -83,24 +88,14 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
   const fetchDocs = useCallback(async () => {
     setLoading(true);
     try {
-      const [docResult, approvalResult] = await Promise.all([
-        supabase
-          .from('official_doc_log')
-          .select('*')
-          .order('sent_date', { ascending: false }),
-        supabase
-          .from('approvals')
-          .select('id, status, title, created_at, sender_name, current_approver_id, doc_number, meta_data')
-          .order('created_at', { ascending: false })
-          .limit(200),
+      const [docRows, approvalRows] = await Promise.all([
+        fetchOfficialDocs(),
+        fetchRecentApprovalsForOfficial(200),
       ]);
 
-      if (docResult.error) throw docResult.error;
-      if (approvalResult.error) throw approvalResult.error;
+      setDocs(docRows as unknown as OfficialDoc[]);
 
-      setDocs((docResult.data || []) as OfficialDoc[]);
-
-      const workflowRows = ((approvalResult.data || []) as Array<Record<string, unknown>>)
+      const workflowRows = (approvalRows as unknown as Array<Record<string, unknown>>)
         .map((item) => {
           const request = extractOfficialDocRequest(item.meta_data);
           if (!request) return null;
@@ -225,7 +220,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
         note: requestPayload.note,
         company: requestPayload.company,
       };
-      const { error } = await supabase.from('official_doc_log').update(payload).eq('id', editingDoc.id);
+      const { error } = await updateOfficialDoc(editingDoc.id, payload);
       if (error) throw error;
 
       setMessage({ type: 'success', text: '수정되었습니다.' });
@@ -249,7 +244,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
     });
     if (!confirmed) return;
     try {
-      const { error } = await supabase.from('official_doc_log').delete().eq('id', id);
+      const { error } = await deleteOfficialDoc(id);
       if (error) throw error;
       void fetchDocs();
     } catch (e: unknown) {
@@ -259,10 +254,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
 
   const handleToggleReceived = async (doc: OfficialDoc) => {
     try {
-      const { error } = await supabase
-        .from('official_doc_log')
-        .update({ is_received: !doc.is_received })
-        .eq('id', doc.id!);
+      const { error } = await updateOfficialDoc(doc.id!, { is_received: !doc.is_received });
       if (error) throw error;
       void fetchDocs();
     } catch (e: unknown) {
