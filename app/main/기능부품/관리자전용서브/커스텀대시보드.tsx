@@ -1,8 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import { DEFAULT_WIDGETS, WIDGET_DEFINITIONS, type WidgetConfig, type WidgetType } from '@/lib/dashboard-widgets';
+import {
+  fetchActiveStaffCount,
+  fetchActiveStaffLeaves,
+  fetchInventoryItems,
+  fetchPendingApprovalCount,
+  fetchRecentNotifications,
+  fetchTodayCheckedInCount,
+} from '@/lib/data/dashboard-widgets';
 
 type Props = { user: Record<string, unknown>; selectedCo?: string };
 
@@ -31,45 +38,44 @@ export default function CustomDashboard({ user, selectedCo }: Props) {
 
         switch (w.type) {
           case 'staff_count': {
-            const { count } = await supabase.from('staff_members').select('id', { count: 'exact', head: true }).eq('status', '재직');
-            value = count ?? 0;
+            value = await fetchActiveStaffCount();
             subtext = '재직 인원';
             break;
           }
           case 'pending_approvals': {
-            const { count } = await supabase.from('approvals').select('id', { count: 'exact', head: true }).eq('status', '대기');
-            value = count ?? 0;
+            value = await fetchPendingApprovalCount();
             subtext = '건 대기 중';
             break;
           }
           case 'low_stock': {
-            const { data: items } = await supabase.from('inventory').select('id, quantity, min_quantity');
-            const lowCount = (items || []).filter((i: any) => (i.quantity || 0) < (i.min_quantity || 0)).length;
-            value = lowCount;
+            const items = await fetchInventoryItems();
+            value = items.filter((i) => (i.quantity ?? 0) < (i.min_quantity ?? 0)).length;
             subtext = '품목 부족';
             break;
           }
           case 'attendance_rate': {
-            const today = new Date().toISOString().slice(0, 10);
-            const { count: checkedIn } = await supabase.from('attendances').select('id', { count: 'exact', head: true }).eq('date', today).not('check_in', 'is', null);
-            const { count: totalStaff } = await supabase.from('staff_members').select('id', { count: 'exact', head: true }).eq('status', '재직');
-            const rate = totalStaff && totalStaff > 0 ? Math.round(((checkedIn || 0) / totalStaff) * 100) : 0;
+            // fetcher dedup으로 staff_count와 동일 호출은 1회로 합쳐짐
+            const [checkedIn, totalStaff] = await Promise.all([
+              fetchTodayCheckedInCount(),
+              fetchActiveStaffCount(),
+            ]);
+            const rate = totalStaff > 0 ? Math.round((checkedIn / totalStaff) * 100) : 0;
             value = `${rate}%`;
-            subtext = `${checkedIn || 0}/${totalStaff || 0}명`;
+            subtext = `${checkedIn}/${totalStaff}명`;
             break;
           }
           case 'leave_usage': {
-            const { data: staffs } = await supabase.from('staff_members').select('annual_leave_total, annual_leave_used').eq('status', '재직');
-            const totalLeave = (staffs || []).reduce((s: number, st: any) => s + (Number(st.annual_leave_total) || 0), 0);
-            const usedLeave = (staffs || []).reduce((s: number, st: any) => s + (Number(st.annual_leave_used) || 0), 0);
+            const staffs = await fetchActiveStaffLeaves();
+            const totalLeave = staffs.reduce((s, st) => s + (Number(st.annual_leave_total) || 0), 0);
+            const usedLeave = staffs.reduce((s, st) => s + (Number(st.annual_leave_used) || 0), 0);
             const rate = totalLeave > 0 ? Math.round((usedLeave / totalLeave) * 100) : 0;
             value = `${rate}%`;
             subtext = `${usedLeave.toFixed(0)}/${totalLeave.toFixed(0)}일`;
             break;
           }
           case 'recent_notifications': {
-            const { data: notifs } = await supabase.from('notifications').select('title, created_at').order('created_at', { ascending: false }).limit(5);
-            value = (notifs || []).length;
+            const notifs = await fetchRecentNotifications(5);
+            value = notifs.length;
             subtext = '최근 알림';
             break;
           }
