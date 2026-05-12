@@ -1,20 +1,35 @@
 'use client';
 
 /**
- * BottomTab.tsx — Phase 2 모바일 바텀탭
+ * BottomTab.tsx — 모바일 바텀탭 공통 컴포넌트
  *
  * - 5개 탭: 홈 / 업무 / 내정보 / 알림 / 더보기
- * - max-width 600px 미만에서만 표시 (CSS media query)
- * - safe-area-inset-bottom 대응 (env(safe-area-inset-bottom))
- * - 알림 탭 뱃지 (notificationCount > 0 시 표시)
- * - JM6: role="tablist", role="tab", aria-selected, aria-label
- * - JM2: useMemo로 탭 목록 캐싱
- * - JM4: any 금지, BottomTabProps 명시
+ * - max-width 600px 미만에서만 표시
+ * - safe-area-inset-bottom 대응
+ * - JM6: role="tablist"/role="tab", aria-selected, aria-label
  */
 
 import React, { useMemo } from 'react';
 import { Home, Briefcase, User, Bell, Menu } from 'lucide-react';
-import type { BottomTabId, BottomTabProps } from './types';
+
+// ── 타입 ──────────────────────────────────────────────────────────────────────
+
+export type BottomTabId = '홈' | '업무' | '내정보' | '알림' | '더보기';
+
+export const BOTTOM_TAB_IDS = ['홈', '업무', '내정보', '알림', '더보기'] as const satisfies readonly BottomTabId[];
+
+const BOTTOM_TAB_ID_SET = new Set<string>(BOTTOM_TAB_IDS);
+
+export function isBottomTabId(value: unknown): value is BottomTabId {
+  return typeof value === 'string' && BOTTOM_TAB_ID_SET.has(value);
+}
+
+export interface BottomTabProps {
+  currentTabId: BottomTabId;
+  onTabChange: (id: BottomTabId) => void;
+  /** 알림 뱃지 개수 (0이면 미표시) */
+  notificationCount?: number;
+}
 
 // ── 탭 정의 ───────────────────────────────────────────────────────────────────
 
@@ -114,7 +129,6 @@ function TabButton({ tab, isActive, badge, onClick }: TabButtonProps) {
         cursor: 'pointer',
       }}
     >
-      {/* 활성 인디케이터 */}
       {isActive && (
         <span
           aria-hidden="true"
@@ -160,15 +174,14 @@ export default function BottomTab({ currentTabId, onTabChange, notificationCount
 
   return (
     <>
-      {/* CSS: 600px 이상에서 숨김 처리 */}
       <style>{`
         @media (min-width: 600px) {
-          .phase2-bottom-tab { display: none !important; }
+          .erp-bottom-tab { display: none !important; }
         }
       `}</style>
 
       <nav
-        className="phase2-bottom-tab"
+        className="erp-bottom-tab"
         aria-label="모바일 하단 탭 네비게이션"
         style={{
           position: 'fixed',
