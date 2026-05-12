@@ -46,13 +46,10 @@ export default function CongratulationsCondolences({ staffs = [], selectedCo }: 
 
     return (
         <div className="flex flex-col h-full animate-in fade-in duration-300">
-            <header className="p-4 md:p-5 border-b border-[var(--border)] bg-[var(--card)] shrink-0">
+            <header className="px-4 md:px-5 py-2 border-b border-[var(--border)] bg-[var(--card)] shrink-0">
                 <div className="flex justify-between items-center">
-                    <div>
-                        <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">🎊 경조사 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo as string}]</span></h2>
-                        <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-1">직원 경조사 등록 및 경조금 지급 이력 관리</p>
-                    </div>
-                    <button onClick={() => setShowForm(!showForm)} className="px-5 py-2.5 bg-[var(--accent)] text-white text-[11px] font-bold rounded-xl shadow-md hover:opacity-90 transition-all">{showForm ? '취소' : '+ 경조사 등록'}</button>
+                    <span className="text-[12px] font-bold text-[var(--toss-gray-3)] truncate">{selectedCo as string}</span>
+                    <button onClick={() => setShowForm(!showForm)} className="px-5 py-2 bg-[var(--accent)] text-white text-[11px] font-bold rounded-xl shadow-md hover:opacity-90 transition-all">{showForm ? '취소' : '+ 경조사 등록'}</button>
                 </div>
             </header>
             <div className="flex-1 overflow-y-auto p-4 md:p-5 space-y-4 custom-scrollbar bg-[var(--page-bg)]">
