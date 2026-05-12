@@ -16,8 +16,14 @@
 
 import { useState, useRef, type MouseEvent } from 'react';
 import { AttendanceTabs } from '../_shared/AttendanceTabs';
-import { EMPLOYEES, ROSTER_CELLS } from '../_shared/attendance-dummy';
-import type { ShiftType } from '../_shared/attendance-dummy';
+import {
+  getV2Employees,
+  getV2RosterCells,
+} from '@/lib/data/v2-attendance';
+import type { ShiftType } from '@/lib/data/v2-attendance';
+
+const EMPLOYEES   = getV2Employees();
+const ROSTER_CELLS = getV2RosterCells();
 
 // ── 근무 유형 스타일 ──────────────────────────────────────────────────────────
 

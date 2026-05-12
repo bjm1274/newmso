@@ -17,14 +17,21 @@
 import { useState } from 'react';
 import { AttendanceTabs } from '../_shared/AttendanceTabs';
 import {
-  EMPLOYEES,
-  TODAY_RECORDS,
-  LEAVE_REQUESTS,
-  LEAVE_BALANCES,
-  ANOMALY_ALERTS,
-  DEPT_SUMMARIES,
-} from '../_shared/attendance-dummy';
-import type { AttendanceStatus, AnomalyType } from '../_shared/attendance-dummy';
+  getV2Employees,
+  getV2TodayRecords,
+  getV2LeaveRequests,
+  getV2LeaveBalances,
+  getV2AnomalyAlerts,
+  getV2DeptSummaries,
+} from '@/lib/data/v2-attendance';
+import type { AttendanceStatus, AnomalyType } from '@/lib/data/v2-attendance';
+
+const EMPLOYEES     = getV2Employees();
+const TODAY_RECORDS = getV2TodayRecords();
+const LEAVE_REQUESTS  = getV2LeaveRequests();
+const LEAVE_BALANCES  = getV2LeaveBalances();
+const ANOMALY_ALERTS  = getV2AnomalyAlerts();
+const DEPT_SUMMARIES  = getV2DeptSummaries();
 
 // ── 유틸 ─────────────────────────────────────────────────────────────────────
 

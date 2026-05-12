@@ -17,11 +17,15 @@
 import { useState, useCallback, useRef, type KeyboardEvent } from 'react';
 import { AttendanceTabs } from '../_shared/AttendanceTabs';
 import {
-  EMPLOYEES,
-  MONTHLY_RECORDS,
-  LEAVE_REQUESTS,
-} from '../_shared/attendance-dummy';
-import type { AttendanceStatus } from '../_shared/attendance-dummy';
+  getV2Employees,
+  getV2MonthlyRecords,
+  getV2LeaveRequests,
+} from '@/lib/data/v2-attendance';
+import type { AttendanceStatus } from '@/lib/data/v2-attendance';
+
+const EMPLOYEES     = getV2Employees();
+const MONTHLY_RECORDS = getV2MonthlyRecords();
+const LEAVE_REQUESTS  = getV2LeaveRequests();
 
 // ── 상수 ─────────────────────────────────────────────────────────────────────
 
