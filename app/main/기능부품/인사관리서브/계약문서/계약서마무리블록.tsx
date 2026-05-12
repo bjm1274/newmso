@@ -30,9 +30,12 @@ export default function ContractClosingBlock(props: Props) {
                 ? 'bg-blue-500/10 text-blue-700'
                 : 'bg-[var(--muted)] text-[var(--toss-gray-4)]';
         return (
-            <div className="flex text-[11.5px]">
-                <span className={`w-[78px] shrink-0 px-2.5 py-1.5 ${labelClass} font-bold`}>{label}</span>
-                <span className="flex-1 px-2.5 py-1.5 text-[var(--foreground)] font-semibold leading-snug break-keep">
+            <div className="flex items-stretch text-[11.5px] min-h-[36px]">
+                <span className={`w-[78px] shrink-0 flex items-center px-2.5 ${labelClass} font-bold`}>{label}</span>
+                <span
+                    className="flex-1 min-w-0 flex items-center px-2.5 text-[var(--foreground)] font-semibold leading-snug truncate"
+                    title={value}
+                >
                     {value}
                 </span>
             </div>
@@ -41,29 +44,33 @@ export default function ContractClosingBlock(props: Props) {
 
     return (
         <div className="mt-5 space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-3">
                 <div className="rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--card)]">
                     <div className="px-3 py-2 bg-slate-800 text-white text-center">
                         <span className="text-[10px] font-black tracking-[0.2em]">사 용 자</span>
                     </div>
                     <div className="divide-y divide-[var(--border-subtle)]">
-                        {renderRow('회사명', companyName)}
-                        {renderRow('사업자번호', companyBusinessNo)}
+                        {renderRow(
+                            '회사명',
+                            companyBusinessNo
+                                ? `${companyName ?? ''} (${companyBusinessNo})`.trim()
+                                : companyName,
+                        )}
                         {renderRow('소재지', companyAddress)}
                         {renderRow('연락처', companyPhone)}
-                        <div className="flex items-center text-[11.5px]">
-                            <span className="w-[78px] shrink-0 px-2.5 py-1.5 bg-[var(--muted)] text-[var(--toss-gray-4)] font-bold">대표자</span>
-                            <span className="flex-1 px-2.5 py-1.5 text-[var(--foreground)] font-semibold leading-snug flex items-center gap-2">
-                                <span>{companyCeo || '-'}</span>
+                        <div className="flex items-stretch text-[11.5px] min-h-[36px]">
+                            <span className="w-[78px] shrink-0 flex items-center px-2.5 bg-[var(--muted)] text-[var(--toss-gray-4)] font-bold">대표자</span>
+                            <span className="flex-1 min-w-0 px-2.5 text-[var(--foreground)] font-semibold leading-snug flex items-center justify-between gap-2">
+                                <span className="truncate" title={companyCeo || ''}>{companyCeo || '-'}</span>
                                 {sealUrl ? (
                                     <img
                                         src={sealUrl}
                                         alt="직인"
-                                        className="w-10 h-10 object-contain select-none pointer-events-none"
+                                        className="w-8 h-8 object-contain select-none pointer-events-none shrink-0"
                                         style={{ mixBlendMode: 'multiply' }}
                                     />
                                 ) : (
-                                    <span className="inline-flex items-center justify-center px-2 py-0.5 border-2 border-red-400/70 rounded-full text-red-500 font-black text-[10px]">
+                                    <span className="inline-flex items-center justify-center px-2 py-0.5 border-2 border-red-400/70 rounded-full text-red-500 font-black text-[10px] shrink-0">
                                         ( 인 )
                                     </span>
                                 )}
@@ -80,14 +87,14 @@ export default function ContractClosingBlock(props: Props) {
                         {renderRow('성명', employeeName, 'employee')}
                         {renderRow('주소', employeeAddress, 'employee')}
                         {renderRow('연락처', employeePhone, 'employee')}
-                        <div className="flex items-center text-[11.5px]">
-                            <span className="w-[78px] shrink-0 px-2.5 py-1.5 bg-blue-500/10 text-blue-700 font-bold">서명</span>
-                            <span className="flex-1 px-2.5 py-1.5 leading-snug flex items-center gap-2 min-h-[36px]">
+                        <div className="flex items-stretch text-[11.5px] min-h-[36px]">
+                            <span className="w-[78px] shrink-0 flex items-center px-2.5 bg-blue-500/10 text-blue-700 font-bold">서명</span>
+                            <span className="flex-1 min-w-0 px-2.5 leading-snug flex items-center gap-2">
                                 {signatureDataUrl ? (
                                     <img
                                         src={signatureDataUrl}
                                         alt="서명"
-                                        className="h-8 object-contain"
+                                        className="h-7 object-contain"
                                         style={{ mixBlendMode: 'multiply' }}
                                     />
                                 ) : (
