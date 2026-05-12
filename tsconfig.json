@@ -42,6 +42,7 @@
     "_*.ts",
     "_*.tsx",
     "analysis_artifacts",
-    "board"
+    "board",
+    "scripts"
   ]
 }
