@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import { formatWon } from '@/lib/date-formatter';
+import { fetchPayrollRecordsByMonth } from '@/lib/data/payroll';
+import { fetchHistoricalStaffNames } from '@/lib/data/staff';
 
 export const DEFAULT_THRESHOLD = 20;
 
@@ -124,16 +125,10 @@ export async function detectPayrollAnomalies({
   const previousMonth = getPreviousMonth(currentMonth);
   const staffLookup = buildStaffLookup(staffs);
 
-  const [currentResult, previousResult] = await Promise.all([
-    supabase.from('payroll_records').select('staff_id, net_pay').eq('year_month', currentMonth),
-    supabase.from('payroll_records').select('staff_id, net_pay').eq('year_month', previousMonth),
-  ]);
-
-  if (currentResult.error) throw currentResult.error;
-  if (previousResult.error) throw previousResult.error;
-
-  const currentRows = (currentResult.data ?? []) as PayrollRow[];
-  const previousRows = (previousResult.data ?? []) as PayrollRow[];
+  const [currentRows, previousRows] = await Promise.all([
+    fetchPayrollRecordsByMonth(currentMonth),
+    fetchPayrollRecordsByMonth(previousMonth),
+  ]) as [PayrollRow[], PayrollRow[]];
 
   const currentMap = new Map<string, PayrollRow>();
   const previousMap = new Map<string, PayrollRow>();
@@ -327,37 +322,14 @@ export default function SalaryAnomalyDetector({ staffs = [] as StaffLike[] }) {
 
     let cancelled = false;
 
-    const fetchHistoricalNames = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('audit_logs')
-          .select('user_id, user_name, created_at')
-          .in('user_id', unresolvedIds)
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        const nextMap: Record<string, string> = {};
-
-        for (const row of data ?? []) {
-          const userId = typeof row.user_id === 'string' ? row.user_id.trim() : '';
-          const userName = typeof row.user_name === 'string' ? row.user_name.trim() : '';
-          if (!userId || !userName || nextMap[userId]) continue;
-          nextMap[userId] = userName;
-        }
-
-        if (!cancelled) {
-          setHistoricalStaffNames(nextMap);
-        }
-      } catch (error) {
+    fetchHistoricalStaffNames(unresolvedIds)
+      .then((nextMap) => {
+        if (!cancelled) setHistoricalStaffNames(nextMap);
+      })
+      .catch((error) => {
         console.warn('급여 이력용 직원명 보조 조회 실패:', error);
-        if (!cancelled) {
-          setHistoricalStaffNames({});
-        }
-      }
-    };
-
-    void fetchHistoricalNames();
+        if (!cancelled) setHistoricalStaffNames({});
+      });
 
     return () => {
       cancelled = true;
