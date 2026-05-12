@@ -2,6 +2,7 @@
 // @ts-nocheck
 'use client';
 
+import { useEffect, useState } from 'react';
 import RosterWizardRuleStep from './RosterWizardRuleStep';
 
 type RosterWizardModalProps = Record<string, any>;
@@ -85,7 +86,45 @@ export default function RosterWizardModal(props: RosterWizardModalProps) {
     workingShifts,
   } = props;
 
-    if (!wizardOpen) return null;
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  if (!wizardOpen) return null;
+
+  if (isMobile) {
+    return (
+      <div
+        className="fixed inset-0 z-40 flex items-center justify-center bg-black/45 px-6"
+        role="dialog"
+        aria-modal="true"
+        aria-label="근무표 자동편성 — 데스크톱 전용 안내"
+      >
+        <div className="flex flex-col items-center justify-center rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-8 text-center shadow-sm max-w-sm w-full">
+          <div className="mb-4 text-5xl" aria-hidden="true">💻</div>
+          <h2 className="text-base font-bold text-[var(--foreground)]">
+            근무표 자동편성은 데스크톱에서 열어주세요
+          </h2>
+          <p className="mt-2 text-[12px] font-medium text-[var(--toss-gray-3)] max-w-xs leading-relaxed">
+            5단계 위저드와 셀 편집이 PC 폭에 최적화되어 있어 모바일에서는 정상 동작하지 않습니다.
+            가로 768px 이상에서 다시 열어 주세요.
+          </p>
+          <button
+            type="button"
+            onClick={closeWizard}
+            className="mt-6 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-5 py-2.5 text-sm font-bold text-[var(--foreground)]"
+            aria-label="닫기"
+          >
+            닫기
+          </button>
+        </div>
+      </div>
+    );
+  }
 
     return (
           <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/45 px-4 py-4">
