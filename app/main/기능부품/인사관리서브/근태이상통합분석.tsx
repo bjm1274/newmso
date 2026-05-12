@@ -24,10 +24,7 @@ export default function AttendanceIssueAnalysisSuite({ staffs, selectedCo, user 
   return (
     <div className="mx-auto max-w-6xl space-y-5 p-4 md:p-4" data-testid="attendance-analysis-issue-suite">
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-[var(--foreground)]">근태 이상 통합 분석</h2>
-          </div>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
           <div className="flex flex-wrap items-center gap-2">
             {VIEW_OPTIONS.map((option) => (
               <button

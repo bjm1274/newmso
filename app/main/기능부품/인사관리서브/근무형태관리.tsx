@@ -747,9 +747,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
     <div className="p-5 space-y-5 animate-in fade-in duration-500" data-testid="shift-management">
       {dialog}
       <header className="flex justify-between items-center">
-        <div>
-          <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tight">근무 형태 관리 <span className="text-sm text-[var(--accent)]">[{selectedCo as string}]</span></h2>
-        </div>
+        <span className="text-[12px] font-bold text-[var(--toss-gray-3)] truncate">{selectedCo as string}</span>
         <button
           type="button"
           onClick={() => {
