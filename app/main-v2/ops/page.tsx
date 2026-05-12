@@ -19,7 +19,6 @@ const OPS_ITEMS = [
 export default function OpsHomePage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-6 text-xl font-black text-[var(--foreground)]">운영</h1>
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2" role="list">
         {OPS_ITEMS.map((item) => (
           <li key={item.href}>

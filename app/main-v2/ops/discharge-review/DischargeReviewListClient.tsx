@@ -53,10 +53,7 @@ export default function DischargeReviewListClient() {
     >
       {/* 헤더 */}
       <div className="border-b border-[var(--border)] px-4 pb-3 pt-5">
-        <h1 className="mb-3 text-[17px] font-bold text-[var(--foreground)]">
-          퇴원심사
-        </h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 mb-3">
           <label htmlFor="dr-search" className="sr-only">
             환자명 또는 병실로 검색
           </label>

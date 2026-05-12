@@ -156,13 +156,12 @@ export default function TeamShareClient() {
   return (
     <div className="flex flex-col h-full overflow-hidden bg-[var(--page-bg)]">
       {/* 상단 헤더 */}
-      <header className="flex items-center px-4 h-[52px] border-b border-[var(--border)] bg-[var(--card)] shrink-0 gap-2">
-        <h1 className="flex-1 text-center text-[16px] font-bold text-[var(--foreground)]">업무공유</h1>
+      <header className="flex items-center px-4 h-[52px] border-b border-[var(--border)] bg-[var(--card)] shrink-0">
         <button
           type="button"
           onClick={handleOpenCreate}
           aria-label="새 자료 등록"
-          className="w-9 h-9 flex items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-5)] hover:bg-[var(--muted)] transition-colors"
+          className="ml-auto w-9 h-9 flex items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-5)] hover:bg-[var(--muted)] transition-colors"
         >
           <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
             <path d="M12 5v14M5 12h14" />
