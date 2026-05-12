@@ -611,9 +611,6 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
   return (
     <div className="bg-[var(--card)] p-4 rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm animate-in fade-in duration-300" data-testid="interim-settlement-view">
       {dialog}
-      <div className="mb-4 pb-3 border-b border-[var(--border)]">
-        <h2 className="text-lg font-bold text-[var(--foreground)]">중간정산</h2>
-      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-4">

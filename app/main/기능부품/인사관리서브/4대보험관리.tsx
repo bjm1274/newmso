@@ -126,9 +126,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: Record<
             <header className="p-4 md:p-5 border-b border-[var(--border)] bg-[var(--card)] shrink-0">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">
-                            🏛️ 4대보험 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo as string}]</span>
-                        </h2>
+                        <span className="text-sm text-[var(--accent)] font-bold">[{selectedCo as string}]</span>
                     </div>
                     <div className="flex items-center gap-2">
                         {pendingCount > 0 && (

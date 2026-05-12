@@ -1233,9 +1233,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
                 <MenuIcon name="history" className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-foreground">
-                  전문 근태 통합 관리 <span className="ml-1 px-2 py-0.5 rounded-[var(--radius-md)] bg-blue-500/10 text-blue-600 text-[10px] font-bold border border-blue-100">{selectedCo}</span>
-                </h2>
+                <span className="px-2 py-0.5 rounded-[var(--radius-md)] bg-blue-500/10 text-blue-600 text-[10px] font-bold border border-blue-100">{selectedCo}</span>
               </div>
             </div>
 

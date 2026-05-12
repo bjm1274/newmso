@@ -283,10 +283,7 @@ export default function PersonnelAppointment({
       <header className="shrink-0 border-b border-[var(--border)] bg-[var(--card)] p-4 md:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-[var(--foreground)]">
-              인사발령 관리
-              <span className="ml-2 text-sm text-[var(--accent)]">[{selectedCo}]</span>
-            </h2>
+            <span className="text-sm text-[var(--accent)] font-bold">[{selectedCo}]</span>
             <p className="text-xs text-[var(--toss-gray-3)]">
               승진, 전보, 퇴직/면직 이력을 저장하고 직원 최신 정보를 함께 반영합니다.
             </p>

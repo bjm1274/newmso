@@ -316,10 +316,7 @@ export default function EducationMain({ staffs, selectedCo }: Record<string, unk
       <header className="px-5 pt-8 pb-4 border-b border-[var(--border)] bg-[var(--card)] flex flex-col gap-4 shrink-0">
         <div className="flex justify-between items-center flex-wrap gap-2">
           <div>
-            <h2 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">
-              Compliance & 자격 관리{' '}
-              <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo as string}]</span>
-            </h2>
+            <span className="text-sm text-[var(--accent)] font-bold">[{selectedCo as string}]</span>
           </div>
           <div className="flex gap-2 flex-wrap">
             <button

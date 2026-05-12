@@ -1107,10 +1107,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       <header className="border-b border-[var(--border)] bg-[var(--card)] p-3 md:p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tight">
-            {보기상태 === '퇴사' ? '퇴사자 현황' : '실시간 구성원 현황'}{' '}
-            <span className="text-sm text-[var(--accent)]">[{선택사업체}]</span>
-          </h2>
+          <span className="text-sm text-[var(--accent)] font-bold">[{선택사업체}]</span>
           <p className="text-[11px] md:text-xs text-[var(--toss-gray-3)] font-bold">
             {보기상태 === '퇴사'
               ? '퇴사 처리된 직원만 표시됩니다.'

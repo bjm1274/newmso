@@ -74,10 +74,7 @@ export default function MinWageChecker({
 
   return (
     <div className="space-y-5 p-4 md:p-4">
-      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h2 className="text-base font-bold text-[var(--foreground)]">최저임금 미달 자동 경고</h2>
-        </div>
+      <div className="flex flex-col items-start justify-end gap-3 sm:flex-row sm:items-center">
         <div className="flex items-center gap-2">
           <select
             value={checkYear}

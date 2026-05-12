@@ -349,8 +349,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
     <div className="app-page space-y-5 p-4 md:p-5">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">증명서 발급 센터</h2>
-          <p className="mt-1 text-sm text-[var(--toss-gray-3)]">
+          <p className="text-sm text-[var(--toss-gray-3)]">
             회사별 문서 서식을 공통으로 적용해 같은 브랜드 규칙으로 발급합니다.
           </p>
         </div>

@@ -164,10 +164,7 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
   return (
     <div className="mx-auto max-w-5xl space-y-5 p-4 md:p-4" data-testid="attendance-analysis-lateness">
       {dialog}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-[var(--foreground)]">지각 / 조퇴 패턴 분석</h2>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <div className="flex gap-2">
           {(Object.keys(PERIOD_MONTHS) as Array<keyof typeof PERIOD_MONTHS>).map((item) => (
             <button

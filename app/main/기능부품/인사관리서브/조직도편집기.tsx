@@ -194,10 +194,7 @@ export default function OrgChartEditor({
   return (
     <div className="flex flex-col h-full">
       {dialog}
-      <div className="p-4 md:p-4 border-b border-[var(--border)] flex flex-col md:flex-row gap-3 items-start md:items-center justify-between shrink-0">
-        <div>
-          <h2 className="text-base font-bold text-[var(--foreground)]">조직도 편집기</h2>
-        </div>
+      <div className="p-4 md:p-4 border-b border-[var(--border)] flex flex-col md:flex-row gap-3 items-start md:items-center justify-end shrink-0">
         <div className="flex gap-2 flex-wrap">
           <button onClick={() => setViewMode('chart')} className={`px-3 py-1.5 rounded-[var(--radius-md)] text-xs font-bold ${viewMode === 'chart' ? 'bg-[var(--foreground)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>
             차트 보기

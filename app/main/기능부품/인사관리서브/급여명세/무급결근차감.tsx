@@ -159,10 +159,7 @@ export default function UnpaidAbsenceDeduction({ staffs, selectedCo, user }: Pro
     <div className="p-4 md:p-4 space-y-4">
       {dialog}
       {/* 헤더 */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-[var(--foreground)]">무급 결근 자동 차감</h2>
-        </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-4">
         <div className="flex items-center gap-3">
           <input
             type="month"

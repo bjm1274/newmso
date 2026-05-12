@@ -464,8 +464,7 @@ export default function DailyWorkerSettlement({
             <LucideIcon name="CalendarClock" size={18} />
           </span>
           <div>
-            <h2 className="text-lg font-bold text-[var(--foreground)]">일용근로 정산</h2>
-            <p className="mt-0.5 text-xs font-medium text-[var(--zinc-500)]">
+            <p className="text-xs font-medium text-[var(--zinc-500)]">
               일급 또는 시급 기준 원천징수와 실지급액을 계산합니다.
             </p>
           </div>

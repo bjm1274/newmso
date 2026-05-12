@@ -280,9 +280,6 @@ export default function LeaveManagement({
     >
       {dialog}
       <div className="relative z-10 flex shrink-0 flex-col gap-4 border-b border-[var(--border)] bg-[var(--card)] p-4 md:flex-row md:items-center md:justify-between md:p-4">
-        <div className="flex min-h-[48px] shrink-0 items-center">
-          <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">전문 연차/휴가 통합 관리</h2>
-        </div>
         <div className="relative z-20 flex w-full gap-2 overflow-x-auto no-scrollbar md:w-auto">
           {availableTabs.map((tab) => (
             <button

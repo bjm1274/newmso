@@ -16,7 +16,6 @@ export default function HRDashboardIntegrated({ staffs = [], selectedCo, checked
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
       <div className="flex flex-wrap gap-3 items-center">
-        <h2 className="text-lg font-bold text-[var(--foreground)]">인사/급여 통합 대시보드</h2>
         <input type="month" value={ym} onChange={(e) => setYm(e.target.value)} className="h-9 px-3 border border-[var(--border)] rounded-md bg-[var(--input-bg)] text-[var(--foreground)] text-sm font-medium" />
       </div>
 

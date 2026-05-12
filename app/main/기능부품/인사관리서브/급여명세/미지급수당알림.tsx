@@ -146,9 +146,6 @@ export default function UnpaidAllowanceAlert({ staffs, selectedCo, user }: Props
   return (
     <div className="p-4 md:p-4 space-y-5 max-w-4xl mx-auto">
       {dialog}
-      <div>
-        <h2 className="text-lg font-bold text-[var(--foreground)]">장기 미지급 수당 알림</h2>
-      </div>
 
       {loading ? (
         <div className="text-center py-10 text-sm text-[var(--toss-gray-3)]">분석 중...</div>

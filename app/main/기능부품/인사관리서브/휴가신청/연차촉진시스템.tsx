@@ -215,11 +215,6 @@ export default function AnnualLeavePromotion({
       {dialog}
       <div className="bg-[var(--card)] p-4 border border-[var(--border)] shadow-sm rounded-2xl">
         <div className="flex justify-between items-center mb-4">
-          <div>
-            <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">
-              연차사용촉진 자동화 시스템
-            </h2>
-          </div>
           <div className="px-4 py-2 bg-blue-500/10 rounded-[var(--radius-lg)]">
             <p className="text-[11px] font-semibold text-[var(--accent)]">
               현재 촉진 시기:{' '}

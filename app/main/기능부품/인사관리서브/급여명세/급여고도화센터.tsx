@@ -821,9 +821,6 @@ export default function PayrollAdvancedCenter({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <h2 className="mt-2 text-xl font-bold text-[var(--foreground)]">급여 고도화 센터</h2>
-      </div>
 
       {loading ? (
         <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 text-center text-sm font-semibold text-[var(--toss-gray-3)] shadow-sm">

@@ -48,10 +48,7 @@ export default function WagePeakCalculator({ staffs = [], selectedCo, user }: { 
 
   return (
     <div className="p-4 md:p-4 space-y-5">
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div>
-          <h2 className="text-base font-bold text-[var(--foreground)]">임금피크제 자동 계산</h2>
-        </div>
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-end">
         <button onClick={() => setShowSettings(v => !v)} className="px-3 py-1.5 bg-[var(--muted)] text-[var(--toss-gray-4)] rounded-[var(--radius-md)] text-xs font-bold">
           {showSettings ? '설정 닫기' : '요율 설정'}
         </button>
