@@ -16,7 +16,7 @@ import { loadLeavePolicySettings, type LeavePolicySettings } from '@/lib/leave-p
 import { isActiveStaff } from '@/lib/active-staff';
 
 type StaffLite = AttendanceAnomalyStaff & {
-  status?: string;
+  status?: string | null;
 };
 
 type AttendanceAnomalyPanelProps = {

@@ -13,7 +13,7 @@ type StaffLite = {
   company?: string;
   department?: string;
   base_salary?: number | null;
-  status?: string;
+  status?: string | null;
 };
 
 type AttendanceDeductionSimulatorProps = {

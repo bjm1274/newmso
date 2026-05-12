@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { runLicenseExpiryJobs, type LicenseExpiryJobsResult } from '@/lib/license-expiry-jobs';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -157,7 +158,26 @@ export async function GET(req: Request) {
 
   try {
     const result = await cleanupPushSubscriptions();
-    return NextResponse.json({ ok: true, ...result });
+
+    // 동일 새벽 시간대 정리 작업이라 license 만료/보수교육 알림도 함께 실행
+    // (Workers Free Plan cron 5개 한도 → 별도 cron 대신 본 cron에 합침).
+    // license 작업이 실패해도 cleanup 결과는 반환되어야 하므로 try/catch로 격리.
+    let licenseJobs: LicenseExpiryJobsResult | null = null;
+    let licenseError: string | null = null;
+    try {
+      const supabase = createAdminClient();
+      licenseJobs = await runLicenseExpiryJobs(supabase);
+    } catch (err) {
+      licenseError = err instanceof Error ? err.message : 'license-expiry-jobs failed';
+      console.error('[push-subscription-cleanup] license jobs failed:', err);
+    }
+
+    return NextResponse.json({
+      ok: true,
+      ...result,
+      licenseJobs,
+      ...(licenseError ? { licenseError } : {}),
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Push subscription cleanup failed';
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
