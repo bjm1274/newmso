@@ -29,7 +29,6 @@ const UDIManagement = dynamic(() => import('./재고관리서브/UDI관리'), { 
 const PurchaseOrderManagement = dynamic(() => import('./재고관리서브/발주관리'), { ssr: false, loading: InvSubViewLoading });
 const ScanModule = dynamic(() => import('./재고관리서브/스캔모듈완성'), { ssr: false, loading: InvSubViewLoading });
 const ProductRegistration = dynamic(() => import('./재고관리서브/물품등록'), { ssr: false, loading: InvSubViewLoading });
-const ExcelBulkUpload = dynamic(() => import('./관리자전용서브/엑셀일괄등록'), { ssr: false, loading: InvSubViewLoading });
 const InvoiceAutoExtraction = dynamic(() => import('./관리자전용서브/명세서자동추출'), { ssr: false, loading: InvSubViewLoading });
 const QRAssetManager = dynamic(() => import('./재고관리서브/자산QR관리'), { ssr: false, loading: InvSubViewLoading });
 const ASReturnManagement = dynamic(() => import('./재고관리서브/AS반품관리'), { ssr: false, loading: InvSubViewLoading });
@@ -307,10 +306,9 @@ export default function IntegratedInventoryManagement({
           {activeView === '등록' && (
             <div className="space-y-4">
               <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm">
-                <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                   {([
                     ['form', '직접 등록'],
-                    ['excel', '일괄 업로드'],
                     ['auto_extract', '명세서 추출'],
                   ] as const).map(([mode, label]) => (
                     <button
@@ -329,15 +327,8 @@ export default function IntegratedInventoryManagement({
                   ))}
                 </div>
               </div>
-              {registrationMode === 'form' ? <ProductRegistration user={user} inventory={data.inventory} suppliers={data.suppliers} fetchInventory={data.fetchInventory} fetchSuppliers={data.fetchSuppliers} />
-                : registrationMode === 'excel' ? (
-                  <ExcelBulkUpload
-                    onRefresh={data.fetchInventory}
-                    allowedModes={['inventory', 'inventory_ecount']}
-                    initialMode="inventory"
-                    title="재고 엑셀 업로드"
-                  />
-                )
+              {registrationMode === 'form'
+                ? <ProductRegistration user={user} inventory={data.inventory} suppliers={data.suppliers} fetchInventory={data.fetchInventory} fetchSuppliers={data.fetchSuppliers} />
                 : <InvoiceAutoExtraction onRefresh={data.fetchInventory} user={user} />}
             </div>
           )}

@@ -15,7 +15,7 @@ export const VALID_VIEWS = [...INVENTORY_VIEWS, ...LEGACY_VIEWS] as const;
 export type InventoryView = (typeof INVENTORY_VIEWS)[number];
 export type InventoryStatusFilter = '전체' | '재고부족' | '유통기한임박' | '정상';
 export type SupplierWorkspaceTab = 'suppliers' | 'documents';
-export type RegistrationMode = 'form' | 'excel' | 'auto_extract';
+export type RegistrationMode = 'form' | 'auto_extract';
 
 // ─────────────────────────────────────────────
 // 공급 워크플로우
