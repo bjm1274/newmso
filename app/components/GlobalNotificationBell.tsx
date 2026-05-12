@@ -2,6 +2,19 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import {
+  Bell,
+  FileText,
+  Package,
+  Wallet,
+  GraduationCap,
+  MessageCircle,
+  Clock,
+  Users,
+  ClipboardList,
+  Settings,
+  type LucideIcon,
+} from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import {
   buildApprovalNotificationHref,
@@ -12,16 +25,17 @@ import {
   resolveNotificationOpenMenu,
 } from '@/lib/notification-metadata';
 
-const TYPE_ICONS: Record<string, string> = {
-  approval: '📝',
-  inventory: '📦',
-  payroll: '💰',
-  education: '🎓',
-  mention: '💬',
-  attendance: '🕒',
-  인사: '👥',
-  board: '📌',
-  default: '🔔',
+const TYPE_ICONS: Record<string, LucideIcon> = {
+  approval: FileText,
+  inventory: Package,
+  payroll: Wallet,
+  education: GraduationCap,
+  mention: MessageCircle,
+  attendance: Clock,
+  인사: Users,
+  board: ClipboardList,
+  system: Settings,
+  default: Bell,
 };
 
 type NotificationBellUser = {
@@ -76,18 +90,21 @@ export default function GlobalNotificationBell({
   const [list, setList] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [toastNotification, setToastNotification] = useState<NotificationItem | null>(null);
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const toastTimerRef = useRef<number | null>(null);
   const lastFetchedAtRef = useRef<number>(0);
   const router = useRouter();
 
+  // 브라우저 Notification API 지원 여부 + 현재 권한 상태 초기화 (JM5: 명시적 제스처 후 요청)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotifPermission(Notification.permission);
+    }
+  }, []);
+
   useEffect(() => {
     if (!user?.id) return;
-
-    // 브라우저 알림 권한: mount 1회만 요청 (JM2)
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
-      void Notification.requestPermission();
-    }
 
     const fetchList = async () => {
       const { data } = await supabase
@@ -256,7 +273,7 @@ export default function GlobalNotificationBell({
           onClick={() => handleNotificationClick(toastNotification)}
         >
           <div className="flex gap-3 rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-2xl animate-in slide-in-from-top-10 fade-in duration-300">
-            <span className="shrink-0 text-2xl">{TYPE_ICONS[toastNotification.type || ''] || TYPE_ICONS.default}</span>
+            {(() => { const ToastIcon = TYPE_ICONS[toastNotification.type || ''] ?? TYPE_ICONS.default; return <ToastIcon className="h-6 w-6 shrink-0 text-[var(--accent)]" />; })()}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-bold text-[var(--foreground)]">{toastNotification.title || '새 알림'}</p>
               <p className="mt-0.5 line-clamp-2 text-[11px] text-[var(--toss-gray-3)]">{toastNotification.body}</p>
@@ -283,7 +300,7 @@ export default function GlobalNotificationBell({
           className="relative flex min-h-[44px] min-w-[44px] touch-manipulation items-center justify-center rounded-[12px] p-2 text-[var(--toss-gray-3)] transition-all hover:bg-[var(--toss-gray-1)] hover:text-[var(--foreground)]"
           aria-label="알림"
         >
-          <span className="text-xl">🔔</span>
+          <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white">
               {unreadCount > 99 ? '99+' : unreadCount}
@@ -295,10 +312,34 @@ export default function GlobalNotificationBell({
           <>
             <div className="fixed inset-0 z-[190] md:hidden" onClick={() => setOpen(false)} />
             <div className="absolute bottom-[calc(100%+12px)] right-0 z-[200] mt-0 flex max-h-[60vh] w-[calc(100vw-32px)] flex-col overflow-hidden rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200 sm:w-[320px] md:left-0 md:right-auto md:top-full md:mt-1 md:max-h-[400px] md:rounded-[16px] md:slide-in-from-top-2">
-              <div className="flex shrink-0 items-center justify-between border-b border-[var(--toss-border)] p-4 md:p-3">
-                <span className="text-xs font-black text-[var(--foreground)]">실시간 알림</span>
-                {unreadCount > 0 && (
-                  <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">읽지 않음 {unreadCount}건</span>
+              <div className="flex shrink-0 flex-col gap-2 border-b border-[var(--toss-border)] p-4 md:p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-[var(--foreground)]">실시간 알림</span>
+                  {unreadCount > 0 && (
+                    <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">읽지 않음 {unreadCount}건</span>
+                  )}
+                </div>
+                {notifPermission === 'default' && (
+                  <button
+                    type="button"
+                    aria-label="브라우저 알림 권한 허용"
+                    onClick={async () => {
+                      try {
+                        const result = await Notification.requestPermission();
+                        setNotifPermission(result);
+                      } catch {
+                        // 권한 요청 실패 시 무시 (JM3)
+                      }
+                    }}
+                    className="w-full rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
+                  >
+                    알림 받기
+                  </button>
+                )}
+                {notifPermission === 'denied' && (
+                  <p className="text-[10px] text-[var(--toss-gray-3)]">
+                    브라우저 설정에서 알림을 허용해 주세요.
+                  </p>
                 )}
               </div>
 
@@ -314,7 +355,7 @@ export default function GlobalNotificationBell({
                       className={`w-full border-b border-[var(--toss-gray-1)] px-3 py-2.5 text-left transition-colors hover:bg-[var(--toss-gray-1)] ${!notification.is_read ? 'bg-[var(--toss-blue-light)]/50' : ''}`}
                     >
                       <div className="flex gap-2">
-                        <span className="shrink-0 text-base">{TYPE_ICONS[notification.type || ''] || TYPE_ICONS.default}</span>
+                        {(() => { const ListIcon = TYPE_ICONS[notification.type || ''] ?? TYPE_ICONS.default; return <ListIcon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent)]" />; })()}
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-[11px] font-bold text-[var(--foreground)]">{notification.title}</p>
                           <p className="line-clamp-2 text-[10px] text-[var(--toss-gray-3)]">{notification.body}</p>
