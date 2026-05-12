@@ -12,8 +12,8 @@
 import { useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
-import BottomTab from './BottomTab';
-import type { MenuId, BottomTabId, SidebarUser } from './types';
+import BottomTab, { type BottomTabId } from '@/app/components/BottomTab';
+import type { MenuId, SidebarUser } from './types';
 
 // pathname → MenuId 매핑
 function resolveMenuId(pathname: string): MenuId {

@@ -23,16 +23,7 @@ export function isMenuId(value: unknown): value is MenuId {
 }
 
 // ── 바텀탭 ───────────────────────────────────────────────────────────────────
-
-export type BottomTabId = '홈' | '업무' | '내정보' | '알림' | '더보기';
-
-export const BOTTOM_TAB_IDS = ['홈', '업무', '내정보', '알림', '더보기'] as const satisfies readonly BottomTabId[];
-
-const BOTTOM_TAB_ID_SET = new Set<string>(BOTTOM_TAB_IDS);
-
-export function isBottomTabId(value: unknown): value is BottomTabId {
-  return typeof value === 'string' && BOTTOM_TAB_ID_SET.has(value);
-}
+// BottomTabId / BOTTOM_TAB_IDS / isBottomTabId / BottomTabProps → @/app/components/BottomTab
 
 // ── 사용자 역할 ───────────────────────────────────────────────────────────────
 
@@ -57,15 +48,6 @@ export interface SidebarProps {
   currentMenuId: MenuId;
   onMenuChange: (id: MenuId) => void;
   user: SidebarUser;
-}
-
-// ── BottomTab props ───────────────────────────────────────────────────────────
-
-export interface BottomTabProps {
-  currentTabId: BottomTabId;
-  onTabChange: (id: BottomTabId) => void;
-  /** 알림 뱃지 개수 (0이면 미표시) */
-  notificationCount?: number;
 }
 
 // ── MoreSheet props ───────────────────────────────────────────────────────────
