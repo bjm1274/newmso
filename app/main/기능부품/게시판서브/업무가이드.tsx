@@ -1292,8 +1292,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
       <header className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-base font-bold text-[var(--foreground)]">{GUIDE_DISPLAY_NAME}</h2>
-            <p className="mt-0.5 text-xs font-medium text-[var(--toss-gray-4)]">
+            <p className="text-xs font-bold text-[var(--toss-gray-3)]">
               {activeTeam ? `${activeCompanyLabel} · ${activeTeam.teamName}` : activeCompanyLabel}
             </p>
           </div>
