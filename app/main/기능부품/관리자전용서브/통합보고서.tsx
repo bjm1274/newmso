@@ -145,11 +145,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300" data-testid="admin-analysis-report">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-xl font-bold text-[var(--foreground)]">통합 보고서</h2>
-        </div>
+      <div className="flex items-center justify-end flex-wrap gap-3">
         <div className="flex items-center gap-2 print:hidden">
           <button
             onClick={handleExcelDownload}

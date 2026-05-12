@@ -173,10 +173,6 @@ export default function SurgeryExamTemplateManager({ user }: SurgeryExamTemplate
 
       {activeTab === 'catalogs' ? (
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 shadow-sm space-y-4">
-          <h2 className="text-base font-semibold text-[var(--foreground)] tracking-tight mb-2">
-            수술 · 검사명 템플릿 관리
-          </h2>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <section className="space-y-3">
               <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">

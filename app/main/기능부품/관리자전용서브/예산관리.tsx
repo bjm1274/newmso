@@ -153,20 +153,17 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300" data-testid="admin-analysis-budget">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-[var(--foreground)]">예산 관리</h2>
-        </div>
-        {activeTab === '집행현황' && (
+      {/* 액션 */}
+      {activeTab === '집행현황' && (
+        <div className="flex items-center justify-end">
           <button
             onClick={() => setShowExecForm(true)}
             className="px-4 py-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-sm font-bold hover:opacity-90 transition-opacity"
           >
             + 집행 등록
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* 탭 */}
       <div className="flex gap-1 bg-[var(--muted)] p-1 rounded-[var(--radius-md)] w-fit">
