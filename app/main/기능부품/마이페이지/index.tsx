@@ -26,54 +26,28 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { HR_TAB_KEY, INV_VIEW_KEY, MYPAGE_TAB_KEY } from '@/app/main/navigation-state';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 import { LucideIcon } from '../조직도서브/조직도측면창';
+import ShortcutManager from './단축키관리';
+import {
+  FAVORITES_KEY,
+  buildMenuEntry,
+  buildMypageEntry,
+  buildSubMenuEntry,
+  canAccessFavoriteEntry,
+  getInnerTabPendingKey,
+  getInnerTabsFor,
+  getPermittedMainMenus,
+  getPermittedMypageTabs,
+  getPermittedSubMenuBearers,
+  getPermittedSubMenuOptions,
+  migrateStoredFavorites,
+  type FavoriteEntry,
+  type MainMenuId,
+  type MypageTabId,
+} from './즐겨찾기설정';
 
 const MYPAGE_RECORDS_VIEW_KEY = 'erp_mypage_records_view';
-const FAVORITES_KEY = 'erp_mypage_favorites';
 
-type FavoriteId =
-  | 'mypage_profile'
-  | 'mypage_commute'
-  | 'mypage_todo'
-  | 'mypage_leave'
-  | 'mypage_records'
-  | 'mypage_certificates'
-  | 'mypage_salary'
-  | 'mypage_documents'
-  | 'hr_payroll'
-  | 'inv_purchase'
-  | 'menu_home'
-  | 'menu_org'
-  | 'menu_extra'
-  | 'menu_chat'
-  | 'menu_board'
-  | 'menu_approval'
-  | 'menu_hr'
-  | 'menu_inventory'
-  | 'menu_admin';
-
-const FAVORITE_OPTIONS: { id: FavoriteId; label: string; icon: string }[] = [
-  { id: 'mypage_profile', label: '내 정보', icon: 'User' },
-  { id: 'mypage_commute', label: '출퇴근', icon: 'Clock' },
-  { id: 'mypage_todo', label: '할일', icon: 'CheckSquare' },
-  { id: 'mypage_documents', label: '서류제출', icon: 'Upload' },
-  { id: 'hr_payroll', label: '인사관리 · 급여', icon: 'Users' },
-  { id: 'inv_purchase', label: '재고관리 · 발주', icon: 'Package' },
-  // 전체 메뉴 바로가기
-  { id: 'menu_home', label: '메인 · 내 정보', icon: 'User' },
-  { id: 'menu_org', label: '조직도', icon: 'Building2' },
-  { id: 'menu_extra', label: '추가기능', icon: 'Plus' },
-  { id: 'menu_chat', label: '채팅', icon: 'MessageSquare' },
-  { id: 'menu_board', label: '게시판', icon: 'ClipboardList' },
-  { id: 'menu_approval', label: '전자결재', icon: 'FileCheck2' },
-  { id: 'menu_hr', label: '인사관리 (전체)', icon: 'Users' },
-  { id: 'menu_inventory', label: '재고관리 (전체)', icon: 'Package' },
-  { id: 'menu_admin', label: '관리자', icon: 'Settings' },
-];
-
-const LEGACY_FAVORITE_MAP: Partial<Record<FavoriteId, FavoriteId>> = {
-  mypage_certificates: 'mypage_records',
-  mypage_salary: 'mypage_records',
-};
+type FavoritePickerKind = 'mypage' | 'menu' | 'submenu';
 
 interface MyPageMainProps {
   user?: Record<string, unknown> | null;
@@ -145,12 +119,16 @@ function MyPageMain({
 }: MyPageMainProps) {
   const { dialog, openConfirm, openPrompt } = useActionDialog();
   const isRetired = !isActiveStaff(user ?? {});
-  const [activeTab, setActiveTab] = useState<'profile' | 'records' | 'todo' | 'commute' | 'leave' | 'documents' | 'notifications'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'records' | 'todo' | 'commute' | 'leave' | 'documents' | 'notifications' | 'shortcuts'>('profile');
   const [recordsView, setRecordsView] = useState<'salary' | 'certificates'>('salary');
-  const [favorites, setFavorites] = useState<FavoriteId[]>([]);
+  const [favorites, setFavorites] = useState<FavoriteEntry[]>([]);
   const [favoritesHydrated, setFavoritesHydrated] = useState(false);
   const [showFavPicker, setShowFavPicker] = useState(false);
-  const [pendingFav, setPendingFav] = useState<FavoriteId | ''>('');
+  const [pickerKind, setPickerKind] = useState<FavoritePickerKind>('submenu');
+  const [pickerMypageTab, setPickerMypageTab] = useState<MypageTabId | ''>('');
+  const [pickerMainMenu, setPickerMainMenu] = useState<MainMenuId | ''>('');
+  const [pickerSubView, setPickerSubView] = useState('');
+  const [pickerInnerTab, setPickerInnerTab] = useState('');
   const [profileSummary, setProfileSummary] = useState(() => buildProfileSummary(user));
   const [isEditingProfile, setIsEditingProfile] = useState(false);
 
@@ -402,7 +380,7 @@ function MyPageMain({
     };
   }, [user?.name]);
 
-  // 즐겨찾기 목록 복구
+  // 즐겨찾기 목록 복구 (레거시 문자열 ID + 신규 객체 둘 다 지원)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     setFavoritesHydrated(false);
@@ -410,14 +388,7 @@ function MyPageMain({
       const raw = window.localStorage.getItem(favoritesKey) || window.localStorage.getItem(FAVORITES_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          const validIds = FAVORITE_OPTIONS.map(o => o.id);
-          const normalized = parsed
-            .map((id: FavoriteId) => LEGACY_FAVORITE_MAP[id] || id)
-            .filter((id: FavoriteId, index: number, array: FavoriteId[]) => array.indexOf(id) === index)
-            .filter((id: FavoriteId) => validIds.includes(id));
-          setFavorites(normalized);
-        }
+        setFavorites(migrateStoredFavorites(parsed));
       }
     } catch {
       // ignore
@@ -437,71 +408,97 @@ function MyPageMain({
     }
   }, [favorites, favoritesHydrated, favoritesKey]);
 
-  const handleFavoriteClick = (fav: FavoriteId) => {
-    if (fav === 'mypage_profile') setActiveTab('profile');
-    else if (fav === 'mypage_commute') setActiveTab('commute');
-    else if (fav === 'mypage_todo') setActiveTab('todo');
-    else if (fav === 'mypage_leave') setActiveTab('leave');
-    else if (fav === 'mypage_records') {
-      setActiveTab('records');
+  const applyMainMenu = useCallback((mainMenu: MainMenuId, subView?: string | null, innerTab?: string | null) => {
+    // 인사관리/재고관리 서브탭은 별도 localStorage 키로 동기화
+    if (mainMenu === '인사관리' && subView) {
+      try { window.localStorage.setItem(HR_TAB_KEY, subView); } catch { /* ignore */ }
+    } else if (mainMenu === '재고관리' && subView) {
+      try { window.localStorage.setItem(INV_VIEW_KEY, subView); } catch { /* ignore */ }
     }
-    else if (fav === 'mypage_certificates') {
-      setActiveTab('records');
-      setRecordsView('certificates');
-    } else if (fav === 'mypage_salary') {
-      setActiveTab('records');
-      setRecordsView('salary');
-    }
-    else if (fav === 'mypage_documents') setActiveTab('documents');
-    else if (fav === 'hr_payroll') {
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(HR_TAB_KEY, '급여');
+    // 깊은 inner tab — 호스트 컴포넌트가 마운트 시 일회성으로 읽고 지움
+    if (innerTab && subView) {
+      const pendingKey = getInnerTabPendingKey(mainMenu, subView);
+      if (pendingKey) {
+        try { window.localStorage.setItem(pendingKey, innerTab); } catch { /* ignore */ }
       }
-      setSubView?.('급여');
-      setMainMenu?.('인사관리');
-    } else if (fav === 'inv_purchase') {
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(INV_VIEW_KEY, '발주');
+    }
+    setSubView?.(subView ?? null);
+    setMainMenu?.(mainMenu);
+  }, [setMainMenu, setSubView]);
+
+  const handleFavoriteClick = useCallback((fav: FavoriteEntry) => {
+    if (fav.kind === 'mypage') {
+      if (fav.tab === 'records_certificates') {
+        setActiveTab('records');
+        setRecordsView('certificates');
+      } else if (fav.tab === 'records_salary') {
+        setActiveTab('records');
+        setRecordsView('salary');
+      } else if (fav.tab === 'notifications') {
+        setActiveTab('notifications');
+      } else {
+        setActiveTab(fav.tab as Exclude<MypageTabId, 'records_certificates' | 'records_salary' | 'notifications'>);
       }
-      setSubView?.('발주');
-      setMainMenu?.('재고관리');
-    } else if (fav === 'menu_home') {
-      setMainMenu?.('내정보');
-    } else if (fav === 'menu_org') {
-      setMainMenu?.('조직도');
-    } else if (fav === 'menu_extra') {
-      setMainMenu?.('추가기능');
-    } else if (fav === 'menu_chat') {
-      setMainMenu?.('채팅');
-    } else if (fav === 'menu_board') {
-      setSubView?.('공지사항');
-      setMainMenu?.('게시판');
-    } else if (fav === 'menu_approval') {
-      setSubView?.('기안함');
-      setMainMenu?.('전자결재');
-    } else if (fav === 'menu_hr') {
-      setSubView?.('구성원');
-      setMainMenu?.('인사관리');
-    } else if (fav === 'menu_inventory') {
-      setSubView?.('현황');
-      setMainMenu?.('재고관리');
-    } else if (fav === 'menu_admin') {
-      setMainMenu?.('관리자');
+      return;
     }
-  };
-
-  const handleFavoriteRemove = (id: FavoriteId) => {
-    setFavorites((prev) => prev.filter(f => f !== id));
-  };
-
-  const handleAddFavorite = () => {
-    if (!pendingFav) return;
-    if (!favorites.includes(pendingFav)) {
-      setFavorites((prev) => [...prev, pendingFav]);
+    if (fav.kind === 'menu') {
+      applyMainMenu(fav.mainMenu);
+      return;
     }
-    setPendingFav('');
+    applyMainMenu(fav.mainMenu, fav.subView, fav.innerTab);
+  }, [applyMainMenu]);
+
+  const handleFavoriteRemove = useCallback((id: string) => {
+    setFavorites((prev) => prev.filter((entry) => entry.id !== id));
+  }, []);
+
+  const resetPicker = useCallback(() => {
+    setPickerKind('submenu');
+    setPickerMypageTab('');
+    setPickerMainMenu('');
+    setPickerSubView('');
+    setPickerInnerTab('');
     setShowFavPicker(false);
-  };
+  }, []);
+
+  const handleAddFavorite = useCallback(() => {
+    let next: FavoriteEntry | null = null;
+    if (pickerKind === 'mypage' && pickerMypageTab) {
+      next = buildMypageEntry(pickerMypageTab);
+    } else if (pickerKind === 'menu' && pickerMainMenu) {
+      next = buildMenuEntry(pickerMainMenu);
+    } else if (pickerKind === 'submenu' && pickerMainMenu && pickerSubView) {
+      next = buildSubMenuEntry(pickerMainMenu, pickerSubView, pickerInnerTab || undefined);
+    }
+    if (!next) return;
+    setFavorites((prev) => (prev.some((entry) => entry.id === next!.id) ? prev : [...prev, next!]));
+    resetPicker();
+  }, [pickerKind, pickerMypageTab, pickerMainMenu, pickerSubView, pickerInnerTab, resetPicker]);
+
+  // 권한 기반 옵션 — user에 따라 동적 필터링
+  const permittedMypageTabs = useMemo(() => getPermittedMypageTabs(user as any), [user]);
+  const permittedMainMenus = useMemo(() => getPermittedMainMenus(user as any), [user]);
+  const permittedSubMenuBearers = useMemo(() => getPermittedSubMenuBearers(user as any), [user]);
+  const pickerSubViewOptions = useMemo(
+    () => (pickerMainMenu ? getPermittedSubMenuOptions(user as any, pickerMainMenu) : []),
+    [pickerMainMenu, user],
+  );
+  const pickerInnerTabOptions = useMemo(
+    () => (pickerMainMenu && pickerSubView ? getInnerTabsFor(pickerMainMenu, pickerSubView) : []),
+    [pickerMainMenu, pickerSubView],
+  );
+
+  const canAddFavorite = useMemo(() => {
+    if (pickerKind === 'mypage') return Boolean(pickerMypageTab);
+    if (pickerKind === 'menu') return Boolean(pickerMainMenu);
+    return Boolean(pickerMainMenu && pickerSubView);
+  }, [pickerKind, pickerMypageTab, pickerMainMenu, pickerSubView]);
+
+  // 권한 기반 즐겨찾기 표시 — 권한이 회수된 항목은 자동 숨김 (저장된 데이터는 유지)
+  const visibleFavorites = useMemo(
+    () => favorites.filter((entry) => canAccessFavoriteEntry(user as any, entry)),
+    [favorites, user],
+  );
 
   const verifyProfilePassword = async () => {
     try {
@@ -774,6 +771,12 @@ function MyPageMain({
               label="알림"
               icon="Bell"
             />
+            <TabButton
+              isActive={activeTab === 'shortcuts'}
+              onClick={() => setActiveTab('shortcuts')}
+              label="단축키"
+              icon="Keyboard"
+            />
           </nav>
 
           <div className="no-scrollbar flex min-w-0 items-center gap-2 overflow-x-auto">
@@ -787,67 +790,152 @@ function MyPageMain({
               <LucideIcon name="Star" size={14} />
               즐겨찾기 추가
             </button>
-            {favorites.map((id) => {
-              const opt = FAVORITE_OPTIONS.find(o => o.id === id);
-              if (!opt) return null;
+            {visibleFavorites.map((entry) => {
               const isActive =
-                (id === 'mypage_profile' && activeTab === 'profile') ||
-                (id === 'mypage_commute' && activeTab === 'commute') ||
-                (id === 'mypage_todo' && activeTab === 'todo') ||
-                (id === 'mypage_leave' && activeTab === 'leave') ||
-                (id === 'mypage_records' && activeTab === 'records') ||
-                (id === 'mypage_certificates' && activeTab === 'records' && recordsView === 'certificates') ||
-                (id === 'mypage_salary' && activeTab === 'records' && recordsView === 'salary') ||
-                (id === 'mypage_documents' && activeTab === 'documents');
+                entry.kind === 'mypage' && (
+                  (entry.tab === 'profile' && activeTab === 'profile') ||
+                  (entry.tab === 'commute' && activeTab === 'commute') ||
+                  (entry.tab === 'todo' && activeTab === 'todo') ||
+                  (entry.tab === 'leave' && activeTab === 'leave') ||
+                  (entry.tab === 'records' && activeTab === 'records') ||
+                  (entry.tab === 'records_certificates' && activeTab === 'records' && recordsView === 'certificates') ||
+                  (entry.tab === 'records_salary' && activeTab === 'records' && recordsView === 'salary') ||
+                  (entry.tab === 'documents' && activeTab === 'documents')
+                );
               return (
                 <QuickFavoriteButton
-                  key={id}
-                  label={opt.label}
-                  icon={opt.icon}
-                  onClick={() => handleFavoriteClick(id)}
-                  active={isActive}
-                  onRemove={() => handleFavoriteRemove(id)}
+                  key={entry.id}
+                  label={entry.label}
+                  icon={entry.icon}
+                  onClick={() => handleFavoriteClick(entry)}
+                  active={Boolean(isActive)}
+                  onRemove={() => handleFavoriteRemove(entry.id)}
                 />
               );
             })}
           </div>
           {showFavPicker && (
-            <div className="flex flex-col gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] p-2 sm:flex-row sm:items-center">
-              <select
-                value={pendingFav}
-                onChange={(e) => setPendingFav(e.target.value as FavoriteId | '')}
-                data-testid="mypage-favorite-select"
-                className="h-9 min-w-0 flex-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-semibold text-[var(--foreground)] outline-none transition-all focus:border-[var(--accent)]"
-              >
-                <option value="">항목 선택</option>
-                {FAVORITE_OPTIONS.filter(o => !favorites.includes(o.id)).map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.label}
-                  </option>
+            <div className="flex flex-col gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] p-2">
+              <div className="flex flex-wrap gap-1.5">
+                {([
+                  { id: 'submenu', label: '메뉴 · 세부기능' },
+                  { id: 'menu', label: '메뉴 바로가기' },
+                  { id: 'mypage', label: '마이페이지 탭' },
+                ] as { id: FavoritePickerKind; label: string }[]).map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => {
+                      setPickerKind(option.id);
+                      setPickerMypageTab('');
+                      setPickerMainMenu('');
+                      setPickerSubView('');
+                      setPickerInnerTab('');
+                    }}
+                    className={`h-8 rounded-[var(--radius-md)] px-3 text-[11px] font-bold transition ${
+                      pickerKind === option.id
+                        ? 'bg-[var(--accent)] text-white'
+                        : 'bg-[var(--card)] text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
                 ))}
-              </select>
-              <div className="flex shrink-0 items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleAddFavorite}
-                  disabled={!pendingFav}
-                  data-testid="mypage-favorite-add"
-                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] px-3 text-[12px] font-bold text-white transition-all hover:opacity-95 disabled:cursor-not-allowed disabled:bg-[var(--toss-gray-2)]"
-                >
-                  <LucideIcon name="Check" size={14} />
-                  추가
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPendingFav('');
-                    setShowFavPicker(false);
-                  }}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-4)] transition-all hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
-                  aria-label="즐겨찾기 선택 닫기"
-                >
-                  <LucideIcon name="X" size={14} />
-                </button>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
+                {pickerKind === 'mypage' && (
+                  <select
+                    value={pickerMypageTab}
+                    onChange={(e) => setPickerMypageTab(e.target.value as MypageTabId | '')}
+                    data-testid="mypage-favorite-select-tab"
+                    className="h-9 min-w-0 flex-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                  >
+                    <option value="">마이페이지 탭 선택</option>
+                    {permittedMypageTabs.map((o) => (
+                      <option key={o.tab} value={o.tab}>{o.label}</option>
+                    ))}
+                  </select>
+                )}
+                {pickerKind === 'menu' && (
+                  <select
+                    value={pickerMainMenu}
+                    onChange={(e) => setPickerMainMenu(e.target.value as MainMenuId | '')}
+                    data-testid="mypage-favorite-select-menu"
+                    className="h-9 min-w-0 flex-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                  >
+                    <option value="">메인 메뉴 선택</option>
+                    {permittedMainMenus.map((o) => (
+                      <option key={o.mainMenu} value={o.mainMenu}>{o.label}</option>
+                    ))}
+                  </select>
+                )}
+                {pickerKind === 'submenu' && (
+                  <>
+                    <select
+                      value={pickerMainMenu}
+                      onChange={(e) => {
+                        setPickerMainMenu(e.target.value as MainMenuId | '');
+                        setPickerSubView('');
+                        setPickerInnerTab('');
+                      }}
+                      data-testid="mypage-favorite-select-mainmenu"
+                      className="h-9 min-w-0 flex-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                    >
+                      <option value="">메뉴 선택</option>
+                      {permittedSubMenuBearers.map((id) => (
+                        <option key={id} value={id}>{id}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={pickerSubView}
+                      onChange={(e) => {
+                        setPickerSubView(e.target.value);
+                        setPickerInnerTab('');
+                      }}
+                      disabled={!pickerMainMenu}
+                      data-testid="mypage-favorite-select-subview"
+                      className="h-9 min-w-0 flex-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)] disabled:opacity-50"
+                    >
+                      <option value="">세부기능 선택</option>
+                      {pickerSubViewOptions.map((o) => (
+                        <option key={o.subView} value={o.subView}>{o.label}</option>
+                      ))}
+                    </select>
+                    {pickerInnerTabOptions.length > 0 && (
+                      <select
+                        value={pickerInnerTab}
+                        onChange={(e) => setPickerInnerTab(e.target.value)}
+                        data-testid="mypage-favorite-select-innertab"
+                        className="h-9 min-w-0 flex-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                      >
+                        <option value="">상세 탭 (선택)</option>
+                        {pickerInnerTabOptions.map((o) => (
+                          <option key={o.id} value={o.id}>{o.label}</option>
+                        ))}
+                      </select>
+                    )}
+                  </>
+                )}
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleAddFavorite}
+                    disabled={!canAddFavorite}
+                    data-testid="mypage-favorite-add"
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] px-3 text-[12px] font-bold text-white transition-all hover:opacity-95 disabled:cursor-not-allowed disabled:bg-[var(--toss-gray-2)]"
+                  >
+                    <LucideIcon name="Check" size={14} />
+                    추가
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetPicker}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-4)] transition-all hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+                    aria-label="즐겨찾기 선택 닫기"
+                  >
+                    <LucideIcon name="X" size={14} />
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -981,6 +1069,11 @@ function MyPageMain({
                   {isEditingProfile ? '수정 취소' : '정보 수정'}
                 </button>
               </div>
+            </div>
+          )}
+          {activeTab === 'shortcuts' && (
+            <div data-testid="mypage-shortcuts-tab" className="animate-premium-fade pb-3">
+              <ShortcutManager user={user as Record<string, unknown> | null} />
             </div>
           )}
           {activeTab === 'commute' && (

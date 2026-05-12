@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import AnnualLeaveManualGrant from '../연차수동부여';
 import {
-  getFlaggedChatRooms,
   includesBannedWord,
   pickFirstFlaggedChatMessage,
 } from '@/lib/system-master-chat-filter';
@@ -86,7 +85,8 @@ function BannedWordModal({ onClose }: { onClose: () => void }) {
 }
 
 // ─── 유틸 함수들 ───
-const CHAT_FETCH_LIMIT = '500';
+const CHAT_FETCH_LIMIT = '2000';      // 메시지 페이지 한도 (서버에서 최대 5000까지 허용)
+const CHAT_ROOM_FETCH_LIMIT = '5000'; // 채팅방 목록 한도 (서버에서 최대 10000까지 허용)
 
 const formatCurrency = (value: unknown) => formatWon(Number(value || 0));
 
@@ -296,7 +296,18 @@ export default function SystemMasterCenter({
     setError('');
     try {
       const keyword = debouncedChatKeyword.trim();
-      const catalogQuery = new URLSearchParams({ scope: 'chats', keyword, limit: CHAT_FETCH_LIMIT });
+      const params: Record<string, string> = {
+        scope: 'chats',
+        keyword,
+        limit: CHAT_FETCH_LIMIT,
+        roomLimit: CHAT_ROOM_FETCH_LIMIT,
+      };
+      // 단어 필터 선택검색 활성화 시 — 서버에서 필터 단어 포함된 채팅방 전체 검색
+      if (showFlaggedOnly && bannedWords.length > 0) {
+        params.bannedWords = bannedWords.join(',');
+        params.flaggedRoomsOnly = '1';
+      }
+      const catalogQuery = new URLSearchParams(params);
       const catalogPayload = await readJson<SystemMasterChatsPayload>(`/api/admin/system-master?${catalogQuery.toString()}`);
       setChatRooms(catalogPayload.rooms || []);
       setChatCatalogMessages(catalogPayload.messages || []);
@@ -306,7 +317,7 @@ export default function SystemMasterCenter({
     } finally {
       setLoading(false);
     }
-  }, [debouncedChatKeyword]);
+  }, [debouncedChatKeyword, showFlaggedOnly, bannedWords]);
 
   const loadChatMessages = useCallback(async (roomId: string) => {
     if (!roomId) return;
@@ -385,6 +396,51 @@ export default function SystemMasterCenter({
     }
   }, [openConfirm]);
 
+  const handleDeleteEmptyRooms = useCallback(async () => {
+    const targets = chatRooms.filter((room) => isEmptyChatRoom(room));
+    if (targets.length === 0) {
+      toast('대화 내역이 없는 채팅방이 없습니다.', 'warning');
+      return;
+    }
+    const confirmed = await openConfirm({
+      title: '대화 없는 채팅방 일괄 삭제',
+      description: `대화 내역이 전혀 없는 채팅방 ${targets.length}개를 한 번에 삭제합니다.\n참여자 목록, 알림 설정 등 관련 데이터도 함께 정리됩니다.`,
+      confirmText: `${targets.length}개 삭제`,
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+
+    setDeletingRoomId('__bulk__');
+    try {
+      const ids = targets.map((room) => String(room.id)).filter(Boolean);
+      const response = await fetch(
+        `/api/admin/system-master?scope=chats&roomIds=${encodeURIComponent(ids.join(','))}`,
+        { method: 'DELETE' },
+      );
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || '일괄 삭제에 실패했습니다.');
+      }
+      const deletedIds = new Set<string>((payload?.deletedRoomIds as string[]) || []);
+      setChatRooms((prev) => prev.filter((room) => !deletedIds.has(String(room.id))));
+      setChatCatalogMessages((prev) => prev.filter((message) => !deletedIds.has(String(message.room_id || ''))));
+      setChatMessages((prev) => prev.filter((message) => !deletedIds.has(String(message.room_id || ''))));
+      setSelectedRoomId((prev) => (prev && deletedIds.has(prev) ? '' : prev));
+
+      const failureCount = Number(payload?.failureCount || 0);
+      if (failureCount > 0) {
+        toast(`${deletedIds.size}개 삭제 · ${failureCount}개 실패`, 'warning');
+      } else {
+        toast(`${deletedIds.size}개 채팅방을 일괄 삭제했습니다.`, 'success');
+      }
+    } catch (deleteError) {
+      const message = deleteError instanceof Error ? deleteError.message : '일괄 삭제에 실패했습니다.';
+      toast(message, 'error');
+    } finally {
+      setDeletingRoomId(null);
+    }
+  }, [chatRooms, openConfirm]);
+
   const runOpsAction = useCallback(async (action: SystemMasterActionId) => {
     setOpsActionLoading(action);
     try {
@@ -442,14 +498,15 @@ export default function SystemMasterCenter({
   );
 
   const visibleChatRooms = useMemo(
-    () => (
-      showEmptyRoomsOnly
-        ? emptyChatRooms
-        : showFlaggedOnly
-        ? getFlaggedChatRooms(chatRooms, chatCatalogMessages, bannedWords)
-        : chatRooms
-    ),
-    [bannedWords, chatCatalogMessages, chatRooms, emptyChatRooms, showEmptyRoomsOnly, showFlaggedOnly],
+    () => {
+      if (showEmptyRoomsOnly) return emptyChatRooms;
+      if (!showFlaggedOnly) return chatRooms;
+      // 선택검색 활성 + 필터 단어 있음 → loadChatCatalog가 서버에서 이미 필터링한 chatRooms를 반환.
+      // 필터 단어가 비어 있는 폴백 상황에서만 클라이언트 측 보조 필터링 적용.
+      if (bannedWords.length === 0) return chatRooms;
+      return chatRooms;
+    },
+    [bannedWords, chatRooms, emptyChatRooms, showEmptyRoomsOnly, showFlaggedOnly],
   );
 
   const visibleChatMessages = useMemo(
@@ -1165,8 +1222,21 @@ export default function SystemMasterCenter({
                   }}
                   className={`h-9 px-3 text-xs font-bold rounded-[var(--radius-md)] border transition ${showEmptyRoomsOnly ? 'bg-[var(--foreground)] text-white border-[var(--foreground)]' : 'border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]'}`}
                 >
-                  대화 없는 방
+                  대화 없는 방 ({emptyChatRooms.length})
                 </button>
+                {emptyChatRooms.length > 0 && (
+                  <button
+                    type="button"
+                    data-testid="system-master-bulk-delete-empty-rooms"
+                    disabled={deletingRoomId === '__bulk__'}
+                    onClick={() => void handleDeleteEmptyRooms()}
+                    className="h-9 rounded-[var(--radius-md)] border border-danger/30 px-3 text-xs font-bold text-danger transition hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {deletingRoomId === '__bulk__'
+                      ? '삭제 중...'
+                      : `빈 방 ${emptyChatRooms.length}개 일괄 삭제`}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowBannedModal(true)}

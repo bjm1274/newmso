@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import LicenseCESubmit from './면허보수교육제출';
 // jsPDF: dynamic import로 전환 (번들 사이즈 최적화)
 
 type ContractRecord = {
@@ -338,6 +339,9 @@ export default function MyDocuments(props: MyDocumentsProps) {
                     );
                 })}
             </div>
+
+            {/* 면허·자격 보수교육 이수증 제출 섹션 */}
+            <LicenseCESubmit user={user as { id?: string; name?: string } | null | undefined} />
 
             <div className="bg-blue-500/10/50 p-4 rounded-[var(--radius-xl)] border border-blue-100">
                 <h4 className="text-[13px] font-black text-blue-800 mb-2">📢 제출 및 촬영 가이드</h4>

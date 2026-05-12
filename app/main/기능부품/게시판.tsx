@@ -23,7 +23,6 @@ import { uploadBoardAttachmentFile } from './게시판업로드';
 import type { StaffMember, BoardPost, ScheduleItem, AttachmentItem } from '@/types';
 import { BOARD_MENU_ITEMS } from './게시판메뉴';
 import {
-  NOTICE_ROOM_ID,
   BOARD_AUTO_CHAT_TYPES,
   BOARD_IDS,
   BOARD_POST_OPTIONAL_COLUMNS,
@@ -1373,68 +1372,28 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
           activeBoard === '경조사' ||
           (activeBoard === '공지사항' &&
             (!normalizedScheduledPublishAt || new Date(normalizedScheduledPublishAt).getTime() <= Date.now()));
-        if (shouldNotifyImmediately) {
-          // 1) 전 직원 알림 발송
+        if (shouldNotifyImmediately && BOARD_AUTO_CHAT_TYPES.has(activeBoard)) {
+          // 서버 라우트에 위임: 공지 메시지 insert + 전 직원 알림 + 푸시 디스패치 일괄 처리
+          // (클라이언트 직접 insert 시 RLS·members 빈 배열·실패 무음화 등 다중 원인으로 무음 실패하던 문제 해결)
           try {
-            const { data: staffList } = await supabase.from('staff_members').select('id');
-            const staffIds = (staffList || []).map((s: { id: string }) => s.id).filter(Boolean);
-            if (staffIds.length > 0) {
-              const label = activeBoard === '공지사항' ? '📢 새 공지사항' : '🎉 새 경조사';
-              const body = (normalizedInsertedPost.title || '(제목 없음)').slice(0, 80);
-              const rows = staffIds.map((userId: string) => ({
-                user_id: userId,
-                type: 'board',
-                title: label,
-                body,
-              }));
-              await supabase.from('notifications').insert(rows);
+            const res = await fetch('/api/board/notice-broadcast', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                postId: normalizedInsertedPost.id,
+                useAnonymous: Boolean(useAnonymous),
+              }),
+            });
+            if (!res.ok) {
+              const errBody = await res.json().catch(() => ({}));
+              const reason = String((errBody as { error?: string })?.error || `HTTP ${res.status}`);
+              toast(`공지 자동 발송 실패: ${reason}`, 'error');
+              logger.warn('공지 자동 발송 실패:', errBody);
             }
           } catch (e) {
-            logger.warn('게시판 전 직원 알림 발송 실패:', e);
-          }
-
-          // 2) 공지 채팅방 자동 메시지 전송 (공지사항·경조사)
-          if (BOARD_AUTO_CHAT_TYPES.has(activeBoard)) {
-            try {
-              const boardIcon = activeBoard === '공지사항' ? '📢' : '🎉';
-              const postTitle = (normalizedInsertedPost.title || '(제목 없음)').slice(0, 120);
-              const rawContent = typeof normalizedInsertedPost.content === 'string'
-                ? normalizedInsertedPost.content : '';
-              // 첨부 메타 제거 후 미리보기
-              const cleanContent = rawContent
-                .replace(/\[\[ATTACHMENTS_META\]\][\s\S]*?\[\[\/ATTACHMENTS_META\]\]/g, '')
-                .replace(/\[\[BOARD_META\]\][\s\S]*?\[\[\/BOARD_META\]\]/g, '')
-                .replace(/\[\[SCHEDULE_META\]\][\s\S]*?\[\[\/SCHEDULE_META\]\]/g, '')
-                .trim();
-              const preview = cleanContent.slice(0, 100).replace(/\n+/g, ' ').trim();
-              const chatContent = [
-                `${boardIcon} [${activeBoard}] ${postTitle}`,
-                preview || null,
-              ].filter(Boolean).join('\n');
-              const senderId = effectiveBoardUserId || String(user?.id || '').trim();
-              if (senderId) {
-                const { data: insertedMsg } = await supabase.from('messages').insert([{
-                  room_id: NOTICE_ROOM_ID,
-                  sender_id: senderId,
-                  sender_name: useAnonymous ? '관리자' : (user?.name || '관리자'),
-                  content: chatContent,
-                }]).select('id').single();
-                // 공지 채팅방 push 알림 트리거
-                if (insertedMsg?.id) {
-                  try {
-                    await fetch('/api/notifications/chat-push', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ roomId: NOTICE_ROOM_ID, messageId: insertedMsg.id }),
-                    });
-                  } catch {
-                    // push 실패는 무시 (메시지는 이미 전송됨)
-                  }
-                }
-              }
-            } catch (e) {
-              logger.warn('공지 채팅방 자동 메시지 전송 실패:', e);
-            }
+            toast('공지 자동 발송 중 오류가 발생했습니다.', 'error');
+            logger.warn('공지 자동 발송 요청 실패:', e);
           }
         }
       } else {

@@ -34,6 +34,7 @@ type PushSubscriptionRow = {
   p256dh: string;
   auth: string;
   fcm_token?: string | null;
+  created_at?: string | null;
 };
 
 type NotificationInsertRow = {
@@ -565,7 +566,16 @@ export async function dispatchChatPushForMessage(params: {
     } satisfies ChatPushDispatchResult;
   }
 
-  const members = Array.isArray(room.members) ? room.members.map((id) => String(id)) : [];
+  let members = Array.isArray(room.members) ? room.members.map((id) => String(id)) : [];
+  // 공지방은 members가 비어 있어도 전 직원에게 발송 (시드 단계에서 members가 미설정됨)
+  const isNoticeRoom =
+    String(room.id || '') === NOTICE_ROOM_ID || String(room.type || '').trim() === 'notice';
+  if (members.length === 0 && isNoticeRoom) {
+    const { data: allStaff } = await supabase.from('staff_members').select('id');
+    members = ((allStaff || []) as Array<{ id: string | null }>)
+      .map((row) => String(row.id || '').trim())
+      .filter(Boolean);
+  }
   if (members.length === 0) {
     await updateChatPushJobByMessageId(supabase, params.messageId, {
       processed_at: new Date().toISOString(),
@@ -603,7 +613,7 @@ export async function dispatchChatPushForMessage(params: {
   const [subscriptionRes, senderRes] = await Promise.all([
     supabase
       .from('push_subscriptions')
-      .select('id, staff_id, endpoint, p256dh, auth, fcm_token')
+      .select('id, staff_id, endpoint, p256dh, auth, fcm_token, created_at')
       .in('staff_id', targetIds),
     supabase
       .from('staff_members')
@@ -734,13 +744,24 @@ export async function dispatchChatPushForMessage(params: {
     }
   }
 
+  // 같은 staff_id에 잔재 fcm_token이 여러 개 남아있을 수 있으므로
+  // 사용자당 가장 최근(created_at 내림차순) 토큰 1개만 사용해 이중 발송 차단.
+  const latestFcmTokenByStaffId = new Map<string, { token: string; createdAt: number }>();
+  for (const row of (subscriptionRes.data || []) as PushSubscriptionRow[]) {
+    if (!row.fcm_token || !row.staff_id || row.staff_id === senderId) continue;
+    const token = String(row.fcm_token).trim();
+    if (!token) continue;
+    const createdAt = row.created_at ? Date.parse(String(row.created_at)) : 0;
+    const prev = latestFcmTokenByStaffId.get(row.staff_id);
+    if (!prev || (Number.isFinite(createdAt) ? createdAt : 0) > prev.createdAt) {
+      latestFcmTokenByStaffId.set(row.staff_id, {
+        token,
+        createdAt: Number.isFinite(createdAt) ? createdAt : 0,
+      });
+    }
+  }
   const uniqueFcmTokens = Array.from(
-    new Set(
-      ((subscriptionRes.data || []) as PushSubscriptionRow[])
-        .filter((row) => row.fcm_token && row.staff_id && row.staff_id !== senderId)
-        .map((row) => String(row.fcm_token))
-        .filter(Boolean)
-    )
+    new Set(Array.from(latestFcmTokenByStaffId.values()).map((entry) => entry.token))
   );
 
   if (uniqueSubscriptions.size === 0 && uniqueFcmTokens.length === 0) {

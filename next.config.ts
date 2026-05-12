@@ -1,5 +1,27 @@
 import type { NextConfig } from "next";
 
+const r2PublicBaseUrl = (
+  process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL ||
+  process.env.R2_PUBLIC_BASE_URL ||
+  ''
+).trim();
+
+const r2RemotePattern = (() => {
+  if (!r2PublicBaseUrl) return null;
+  try {
+    const parsed = new URL(r2PublicBaseUrl);
+    const protocol = parsed.protocol.replace(':', '');
+    if (protocol !== 'https' && protocol !== 'http') return null;
+    return {
+      protocol: protocol as 'https' | 'http',
+      hostname: parsed.hostname,
+      pathname: '/**',
+    };
+  } catch {
+    return null;
+  }
+})();
+
 const nextConfig: NextConfig = {
   images: {
     formats: ["image/webp"],
@@ -12,6 +34,7 @@ const nextConfig: NextConfig = {
         hostname: 'rtleqrtcqucntnygzudv.supabase.co',
         pathname: '/storage/v1/object/**',
       },
+      ...(r2RemotePattern ? [r2RemotePattern] : []),
     ],
   },
   compress: true,

@@ -887,7 +887,10 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
             .from('staff_licenses')
             .delete()
             .eq('staff_id', editStaffId);
-          if (licDelErr) logger.warn('면허 기존 삭제 실패:', licDelErr);
+          if (licDelErr) {
+            logger.warn('면허 기존 삭제 실패:', licDelErr);
+            toast(`면허·자격증 기존 데이터 삭제 실패: ${licDelErr.message ?? '권한/정책 확인 필요'}`, 'error');
+          }
           if (filledLicensesEdit.length > 0) {
             const { error: licInsErr } = await supabase.from('staff_licenses').insert(
               filledLicensesEdit.map((l: LicenseRow) => ({
@@ -902,7 +905,27 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
                 is_primary: l.is_primary,
               })),
             );
-            if (licInsErr) logger.warn('면허 재삽입 실패:', licInsErr);
+            if (licInsErr) {
+              logger.warn('면허 재삽입 실패:', licInsErr);
+              toast(`면허·자격증 저장 실패: ${licInsErr.message ?? '권한/정책 확인 필요'}`, 'error');
+            }
+          }
+
+          // 저장 직후 검증 — 화면 입력보다 잔재 row가 더 많으면 사용자에게 경고
+          const { data: verifyRows, error: verifyErr } = await supabase
+            .from('staff_licenses')
+            .select('id, license_name, license_type')
+            .eq('staff_id', editStaffId);
+          if (verifyErr) {
+            logger.warn('면허 저장 후 검증 실패:', verifyErr);
+          } else if ((verifyRows?.length ?? 0) > filledLicensesEdit.length) {
+            const leftover = (verifyRows ?? [])
+              .map((r) => String(r.license_name || r.license_type || '미상'))
+              .join(', ');
+            toast(
+              `면허·자격증 DB에 잔재가 남아 있습니다 (${verifyRows?.length}건: ${leftover}). 자격·안전센터 → 면허/자격증 메뉴에서 직접 확인해 주세요.`,
+              'warning',
+            );
           }
 
           // 직종 — upsert + 체크 해제된 것 delete

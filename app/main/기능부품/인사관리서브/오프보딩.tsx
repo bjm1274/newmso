@@ -108,6 +108,7 @@ export default function OffboardingView({
   const [loading, setLoading] = useState(false);
   const [checklistsByStaff, setChecklistsByStaff] = useState<Record<string, ChecklistItem[]>>({});
   const [existingChecklistRows, setExistingChecklistRows] = useState<Record<string, boolean>>({});
+  const [licenseHoldersById, setLicenseHoldersById] = useState<Record<string, string[]>>({});
 
   const filteredStaffs = useMemo(() => {
     return staffs.filter((staff) => selectedCo === '전체' || staff.company === selectedCo);
@@ -214,6 +215,51 @@ export default function OffboardingView({
     };
 
     void loadChecklists();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pendingList]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadLicenseHolders = async () => {
+      if (pendingList.length === 0) {
+        if (!cancelled) setLicenseHoldersById({});
+        return;
+      }
+
+      const ids = pendingList.map((staff) => String(staff.id));
+      const { data, error } = await supabase
+        .from('staff_licenses')
+        .select('staff_id, license_name, license_type')
+        .in('staff_id', ids);
+
+      if (cancelled) return;
+
+      if (error) {
+        console.warn('퇴사자 면허 보유 조회 실패:', error);
+        setLicenseHoldersById({});
+        return;
+      }
+
+      const names: Record<string, string[]> = {};
+      (data ?? []).forEach((row) => {
+        const record = row as { staff_id: unknown; license_name: unknown; license_type: unknown };
+        const id = String(record.staff_id ?? '');
+        if (!id) return;
+        const label =
+          (typeof record.license_name === 'string' && record.license_name.trim()) ||
+          (typeof record.license_type === 'string' && record.license_type.trim()) ||
+          '면허';
+        if (!names[id]) names[id] = [];
+        names[id].push(label);
+      });
+      setLicenseHoldersById(names);
+    };
+
+    void loadLicenseHolders();
 
     return () => {
       cancelled = true;
@@ -638,6 +684,24 @@ export default function OffboardingView({
                         {hasChecklist ? (completed ? '완료' : '진행 중') : '과거 데이터'}
                       </span>
                     </div>
+
+                    {(licenseHoldersById[staffId]?.length || 0) > 0 && (
+                      <div
+                        role="alert"
+                        className="mb-4 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-amber-800"
+                      >
+                        <span aria-hidden="true" className="text-base leading-none">⚠️</span>
+                        <div className="space-y-0.5">
+                          <p className="text-xs font-black">HIRA 면허자격 회수 필요</p>
+                          <p className="text-[11px] font-medium leading-snug">
+                            이 직원은 면허·자격증 보유자({licenseHoldersById[staffId].length}건: {licenseHoldersById[staffId].join(', ')})입니다. 건강보험심사평가원(HIRA) 요양기관업무포털에서 면허자격을 반드시 회수 처리해 주세요.
+                          </p>
+                          <p className="text-[10px] font-semibold text-amber-700/80">
+                            안내가 사라지지 않으면 좌측 메뉴 “면허·자격증 관리”에서 해당 직원의 row를 삭제하세요.
+                          </p>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="mb-4 space-y-2">
                       {checklistItems.map((item) => (

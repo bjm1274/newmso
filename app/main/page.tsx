@@ -1,5 +1,6 @@
 'use client';
 import { logger } from '@/lib/logger';
+import { useGlobalShortcuts } from './기능부품/마이페이지/useGlobalShortcuts';
 
 import { toast } from '@/lib/toast';
 import { Suspense, startTransition, useState, useEffect, useCallback, useMemo } from 'react';
@@ -1021,6 +1022,19 @@ function MainPageContent() {
       setSubView(nextSubView);
     });
   }, []);
+
+  // 전역 Alt+키 단축키 — 직원별 매핑된 메뉴로 즉시 이동
+  const shortcutSetMainMenu = useCallback((menu: string) => {
+    startTransition(() => { setMainMenu(menu); });
+  }, []);
+  const shortcutSetSubView = useCallback((view: string | null) => {
+    startTransition(() => { setSubView(view ?? '전체'); });
+  }, []);
+  useGlobalShortcuts({
+    user,
+    setMainMenu: shortcutSetMainMenu,
+    setSubView: shortcutSetSubView,
+  });
 
   const handleRefresh = useCallback(() => {
     void fetchERPData(user);

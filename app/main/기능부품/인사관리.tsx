@@ -272,13 +272,35 @@ function getWorkspaceForHrMenu(menuId: HrMenuId): HrWorkspaceId {
   return '복지 · 문서';
 }
 
+// 즐겨찾기/단축키에서 깊은 inner tab을 직접 지정한 경우 일회성으로 읽고 지움
+function consumePendingTab(storageKey: string): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const value = window.localStorage.getItem(storageKey);
+    if (value) {
+      window.localStorage.removeItem(storageKey);
+      return value;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 function getPayrollMainInitialTab(menuId?: string | null): string {
+  const pending = consumePendingTab('erp_payroll_pending_initial_tab');
+  if (pending) return pending;
   if (menuId === '원천징수파일') return '원천징수파일';
   if (menuId === '4대보험') return '4대보험EDI';
   return '대시보드';
 }
 
 function getContractInitialTab(menuId?: string | null): ContractEmbeddedTabId {
+  const pending = consumePendingTab('erp_contract_pending_initial_tab');
+  if (pending) {
+    const mapped = CONTRACT_UTILITY_MENU_MAP[pending];
+    if (mapped) return mapped;
+  }
   return CONTRACT_UTILITY_MENU_MAP[menuId || ''] || '기본';
 }
 
@@ -287,6 +309,10 @@ function getLeaveSuiteInitialTab(menuId?: string | null): LeaveSuiteTabId {
 }
 
 function getAttendanceInitialTab(menuId?: string | null): AttendanceAnalysisTabId {
+  const pending = consumePendingTab('erp_attendance_pending_initial_tab');
+  if (pending && (ATTENDANCE_ANALYSIS_MENU_MAP[pending] || ['근태관리','연차휴가','간호근무표','근태이상차감','근태이상분석','근태차감시뮬레이터','근무형태이력'].includes(pending))) {
+    return (ATTENDANCE_ANALYSIS_MENU_MAP[pending] || pending) as AttendanceAnalysisTabId;
+  }
   return ATTENDANCE_ANALYSIS_MENU_MAP[menuId || ''] || '근태관리';
 }
 

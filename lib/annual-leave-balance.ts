@@ -14,7 +14,14 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 const RecalcInputSchema = z.object({
   staffId: z.string().uuid('staffId는 유효한 UUID여야 합니다'),
   year: z.number().int().min(2000).max(2100).optional(),
+  expiredOverride: z.number().min(0).optional(),
+  compensatedOverride: z.number().min(0).optional(),
 });
+
+export type RecalcOverrides = {
+  expiredDays?: number;
+  compensatedDays?: number;
+};
 
 // ─── DB 조회 결과 타입 ────────────────────────────────────────────────────────
 
@@ -37,6 +44,7 @@ type CompanyRow = {
 
 type LeaveBalanceRow = {
   expired_days: number | null;
+  compensated_days: number | null;
 };
 
 // ─── 내부 헬퍼 ───────────────────────────────────────────────────────────────
@@ -72,9 +80,15 @@ export async function recalculateLeaveBalance(
   staffId: string,
   year?: number,
   client: SupabaseClient = supabase,
+  overrides?: RecalcOverrides,
 ): Promise<void> {
   // 입력 검증 (JM4)
-  const parsed = RecalcInputSchema.safeParse({ staffId, year });
+  const parsed = RecalcInputSchema.safeParse({
+    staffId,
+    year,
+    expiredOverride: overrides?.expiredDays,
+    compensatedOverride: overrides?.compensatedDays,
+  });
   if (!parsed.success) {
     const msg = parsed.error.issues.map((e) => e.message).join(', ');
     console.error('[recalculateLeaveBalance] 입력 오류:', msg);
@@ -142,18 +156,27 @@ export async function recalculateLeaveBalance(
 
   const expiryDateStr = expiryDate.toISOString().slice(0, 10);
 
-  // 6. 기존 소멸일수 조회 (이미 소멸 처리된 것은 유지)
+  // 6. 기존 소멸/수당지급 일수 조회 (이미 처리된 것은 유지)
+  //    overrides가 있으면 그 값으로 덮어쓰기 (관리자 수동 입력 경로)
   const { data: existingBalance } = await client
     .from('leave_balances')
-    .select('expired_days')
+    .select('expired_days, compensated_days')
     .eq('staff_id', staffId)
-    .eq('expiry_date', expiryDateStr)
+    .eq('year', targetYear)
     .maybeSingle();
 
-  const expiredDays = Number((existingBalance as LeaveBalanceRow | null)?.expired_days) || 0;
+  const existing = existingBalance as LeaveBalanceRow | null;
+  const expiredDays =
+    overrides?.expiredDays !== undefined
+      ? Number(overrides.expiredDays)
+      : Number(existing?.expired_days) || 0;
+  const compensatedDays =
+    overrides?.compensatedDays !== undefined
+      ? Number(overrides.compensatedDays)
+      : Number(existing?.compensated_days) || 0;
 
-  // 7. 잔여일수 계산
-  const remainingDays = Math.max(0, totalDays - usedDays - expiredDays);
+  // 7. 잔여일수 계산 (소멸 + 수당지급 차감)
+  const remainingDays = Math.max(0, totalDays - usedDays - expiredDays - compensatedDays);
 
   // 8. UPSERT
   const { error: upsertError } = await client
@@ -167,6 +190,7 @@ export async function recalculateLeaveBalance(
         remaining_days: remainingDays,
         expiry_date: expiryDateStr,
         expired_days: expiredDays,
+        compensated_days: compensatedDays,
       },
       {
         onConflict: 'staff_id,year',

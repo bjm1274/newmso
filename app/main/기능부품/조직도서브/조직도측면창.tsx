@@ -430,6 +430,12 @@ const ICON_PATHS: Record<string, React.ReactNode> = {
       <path d="m5.5 5.1-3.3 12A2 2 0 0 0 4.1 20h15.8a2 2 0 0 0 1.9-2.9l-3.3-12A2 2 0 0 0 16.6 4H7.4a2 2 0 0 0-1.9 1.1Z" />
     </>
   ),
+  keyboard: (
+    <>
+      <rect x="2" y="6" width="20" height="12" rx="2" />
+      <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10" />
+    </>
+  ),
   alert: (
     <>
       <path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z" />
@@ -570,6 +576,7 @@ const LUCIDE_ICON_ALIASES: Record<string, string> = {
   Hospital: 'hospital',
   Hourglass: 'loader',
   Inbox: 'inbox',
+  Keyboard: 'keyboard',
   LoaderCircle: 'loader',
   Landmark: 'landmark',
   Lock: 'admin',

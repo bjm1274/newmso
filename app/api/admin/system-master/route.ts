@@ -854,15 +854,47 @@ export async function GET(request: NextRequest) {
     }
 
     if (scope === 'chats') {
-      const chatLimit = Math.min(Math.max(Number(limit) || 500, 1), 1000);
-      const [roomRes, messageRes] = await Promise.all([
-        supabase.from('chat_rooms').select(CHAT_ROOM_ADMIN_SELECT).order('created_at', { ascending: false }).limit(200),
-        (() => {
-          let query = supabase.from('messages').select(CHAT_MESSAGE_ADMIN_SELECT).order('created_at', { ascending: false }).limit(chatLimit);
-          if (roomId) query = query.eq('room_id', roomId);
-          if (keyword) query = query.ilike('content', `%${keyword}%`);
-          return query;
-        })(),
+      const chatLimit = Math.min(Math.max(Number(limit) || 1000, 1), 5000);
+      const roomLimitRaw = Number(searchParams.get('roomLimit') || 0);
+      const roomLimit = Math.min(Math.max(Number.isFinite(roomLimitRaw) && roomLimitRaw > 0 ? roomLimitRaw : 2000, 1), 10000);
+
+      // 단어 필터(선택검색) — bannedWords 파라미터로 다중 키워드 OR 검색
+      const bannedWordsParam = String(searchParams.get('bannedWords') || '').trim();
+      const bannedWords = bannedWordsParam
+        ? bannedWordsParam.split(',').map((w) => w.trim()).filter(Boolean)
+        : [];
+      const wantOnlyBannedRooms = searchParams.get('flaggedRoomsOnly') === '1' && bannedWords.length > 0;
+
+      // 1. 메시지 조회 (keyword 또는 bannedWords 조건 반영)
+      let messageQuery = supabase
+        .from('messages')
+        .select(CHAT_MESSAGE_ADMIN_SELECT)
+        .order('created_at', { ascending: false })
+        .limit(chatLimit);
+      if (roomId) messageQuery = messageQuery.eq('room_id', roomId);
+      if (keyword) messageQuery = messageQuery.ilike('content', `%${keyword}%`);
+
+      // 2. 단어 필터 매칭 메시지 조회 (전체 채팅방 식별용 — limit 별도)
+      const bannedWordsMessageQuery = bannedWords.length > 0
+        ? supabase
+            .from('messages')
+            .select('id, room_id, content')
+            .or(bannedWords.map((word) => `content.ilike.%${word.replace(/[,)]/g, '')}%`).join(','))
+            .order('created_at', { ascending: false })
+            .limit(5000)
+        : null;
+
+      // 3. 채팅방 조회 (roomLimit 기본 2000, 최대 10000)
+      const roomQuery = supabase
+        .from('chat_rooms')
+        .select(CHAT_ROOM_ADMIN_SELECT)
+        .order('created_at', { ascending: false })
+        .limit(roomLimit);
+
+      const [roomRes, messageRes, bannedRes] = await Promise.all([
+        roomQuery,
+        messageQuery,
+        bannedWordsMessageQuery ?? Promise.resolve({ data: [], error: null } as never),
       ]);
 
       if (roomRes.error) {
@@ -871,8 +903,22 @@ export async function GET(request: NextRequest) {
       if (messageRes.error) {
         return NextResponse.json({ error: '메시지 데이터를 불러오는 중 오류가 발생했습니다.' }, { status: 500 });
       }
+      if (bannedRes && (bannedRes as { error?: { message?: string } }).error) {
+        return NextResponse.json({ error: '필터 단어 검색 중 오류가 발생했습니다.' }, { status: 500 });
+      }
 
-      const rooms = toLooseRecordArray<ChatRoomRow>(roomRes.data);
+      const bannedRoomIds = new Set<string>(
+        bannedWords.length > 0
+          ? toLooseRecordArray<ChatMessageRow>((bannedRes as { data: ChatMessageRow[] }).data || [])
+              .map((row) => String(row.room_id || '').trim())
+              .filter(Boolean)
+          : [],
+      );
+
+      let rooms = toLooseRecordArray<ChatRoomRow>(roomRes.data);
+      if (wantOnlyBannedRooms) {
+        rooms = rooms.filter((room) => bannedRoomIds.has(String(room.id || '')));
+      }
       const roomMap = new Map<string, ChatRoomRow>(rooms.map((room) => [String(room.id), room]));
       const normalizedRooms = rooms
         .map((room) => normalizeChatRoom(room, staffMap))
@@ -886,7 +932,11 @@ export async function GET(request: NextRequest) {
         .filter((message) => !keyword || matchSearch(message, keyword))
         .map((message) => normalizeMessage(message, roomMap, staffMap));
 
-      return NextResponse.json({ rooms: normalizedRooms, messages: filteredMessages });
+      return NextResponse.json({
+        rooms: normalizedRooms,
+        messages: filteredMessages,
+        flaggedRoomIds: bannedWords.length > 0 ? Array.from(bannedRoomIds) : undefined,
+      });
     }
 
     if (scope === 'operations') {
@@ -1096,6 +1146,54 @@ export async function GET(request: NextRequest) {
   }
 }
 
+async function deleteChatRoomCascade(
+  supabase: ReturnType<typeof getAdminClient>,
+  roomId: string,
+): Promise<{ ok: true; deletedMessageCount: number; deletedPollCount: number } | { ok: false; error: string; status: number }> {
+  const { data: room, error: roomError } = await supabase.from('chat_rooms').select('id').eq('id', roomId).maybeSingle();
+  if (roomError) return { ok: false, error: roomError.message, status: 500 };
+  if (!room) return { ok: false, error: 'Chat room not found', status: 404 };
+
+  const { data: messageRows, error: messageRowsError } = await supabase.from('messages').select('id').eq('room_id', roomId);
+  if (messageRowsError) return { ok: false, error: messageRowsError.message, status: 500 };
+
+  const { data: pollRows, error: pollRowsError } = await supabase.from('polls').select('id').eq('room_id', roomId);
+  if (pollRowsError) return { ok: false, error: pollRowsError.message, status: 500 };
+
+  const messageIds = (messageRows || []).map((row) => String(row.id)).filter(Boolean);
+  const pollIds = (pollRows || []).map((row) => String(row.id)).filter(Boolean);
+
+  if (pollIds.length > 0) {
+    const { error } = await supabase.from('poll_votes').delete().in('poll_id', pollIds);
+    if (error) return { ok: false, error: error.message, status: 500 };
+  }
+  if (messageIds.length > 0) {
+    const [{ error: reactionsError }, { error: bookmarksByMessageError }] = await Promise.all([
+      supabase.from('message_reactions').delete().in('message_id', messageIds),
+      supabase.from('message_bookmarks').delete().in('message_id', messageIds),
+    ]);
+    if (reactionsError) return { ok: false, error: reactionsError.message, status: 500 };
+    if (bookmarksByMessageError) return { ok: false, error: bookmarksByMessageError.message, status: 500 };
+  }
+
+  const cleanupResults = await Promise.all([
+    supabase.from('message_bookmarks').delete().eq('room_id', roomId),
+    supabase.from('pinned_messages').delete().eq('room_id', roomId),
+    supabase.from('room_read_cursors').delete().eq('room_id', roomId),
+    supabase.from('room_notification_settings').delete().eq('room_id', roomId),
+    supabase.from('polls').delete().eq('room_id', roomId),
+    supabase.from('messages').delete().eq('room_id', roomId),
+  ]);
+  for (const result of cleanupResults) {
+    if (result.error) return { ok: false, error: result.error.message, status: 500 };
+  }
+
+  const { error: deleteRoomError } = await supabase.from('chat_rooms').delete().eq('id', roomId);
+  if (deleteRoomError) return { ok: false, error: deleteRoomError.message, status: 500 };
+
+  return { ok: true, deletedMessageCount: messageIds.length, deletedPollCount: pollIds.length };
+}
+
 export async function DELETE(request: NextRequest) {
   try {
     const session = await readSessionFromRequest(request);
@@ -1106,75 +1204,48 @@ export async function DELETE(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const scope = searchParams.get('scope') || 'overview';
     const roomId = String(searchParams.get('roomId') || '').trim();
+    const roomIdsParam = String(searchParams.get('roomIds') || '').trim();
+    const roomIds = roomIdsParam
+      ? Array.from(new Set(roomIdsParam.split(',').map((id) => id.trim()).filter(Boolean)))
+      : [];
 
-    if (scope !== 'chats' || !roomId) {
+    if (scope !== 'chats' || (!roomId && roomIds.length === 0)) {
       return NextResponse.json({ error: 'Unsupported delete request' }, { status: 400 });
     }
 
     const supabase = getAdminClient();
 
-    const { data: room, error: roomError } = await supabase.from('chat_rooms').select('id').eq('id', roomId).maybeSingle();
-
-    if (roomError) {
-      return NextResponse.json({ error: roomError.message }, { status: 500 });
-    }
-    if (!room) {
-      return NextResponse.json({ error: 'Chat room not found' }, { status: 404 });
-    }
-
-    const { data: messageRows, error: messageRowsError } = await supabase.from('messages').select('id').eq('room_id', roomId);
-    if (messageRowsError) {
-      return NextResponse.json({ error: messageRowsError.message }, { status: 500 });
+    // 단일 삭제 (기존 동작)
+    if (roomId && roomIds.length === 0) {
+      const result = await deleteChatRoomCascade(supabase, roomId);
+      if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+      return NextResponse.json({
+        ok: true,
+        deletedRoomId: roomId,
+        deletedMessageCount: result.deletedMessageCount,
+        deletedPollCount: result.deletedPollCount,
+      });
     }
 
-    const { data: pollRows, error: pollRowsError } = await supabase.from('polls').select('id').eq('room_id', roomId);
-    if (pollRowsError) {
-      return NextResponse.json({ error: pollRowsError.message }, { status: 500 });
-    }
-
-    const messageIds = (messageRows || []).map((row) => String(row.id)).filter(Boolean);
-    const pollIds = (pollRows || []).map((row) => String(row.id)).filter(Boolean);
-
-    if (pollIds.length > 0) {
-      const { error } = await supabase.from('poll_votes').delete().in('poll_id', pollIds);
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    if (messageIds.length > 0) {
-      const [{ error: reactionsError }, { error: bookmarksByMessageError }] = await Promise.all([
-        supabase.from('message_reactions').delete().in('message_id', messageIds),
-        supabase.from('message_bookmarks').delete().in('message_id', messageIds),
-      ]);
-
-      if (reactionsError) return NextResponse.json({ error: reactionsError.message }, { status: 500 });
-      if (bookmarksByMessageError) return NextResponse.json({ error: bookmarksByMessageError.message }, { status: 500 });
-    }
-
-    const cleanupResults = await Promise.all([
-      supabase.from('message_bookmarks').delete().eq('room_id', roomId),
-      supabase.from('pinned_messages').delete().eq('room_id', roomId),
-      supabase.from('room_read_cursors').delete().eq('room_id', roomId),
-      supabase.from('room_notification_settings').delete().eq('room_id', roomId),
-      supabase.from('polls').delete().eq('room_id', roomId),
-      supabase.from('messages').delete().eq('room_id', roomId),
-    ]);
-
-    for (const result of cleanupResults) {
-      if (result.error) {
-        return NextResponse.json({ error: result.error.message }, { status: 500 });
+    // 일괄 삭제 — 안전을 위해 한 번에 최대 500개로 제한
+    const targets = roomIds.slice(0, 500);
+    const deletedRoomIds: string[] = [];
+    const failures: { roomId: string; error: string }[] = [];
+    for (const id of targets) {
+      const result = await deleteChatRoomCascade(supabase, id);
+      if (result.ok) {
+        deletedRoomIds.push(id);
+      } else {
+        failures.push({ roomId: id, error: result.error });
       }
     }
 
-    const { error: deleteRoomError } = await supabase.from('chat_rooms').delete().eq('id', roomId);
-    if (deleteRoomError) {
-      return NextResponse.json({ error: deleteRoomError.message }, { status: 500 });
-    }
-
     return NextResponse.json({
-      ok: true,
-      deletedRoomId: roomId,
-      deletedMessageCount: messageIds.length,
-      deletedPollCount: pollIds.length,
+      ok: failures.length === 0,
+      deletedRoomIds,
+      failureCount: failures.length,
+      failures,
+      requestedCount: targets.length,
     });
   } catch (error) {
     const message = error instanceof Error && error.message ? error.message : 'Server error';

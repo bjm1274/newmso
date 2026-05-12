@@ -8,16 +8,22 @@ type ManualGrantUpdate = {
   staffId: string;
   total: number;
   used: number;
+  expired: number;
+  compensated: number;
 };
 
 type ManualGrantPayload = {
   staffId?: string;
   total?: number;
   used?: number;
+  expired?: number;
+  compensated?: number;
   updates?: Array<{
     staffId?: string;
     total?: number;
     used?: number;
+    expired?: number;
+    compensated?: number;
   }>;
 };
 
@@ -38,11 +44,24 @@ function normalizeLeaveValue(value: unknown) {
   return parsed;
 }
 
+function normalizeOptionalLeaveValue(value: unknown) {
+  if (value === undefined || value === null || value === '') return 0;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return parsed;
+}
+
 function normalizeUpdates(payload: ManualGrantPayload | null) {
   const rawUpdates = Array.isArray(payload?.updates)
     ? payload.updates
     : payload?.staffId
-      ? [{ staffId: payload.staffId, total: payload.total, used: payload.used }]
+      ? [{
+          staffId: payload.staffId,
+          total: payload.total,
+          used: payload.used,
+          expired: payload.expired,
+          compensated: payload.compensated,
+        }]
       : [];
 
   const normalized = rawUpdates
@@ -50,8 +69,10 @@ function normalizeUpdates(payload: ManualGrantPayload | null) {
       const staffId = typeof update?.staffId === 'string' ? update.staffId.trim() : '';
       const total = normalizeLeaveValue(update?.total);
       const used = normalizeLeaveValue(update?.used);
+      const expired = normalizeOptionalLeaveValue(update?.expired);
+      const compensated = normalizeOptionalLeaveValue(update?.compensated);
 
-      if (!staffId || total === null || used === null) {
+      if (!staffId || total === null || used === null || expired === null || compensated === null) {
         return null;
       }
 
@@ -59,6 +80,8 @@ function normalizeUpdates(payload: ManualGrantPayload | null) {
         staffId,
         total,
         used,
+        expired,
+        compensated,
       } satisfies ManualGrantUpdate;
     })
     .filter((update): update is ManualGrantUpdate => update !== null);
@@ -80,6 +103,17 @@ export async function POST(request: Request) {
 
     if (updates.length === 0) {
       return NextResponse.json({ error: '수정할 연차 정보가 올바르지 않습니다.' }, { status: 400 });
+    }
+
+    // 사용 + 소멸 + 수당지급 합이 총량을 넘으면 거부 (JM3: 사전 검증)
+    const invalid = updates.find((u) => u.used + u.expired + u.compensated > u.total + 0.001);
+    if (invalid) {
+      return NextResponse.json(
+        {
+          error: `사용(${invalid.used}) + 소멸(${invalid.expired}) + 수당지급(${invalid.compensated}) 합계가 총 연차(${invalid.total})를 초과합니다. (staffId: ${invalid.staffId})`,
+        },
+        { status: 400 },
+      );
     }
 
     const supabase = getAdminClient();
@@ -119,8 +153,12 @@ export async function POST(request: Request) {
       }
       actualUpdated += 1;
 
-      // leave_balances 정합성 갱신 (JM3: 실패해도 메인 응답 차단 안 함)
-      recalculateLeaveBalance(update.staffId, undefined, supabase).catch((balanceErr) => {
+      // leave_balances 정합성 갱신 — 소멸/수당지급 일수도 함께 override
+      // (JM3: 실패해도 메인 응답 차단 안 함)
+      recalculateLeaveBalance(update.staffId, undefined, supabase, {
+        expiredDays: update.expired,
+        compensatedDays: update.compensated,
+      }).catch((balanceErr) => {
         console.error('[manual-grant] recalculateLeaveBalance 실패:', balanceErr, update.staffId);
       });
     }

@@ -85,10 +85,11 @@ export default function ContractMain({
     : activeTab === '신규/변경계약서' ? (contractSubType === '신규' ? '신규계약서' : '변경계약서')
       : '표준근로계약서';
 
-  const selectedContractStaffs = useMemo(
-    () => ((staffs as any[]) || []).filter((staff: any) => checkedIds.includes(Number(staff.id))),
-    [checkedIds, staffs],
-  );
+  const selectedContractStaffs = useMemo(() => {
+    if (!checkedIds.length) return [] as any[];
+    const checkedKeySet = new Set(checkedIds.map((id) => String(id)));
+    return ((staffs as any[]) || []).filter((staff: any) => checkedKeySet.has(String(staff?.id)));
+  }, [checkedIds, staffs]);
 
   const fetchContracts = async () => {
     const { data, error } = await supabase.from('employment_contracts').select('*');
@@ -507,8 +508,8 @@ export default function ContractMain({
           { label: '대상자', value: selectedContractStaffs.length > 0 ? selectedContractStaffs.slice(0, 4).map((staff: any) => staff.name).join(', ') + (selectedContractStaffs.length > 4 ? ` 외 ${selectedContractStaffs.length - 4}명` : '') : '-' },
           { label: '적용일', value: salaryInfo.effective_date || '직원 입사일 기준' },
           { label: '기본급', value: activeTab === '계약현황' ? '직원 현재 기본급 사용' : formatWon(salaryInfo.base_salary) },
-          { label: '주당 근무', value: `${salaryInfo.working_hours_per_week}시간 · ${salaryInfo.working_days_per_week}일` },
-          { label: '근무 시간', value: `${salaryInfo.shift_start_time} - ${salaryInfo.shift_end_time}` },
+          { label: '주당 근무', value: activeTab === '계약현황' ? '직원별 현재 근무유형 사용' : `${salaryInfo.working_hours_per_week}시간 · ${salaryInfo.working_days_per_week}일` },
+          { label: '근무 시간', value: activeTab === '계약현황' ? '직원별 현재 근무유형 사용' : `${salaryInfo.shift_start_time} - ${salaryInfo.shift_end_time}` },
         ]}
         changes={activeTab === '계약현황' ? [] : [
           { label: '계약 상태', before: '미발송/반려', after: '서명대기' },
