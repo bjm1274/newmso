@@ -121,6 +121,14 @@ export default function AdminView(props: Record<string, unknown>) {
   const [operationsTab, setOperationsTab] = useState<AdminOperationsTabId>(initialState.operationsTab);
   const [auditTab, setAuditTab] = useState<AdminAuditTabId>(initialState.auditTab);
   const [inventory, setInventory] = useState<any[]>([]);
+  // T-017: 관리자 화면 대부분이 데스크톱 폭에 최적화. 모바일에서는 안내 화면 노출.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   const isSystemMaster = hasSystemMasterPermission(user as any);
   const hasAdminMenuAccess = canAccessMainMenu(user as any, '관리자');
@@ -199,6 +207,25 @@ export default function AdminView(props: Record<string, unknown>) {
         <h2 className="text-xl font-bold text-[var(--foreground)]">관리자 메뉴 접근 권한이 없습니다.</h2>
         <p className="mt-2 text-sm font-semibold text-[var(--toss-gray-3)]">
           메인 메뉴 권한과 관리자 세부 권한을 확인해 주세요.
+        </p>
+      </div>
+    );
+  }
+
+  // T-017: 모바일 가드. 단순 화면(알림자동화·팝업관리)은 모바일에서도 사용 가능.
+  const isMobileSafeTab =
+    activeTab === '운영설정' && (operationsTab === '알림자동화' || operationsTab === '팝업관리');
+  if (isMobile && !isMobileSafeTab) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center bg-[var(--muted)] p-6 text-center">
+        <div className="mb-4 text-5xl">💻</div>
+        <h2 className="text-base font-bold text-[var(--foreground)]">관리자 메뉴는 데스크톱에서 열어주세요</h2>
+        <p className="mt-2 text-[12px] font-medium text-[var(--toss-gray-3)] max-w-xs leading-relaxed">
+          대시보드·감사·시스템 마스터 등 대부분의 관리자 화면은 PC 폭에 최적화되어 있어
+          모바일에서는 표·차트가 잘립니다. 가로 768px 이상에서 다시 열어 주세요.
+        </p>
+        <p className="mt-3 text-[11px] font-bold text-[var(--toss-gray-4)]">
+          모바일 사용 가능: 알림 자동화 · 팝업 관리
         </p>
       </div>
     );
