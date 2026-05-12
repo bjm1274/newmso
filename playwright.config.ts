@@ -54,5 +54,13 @@ export default defineConfig({
         browserName: 'webkit',
       },
     },
+    {
+      name: 'a11y-chromium',
+      testDir: './tests/a11y',
+      testMatch: /.*\.a11y\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+    },
   ],
 });
