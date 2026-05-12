@@ -60,6 +60,8 @@ import {
   type QueryResult,
   type StaffSummary,
 } from './게시판-view-utils';
+import { isAnonymousReadStatusPost, BODY_PARTS, VALID_BODY_IDS } from './게시판/post-helpers';
+import ReadStatusModal from './게시판/ReadStatusModal';
 
 interface BoardViewProps {
   user: StaffMember | null;
@@ -82,9 +84,6 @@ type BoardCommentRow = {
   parent_comment_id?: string | null;
   [key: string]: unknown;
 };
-
-const isAnonymousReadStatusPost = (post: BoardPost | null | undefined) =>
-  Boolean(post?.is_anonymous) || String(post?.board_type || '') === '익명소리함';
 
 export default function BoardView({ user, subView, setSubView, selectedCo, selectedCompanyId, initialBoard, initialPostId, onConsumePostId, surgeries, mris, setMainMenu }: BoardViewProps) {
   const { dialog, openConfirm } = useActionDialog();
@@ -149,21 +148,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const [surgeryTemplates, setSurgeryTemplates] = useState<BoardTemplateRow[]>([]);
   const [mriTemplates, setMriTemplates] = useState<BoardTemplateRow[]>([]);
 
-  // 수술/MRI 부위 필터 (사람 모형: 아래팔/위팔 기준만, 손·손가락·팔꿈치 제외)
-  const BODY_PARTS = [
-    { id: 'all', label: '전체', emoji: '👤' },
-    { id: 'cervical', label: '경추/목', emoji: '🧠' },
-    { id: 'chest', label: '흉부/가슴', emoji: '❤️' },
-    { id: 'lumbar', label: '요추/허리', emoji: '🦴' },
-    { id: 'shoulder', label: '어깨', emoji: '🏋️' },
-    { id: 'upper_arm', label: '위팔', emoji: '💪' },
-    { id: 'forearm', label: '아래팔', emoji: '🤚' },
-    { id: 'hip', label: '고관절/골반', emoji: '🦵' },
-    { id: 'knee', label: '무릎', emoji: '🦿' },
-    { id: 'ankle', label: '발목/발', emoji: '🦶' },
-    { id: 'other', label: '기타', emoji: '➕' },
-  ];
-  const VALID_BODY_IDS = new Set(BODY_PARTS.map((b) => b.id));
+  // 수술/MRI 부위 필터 — BODY_PARTS / VALID_BODY_IDS는 게시판/post-helpers.ts에서 import
   const [selectedBodyPart, setSelectedBodyPart] = useState<string>('all');
   const [showBodyPicker, setShowBodyPicker] = useState(false);
   // 제거된 부위(손/손가락, 팔꿈치)가 선택돼 있으면 '전체'로 보정
@@ -2879,90 +2864,13 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
             </div>
           )}
           {readStatusPost && !isAnonymousReadStatusPost(readStatusPost) && (
-            <div
-              className="fixed inset-0 z-[var(--z-modal)] flex items-end md:items-center justify-center bg-black/40 p-0 md:p-5"
-              onClick={() => setReadStatusPost(null)}
-            >
-              <div
-                className="w-full max-w-2xl max-h-[80dvh] overflow-y-auto bg-[var(--card)] border-0 md:border border-[var(--border)] rounded-t-[24px] md:rounded-[var(--radius-xl)] shadow-sm p-4 md:p-5 space-y-4 safe-area-pb"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">
-                      읽음 현황
-                    </p>
-                    <h3 className="text-lg font-semibold text-[var(--foreground)]">
-                      {readStatusPost.title}
-                    </h3>
-                    <p className="mt-1 text-[12px] text-[var(--toss-gray-3)] font-medium">
-                      읽음 {readStatusReaders.length}명 · 미확인 {readStatusPendingAudience.length}명
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setReadStatusPost(null)}
-                    className="px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--border)] text-[11px] font-bold text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
-                  >
-                    닫기
-                  </button>
-                </div>
-                {readStatusLoading ? (
-                  <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-4 py-6 text-center text-sm font-semibold text-[var(--toss-gray-3)]">
-                    읽음 현황을 불러오는 중입니다.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-bold text-[var(--foreground)]">읽음</p>
-                        <span className="text-xs font-semibold text-emerald-600">{readStatusReaders.length}명</span>
-                      </div>
-                      <div className="space-y-2">
-                        {readStatusReaders.length > 0 ? (
-                          readStatusReaders.map((member) => (
-                            <div
-                              key={`reader-${String(member.id ?? '')}`}
-                              className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)]/40 px-3 py-2"
-                            >
-                              <p className="text-sm font-semibold text-[var(--foreground)]">{member.name || '이름 없음'}</p>
-                              <p className="text-[11px] text-[var(--toss-gray-3)] font-medium">
-                                {[member.department, member.position].filter(Boolean).join(' · ') || '부서/직급 미지정'}
-                              </p>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-[12px] font-medium text-[var(--toss-gray-3)]">아직 읽은 직원이 없습니다.</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-bold text-[var(--foreground)]">미확인</p>
-                        <span className="text-xs font-semibold text-amber-600">{readStatusPendingAudience.length}명</span>
-                      </div>
-                      <div className="space-y-2">
-                        {readStatusPendingAudience.length > 0 ? (
-                          readStatusPendingAudience.map((member) => (
-                            <div
-                              key={`pending-${String(member.id ?? '')}`}
-                              className="rounded-[var(--radius-md)] bg-amber-50 px-3 py-2"
-                            >
-                              <p className="text-sm font-semibold text-[var(--foreground)]">{member.name || '이름 없음'}</p>
-                              <p className="text-[11px] text-[var(--toss-gray-3)] font-medium">
-                                {[member.department, member.position].filter(Boolean).join(' · ') || '부서/직급 미지정'}
-                              </p>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-[12px] font-medium text-[var(--toss-gray-3)]">모든 대상자가 읽었습니다.</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            <ReadStatusModal
+              post={readStatusPost}
+              readers={readStatusReaders}
+              pending={readStatusPendingAudience}
+              loading={readStatusLoading}
+              onClose={() => setReadStatusPost(null)}
+            />
           )}
         </div>
       )}
