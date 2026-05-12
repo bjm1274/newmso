@@ -314,9 +314,6 @@ function ApprovalForms() {
 export default function OperationClient() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <header className="border-b border-[var(--border)] bg-[var(--card)] px-6 py-4">
-        <h1 className="text-lg font-bold text-[var(--foreground)]">운영설정</h1>
-      </header>
       <main className="flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-10">
         <PermissionMatrix />
         <GeneralSettingsSection />

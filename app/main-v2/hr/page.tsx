@@ -20,7 +20,6 @@ const HR_ITEMS = [
 export default function HrHomePage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-6 text-xl font-black text-[var(--foreground)]">인사</h1>
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2" role="list">
         {HR_ITEMS.map((item) => (
           <li key={item.href}>
