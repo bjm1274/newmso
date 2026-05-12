@@ -3,6 +3,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { subscribeRealtime } from '@/lib/realtime-bus';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import SmartMonthPicker from '../공통/SmartMonthPicker';
 
@@ -82,19 +83,20 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
     fetchTransactions();
   }, [fetchTransactions]);
 
-  // 실시간 구독
+  // 실시간 구독 (realtime-bus: 채널 공유 + 1초 배치 dedup)
   useEffect(() => {
-    const ch = supabase.channel('corporate_card_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'corporate_card_transactions' }, () => {
+    const unsub = subscribeRealtime(
+      'corporate-card-realtime',
+      [
+        { table: 'corporate_card_transactions' },
+        { table: 'corporate_cards' },
+      ],
+      () => {
         fetchTransactions();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'corporate_cards' }, () => {
         fetchCards();
-      })
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
+      },
+    );
+    return () => unsub();
   }, [fetchTransactions, fetchCards]);
 
   const totalByCat = list.reduce((acc: Record<string, number>, r: any) => {

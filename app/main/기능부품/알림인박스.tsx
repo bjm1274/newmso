@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { subscribeRealtime } from '@/lib/realtime-bus';
 import {
   resolveNotificationTarget,
   toNotificationMetadataRecord,
@@ -766,10 +767,13 @@ function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown
     setLoading(true);
     fetchNotifications();
     if (!_u?.id) return;
-    const ch = supabase.channel(`inbox-${_u.id as string}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${_u.id as string}` }, () => fetchNotifications())
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    const userId = _u.id as string;
+    const unsub = subscribeRealtime(
+      `inbox-${userId}`,
+      [{ table: 'notifications', filter: `user_id=eq.${userId}` }],
+      () => fetchNotifications(),
+    );
+    return () => unsub();
   }, [_u?.id, fetchNotifications]);
 
   // 인박스가 열리면 1.5초 후 자동으로 전체 읽음 처리 (뱃지 클리어)
