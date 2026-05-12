@@ -16,6 +16,11 @@ export type RealtimeCallback = (payload: unknown) => void;
 export type TableFilter = {
   table: string;
   event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*';
+  /**
+   * Postgres row filter (예: 'user_id=eq.abc').
+   * filter가 다르면 호출자가 channelKey도 다르게 지정해야 채널 공유가 의도대로 동작.
+   */
+  filter?: string;
 };
 
 export type RealtimeOptions = {
@@ -83,10 +88,17 @@ export function subscribeRealtime(
     channelRegistry.set(channelKey, entry);
 
     // 테이블별 postgres_changes 등록
-    for (const { table, event = '*' } of tables) {
+    for (const { table, event = '*', filter } of tables) {
+      const subscription: {
+        event: 'INSERT' | 'UPDATE' | 'DELETE' | '*';
+        schema: string;
+        table: string;
+        filter?: string;
+      } = { event, schema: 'public', table };
+      if (filter) subscription.filter = filter;
       channel.on(
         'postgres_changes',
-        { event, schema: 'public', table },
+        subscription,
         (payload) => {
           handlePayload(channelKey, table, payload);
         },
