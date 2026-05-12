@@ -25,11 +25,16 @@ const ENTRY_DEFAULTS: ChecklistItem[] = [
 const EXIT_DEFAULTS: ChecklistItem[] = [
   { key: 'handover', label: '업무 인수인계 완료', done: false, doneAt: null },
   { key: 'account_disable', label: '사내 계정 및 권한 회수', done: false, doneAt: null },
-  { key: 'asset_return', label: 'PC·노트북·비품 반납 확인', done: false, doneAt: null },
-  { key: 'card_security_return', label: '카드·보안매체·출입 권한 회수', done: false, doneAt: null },
+  { key: 'uniform_return', label: '유니폼·명찰·사물함 키 반납 확인', done: false, doneAt: null },
   { key: 'payroll_settlement', label: '최종 급여 및 정산 확인', done: false, doneAt: null },
   { key: 'document_close', label: '문서·전자서명·인수 기록 마감', done: false, doneAt: null },
 ];
+
+const EXIT_DEPRECATED_KEYS = new Set(['asset_return', 'card_security_return']);
+const EXIT_DEPRECATED_LABELS = new Set([
+  'PC·노트북·비품 반납 확인',
+  '카드·보안매체·출입 권한 회수',
+]);
 
 function toChecklistItem(raw: unknown): ChecklistItem | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -73,9 +78,18 @@ export function getChecklistTargetDate(type: ChecklistType, baseDateValue?: stri
 
 export function normalizeChecklistItems(rawItems: unknown, type: ChecklistType): ChecklistItem[] {
   const defaults = getDefaultChecklist(type);
-  const incoming = Array.isArray(rawItems)
+  const incomingAll = Array.isArray(rawItems)
     ? (rawItems.map(toChecklistItem).filter(Boolean) as ChecklistItem[])
     : [];
+
+  const incoming =
+    type === '퇴사'
+      ? incomingAll.filter(
+          (candidate) =>
+            !EXIT_DEPRECATED_KEYS.has(candidate.key) &&
+            !EXIT_DEPRECATED_LABELS.has(candidate.label),
+        )
+      : incomingAll;
 
   const merged = defaults.map((item) => {
     const matched = incoming.find(

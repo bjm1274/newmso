@@ -1,5 +1,53 @@
 const INTERNAL_OBJECT_PROXY_PATH = '/api/storage/object';
 const MANAGED_DOWNLOAD_MEDIA_QUERY = '(hover: none) and (pointer: coarse), (max-width: 767px)';
+const SUPABASE_PUBLIC_HOST = (() => {
+  const raw = String(process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+  if (!raw) return '';
+  try {
+    return new URL(raw).hostname;
+  } catch {
+    return '';
+  }
+})();
+
+const R2_PUBLIC_BASE = String(process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL || '')
+  .trim()
+  .replace(/\/+$/, '');
+const R2_PUBLIC_HOST = (() => {
+  if (!R2_PUBLIC_BASE) return '';
+  try {
+    return new URL(R2_PUBLIC_BASE).hostname;
+  } catch {
+    return '';
+  }
+})();
+
+function encodeObjectKey(objectKey: string): string {
+  return objectKey.split('/').map(encodeURIComponent).join('/');
+}
+
+function rewriteInternalR2UrlToPublic(rawUrl: string): string | null {
+  if (!R2_PUBLIC_BASE) return null;
+  try {
+    const parsed = new URL(rawUrl, 'https://local-storage-proxy.test');
+    if (parsed.pathname !== INTERNAL_OBJECT_PROXY_PATH) return null;
+    if (parsed.searchParams.get('provider') !== 'r2') return null;
+    const objectKey = parsed.searchParams.get('key');
+    if (!objectKey) return null;
+    return `${R2_PUBLIC_BASE}/${encodeObjectKey(objectKey)}`;
+  } catch {
+    return null;
+  }
+}
+
+function isPublicR2StorageUrl(url: string): boolean {
+  if (!R2_PUBLIC_HOST) return false;
+  try {
+    return new URL(url).hostname === R2_PUBLIC_HOST;
+  } catch {
+    return false;
+  }
+}
 
 export function isInternalStorageObjectUrl(url: string): boolean {
   const rawUrl = String(url || '').trim();
@@ -10,6 +58,19 @@ export function isInternalStorageObjectUrl(url: string): boolean {
     return parsed.pathname === INTERNAL_OBJECT_PROXY_PATH;
   } catch {
     return rawUrl.startsWith(`${INTERNAL_OBJECT_PROXY_PATH}?`) || rawUrl === INTERNAL_OBJECT_PROXY_PATH;
+  }
+}
+
+function isPublicSupabaseStorageUrl(url: string): boolean {
+  if (!SUPABASE_PUBLIC_HOST) return false;
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.hostname === SUPABASE_PUBLIC_HOST &&
+      parsed.pathname.startsWith('/storage/v1/object/public/')
+    );
+  } catch {
+    return false;
   }
 }
 
@@ -41,10 +102,20 @@ export function buildStorageInlineUrl(url: string, fileName: string): string {
   if (/^(blob|data):/i.test(normalizedUrl)) return normalizedUrl;
 
   if (isInternalStorageObjectUrl(normalizedUrl)) {
-    return normalizedUrl;
+    // R2 public 도메인이 설정돼 있으면 내부 프록시 URL을 직접 R2 CDN으로 rewrite
+    // → Cloudflare Workers를 완전히 우회 (대용량/다중 이미지 로드 안정성 ↑)
+    const directR2Url = rewriteInternalR2UrlToPublic(normalizedUrl);
+    return directR2Url || normalizedUrl;
   }
 
   if (normalizedUrl.startsWith('/')) {
+    return normalizedUrl;
+  }
+
+  // 공개 스토리지(Supabase public bucket / R2 custom domain)는 인증 없이
+  // 직접 접근 가능하므로 Cloudflare Workers 프록시를 거치지 않는다.
+  // 프록시 경유 시 큰 이미지에서 1102(Worker 리소스 초과) 오류 발생.
+  if (isPublicSupabaseStorageUrl(normalizedUrl) || isPublicR2StorageUrl(normalizedUrl)) {
     return normalizedUrl;
   }
 

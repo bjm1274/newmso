@@ -42,6 +42,12 @@ type LeaveRollbackAuditRow = {
   } | null;
 };
 
+type LeaveBalanceRow = {
+  staff_id: string;
+  expired_days: number | null;
+  compensated_days: number | null;
+};
+
 type AnnualLeaveLedgerProps = {
   staffs: StaffLite[];
   selectedCo: string;
@@ -50,6 +56,7 @@ type AnnualLeaveLedgerProps = {
 export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLedgerProps) {
   const [leaveRows, setLeaveRows] = useState<LeaveLedgerRow[]>([]);
   const [rollbackAudits, setRollbackAudits] = useState<LeaveRollbackAuditRow[]>([]);
+  const [balancesByStaff, setBalancesByStaff] = useState<Record<string, { expired: number; compensated: number }>>({});
   const [loading, setLoading] = useState(false);
 
   const filteredStaffs = useMemo(
@@ -69,11 +76,15 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
       try {
         const staffIds = filteredStaffs.map((staff) => staff.id);
         if (staffIds.length === 0) {
-          if (active) setLeaveRows([]);
+          if (active) {
+            setLeaveRows([]);
+            setBalancesByStaff({});
+          }
           return;
         }
 
-        const [{ data, error }, { data: auditData, error: auditError }] = await Promise.all([
+        const currentYear = new Date().getFullYear();
+        const [{ data, error }, { data: auditData, error: auditError }, { data: balanceData, error: balanceError }] = await Promise.all([
           supabase
             .from('leave_requests')
             .select('id, staff_id, leave_type, start_date, end_date, status, reason, approved_at')
@@ -87,10 +98,16 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
             .eq('action', 'leave_request_status_updated')
             .order('created_at', { ascending: false })
             .limit(200),
+          supabase
+            .from('leave_balances')
+            .select('staff_id, expired_days, compensated_days')
+            .in('staff_id', staffIds)
+            .eq('year', currentYear),
         ]);
 
         if (error) throw error;
         if (auditError) throw auditError;
+        if (balanceError) throw balanceError;
 
         const leaveIds = new Set((data || []).map((row) => String(row.id)));
         const nextRollbackAudits = ((auditData || []) as LeaveRollbackAuditRow[]).filter((row) => {
@@ -98,15 +115,25 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
           return leaveIds.has(String(row.target_id || '')) || staffIds.includes(auditedStaffId);
         });
 
+        const nextBalances: Record<string, { expired: number; compensated: number }> = {};
+        ((balanceData || []) as LeaveBalanceRow[]).forEach((row) => {
+          nextBalances[String(row.staff_id)] = {
+            expired: Number(row.expired_days) || 0,
+            compensated: Number(row.compensated_days) || 0,
+          };
+        });
+
         if (active) {
           setLeaveRows((data || []) as LeaveLedgerRow[]);
           setRollbackAudits(nextRollbackAudits);
+          setBalancesByStaff(nextBalances);
         }
       } catch (error) {
         console.error('연차 원장 조회 실패:', error);
         if (active) {
           setLeaveRows([]);
           setRollbackAudits([]);
+          setBalancesByStaff({});
         }
       } finally {
         if (active) setLoading(false);
@@ -136,17 +163,22 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
           );
           const total = Number(staff.annual_leave_total || 0);
           const used = Number(staff.annual_leave_used ?? approvedDays);
+          const balance = balancesByStaff[staff.id];
+          const expired = balance?.expired ?? 0;
+          const compensated = balance?.compensated ?? 0;
           return {
             staff,
             total,
             approvedDays,
             used,
-            remaining: Math.max(0, total - used),
+            expired,
+            compensated,
+            remaining: Math.max(0, total - used - expired - compensated),
             approvedCount: approvedRows.length,
           };
         })
         .sort((a, b) => a.staff.name.localeCompare(b.staff.name, 'ko')),
-    [approvedAnnualLeaveRows, filteredStaffs]
+    [approvedAnnualLeaveRows, balancesByStaff, filteredStaffs]
   );
 
   const rollbackTimelineRows = useMemo(
@@ -181,7 +213,8 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
           <div>
             <h3 className="text-sm font-bold text-[var(--foreground)]">연차 원장</h3>
             <p className="mt-1 text-xs font-medium text-[var(--toss-gray-4)]">
-              승인된 연차 사용일수와 직원별 연차 총량/잔여일수를 한눈에 확인합니다.
+              승인된 연차 사용일수, 촉진 후 소멸·미사용연차수당 지급 일수까지 반영한 잔여 연차를 확인합니다.
+              <span className="ml-1 text-[var(--toss-gray-3)]">(잔여 = 부여 − 사용 − 소멸 − 수당지급)</span>
             </p>
           </div>
           <div className="rounded-xl border border-blue-100 bg-blue-500/10 px-3 py-2 text-[11px] font-bold text-blue-600">
@@ -202,6 +235,8 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
                 <th className="px-4 py-3">회사/부서</th>
                 <th className="px-4 py-3 text-right">총 연차</th>
                 <th className="px-4 py-3 text-right">사용</th>
+                <th className="px-4 py-3 text-right">소멸</th>
+                <th className="px-4 py-3 text-right">수당지급</th>
                 <th className="px-4 py-3 text-right">잔여</th>
                 <th className="px-4 py-3 text-right">승인 건수</th>
               </tr>
@@ -217,13 +252,15 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
                   </td>
                   <td className="px-4 py-3 text-right font-semibold">{row.total.toFixed(1)}</td>
                   <td className="px-4 py-3 text-right text-[var(--accent)] font-semibold">{row.used.toFixed(1)}</td>
+                  <td className="px-4 py-3 text-right text-red-500 font-semibold">{row.expired.toFixed(1)}</td>
+                  <td className="px-4 py-3 text-right text-amber-600 font-semibold">{row.compensated.toFixed(1)}</td>
                   <td className="px-4 py-3 text-right font-semibold text-green-600">{row.remaining.toFixed(1)}</td>
                   <td className="px-4 py-3 text-right text-[var(--toss-gray-4)]">{row.approvedCount}</td>
                 </tr>
               ))}
               {!loading && summaryRows.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-[var(--toss-gray-4)]">
+                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-[var(--toss-gray-4)]">
                     표시할 직원이 없습니다.
                   </td>
                 </tr>

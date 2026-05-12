@@ -189,7 +189,7 @@ export default function ApprovalComposerView({
   const nextLabel = currentStep === 3 ? '확인 및 상신' : '다음 단계';
 
   return (
-    <div className="mx-auto max-w-3xl space-y-3 pb-6">
+    <div className="-mx-4 md:mx-auto md:max-w-[62.4rem] space-y-3 pb-6">
       {isEditingApproval && (
         <div className="app-card flex items-start gap-3 border-[var(--accent)]/25 bg-[var(--accent-selected-subtle)] p-3">
           <span className="erp-icon-box h-8 w-8 shrink-0 bg-[var(--card)] text-[var(--accent)]">

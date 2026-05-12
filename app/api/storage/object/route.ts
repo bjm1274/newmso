@@ -8,6 +8,18 @@ import { readSessionFromRequest } from '@/lib/server-session';
 
 export const dynamic = 'force-dynamic';
 
+function getPublicBaseUrl(): string {
+  return String(
+    process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL || process.env.R2_PUBLIC_BASE_URL || ''
+  )
+    .trim()
+    .replace(/\/+$/, '');
+}
+
+function encodeObjectKey(objectKey: string): string {
+  return objectKey.split('/').map(encodeURIComponent).join('/');
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await readSessionFromRequest(request);
@@ -32,6 +44,21 @@ export async function GET(request: NextRequest) {
     const allowedBucket = getConfiguredR2ChatBucket();
     if (!allowedBucket || bucket !== allowedBucket) {
       return NextResponse.json({ error: 'This bucket is not available' }, { status: 403 });
+    }
+
+    // R2 custom domain이 설정돼 있으면 인라인 보기는 R2 CDN으로 직접 redirect
+    // (Workers 응답 본문 부담 제거, 브라우저가 redirect 자체를 캐싱).
+    // 다운로드 요청은 Content-Disposition을 강제해야 하므로 기존 프록시 경로 유지.
+    const publicBaseUrl = getPublicBaseUrl();
+    if (publicBaseUrl && !download) {
+      const target = `${publicBaseUrl}/${encodeObjectKey(objectKey)}`;
+      return NextResponse.redirect(target, {
+        status: 302,
+        headers: {
+          // 객체 키가 UUID라 영구 불변 → 브라우저 redirect 캐시 길게 유지
+          'Cache-Control': 'public, max-age=86400, immutable',
+        },
+      });
     }
 
     const signedUrl = await createR2DownloadUrl(bucket, objectKey);

@@ -2,10 +2,19 @@
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { canAccessHrSection } from '@/lib/access-control';
+import { getScopedActiveStaffs } from '@/lib/active-staff';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
-import LegacyLicenseMigration from './LegacyLicenseMigration';
+import { LICENSE_TYPE_OPTIONS } from './구성원현황/staff-registration-types';
+import {
+  computeLicenseStatus,
+  computeCENextDue,
+  getRenewalRule,
+  type LicenseStatus,
+  type CEDueStatus,
+} from '@/lib/license-renewal-policy';
+import LicenseCEReviewModal from './면허보수교육검토';
 
 // ---------------------------------------------------------------------------
 // Zod 스키마
@@ -20,31 +29,18 @@ type JobCategory = z.infer<typeof JobCategorySchema>;
 // ---------------------------------------------------------------------------
 // 유틸
 // ---------------------------------------------------------------------------
-const STATUS_COLORS: Record<string, string> = {
+const STATUS_COLORS: Record<LicenseStatus, string> = {
   valid: 'bg-green-500/20 text-green-700',
   expiring: 'bg-orange-500/20 text-orange-700',
   expired: 'bg-red-500/20 text-red-600',
+  unknown: 'bg-gray-500/20 text-gray-600',
 };
-const STATUS_LABELS: Record<string, string> = {
+const STATUS_LABELS: Record<LicenseStatus, string> = {
   valid: '유효',
   expiring: '만료 임박',
   expired: '만료',
+  unknown: '확인 필요',
 };
-
-function getStatus(expiry: string | null): 'valid' | 'expiring' | 'expired' {
-  if (!expiry) return 'valid';
-  const d = new Date(expiry);
-  const now = new Date();
-  const diff = (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
-  if (diff < 0) return 'expired';
-  if (diff <= 60) return 'expiring';
-  return 'valid';
-}
-
-function getDaysLeft(expiry: string | null): number | null {
-  if (!expiry) return null;
-  return Math.ceil((new Date(expiry).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-}
 
 // ---------------------------------------------------------------------------
 // 면허/자격증 row 타입
@@ -52,17 +48,26 @@ function getDaysLeft(expiry: string | null): number | null {
 interface LicenseRow {
   id: string;
   staff_id: string;
+  license_type: string | null;
   license_name: string;
   license_number: string | null;
   issued_date: string | null;
   expiry_date: string | null;
+  renewed_date: string | null;
   issuing_body: string | null;
   memo: string | null;
   [key: string]: unknown;
 }
 
 interface EnrichedLicense extends LicenseRow {
-  status: 'expired' | 'valid' | 'expiring';
+  status: LicenseStatus;
+  effectiveExpiry: string | null;
+  effectiveExpirySource: 'explicit' | 'renewed' | 'issued' | 'unknown';
+  daysLeft: number | null;
+  ceDueDate: string | null;
+  ceDueStatus: CEDueStatus;
+  ceDaysLeft: number | null;
+  ceLabel: string | null;
   staff: Record<string, unknown> | undefined;
 }
 
@@ -88,22 +93,33 @@ export default function LicenseManager({
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
     staff_id: '',
+    license_type: '',
     license_name: '',
     license_number: '',
     issued_date: '',
     expiry_date: '',
+    renewed_date: '',
     issuing_body: '',
     memo: '',
   });
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
 
-  const [filterStatus, setFilterStatus] = useState<'전체' | '유효' | '만료 임박' | '만료'>('전체');
+  const [filterStatus, setFilterStatus] = useState<'전체' | '유효' | '만료 임박' | '만료' | '확인 필요'>('전체');
   const [filterStaff, setFilterStaff] = useState('');
   const [filterJobCode, setFilterJobCode] = useState('');
+  const [filterLicenseType, setFilterLicenseType] = useState('');
 
-  const filteredStaffs = (staffs as Record<string, unknown>[]).filter(
-    (s) => selectedCo === '전체' || s.company === selectedCo
+  // 보수교육 검토 모달
+  const [ceReviewOpen, setCEReviewOpen] = useState(false);
+  const [pendingCECount, setPendingCECount] = useState(0);
+  // license_id → 마지막 승인된 보수교육 이수일
+  const [lastCEMap, setLastCEMap] = useState<Record<string, string>>({});
+
+  // 회사 필터 + 재직자만 (퇴사자 제외)
+  const filteredStaffs = getScopedActiveStaffs(
+    staffs as Record<string, unknown>[],
+    selectedCo ?? '전체',
   );
 
   // 직종 필터에 해당하는 직원 ID 집합
@@ -120,6 +136,24 @@ export default function LicenseManager({
   const fetchLicenses = useCallback(async () => {
     const { data } = await supabase.from('staff_licenses').select('*').order('expiry_date');
     setLicenses(data ?? []);
+  }, []);
+
+  // 면허별 마지막 승인된 보수교육 이수일 조회
+  const fetchLastCE = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('license_continuing_education')
+      .select('license_id, education_date')
+      .eq('status', 'approved')
+      .not('education_date', 'is', null)
+      .not('license_id', 'is', null)
+      .order('education_date', { ascending: false });
+    if (error) return;
+    const next: Record<string, string> = {};
+    for (const row of (data ?? []) as { license_id: string | null; education_date: string | null }[]) {
+      if (!row.license_id || !row.education_date) continue;
+      if (!next[row.license_id]) next[row.license_id] = row.education_date;
+    }
+    setLastCEMap(next);
   }, []);
 
   const fetchJobCategories = useCallback(async () => {
@@ -149,35 +183,101 @@ export default function LicenseManager({
     setStaffJobMap(next);
   }, [filteredStaffs]);
 
-  useEffect(() => { void fetchLicenses(); void fetchJobCategories(); }, [fetchLicenses, fetchJobCategories]);
+  useEffect(() => { void fetchLicenses(); void fetchJobCategories(); void fetchLastCE(); }, [fetchLicenses, fetchJobCategories, fetchLastCE]);
   useEffect(() => { void fetchStaffJobMap(); }, [fetchStaffJobMap]);
 
-  const enriched: EnrichedLicense[] = licenses.map((l) => ({
-    ...l,
-    status: getStatus(l.expiry_date),
-    staff: filteredStaffs.find((s) => String(s.id) === String(l.staff_id)),
-  }));
+  // 부모 staffs prop이 갱신되면(=구성원현황 등에서 새로고침 호출됨) staff_licenses도 재조회
+  useEffect(() => {
+    void fetchLicenses();
+  }, [staffs, fetchLicenses]);
+
+  // 브라우저 탭 복귀 시 최신 상태 동기화
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void fetchLicenses();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [fetchLicenses]);
+
+  const enriched: EnrichedLicense[] = licenses.map((l) => {
+    const computed = computeLicenseStatus({
+      license_type: l.license_type,
+      expiry_date: l.expiry_date,
+      renewed_date: l.renewed_date,
+      issued_date: l.issued_date,
+    });
+    const ceDue = computeCENextDue({
+      license_type: l.license_type,
+      last_ce_date: lastCEMap[l.id] ?? null,
+      renewed_date: l.renewed_date,
+      issued_date: l.issued_date,
+    });
+    return {
+      ...l,
+      status: computed.status,
+      effectiveExpiry: computed.effective.date,
+      effectiveExpirySource: computed.effective.source,
+      daysLeft: computed.daysLeft,
+      ceDueDate: ceDue.date,
+      ceDueStatus: ceDue.status,
+      ceDaysLeft: ceDue.daysLeft,
+      ceLabel: ceDue.ceLabel,
+      staff: filteredStaffs.find((s) => String(s.id) === String(l.staff_id)),
+    };
+  });
+
+  // 재직자(filteredStaffs) ID 집합 — 퇴사자 자격증은 목록에서 제외
+  const activeStaffIds = new Set(filteredStaffs.map((s) => String(s.id)));
 
   const filtered = enriched.filter((l) => {
+    if (!activeStaffIds.has(String(l.staff_id))) return false;
     if (filterStatus === '유효' && l.status !== 'valid') return false;
     if (filterStatus === '만료 임박' && l.status !== 'expiring') return false;
     if (filterStatus === '만료' && l.status !== 'expired') return false;
+    if (filterStatus === '확인 필요' && l.status !== 'unknown') return false;
     if (filterStaff && String(l.staff_id) !== filterStaff) return false;
+    if (filterLicenseType) {
+      const type = String(l.license_type ?? '').trim();
+      if (filterLicenseType === '기타') {
+        // '기타' 필터는 명시적으로 '기타'로 저장된 항목 + 분류 미지정(NULL/빈값) 항목까지 포함
+        const isKnownType = (LICENSE_TYPE_OPTIONS as readonly string[]).includes(type);
+        if (isKnownType && type !== '기타') return false;
+      } else if (type !== filterLicenseType) {
+        return false;
+      }
+    }
     if (!staffIdsForJobFilter.has(String(l.staff_id))) return false;
     return true;
   });
 
-  const expiringCount = enriched.filter((l) => l.status === 'expiring').length;
-  const expiredCount = enriched.filter((l) => l.status === 'expired').length;
+  const activeEnriched = enriched.filter((l) => activeStaffIds.has(String(l.staff_id)));
+  const expiringCount = activeEnriched.filter((l) => l.status === 'expiring').length;
+  const expiredCount = activeEnriched.filter((l) => l.status === 'expired').length;
+  const unknownCount = activeEnriched.filter((l) => l.status === 'unknown').length;
+
+  // 보수교육 검토 대기 건수
+  const fetchPendingCECount = useCallback(async () => {
+    if (!canEdit) return;
+    const { count } = await supabase
+      .from('license_continuing_education')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending');
+    setPendingCECount(count ?? 0);
+  }, [canEdit]);
+
+  useEffect(() => { void fetchPendingCECount(); }, [fetchPendingCECount, ceReviewOpen]);
 
   const openAdd = () => {
     setEditId(null);
     setForm({
       staff_id: String(filteredStaffs[0]?.id ?? ''),
+      license_type: '',
       license_name: '',
       license_number: '',
       issued_date: '',
       expiry_date: '',
+      renewed_date: '',
       issuing_body: '',
       memo: '',
     });
@@ -188,10 +288,12 @@ export default function LicenseManager({
     setEditId(String(l.id));
     setForm({
       staff_id: String(l.staff_id),
+      license_type: String(l.license_type ?? ''),
       license_name: String(l.license_name ?? ''),
       license_number: String(l.license_number ?? ''),
       issued_date: String(l.issued_date ?? ''),
       expiry_date: String(l.expiry_date ?? ''),
+      renewed_date: String(l.renewed_date ?? ''),
       issuing_body: String(l.issuing_body ?? ''),
       memo: String(l.memo ?? ''),
     });
@@ -204,10 +306,18 @@ export default function LicenseManager({
     if (!canEdit) return toast('수정 권한이 없습니다.', 'error');
     setSaving(true);
     try {
+      // PostgreSQL date 컬럼은 빈 문자열을 거부하므로 null로 변환
+      const payload = {
+        ...form,
+        license_type: form.license_type || null,
+        issued_date: form.issued_date || null,
+        expiry_date: form.expiry_date || null,
+        renewed_date: form.renewed_date || null,
+      };
       if (editId) {
-        await supabase.from('staff_licenses').update(form).eq('id', editId);
+        await supabase.from('staff_licenses').update(payload).eq('id', editId);
       } else {
-        await supabase.from('staff_licenses').insert([form]);
+        await supabase.from('staff_licenses').insert([payload]);
       }
       setShowModal(false);
       void fetchLicenses();
@@ -242,22 +352,34 @@ export default function LicenseManager({
           <h2 className="text-base font-bold text-[var(--foreground)]">면허·자격증 관리</h2>
           <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">직원별 면허·자격증 만료일을 추적합니다.</p>
         </div>
-        {canEdit && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={openAdd}
-            className="px-4 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-sm font-bold shadow-sm hover:opacity-90"
+            type="button"
+            onClick={() => void fetchLicenses()}
+            className="px-3 py-2 border border-[var(--border)] text-[var(--foreground)] rounded-[var(--radius-md)] text-xs font-bold bg-[var(--card)] hover:bg-[var(--muted)]"
+            aria-label="목록 새로고침"
+            title="목록 새로고침"
           >
-            + 등록
+            새로고침
           </button>
-        )}
+          {canEdit && (
+            <button
+              onClick={openAdd}
+              className="px-4 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-sm font-bold shadow-sm hover:opacity-90"
+            >
+              + 등록
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 요약 카드 */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: '전체', value: enriched.length, color: 'bg-blue-500/10 text-blue-700 border-blue-500/20' },
+          { label: '전체', value: activeEnriched.length, color: 'bg-blue-500/10 text-blue-700 border-blue-500/20' },
           { label: '만료 임박 (60일)', value: expiringCount, color: 'bg-orange-500/10 text-orange-700 border-orange-500/20' },
           { label: '만료됨', value: expiredCount, color: 'bg-red-500/10 text-red-600 border-red-500/20' },
+          { label: '확인 필요', value: unknownCount, color: 'bg-gray-500/10 text-gray-700 border-gray-500/20' },
         ].map((c) => (
           <div key={c.label} className={`p-3 rounded-[var(--radius-lg)] border ${c.color} text-center`}>
             <p className="text-xl font-bold">{c.value}</p>
@@ -266,9 +388,28 @@ export default function LicenseManager({
         ))}
       </div>
 
+      {/* 보수교육 검토 진입 + 미검토 배지 */}
+      {canEdit && (
+        <div className="flex items-center justify-between rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/10 px-4 py-3">
+          <div>
+            <p className="text-xs font-bold text-blue-700">📄 보수교육 이수증 검토</p>
+            <p className="mt-0.5 text-[10px] text-blue-600">
+              직원이 제출한 이수증을 OCR로 스캔하여 교육일을 추출하고, 법정 갱신주기로 만료일을 자동 연장합니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCEReviewOpen(true)}
+            className="rounded-[var(--radius-md)] bg-blue-600 px-4 py-2 text-[11px] font-bold text-white shadow-sm hover:bg-blue-700"
+          >
+            검토 대기 {pendingCECount}건
+          </button>
+        </div>
+      )}
+
       {/* 필터 */}
       <div className="flex flex-wrap gap-2 items-center">
-        {(['전체', '유효', '만료 임박', '만료'] as const).map((f) => (
+        {(['전체', '유효', '만료 임박', '만료', '확인 필요'] as const).map((f) => (
           <button
             key={f}
             onClick={() => setFilterStatus(f)}
@@ -294,6 +435,19 @@ export default function LicenseManager({
             </option>
           ))}
         </select>
+        <select
+          value={filterLicenseType}
+          onChange={(e) => setFilterLicenseType(e.target.value)}
+          className="px-3 py-1.5 border border-[var(--border)] rounded-[var(--radius-md)] text-xs bg-[var(--card)] outline-none"
+          aria-label="면허·자격 종류 필터"
+        >
+          <option value="">전체 면허·자격</option>
+          {LICENSE_TYPE_OPTIONS.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
         {jobCategories.length > 0 && (
           <select
             value={filterJobCode}
@@ -311,13 +465,6 @@ export default function LicenseManager({
         )}
       </div>
 
-      {/* 이전 데이터 마이그레이션 섹션 (분리 컴포넌트) */}
-      <LegacyLicenseMigration
-        staffs={filteredStaffs}
-        canEdit={canEdit}
-        onMigrated={fetchLicenses}
-      />
-
       {/* 면허 목록 */}
       {filtered.length === 0 ? (
         <div className="text-center py-10 text-[var(--toss-gray-3)] font-bold text-sm">
@@ -326,7 +473,9 @@ export default function LicenseManager({
       ) : (
         <div className="space-y-2">
           {filtered.map((l) => {
-            const daysLeft = getDaysLeft((l.expiry_date as string | null) ?? null);
+            const daysLeft = l.daysLeft;
+            const rule = getRenewalRule(l.license_type);
+            const isInferred = l.effectiveExpirySource !== 'explicit' && l.effectiveExpirySource !== 'unknown';
             return (
               <div
                 key={String(l.id)}
@@ -340,7 +489,9 @@ export default function LicenseManager({
                         ? 'bg-red-400'
                         : l.status === 'expiring'
                           ? 'bg-orange-400'
-                          : 'bg-green-400'
+                          : l.status === 'unknown'
+                            ? 'bg-gray-400'
+                            : 'bg-green-400'
                     }`}
                   />
                   <div>
@@ -351,6 +502,30 @@ export default function LicenseManager({
                       <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${STATUS_COLORS[l.status]}`}>
                         {STATUS_LABELS[l.status]}
                       </span>
+                      {isInferred && l.effectiveExpiry && (
+                        <span
+                          className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-500/15 text-amber-700"
+                          title={`만료일 미입력 — ${rule?.label ?? '법정 갱신주기'} 기준 자동 산출`}
+                        >
+                          자동산출
+                        </span>
+                      )}
+                      {l.ceDueStatus === 'overdue' && (
+                        <span
+                          className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-500/15 text-red-600"
+                          title={l.ceLabel ?? '보수교육 마감 경과'}
+                        >
+                          보수교육 미이수
+                        </span>
+                      )}
+                      {l.ceDueStatus === 'due_soon' && (
+                        <span
+                          className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-orange-500/15 text-orange-700"
+                          title={l.ceLabel ?? '보수교육 마감 임박'}
+                        >
+                          보수교육 임박
+                        </span>
+                      )}
                     </div>
                     <p className="text-[10px] text-[var(--toss-gray-3)]">
                       {String((l.staff as Record<string, unknown>)?.name ?? '')} ·{' '}
@@ -359,7 +534,10 @@ export default function LicenseManager({
                     </p>
                     <p className="text-[10px] text-[var(--toss-gray-3)]">
                       {l.issued_date ? `발급: ${String(l.issued_date)}` : ''}
-                      {l.expiry_date ? ` · 만료: ${String(l.expiry_date)}` : ''}
+                      {l.renewed_date ? ` · 갱신: ${String(l.renewed_date)}` : ''}
+                      {l.effectiveExpiry
+                        ? ` · 만료${isInferred ? '(예상)' : ''}: ${l.effectiveExpiry}`
+                        : ' · 만료일: 정보부족'}
                       {daysLeft !== null && (
                         <span
                           className={`ml-1 font-bold ${
@@ -374,6 +552,29 @@ export default function LicenseManager({
                         </span>
                       )}
                     </p>
+                    {l.ceDueDate && l.ceDueStatus !== 'unknown' && (
+                      <p className="text-[10px] text-[var(--toss-gray-3)] mt-0.5">
+                        보수교육 마감: {l.ceDueDate}
+                        {l.ceDaysLeft !== null && (
+                          <span
+                            className={`ml-1 font-bold ${
+                              l.ceDaysLeft < 0
+                                ? 'text-red-500'
+                                : l.ceDaysLeft <= 60
+                                  ? 'text-orange-500'
+                                  : 'text-green-600'
+                            }`}
+                          >
+                            {l.ceDaysLeft < 0
+                              ? `(${Math.abs(l.ceDaysLeft)}일 경과)`
+                              : `(${l.ceDaysLeft}일 남음)`}
+                          </span>
+                        )}
+                        {l.ceLabel && (
+                          <span className="ml-1 text-[var(--toss-gray-4)]">· {l.ceLabel}</span>
+                        )}
+                      </p>
+                    )}
                   </div>
                 </div>
                 {canEdit && (
@@ -432,12 +633,31 @@ export default function LicenseManager({
                   ))}
                 </select>
               </div>
+              <div>
+                <label htmlFor="lic-type-select" className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">
+                  면허·자격 종류
+                </label>
+                <select
+                  id="lic-type-select"
+                  value={form.license_type}
+                  onChange={(e) => setForm((f) => ({ ...f, license_type: e.target.value }))}
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
+                >
+                  <option value="">선택 안 함</option>
+                  {LICENSE_TYPE_OPTIONS.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
               {(
                 [
                   { label: '면허·자격증명 *', key: 'license_name', type: 'text', placeholder: '예: 간호사 면허' },
                   { label: '자격증 번호', key: 'license_number', type: 'text', placeholder: '예: 제12345호' },
                   { label: '발급기관', key: 'issuing_body', type: 'text', placeholder: '예: 보건복지부' },
                   { label: '발급일', key: 'issued_date', type: 'date', placeholder: '' },
+                  { label: '갱신일', key: 'renewed_date', type: 'date', placeholder: '' },
                   { label: '만료일', key: 'expiry_date', type: 'date', placeholder: '' },
                   { label: '메모', key: 'memo', type: 'text', placeholder: '비고 사항' },
                 ] as { label: string; key: keyof typeof form; type: string; placeholder: string }[]
@@ -477,6 +697,18 @@ export default function LicenseManager({
             </div>
           </div>
         </div>
+      )}
+
+      {ceReviewOpen && (
+        <LicenseCEReviewModal
+          onClose={() => setCEReviewOpen(false)}
+          onChanged={() => {
+            void fetchLicenses();
+            void fetchPendingCECount();
+            void fetchLastCE();
+          }}
+          staffs={filteredStaffs}
+        />
       )}
     </div>
   );

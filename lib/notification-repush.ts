@@ -20,7 +20,22 @@ type PushSubscriptionRow = {
   p256dh: string;
   auth: string;
   fcm_token?: string | null;
+  created_at?: string | null;
 };
+
+// 채팅 메시지 알림은 사용자가 리마인드를 원치 않음 — 재발송 대상에서 제외
+const CHAT_NOTIFICATION_TYPES = new Set(['message', 'mention', 'chat']);
+
+function isChatNotification(row: NotificationRow): boolean {
+  const metadata = toMetadata(row.metadata);
+  const candidates = [row.type, metadata.type, metadata.notification_type]
+    .map((value) => String(value || '').trim().toLowerCase())
+    .filter(Boolean);
+  if (candidates.some((value) => CHAT_NOTIFICATION_TYPES.has(value))) return true;
+  // metadata.room_id가 있으면 채팅 메시지 알림으로 간주
+  if (metadata.room_id) return true;
+  return false;
+}
 
 export type NotificationRepushResult = {
   ok: boolean;
@@ -166,7 +181,7 @@ export async function processUnreadNotificationRepushServer(
   const targetUserIds = Array.from(new Set(notifications.map((row) => String(row.user_id || '')).filter(Boolean)));
   const { data: subscriptionRows, error: subscriptionError } = await supabase
     .from('push_subscriptions')
-    .select('id, staff_id, endpoint, p256dh, auth, fcm_token')
+    .select('id, staff_id, endpoint, p256dh, auth, fcm_token, created_at')
     .in('staff_id', targetUserIds);
 
   if (subscriptionError) {
@@ -194,6 +209,12 @@ export async function processUnreadNotificationRepushServer(
   const errors: string[] = [];
 
   for (const row of notifications) {
+    // 채팅 메시지/멘션은 리마인드(재발송) 대상에서 제외 — 사용자 요청
+    if (isChatNotification(row)) {
+      skipped += 1;
+      continue;
+    }
+
     const metadata = toMetadata(row.metadata);
     const lastRepushAt = parseIso(metadata.repush_sent_at);
     const repushAttempts = Number(metadata.repush_attempt_count || 0);
@@ -218,13 +239,21 @@ export async function processUnreadNotificationRepushServer(
       }
     });
 
-    const uniqueFcmTokens = Array.from(
-      new Set(
-        userSubscriptions
-          .map((subscription) => String(subscription.fcm_token || '').trim())
-          .filter(Boolean),
-      ),
-    );
+    // 같은 사용자의 잔재 fcm_token이 여러 개 남아있을 수 있으므로
+    // 가장 최신(created_at 내림차순) 토큰 1개만 사용해 이중 발송 차단.
+    let latestFcmToken: string | null = null;
+    let latestFcmCreatedAt = -Infinity;
+    for (const subscription of userSubscriptions) {
+      const token = String(subscription.fcm_token || '').trim();
+      if (!token) continue;
+      const parsed = subscription.created_at ? Date.parse(String(subscription.created_at)) : 0;
+      const createdAt = Number.isFinite(parsed) ? parsed : 0;
+      if (createdAt > latestFcmCreatedAt) {
+        latestFcmCreatedAt = createdAt;
+        latestFcmToken = token;
+      }
+    }
+    const uniqueFcmTokens = latestFcmToken ? [latestFcmToken] : [];
 
     if (uniqueSubscriptions.size === 0 && uniqueFcmTokens.length === 0) {
       skipped += 1;

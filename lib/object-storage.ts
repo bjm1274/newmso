@@ -167,12 +167,17 @@ function getR2Config(): R2Config | null {
     return null;
   }
 
+  // 클라이언트와 동일 값을 공유해야 하므로 NEXT_PUBLIC_* 우선
+  const publicBaseUrl =
+    normalizeOptionalUrl(process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL) ||
+    normalizeOptionalUrl(process.env.R2_PUBLIC_BASE_URL);
+
   return {
     accountId,
     accessKeyId,
     secretAccessKey,
     chatBucket: String(process.env.R2_CHAT_BUCKET || DEFAULT_R2_CHAT_BUCKET).trim() || DEFAULT_R2_CHAT_BUCKET,
-    publicBaseUrl: normalizeOptionalUrl(process.env.R2_PUBLIC_BASE_URL),
+    publicBaseUrl,
   };
 }
 

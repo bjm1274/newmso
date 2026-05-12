@@ -6,6 +6,9 @@ main = ".open-next/worker.js"
 [assets]
 directory = ".open-next/assets"
 
+[vars]
+NEXT_PUBLIC_R2_PUBLIC_BASE_URL = "https://r2.pchos.kr"
+
 # Cron Triggers
 [triggers]
 crons = [
@@ -14,4 +17,5 @@ crons = [
   "0 23 * * *",   # /api/cron/chat-push-dispatch
   "0 8 * * *",    # /api/cron/leave-notice-announcements
   "0 3 * * *",    # /api/cron/push-subscription-cleanup
+  "0 16 * * *",   # /api/cron/license-expiry-check  (KST 01:00)
 ]

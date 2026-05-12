@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import AnnualLeaveManualGrant from './연차수동부여';
 import {
-  getFlaggedChatRooms,
   includesBannedWord,
   pickFirstFlaggedChatMessage,
 } from '@/lib/system-master-chat-filter';
@@ -305,7 +304,8 @@ type SystemMasterActionId =
   | 'run_todo_reminders'
   | 'cleanup_push_subscriptions';
 
-const CHAT_FETCH_LIMIT = '500';
+const CHAT_FETCH_LIMIT = '2000';
+const CHAT_ROOM_FETCH_LIMIT = '5000';
 
 const formatCurrency = (value: unknown) => formatWon(Number(value || 0));
 
@@ -359,6 +359,22 @@ async function readJson<T>(url: string): Promise<T> {
   return payload as T;
 }
 
+function roomHasMessageHistory(room: SystemMasterChatRoom | null | undefined) {
+  if (!room) return false;
+  const loose = room as Record<string, unknown>;
+  if (typeof loose.has_message_history === 'boolean') {
+    return loose.has_message_history;
+  }
+  if (typeof loose.message_count === 'number') {
+    return loose.message_count > 0;
+  }
+  return Boolean(String(loose.last_message_at || loose.last_activity_at || '').trim());
+}
+
+function isEmptyChatRoom(room: SystemMasterChatRoom | null | undefined) {
+  return Boolean(room?.id) && !roomHasMessageHistory(room);
+}
+
 export default function SystemMasterCenter({
   user,
   staffs = [],
@@ -390,6 +406,7 @@ export default function SystemMasterCenter({
   const [bannedWords, setBannedWords] = useState<string[]>(loadBannedWords);
   const [showBannedModal, setShowBannedModal] = useState(false);
   const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
+  const [showEmptyRoomsOnly, setShowEmptyRoomsOnly] = useState(false);
   const [deletingMsgId, setDeletingMsgId] = useState<string | null>(null);
   const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null);
   const [opsActionLoading, setOpsActionLoading] = useState<string>('');
@@ -491,11 +508,18 @@ export default function SystemMasterCenter({
     setLoading(true);
     setError('');
     try {
-      const catalogQuery = new URLSearchParams({
+      const catalogParams: Record<string, string> = {
         scope: 'chats',
         keyword: chatKeyword,
         limit: CHAT_FETCH_LIMIT,
-      });
+        roomLimit: CHAT_ROOM_FETCH_LIMIT,
+      };
+      // 단어 필터 선택검색 — 서버에서 매칭 채팅방 전체 조회
+      if (showFlaggedOnly && bannedWords.length > 0) {
+        catalogParams.bannedWords = bannedWords.join(',');
+        catalogParams.flaggedRoomsOnly = '1';
+      }
+      const catalogQuery = new URLSearchParams(catalogParams);
       const roomQuery = new URLSearchParams({
         scope: 'chats',
         keyword: chatKeyword,
@@ -520,7 +544,7 @@ export default function SystemMasterCenter({
     } finally {
       setLoading(false);
     }
-  }, [chatKeyword, selectedRoomId]);
+  }, [chatKeyword, selectedRoomId, showFlaggedOnly, bannedWords]);
 
   useEffect(() => {
     if (!isSystemMaster || activeTab !== '개요') return;
@@ -638,6 +662,51 @@ export default function SystemMasterCenter({
     }
   }, [openConfirm]);
 
+  const handleDeleteEmptyRooms = useCallback(async () => {
+    const targets = chatRooms.filter((room) => isEmptyChatRoom(room));
+    if (targets.length === 0) {
+      toast('대화 내역이 없는 채팅방이 없습니다.', 'warning');
+      return;
+    }
+    const confirmed = await openConfirm({
+      title: '대화 없는 채팅방 일괄 삭제',
+      description: `대화 내역이 전혀 없는 채팅방 ${targets.length}개를 한 번에 삭제합니다.\n참여자 목록, 알림 설정 등 관련 데이터도 함께 정리됩니다.`,
+      confirmText: `${targets.length}개 삭제`,
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+
+    setDeletingRoomId('__bulk__');
+    try {
+      const ids = targets.map((room) => String(room.id)).filter(Boolean);
+      const response = await fetch(
+        `/api/admin/system-master?scope=chats&roomIds=${encodeURIComponent(ids.join(','))}`,
+        { method: 'DELETE' },
+      );
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || '일괄 삭제에 실패했습니다.');
+      }
+      const deletedIds = new Set<string>((payload?.deletedRoomIds as string[]) || []);
+      setChatRooms((prev) => prev.filter((room) => !deletedIds.has(String(room.id))));
+      setChatCatalogMessages((prev) => prev.filter((message) => !deletedIds.has(String(message.room_id || ''))));
+      setChatMessages((prev) => prev.filter((message) => !deletedIds.has(String(message.room_id || ''))));
+      setSelectedRoomId((prev) => (prev && deletedIds.has(prev) ? '' : prev));
+
+      const failureCount = Number(payload?.failureCount || 0);
+      if (failureCount > 0) {
+        toast(`${deletedIds.size}개 삭제 · ${failureCount}개 실패`, 'warning');
+      } else {
+        toast(`${deletedIds.size}개 채팅방을 일괄 삭제했습니다.`, 'success');
+      }
+    } catch (deleteError) {
+      const message = deleteError instanceof Error ? deleteError.message : '일괄 삭제에 실패했습니다.';
+      toast(message, 'error');
+    } finally {
+      setDeletingRoomId(null);
+    }
+  }, [chatRooms, openConfirm]);
+
   const runOpsAction = useCallback(async (action: SystemMasterActionId) => {
     setOpsActionLoading(action);
     try {
@@ -679,18 +748,31 @@ export default function SystemMasterCenter({
     [chatRooms, selectedRoomId],
   );
 
+  const emptyChatRooms = useMemo(
+    () => chatRooms.filter((room) => isEmptyChatRoom(room)),
+    [chatRooms],
+  );
+
+  const selectedRoomIsEmpty = useMemo(
+    () => isEmptyChatRoom(selectedChatRoom),
+    [selectedChatRoom],
+  );
+
   const flaggedChatMessageCount = useMemo(
     () => chatCatalogMessages.filter((message) => includesBannedWord(message.content, bannedWords)).length,
     [bannedWords, chatCatalogMessages],
   );
 
   const visibleChatRooms = useMemo(
-    () => (
-      showFlaggedOnly
-        ? getFlaggedChatRooms(chatRooms, chatCatalogMessages, bannedWords)
-        : chatRooms
-    ),
-    [bannedWords, chatCatalogMessages, chatRooms, showFlaggedOnly],
+    () => {
+      if (showEmptyRoomsOnly) return emptyChatRooms;
+      if (!showFlaggedOnly) return chatRooms;
+      // 선택검색 + 필터 단어 → 서버 사이드 필터링 결과(chatRooms)를 그대로 사용
+      if (bannedWords.length > 0) return chatRooms;
+      // 폴백: 필터 단어 없을 때는 클라이언트 자체 필터링
+      return chatRooms;
+    },
+    [bannedWords, chatRooms, emptyChatRooms, showEmptyRoomsOnly, showFlaggedOnly],
   );
 
   const visibleChatMessages = useMemo(
@@ -1309,13 +1391,19 @@ export default function SystemMasterCenter({
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-base font-bold text-[var(--foreground)]">채팅방 목록</h3>
               <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                {showFlaggedOnly ? `${visibleChatRooms.length}/${chatRooms.length}개` : `${chatRooms.length}개`}
+                {showFlaggedOnly || showEmptyRoomsOnly
+                  ? `${visibleChatRooms.length}/${chatRooms.length}개`
+                  : `${chatRooms.length}개`}
               </span>
             </div>
             <div className="mt-4 space-y-2">
               {visibleChatRooms.length === 0 ? (
                 <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-4 py-8 text-center text-sm text-[var(--toss-gray-3)]">
-                  {showFlaggedOnly ? '필터 단어가 포함된 채팅방이 없습니다.' : '표시할 채팅방이 없습니다.'}
+                  {showEmptyRoomsOnly
+                    ? '대화 내역이 없는 채팅방이 없습니다.'
+                    : showFlaggedOnly
+                      ? '필터 단어가 포함된 채팅방이 없습니다.'
+                      : '표시할 채팅방이 없습니다.'}
                 </div>
               ) : (
                 visibleChatRooms.map((room) => (
@@ -1358,7 +1446,11 @@ export default function SystemMasterCenter({
                     }}
                     className="h-9 rounded-[var(--radius-md)] border border-danger/20 px-3 text-xs font-bold text-danger transition hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {deletingRoomId === selectedRoomId ? '삭제 중...' : '선택 방 삭제'}
+                    {deletingRoomId === selectedRoomId
+                      ? '삭제 중...'
+                      : selectedRoomIsEmpty
+                        ? '대화 없는 방 삭제'
+                        : '선택 방 삭제'}
                   </button>
                 )}
                 {(() => {
@@ -1374,11 +1466,38 @@ export default function SystemMasterCenter({
                 })()}
                 <button
                   type="button"
-                  onClick={() => setShowFlaggedOnly((v) => !v)}
+                  onClick={() => {
+                    setShowEmptyRoomsOnly(false);
+                    setShowFlaggedOnly((v) => !v);
+                  }}
                   className={`h-9 px-3 text-xs font-bold rounded-[var(--radius-md)] border transition ${showFlaggedOnly ? 'bg-danger text-white border-danger' : 'border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]'}`}
                 >
                   선택검색
                 </button>
+                <button
+                  type="button"
+                  data-testid="system-master-empty-room-filter"
+                  onClick={() => {
+                    setShowFlaggedOnly(false);
+                    setShowEmptyRoomsOnly((v) => !v);
+                  }}
+                  className={`h-9 px-3 text-xs font-bold rounded-[var(--radius-md)] border transition ${showEmptyRoomsOnly ? 'bg-[var(--foreground)] text-white border-[var(--foreground)]' : 'border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]'}`}
+                >
+                  대화 없는 방 ({emptyChatRooms.length})
+                </button>
+                {emptyChatRooms.length > 0 && (
+                  <button
+                    type="button"
+                    data-testid="system-master-bulk-delete-empty-rooms"
+                    disabled={deletingRoomId === '__bulk__'}
+                    onClick={() => void handleDeleteEmptyRooms()}
+                    className="h-9 rounded-[var(--radius-md)] border border-danger/30 px-3 text-xs font-bold text-danger transition hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {deletingRoomId === '__bulk__'
+                      ? '삭제 중...'
+                      : `빈 방 ${emptyChatRooms.length}개 일괄 삭제`}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowBannedModal(true)}

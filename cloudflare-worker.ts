@@ -25,6 +25,7 @@ const CRON_ROUTE_BY_SCHEDULE: Record<string, string> = {
   '*/15 * * * *': '/api/cron/chat-push-dispatch',
   '0 8 * * *': '/api/cron/leave-notice-announcements',
   '0 3 * * *': '/api/cron/push-subscription-cleanup',
+  '0 16 * * *': '/api/cron/license-expiry-check',
 };
 
 async function callCronRoute(

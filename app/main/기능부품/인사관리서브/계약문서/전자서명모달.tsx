@@ -6,6 +6,12 @@ import SignatureCanvas from 'react-signature-canvas';
 import { upgradeLegacyContractTemplate } from '@/lib/contract-template-defaults';
 import { fillEmploymentContractTemplate } from '@/lib/contract-template-render';
 import {
+    buildClosingPrintHTML,
+    stripContractClosingLines,
+    type ContractClosingData,
+} from '@/lib/contract-template-closing';
+import ContractClosingBlock from './계약서마무리블록';
+import {
     getShiftBandGroupRows,
     getWeeklyRotationShiftIds,
     isShiftBandGroupRow,
@@ -172,6 +178,43 @@ export default function ContractSignatureModal({ contract, user, templateText, o
     const allAgreed = REQUIRED_AGREEMENTS.every(item => agreements[item.id]);
     const isTemplateReady = localTemplateText.trim().length > 0;
 
+    const formatKoreanDate = (input: unknown): string => {
+        if (!input) return '';
+        const date = input instanceof Date ? input : new Date(String(input));
+        if (Number.isNaN(date.getTime())) return '';
+        return date.toLocaleDateString('ko-KR', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+        });
+    };
+
+    const contractIssueDate =
+        formatKoreanDate(
+            contract?.requested_at ?? contract?.sent_at ?? contract?.issued_at ?? contract?.created_at,
+        ) || formatKoreanDate(new Date());
+
+    const closingData: ContractClosingData = {
+        companyName: String(
+            (company?.name as string | undefined) || user?.company || contract?.company_name || '',
+        ),
+        companyAddress: String((company?.address as string | undefined) || ''),
+        companyCeo: String(
+            (company?.ceo_name as string | undefined) ||
+            (company?.representative_name as string | undefined) || '',
+        ),
+        companyPhone: String((company?.phone as string | undefined) || ''),
+        companyBusinessNo: String(
+            (company?.business_no as string | undefined) ||
+            (company?.business_number as string | undefined) || '',
+        ),
+        sealUrl: (company?.seal_url as string | undefined) || null,
+        employeeName: String(user?.name || ''),
+        employeeAddress: String(user?.address || ''),
+        employeePhone: String(user?.phone || ''),
+        contractDate: contractIssueDate,
+    };
+
     const handleNext = () => {
         if (step === 1) setStep(2);
         else if (step === 2) {
@@ -285,9 +328,19 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                 </div>
             `;
 
+            const { mainText: strippedTemplate } = stripContractClosingLines(localTemplateText);
+            const bodyText = strippedTemplate || localTemplateText;
+            const closingHTML = buildClosingPrintHTML({
+                ...closingData,
+                signatureDataUrl: signatureData,
+            });
+
             const fullContractHTML = `
                 <div class="contract-wrapper">
-                    <div class="contract-page">${localTemplateText}</div>
+                    <div class="contract-page">
+                        <pre style="white-space:pre-wrap;font-family:'Noto Sans KR', sans-serif;font-size:13px;line-height:1.75;margin:0;color:#1f2937;">${bodyText}</pre>
+                        ${closingHTML}
+                    </div>
                     ${agreementsSection}
                     ${confidentialitySection}
                 </div>
@@ -338,7 +391,8 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                         <p className="text-[11px] text-[var(--toss-gray-4)]">잠시만 기다려 주세요.</p>
                                     </div>
                                 ) : (() => {
-                                    let raw = localTemplateText;
+                                    const stripped = stripContractClosingLines(localTemplateText);
+                                    let raw = stripped.mainText || localTemplateText;
                                     if (!raw.trim()) {
                                         return (
                                             <div className="min-h-[280px] flex items-center justify-center text-center">
@@ -360,9 +414,16 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                         matches.push({ index: mm.index, full: mm[0], num: mm[1], title: mm[2] });
                                     }
 
-                                    if (matches.length === 0) return <p className="text-[14px] text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{raw}</p>;
+                                    if (matches.length === 0) {
+                                        return (
+                                            <>
+                                                <p className="text-[14px] text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{raw}</p>
+                                                <ContractClosingBlock {...closingData} />
+                                            </>
+                                        );
+                                    }
 
-                                    return matches.map((sec, si) => {
+                                    const sectionNodes = matches.map((sec, si) => {
                                         const start = sec.index + sec.full.length;
                                         const end = si + 1 < matches.length ? matches[si + 1].index : raw.length;
                                         const body = raw.slice(start, end).replace(/─+/g, '').trim();
@@ -412,6 +473,13 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                             </div>
                                         );
                                     });
+
+                                    return (
+                                        <>
+                                            {sectionNodes}
+                                            <ContractClosingBlock {...closingData} />
+                                        </>
+                                    );
                                 })()}
                             </div>
 

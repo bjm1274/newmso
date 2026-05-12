@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { filterRosterShiftsForDepartment } from '@/lib/roster-shift-team-filter';
+import { isActiveStaff } from '@/lib/active-staff';
 import SmartDatePicker from '../../공통/SmartDatePicker';
 import SmartMonthPicker from '../../공통/SmartMonthPicker';
 import AttendanceIssueAnalysisSuite from '../근태이상통합분석';
@@ -21,6 +22,7 @@ type StaffMember = {
   department: string;
   company: string;
   shift_type?: string;
+  status?: string | null;
   [key: string]: unknown;
 };
 
@@ -618,8 +620,9 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
   }, [filtered]);
 
   const rosterFiltered = useMemo(() => {
-    if (rosterTeam === '전체') return filtered;
-    return filtered.filter((s: StaffMember) => s.department === rosterTeam);
+    const activeOnly = filtered.filter((s: StaffMember) => isActiveStaff(s));
+    if (rosterTeam === '전체') return activeOnly;
+    return activeOnly.filter((s: StaffMember) => s.department === rosterTeam);
   }, [filtered, rosterTeam]);
   const visibleWorkShifts = useMemo(() => {
     const scopedDepartment = rosterTeam === '전체' ? '' : rosterTeam;

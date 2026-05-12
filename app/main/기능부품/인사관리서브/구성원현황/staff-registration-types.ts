@@ -16,6 +16,9 @@ export const LICENSE_TYPE_OPTIONS = [
   '간호조무사자격',
   '약사면허',
   '의사면허',
+  '응급구조사자격',
+  '영양사면허',
+  '조리사면허',
   '기타',
 ] as const;
 

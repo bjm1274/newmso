@@ -11,6 +11,7 @@ import {
   upgradeLegacyContractTemplate,
 } from '@/lib/contract-template-defaults';
 import { fillEmploymentContractTemplate } from '@/lib/contract-template-render';
+import { stripContractClosingLines } from '@/lib/contract-template-closing';
 import {
   getShiftBandGroupRows,
   getWeeklyRotationShiftIds,
@@ -187,8 +188,13 @@ export default function ContractPreview({
   function parseContractSections(rawText: string) {
     if (!rawText) return [];
 
+    // 마지막 마무리 블록(회사/근로자/서명/교부 확인 등)은 하단의 구조화된 박스에서
+    // 따로 렌더링하므로 본문 파싱에서 제외한다.
+    const { mainText } = stripContractClosingLines(rawText);
+    const base = mainText || rawText;
+
     // 1. ASCII 표 장식 문자 제거
-    let cleaned = rawText.replace(/[┌┬┐├┼┤└┴┘─│]+/g, '');
+    let cleaned = base.replace(/[┌┬┐├┼┤└┴┘─│]+/g, '');
     // 제목 줄 (근 로 계 약 서 (월급제)) 제거 — 헤더에서 별도 렌더링
     cleaned = cleaned.replace(/근\s*로\s*계\s*약\s*서\s*\(\s*월\s*급\s*제\s*\)/, '');
     // [사용자 기본정보], [근로자 기본정보] 블록 제거 — 상단 표에서 별도 렌더링
