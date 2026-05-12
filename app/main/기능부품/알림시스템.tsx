@@ -2,7 +2,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { sound } from '@/lib/sounds';
 import { isNamedSystemMasterAccount } from '@/lib/system-master';
 import { canAccessAdminSection } from '@/lib/access-control';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
@@ -18,12 +17,50 @@ import { CHAT_ACTIVE_ROOM_KEY as ACTIVE_CHAT_ROOM_SESSION_KEY } from '@/app/main
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { toNotificationText, getInitials, timeAgo } from '@/lib/notification-utils';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
+
+// ─── 서브모듈 re-exports (외부 import 호환성 유지) ───
+export type { NotifSettings } from './알림시스템/settings';
+export { saveNotifSettings, loadNotifSettings } from './알림시스템/settings';
+
+export type { NotificationDeliveryLogEntry } from './알림시스템/delivery-log';
+export {
+  NOTIFICATION_DELIVERY_LOG_KEY,
+  NOTIFICATION_DELIVERY_EVENT,
+  readNotificationDeliveryLog,
+  recordNotificationDelivery,
+} from './알림시스템/delivery-log';
+
+export type { PushDebugEntry } from './알림시스템/push-debug';
+export {
+  PUSH_DEBUG_STORAGE_KEY,
+  normalizePushDebugDetail,
+  readPushDebugLog,
+  recordPushDebug,
+} from './알림시스템/push-debug';
+
+// ─── 서브모듈 imports (본체 내부 사용) ───
+import { loadNotifSettings } from './알림시스템/settings';
+import { recordNotificationDelivery } from './알림시스템/delivery-log';
 import {
-  normalizeRoomNotificationKeyword,
-  normalizeRoomNotificationMode,
-  readStoredRoomPreferences,
-  readStoredThreadPreferences,
-} from './메신저유틸';
+  isInDND,
+  isWeekendQuiet,
+  matchesNotificationKeywords,
+  resolveChatRoomSurfaceSuppression,
+  isFollowedThreadNotification,
+} from './알림시스템/filter-helpers';
+import { recordPushDebug } from './알림시스템/push-debug';
+import {
+  urlBase64ToUint8Array,
+  uint8ArrayToBase64Url,
+  getPushVapidStorageKey,
+  getPushSubscriptionActiveKey,
+} from './알림시스템/push-utils';
+import { getTypeCfg } from './알림시스템/ui-config';
+import {
+  isMissingTodoReminderSchema,
+  setAppBadge,
+  playIncomingNotificationFeedback,
+} from './알림시스템/device-feedback';
 
 /**
  * [실시간 알림 엔진 + KakaoTalk 스타일 Toast UI]
@@ -32,433 +69,10 @@ import {
  * - Toast: 우측 하단 슬라이드인, 7초 진행바, 빠른 액션, 최대 4개
  */
 
-// ─── 알림 설정 (localStorage) ───
-export interface NotifSettings {
-  sound: boolean;
-  vibration: boolean;
-  dndEnabled: boolean;
-  dndFrom: string;
-  dndTo: string;
-  weekendMute: boolean;
-  keywordAlertsEnabled: boolean;
-  keywords: string[];
-  types: Record<string, boolean>;
-}
-
-const DEFAULT_SETTINGS: NotifSettings = {
-  sound: true, vibration: true, dndEnabled: false,
-  dndFrom: '22:00', dndTo: '08:00',
-  weekendMute: false,
-  keywordAlertsEnabled: false,
-  keywords: [],
-  types: {
-    message: true, mention: true, approval: true, payroll: true,
-    inventory: true, attendance: true, board: true, 인사: true,
-    education: true, notification: true, todo: true,
-  },
-};
-
-export type NotificationDeliveryLogEntry = {
-  id: string;
-  notificationId?: string | null;
-  type: string;
-  title: string;
-  stage: string;
-  at: string;
-  detail?: Record<string, unknown> | null;
-};
-
-const NOTIFICATION_DELIVERY_LOG_KEY = 'erp_notification_delivery_log';
-export const NOTIFICATION_DELIVERY_EVENT = 'erp-notification-delivery-log';
-
-function normalizeKeywordList(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return Array.from(
-    new Set(
-      value
-        .map((entry) => String(entry || '').trim().toLowerCase())
-        .filter(Boolean)
-        .slice(0, 30),
-    ),
-  );
-}
-
-export function saveNotifSettings(next: NotifSettings) {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(STORAGE_KEYS.NOTIF_SETTINGS, JSON.stringify(next));
-  } catch {
-    // ignore storage failures
-  }
-}
-
-export function readNotificationDeliveryLog(): NotificationDeliveryLogEntry[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(NOTIFICATION_DELIVERY_LOG_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed as NotificationDeliveryLogEntry[] : [];
-  } catch {
-    return [];
-  }
-}
-
-export function recordNotificationDelivery(
-  entry: Omit<NotificationDeliveryLogEntry, 'id' | 'at'> & { id?: string; at?: string },
-) {
-  if (typeof window === 'undefined') return;
-  const nextEntry: NotificationDeliveryLogEntry = {
-    id:
-      entry.id ||
-      (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(16).slice(2)}`),
-    notificationId: entry.notificationId || null,
-    type: entry.type,
-    title: entry.title,
-    stage: entry.stage,
-    at: entry.at || new Date().toISOString(),
-    detail: normalizePushDebugDetail(entry.detail),
-  };
-
-  try {
-    const nextLog = [nextEntry, ...readNotificationDeliveryLog()].slice(0, 40);
-    window.localStorage.setItem(NOTIFICATION_DELIVERY_LOG_KEY, JSON.stringify(nextLog));
-  } catch {
-    // ignore storage failures
-  }
-
-  try {
-    window.dispatchEvent(new CustomEvent(NOTIFICATION_DELIVERY_EVENT, {
-      detail: nextEntry,
-    }));
-  } catch {
-    // ignore event failures
-  }
-}
-
-export function loadNotifSettings(): NotifSettings {
-  if (typeof window === 'undefined') return DEFAULT_SETTINGS;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.NOTIF_SETTINGS);
-    if (!raw) return DEFAULT_SETTINGS;
-    const p = JSON.parse(raw);
-    return {
-      ...DEFAULT_SETTINGS,
-      ...p,
-      keywords: normalizeKeywordList(p.keywords),
-      types: { ...DEFAULT_SETTINGS.types, ...(p.types || {}) },
-    };
-  } catch { return DEFAULT_SETTINGS; }
-}
-
-function isInDND(s: NotifSettings): boolean {
-  if (!s.dndEnabled) return false;
-  const now = new Date();
-  const cur = now.getHours() * 60 + now.getMinutes();
-  const [fh, fm] = s.dndFrom.split(':').map(Number);
-  const [th, tm] = s.dndTo.split(':').map(Number);
-  const from = fh * 60 + fm, to = th * 60 + tm;
-  return from <= to ? cur >= from && cur < to : cur >= from || cur < to;
-}
-
-function isWeekendQuiet(s: NotifSettings): boolean {
-  if (!s.weekendMute) return false;
-  const day = new Date().getDay();
-  return day === 0 || day === 6;
-}
-
-function shouldApplyKeywordFilter(type: string) {
-  return type === 'message' || type === 'board' || type === 'notification';
-}
-
-function matchesNotificationKeywords(
-  settings: NotifSettings,
-  type: string,
-  title: string,
-  body: string,
-  metadata: Record<string, unknown>,
-) {
-  if (!settings.keywordAlertsEnabled) return true;
-  const keywords = normalizeKeywordList(settings.keywords);
-  if (keywords.length === 0) return true;
-  if (!shouldApplyKeywordFilter(type)) return true;
-
-  const haystack = [
-    title,
-    body,
-    metadata.sender_name,
-    metadata.room_name,
-    metadata.board_type,
-    metadata.open_menu,
-    metadata.open_subview,
-  ]
-    .map((value) => String(value || '').toLowerCase())
-    .join(' ');
-
-  return keywords.some((keyword) => haystack.includes(keyword));
-}
-
-function matchesChatRoomKeywordPreference(
-  keyword: string,
-  title: string,
-  body: string,
-  metadata: Record<string, unknown>,
-) {
-  const normalizedKeyword = normalizeRoomNotificationKeyword(keyword).toLowerCase();
-  if (!normalizedKeyword) return false;
-
-  const haystack = [
-    title,
-    body,
-    metadata.sender_name,
-    metadata.room_name,
-    metadata.message_preview,
-    metadata.content,
-  ]
-    .map((value) => String(value || '').toLowerCase())
-    .join(' ');
-
-  return haystack.includes(normalizedKeyword);
-}
-
-function resolveChatRoomSurfaceSuppression(params: {
-  effectiveUserId: string | null | undefined;
-  roomId: string;
-  type: string;
-  title: string;
-  body: string;
-  metadata: Record<string, unknown>;
-}) {
-  const preferences = readStoredRoomPreferences(params.effectiveUserId);
-  const preference = preferences[params.roomId] || {};
-  const mode = normalizeRoomNotificationMode(preference.notifyMode);
-  const keyword = normalizeRoomNotificationKeyword(preference.notifyKeyword);
-
-  if (mode === 'mute') {
-    return {
-      suppressLiveSurface: true,
-      mode,
-      keyword,
-    };
-  }
-
-  if (mode === 'mention_only') {
-    return {
-      suppressLiveSurface: params.type !== 'mention',
-      mode,
-      keyword,
-    };
-  }
-
-  if (mode === 'keyword') {
-    return {
-      suppressLiveSurface:
-        params.type !== 'mention' &&
-        !matchesChatRoomKeywordPreference(keyword, params.title, params.body, params.metadata),
-      mode,
-      keyword,
-    };
-  }
-
-  return {
-    suppressLiveSurface: false,
-    mode,
-    keyword,
-  };
-}
-
-function isFollowedThreadNotification(
-  effectiveUserId: string | null | undefined,
-  metadata: Record<string, unknown>,
-) {
-  const preferences = readStoredThreadPreferences(effectiveUserId);
-  const candidateIds = [
-    metadata.thread_root_id,
-    metadata.reply_to_id,
-    metadata.message_id,
-    metadata.id,
-  ]
-    .map((value) => String(value || '').trim())
-    .filter(Boolean);
-
-  return candidateIds.some((threadId) => preferences[threadId]?.followed === true);
-}
-
-// ─── 타입별 스타일 ───
-const TYPE_CFG: Record<string, { icon: string; bg: string; progress: string; accent: string }> = {
-  message: { icon: '💬', bg: 'bg-blue-500/100', progress: 'bg-blue-400', accent: 'border-blue-400' },
-  mention: { icon: '📣', bg: 'bg-indigo-500/100', progress: 'bg-indigo-400', accent: 'border-indigo-400' },
-  approval: { icon: '📋', bg: 'bg-violet-600', progress: 'bg-violet-400', accent: 'border-violet-400' },
-  payroll: { icon: '💰', bg: 'bg-emerald-600', progress: 'bg-emerald-400', accent: 'border-emerald-400' },
-  inventory: { icon: '📦', bg: 'bg-orange-500/100', progress: 'bg-orange-400', accent: 'border-orange-400' },
-  attendance: { icon: '⏰', bg: 'bg-teal-500', progress: 'bg-teal-400', accent: 'border-teal-400' },
-  board: { icon: '📌', bg: 'bg-pink-500/100', progress: 'bg-pink-400', accent: 'border-pink-400' },
-  인사: { icon: '👥', bg: 'bg-cyan-600', progress: 'bg-cyan-400', accent: 'border-cyan-400' },
-  education: { icon: '📚', bg: 'bg-purple-500/100', progress: 'bg-purple-400', accent: 'border-purple-400' },
-  todo: { icon: '🗓️', bg: 'bg-sky-600', progress: 'bg-sky-400', accent: 'border-sky-400' },
-  notification: { icon: '🔔', bg: 'bg-[var(--toss-gray-4)]', progress: 'bg-[var(--toss-gray-3)]', accent: 'border-[var(--border)]' },
-};
-const DEFAULT_CFG = { icon: '🔔', bg: 'bg-[var(--toss-gray-4)]', progress: 'bg-[var(--toss-gray-3)]', accent: 'border-[var(--border)]' };
-const getTypeCfg = (type: string) => TYPE_CFG[type] || DEFAULT_CFG;
-
 export const PUSH_STATUS_CHANGED_EVENT = 'erp-push-status-changed';
 export const PUSH_DEBUG_EVENT = 'erp-push-debug';
 
-type PushDebugEntry = {
-  source: 'app' | 'sw';
-  stage: string;
-  message: string;
-  at: string;
-  detail?: Record<string, unknown> | null;
-};
-
-const PUSH_DEBUG_STORAGE_KEY = 'erp_push_debug_log';
 const pushInitInFlightMap = new Map<string, Promise<void>>();
-
-function normalizePushDebugDetail(detail: Record<string, unknown> | null | undefined) {
-  if (!detail) return null;
-  return Object.entries(detail).reduce<Record<string, unknown>>((acc, [key, value]) => {
-    if (value === undefined) return acc;
-    if (value === null) {
-      acc[key] = null;
-      return acc;
-    }
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-      acc[key] = value;
-      return acc;
-    }
-    acc[key] = JSON.stringify(value);
-    return acc;
-  }, {});
-}
-
-export function readPushDebugLog(): PushDebugEntry[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(PUSH_DEBUG_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed as PushDebugEntry[] : [];
-  } catch {
-    return [];
-  }
-}
-
-export function recordPushDebug(entry: Omit<PushDebugEntry, 'at'> & { at?: string }) {
-  if (typeof window === 'undefined') return;
-  const nextEntry: PushDebugEntry = {
-    source: entry.source,
-    stage: entry.stage,
-    message: entry.message,
-    at: entry.at || new Date().toISOString(),
-    detail: normalizePushDebugDetail(entry.detail),
-  };
-
-  try {
-    const nextLog = [nextEntry, ...readPushDebugLog()].slice(0, 20);
-    window.localStorage.setItem(PUSH_DEBUG_STORAGE_KEY, JSON.stringify(nextLog));
-  } catch {
-    // ignore storage failures
-  }
-
-  try {
-    window.dispatchEvent(new CustomEvent(PUSH_DEBUG_EVENT, {
-      detail: nextEntry,
-    }));
-  } catch {
-    // ignore event failures
-  }
-}
-
-
-function isMissingTodoReminderSchema(error: unknown) {
-  const code = String((error as { code?: string } | null)?.code || '').trim();
-  const message = `${String((error as { message?: string } | null)?.message || '')} ${String((error as { details?: string } | null)?.details || '')}`.toLowerCase();
-  return (
-    code === '42P01' ||
-    code === '42703' ||
-    message.includes('todo_reminder_logs') ||
-    message.includes('repeat_parent_id') ||
-    message.includes('reminder_at')
-  );
-}
-
-function setAppBadge(count: number) {
-  try {
-    if (typeof navigator === 'undefined') return;
-    if (count > 0 && 'setAppBadge' in navigator) (navigator as any).setAppBadge(count).catch(() => { });
-    else if (count === 0 && 'clearAppBadge' in navigator) (navigator as any).clearAppBadge().catch(() => { });
-  } catch { /* ignore */ }
-}
-
-function vibrateIfSupported(pattern: number | number[] = [180]) {
-  try {
-    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-      navigator.vibrate(pattern);
-    }
-  } catch { /* ignore */ }
-}
-
-function getNotificationHapticPattern(type: string) {
-  if (type === 'message' || type === 'mention') {
-    return [90, 40, 120];
-  }
-  return [180];
-}
-
-function playIncomingNotificationFeedback({
-  type,
-  allowSound,
-  allowVibration,
-}: {
-  type: string;
-  allowSound: boolean;
-  allowVibration: boolean;
-}) {
-  const run = () => {
-    if (allowSound) {
-      if (type === 'message' || type === 'mention') sound.playTalk();
-      else sound.playSystem();
-    }
-    if (allowVibration) {
-      vibrateIfSupported(getNotificationHapticPattern(type));
-    }
-  };
-
-  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
-    window.requestAnimationFrame(run);
-    return;
-  }
-
-  run();
-}
-
-function urlBase64ToUint8Array(b64: string): ArrayBuffer {
-  const padding = '='.repeat((4 - (b64.length % 4)) % 4);
-  const base64 = (b64 + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const raw = window.atob(base64);
-  const out = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
-  return out.buffer;
-}
-
-function uint8ArrayToBase64Url(value: ArrayBuffer | null | undefined) {
-  if (!value) return '';
-  const bytes = new Uint8Array(value);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-  return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}
-
-function getPushVapidStorageKey(staffId?: string) {
-  return `erp_push_vapid_public_key:${staffId || 'guest'}`;
-}
-
-function getPushSubscriptionActiveKey(staffId?: string) {
-  return `erp_push_subscription_active:${staffId || 'guest'}`;
-}
 
 function getPushDeviceIdKey(staffId?: string) {
   return `erp_push_device_id:${staffId || 'guest'}`;
