@@ -212,7 +212,7 @@ export default function IntegratedInventoryManagement({
     <div className="relative flex h-full min-h-0 flex-col overflow-x-hidden app-page" data-testid="inventory-view">
       {stockModal.dialog}
       {workflow.dialog}
-      <PageHeader title={currentViewMeta.title} />
+      <PageHeader breadcrumb={currentViewMeta.title ? [currentViewMeta.title] : undefined} />
       <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
         <main className="flex-1 bg-[var(--page-bg)] p-3 md:p-4 overflow-y-auto custom-scrollbar">
           {/* ── 뷰 라우팅 ── */}
