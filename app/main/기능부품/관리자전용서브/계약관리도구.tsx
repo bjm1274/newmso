@@ -9,6 +9,8 @@ import {
   DEFAULT_CONTRACT_TEMPLATE,
   upgradeLegacyContractTemplate,
 } from '@/lib/contract-template-defaults';
+import type { ContractClosingData } from '@/lib/contract-template-closing';
+import ContractStandardPreview from '@/app/main/기능부품/인사관리서브/계약문서/계약서표준미리보기';
 
 // COMPANIES 상수는 이제 DB에서 동적으로 관리됩니다.
 
@@ -21,6 +23,31 @@ export default function ContractManager() {
   const [loading, setLoading] = useState(true);
   const [sealUrl, setSealUrl] = useState<string | null>(null);
   const [uploadingSeal, setUploadingSeal] = useState(false);
+  const [companyInfo, setCompanyInfo] = useState<{
+    business_no?: string;
+    address?: string;
+    phone?: string;
+    ceo_name?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!selectedCo) {
+        setCompanyInfo(null);
+        return;
+      }
+      const { data } = await supabase
+        .from('companies')
+        .select('business_no, address, phone, ceo_name')
+        .eq('name', selectedCo)
+        .maybeSingle();
+      if (!cancelled) setCompanyInfo((data as any) || null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCo]);
 
   useEffect(() => {
     const fetchTemplate = async () => {
@@ -208,73 +235,30 @@ export default function ContractManager() {
           </div>
 
           <div className="custom-scrollbar flex flex-1 justify-center overflow-y-auto p-4 md:p-5">
-            {/* 고해상도 미리보기 페이퍼 */}
-            <div className="w-full max-w-[640px] bg-[var(--card)] shadow-sm rounded-sm border border-[var(--border)] min-h-[900px] flex flex-col p-[50px] font-serif transition-transform duration-500 scale-[0.98] hover:scale-100 origin-top">
-              {/* 미리보기 헤더: 자동 연동 정보 모사 */}
-              <div className="relative border-b-2 border-slate-800 pb-10 mb-10">
-                <h1 className="text-3xl font-black text-center mb-12 tracking-[0.2em] underline underline-offset-8 decoration-1">근 로 계 약 서</h1>
-
-                <div className="grid grid-cols-2 gap-3">
-                  {/* 왼쪽: 회사 정보 */}
-                  <div className="space-y-3">
-                    <p className="text-[11px] font-bold text-[var(--foreground)] border-b-2 border-slate-900 pb-1 flex items-center gap-1">
-                      [사용자]
-                    </p>
-                    <div className="grid grid-cols-12 border-t border-l border-[var(--border)] text-[10px]">
-                      <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center">회사명</div>
-                      <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-bold">{selectedCo}</div>
-
-                      <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center">사업자번호</div>
-                      <div className="col-span-8 border-r border-b border-[var(--border)] p-2 text-[var(--toss-gray-3)] italic">자동 연동</div>
-
-                      <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center">주소</div>
-                      <div className="col-span-8 border-r border-b border-[var(--border)] p-2 text-[var(--toss-gray-3)] italic">자동 연동</div>
-
-                      <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center">연락처</div>
-                      <div className="col-span-8 border-r border-b border-[var(--border)] p-2 text-[var(--toss-gray-3)] italic">자동 연동</div>
-                    </div>
-                  </div>
-
-                  {/* 오른쪽: 근로자 정보 */}
-                  <div className="space-y-3">
-                    <p className="text-[11px] font-bold text-[var(--foreground)] border-b-2 border-slate-900 pb-1 flex items-center gap-1">
-                      [근로자]
-                    </p>
-                    <div className="grid grid-cols-12 border-t border-l border-[var(--border)] text-[10px]">
-                      <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center">성명</div>
-                      <div className="col-span-8 border-r border-b border-[var(--border)] p-2 text-[var(--toss-gray-3)] italic">근로자 성명</div>
-
-                      <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center">생년월일</div>
-                      <div className="col-span-8 border-r border-b border-[var(--border)] p-2 text-[var(--toss-gray-3)] italic">0000.00.00</div>
-
-                      <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center">주소</div>
-                      <div className="col-span-8 border-r border-b border-[var(--border)] p-2 text-[var(--toss-gray-3)] italic">자동 연동</div>
-
-                      <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center">연락처</div>
-                      <div className="col-span-8 border-r border-b border-[var(--border)] p-2 text-[var(--toss-gray-3)] italic">자동 연동</div>
-                    </div>
-                  </div>
+            {/* 고해상도 미리보기 페이퍼 (전자서명 모달과 동일 디자인) */}
+            <div className="w-full max-w-[680px] bg-[var(--card)] shadow-sm rounded-sm border border-[var(--border)] min-h-[900px] flex flex-col p-[44px]">
+              {template ? (
+                <ContractStandardPreview
+                  templateText={template}
+                  closingData={{
+                    companyName: selectedCo,
+                    companyBusinessNo: companyInfo?.business_no || '자동 연동',
+                    companyAddress: companyInfo?.address || '자동 연동',
+                    companyPhone: companyInfo?.phone || '자동 연동',
+                    companyCeo: companyInfo?.ceo_name || '자동 연동',
+                    sealUrl: sealUrl || undefined,
+                    employeeName: '근로자 성명',
+                    employeeAddress: '자동 연동',
+                    employeePhone: '자동 연동',
+                    contractDate: `${new Date().getFullYear()}년 ${String(new Date().getMonth() + 1).padStart(2, '0')}월 ${String(new Date().getDate()).padStart(2, '0')}일`,
+                  }}
+                />
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center opacity-20 py-20">
+                  <span className="text-4xl mb-4">⌨️</span>
+                  <p className="font-sans font-bold">에디터에 내용을 입력하세요</p>
                 </div>
-              </div>
-
-              {/* 미리보기 본문: 에디터 내용 반영 */}
-              <div className="flex-1 text-[13px] leading-[1.8] text-[var(--foreground)] whitespace-pre-wrap font-serif">
-                {template || (
-                  <div className="h-full flex flex-col items-center justify-center opacity-20 py-20">
-                    <span className="text-4xl mb-4">⌨️</span>
-                    <p className="font-sans font-bold">에디터에 내용을 입력하세요</p>
-                  </div>
-                )}
-              </div>
-
-              {/* 미리보기 하단: 서명란 */}
-              <div className="mt-16 pt-8 border-t border-dotted border-[var(--border)] flex justify-between items-end shrink-0">
-                <p className="text-[11px] text-[var(--toss-gray-3)]">전자 서명 시 상기 내용은 법적 효력을 가집니다.</p>
-                <div className="text-right">
-                  <p className="text-[12px] font-bold mb-4">{new Date().getFullYear()}년 {new Date().getMonth() + 1}월 {new Date().getDate()}일</p>
-                  <p className="text-[13px] font-bold">{selectedCo} 대표이사 (인)</p>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

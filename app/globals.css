@@ -1228,5 +1228,70 @@ button, a, [role="button"] {
   }
   .no-print { display: none !important; }
   .print-only { display: block; }
+
+  /* @page 마진 0 → 브라우저 자동 헤더(날짜, URL 등) 제거 */
+  @page { margin: 0; size: A4; }
+
+  /* [data-print-root]와 무관한 모든 요소를 display:none으로 완전 제거
+     (visibility:hidden은 layout 공간을 차지해서 빈 공간을 만듦) */
+  body:has([data-print-root]) *:not(:has([data-print-root])):not([data-print-root]):not([data-print-root] *) {
+    display: none !important;
+  }
+
+  /* [data-print-root]의 ancestor chain (자기 자신 제외)을 normal-flow block으로 정리 */
+  html:has([data-print-root]),
+  body:has([data-print-root]),
+  :has([data-print-root]):not([data-print-root]) {
+    position: static !important;
+    transform: none !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    background: white !important;
+    box-shadow: none !important;
+    border: none !important;
+    display: block !important;
+  }
+
+  /* [data-print-root] 자체 — normal flow에 두어야 page break가 자동 동작 */
+  body:has([data-print-root]) [data-print-root] {
+    position: static !important;
+    margin: 0 !important;
+    padding: 10mm 12mm !important;
+    width: auto !important;
+    max-width: none !important;
+    background: white !important;
+    box-shadow: none !important;
+    border: none !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  /* 인쇄 영역 내부 자손의 강제 높이/플렉스 reset — 빈 여백 제거 */
+  body:has([data-print-root]) [data-print-root] > * {
+    flex: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+
+  /* 조항이 페이지 경계에서 부자연스럽게 잘리지 않도록 */
+  body:has([data-print-root]) [data-print-root] h1,
+  body:has([data-print-root]) [data-print-root] h2,
+  body:has([data-print-root]) [data-print-root] h3,
+  body:has([data-print-root]) [data-print-root] h4 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
 }
 .print-only { display: none; }

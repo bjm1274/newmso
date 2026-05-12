@@ -89,3 +89,6 @@ app/main/*.zip
 build.out
 .next-dev-*.log
 .tmp-build.log
+
+# Local Claude preview/launch config
+.claude/launch.json
