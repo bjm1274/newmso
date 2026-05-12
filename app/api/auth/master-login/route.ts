@@ -80,6 +80,16 @@ export async function POST(request: NextRequest) {
   const { adminName, adminPasswordHash, masterId, masterPasswordHash } = getAdminCredentialConfig();
 
   try {
+    // 진단: Cloudflare Worker env 바인딩 확인
+    const supabaseUrl = getRuntimeEnv('NEXT_PUBLIC_SUPABASE_URL');
+    const serviceKey = getRuntimeEnv('SUPABASE_SERVICE_ROLE_KEY');
+    console.log('[master-login] env check:', {
+      hasUrl: !!supabaseUrl,
+      hasKey: !!serviceKey,
+      urlPrefix: supabaseUrl ? supabaseUrl.slice(0, 30) : '(empty)',
+      keyLength: serviceKey ? serviceKey.length : 0,
+    });
+
     const supabase = getAdminClient();
     let userRow: any = null;
 
@@ -90,7 +100,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (byEmployeeNoError) {
-      console.error('[master-login] staff_members employee_no 조회 실패:', byEmployeeNoError);
+      console.error('[master-login] staff_members employee_no 조회 실패:', JSON.stringify(byEmployeeNoError));
     }
 
     if (byEmployeeNo) {
@@ -103,7 +113,7 @@ export async function POST(request: NextRequest) {
         .limit(10);
 
       if (byNameError) {
-        console.error('[master-login] staff_members name 조회 실패:', byNameError);
+        console.error('[master-login] staff_members name 조회 실패:', JSON.stringify(byNameError));
         // 폴백: 빈 결과로 진행. privileged login(관리자/마스터) 경로는 살리고,
         // 일반 직원은 사번 입력으로 우회 가능.
       }
