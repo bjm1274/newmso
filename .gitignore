@@ -82,3 +82,10 @@ analysis_artifacts/claude_design_handoff/uploads/
 # Backup zips inside source
 app/main/*.Zip
 app/main/*.zip
+
+# Build/dev logs and root-level temp artifacts
+*.log
+*.Zip
+build.out
+.next-dev-*.log
+.tmp-build.log
