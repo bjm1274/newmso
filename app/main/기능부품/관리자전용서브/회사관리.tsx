@@ -330,10 +330,7 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300" data-testid="company-manager-view">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-[var(--foreground)]">회사관리</h2>
-        </div>
+      <div className="flex flex-wrap items-center gap-3">
         <div className="flex flex-wrap gap-1 rounded-[var(--radius-lg)] bg-[var(--muted)] p-1">
           {COMPANY_TABS.map((tab) => (
             <button

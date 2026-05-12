@@ -118,8 +118,7 @@ export default function CustomDashboard({ user, selectedCo }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-[var(--foreground)]">대시보드</h2>
+      <div className="flex items-center justify-end">
         <div className="flex gap-2">
           <button
             type="button"

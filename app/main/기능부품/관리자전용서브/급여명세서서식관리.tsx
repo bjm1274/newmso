@@ -648,12 +648,6 @@ export default function PayrollSlipDesignManager() {
       {dialog}
       <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-[var(--foreground)]">문서 서식 통합 관리</h2>
-            <p className="mt-1 text-sm text-[var(--toss-gray-3)]">
-              급여명세서와 증명서는 기본 디자인을 기준으로 보고, 필요한 부분만 수정해서 덧씌우는 방식으로 관리합니다.
-            </p>
-          </div>
           {loading && (
             <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">불러오는 중...</span>
           )}

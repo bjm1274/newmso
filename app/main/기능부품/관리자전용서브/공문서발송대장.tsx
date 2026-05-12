@@ -286,10 +286,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
   return (
     <div className="space-y-4 p-4 md:p-4">
       {dialog}
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h2 className="text-lg font-bold text-[var(--foreground)]">공문서 발송 대장</h2>
-        </div>
+      <div className="flex items-center">
         <button
           onClick={openAdd}
           className="rounded-[var(--radius-md)] bg-[var(--accent)] px-5 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90"

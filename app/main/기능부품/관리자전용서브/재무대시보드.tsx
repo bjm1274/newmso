@@ -35,10 +35,7 @@ export default function FinancialDashboard() {
 
     return (
         <div className="space-y-4 animate-in fade-in duration-500 max-w-7xl mx-auto pb-12" data-testid="admin-analysis-financial">
-            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-[var(--border)] pb-4 space-y-4 md:space-y-0">
-                <div>
-                    <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">C-Level 재무분석 보드</h2>
-                </div>
+            <div className="flex items-center justify-end border-b border-[var(--border)] pb-4">
                 <div className="flex gap-2">
                     {['Q1', 'Q2', 'Q3', 'Q4'].map(q => (
                         <button key={q} onClick={() => setPeriod(q as any)} className={`px-3 py-1.5 text-xs font-bold rounded-[var(--radius-md)] transition-colors ${period === q ? 'bg-[var(--accent)] text-white' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'}`}>{q}</button>

@@ -362,9 +362,6 @@ export default function SalaryAnomalyDetector({ staffs = [] as StaffLike[] }) {
     <div className="space-y-4" data-testid="salary-anomaly-detector">
       <div className="flex flex-col gap-3 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h2 className="text-xl font-black text-[var(--foreground)]">급여 이상치 자동 감지</h2>
-          </div>
           <div className="flex flex-wrap items-center gap-2">
             <input
               type="month"

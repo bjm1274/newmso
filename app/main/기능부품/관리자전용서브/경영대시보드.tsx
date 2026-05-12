@@ -80,10 +80,6 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300" data-testid="admin-analysis-business">
-      <div className="border border-[var(--border)] bg-[var(--card)] px-4 py-5">
-        <h2 className="text-base font-bold text-[var(--foreground)]">관리자</h2>
-      </div>
-
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {stats.map((item) => (
           <article key={item.label} className="erp-stat-card">
