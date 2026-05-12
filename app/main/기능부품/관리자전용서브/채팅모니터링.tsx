@@ -2,8 +2,13 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
-import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
+import { fetchStaffsBasic } from '@/lib/data/staff';
+import {
+  deleteChatMessage,
+  fetchChatRoomsForStaff,
+  fetchMessagesForRoom,
+} from '@/lib/data/chat-monitoring';
 
 type Staff = {
   id: string;
@@ -152,42 +157,55 @@ export default function ChatMonitor({ staffs: propStaffs }: { staffs?: Staff[] }
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!propStaffs || propStaffs.length === 0) {
-      supabase.from('staff_members').select('id,name,position,department,company').then(({ data }) => {
-        setStaffs((data as Staff[]) || []);
+    if (propStaffs && propStaffs.length > 0) return;
+    let cancelled = false;
+    fetchStaffsBasic()
+      .then((data) => {
+        if (!cancelled) setStaffs(data as Staff[]);
+      })
+      .catch(() => {
+        if (!cancelled) setStaffs([]);
       });
-    }
+    return () => {
+      cancelled = true;
+    };
   }, [propStaffs]);
 
   useEffect(() => {
     if (!selectedStaff) { setRooms([]); setSelectedRoom(null); setMessages([]); return; }
+    let cancelled = false;
     setLoading(true);
     setSelectedRoom(null);
     setMessages([]);
-    supabase
-      .from('chat_rooms')
-      .select('*')
-      .contains('members', [selectedStaff.id])
-      .order('updated_at', { ascending: false })
-      .then(({ data }) => {
-        setRooms((data as ChatRoom[]) || []);
-        setLoading(false);
+    fetchChatRoomsForStaff(selectedStaff.id)
+      .then((data) => {
+        if (cancelled) return;
+        setRooms(data as ChatRoom[]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedStaff]);
 
   useEffect(() => {
     if (!selectedRoom) { setMessages([]); return; }
+    let cancelled = false;
     setMsgLoading(true);
-    supabase
-      .from('messages')
-      .select('*')
-      .eq('room_id', selectedRoom.id)
-      .order('created_at', { ascending: true })
-      .then(({ data }) => {
-        setMessages((data as Message[]) || []);
-        setMsgLoading(false);
+    fetchMessagesForRoom(selectedRoom.id)
+      .then((data) => {
+        if (cancelled) return;
+        setMessages(data as Message[]);
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+      })
+      .finally(() => {
+        if (!cancelled) setMsgLoading(false);
       });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedRoom]);
 
   // 금지어 관리 모달 닫을 때 최신 목록 반영
@@ -228,7 +246,7 @@ export default function ChatMonitor({ staffs: propStaffs }: { staffs?: Staff[] }
     });
     if (!confirmed) return;
     setDeletingId(msg.id);
-    const { error } = await supabase.from('messages').delete().eq('id', msg.id);
+    const { error } = await deleteChatMessage(msg.id, msg.room_id);
     if (error) {
       toast('삭제 실패: ' + error.message, 'error');
     } else {
