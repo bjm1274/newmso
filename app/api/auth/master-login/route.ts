@@ -83,11 +83,15 @@ export async function POST(request: NextRequest) {
     const supabase = getAdminClient();
     let userRow: any = null;
 
-    const { data: byEmployeeNo } = await supabase
+    const { data: byEmployeeNo, error: byEmployeeNoError } = await supabase
       .from('staff_members')
       .select('*')
       .eq('employee_no', loginId)
       .maybeSingle();
+
+    if (byEmployeeNoError) {
+      console.error('[master-login] staff_members employee_no 조회 실패:', byEmployeeNoError);
+    }
 
     if (byEmployeeNo) {
       userRow = byEmployeeNo;
@@ -99,10 +103,12 @@ export async function POST(request: NextRequest) {
         .limit(10);
 
       if (byNameError) {
-        return failureResponse('등록된 사용자 조회 중 오류가 발생했습니다.', 500);
+        console.error('[master-login] staff_members name 조회 실패:', byNameError);
+        // 폴백: 빈 결과로 진행. privileged login(관리자/마스터) 경로는 살리고,
+        // 일반 직원은 사번 입력으로 우회 가능.
       }
 
-      const activeNameMatches = (byName ?? []).filter(isActiveStaffForLogin);
+      const activeNameMatches = (byNameError ? [] : (byName ?? [])).filter(isActiveStaffForLogin);
 
       if (activeNameMatches.length > 1) {
         return failureResponse('동명이인이 있습니다. 로그인 아이디에 사번을 입력해 주세요.');
@@ -280,6 +286,7 @@ export async function POST(request: NextRequest) {
     resetAttempts(loginId); // 로그인 성공 시 실패 카운트 초기화
     return successResponse(userRow, notice);
   } catch (error) {
+    console.error('[master-login] 처리 중 예외 발생:', error);
     return failureResponse('시스템 접속 중 오류가 발생했습니다.', 500);
   }
 }
