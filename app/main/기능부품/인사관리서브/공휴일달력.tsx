@@ -324,9 +324,8 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
       {dialog}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-lg font-bold text-[var(--foreground)]">공휴일 자동 반영 달력</h2>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-1">한국 법정 공휴일이 반영된 달력 ({Math.min(...knownYears)}~{Math.max(...knownYears)}년)</p>
-          {!hasDataForYear && <p className="text-xs text-orange-500 mt-1">⚠️ {year}년 공휴일 데이터가 없습니다. 관리자에게 업데이트를 요청하세요.</p>}
+          <p className="text-xs text-[var(--toss-gray-3)]">한국 법정 공휴일 ({Math.min(...knownYears)}~{Math.max(...knownYears)}년)</p>
+          {!hasDataForYear && <p className="text-xs text-orange-500 mt-1">{year}년 공휴일 데이터가 없습니다. 관리자에게 업데이트를 요청하세요.</p>}
         </div>
         <div className="flex gap-2">
           {(['월별', '연간'] as const).map(t => (

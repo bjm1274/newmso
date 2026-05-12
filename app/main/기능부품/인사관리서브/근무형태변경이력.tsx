@@ -298,9 +298,6 @@ export default function WorkTypeChangeHistory({ staffs, selectedCo, user }: Prop
     <div className="space-y-4 p-4 md:p-5" data-testid="attendance-analysis-worktype-history">
       {dialog}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-[var(--foreground)]">근무형태이력</h2>
-        </div>
         <button
           type="button"
           onClick={() => {

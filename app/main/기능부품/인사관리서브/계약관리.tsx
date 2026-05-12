@@ -283,10 +283,10 @@ export default function ContractMain({
 
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-500 bg-[var(--tab-bg)]/20">
-      <header className="p-5 border-b border-[var(--border)] bg-[var(--card)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
+      <header className="px-5 py-2 border-b border-[var(--border)] bg-[var(--card)] flex flex-col md:flex-row justify-between items-start md:items-center gap-2 shrink-0">
         <div>
-          <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tight">전자 계약 및 법적 비과세 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo as string}]</span></h2>
-          <div className="flex gap-0.5 p-1 app-tab-bar w-fit mt-2">
+          <span className="text-[12px] font-bold text-[var(--toss-gray-3)] truncate">{selectedCo as string}</span>
+          <div className="flex gap-0.5 p-1 app-tab-bar w-fit mt-1">
             {['계약현황', '신규/변경계약서', '연봉계약갱신', '양식 편집'].map(tab => (
               visibleTabs.includes(tab) ? (
                 <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 text-xs font-medium rounded-md transition-all whitespace-nowrap ${activeTab === tab ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--card)]/60'}`}>{tab}</button>

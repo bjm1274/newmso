@@ -213,12 +213,6 @@ export default function ContractAutoGenerator({ staffs, selectedCo, user }: Prop
       `}</style>
       <div className="print-area"><PreviewContent /></div>
 
-      {/* 헤더 */}
-      <div>
-        <h2 className="text-lg font-bold text-[var(--foreground)]">계약서 자동 생성기</h2>
-        <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">계약 유형과 변수를 입력하면 계약서를 자동으로 생성합니다.</p>
-      </div>
-
       {/* 메시지 */}
       {message && (
         <div
