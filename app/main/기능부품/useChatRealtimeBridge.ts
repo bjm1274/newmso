@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { supabase } from '@/lib/supabase';
+import { subscribeRealtimeBatched } from '@/lib/realtime-bus';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 import { fetchAllChatRooms, readCachedChatRooms, writeCachedChatRooms } from './chatQueryService';
 import type { PresenceInfo } from './메신저타입';
@@ -529,16 +530,21 @@ export function useChatRealtimeBridge({
       }, 500);
     };
 
-    const channel = supabase.channel('chat-rooms-list')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, (payload: Record<string, unknown>) => {
-        if (!shouldRefreshForRoomChange(payload)) return;
-        scheduleRefresh();
-      })
-      .subscribe();
+    // realtime-bus batched 모드: 배치 윈도우 안의 모든 payload를 검사해
+    // 한 건이라도 refresh 대상이면 scheduleRefresh
+    const unsub = subscribeRealtimeBatched(
+      'chat-rooms-list',
+      [{ table: 'chat_rooms' }],
+      (payloads) => {
+        if (payloads.some((p) => shouldRefreshForRoomChange(p as Record<string, unknown>))) {
+          scheduleRefresh();
+        }
+      },
+    );
     return () => {
       disposed = true;
       if (refreshTimer) clearTimeout(refreshTimer);
-      supabase.removeChannel(channel);
+      unsub();
     };
   }, [effectiveChatUserId, ensureSelfChatRoom, syncChatRoomsState, userId]);
 
