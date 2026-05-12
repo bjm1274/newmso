@@ -1,6 +1,14 @@
 /**
  * lib/realtime-bus.ts
  * Supabase Realtime 통합 dispatcher — 채널 공유 + 배치 dedup (JM2·JM3·JM4)
+ *
+ * 두 가지 콜백 모드:
+ *   - subscribeRealtime: 단일 콜백 (배치 윈도우의 마지막 payload만 전달)
+ *     payload를 사용하지 않고 단순히 "변경됨 → refetch" 패턴에 적합.
+ *   - subscribeRealtimeBatched: 배치 콜백 (윈도우 안에 수신된 모든 payload를 array로 전달)
+ *     payload 기반 필터링·증분 업데이트가 필요한 경우 사용.
+ *
+ * 동일 channelKey면 두 모드를 섞어 사용해도 채널은 1개로 공유.
  */
 
 import { supabase } from '@/lib/supabase';
@@ -12,6 +20,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 
 export type Unsubscribe = () => void;
 export type RealtimeCallback = (payload: unknown) => void;
+export type RealtimeBatchCallback = (payloads: unknown[]) => void;
 
 export type TableFilter = {
   table: string;
@@ -34,9 +43,9 @@ export type RealtimeOptions = {
 
 type ChannelEntry = {
   channel: RealtimeChannel;
-  callbacks: Set<RealtimeCallback>;
-  /** 배치 윈도우 내 수신된 테이블 셋 */
-  pendingTables: Set<string>;
+  singleCallbacks: Set<RealtimeCallback>;
+  batchCallbacks: Set<RealtimeBatchCallback>;
+  pendingPayloads: unknown[];
   batchTimer: ReturnType<typeof setTimeout> | null;
   batchWindowMs: number;
 };
@@ -47,22 +56,64 @@ const channelRegistry = new Map<string, ChannelEntry>();
 // 구현
 // ─────────────────────────────────────────────
 
+function getOrCreateEntry(
+  channelKey: string,
+  tables: TableFilter[],
+  batchWindowMs: number,
+): ChannelEntry {
+  const existing = channelRegistry.get(channelKey);
+  if (existing) {
+    existing.batchWindowMs = batchWindowMs;
+    return existing;
+  }
+
+  const channel = supabase.channel(channelKey);
+  const entry: ChannelEntry = {
+    channel,
+    singleCallbacks: new Set(),
+    batchCallbacks: new Set(),
+    pendingPayloads: [],
+    batchTimer: null,
+    batchWindowMs,
+  };
+  channelRegistry.set(channelKey, entry);
+
+  for (const { table, event = '*', filter } of tables) {
+    const subscription: {
+      event: 'INSERT' | 'UPDATE' | 'DELETE' | '*';
+      schema: string;
+      table: string;
+      filter?: string;
+    } = { event, schema: 'public', table };
+    if (filter) subscription.filter = filter;
+    channel.on('postgres_changes', subscription, (payload) => {
+      handlePayload(channelKey, payload);
+    });
+  }
+
+  channel.subscribe();
+  return entry;
+}
+
+function makeUnsubscribe(
+  channelKey: string,
+  remove: (entry: ChannelEntry) => void,
+): Unsubscribe {
+  return () => {
+    const entry = channelRegistry.get(channelKey);
+    if (!entry) return;
+    remove(entry);
+    if (entry.singleCallbacks.size === 0 && entry.batchCallbacks.size === 0) {
+      if (entry.batchTimer !== null) clearTimeout(entry.batchTimer);
+      supabase.removeChannel(entry.channel);
+      channelRegistry.delete(channelKey);
+    }
+  };
+}
+
 /**
- * Supabase Realtime 구독.
- *
- * - 동일 channelKey면 기존 채널을 공유 (Supabase 채널 1개)
- * - batchWindowMs 내 동일 테이블 이벤트는 1회만 callback 호출 (dedup)
- * - 반환된 Unsubscribe를 호출하면 해당 callback 제거.
- *   모든 callback이 제거되면 채널 unsubscribe.
- *
- * @example
- * const unsub = subscribeRealtime(
- *   'payroll-list',
- *   [{ table: 'payroll_records', event: '*' }],
- *   () => mutate(),
- * );
- * // cleanup
- * return () => unsub();
+ * 단일 콜백 모드 — 윈도우 내 마지막 payload만 callback에 전달.
+ * payload를 사용하지 않고 단순 refetch 패턴에 적합.
  */
 export function subscribeRealtime(
   channelKey: string,
@@ -71,93 +122,63 @@ export function subscribeRealtime(
   options?: RealtimeOptions,
 ): Unsubscribe {
   const batchWindowMs = options?.batchWindowMs ?? 1_000;
+  const entry = getOrCreateEntry(channelKey, tables, batchWindowMs);
+  entry.singleCallbacks.add(callback);
+  return makeUnsubscribe(channelKey, (e) => {
+    e.singleCallbacks.delete(callback);
+  });
+}
 
-  let entry = channelRegistry.get(channelKey);
-
-  if (!entry) {
-    // 신규 채널 생성
-    const channel = supabase.channel(channelKey);
-
-    entry = {
-      channel,
-      callbacks: new Set(),
-      pendingTables: new Set(),
-      batchTimer: null,
-      batchWindowMs,
-    };
-    channelRegistry.set(channelKey, entry);
-
-    // 테이블별 postgres_changes 등록
-    for (const { table, event = '*', filter } of tables) {
-      const subscription: {
-        event: 'INSERT' | 'UPDATE' | 'DELETE' | '*';
-        schema: string;
-        table: string;
-        filter?: string;
-      } = { event, schema: 'public', table };
-      if (filter) subscription.filter = filter;
-      channel.on(
-        'postgres_changes',
-        subscription,
-        (payload) => {
-          handlePayload(channelKey, table, payload);
-        },
-      );
-    }
-
-    channel.subscribe();
-  } else {
-    // 기존 채널에 callback만 추가 (채널 재생성 없음)
-    entry.batchWindowMs = batchWindowMs;
-  }
-
-  entry.callbacks.add(callback);
-
-  return () => {
-    const e = channelRegistry.get(channelKey);
-    if (!e) return;
-    e.callbacks.delete(callback);
-
-    if (e.callbacks.size === 0) {
-      // 모든 구독자 해제 → 채널 정리
-      if (e.batchTimer !== null) {
-        clearTimeout(e.batchTimer);
-      }
-      supabase.removeChannel(e.channel);
-      channelRegistry.delete(channelKey);
-    }
-  };
+/**
+ * 배치 콜백 모드 — 윈도우 내 수신된 모든 payload를 array로 callback에 전달.
+ * payload 기반 필터링·증분 업데이트가 필요한 경우 사용.
+ */
+export function subscribeRealtimeBatched(
+  channelKey: string,
+  tables: TableFilter[],
+  callback: RealtimeBatchCallback,
+  options?: RealtimeOptions,
+): Unsubscribe {
+  const batchWindowMs = options?.batchWindowMs ?? 1_000;
+  const entry = getOrCreateEntry(channelKey, tables, batchWindowMs);
+  entry.batchCallbacks.add(callback);
+  return makeUnsubscribe(channelKey, (e) => {
+    e.batchCallbacks.delete(callback);
+  });
 }
 
 // ─────────────────────────────────────────────
 // 내부 헬퍼
 // ─────────────────────────────────────────────
 
-function handlePayload(
-  channelKey: string,
-  table: string,
-  payload: unknown,
-): void {
+function handlePayload(channelKey: string, payload: unknown): void {
   const entry = channelRegistry.get(channelKey);
   if (!entry) return;
 
-  // 배치 dedup: 이미 윈도우 내 같은 테이블 이벤트면 추가만
-  entry.pendingTables.add(table);
+  entry.pendingPayloads.push(payload);
 
   if (entry.batchTimer !== null) return;
 
   entry.batchTimer = setTimeout(() => {
     const e = channelRegistry.get(channelKey);
     if (!e) return;
+    const collected = e.pendingPayloads.slice();
+    const last = collected[collected.length - 1];
+    e.pendingPayloads = [];
     e.batchTimer = null;
-    e.pendingTables.clear();
 
-    // 등록된 모든 callback 호출
-    for (const cb of e.callbacks) {
+    for (const cb of e.singleCallbacks) {
       try {
-        cb(payload);
+        cb(last);
       } catch {
         // callback 오류가 다른 callback을 막지 않도록 (JM3)
+      }
+    }
+    for (const cb of e.batchCallbacks) {
+      try {
+        cb(collected);
+      } catch {
+        // (JM3)
       }
     }
   }, entry.batchWindowMs);
