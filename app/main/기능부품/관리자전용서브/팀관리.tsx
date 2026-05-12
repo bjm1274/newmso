@@ -2,7 +2,13 @@
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import {
+  createOrgTeam,
+  deleteOrgTeam,
+  fetchCompanyOptions,
+  fetchOrgTeams,
+  type OrgTeam,
+} from '@/lib/data/org';
 
 const HOSPITAL_DIVISIONS = ['진료부', '간호부', '총무부'];
 const MSO_DIVISIONS = ['운영본부', '전략기획본부'];
@@ -23,7 +29,7 @@ export default function TeamManager({
   disabled = false,
 }: TeamManagerProps) {
   const { dialog, openConfirm } = useActionDialog();
-  const [teams, setTeams] = useState<any[]>([]);
+  const [teams, setTeams] = useState<OrgTeam[]>([]);
   const [companies, setCompanies] = useState<string[]>([]);
   const [company, setCompany] = useState(selectedCompany || '');
   const [adding, setAdding] = useState(false);
@@ -38,13 +44,8 @@ export default function TeamManager({
       setTeams([]);
       return;
     }
-    const { data } = await supabase
-      .from('org_teams')
-      .select('*')
-      .eq('company_name', effectiveCompany)
-      .order('division')
-      .order('sort_order');
-    setTeams(data || []);
+    const data = await fetchOrgTeams(effectiveCompany);
+    setTeams(data);
   }, [disabled, effectiveCompany]);
 
   useEffect(() => {
@@ -54,32 +55,19 @@ export default function TeamManager({
   }, [selectedCompany]);
 
   useEffect(() => {
-    // 회사 목록 DB에서 동적 조회
-    const fetchCompanies = async () => {
-      const { data: companyRows, error } = await supabase
-        .from('companies')
-        .select('name, is_active')
-        .eq('is_active', true)
-        .order('name');
-
-      if (!error && companyRows && companyRows.length > 0) {
-        const names = companyRows
-          .map((row: any) => row.name)
-          .filter(Boolean) as string[];
+    let cancelled = false;
+    fetchCompanyOptions()
+      .then((names) => {
+        if (cancelled) return;
         setCompanies(names);
         if (!selectedCompany && names.length > 0 && !company) setCompany(names[0]);
-        return;
-      }
-
-      const { data: staffRows } = await supabase.from('staff_members').select('company');
-      const names = Array.from(
-        new Set((staffRows || []).map((row: any) => row.company).filter(Boolean)),
-      ).sort() as string[];
-      setCompanies(names);
-      if (!selectedCompany && names.length > 0 && !company) setCompany(names[0]);
+      })
+      .catch(() => {
+        if (!cancelled) setCompanies([]);
+      });
+    return () => {
+      cancelled = true;
     };
-
-    fetchCompanies();
   }, [company, selectedCompany]);
 
   useEffect(() => {
@@ -94,15 +82,23 @@ export default function TeamManager({
   const handleAdd = async () => {
     if (disabled || !effectiveCompany) return toast('회사명을 먼저 입력해 주세요.', 'warning');
     if (!newTeam.team_name.trim()) return toast('팀명을 입력하세요.', 'warning');
-    const { error } = await supabase.from('org_teams').insert({
+    const resolvedDivision =
+      effectiveCompany === 'SY INC.'
+        ? newTeam.division === '운영본부'
+          ? '총무부'
+          : '진료부'
+        : newTeam.division;
+    const siblings = teams.filter((t) => {
+      if (effectiveCompany === 'SY INC.') {
+        return newTeam.division === '운영본부' ? t.division === '총무부' : t.division === '진료부';
+      }
+      return t.division === newTeam.division;
+    });
+    const { error } = await createOrgTeam({
       company_name: effectiveCompany,
-      division: effectiveCompany === 'SY INC.' ? (newTeam.division === '운영본부' ? '총무부' : '진료부') : newTeam.division,
+      division: resolvedDivision,
       team_name: newTeam.team_name.trim(),
-      sort_order: teams.filter((t: any) => {
-        const d = newTeam.division;
-        if (effectiveCompany === 'SY INC.') return d === '운영본부' ? t.division === '총무부' : t.division === '진료부';
-        return t.division === d;
-      }).length + 1,
+      sort_order: siblings.length + 1,
     });
     if (!error) {
       setNewTeam({ division: currentDivisions[0], team_name: '' });
@@ -123,14 +119,14 @@ export default function TeamManager({
       tone: 'danger',
     });
     if (!confirmed) return;
-    await supabase.from('org_teams').delete().eq('id', id);
+    await deleteOrgTeam(id, effectiveCompany);
     fetchTeams();
     onRefresh?.();
   };
 
   const byDivision = currentDivisions.map((d) => ({
     name: d,
-    teams: teams.filter((t: any) => {
+    teams: teams.filter((t) => {
       if (effectiveCompany === 'SY INC.') return d === '운영본부' ? t.division === '총무부' : t.division === '진료부';
       return t.division === d;
     }),
