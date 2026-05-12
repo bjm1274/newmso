@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, memo, type ChangeEvent, type ClipboardEvent, type KeyboardEvent, type RefObject } from 'react';
+import { useRef, useState, useEffect, memo, type ChangeEvent, type ClipboardEvent, type KeyboardEvent, type RefObject } from 'react';
 import type { ChatMessage, StaffMember } from '@/types';
 import { getPendingAttachmentDisplayName } from './메신저첨부';
 import { buildMessengerImageAlt } from './메신저공통';
@@ -74,7 +74,26 @@ function MessengerComposerImpl({
 }: MessengerComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const albumFileInputRef = useRef<HTMLInputElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+    const vv = window.visualViewport;
+    const handleResize = () => {
+      const offsetBottom = window.innerHeight - vv.height - vv.offsetTop;
+      if (wrapperRef.current) {
+        wrapperRef.current.style.transform = `translateY(-${Math.max(0, offsetBottom)}px)`;
+      }
+    };
+    vv.addEventListener('resize', handleResize);
+    vv.addEventListener('scroll', handleResize);
+    handleResize();
+    return () => {
+      vv.removeEventListener('resize', handleResize);
+      vv.removeEventListener('scroll', handleResize);
+    };
+  }, []);
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -99,6 +118,7 @@ function MessengerComposerImpl({
 
   return (
     <div
+      ref={wrapperRef}
       data-testid="chat-upload-dropzone"
       className={`relative z-10 shrink-0 bg-[var(--card)] px-2 py-1 pb-[calc(env(safe-area-inset-bottom)+4px)] md:px-3 md:py-2 md:pb-2 transition-all ${isDragging ? 'border-t-2 border-[var(--accent)] border-dashed bg-blue-500/10 dark:bg-blue-900/20' : 'border-t border-[var(--border)]'}`}
       onDragOver={(event) => {
