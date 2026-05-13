@@ -30,6 +30,12 @@ type AttachmentDragState = {
   originY: number;
 } | null;
 
+type PinchState = {
+  pointers: Map<number, { x: number; y: number }>;
+  startDistance: number;
+  startZoom: number;
+} | null;
+
 export function useChatAttachmentPreview() {
   const [preview, setPreview] = useState<AttachmentPreviewState | null>(null);
   const activeItem = preview ? preview.items[preview.activeIndex] ?? null : null;
@@ -44,6 +50,7 @@ export function useChatAttachmentPreview() {
   const zoomRef = useRef(1);
   const offsetRef = useRef({ x: 0, y: 0 });
   const dragRef = useRef<AttachmentDragState>(null);
+  const pinchRef = useRef<PinchState>(null);
 
   const closePreview = useCallback(() => setPreview(null), []);
 
@@ -123,8 +130,35 @@ export function useChatAttachmentPreview() {
   }, [nudgeZoom]);
 
   const handleImagePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (zoomRef.current <= 1) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
+
+    // 두 번째 손가락이 닿으면 핀치 줌 모드로 진입 (모바일/터치패드 멀티터치)
+    if (event.pointerType === 'touch') {
+      const pinch = pinchRef.current;
+      if (!pinch) {
+        pinchRef.current = {
+          pointers: new Map([[event.pointerId, { x: event.clientX, y: event.clientY }]]),
+          startDistance: 0,
+          startZoom: zoomRef.current,
+        };
+      } else {
+        pinch.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (pinch.pointers.size === 2) {
+          const [a, b] = Array.from(pinch.pointers.values());
+          pinch.startDistance = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+          pinch.startZoom = zoomRef.current;
+          // 핀치 시작 시 드래그는 종료
+          dragRef.current = null;
+          setIsDragging(false);
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        return;
+      }
+    }
+
+    if (zoomRef.current <= 1) return;
     event.preventDefault();
     event.stopPropagation();
     dragRef.current = {
@@ -139,13 +173,38 @@ export function useChatAttachmentPreview() {
   }, []);
 
   const handleImagePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const pinch = pinchRef.current;
+    if (pinch && pinch.pointers.has(event.pointerId)) {
+      pinch.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pinch.pointers.size >= 2 && pinch.startDistance > 0) {
+        const [a, b] = Array.from(pinch.pointers.values());
+        const distance = Math.hypot(a.x - b.x, a.y - b.y);
+        const ratio = distance / pinch.startDistance;
+        applyZoom(pinch.startZoom * ratio);
+        event.preventDefault();
+      }
+      return;
+    }
+
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     event.preventDefault();
     setOffset({ x: drag.originX + (event.clientX - drag.startX), y: drag.originY + (event.clientY - drag.startY) });
-  }, []);
+  }, [applyZoom]);
 
   const handleImagePointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const pinch = pinchRef.current;
+    if (pinch && pinch.pointers.has(event.pointerId)) {
+      pinch.pointers.delete(event.pointerId);
+      if (pinch.pointers.size < 2) {
+        pinchRef.current = null;
+      }
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      return;
+    }
+
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     dragRef.current = null;
@@ -276,9 +335,9 @@ export function ChatAttachmentPreviewModal({ controller }: ChatAttachmentPreview
 
         {/* 우: 액션 버튼 */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* 줌 (이미지만) */}
+          {/* 줌 (이미지만) — 모바일에서도 노출 */}
           {isImage ? (
-            <div className="hidden sm:flex items-center gap-0.5 rounded-full bg-white/10 px-1">
+            <div className="flex items-center gap-0.5 rounded-full bg-white/10 px-1">
               <button type="button" onClick={() => nudgeZoom(-0.25)} className={btnCls} aria-label="축소">
                 <span className="text-base leading-none">−</span>
               </button>

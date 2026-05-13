@@ -89,12 +89,19 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
         closeStaffSearch();
     };
 
-    // 미수검 대상자: 회사 범위 내 활성 직원 중 최근 1년간 완료 검진이 없는 사람.
-    const checkupDue = useMemo(() => filtered.filter((s: any) => {
-        const last = filteredRecords.filter((r: any) => r.staff_id === s.id && r.status === '완료').sort((a: any, b: any) => new Date(b.completed_date || '').getTime() - new Date(a.completed_date || '').getTime())[0];
-        if (!last) return true;
-        return (Date.now() - new Date(last.completed_date || '').getTime()) / 86400000 > 365;
-    }), [filtered, filteredRecords]);
+    // 미수검 대상자: 회사 범위 내 활성 직원 중 "올해(현재 연도)"에 완료 검진이 없는 사람.
+    // 일자 기준이 아니라 연도 기준 — 예) 2025-05-30 검진 완료자도 2026-01-01부터 미수검.
+    const checkupDue = useMemo(() => {
+        const currentYear = new Date().getFullYear();
+        return filtered.filter((s: any) => {
+            const last = filteredRecords
+                .filter((r: any) => r.staff_id === s.id && r.status === '완료' && r.completed_date)
+                .sort((a: any, b: any) => new Date(b.completed_date || '').getTime() - new Date(a.completed_date || '').getTime())[0];
+            if (!last) return true;
+            const lastYear = new Date(last.completed_date).getFullYear();
+            return Number.isFinite(lastYear) ? lastYear < currentYear : true;
+        });
+    }, [filtered, filteredRecords]);
 
     const displayRecords = useMemo(() => {
         let rows = filteredRecords;
@@ -294,7 +301,7 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
                 )}
                 {checkupDue.length > 0 && (
                     <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-3">
-                        <h3 className="text-[11px] font-bold text-red-800 mb-2">🚨 검진 미수검 대상자 ({checkupDue.length}명, 1년 내 기록 없음)</h3>
+                        <h3 className="text-[11px] font-bold text-red-800 mb-2">🚨 검진 미수검 대상자 ({checkupDue.length}명, {new Date().getFullYear()}년 검진 기록 없음)</h3>
                         <div className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-9 gap-1.5">
                             {checkupDue.map((s: any) => (
                                 <div key={s.id} className="flex items-center justify-between gap-1 bg-[var(--card)] px-2 py-1.5 rounded-lg border border-red-100 min-w-0">
