@@ -100,23 +100,27 @@ export function useApprovalBulkActions({
     return payload as TransitionApprovalsPayload;
   }, []);
 
-  const handleBulkApprove = useCallback(async (options?: { skipConfirm?: boolean }) => {
+  const handleBulkApprove = useCallback(async (options?: { skipConfirm?: boolean; comment?: string }) => {
     const count = selectedApprovalIds.length;
     if (count === 0) return;
-    const confirmed = options?.skipConfirm
-      ? true
-      : await openConfirm({
+    const comment = options?.skipConfirm
+      ? options.comment ?? ''
+      : await openPrompt({
           title: '일괄 승인',
-          description: `선택한 ${count}건을 승인할까요?`,
+          description: `선택한 ${count}건을 승인합니다. 코멘트를 선택 입력합니다.`,
           confirmText: '승인',
           cancelText: '취소',
           tone: 'accent',
+          inputType: 'textarea',
+          placeholder: '승인 코멘트를 입력해 주세요. (선택)',
+          helperText: '비워 두어도 일괄 승인됩니다.',
         });
-    if (!confirmed) return;
+    if (comment === null) return;
     try {
       const payload = await transitionApprovalsOnServer({
         action: 'approve',
         approvalIds: selectedApprovalIds,
+        reason: comment || null,
       });
 
       setSelectedApprovalIds([]);
@@ -145,7 +149,7 @@ export function useApprovalBulkActions({
         'error'
       );
     }
-  }, [fetchApprovals, markApprovalNotificationsAsRead, openConfirm, selectedApprovalIds, setSelectedApprovalIds, transitionApprovalsOnServer]);
+  }, [fetchApprovals, markApprovalNotificationsAsRead, openPrompt, selectedApprovalIds, setSelectedApprovalIds, transitionApprovalsOnServer]);
 
   const handleBulkReject = useCallback(async (options?: { reason?: string; skipPrompt?: boolean }) => {
     const count = selectedApprovalIds.length;

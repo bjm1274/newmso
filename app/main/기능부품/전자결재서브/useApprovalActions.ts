@@ -104,19 +104,23 @@ export function useApprovalActions({
   );
 
   const handleApproveAction = useCallback(async (item: ApprovalRecord) => {
-    const confirmed = await openConfirm({
+    const comment = await openPrompt({
       title: '결재 승인',
-      description: '승인 관련 데이터가 즉시 반영됩니다.',
+      description: '승인 관련 데이터가 즉시 반영됩니다. 코멘트를 선택 입력합니다.',
       confirmText: '승인',
       cancelText: '취소',
       tone: 'accent',
+      inputType: 'textarea',
+      placeholder: '승인 코멘트를 입력해 주세요. (선택)',
+      helperText: '비워 두어도 승인 처리됩니다.',
     });
-    if (!confirmed) return;
+    if (comment === null) return;
 
     try {
       const payload = await transitionApprovalsOnServer({
         action: 'approve',
         approvalIds: [String(item.id || '')],
+        reason: comment,
       });
       const result = payload.results[0];
 
@@ -163,7 +167,7 @@ export function useApprovalActions({
   }, [
     fetchApprovals,
     markApprovalNotificationsAsRead,
-    openConfirm,
+    openPrompt,
     transitionApprovalsOnServer,
   ]);
 

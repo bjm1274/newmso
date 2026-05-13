@@ -41,6 +41,7 @@ export async function POST(request: Request) {
     }
 
     const supabase = createAdminSupabase();
+    const reason = body?.reason ? String(body.reason) : null;
     const result = await transitionApprovals({
       supabase,
       approvalIds,
@@ -51,7 +52,8 @@ export async function POST(request: Request) {
         isAdmin: isAdminSession(session.user),
       },
       action,
-      rejectReason: body?.reason ? String(body.reason) : null,
+      rejectReason: action === 'reject' ? reason : null,
+      approveComment: action === 'approve' ? reason : null,
     });
 
     return NextResponse.json({
