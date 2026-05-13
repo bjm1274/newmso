@@ -1895,23 +1895,9 @@ export default function NotificationSystem({
       }
     };
 
-    const dispatchUnreadRepush = async () => {
-      if (!hasPushSubscriptionActive(effectiveUserId)) return;
-      try {
-        await fetch('/api/notifications/repush-unread', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ limit: 20 }),
-        });
-      } catch {
-        // ignore repush probe failures
-      }
-    };
-
-    const recoverPushDelivery = () => {
-      void flushPendingChatPushQueue();
-      void dispatchUnreadRepush();
-    };
+    // 안 읽은 알림 재발송(repush)은 KST 09:00 cron(unread-notification-repush)에서 1회만 처리.
+    // 채팅 메시지는 재알림 대상에서 제외되며, 공지/전자결재 등 중요 알림만 다음날 09시에 재발송됨.
+    // → 클라이언트에서 5분 interval / focus / online으로 호출하던 로직은 제거 (사용자 알림 중복 제거 목적).
 
     let chatSyncTimer: number | null = null;
     const handleChatSync = (event: Event) => {
@@ -1926,22 +1912,17 @@ export default function NotificationSystem({
       }, 2500);
     };
 
-    void dispatchUnreadRepush();
     void flushPendingChatPushQueue();
-    const interval = window.setInterval(() => {
-      recoverPushDelivery();
-    }, 5 * 60 * 1000);
-    window.addEventListener('focus', recoverPushDelivery);
-    window.addEventListener('online', recoverPushDelivery);
+    window.addEventListener('focus', flushPendingChatPushQueue);
+    window.addEventListener('online', flushPendingChatPushQueue);
     window.addEventListener('erp-chat-sync', handleChatSync as EventListener);
 
     return () => {
-      window.clearInterval(interval);
       if (chatSyncTimer) {
         window.clearTimeout(chatSyncTimer);
       }
-      window.removeEventListener('focus', recoverPushDelivery);
-      window.removeEventListener('online', recoverPushDelivery);
+      window.removeEventListener('focus', flushPendingChatPushQueue);
+      window.removeEventListener('online', flushPendingChatPushQueue);
       window.removeEventListener('erp-chat-sync', handleChatSync as EventListener);
     };
   }, [effectiveUserId]);

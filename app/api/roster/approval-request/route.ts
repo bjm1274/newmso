@@ -40,6 +40,7 @@ type PushSubscriptionRow = {
   p256dh: string | null;
   auth: string | null;
   fcm_token?: string | null;
+  created_at?: string | null;
 };
 
 type NotificationInsertRow = {
@@ -235,7 +236,7 @@ async function dispatchImmediateApprovalPush(
 
   const { data: subscriptionRows, error: subscriptionError } = await supabase
     .from('push_subscriptions')
-    .select('id, staff_id, endpoint, p256dh, auth, fcm_token')
+    .select('id, staff_id, endpoint, p256dh, auth, fcm_token, created_at')
     .in('staff_id', targetUserIds);
 
   if (subscriptionError) {
@@ -248,12 +249,23 @@ async function dispatchImmediateApprovalPush(
   const payload = buildImmediatePushPayload(sampleNotification);
   let pushSentCount = 0;
 
+  // staff_id당 잔재 fcm_token이 여러 개 남아있을 수 있으므로
+  // 가장 최신(created_at) 토큰 1개만 사용해 같은 사용자에게 이중 발송되지 않도록 한다.
+  const latestFcmTokenByStaffId = new Map<string, { token: string; createdAt: number }>();
+  for (const row of subscriptions) {
+    const staffId = String(row.staff_id || '').trim();
+    const token = String(row.fcm_token || '').trim();
+    if (!staffId || !token) continue;
+    const createdAt = row.created_at ? Date.parse(String(row.created_at)) : 0;
+    const numericCreatedAt = Number.isFinite(createdAt) ? createdAt : 0;
+    const prev = latestFcmTokenByStaffId.get(staffId);
+    if (!prev || numericCreatedAt > prev.createdAt) {
+      latestFcmTokenByStaffId.set(staffId, { token, createdAt: numericCreatedAt });
+    }
+  }
+  const staffIdsWithFcmToken = new Set(latestFcmTokenByStaffId.keys());
   const uniqueFcmTokens = Array.from(
-    new Set(
-      subscriptions
-        .map((row) => String(row.fcm_token || '').trim())
-        .filter(Boolean),
-    ),
+    new Set(Array.from(latestFcmTokenByStaffId.values()).map((entry) => entry.token)),
   );
 
   if (uniqueFcmTokens.length > 0) {
@@ -281,8 +293,11 @@ async function dispatchImmediateApprovalPush(
     const uniqueWebSubscriptions = new Map<string, PushSubscriptionRow>();
     subscriptions.forEach((row) => {
       const endpoint = String(row.endpoint || '').trim();
+      const staffId = String(row.staff_id || '').trim();
       if (!endpoint || !/^https?:\/\//i.test(endpoint)) return;
       if (!row.p256dh || !row.auth) return;
+      // FCM 토큰이 있는 사용자는 Web Push 제외 — 같은 기기에 FCM+Web Push 이중 발송 방지
+      if (staffId && staffIdsWithFcmToken.has(staffId)) return;
       if (!uniqueWebSubscriptions.has(endpoint)) {
         uniqueWebSubscriptions.set(endpoint, row);
       }

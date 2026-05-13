@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push-cloudflare';
 import { sendFcmBatch } from '@/lib/fcm-http';
 import { isWithinPushQuietHours } from '@/lib/push-quiet-hours';
+import { NOTICE_ROOM_ID } from '@/lib/constants';
 
 type NotificationRow = {
   id: string;
@@ -23,17 +24,38 @@ type PushSubscriptionRow = {
   created_at?: string | null;
 };
 
-// 채팅 메시지 알림은 사용자가 리마인드를 원치 않음 — 재발송 대상에서 제외
+// 재알림 대상 — 공지/전자결재 등 중요 항목만. 채팅 메시지는 리마인드 대상에서 제외(공지방은 예외).
+const REPUSH_ELIGIBLE_TYPES = new Set(['approval', 'notice', 'announcement']);
 const CHAT_NOTIFICATION_TYPES = new Set(['message', 'mention', 'chat']);
 
-function isChatNotification(row: NotificationRow): boolean {
+function getNormalizedTypeCandidates(row: NotificationRow): string[] {
   const metadata = toMetadata(row.metadata);
-  const candidates = [row.type, metadata.type, metadata.notification_type]
+  return [row.type, metadata.type, metadata.notification_type]
     .map((value) => String(value || '').trim().toLowerCase())
     .filter(Boolean);
-  if (candidates.some((value) => CHAT_NOTIFICATION_TYPES.has(value))) return true;
-  // metadata.room_id가 있으면 채팅 메시지 알림으로 간주
-  if (metadata.room_id) return true;
+}
+
+function isNoticeRoomMessage(row: NotificationRow): boolean {
+  const metadata = toMetadata(row.metadata);
+  const roomId = String(metadata.room_id || '').trim();
+  return Boolean(roomId) && roomId === NOTICE_ROOM_ID;
+}
+
+function isRepushEligible(row: NotificationRow): boolean {
+  const typeCandidates = getNormalizedTypeCandidates(row);
+  // 공지/결재 등 중요 알림은 무조건 재발송 대상
+  if (typeCandidates.some((value) => REPUSH_ELIGIBLE_TYPES.has(value))) return true;
+  // 공지방(NOTICE_ROOM_ID) 채팅은 중요 공지로 보고 재발송
+  if (isNoticeRoomMessage(row)) return true;
+  return false;
+}
+
+function isChatNotification(row: NotificationRow): boolean {
+  const typeCandidates = getNormalizedTypeCandidates(row);
+  if (typeCandidates.some((value) => CHAT_NOTIFICATION_TYPES.has(value))) return true;
+  const metadata = toMetadata(row.metadata);
+  // metadata.room_id가 있고 공지방이 아니면 일반 채팅 → 재알림 제외
+  if (metadata.room_id && !isNoticeRoomMessage(row)) return true;
   return false;
 }
 
@@ -49,9 +71,12 @@ export type NotificationRepushResult = {
   reason?: string;
 };
 
-const DEFAULT_DELAY_MINUTES = 10;
-const DEFAULT_COOLDOWN_MINUTES = 20;
-const DEFAULT_MAX_ATTEMPTS = 2;
+// 재알림 정책: 다음날 오전 9시에 1회만 재발송.
+// cron(`0 0 * * *` = KST 09:00)에서 호출되며,
+// 최소 12시간 ~ 최대 7일 사이의 안 읽은 중요 알림이 대상.
+const REPUSH_MIN_AGE_HOURS = 12;
+const REPUSH_MAX_AGE_DAYS = 7;
+const DEFAULT_MAX_ATTEMPTS = 1;
 
 function getAdminClient(): SupabaseClient {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -77,13 +102,6 @@ function toStringRecord(value: Record<string, unknown>) {
     acc[key] = typeof entry === 'string' ? entry : JSON.stringify(entry);
     return acc;
   }, {});
-}
-
-function parseIso(value: unknown) {
-  const normalized = String(value || '').trim();
-  if (!normalized) return null;
-  const date = new Date(normalized);
-  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function buildRepushPayload(row: NotificationRow) {
@@ -144,14 +162,16 @@ export async function processUnreadNotificationRepushServer(
   }
 
   const nowIso = now.toISOString();
-  const cutoffIso = new Date(now.getTime() - DEFAULT_DELAY_MINUTES * 60 * 1000).toISOString();
+  const minAgeCutoffIso = new Date(now.getTime() - REPUSH_MIN_AGE_HOURS * 60 * 60 * 1000).toISOString();
+  const maxAgeCutoffIso = new Date(now.getTime() - REPUSH_MAX_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const scopedUserIds = normalizeScopedUserIds(userIds);
 
   let notificationQuery = supabase
     .from('notifications')
     .select('id,user_id,type,title,body,metadata,created_at')
     .is('read_at', null)
-    .lte('created_at', cutoffIso)
+    .lte('created_at', minAgeCutoffIso)
+    .gte('created_at', maxAgeCutoffIso)
     .order('created_at', { ascending: true })
     .limit(limit);
 
@@ -209,22 +229,22 @@ export async function processUnreadNotificationRepushServer(
   const errors: string[] = [];
 
   for (const row of notifications) {
-    // 채팅 메시지/멘션은 리마인드(재발송) 대상에서 제외 — 사용자 요청
+    // 1) 채팅(message/mention)은 공지방을 제외하고 모두 재발송 대상에서 제외
     if (isChatNotification(row)) {
       skipped += 1;
       continue;
     }
 
-    const metadata = toMetadata(row.metadata);
-    const lastRepushAt = parseIso(metadata.repush_sent_at);
-    const repushAttempts = Number(metadata.repush_attempt_count || 0);
-
-    if (repushAttempts >= DEFAULT_MAX_ATTEMPTS) {
+    // 2) 공지/결재 등 중요 항목만 재발송 — 그 외 type은 스킵
+    if (!isRepushEligible(row)) {
       skipped += 1;
       continue;
     }
 
-    if (lastRepushAt && now.getTime() - lastRepushAt.getTime() < DEFAULT_COOLDOWN_MINUTES * 60 * 1000) {
+    const metadata = toMetadata(row.metadata);
+    const repushAttempts = Number(metadata.repush_attempt_count || 0);
+
+    if (repushAttempts >= DEFAULT_MAX_ATTEMPTS) {
       skipped += 1;
       continue;
     }

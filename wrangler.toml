@@ -17,4 +17,5 @@ crons = [
   "0 23 * * *",   # /api/cron/chat-push-dispatch
   "0 8 * * *",    # /api/cron/leave-notice-announcements
   "0 3 * * *",    # /api/cron/push-subscription-cleanup (+ runLicenseExpiryJobs 통합)
+  "0 0 * * *",    # /api/cron/unread-notification-repush (KST 09:00 — 안 읽은 공지/결재 1회 재알림)
 ]
