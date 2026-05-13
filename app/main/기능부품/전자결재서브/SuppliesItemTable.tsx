@@ -219,9 +219,9 @@ export default function SuppliesItemTable({
             <col className="w-[12%]" />
             <col className="w-[29%]" />
             <col className="w-[12%]" />
-            <col className="w-[7%]" />
-            <col className="w-[32%]" />
-            <col className="w-[8%]" />
+            <col className="w-[6%]" />
+            <col className="w-[36%]" />
+            <col className="w-[5%]" />
           </colgroup>
           <thead>
             <tr className="border-b border-[var(--border)]">
@@ -237,9 +237,9 @@ export default function SuppliesItemTable({
               >
                 물품명 {sortKey === 'name' ? (sortAsc ? '▲' : '▼') : ''}
               </th>
-              <th className="px-1.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">현재 재고</th>
-              <th className="px-1 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">신청 수량</th>
-              <th className="pl-1 pr-0.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">용도</th>
+              <th className="pl-1.5 pr-0 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">현재 재고</th>
+              <th className="pl-0 pr-0 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">신청 수량</th>
+              <th className="pl-1.5 pr-0.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">용도</th>
               <th
                 aria-label="삭제"
                 className="pl-0 pr-0 py-2 text-right text-[11px] font-bold text-[var(--toss-gray-4)]"
@@ -331,10 +331,10 @@ export default function SuppliesItemTable({
                       : null}
                   </div>
                 </td>
-                <td className="px-1 py-1.5 align-middle">
+                <td className="pl-1 pr-0 py-1.5 align-middle">
                   <div
                     data-testid={`supplies-item-current-stock-${index}`}
-                    className={`inline-flex min-h-9 min-w-[70px] items-center justify-center rounded-[var(--radius-md)] border px-1.5 text-[10px] font-black ${
+                    className={`inline-flex min-h-9 min-w-[64px] items-center justify-center rounded-[var(--radius-md)] border px-1.5 text-[10px] font-black ${
                       item.currentStock === null
                         ? 'border-[var(--border)] bg-[var(--surface-muted)] text-[var(--toss-gray-3)]'
                         : item.currentStock <= 5
@@ -345,15 +345,15 @@ export default function SuppliesItemTable({
                     {item.currentStock === null ? '-' : `${item.currentStock} ${item.unit}`}
                   </div>
                 </td>
-                <td className="px-1 py-1.5 align-middle">
-                  <div className="grid min-w-0 grid-cols-[minmax(36px,1fr)_auto] items-center gap-1">
+                <td className="pl-0 pr-0 py-1.5 align-middle">
+                  <div className="flex min-w-0 items-center gap-1">
                     <input
                       data-testid={`supplies-item-qty-${index}`}
                       type="number"
                       min="1"
                       value={item.qty}
                       onChange={(event) => updateItemField(index, 'qty', event.target.value)}
-                      className="h-9 w-full min-w-0 rounded-[var(--radius-md)] border border-[var(--accent-selected-subtle)] bg-[var(--accent-selected-subtle)] px-1 text-center text-[13px] font-black tabular-nums text-[var(--accent)] outline-none [appearance:textfield] focus:ring-2 focus:ring-[var(--accent)]/30 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      className="h-9 w-9 min-w-0 rounded-[var(--radius-md)] border border-[var(--accent-selected-subtle)] bg-[var(--accent-selected-subtle)] px-0.5 text-center text-[13px] font-black tabular-nums text-[var(--accent)] outline-none [appearance:textfield] focus:ring-2 focus:ring-[var(--accent)]/30 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     />
                     <button
                       type="button"
@@ -367,7 +367,7 @@ export default function SuppliesItemTable({
                     </button>
                   </div>
                 </td>
-                <td className="pl-1 pr-0.5 py-1.5 align-middle">
+                <td className="pl-1.5 pr-0.5 py-1.5 align-middle">
                   <input
                     data-testid={`supplies-item-purpose-${index}`}
                     value={item.purpose}

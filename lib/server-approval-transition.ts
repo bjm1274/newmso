@@ -268,8 +268,9 @@ async function transitionSingleApproval(params: {
   actor: ActorContext;
   action: ApprovalAction;
   rejectReason?: string | null;
+  approveComment?: string | null;
 }) {
-  const { supabase, item, actor, action, rejectReason } = params;
+  const { supabase, item, actor, action, rejectReason, approveComment } = params;
   const approvalId = String(item.id || '').trim();
   const itemStatus = String(item.status || '').trim();
 
@@ -425,23 +426,37 @@ async function transitionSingleApproval(params: {
     ? (resolveEffectiveApproverId(nextLineApproverId, staffMap) || nextLineApproverId)
     : null;
 
+  const trimmedApproveComment = String(approveComment || '').trim();
+  const finalApprovalNote = trimmedApproveComment
+    ? `최종 승인: ${trimmedApproveComment}`
+    : '최종 승인';
+  const stepApprovalNote = trimmedApproveComment
+    ? `${currentIndex + 1}차 승인: ${trimmedApproveComment}`
+    : `${currentIndex + 1}차 승인`;
+
   const updateData: Record<string, unknown> = isFinalApproval
     ? {
         status: '승인',
-        meta_data: buildNextApprovalMetaData(baseMetaData, actor, 'approved_final', {
-          note: '최종 승인',
-          lock: true,
-          currentApproverId: effectiveCurrentApproverId,
-          revision,
-        }),
+        meta_data: {
+          ...buildNextApprovalMetaData(baseMetaData, actor, 'approved_final', {
+            note: finalApprovalNote,
+            lock: true,
+            currentApproverId: effectiveCurrentApproverId,
+            revision,
+          }),
+          ...(trimmedApproveComment ? { approve_comment: trimmedApproveComment } : {}),
+        },
       }
     : {
         current_approver_id: nextApproverId,
-        meta_data: buildNextApprovalMetaData(baseMetaData, actor, 'approved_step', {
-          note: `${currentIndex + 1}차 승인`,
-          currentApproverId: nextApproverId,
-          revision,
-        }),
+        meta_data: {
+          ...buildNextApprovalMetaData(baseMetaData, actor, 'approved_step', {
+            note: stepApprovalNote,
+            currentApproverId: nextApproverId,
+            revision,
+          }),
+          ...(trimmedApproveComment ? { approve_comment: trimmedApproveComment } : {}),
+        },
       };
 
   const updatedApproval = await updateApprovalRecord(supabase, approvalId, updateData);
@@ -489,8 +504,9 @@ export async function transitionApprovals(params: {
   actor: ActorContext;
   action: ApprovalAction;
   rejectReason?: string | null;
+  approveComment?: string | null;
 }) {
-  const { supabase, approvalIds, actor, action, rejectReason } = params;
+  const { supabase, approvalIds, actor, action, rejectReason, approveComment } = params;
   const normalizedIds = Array.from(new Set(approvalIds.map((id) => String(id || '').trim()).filter(Boolean)));
 
   if (normalizedIds.length === 0) {
@@ -546,6 +562,7 @@ export async function transitionApprovals(params: {
           actor,
           action,
           rejectReason,
+          approveComment,
         })
       );
     } catch (error) {
