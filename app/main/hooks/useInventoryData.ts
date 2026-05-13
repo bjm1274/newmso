@@ -3,7 +3,13 @@
 import { useState, useCallback, useRef } from 'react';
 import type { InventoryItem, Supplier } from '@/types';
 import { supabase } from '@/lib/supabase';
-import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import {
+  buildInventorySelect,
+  INVENTORY_OPTIONAL_COLUMNS,
+  INVENTORY_LOG_LIST_SELECT,
+  SUPPLIER_LIST_SELECT,
+} from '@/lib/inventory-query-columns';
 
 /**
  * 재고·거래처·로그 데이터 로딩을 담당하는 훅.
@@ -39,18 +45,19 @@ export function useInventoryData({
         ? userCompanyId ?? null
         : scopedCompanyName && selectedCompanyId ? selectedCompanyId : null;
 
-      const { data, error } = await withMissingColumnFallback(
-        async () => {
-          let query = supabase.from('inventory').select('*').order('item_name', { ascending: true });
+      const { data, error } = await withMissingColumnsFallback<InventoryItem[]>(
+        (omittedColumns) => {
+          let query = supabase
+            .from('inventory')
+            .select(buildInventorySelect(omittedColumns))
+            .order('item_name', { ascending: true });
           if (scopedCompanyName) query = query.eq('company', scopedCompanyName);
-          else if (scopedCompanyId) query = query.eq('company_id', scopedCompanyId);
-          return query;
+          else if (scopedCompanyId && !omittedColumns.has('company_id')) {
+            query = query.eq('company_id', scopedCompanyId);
+          }
+          return query.returns<InventoryItem[]>();
         },
-        async () => {
-          let q = supabase.from('inventory').select('*').order('item_name', { ascending: true });
-          if (scopedCompanyName) q = q.eq('company', scopedCompanyName);
-          return q;
-        },
+        INVENTORY_OPTIONAL_COLUMNS,
       );
       if (error) throw error;
       if (data) { setInventory(data); inventoryLoadedRef.current = true; }
@@ -64,7 +71,10 @@ export function useInventoryData({
 
   const fetchSuppliers = useCallback(async () => {
     try {
-      const { data, error } = await supabase.from('suppliers').select('*');
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select(SUPPLIER_LIST_SELECT)
+        .returns<Supplier[]>();
       if (error) throw error;
       if (data) setSuppliers(data);
     } catch (err) {
@@ -74,28 +84,26 @@ export function useInventoryData({
 
   const fetchLogs = useCallback(async () => {
     try {
-      const { data, error } = await withMissingColumnFallback(
-        async () => {
-          let query = supabase.from('inventory_logs').select('*').order('created_at', { ascending: false }).limit(100);
+      const { data, error } = await withMissingColumnsFallback<Record<string, unknown>[]>(
+        (omittedColumns) => {
+          let query = supabase
+            .from('inventory_logs')
+            .select(INVENTORY_LOG_LIST_SELECT)
+            .order('created_at', { ascending: false })
+            .limit(100);
           if (isMsoUser) {
             if (selectedCo && selectedCo !== '전체') query = query.eq('company', selectedCo);
-            else if (selectedCompanyId) query = query.eq('company_id', selectedCompanyId);
+            else if (selectedCompanyId && !omittedColumns.has('company_id')) {
+              query = query.eq('company_id', selectedCompanyId);
+            }
           } else if (userCompany) {
             query = query.eq('company', userCompany);
-          } else if (userCompanyId) {
+          } else if (userCompanyId && !omittedColumns.has('company_id')) {
             query = query.eq('company_id', userCompanyId);
           }
-          return query;
+          return query.returns<Record<string, unknown>[]>();
         },
-        async () => {
-          let q = supabase.from('inventory_logs').select('*').order('created_at', { ascending: false }).limit(100);
-          if (isMsoUser) {
-            if (selectedCo && selectedCo !== '전체') q = q.eq('company', selectedCo);
-          } else if (userCompany) {
-            q = q.eq('company', userCompany);
-          }
-          return q;
-        },
+        ['company_id'],
       );
       if (error) throw error;
       setLogs(data || []);

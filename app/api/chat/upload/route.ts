@@ -135,12 +135,17 @@ function isMissingBucketError(error: unknown, bucketName: string) {
   );
 }
 
+const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024;
+
 function validateUploadTarget(fileName: string, mimeType: string, fileSize: number) {
   if (!fileName.trim()) {
     throw new Error('업로드할 파일 이름이 없습니다.');
   }
 
   if (mimeType.startsWith('image/')) {
+    if (fileSize > MAX_IMAGE_SIZE_BYTES) {
+      throw new Error('이미지 크기는 20MB 이하여야 합니다.');
+    }
     return;
   }
 

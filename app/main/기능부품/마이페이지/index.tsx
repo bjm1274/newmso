@@ -194,7 +194,7 @@ function MyPageMain({
     try {
       const { data, error } = await supabase
         .from('attendance')
-        .select('check_in, check_out, status, date, displayStatus, isVirtual')
+        .select('check_in, check_out, status, date')
         .eq('staff_id', userId as string)
         .gte('date', firstDay)
         .lte('date', lastDay);

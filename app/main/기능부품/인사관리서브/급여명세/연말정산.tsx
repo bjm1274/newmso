@@ -4,6 +4,7 @@ import type { StaffMember } from '@/types';
 import { useState, useEffect } from 'react';
 import { getPayrollGrossPay } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
+import { STAFF_BOOTSTRAP_SELECT } from '@/lib/staff-query-columns';
 import {
   calculateAnnualIncomeTax,
   DEFAULT_TAX_INSURANCE_RATES,
@@ -64,11 +65,11 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: YearEndSe
   };
 
   const fetchSettlementData = async () => {
-    const staffQuery = supabase.from('staff_members').select('*');
+    const staffQuery = supabase.from('staff_members').select(STAFF_BOOTSTRAP_SELECT);
     const { data: staff } = await (selectedCo && selectedCo !== '전체'
-      ? staffQuery.eq('company', selectedCo)
-      : staffQuery);
-    setStaffList(staff || []);
+      ? staffQuery.eq('company', selectedCo).returns<StaffMember[]>()
+      : staffQuery.returns<StaffMember[]>());
+    setStaffList(staff ?? []);
 
     const { data: payroll } = await supabase
       .from('payroll_records')

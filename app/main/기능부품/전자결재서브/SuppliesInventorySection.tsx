@@ -27,7 +27,7 @@ type SuppliesInventorySectionProps = {
   sortAsc: boolean;
   handleSearch: (index: number, value: string) => void;
   selectItem: (index: number, selected: InventoryCatalogItem) => void;
-  updateItemField: (index: number, key: 'qty' | 'category' | 'purpose', value: unknown) => void;
+  updateItemField: (index: number, key: 'qty' | 'category' | 'purpose' | 'unit', value: unknown) => void;
   updateDropdownPosition: (index: number) => void;
   handleSort: (key: 'category' | 'name') => void;
   removeItemRow: (index: number) => void;

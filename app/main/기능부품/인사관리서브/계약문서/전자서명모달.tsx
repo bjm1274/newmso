@@ -273,8 +273,12 @@ export default function ContractSignatureModal({ contract, user, templateText, o
         submitLockRef.current = true;
         setIsGenerating(true);
         try {
-            const signatureData = sigCanvas.current?.getTrimmedCanvas().toDataURL('image/png');
-            if (!signatureData) return;
+            // react-signature-canvas v1.1.0-alpha부터 getTrimmedCanvas 제거 → toDataURL 직접 호출
+            const signatureData = sigCanvas.current?.toDataURL('image/png');
+            if (!signatureData) {
+                toast('서명을 다시 시도해 주세요.', 'error');
+                return;
+            }
 
             // 1. 전체 통합 HTML 구성 (인쇄 및 저장용)
             // - 계약서 본문

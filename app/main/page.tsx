@@ -9,6 +9,11 @@ import { supabase } from '@/lib/supabase';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 import { setSelectedCompanyId as persistSelectedCompanyId, getSelectedCompanyId } from '@/lib/useCompany';
 import { normalizeProfileUser } from '@/lib/profile-photo';
+import {
+  buildStaffBootstrapSelect,
+  STAFF_BOOTSTRAP_OPTIONAL_COLUMNS,
+} from '@/lib/staff-query-columns';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { getStoredSessionLoginAt, isForceLogoutAfterLogin, normalizeSessionLoginAt } from '@/lib/session-force-logout';
 import {
   canAccessAdminSection,
@@ -819,10 +824,16 @@ function MainPageContent() {
     setLoading(true);
     const u = currentUser ?? user;
     try {
-      const { data: staffData, error: staffError } = await supabase
-        .from('staff_members')
-        .select('*')
-        .order('employee_no', { ascending: true });
+      const { data: staffData, error: staffError } =
+        await withMissingColumnsFallback<StaffMember[]>(
+          (omittedColumns) =>
+            supabase
+              .from('staff_members')
+              .select(buildStaffBootstrapSelect(omittedColumns))
+              .order('employee_no', { ascending: true })
+              .returns<StaffMember[]>(),
+          STAFF_BOOTSTRAP_OPTIONAL_COLUMNS,
+        );
 
       if (staffError) throw staffError;
 

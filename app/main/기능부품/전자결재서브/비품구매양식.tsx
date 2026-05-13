@@ -349,7 +349,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
     );
   };
 
-  const updateItemField = (index: number, key: 'qty' | 'category' | 'purpose', value: unknown) => {
+  const updateItemField = (index: number, key: 'qty' | 'category' | 'purpose' | 'unit', value: unknown) => {
     setItems((prev) =>
       prev.map((item, itemIndex) =>
         itemIndex === index
@@ -360,7 +360,9 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
                   ? sanitizeQuantity(value)
                   : key === 'category'
                     ? normalizeSupplyRequestCategory(value)
-                    : value,
+                    : key === 'unit'
+                      ? normalizeInventoryUnit(value)
+                      : value,
             }
           : item,
       ),
