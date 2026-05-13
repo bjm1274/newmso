@@ -121,17 +121,20 @@ function toDateKey(date: Date) {
 function formatClockLabel(value: unknown) {
   const text = normalizeText(value);
   if (!text) return null;
+  // HH:MM(:SS) 만 들어오면 그대로 — 이미 KST 가정.
   if (/^\d{2}:\d{2}(:\d{2})?$/.test(text)) return text.slice(0, 5);
-  if (text.length >= 16 && text[10] === 'T') return text.slice(11, 16);
+  // ISO 8601 timestamp는 반드시 Date.parse 후 KST로 변환해야 한다.
+  // (이전 코드는 text.slice(11, 16)으로 UTC 시각을 그대로 반환해 새벽 시간으로 잘못 표시됨)
   const parsed = Date.parse(text);
   if (Number.isFinite(parsed)) {
     return new Intl.DateTimeFormat('ko-KR', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
+      timeZone: 'Asia/Seoul',
     }).format(new Date(parsed));
   }
-  return text.slice(0, 5);
+  return text.length >= 16 && text[10] === 'T' ? text.slice(11, 16) : text.slice(0, 5);
 }
 
 function getAttendanceCheckIn(attendance?: AttendanceSnapshot | null) {
@@ -1109,6 +1112,7 @@ export default function OrgChart({
                       hour: '2-digit',
                       minute: '2-digit',
                       second: '2-digit',
+                      timeZone: 'Asia/Seoul',
                     })} 갱신
                   </span>
                 ) : null}
