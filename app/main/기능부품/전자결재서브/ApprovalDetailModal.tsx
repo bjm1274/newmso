@@ -22,6 +22,8 @@ type TemplateDesign = Record<string, any>;
 type ApprovalDetailModalProps = {
   item: ApprovalRecord | null | undefined;
   approvalDirectoryStaffs: StaffMember[];
+  /** 표시용 lookup (활성/회사 필터 없음). 미전달 시 approvalDirectoryStaffs로 폴백. */
+  approvalLookupStaffs?: StaffMember[];
   onClose: () => void;
   buildApprovalPrintHtml: (item: ApprovalRecord, options?: { autoPrint?: boolean }) => string;
   openApprovalPrintView: (item: ApprovalRecord) => void;
@@ -56,6 +58,7 @@ type ApprovalDetailModalProps = {
 export default function ApprovalDetailModal({
   item,
   approvalDirectoryStaffs,
+  approvalLookupStaffs,
   onClose,
   buildApprovalPrintHtml,
   openApprovalPrintView,
@@ -136,7 +139,7 @@ export default function ApprovalDetailModal({
               </div>
               <ApprovalProgressSummary
                 item={item}
-                staffs={approvalDirectoryStaffs}
+                staffs={approvalLookupStaffs ?? approvalDirectoryStaffs}
                 resolveApprovalLineIds={resolveApprovalLineIds}
                 resolveCurrentApproverId={resolveCurrentApproverId}
                 resolveApprovalDelaySnapshot={resolveApprovalDelaySnapshot}
