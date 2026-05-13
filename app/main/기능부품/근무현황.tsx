@@ -114,10 +114,13 @@ function formatClockLabel(value?: string | null) {
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(normalizedRaw)) {
     const parsed = new Date(normalizedRaw);
     if (!Number.isNaN(parsed.getTime())) {
+      // Cloudflare Workers/SSR 환경의 시스템 timezone이 UTC라
+      // timeZone: 'Asia/Seoul'을 명시하지 않으면 KST 변환이 누락된다.
       return parsed.toLocaleTimeString('ko-KR', {
         hour: '2-digit',
         minute: '2-digit',
         hour12: false,
+        timeZone: 'Asia/Seoul',
       });
     }
   }
@@ -212,6 +215,7 @@ function WorkStatus({ user }: { user?: any }) {
   const [loading, setLoading] = useState(true);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [departmentFilter, setDepartmentFilter] = useState('전체');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'present' | 'late' | 'early_leave'>('all');
   const [showActiveOnly, setShowActiveOnly] = useState(false);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null);
@@ -497,6 +501,14 @@ function WorkStatus({ user }: { user?: any }) {
       const hasCheckedOut = Boolean(record.check_out || record.check_out_time);
       if (!hasCheckedIn || hasCheckedOut) return;
 
+      // 상태 필터: 'all'이 아니면 attendance.status로 좁힘
+      // status가 비어 있으면 '정상 출근(present)'으로 간주 (DB에 status를 안 채우는 케이스 호환)
+      if (statusFilter !== 'all') {
+        const rawStatus = String(record.status || '').trim().toLowerCase();
+        const effectiveStatus = rawStatus || 'present';
+        if (effectiveStatus !== statusFilter) return;
+      }
+
       const staff = staffMap.get(record.staff_id);
       if (!staff) return;
 
@@ -536,7 +548,7 @@ function WorkStatus({ user }: { user?: any }) {
         }
         return right.items.length - left.items.length;
       });
-  }, [assignments, shiftLookup, staffMap, staffShiftMap, todayAttendance, todayKey]);
+  }, [assignments, shiftLookup, staffMap, staffShiftMap, statusFilter, todayAttendance, todayKey]);
 
   const assignmentCountsByDate = useMemo(() => {
     const counts = new Map<string, DayShiftCounts>();
@@ -691,6 +703,20 @@ function WorkStatus({ user }: { user?: any }) {
                 </option>
               ))}
             </select>
+            <select
+              value={statusFilter}
+              onChange={(event) =>
+                setStatusFilter(event.target.value as 'all' | 'present' | 'late' | 'early_leave')
+              }
+              data-testid="work-status-status-filter"
+              aria-label="출근 상태 필터"
+              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] outline-none transition focus:border-[var(--accent)]"
+            >
+              <option value="all">전체 상태</option>
+              <option value="present">🟢 정상 출근</option>
+              <option value="late">🟡 지각</option>
+              <option value="early_leave">🟠 조퇴</option>
+            </select>
             <button
               type="button"
               onClick={() => setShowActiveOnly((current) => !current)}
@@ -734,7 +760,7 @@ function WorkStatus({ user }: { user?: any }) {
               className="rounded-[var(--radius-md)] bg-[var(--card)] px-2.5 py-1 text-[var(--toss-gray-3)]"
               data-testid="work-status-last-sync"
             >
-              마지막 갱신 {lastRefreshAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              마지막 갱신 {lastRefreshAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Seoul' })}
             </span>
           ) : null}
         </div>

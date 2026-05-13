@@ -806,7 +806,15 @@ function MessengerTimelineComponent({
                                     url={fileUrl}
                                     name={attachmentName}
                                     kind={attachmentKind}
-                                    onPreview={() => onOpenAttachmentPreview(fileUrl, attachmentName, attachmentKind)}
+                                    onPreview={() => {
+                                      // 이미지는 채팅방 전체 갤러리로 묶어 좌우 키/버튼 탐색 가능하게,
+                                      // 그 외 파일/비디오/PDF는 단일 미리보기.
+                                      if (attachmentKind === 'image') {
+                                        onOpenAttachmentPreviewForMessage(msg);
+                                      } else {
+                                        onOpenAttachmentPreview(fileUrl, attachmentName, attachmentKind);
+                                      }
+                                    }}
                                     layout="bubble"
                                     tone={isMine ? 'accent' : 'default'}
                                     onMediaLoad={onMediaLoad}
