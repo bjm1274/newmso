@@ -46,6 +46,53 @@ function pickPreferredSubscription(rows: PushSubscriptionRow[]) {
   })[0];
 }
 
+async function cleanupRetentionLogs(supabase: ReturnType<typeof createAdminClient>) {
+  const result = { notificationsDeleted: 0, chatPushJobsDeleted: 0 } as {
+    notificationsDeleted: number;
+    chatPushJobsDeleted: number;
+    notificationsError?: string;
+    chatPushJobsError?: string;
+  };
+
+  // 읽음 처리되고 90일 경과한 알림은 삭제 (egress·storage 절감)
+  const NOTIFICATION_RETENTION_DAYS = 90;
+  const notifCutoff = new Date(
+    Date.now() - NOTIFICATION_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString();
+
+  const notifRes = await supabase
+    .from('notifications')
+    .delete({ count: 'estimated' })
+    .not('read_at', 'is', null)
+    .lt('read_at', notifCutoff);
+
+  if (notifRes.error) {
+    result.notificationsError = notifRes.error.message;
+  } else {
+    result.notificationsDeleted = notifRes.count ?? 0;
+  }
+
+  // 발송 처리(또는 폐기)된 chat_push_jobs 30일 경과 정리
+  const PUSH_JOB_RETENTION_DAYS = 30;
+  const pushCutoff = new Date(
+    Date.now() - PUSH_JOB_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString();
+
+  const pushRes = await supabase
+    .from('chat_push_jobs')
+    .delete({ count: 'estimated' })
+    .not('processed_at', 'is', null)
+    .lt('processed_at', pushCutoff);
+
+  if (pushRes.error) {
+    result.chatPushJobsError = pushRes.error.message;
+  } else {
+    result.chatPushJobsDeleted = pushRes.count ?? 0;
+  }
+
+  return result;
+}
+
 async function cleanupPushSubscriptions() {
   const supabase = createAdminClient();
 
@@ -172,11 +219,24 @@ export async function GET(req: Request) {
       console.error('[push-subscription-cleanup] license jobs failed:', err);
     }
 
+    // 알림/푸시잡 보관 정책 정리도 함께 (Supabase egress 절감)
+    let retention: Awaited<ReturnType<typeof cleanupRetentionLogs>> | null = null;
+    let retentionError: string | null = null;
+    try {
+      const supabase = createAdminClient();
+      retention = await cleanupRetentionLogs(supabase);
+    } catch (err) {
+      retentionError = err instanceof Error ? err.message : 'retention cleanup failed';
+      console.error('[push-subscription-cleanup] retention cleanup failed:', err);
+    }
+
     return NextResponse.json({
       ok: true,
       ...result,
       licenseJobs,
       ...(licenseError ? { licenseError } : {}),
+      retention,
+      ...(retentionError ? { retentionError } : {}),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Push subscription cleanup failed';

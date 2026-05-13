@@ -4,6 +4,11 @@ import { useState, useCallback, type Dispatch, type SetStateAction } from 'react
 import { supabase } from '@/lib/supabase';
 import { normalizeProfileUser } from '@/lib/profile-photo';
 import { hasUserPayloadChanged } from '@/lib/access-control';
+import {
+  buildStaffBootstrapSelect,
+  STAFF_BOOTSTRAP_OPTIONAL_COLUMNS,
+} from '@/lib/staff-query-columns';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import type { ErpUser, ERPData, StaffMember } from '@/types';
 
 export interface ERPDataState {
@@ -34,10 +39,16 @@ export function useERPData(
       setLoading(true);
       const u = currentUser ?? getUser();
       try {
-        const { data: staffData, error: staffError } = await supabase
-          .from('staff_members')
-          .select('*')
-          .order('employee_no', { ascending: true });
+        const { data: staffData, error: staffError } =
+          await withMissingColumnsFallback<StaffMember[]>(
+            (omittedColumns) =>
+              supabase
+                .from('staff_members')
+                .select(buildStaffBootstrapSelect(omittedColumns))
+                .order('employee_no', { ascending: true })
+                .returns<StaffMember[]>(),
+            STAFF_BOOTSTRAP_OPTIONAL_COLUMNS,
+          );
 
         if (staffError) throw staffError;
 

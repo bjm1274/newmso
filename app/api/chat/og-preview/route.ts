@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { readSessionFromRequest } from '@/lib/server-session';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,35 @@ type OgData = {
 
 const CACHE = new Map<string, { data: OgData; expiresAt: number }>();
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15분
+
+function isPublicHttpUrl(target: URL): boolean {
+  if (target.protocol !== 'http:' && target.protocol !== 'https:') return false;
+  const host = target.hostname.toLowerCase();
+  if (!host) return false;
+  if (host === 'localhost' || host.endsWith('.localhost')) return false;
+  if (host === '0.0.0.0' || host === '::' || host === '[::]') return false;
+
+  // IPv4 private/loopback/link-local/meta ranges
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const [a, b] = ipv4.slice(1).map(Number);
+    if (a === 10) return false;
+    if (a === 127) return false;
+    if (a === 169 && b === 254) return false;
+    if (a === 172 && b >= 16 && b <= 31) return false;
+    if (a === 192 && b === 168) return false;
+  }
+
+  // IPv6 loopback / link-local / unique-local
+  if (host.startsWith('[')) {
+    const bare = host.replace(/^\[|\]$/g, '');
+    if (bare === '::1') return false;
+    if (bare.startsWith('fc') || bare.startsWith('fd')) return false;
+    if (bare.startsWith('fe80:')) return false;
+  }
+
+  return true;
+}
 
 function extractMeta(html: string, property: string): string | null {
   // og:title, og:description, og:image, og:site_name
@@ -30,15 +60,25 @@ function extractTitle(html: string): string | null {
 }
 
 export async function GET(request: NextRequest) {
+  const session = await readSessionFromRequest(request);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const url = request.nextUrl.searchParams.get('url');
   if (!url) {
     return NextResponse.json({ error: 'url parameter required' }, { status: 400 });
   }
 
+  let parsedUrl: URL;
   try {
-    new URL(url);
+    parsedUrl = new URL(url);
   } catch {
     return NextResponse.json({ error: 'invalid url' }, { status: 400 });
+  }
+
+  if (!isPublicHttpUrl(parsedUrl)) {
+    return NextResponse.json({ error: 'url not allowed' }, { status: 400 });
   }
 
   // 캐시 확인

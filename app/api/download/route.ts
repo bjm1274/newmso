@@ -69,6 +69,11 @@ function isAllowedUrl(url: string): boolean {
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await readSessionFromRequest(request);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = request.nextUrl;
     const fileUrl = String(searchParams.get('url') ?? '').trim();
     const fileName = String(searchParams.get('name') ?? '').trim() || 'download';
@@ -91,11 +96,6 @@ export async function GET(request: NextRequest) {
       const admin = supabaseTarget ? getAdminClient() : null;
 
       if (supabaseTarget && admin) {
-        const session = await readSessionFromRequest(request);
-        if (!session?.user?.id) {
-          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
         const { data, error } = await admin.storage
           .from(supabaseTarget.bucket)
           .download(supabaseTarget.path);

@@ -9,6 +9,7 @@ import {
   updateStaffPasswordWithFallback,
   verifyStoredPassword,
 } from '@/lib/staff-password';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import {
   clearSessionCookie,
   createSessionToken,
@@ -52,6 +53,123 @@ function failureResponse(error?: string, status = 200) {
 }
 
 const isActiveStaffForLogin = (row: any) => isActiveStaff(row);
+const STAFF_LOGIN_COLUMNS = [
+  'id',
+  'employee_no',
+  'name',
+  'role',
+  'department',
+  'company',
+  'company_id',
+  'position',
+  'status',
+  'permissions',
+  'photo_url',
+  'avatar_url',
+  'profile_photo_path',
+  'profile_photo_updated_at',
+  'email',
+  'phone',
+  'auth_user_id',
+  'is_system_master',
+  'password',
+  'passwd',
+] as const;
+const STAFF_LOGIN_OPTIONAL_COLUMNS = [
+  'role',
+  'department',
+  'company',
+  'company_id',
+  'position',
+  'status',
+  'permissions',
+  'photo_url',
+  'avatar_url',
+  'profile_photo_path',
+  'profile_photo_updated_at',
+  'email',
+  'phone',
+  'auth_user_id',
+  'is_system_master',
+  'password',
+  'passwd',
+];
+
+function buildStaffLoginSelect(omittedColumns: ReadonlySet<string>) {
+  return STAFF_LOGIN_COLUMNS.filter((column) => !omittedColumns.has(column)).join(', ');
+}
+
+async function runStaffLoginSelect<T>(
+  runSelect: (selectClause: string) => PromiseLike<{ data: T | null; error: any }>
+) {
+  return withMissingColumnsFallback<T>(
+    (omittedColumns) => runSelect(buildStaffLoginSelect(omittedColumns)),
+    STAFF_LOGIN_OPTIONAL_COLUMNS
+  );
+}
+
+function isSupabaseQuotaRestriction(error: any) {
+  const message = String(error?.message ?? '').toLowerCase();
+  return message.includes('exceed_egress_quota') || message.includes('service for this project is restricted');
+}
+
+function authDataUnavailableResponse(error: any) {
+  const status = isSupabaseQuotaRestriction(error) ? 503 : 500;
+  return failureResponse(
+    '현재 인증 데이터베이스를 조회할 수 없습니다. 잠시 후 다시 시도하거나 관리자에게 문의해 주세요.',
+    status
+  );
+}
+
+async function privilegedFallbackResponse(loginId: string, password: string) {
+  const privilegedLogin = await verifyPrivilegedLogin(loginId, password);
+  if (!privilegedLogin.ok) return null;
+
+  const { adminName } = getAdminCredentialConfig();
+
+  if (privilegedLogin.kind === 'admin') {
+    const adminDisplayName = adminName || 'MSO 관리자';
+    return successResponse({
+      id: null,
+      employee_no: /^\d+$/.test(loginId) ? loginId : '1',
+      login_id: loginId,
+      name: adminDisplayName,
+      role: 'admin',
+      department: '경영지원팀',
+      company: 'SY INC.',
+      company_id: null,
+      permissions: {
+        inventory: true,
+        hr: true,
+        approval: true,
+        admin: true,
+        mso: true,
+        hr_교대근무: true,
+      },
+    });
+  }
+
+  return successResponse({
+    id: null,
+    employee_no: '0',
+    login_id: loginId,
+    name: '시스템관리자',
+    role: 'admin',
+    is_system_master: true,
+    department: '경영지원팀',
+    company: 'SY INC.',
+    company_id: null,
+    permissions: {
+      inventory: true,
+      hr: true,
+      approval: true,
+      admin: true,
+      mso: true,
+      system_master: true,
+      hr_교대근무: true,
+    },
+  });
+}
 
 export async function POST(request: NextRequest) {
   let loginId = '';
@@ -80,42 +198,41 @@ export async function POST(request: NextRequest) {
   const { adminName, adminPasswordHash, masterId, masterPasswordHash } = getAdminCredentialConfig();
 
   try {
-    // 진단: Cloudflare Worker env 바인딩 확인
-    const supabaseUrl = getRuntimeEnv('NEXT_PUBLIC_SUPABASE_URL');
-    const serviceKey = getRuntimeEnv('SUPABASE_SERVICE_ROLE_KEY');
-    console.log('[master-login] env check:', {
-      hasUrl: !!supabaseUrl,
-      hasKey: !!serviceKey,
-      urlPrefix: supabaseUrl ? supabaseUrl.slice(0, 30) : '(empty)',
-      keyLength: serviceKey ? serviceKey.length : 0,
-    });
+    const privilegedResponse = await privilegedFallbackResponse(loginId, password);
+    if (privilegedResponse) {
+      return privilegedResponse;
+    }
 
     const supabase = getAdminClient();
     let userRow: any = null;
 
-    const { data: byEmployeeNo, error: byEmployeeNoError } = await supabase
-      .from('staff_members')
-      .select('*')
-      .eq('employee_no', loginId)
-      .maybeSingle();
+    const { data: byEmployeeNo, error: byEmployeeNoError } = await runStaffLoginSelect((selectClause) =>
+      supabase
+        .from('staff_members')
+        .select(selectClause)
+        .eq('employee_no', loginId)
+        .maybeSingle()
+    );
 
     if (byEmployeeNoError) {
       console.error('[master-login] staff_members employee_no 조회 실패:', JSON.stringify(byEmployeeNoError));
+      return authDataUnavailableResponse(byEmployeeNoError);
     }
 
     if (byEmployeeNo) {
       userRow = byEmployeeNo;
     } else {
-      const { data: byName, error: byNameError } = await supabase
-        .from('staff_members')
-        .select('*')
-        .eq('name', loginId)
-        .limit(10);
+      const { data: byName, error: byNameError } = await runStaffLoginSelect<any[]>((selectClause) =>
+        supabase
+          .from('staff_members')
+          .select(selectClause)
+          .eq('name', loginId)
+          .limit(10)
+      );
 
       if (byNameError) {
         console.error('[master-login] staff_members name 조회 실패:', JSON.stringify(byNameError));
-        // 폴백: 빈 결과로 진행. privileged login(관리자/마스터) 경로는 살리고,
-        // 일반 직원은 사번 입력으로 우회 가능.
+        return authDataUnavailableResponse(byNameError);
       }
 
       const activeNameMatches = (byNameError ? [] : (byName ?? [])).filter(isActiveStaffForLogin);
@@ -139,20 +256,24 @@ export async function POST(request: NextRequest) {
         let msoRow: any = null;
 
         if (adminName) {
-          const { data } = await supabase
-            .from('staff_members')
-            .select('*')
-            .eq('name', adminName)
-            .maybeSingle();
+          const { data } = await runStaffLoginSelect((selectClause) =>
+            supabase
+              .from('staff_members')
+              .select(selectClause)
+              .eq('name', adminName)
+              .maybeSingle()
+          );
           msoRow = data ?? null;
         }
 
         if (!msoRow && /^\d+$/.test(loginId)) {
-          const { data } = await supabase
-            .from('staff_members')
-            .select('*')
-            .eq('employee_no', loginId)
-            .maybeSingle();
+          const { data } = await runStaffLoginSelect((selectClause) =>
+            supabase
+              .from('staff_members')
+              .select(selectClause)
+              .eq('employee_no', loginId)
+              .maybeSingle()
+          );
           msoRow = data ?? null;
         }
 

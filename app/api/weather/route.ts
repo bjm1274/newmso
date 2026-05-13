@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { readSessionFromRequest } from '@/lib/server-session';
 
 // ──────────────────────────────────────────────
 // 타입 정의
@@ -109,6 +110,11 @@ function worstGrade(a: GradeResult, b: GradeResult): GradeResult {
 // ──────────────────────────────────────────────
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  const session = await readSessionFromRequest(request);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { searchParams } = request.nextUrl;
   const lat = searchParams.get('lat');
   const lon = searchParams.get('lon');

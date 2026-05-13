@@ -1,7 +1,5 @@
 import bcrypt from 'bcryptjs';
 
-// 레거시 비밀번호 제거 - 환경변수 해시만 사용
-const LEGACY_ADMIN_PASSWORD = 'qkrcjfghd!!';
 const LEGACY_ADMIN_LOGIN_IDS = ['1'];
 type PrivilegedKind = 'admin' | 'master';
 type PrivilegedVerificationResult =
@@ -24,30 +22,21 @@ export function getAdminCredentialConfig() {
 async function matchesConfiguredPassword(
   inputPassword: string,
   configuredPassword: string,
-  legacyPassword?: string
 ) {
   const normalizedConfiguredPassword = String(configuredPassword || '').trim();
   const normalizedInputPassword = String(inputPassword || '');
 
-  let matched = false;
+  if (!normalizedConfiguredPassword) return false;
 
-  if (normalizedConfiguredPassword) {
-    if (normalizedConfiguredPassword.startsWith('$2')) {
-      try {
-        matched = await bcrypt.compare(normalizedInputPassword, normalizedConfiguredPassword);
-      } catch {
-        matched = false;
-      }
-    } else {
-      matched = normalizedConfiguredPassword === normalizedInputPassword;
+  if (normalizedConfiguredPassword.startsWith('$2')) {
+    try {
+      return await bcrypt.compare(normalizedInputPassword, normalizedConfiguredPassword);
+    } catch {
+      return false;
     }
   }
 
-  if (matched) {
-    return true;
-  }
-
-  return Boolean(legacyPassword && normalizedInputPassword === legacyPassword);
+  return normalizedConfiguredPassword === normalizedInputPassword;
 }
 
 function collectUserIdentifiers(user: any) {
@@ -84,7 +73,7 @@ export async function verifyPrivilegedLogin(
   const { adminName, adminPasswordHash, masterId, masterPasswordHash } = getAdminCredentialConfig();
 
   if (matchesAdminLoginId(loginId, adminName)) {
-    const matched = await matchesConfiguredPassword(password, adminPasswordHash, LEGACY_ADMIN_PASSWORD);
+    const matched = await matchesConfiguredPassword(password, adminPasswordHash);
     if (matched) {
       return { ok: true, kind: 'admin' };
     }
@@ -107,7 +96,7 @@ export async function verifyPrivilegedSessionPassword(
   const { adminName, adminPasswordHash, masterId, masterPasswordHash } = getAdminCredentialConfig();
 
   if (matchesAdminSessionUser(user, adminName)) {
-    const matched = await matchesConfiguredPassword(password, adminPasswordHash, LEGACY_ADMIN_PASSWORD);
+    const matched = await matchesConfiguredPassword(password, adminPasswordHash);
     if (matched) {
       return { ok: true, kind: 'admin' };
     }

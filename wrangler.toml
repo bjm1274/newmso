@@ -10,9 +10,9 @@ directory = ".open-next/assets"
 NEXT_PUBLIC_R2_PUBLIC_BASE_URL = "https://r2.pchos.kr"
 
 # Cron Triggers
+# Daily full backup stays paused to avoid unnecessary Supabase egress.
 [triggers]
 crons = [
-  "0 15 * * *",   # /api/cron/backup
   "0 17 * * *",   # /api/cron/chat-retention
   "0 23 * * *",   # /api/cron/chat-push-dispatch
   "0 8 * * *",    # /api/cron/leave-notice-announcements

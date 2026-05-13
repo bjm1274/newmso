@@ -15,7 +15,7 @@ type SuppliesItemTableProps = {
   sortAsc: boolean;
   handleSearch: (index: number, value: string) => void;
   selectItem: (index: number, selected: InventoryCatalogItem) => void;
-  updateItemField: (index: number, key: 'qty' | 'category' | 'purpose', value: unknown) => void;
+  updateItemField: (index: number, key: 'qty' | 'category' | 'purpose' | 'unit', value: unknown) => void;
   updateDropdownPosition: (index: number) => void;
   handleSort: (key: 'category' | 'name') => void;
   removeItemRow: (index: number) => void;
@@ -183,14 +183,18 @@ export default function SuppliesItemTable({
                     min="1"
                     value={item.qty}
                     onChange={(event) => updateItemField(index, 'qty', event.target.value)}
-                    className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--accent-selected-subtle)] bg-[var(--accent-selected-subtle)] px-3 text-center text-lg font-black tabular-nums text-[var(--accent)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                    className="h-10 w-1/2 rounded-[var(--radius-md)] border border-[var(--accent-selected-subtle)] bg-[var(--accent-selected-subtle)] px-3 text-center text-lg font-black tabular-nums text-[var(--accent)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
                   />
-                  <span
+                  <button
+                    type="button"
                     data-testid={`supplies-item-unit-mobile-${index}`}
-                    className="erp-chip erp-chip-active shrink-0"
+                    onClick={() => updateItemField(index, 'unit', item.unit === 'EA' ? 'BOX' : 'EA')}
+                    aria-label={`단위 ${item.unit} — 클릭하여 ${item.unit === 'EA' ? 'BOX' : 'EA'}로 변경`}
+                    title="클릭하여 EA/BOX 전환"
+                    className="erp-chip erp-chip-active shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
                   >
                     {item.unit}
-                  </span>
+                  </button>
                 </div>
               </label>
 
@@ -215,9 +219,9 @@ export default function SuppliesItemTable({
             <col className="w-[12%]" />
             <col className="w-[29%]" />
             <col className="w-[12%]" />
-            <col className="w-[14%]" />
-            <col className="w-[27%]" />
-            <col className="w-[6%]" />
+            <col className="w-[7%]" />
+            <col className="w-[32%]" />
+            <col className="w-[8%]" />
           </colgroup>
           <thead>
             <tr className="border-b border-[var(--border)]">
@@ -238,7 +242,7 @@ export default function SuppliesItemTable({
               <th className="pl-1 pr-0.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">용도</th>
               <th
                 aria-label="삭제"
-                className="pl-0 pr-2 py-2 text-right text-[11px] font-bold text-[var(--toss-gray-4)]"
+                className="pl-0 pr-0 py-2 text-right text-[11px] font-bold text-[var(--toss-gray-4)]"
               />
             </tr>
           </thead>
@@ -342,21 +346,25 @@ export default function SuppliesItemTable({
                   </div>
                 </td>
                 <td className="px-1 py-1.5 align-middle">
-                  <div className="grid min-w-[104px] grid-cols-[minmax(64px,1fr)_auto] items-center gap-1">
+                  <div className="grid min-w-0 grid-cols-[minmax(36px,1fr)_auto] items-center gap-1">
                     <input
                       data-testid={`supplies-item-qty-${index}`}
                       type="number"
                       min="1"
                       value={item.qty}
                       onChange={(event) => updateItemField(index, 'qty', event.target.value)}
-                      className="h-9 w-full min-w-[64px] rounded-[var(--radius-md)] border border-[var(--accent-selected-subtle)] bg-[var(--accent-selected-subtle)] px-2 text-center text-[13px] font-black tabular-nums text-[var(--accent)] outline-none [appearance:textfield] focus:ring-2 focus:ring-[var(--accent)]/30 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      className="h-9 w-full min-w-0 rounded-[var(--radius-md)] border border-[var(--accent-selected-subtle)] bg-[var(--accent-selected-subtle)] px-1 text-center text-[13px] font-black tabular-nums text-[var(--accent)] outline-none [appearance:textfield] focus:ring-2 focus:ring-[var(--accent)]/30 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     />
-                    <span
+                    <button
+                      type="button"
                       data-testid={`supplies-item-unit-${index}`}
-                      className="erp-chip erp-chip-active shrink-0 text-[9px]"
+                      onClick={() => updateItemField(index, 'unit', item.unit === 'EA' ? 'BOX' : 'EA')}
+                      aria-label={`단위 ${item.unit} — 클릭하여 ${item.unit === 'EA' ? 'BOX' : 'EA'}로 변경`}
+                      title="클릭하여 EA/BOX 전환"
+                      className="erp-chip erp-chip-active shrink-0 cursor-pointer text-[9px] hover:opacity-80 transition-opacity"
                     >
                       {item.unit}
-                    </span>
+                    </button>
                   </div>
                 </td>
                 <td className="pl-1 pr-0.5 py-1.5 align-middle">
@@ -368,7 +376,7 @@ export default function SuppliesItemTable({
                     placeholder="사용 용도를 입력하세요"
                   />
                 </td>
-                <td className="pl-0 pr-2 py-1.5 align-middle text-right">
+                <td className="pl-0 pr-0 py-1.5 align-middle text-right">
                   <button
                     type="button"
                     data-testid={`supplies-item-delete-${index}`}
