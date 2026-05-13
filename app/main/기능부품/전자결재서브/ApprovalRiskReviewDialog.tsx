@@ -21,7 +21,8 @@ export type ApprovalWorkflowSummary = {
 export function resolveStaffLabel(staffs: StaffMember[], staffId: string | null | undefined) {
   if (!staffId) return '미지정';
   const matched = staffs.find((staff) => String(staff.id) === String(staffId));
-  if (!matched) return staffId;
+  // staffs 배열에 없는 결재자(시스템 마스터·퇴사자·로딩 중 등)는 UUID 노출 대신 친화 텍스트.
+  if (!matched) return '확인 필요';
   return [matched.name, matched.position].filter(Boolean).join(' ');
 }
 

@@ -49,6 +49,8 @@ type ApprovalInboxViewProps = {
   handleBulkReject: (options?: { reason?: string; skipPrompt?: boolean }) => void | Promise<void>;
   setSelectedApprovalId: Dispatch<SetStateAction<string | null>>;
   approvalDirectoryStaffs: StaffMember[];
+  /** 표시용 lookup (활성/회사 필터 없음). 미전달 시 approvalDirectoryStaffs로 폴백. */
+  approvalLookupStaffs?: StaffMember[];
   resolveApprovalLineIds: (item: ApprovalRecord) => string[];
   resolveCurrentApproverId: (item: ApprovalRecord) => string | null;
   resolveApprovalTemplateMeta: (item: ApprovalRecord) => TemplateMeta;
@@ -106,10 +108,13 @@ export default function ApprovalInboxView({
   handleRejectAction,
   handleRecallAction,
   approvalDirectoryStaffs,
+  approvalLookupStaffs,
   resolveApprovalLineIds,
   resolveCurrentApproverId,
   resolveApprovalDelaySnapshot,
 }: ApprovalInboxViewProps) {
+  // 표시용 lookup은 풀(staffs 풀 + 외부 결재자) — 결재선 선택과 분리해 UUID 노출 차단.
+  const lookupStaffsForDisplay = approvalLookupStaffs ?? approvalDirectoryStaffs;
   const [bulkReviewAction, setBulkReviewAction] = useState<'approve' | 'reject' | null>(null);
   const [bulkRejectReason, setBulkRejectReason] = useState('');
   const documentFilterOptions = [ALL_DOCUMENT_FILTER, ...documentTypeOptions];
@@ -372,7 +377,7 @@ export default function ApprovalInboxView({
                   const status = statusTone(item.status);
                   const workflowSummary = buildApprovalWorkflowSummary({
                     item,
-                    staffs: approvalDirectoryStaffs,
+                    staffs: lookupStaffsForDisplay,
                     resolveApprovalLineIds,
                     resolveCurrentApproverId,
                   });
@@ -403,7 +408,7 @@ export default function ApprovalInboxView({
                           <p className="font-bold text-[var(--foreground)]">{String(item.title || '제목 없음')}</p>
                           <ApprovalProgressSummary
                             item={item}
-                            staffs={approvalDirectoryStaffs}
+                            staffs={lookupStaffsForDisplay}
                             resolveApprovalLineIds={resolveApprovalLineIds}
                             resolveCurrentApproverId={resolveCurrentApproverId}
                             resolveApprovalDelaySnapshot={resolveApprovalDelaySnapshot}

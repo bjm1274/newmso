@@ -212,6 +212,14 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
     () => mergeApprovalStaffDirectory(scopedStaffs, supportApproverStaffs).filter(isActiveStaff),
     [scopedStaffs, supportApproverStaffs]
   );
+
+  // 표시용 lookup staff 배열 — 활성/회사 필터 없이 전체 staffs + 외부 지원 결재자.
+  // approvalDirectoryStaffs(결재선 선택용)는 활성+회사 필터를 거치기 때문에
+  // 다른 회사 결재자/퇴사한 결재자 이름 lookup이 실패해 UUID가 노출되던 문제를 차단.
+  const approvalLookupStaffs = useMemo(
+    () => mergeApprovalStaffDirectory(staffs, supportApproverStaffs),
+    [staffs, supportApproverStaffs]
+  );
   useEffect(() => {
     if (isMso) {
       setSupportApproverStaffs([]);
@@ -1280,6 +1288,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
             handleBulkReject={handleBulkReject}
             setSelectedApprovalId={setSelectedApprovalId}
             approvalDirectoryStaffs={approvalDirectoryStaffs}
+            approvalLookupStaffs={approvalLookupStaffs}
             resolveApprovalLineIds={resolveApprovalLineIds}
             resolveCurrentApproverId={resolveCurrentApproverId}
             resolveApprovalTemplateMeta={resolveApprovalTemplateMeta}
@@ -1323,6 +1332,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
       <ApprovalDetailModal
         item={selectedApprovalId ? approvals.find((approval) => approval.id === selectedApprovalId) : null}
         approvalDirectoryStaffs={approvalDirectoryStaffs}
+        approvalLookupStaffs={approvalLookupStaffs}
         onClose={() => setSelectedApprovalId(null)}
         buildApprovalPrintHtml={buildApprovalPrintHtml}
         openApprovalPrintView={openApprovalPrintView}
