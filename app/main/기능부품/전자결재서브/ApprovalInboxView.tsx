@@ -152,6 +152,8 @@ export default function ApprovalInboxView({
     return { label: '대기', className: 'erp-status erp-status-yellow' };
   };
 
+  const [searchExpanded, setSearchExpanded] = useState(false);
+
   const closeBulkReview = () => {
     setBulkReviewAction(null);
     setBulkRejectReason('');
@@ -183,130 +185,122 @@ export default function ApprovalInboxView({
         />
       )}
 
-      <section className="app-card p-4">
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-black tracking-tight text-[var(--foreground)]">{viewMode}</h2>
-            </div>
-            <span className="erp-chip erp-chip-active">{listForView.length}건</span>
-          </div>
+      <section className="app-card px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            data-testid="approval-document-filter"
+            value={approvalDocumentFilter}
+            onChange={(event) => setApprovalDocumentFilter(event.target.value)}
+            className="h-8 w-auto min-w-0 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2 pr-7 text-[11px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]/50"
+          >
+            {documentFilterOptions.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
 
-          <div className="grid gap-2 md:grid-cols-[minmax(140px,180px)_minmax(140px,180px)_minmax(140px,180px)_1fr]">
-            <select
-              data-testid="approval-document-filter"
-              value={approvalDocumentFilter}
-              onChange={(event) => setApprovalDocumentFilter(event.target.value)}
-              className="h-10 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-[12px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]/50"
-            >
-              {documentFilterOptions.map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
+          <select
+            value={approvalStatusFilter}
+            onChange={(event) => setApprovalStatusFilter(event.target.value as '전체' | '대기' | '승인' | '반려')}
+            className="h-8 w-auto min-w-0 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2 pr-7 text-[11px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]/50"
+          >
+            {['전체', '대기', '승인', '반려'].map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
 
-            <select
-              value={approvalStatusFilter}
-              onChange={(event) => setApprovalStatusFilter(event.target.value as '전체' | '대기' | '승인' | '반려')}
-              className="h-10 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-[12px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]/50"
-            >
-              {['전체', '대기', '승인', '반려'].map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
+          <select
+            data-testid="approval-date-mode"
+            value={approvalDateMode}
+            onChange={(event) => {
+              setApprovalDateMode(event.target.value as 'month' | 'week' | 'range');
+              setApprovalDateTouched(true);
+            }}
+            className="h-8 w-auto min-w-0 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2 pr-7 text-[11px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]/50"
+          >
+            <option value="week">주간별</option>
+            <option value="month">월별</option>
+            <option value="range">기간</option>
+          </select>
 
-            <select
-              data-testid="approval-date-mode"
-              value={approvalDateMode}
+          {approvalDateMode === 'month' && (
+            <input
+              data-testid="approval-month-filter"
+              type="month"
+              value={approvalMonth}
               onChange={(event) => {
-                setApprovalDateMode(event.target.value as 'month' | 'week' | 'range');
+                setApprovalMonth(event.target.value);
                 setApprovalDateTouched(true);
               }}
-              className="h-10 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-[12px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]/50"
-            >
-              <option value="week">주간별</option>
-              <option value="month">월별</option>
-              <option value="range">기간</option>
-            </select>
+              className="h-8 w-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2 text-[11px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]/50"
+            />
+          )}
+          {approvalDateMode === 'week' && (
+            <input
+              type="date"
+              value={approvalWeekDate}
+              onChange={(event) => {
+                setApprovalWeekDate(event.target.value);
+                setApprovalDateTouched(true);
+              }}
+              className="h-8 w-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2 text-[11px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]/50"
+            />
+          )}
+          {approvalDateMode === 'range' && (
+            <>
+              <input
+                data-testid="approval-date-from"
+                type="date"
+                value={approvalDateFrom}
+                onChange={(event) => {
+                  setApprovalDateFrom(event.target.value);
+                  setApprovalDateTouched(true);
+                }}
+                className="h-8 w-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2 text-[11px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]/50"
+              />
+              <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">~</span>
+              <input
+                data-testid="approval-date-to"
+                type="date"
+                value={approvalDateTo}
+                onChange={(event) => {
+                  setApprovalDateTo(event.target.value);
+                  setApprovalDateTouched(true);
+                }}
+                className="h-8 w-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2 text-[11px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]/50"
+              />
+            </>
+          )}
 
+          {searchExpanded ? (
             <input
               data-testid="approval-keyword-filter"
+              autoFocus
               value={approvalKeyword}
               onChange={(event) => setApprovalKeyword(event.target.value)}
+              onBlur={() => {
+                if (!approvalKeyword) setSearchExpanded(false);
+              }}
               placeholder="제목, 내용, 기안자 검색"
-              className="h-10 min-w-0 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-[12px] font-semibold text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)] focus:border-[var(--accent)]/50"
+              className="h-8 w-48 min-w-0 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2 text-[11px] font-semibold text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)] focus:border-[var(--accent)]/50"
             />
-          </div>
+          ) : (
+            <button
+              type="button"
+              aria-label="검색"
+              onClick={() => setSearchExpanded(true)}
+              className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--muted)]"
+            >
+              <LucideIcon name="Search" size={14} />
+            </button>
+          )}
 
-          <div className="flex flex-wrap items-center gap-2">
-            {approvalDateMode === 'month' && (
-              <input
-                data-testid="approval-month-filter"
-                type="month"
-                value={approvalMonth}
-                onChange={(event) => {
-                  setApprovalMonth(event.target.value);
-                  setApprovalDateTouched(true);
-                }}
-                className="h-9 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-[12px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]/50"
-              />
-            )}
-            {approvalDateMode === 'week' && (
-              <input
-                type="date"
-                value={approvalWeekDate}
-                onChange={(event) => {
-                  setApprovalWeekDate(event.target.value);
-                  setApprovalDateTouched(true);
-                }}
-                className="h-9 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-[12px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]/50"
-              />
-            )}
-            {approvalDateMode === 'range' && (
-              <>
-                <input
-                  data-testid="approval-date-from"
-                  type="date"
-                  value={approvalDateFrom}
-                  onChange={(event) => {
-                    setApprovalDateFrom(event.target.value);
-                    setApprovalDateTouched(true);
-                  }}
-                  className="h-9 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-[12px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]/50"
-                />
-                <span className="text-[12px] font-bold text-[var(--toss-gray-3)]">~</span>
-                <input
-                  data-testid="approval-date-to"
-                  type="date"
-                  value={approvalDateTo}
-                  onChange={(event) => {
-                    setApprovalDateTo(event.target.value);
-                    setApprovalDateTouched(true);
-                  }}
-                  className="h-9 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-[12px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]/50"
-                />
-              </>
-            )}
+          <div className="ml-auto flex items-center gap-1.5 text-[11px] font-semibold">
+            <span className="rounded-[var(--radius-md)] bg-[var(--warning-light)] px-1.5 py-0.5 text-[var(--warning)]">대기 {approvalSummary.pending}</span>
+            <span className="rounded-[var(--radius-md)] bg-[var(--success-light)] px-1.5 py-0.5 text-[var(--success)]">승인 {approvalSummary.approved}</span>
+            <span className="rounded-[var(--radius-md)] bg-[var(--danger-light)] px-1.5 py-0.5 text-[var(--danger)]">반려 {approvalSummary.rejected}</span>
           </div>
         </div>
       </section>
-
-      <div className="erp-stat-grid">
-        {[
-          { label: '대기중', value: `${approvalSummary.pending}건`, icon: 'Clock3', tone: 'text-[var(--warning)] bg-[var(--warning-light)]' },
-          { label: '이번 달 승인', value: `${approvalSummary.approved}건`, icon: 'Check', tone: 'text-[var(--success)] bg-[var(--success-light)]' },
-          { label: '반려', value: `${approvalSummary.rejected}건`, icon: 'X', tone: 'text-[var(--danger)] bg-[var(--danger-light)]' },
-        ].map((item) => (
-          <article key={item.label} className="erp-stat-card">
-            <div className="flex items-start justify-between gap-3">
-              <p className="text-[12px] font-medium text-[var(--toss-gray-4)]">{item.label}</p>
-              <span className={`flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] ${item.tone}`}>
-                <LucideIcon name={item.icon} size={16} />
-              </span>
-            </div>
-            <p className="mt-3 text-[24px] font-black leading-none text-[var(--foreground)]">{item.value}</p>
-          </article>
-        ))}
-      </div>
 
       {(viewMode === '기안함' || viewMode === '참조 문서함') && approvalStatusFilter === '대기' && listForView.length > 0 && (
         <p className="text-xs text-[var(--toss-gray-3)]">결재 대기 문서입니다.</p>
