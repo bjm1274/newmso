@@ -1679,18 +1679,21 @@ export default function ChatView({
         setLoadingRoomId(saved);
         setSelectedRoomId(saved);
       } else {
+        // 첫 진입 + 저장된 방 없음 → 공지방을 기본으로 (PC만, 모바일은 방 목록 노출 유지)
         pendingBottomAlignRoomIdRef.current = null;
         isNearBottomRef.current = true;
         setShowScrollToLatest(false);
-        setLoadingRoomId(null);
-        setSelectedRoomId(null);
+        const initialRoomId = shouldRestoreSavedRoomOnMount ? NOTICE_ROOM_ID : null;
+        setLoadingRoomId(initialRoomId);
+        setSelectedRoomId(initialRoomId);
       }
     } catch {
       pendingBottomAlignRoomIdRef.current = null;
       isNearBottomRef.current = true;
       setShowScrollToLatest(false);
-      setLoadingRoomId(null);
-      setSelectedRoomId(null);
+      const fallbackRoomId = shouldRestoreSavedRoomOnMount ? NOTICE_ROOM_ID : null;
+      setLoadingRoomId(fallbackRoomId);
+      setSelectedRoomId(fallbackRoomId);
     }
   }, []);
 
@@ -1757,7 +1760,8 @@ export default function ChatView({
     setTimelineRoomId(null);
     setViewMode('chat');
     setShowDrawer(false);
-    setRoom(null);
+    // 사이드바 채팅 메뉴 재클릭(=재진입) → 공지방을 기본으로 (PC만)
+    setRoom(isMobileChatViewport() ? null : NOTICE_ROOM_ID);
     onConsumeOpenChatRoomId?.();
   }, [chatListResetToken, onConsumeOpenChatRoomId]);
 
