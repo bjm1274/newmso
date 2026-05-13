@@ -1753,6 +1753,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
                     onChange={(e) => setBulkStatus(e.target.value)}
                     className="w-full bg-[var(--tab-bg)] dark:bg-zinc-800/50 border border-[var(--border)] dark:border-zinc-700 rounded-xl px-4 py-3 text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none cursor-pointer transition-shadow"
                   >
+                    <option value="present">🟢 정상 출근</option>
                     <option value="absent">🔴 결근</option>
                     <option value="half_leave">🔵 반차</option>
                     <option value="annual_leave">🟣 연차</option>
@@ -1797,15 +1798,23 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
                         dates.push(cur.toISOString().slice(0, 10));
                         cur.setDate(cur.getDate() + 1);
                       }
-                      if (['present', 'late', 'early_leave'].includes(bulkStatus)) {
-                        toast('정상 출근/지각/조퇴는 실제 출퇴근 기록 또는 개별 정정으로만 처리해주세요.', 'warning');
+                      if (['late', 'early_leave'].includes(bulkStatus)) {
+                        toast('지각/조퇴는 실제 출퇴근 기록 또는 개별 정정으로만 처리해주세요.', 'warning');
                         return;
                       }
+                      // 정상 출근 일괄 적용 시 회사 기본 시간(09:00~18:00)으로 출퇴근 기록 채움
+                      const isPresent = bulkStatus === 'present';
                       const rows = staffIds.flatMap((staffId: string) =>
                         dates.map((work_date) => ({
                           staff_id: staffId,
                           work_date,
                           status: bulkStatus,
+                          ...(isPresent
+                            ? {
+                                check_in_time: `${work_date}T09:00:00+09:00`,
+                                check_out_time: `${work_date}T18:00:00+09:00`,
+                              }
+                            : {}),
                         }))
                       );
                       for (const row of rows) {

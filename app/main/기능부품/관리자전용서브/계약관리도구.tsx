@@ -201,15 +201,24 @@ export default function ContractManager() {
                     if (!file) return;
                     setUploadingSeal(true);
                     try {
-                      const ext = file.name.split('.').pop() || 'png';
-                      const safeFolder = selectedCo.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'company';
-                      const fileName = `seals/${safeFolder}_${Date.now()}.${ext}`;
-                      const { error: upErr } = await supabase.storage.from('company-seals').upload(fileName, file);
-                      if (upErr) throw upErr;
-                      const { data: urlData } = supabase.storage.from('company-seals').getPublicUrl(fileName);
-                      setSealUrl(urlData.publicUrl);
-                    } catch (err) {
-                      toast('직인 업로드에 실패했습니다. (Storage 설정을 확인하세요)', 'error');
+                      const formData = new FormData();
+                      formData.append('file', file);
+                      formData.append('company', selectedCo);
+                      const res = await fetch('/api/admin/seal/upload', {
+                        method: 'POST',
+                        body: formData,
+                      });
+                      const payload = await res.json().catch(() => ({}));
+                      if (!res.ok || !payload?.url) {
+                        const message =
+                          (payload as { error?: string } | null)?.error ||
+                          '직인 업로드에 실패했습니다.';
+                        toast(message, 'error');
+                        return;
+                      }
+                      setSealUrl(payload.url as string);
+                    } catch {
+                      toast('직인 업로드 중 네트워크 오류가 발생했습니다.', 'error');
                     } finally {
                       setUploadingSeal(false);
                       e.target.value = '';

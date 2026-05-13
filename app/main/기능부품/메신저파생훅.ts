@@ -470,29 +470,62 @@ export function useChatMediaPreviewState({
     if (!attachmentUrl) return;
 
     const previewKind = resolveAttachmentKind(attachmentUrl, message.file_kind);
-    if (previewKind === 'image' && message.album_id) {
-      const albumMessages = sortAlbumMessages(
-        messages.filter(
-          (candidate) =>
-            !candidate.is_deleted &&
-            String(candidate.album_id || '') === String(message.album_id || '') &&
-            resolveAttachmentKind(candidate.file_url, candidate.file_kind) === 'image',
-        ),
+
+    if (previewKind === 'image') {
+      // 1순위: 같은 앨범(album_id)의 이미지들로 갤러리 구성
+      if (message.album_id) {
+        const albumMessages = sortAlbumMessages(
+          messages.filter(
+            (candidate) =>
+              !candidate.is_deleted &&
+              String(candidate.album_id || '') === String(message.album_id || '') &&
+              resolveAttachmentKind(candidate.file_url, candidate.file_kind) === 'image',
+          ),
+        );
+
+        if (albumMessages.length > 1) {
+          const previewItems = albumMessages
+            .map((candidate) =>
+              buildAttachmentPreviewItem(
+                candidate.file_url,
+                candidate.file_name,
+                resolveAttachmentKind(candidate.file_url, candidate.file_kind),
+              ),
+            )
+            .filter((item): item is AttachmentPreviewItem => Boolean(item));
+          const startIndex = Math.max(
+            0,
+            albumMessages.findIndex((candidate) => String(candidate.id) === String(message.id)),
+          );
+
+          if (previewItems.length > 1) {
+            openAttachmentPreviewGallery(previewItems, startIndex);
+            return;
+          }
+        }
+      }
+
+      // 2순위: 채팅방 내 모든 이미지 메시지를 시간순으로 묶어 좌우 탐색 가능하게
+      // (예전 사진 → 최근 사진까지 방향키 / 좌우 버튼으로 이동)
+      const allRoomImages = messages.filter(
+        (candidate) =>
+          !candidate.is_deleted &&
+          resolveAttachmentKind(candidate.file_url, candidate.file_kind) === 'image',
       );
 
-      if (albumMessages.length > 1) {
-        const previewItems = albumMessages
+      if (allRoomImages.length > 1) {
+        const previewItems = allRoomImages
           .map((candidate) =>
             buildAttachmentPreviewItem(
               candidate.file_url,
               candidate.file_name,
-              resolveAttachmentKind(candidate.file_url, candidate.file_kind),
+              'image',
             ),
           )
           .filter((item): item is AttachmentPreviewItem => Boolean(item));
         const startIndex = Math.max(
           0,
-          albumMessages.findIndex((candidate) => String(candidate.id) === String(message.id)),
+          allRoomImages.findIndex((candidate) => String(candidate.id) === String(message.id)),
         );
 
         if (previewItems.length > 1) {
