@@ -1,5 +1,5 @@
 import { useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
-import { insertNotificationsOrThrow } from '@/lib/notification-utils';
+import { upsertNotificationWithDedupe } from '@/lib/notification-utils';
 import {
   appendApprovalHistory,
   getApprovalRevision,
@@ -188,6 +188,11 @@ export function useApprovalRouting({
       const currentApproverId = resolveCurrentApproverId(item);
       if (!currentApproverId) continue;
       const metaData = item?.meta_data as ApprovalRecord | null | undefined;
+      const tracker = (metaData?.delay_notification && typeof metaData.delay_notification === 'object')
+        ? (metaData.delay_notification as ApprovalRecord)
+        : null;
+      const previousCount = Math.max(0, Number(tracker?.count) || 0);
+      const nextCount = previousCount + 1;
       const nextMetaData = appendApprovalHistory(
         markDelayNotification(
           metaData,
@@ -204,7 +209,8 @@ export function useApprovalRouting({
       );
 
       try {
-        await insertNotificationsOrThrow({
+        // 결정적 ID로 dedupe — 여러 탭/기기 동시 실행 시 중복 알림 방지
+        await upsertNotificationWithDedupe({
           user_id: currentApproverId,
           type: 'approval',
           title: `[결재 지연] ${String(item.title || '전자결재 문서')}`,
@@ -218,7 +224,9 @@ export function useApprovalRouting({
             delay_hours: delayConfig.thresholdHours,
             delay_repeat_hours: delayConfig.repeatHours,
             delay_max_notifications: delayConfig.maxNotifications,
+            delay_count: nextCount,
           },
+          dedupeKey: `approval-delay:${String(item.id)}:${currentApproverId}:${nextCount}`,
         });
         await supabase.from('approvals').update({ meta_data: nextMetaData }).eq('id', item.id);
       } catch (delayError) {

@@ -213,3 +213,63 @@ export async function insertNotificationsOrThrow(
   if (error) throw error;
   return data;
 }
+
+// SHA-256 기반 결정적 UUID v5 스타일 ID — 같은 dedupeKey는 동일 ID가 되어
+// notifications 테이블 PRIMARY KEY로 race condition 중복 INSERT를 차단한다.
+export async function buildDeterministicNotificationId(
+  userId: string,
+  dedupeKey: string,
+): Promise<string> {
+  const source = `erp-notification:${userId}:${dedupeKey}`;
+  const encoder = new TextEncoder();
+  const buffer = await crypto.subtle.digest('SHA-256', encoder.encode(source));
+  const bytes = new Uint8Array(buffer.slice(0, 16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
+type DedupedNotificationInput = {
+  user_id: string;
+  type: string;
+  title: string;
+  body: string;
+  metadata?: Record<string, unknown> | null;
+  // dedupeKey가 있으면 같은 키에 대해 1번만 insert(upsert ignoreDuplicates).
+  dedupeKey: string;
+};
+
+// 결정적 ID + upsert(ignoreDuplicates)로 같은 dedupeKey가 어디서 호출되든 1건만 만들어준다.
+// 여러 탭/기기에서 동시 호출돼도 중복 알림이 생성되지 않는다.
+export async function upsertNotificationWithDedupe(input: DedupedNotificationInput) {
+  const id = await buildDeterministicNotificationId(input.user_id, input.dedupeKey);
+  const row = {
+    id,
+    user_id: input.user_id,
+    type: input.type,
+    title: input.title,
+    body: input.body,
+    metadata: {
+      ...(input.metadata ?? {}),
+      dedupe_key: input.dedupeKey,
+    },
+    read_at: null,
+    created_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabase
+    .from('notifications')
+    .upsert([row], { onConflict: 'id', ignoreDuplicates: true });
+
+  if (error) {
+    const code = String((error as { code?: string } | null)?.code || '');
+    const message = String((error as { message?: string } | null)?.message || '');
+    const isDuplicate = code === '23505' || /duplicate key|unique constraint/i.test(message);
+    if (!isDuplicate) {
+      throw error;
+    }
+  }
+
+  return { id };
+}
