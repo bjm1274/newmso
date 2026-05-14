@@ -100,7 +100,8 @@
   --mobile-padding-x: 16px;
   --mobile-padding-y: 12px;
   --mobile-section-gap: 20px;
-  --mobile-bottomtab-height: 60px;
+  /* 실제 mobile-bottom-tabbar 높이 = nav 56 + pt 4 + border 1 + pb(max(8px,env)) */
+  --mobile-bottomtab-height: 69px;
   --mobile-bottomsheet-radius: 16px 16px 0 0;
 
   /* 인쇄 전용 — 인쇄용 bg-white 허용 (JM 메모리) */
@@ -780,7 +781,7 @@ select:not(.no-style) {
     --mobile-padding-x: 16px;
     --mobile-section-gap: 20px;
     --mobile-card-gap: 10px;
-    --mobile-bottomtab-height: calc(60px + env(safe-area-inset-bottom, 0px));
+    --mobile-bottomtab-height: calc(61px + max(8px, env(safe-area-inset-bottom, 0px)));
     --safe-pt: env(safe-area-inset-top, 0px);
     --safe-pb: max(8px, env(safe-area-inset-bottom, 0px));
 
@@ -834,6 +835,48 @@ select:not(.no-style) {
   .erp-page-pad {
     padding-left: var(--mobile-padding-x);
     padding-right: var(--mobile-padding-x);
+  }
+}
+
+/* ======================================================================
+ * P1-3 StickyFormFooter utility — globals.css §P1-3
+ * 모바일에서 fixed 하단 고정, 데스크톱에서 static 배치.
+ * ====================================================================== */
+
+/* 모바일 fixed 푸터 본체 */
+.sticky-form-footer {
+  background: var(--card);
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 767px) {
+  .sticky-form-footer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    /* 바텀탭(--mobile-bottomtab-height) 위에 위치 */
+    bottom: var(--mobile-bottomtab-height, 60px);
+    z-index: var(--z-sticky, 100);
+    padding: 12px 16px;
+    padding-bottom: calc(12px + var(--safe-pb, 8px));
+  }
+  /* 푸터가 콘텐츠를 가리지 않도록 본문 하단에 여백 추가 */
+  .sticky-form-footer-spacer {
+    /* 푸터 높이(≈68px) + 바텀탭 높이만큼 추가 */
+    height: calc(68px + var(--mobile-bottomtab-height, 60px));
+    flex-shrink: 0;
+  }
+}
+
+@media (min-width: 768px) {
+  .sticky-form-footer {
+    position: static;
+    padding: 16px 0 0;
+    border-top: none;
+    background: transparent;
+  }
+  .sticky-form-footer-spacer {
+    display: none;
   }
 }
 

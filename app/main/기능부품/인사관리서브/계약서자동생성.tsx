@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import StickyFormFooter from '@/app/components/StickyFormFooter';
 
 interface Props {
   staffs: any[];
@@ -308,35 +309,45 @@ export default function ContractAutoGenerator({ staffs, selectedCo, user }: Prop
         </div>
       </div>
 
-      {/* 미리보기 및 액션 버튼 */}
-      <div className="flex flex-wrap gap-3">
+      {/* StickyFormFooter: 모바일에서 고정 하단 푸터, 데스크톱에서 일반 배치 */}
+      <StickyFormFooter
+        secondary={
+          <button
+            type="button"
+            onClick={() => { setForm({ ...DEFAULT_FORM, company_name: selectedCo !== '전체' ? selectedCo : '' }); setShowPreview(false); setMessage(null); }}
+            className="px-5 py-2.5 bg-[var(--muted)] text-[var(--toss-gray-3)] text-xs font-bold rounded-xl hover:bg-[var(--toss-gray-2)] transition-colors"
+          >
+            초기화
+          </button>
+        }
+        primary={
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            data-testid="contract-generator-save-button"
+            className="px-5 py-2.5 bg-[var(--accent)] text-white text-xs font-bold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {saving ? '저장 중...' : 'DB 저장'}
+          </button>
+        }
+      >
+        {/* 미리보기 · 인쇄 보조 버튼 */}
         <button
+          type="button"
           onClick={() => setShowPreview(!showPreview)}
           className="px-5 py-2.5 bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl hover:bg-[var(--toss-gray-2)] transition-colors"
         >
           {showPreview ? '미리보기 닫기' : '미리보기'}
         </button>
         <button
+          type="button"
           onClick={handlePrint}
           className="px-5 py-2.5 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition-colors"
         >
           PDF 출력 (인쇄)
         </button>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          data-testid="contract-generator-save-button"
-          className="px-5 py-2.5 bg-[var(--accent)] text-white text-xs font-bold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          {saving ? '저장 중...' : 'DB 저장'}
-        </button>
-        <button
-          onClick={() => { setForm({ ...DEFAULT_FORM, company_name: selectedCo !== '전체' ? selectedCo : '' }); setShowPreview(false); setMessage(null); }}
-          className="px-5 py-2.5 bg-[var(--muted)] text-[var(--toss-gray-3)] text-xs font-bold rounded-xl hover:bg-[var(--toss-gray-2)] transition-colors"
-        >
-          초기화
-        </button>
-      </div>
+      </StickyFormFooter>
 
       {/* 인라인 미리보기 */}
       {showPreview && (
