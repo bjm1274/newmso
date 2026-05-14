@@ -754,6 +754,89 @@ select:not(.no-style) {
   }
 }
 
+/* ======================================================================
+ * P0-1 모바일 표준 오버라이드 — docs/mobile/MSO_Mobile_Improvement.html §01
+ * 데스크톱 :root 토큰은 건드리지 않고, 767px 이하에서만 재정의한다.
+ * ====================================================================== */
+@media (max-width: 767px) {
+  :root {
+    /* Typography — 한 단 ↑ */
+    --body-font-size: 15px;
+    --body-line-height: 1.55;
+    --caption-font-size: 12px;
+    --section-title-font-size: 16px;
+    --section-title-font-weight: 800;
+    --page-header-font-size: 19px;
+    --page-header-font-weight: 800;
+    --stat-value-font-size: 22px;
+    --button-font-size: 14px;
+    --button-font-weight: 700;
+    --chip-font-size: 13px;
+    --chip-font-weight: 700;
+
+    /* Spacing & Touch — 강제 */
+    --touch-target: 44px;
+    --touch-target-sm: 40px;
+    --mobile-padding-x: 16px;
+    --mobile-section-gap: 20px;
+    --mobile-card-gap: 10px;
+    --mobile-bottomtab-height: calc(60px + env(safe-area-inset-bottom, 0px));
+    --safe-pt: env(safe-area-inset-top, 0px);
+    --safe-pb: max(8px, env(safe-area-inset-bottom, 0px));
+
+    /* Radius / Shadow — 모바일만 상향 (OLED dirty 방지 위해 shadow 1-layer) */
+    --radius-lg: 12px;
+    --radius-2xl: 16px;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
+  }
+
+  /* 본문/헤딩 — 코드베이스에 실제 존재하는 클래스에만 매핑 */
+  body {
+    font-size: var(--body-font-size);
+    line-height: var(--body-line-height);
+  }
+  .section-title {
+    font-size: var(--section-title-font-size);
+    font-weight: var(--section-title-font-weight);
+  }
+  .page-header-title {
+    font-size: var(--page-header-font-size);
+    font-weight: var(--page-header-font-weight);
+  }
+  .stat-card-value { font-size: var(--stat-value-font-size); }
+  .caption-premium { font-size: var(--caption-font-size); }
+  .tab-item,
+  .erp-chip,
+  .erp-status {
+    font-size: var(--chip-font-size);
+    font-weight: var(--chip-font-weight);
+  }
+
+  /* 버튼 — 폰트 상향 + 44px 터치 타깃 (.btn-premium-ghost는 미존재, danger 포함) */
+  .btn-premium-primary,
+  .btn-premium-secondary,
+  .btn-premium-danger {
+    font-size: var(--button-font-size);
+    font-weight: var(--button-font-weight);
+    min-height: var(--touch-target);
+  }
+
+  /* 모든 인터랙티브 요소에 44px 강제 — WCAG 2.5.5 */
+  button,
+  a[role="button"],
+  [role="button"],
+  .icon-btn,
+  .tab-item {
+    min-height: var(--touch-target);
+  }
+
+  /* 페이지 좌우 안전 여백 */
+  .erp-page-pad {
+    padding-left: var(--mobile-padding-x);
+    padding-right: var(--mobile-padding-x);
+  }
+}
+
 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not(.no-style)::placeholder,
 textarea:not(.no-style)::placeholder {
   color: var(--zinc-400);
