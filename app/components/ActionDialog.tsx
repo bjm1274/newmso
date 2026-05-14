@@ -1,10 +1,13 @@
 'use client';
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { BottomSheet } from './BottomSheet';
+import { useIsMobile } from './useIsMobile';
 
 export type ActionDialogTone = 'default' | 'accent' | 'danger';
 export type ActionDialogMode = 'confirm' | 'prompt';
 export type ActionDialogInputType = 'text' | 'password' | 'textarea';
+export type ActionDialogMobileVariant = 'sheet' | 'modal';
 
 export type ActionDialogState = {
   open: boolean;
@@ -26,6 +29,7 @@ export type ActionDialogState = {
 type Props = ActionDialogState & {
   onCancel: () => void;
   onConfirm: (value?: string) => void;
+  mobileVariant?: ActionDialogMobileVariant;
 };
 
 const toneClassNameMap: Record<ActionDialogTone, string> = {
@@ -51,7 +55,9 @@ export default function ActionDialog({
   busy = false,
   onCancel,
   onConfirm,
+  mobileVariant = 'sheet',
 }: Props) {
+  const isMobile = useIsMobile();
   const [value, setValue] = useState(initialValue);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
   const valueRef = useRef(initialValue);
@@ -121,6 +127,79 @@ export default function ActionDialog({
 
   if (!open) return null;
 
+  const promptInput = mode === 'prompt' ? (
+    <div className="mt-3 space-y-2">
+      {inputType === 'textarea' ? (
+        <textarea
+          ref={inputRef as React.MutableRefObject<HTMLTextAreaElement | null>}
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          placeholder={placeholder}
+          maxLength={maxLength}
+          rows={5}
+          className="min-h-[132px] w-full resize-y rounded-[18px] border border-[var(--border)] bg-[var(--input-bg)] px-4 py-3 text-sm font-medium text-[var(--foreground)] outline-none transition-colors focus:border-[var(--accent)] focus:bg-[var(--card)]"
+        />
+      ) : (
+        <input
+          ref={inputRef as React.MutableRefObject<HTMLInputElement | null>}
+          type={inputType}
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          placeholder={placeholder}
+          maxLength={maxLength}
+          className="h-12 w-full rounded-[18px] border border-[var(--border)] bg-[var(--input-bg)] px-4 text-sm font-semibold text-[var(--foreground)] outline-none transition-colors focus:border-[var(--accent)] focus:bg-[var(--card)]"
+        />
+      )}
+      {helperText ? (
+        <p className="text-[11px] font-semibold leading-relaxed text-[var(--toss-gray-3)]">
+          {helperText}
+        </p>
+      ) : null}
+    </div>
+  ) : null;
+
+  const footerContent = (
+    <div className="flex gap-2">
+      <button
+        type="button"
+        onClick={onCancel}
+        disabled={busy}
+        className="flex-1 rounded-[16px] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-bold text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {cancelText}
+      </button>
+      <button
+        type="button"
+        onClick={() => onConfirm(mode === 'prompt' ? value : undefined)}
+        disabled={!canConfirm}
+        className={`flex-1 rounded-[16px] px-4 py-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${toneClassNameMap[tone]}`}
+      >
+        {busy ? '처리 중...' : confirmText}
+      </button>
+    </div>
+  );
+
+  if (mobileVariant === 'sheet' && isMobile) {
+    return (
+      <BottomSheet
+        open={open}
+        onClose={() => { if (!busy) onCancel(); }}
+        title={title}
+        footer={footerContent}
+      >
+        {description ? (
+          <p
+            id={descriptionId}
+            className="whitespace-pre-line text-sm leading-relaxed text-[var(--toss-gray-4)]"
+          >
+            {description}
+          </p>
+        ) : null}
+        {promptInput}
+      </BottomSheet>
+    );
+  }
+
   return (
     <div
       className="fixed inset-0 z-[400] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
@@ -147,56 +226,11 @@ export default function ActionDialog({
               </p>
             ) : null}
           </div>
-
-          {mode === 'prompt' ? (
-            <div className="space-y-2">
-              {inputType === 'textarea' ? (
-                <textarea
-                  ref={inputRef as React.MutableRefObject<HTMLTextAreaElement | null>}
-                  value={value}
-                  onChange={(event) => setValue(event.target.value)}
-                  placeholder={placeholder}
-                  maxLength={maxLength}
-                  rows={5}
-                  className="min-h-[132px] w-full resize-y rounded-[18px] border border-[var(--border)] bg-[var(--input-bg)] px-4 py-3 text-sm font-medium text-[var(--foreground)] outline-none transition-colors focus:border-[var(--accent)] focus:bg-[var(--card)]"
-                />
-              ) : (
-                <input
-                  ref={inputRef as React.MutableRefObject<HTMLInputElement | null>}
-                  type={inputType}
-                  value={value}
-                  onChange={(event) => setValue(event.target.value)}
-                  placeholder={placeholder}
-                  maxLength={maxLength}
-                  className="h-12 w-full rounded-[18px] border border-[var(--border)] bg-[var(--input-bg)] px-4 text-sm font-semibold text-[var(--foreground)] outline-none transition-colors focus:border-[var(--accent)] focus:bg-[var(--card)]"
-                />
-              )}
-              {helperText ? (
-                <p className="text-[11px] font-semibold leading-relaxed text-[var(--toss-gray-3)]">
-                  {helperText}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
+          {promptInput}
         </div>
 
-        <div className="flex gap-2 border-t border-[var(--border)] bg-[var(--background)]/40 px-5 py-4">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={busy}
-            className="flex-1 rounded-[16px] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-bold text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {cancelText}
-          </button>
-          <button
-            type="button"
-            onClick={() => onConfirm(mode === 'prompt' ? value : undefined)}
-            disabled={!canConfirm}
-            className={`flex-1 rounded-[16px] px-4 py-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${toneClassNameMap[tone]}`}
-          >
-            {busy ? '처리 중...' : confirmText}
-          </button>
+        <div className="border-t border-[var(--border)] bg-[var(--background)]/40 px-5 py-4">
+          {footerContent}
         </div>
       </div>
     </div>
