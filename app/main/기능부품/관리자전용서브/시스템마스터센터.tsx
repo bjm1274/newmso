@@ -578,10 +578,7 @@ export default function SystemMasterCenter({
     <div className="space-y-5" data-testid="system-master-center">
       {dialog}
       <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h2 className="mt-2 text-2xl font-black tracking-tight text-[var(--foreground)]">시스템마스터센터</h2>
-          </div>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-end">
           <div className="flex flex-wrap items-center gap-2">
             {MASTER_TABS.map((tab) => (
               <button
