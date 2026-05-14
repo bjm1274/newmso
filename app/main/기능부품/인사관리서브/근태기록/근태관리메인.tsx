@@ -340,18 +340,10 @@ function buildMonthCalendarCells(selectedMonth: string) {
   return cells;
 }
 
+// 근무형태에 "교대근무 전용 스케줄 여부"(is_shift)가 체크된 경우에만
+// 근무표 생성 도구상자에 노출한다.
 function isShiftBasedShift(shift: Record<string, unknown>): boolean {
-  const type = String(shift?.shift_type || '').toLowerCase().trim();
-  if (type) {
-    if (['rotation', 'shift', '3교대', '2교대', 'd', 'day', 'e', 'evening', 'n', 'night', '교대'].some(t => type.includes(t))) return true;
-    if (['normal', 'office', 'day_fixed', 'fixed', '상근', '일반', '통상'].some(t => type.includes(t))) return false;
-  }
-  const name = String(shift?.name || '');
-  if (/(상근|통상|일반|9.?to.?[56])/i.test(name)) return false;
-  if (/\/[DEN]\b/.test(name)) return true;
-  if (/(교대|야간|준야|이브닝|나이트|전담)/.test(name)) return true;
-  if (/(외래|관리사|관리실|물리치료|식당|조출|후출)/.test(name)) return false;
-  return false;
+  return shift?.is_shift === true;
 }
 
 export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, initialView = 'calendar', initialLeaveTab }: AttendanceMainProps) {
@@ -531,6 +523,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
           'company_name',
           'weekly_work_days',
           'is_weekend_work',
+          'is_shift',
         ].filter((column) => !omittedColumns.has(column));
 
         let query = supabase
@@ -544,7 +537,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
 
         return query.order('start_time', { ascending: true });
       },
-      ['description', 'shift_type', 'company_name', 'weekly_work_days', 'is_weekend_work']
+      ['description', 'shift_type', 'company_name', 'weekly_work_days', 'is_weekend_work', 'is_shift']
     ).then(({ data, error }) => {
       if (error) {
         console.error('근무형태 조회 실패:', error);
@@ -1228,15 +1221,6 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
       <header className="px-4 pt-4 pb-3 border-b border-[var(--border)] bg-[var(--card)] shrink-0 shadow-sm z-10 sticky top-0">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
           <div className="flex-1 w-full">
-            <div className="flex items-center gap-3 mb-4 block w-full">
-              <div className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--accent)] flex items-center justify-center text-white shadow-sm shrink-0">
-                <MenuIcon name="history" className="h-5 w-5" />
-              </div>
-              <div>
-                <span className="px-2 py-0.5 rounded-[var(--radius-md)] bg-blue-500/10 text-blue-600 text-[10px] font-bold border border-blue-100">{selectedCo}</span>
-              </div>
-            </div>
-
             <div className="flex items-center gap-1 bg-[var(--tab-bg)]/80 dark:bg-zinc-800/80 p-1 rounded-[var(--radius-lg)] w-fit border border-[var(--border)]/50 dark:border-zinc-700/50 overflow-x-auto custom-scrollbar">
               {([
                 { id: 'dashboard', label: '대시보드', icon: 'analytics' },
