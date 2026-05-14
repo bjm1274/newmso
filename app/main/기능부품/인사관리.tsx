@@ -6,6 +6,7 @@ import { canAccessHrSection, canAccessMainMenu, isAdminUser } from '@/lib/access
 import { supabase } from '@/lib/supabase';
 import 구성원관리 from './인사관리서브/구성원현황';
 import { MenuIcon } from './조직도서브/조직도측면창';
+import { ChevronDown } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 // ── 서브뷰 lazy 로드 (인사관리 번들 최소화, 구성원 뷰만 정적) ──
@@ -460,18 +461,20 @@ function SectionTabBar({
   activeTab,
   onChange,
   testIdPrefix,
+  rightSlot,
 }: {
   tabs: { id: string; label: string; icon: string }[];
   activeTab: string;
   onChange: (tabId: string) => void;
   testIdPrefix?: string;
+  rightSlot?: React.ReactNode;
 }) {
   return (
     <div
-      className="shrink-0 border-b border-[var(--border)] bg-[var(--card)] px-3 py-2.5 md:px-5"
+      className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--card)] px-3 py-2.5 md:px-5"
       data-testid={testIdPrefix ? `${testIdPrefix}-bar` : undefined}
     >
-      <div className="no-scrollbar flex gap-1 overflow-x-auto">
+      <div className="no-scrollbar flex min-w-0 gap-1 overflow-x-auto">
         {tabs.map((tab, index) => (
           <button
             key={tab.id}
@@ -489,6 +492,7 @@ function SectionTabBar({
           </button>
         ))}
       </div>
+      {rightSlot && <div className="flex shrink-0 items-center gap-2">{rightSlot}</div>}
     </div>
   );
 }
@@ -507,6 +511,8 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
   const [선택워크스페이스, 워크스페이스설정] = useState<HrWorkspaceId>(() => getInitialHrWorkspaceState(initialMenu));
   const [선택사업체, 사업체설정] = useState('전체');
   const [등록창상태, 창상태설정] = useState(false);
+  // 모바일 2차 서브메뉴 칩바 접기/펼치기 (데스크톱 사이드바는 항상 표시)
+  const [subNavCollapsed, setSubNavCollapsed] = useState(false);
   const [직원상태필터, 직원상태필터설정] = useState<StaffStatus>('재직');
   const [문서연결대상, 문서연결대상설정] = useState<{ id?: string; name?: string } | undefined>(undefined);
   const [근태분석탭, 근태분석탭설정] = useState<AttendanceAnalysisTabId>(getAttendanceInitialTab(initialMenu));
@@ -517,6 +523,8 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
   const [계약내부탭, 계약내부탭설정] = useState<ContractEmbeddedTabId>(getContractInitialTab(initialMenu));
   const [휴가내부탭, 휴가내부탭설정] = useState<LeaveSuiteTabId>(getLeaveSuiteInitialTab(initialMenu));
   const [전체직원목록, 전체직원목록설정] = useState<any[]>([]);
+  const [personnelTabActions, setPersonnelTabActions] = useState<React.ReactNode>(null);
+  const [lifecycleTabActions, setLifecycleTabActions] = useState<React.ReactNode>(null);
 
   type UserLike = Parameters<typeof canAccessMainMenu>[0];
   const userLike = user as unknown as UserLike;
@@ -720,7 +728,26 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
         </div>
 
         <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
-          <div className="no-scrollbar flex gap-0.5 overflow-x-auto px-2 py-1.5 md:hidden">
+          <button
+            type="button"
+            onClick={() => setSubNavCollapsed((v) => !v)}
+            aria-expanded={!subNavCollapsed}
+            aria-controls="hr-subnav-items"
+            className="flex min-h-11 w-full shrink-0 touch-manipulation items-center justify-between gap-2 px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] md:hidden"
+          >
+            <span className="truncate">
+              {visibleHrTabs.find((t) => t.id === activeMenu)?.label || '서브메뉴'}
+            </span>
+            <ChevronDown
+              size={16}
+              aria-hidden="true"
+              className={`shrink-0 transition-transform duration-150 ${subNavCollapsed ? '' : 'rotate-180'}`}
+            />
+          </button>
+          <div
+            id="hr-subnav-items"
+            className={`no-scrollbar ${subNavCollapsed ? 'hidden' : 'flex'} gap-0.5 overflow-x-auto px-2 py-1.5 md:hidden`}
+          >
             {visibleHrTabs.map(({ id, label, icon }) => (
               <button
                 key={id}
@@ -862,10 +889,11 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                 activeTab={activePersonnelTab}
                 onChange={(tabId) => 인사변동탭설정(tabId as PersonnelSuiteTabId)}
                 testIdPrefix="personnel-suite"
+                rightSlot={personnelTabActions}
               />
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {activePersonnelTab === '인사발령' && (
-                  <PersonnelAppointment staffs={인사직원목록} selectedCo={선택사업체} user={user} />
+                  <PersonnelAppointment staffs={인사직원목록} selectedCo={선택사업체} user={user} onHeaderActions={setPersonnelTabActions} />
                 )}
                 {activePersonnelTab === '포상/징계' && (
                   <RewardDisciplineManagement staffs={인사직원목록} selectedCo={선택사업체} user={user} />
@@ -881,11 +909,12 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                 activeTab={activeLifecycleTab}
                 onChange={(tabId) => 입퇴사교육탭설정(tabId as LifecycleSuiteTabId)}
                 testIdPrefix="lifecycle-suite"
+                rightSlot={lifecycleTabActions}
               />
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {activeLifecycleTab === '교육' && (
                   <div className="p-3 md:p-4">
-                    <EducationMain staffs={인사직원목록} selectedCo={선택사업체} />
+                    <EducationMain staffs={인사직원목록} selectedCo={선택사업체} onHeaderActions={setLifecycleTabActions} />
                   </div>
                 )}
                 {activeLifecycleTab === '오프보딩' && (
