@@ -30,6 +30,7 @@ type DayShiftSchedule = {
   enabled: boolean;
   start_time: string;
   end_time: string;
+  apply_break: boolean;
 };
 type WeeklyShiftSchedule = Record<WeekdayKey, DayShiftSchedule>;
 type ShiftGroup = Shift & {
@@ -103,6 +104,7 @@ function createWeeklySchedule(
       enabled: mode === 'all_days' || !day.weekend,
       start_time: start,
       end_time: end,
+      apply_break: true,
     };
     return acc;
   }, {} as WeeklyShiftSchedule);
@@ -121,6 +123,7 @@ function normalizeWeeklySchedule(
       enabled: current?.enabled ?? defaults[day.key].enabled,
       start_time: cleanTime(current?.start_time, defaults[day.key].start_time),
       end_time: cleanTime(current?.end_time, defaults[day.key].end_time),
+      apply_break: current?.apply_break ?? defaults[day.key].apply_break,
     };
     return acc;
   }, {} as WeeklyShiftSchedule);
@@ -306,8 +309,8 @@ function calculateWeeklyWorkHours(shift: {
       return sum + calculateWorkMinutes({
         start_time: schedule.start_time,
         end_time: schedule.end_time,
-        break_start_time: shift.break_start_time,
-        break_end_time: shift.break_end_time,
+        break_start_time: schedule.apply_break ? shift.break_start_time : null,
+        break_end_time: schedule.apply_break ? shift.break_end_time : null,
       });
     }, 0);
     return Math.round((totalMinutes / 60) * 10) / 10;
@@ -924,11 +927,17 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                   <label className="caption uppercase">요일별 출퇴근 시간</label>
                   <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">주 {countEnabledWorkDays(newShift.daily_schedules)}일</span>
                 </div>
+                <div className="grid grid-cols-[60px_1fr_1fr_44px] items-center gap-2 px-0.5">
+                  <span />
+                  <span className="text-[9px] font-bold text-[var(--toss-gray-3)] uppercase">출근</span>
+                  <span className="text-[9px] font-bold text-[var(--toss-gray-3)] uppercase">퇴근</span>
+                  <span className="text-[9px] font-bold text-[var(--toss-gray-3)] uppercase text-center" title="체크된 요일만 휴게시간을 차감합니다">휴게</span>
+                </div>
                 <div className="space-y-1.5">
                   {WEEKDAY_OPTIONS.map((day) => {
                     const schedule = newShift.daily_schedules[day.key];
                     return (
-                      <div key={day.key} className="grid grid-cols-[68px_1fr_1fr] items-center gap-2">
+                      <div key={day.key} className="grid grid-cols-[60px_1fr_1fr_44px] items-center gap-2">
                         <label className="flex items-center gap-2 text-[11px] font-bold text-[var(--foreground)]">
                           <input
                             type="checkbox"
@@ -989,6 +998,26 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                           className="w-full p-2 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs radius-toss disabled:opacity-40"
                           data-testid={`shift-day-${day.key}-end`}
                         />
+                        <div className="flex justify-center">
+                          <input
+                            type="checkbox"
+                            checked={schedule.apply_break}
+                            disabled={!schedule.enabled}
+                            onChange={e => {
+                              const checked = e.target.checked;
+                              setNewShift((prev) => ({
+                                ...prev,
+                                daily_schedules: {
+                                  ...prev.daily_schedules,
+                                  [day.key]: { ...prev.daily_schedules[day.key], apply_break: checked },
+                                },
+                              }));
+                            }}
+                            className="w-4 h-4 text-[var(--accent)] disabled:opacity-40"
+                            title={`${day.label} 휴게시간 적용`}
+                            data-testid={`shift-day-${day.key}-break`}
+                          />
+                        </div>
                       </div>
                     );
                   })}
@@ -1062,6 +1091,9 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                     className="w-full p-3 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs radius-toss"
                   />
                 </div>
+                <p className="col-span-2 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                  휴게시간은 위 요일별 표에서 &apos;휴게&apos;가 체크된 요일에만 차감되어 근무시간이 계산됩니다.
+                </p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
