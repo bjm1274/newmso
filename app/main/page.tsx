@@ -41,6 +41,7 @@ import NotificationSystem from './기능부품/알림시스템';
 import ChatAlertBanner from './기능부품/채팅알림배너';
 import PermissionPromptModal from './기능부품/권한요청모달';
 import OfflineStatusBanner from '@/app/components/OfflineStatusBanner';
+import { ChevronDown } from 'lucide-react';
 import { NavigationProvider } from './contexts/NavigationContext';
 import { CompanyProvider } from './contexts/CompanyContext';
 import { AppDataProvider } from './contexts/AppDataContext';
@@ -118,6 +119,8 @@ function MainPageContent() {
   // 초기 상태를 로컬 스토리지에서 시도 (기본: 내 정보)
   const [mainMenu, setMainMenu] = useState('내정보');
   const [subView, setSubView] = useState('전체');
+  // 모바일 2차 서브메뉴 칩바 접기/펼치기 (데스크톱 사이드바는 항상 표시)
+  const [subNavCollapsed, setSubNavCollapsed] = useState(false);
   const [selectedCo, setSelectedCo] = useState('전체');
   const [initialMyPageTab, setInitialMyPageTab] = useState<string | null>(null);
   const [initialBoardView, setInitialBoardView] = useState<string | null>(null);
@@ -1229,8 +1232,27 @@ function MainPageContent() {
       />
 
       {selectableSubMenus.length > 0 && (
-        <aside className="app-subnav no-scrollbar scroll-smooth snap-x snap-mandatory flex w-full shrink-0 flex-col overflow-x-auto border-b md:sticky md:top-0 md:max-h-[100dvh] md:w-[var(--submenu-width)] md:snap-none md:overflow-x-visible md:overflow-y-auto md:border-r md:border-b-0">
-          <div className="flex flex-row gap-0.5 px-2 py-1.5 md:flex-col md:px-2 md:py-3">
+        <aside className="app-subnav flex w-full shrink-0 flex-col border-b md:sticky md:top-0 md:max-h-[100dvh] md:w-[var(--submenu-width)] md:overflow-y-auto md:border-r md:border-b-0">
+          <button
+            type="button"
+            onClick={() => setSubNavCollapsed((v) => !v)}
+            aria-expanded={!subNavCollapsed}
+            aria-controls="app-subnav-items"
+            className="flex min-h-11 w-full shrink-0 touch-manipulation items-center justify-between gap-2 px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] md:hidden"
+          >
+            <span className="truncate">
+              {selectableSubMenus.find((s) => s.id === displayedSubView)?.label || '서브메뉴'}
+            </span>
+            <ChevronDown
+              size={16}
+              aria-hidden="true"
+              className={`shrink-0 transition-transform duration-150 ${subNavCollapsed ? '' : 'rotate-180'}`}
+            />
+          </button>
+          <div
+            id="app-subnav-items"
+            className={`${subNavCollapsed ? 'hidden md:flex' : 'flex'} no-scrollbar scroll-smooth snap-x snap-mandatory flex-row gap-0.5 overflow-x-auto px-2 py-1.5 md:flex-col md:snap-none md:overflow-x-visible md:px-2 md:py-3`}
+          >
           {(() => {
             if (mainMenu === '관리자' || mainMenu === '재고관리') {
               const groups = currentSubMenuGroups;
