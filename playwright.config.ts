@@ -55,6 +55,18 @@ export default defineConfig({
       },
     },
     {
+      // 320px 폭 회귀 — 가로 오버플로우 자동 탐지 전용.
+      // 기존 .mobile.spec.ts는 iPhone 13(390px) 기준이라 여기서 돌리지 않는다.
+      name: 'mobile-320',
+      testMatch: /mobile-overflow\.mobile\.spec\.ts/,
+      use: {
+        browserName: 'chromium',
+        viewport: { width: 320, height: 568 },
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
+    {
       name: 'a11y-chromium',
       testDir: './tests/a11y',
       testMatch: /.*\.a11y\.spec\.ts/,
