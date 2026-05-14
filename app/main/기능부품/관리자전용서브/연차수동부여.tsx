@@ -214,7 +214,7 @@ export default function AnnualLeaveManualGrant({
   const getCompensated = (staff: any) =>
     edits[staff.id]?.compensated ?? balances[staff.id]?.compensated ?? 0;
   const getRemaining = (staff: any) =>
-    Math.max(0, getTotal(staff) - getUsed(staff) - getExpired(staff) - getCompensated(staff));
+    getTotal(staff) - getUsed(staff) - getExpired(staff) - getCompensated(staff);
 
   const setField = (id: string, key: keyof EditState, value: number) =>
     setEdits((prev) => ({ ...prev, [id]: { ...prev[id], [key]: clampNumber(value) } }));
