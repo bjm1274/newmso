@@ -257,24 +257,8 @@ function getShiftBandColorClass(band: ShiftBand, variant: 'tool' | 'cell') {
   }
 }
 
-function getCompactShiftLabel(
-  shift:
-    | {
-        name?: string | null;
-        start_time?: string | null;
-        end_time?: string | null;
-        shift_type?: string | null;
-        description?: string | null;
-      }
-    | null
-    | undefined
-) {
-  const band = resolveRosterShiftBand(shift);
-  if (band === 'day') return 'D';
-  if (band === 'evening') return 'E';
-  if (band === 'night') return 'N';
-  if (band === 'off') return '휴무';
-  return String(shift?.name || '').replace('근무', '').slice(0, 3);
+function getShiftCellLabel(shift: { name?: string | null } | null | undefined) {
+  return String(shift?.name || '').trim();
 }
 
 function buildWeekDates(anchorDate: string) {
@@ -1486,8 +1470,8 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
                               }
                             }}
                           >
-                            <div className="w-full h-8 flex items-center justify-center text-[11px] rounded transition-all">
-                              {shiftObj ? getCompactShiftLabel(shiftObj) : <span className="opacity-0 group-hover:opacity-20 text-[9px] text-[var(--toss-gray-3)] font-black">+</span>}
+                            <div className="w-full h-8 flex items-center justify-center text-center text-[10px] leading-tight font-bold rounded transition-all px-0.5">
+                              {shiftObj ? getShiftCellLabel(shiftObj) : <span className="text-[var(--toss-gray-3)] font-semibold">휴무</span>}
                             </div>
                           </td>
                         );
