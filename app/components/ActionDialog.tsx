@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { BottomSheet } from './BottomSheet';
 import { useIsMobile } from './useIsMobile';
+import { useSheetHistory } from '../hooks/useSheetHistory';
 
 export type ActionDialogTone = 'default' | 'accent' | 'danger';
 export type ActionDialogMode = 'confirm' | 'prompt';
@@ -124,6 +125,13 @@ export default function ActionDialog({
     if (!required) return true;
     return value.trim().length > 0;
   }, [busy, mode, required, value]);
+
+  // 모바일 시트일 때만 뒤로가기로 닫히도록 history entry push
+  const isMobileSheet = mobileVariant === 'sheet' && isMobile;
+  const handleSheetClose = useCallback(() => {
+    if (!busy) onCancel();
+  }, [busy, onCancel]);
+  useSheetHistory(open && isMobileSheet, handleSheetClose);
 
   if (!open) return null;
 

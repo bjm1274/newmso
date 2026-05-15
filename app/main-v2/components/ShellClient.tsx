@@ -9,7 +9,7 @@
  * - JM4: any 금지, 타입 명시
  */
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
 import BottomTab, { type BottomTabId } from '@/app/components/BottomTab';
@@ -52,6 +52,13 @@ export function ShellClient({ children }: ShellClientProps) {
   const [activeTab, setActiveTab] = useState<BottomTabId>(() =>
     resolveTabId(pathname),
   );
+
+  // 깊은 라우팅 진입/네비게이션 시 BottomTab/Sidebar 활성 상태 복원
+  // (라우터 push 또는 popstate로 pathname이 바뀌면 자동 동기화)
+  useEffect(() => {
+    setActiveMenu(resolveMenuId(pathname));
+    setActiveTab(resolveTabId(pathname));
+  }, [pathname]);
 
   return (
     <div className="flex h-dvh overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
