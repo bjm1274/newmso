@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { BottomSheet } from './BottomSheet';
 import { useIsMobile } from './useIsMobile';
+import { useSheetHistory } from '../hooks/useSheetHistory';
 
 export type RiskActionSeverity = 'warning' | 'danger' | 'critical';
 export type RiskActionMobileVariant = 'sheet' | 'modal';
@@ -120,6 +121,13 @@ export function RiskActionDialog({
     if (!confirmationPhrase) return true;
     return typedPhrase.trim() === confirmationPhrase;
   }, [busy, confirmationPhrase, typedPhrase]);
+
+  // 모바일 시트일 때만 뒤로가기로 닫히도록 history entry push
+  const isMobileSheet = mobileVariant === 'sheet' && isMobile;
+  const handleSheetClose = useCallback(() => {
+    if (!busy) onCancel();
+  }, [busy, onCancel]);
+  useSheetHistory(open && isMobileSheet, handleSheetClose);
 
   if (!open) return null;
 
