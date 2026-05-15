@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
 import {
@@ -14,6 +13,7 @@ import {
   type SupplyRequestItemUnit,
   type SupplyRequestMonthlySuggestion,
 } from '@/app/main/inventory-utils';
+import SuppliesPurchaseGrid from './비품구매양식Grid';
 
 export type SupplyRow = {
   name: string;
@@ -750,176 +750,21 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
           ))}
         </div>
 
-        <div className="hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-sm md:block">
-          <table className="w-full max-w-full table-fixed border-collapse">
-            <colgroup>
-              <col className="w-[13%]" />
-              <col className="w-[30%]" />
-              <col className="w-[15%]" />
-              <col className="w-[15%]" />
-              <col className="w-[21%]" />
-              <col className="w-[6%]" />
-            </colgroup>
-            <thead className="bg-[var(--muted)]">
-              <tr className="border-b border-[var(--border)]">
-                <th
-                  className="cursor-pointer select-none px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)] hover:text-[var(--accent)]"
-                  onClick={() => handleSort('category')}
-                >
-                  품목구분 {sortKey === 'category' ? (sortAsc ? '▲' : '▼') : ''}
-                </th>
-                <th
-                  className="cursor-pointer select-none px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)] hover:text-[var(--accent)]"
-                  onClick={() => handleSort('name')}
-                >
-                  물품명 {sortKey === 'name' ? (sortAsc ? '▲' : '▼') : ''}
-                </th>
-                <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">현재 재고</th>
-                <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">신청 수량</th>
-                <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">용도</th>
-                <th className="px-1 py-2" aria-label="행 삭제" />
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, index) => (
-                <tr key={`desktop-reordered-${index}`} className="border-b border-[var(--border)] last:border-b-0">
-                  <td className="px-1.5 py-1.5 align-middle">
-                    <select
-                      data-testid={`supplies-item-category-${index}`}
-                      value={item.category}
-                      onChange={(event) => updateItemField(index, 'category', event.target.value)}
-                      className="h-10 w-full rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-2 text-[10px] font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-                    >
-                      <option value="">구분 선택</option>
-                      {SUPPLY_REQUEST_CATEGORY_OPTIONS.map((category) => (
-                        <option key={category} value={category}>
-                          {category}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-2 py-1.5 align-middle">
-                    <div>
-                      <input
-                        data-supply-input
-                        data-testid={`supplies-item-name-${index}`}
-                        ref={(el) => { if (el) inputRefs.current.set(index, el); }}
-                        value={item.name}
-                        onChange={(event) => {
-                          handleSearch(index, event.target.value);
-                          updateDropdownPosition(index);
-                        }}
-                        onFocus={(event) => {
-                          handleSearch(index, event.target.value);
-                          updateDropdownPosition(index);
-                        }}
-                        onBlur={() => {
-                          // 클릭 선택 가능하도록 약간의 딜레이
-                          setTimeout(() => setActiveDropdownIndex((prev) => prev === index ? null : prev), 200);
-                        }}
-                        className="h-10 w-full rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-2.5 text-xs font-bold text-[var(--foreground)] outline-none transition-all focus:bg-[var(--card)] focus:ring-2 focus:ring-[var(--accent)]/20"
-                        placeholder="물품명을 입력하세요"
-                      />
-                      {activeDropdownIndex === index && item.suggestions.length > 0 && dropdownPos
-                        ? createPortal(
-                            <div
-                              data-supply-dropdown
-                              className="fixed z-[9999] max-h-[240px] overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-lg"
-                              style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
-                            >
-                              {item.suggestions.map((suggestion, suggestionIndex) => (
-                                <div
-                                  key={`${suggestion.name}-${suggestionIndex}`}
-                                  data-testid={`supplies-item-suggestion-${index}-${suggestionIndex}`}
-                                  onMouseDown={() => selectItem(index, suggestion)}
-                                  className="flex cursor-pointer items-center justify-between gap-3 border-b p-3 text-[11px] font-bold transition-colors last:border-none hover:bg-[var(--muted)]"
-                                >
-                                  <div className="min-w-0">
-                                    <span className="block truncate text-[var(--foreground)]">{suggestion.name}</span>
-                                    {suggestion.spec ? (
-                                      <span className="mt-1 block truncate text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                                        {suggestion.spec}
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                  <span
-                                    className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold ${
-                                      suggestion.stock <= suggestion.min_stock
-                                        ? 'bg-red-500/20 text-red-600'
-                                        : 'bg-green-500/20 text-green-600'
-                                    }`}
-                                  >
-                                    재고 {suggestion.stock} {suggestion.unit}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>,
-                            document.body,
-                          )
-                        : null}
-                    </div>
-                  </td>
-                  <td className="px-2 py-1.5 align-middle">
-                    <div
-                      data-testid={`supplies-item-current-stock-${index}`}
-                      className={`inline-flex min-h-[40px] min-w-[88px] items-center justify-center rounded-[var(--radius-md)] px-2.5 text-[11px] font-black ${
-                        item.currentStock === null
-                          ? 'bg-[var(--muted)] text-[var(--toss-gray-3)]'
-                          : item.currentStock <= 5
-                            ? 'bg-red-500/10 text-red-600'
-                            : 'bg-blue-500/10 text-blue-600'
-                      }`}
-                    >
-                      {item.currentStock === null ? '-' : `${item.currentStock} ${item.unit}`}
-                    </div>
-                  </td>
-                  <td className="px-2 py-1.5 align-middle">
-                    <div className="flex items-center gap-2">
-                      <input
-                        data-testid={`supplies-item-qty-${index}`}
-                        type="number"
-                        min="1"
-                        value={item.qty}
-                        onChange={(event) => updateItemField(index, 'qty', event.target.value)}
-                        className="h-10 w-full min-w-[64px] rounded-[var(--radius-md)] border-none bg-[var(--toss-blue-light)]/50 px-2.5 text-center text-sm font-black tabular-nums tracking-tight text-[var(--accent)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
-                      />
-                      <span
-                        data-testid={`supplies-item-unit-${index}`}
-                        className="shrink-0 rounded-full bg-[var(--muted)] px-2.5 py-1 text-[10px] font-black text-[var(--accent)]"
-                      >
-                        {item.unit}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-2 py-1.5 align-middle">
-                    <input
-                      data-testid={`supplies-item-purpose-${index}`}
-                      value={item.purpose}
-                      onChange={(event) => updateItemField(index, 'purpose', event.target.value)}
-                      className="h-10 w-full rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-2.5 text-xs font-semibold text-[var(--foreground)] outline-none transition-all focus:bg-[var(--card)] focus:ring-2 focus:ring-[var(--accent)]/20"
-                      placeholder="사용 용도를 입력하세요"
-                    />
-                  </td>
-                  <td className="px-1 py-1.5 align-middle">
-                    <button
-                      type="button"
-                      data-testid={`supplies-item-remove-${index}`}
-                      onClick={() => removeItemAt(index)}
-                      disabled={items.length <= 1}
-                      aria-label={`항목 ${index + 1} 삭제`}
-                      title="이 항목 삭제"
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-4)] transition-colors hover:border-red-300 hover:bg-red-500/10 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
-                        <line x1="5" y1="12" x2="19" y2="12" />
-                      </svg>
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <SuppliesPurchaseGrid
+          items={items}
+          inputRefs={inputRefs}
+          dropdownPos={dropdownPos}
+          activeDropdownIndex={activeDropdownIndex}
+          setActiveDropdownIndex={setActiveDropdownIndex}
+          sortKey={sortKey}
+          sortAsc={sortAsc}
+          handleSearch={handleSearch}
+          selectItem={selectItem}
+          updateItemField={updateItemField}
+          updateDropdownPosition={updateDropdownPosition}
+          handleSort={handleSort}
+          removeItemAt={removeItemAt}
+        />
 
       </div>
     </div>
