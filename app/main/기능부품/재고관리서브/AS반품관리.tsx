@@ -2,51 +2,21 @@
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
+import {
+  ASRecordGrid,
+  ReturnRecordGrid,
+  AS_STATUS_COLORS,
+  RETURN_STATUS_COLORS,
+  type AsRecord,
+  type AsStatus,
+  type ReturnRecord,
+  type ReturnStatus,
+} from './AS반품관리Grid';
 
 const AS_STORAGE_KEY = 'erp_as_records';
 const RETURN_STORAGE_KEY = 'erp_return_records';
 
-type AsStatus = '접수' | '처리중' | '완료' | '반품';
-type ReturnStatus = '요청' | '승인' | '완료';
 type ActiveTab = 'as' | 'return' | 'history';
-
-interface AsRecord {
-  id: string;
-  device_name: string;
-  model_name: string;
-  received_date: string;
-  problem_description: string;
-  company_name: string;
-  manager_name: string;
-  status: AsStatus;
-  created_at: string;
-  type: 'as';
-}
-
-interface ReturnRecord {
-  id: string;
-  item_name: string;
-  quantity: number;
-  return_reason: string;
-  company_name: string;
-  return_date: string;
-  status: ReturnStatus;
-  created_at: string;
-  type: 'return';
-}
-
-const AS_STATUS_COLORS: Record<AsStatus, string> = {
-  접수: 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]',
-  처리중: 'bg-blue-500/10 text-blue-600',
-  완료: 'bg-green-500/10 text-green-600',
-  반품: 'bg-red-500/10 text-red-600',
-};
-
-const RETURN_STATUS_COLORS: Record<ReturnStatus, string> = {
-  요청: 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]',
-  승인: 'bg-blue-500/10 text-blue-600',
-  완료: 'bg-green-500/10 text-green-600',
-};
 
 const generateId = () => crypto.randomUUID();
 
@@ -432,161 +402,25 @@ export default function ASReturnManagement({ user }: { user: any }) {
 
       {/* AS 접수 탭 */}
       {activeTab === 'as' && (
-        <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm overflow-hidden">
-          {asRecords.length === 0 ? (
-            <div className="py-8 text-center text-[var(--toss-gray-3)] font-semibold text-sm">
-              <p className="mb-2 text-2xl">🔧</p>
-              <p>등록된 AS 접수 내역이 없습니다.</p>
-              <p className="text-[11px] mt-1 text-[var(--toss-gray-3)]">우측 상단의 + AS 등록 버튼을 눌러 새 항목을 추가하세요.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto no-scrollbar">
-              <table className="w-full text-left border-collapse min-w-[800px]">
-                <thead>
-                  <tr className="bg-[var(--muted)]/50 border-b border-[var(--border)]">
-                    <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">기기명 / 모델</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">접수일</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">문제 내용</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">업체 / 담당자</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-center">상태</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-right">관리</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border)]">
-                  {asRecords.map(record => (
-                    <tr key={record.id} className="hover:bg-[var(--toss-blue-light)]/40 transition-all group" data-testid={`as-record-row-${record.id}`}>
-                      <td className="px-4 py-3">
-                        <p className="text-xs font-semibold text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors">{record.device_name}</p>
-                        {record.model_name && (
-                          <p className="text-[11px] text-[var(--toss-gray-3)] mt-0.5">{record.model_name}</p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-xs font-semibold text-[var(--toss-gray-4)]">{record.received_date}</p>
-                      </td>
-                      <td className="px-4 py-3 max-w-[200px]">
-                        <p className="text-xs text-[var(--toss-gray-4)] truncate" title={record.problem_description}>
-                          {record.problem_description || '-'}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-xs font-semibold text-[var(--foreground)]">{record.company_name || '-'}</p>
-                        <p className="text-[11px] text-[var(--toss-gray-3)]">{record.manager_name || '-'}</p>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <select
-                          value={record.status}
-                          onChange={e => updateAsStatus(record.id, e.target.value as AsStatus)}
-                          data-testid={`as-status-${record.id}`}
-                          className={`px-2 py-1 rounded-full text-[11px] font-semibold border-0 cursor-pointer outline-none ${AS_STATUS_COLORS[record.status]}`}
-                        >
-                          {(['접수', '처리중', '완료', '반품'] as AsStatus[]).map(s => (
-                            <option key={s} value={s}>{s}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-4 py-3 text-right space-x-1">
-                        <button
-                          onClick={() => openAsEdit(record)}
-                          data-testid={`as-edit-${record.id}`}
-                          className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--accent)] text-[11px] font-semibold rounded-md hover:opacity-80"
-                        >
-                          수정
-                        </button>
-                        <button
-                          onClick={() => deleteAsRecord(record.id)}
-                          data-testid={`as-delete-${record.id}`}
-                          className="px-2 py-1 bg-red-500/10 text-red-600 text-[11px] font-semibold rounded-md hover:bg-red-500/20"
-                        >
-                          삭제
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+        <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm p-3 md:p-2" data-testid="as-record-list">
+          <ASRecordGrid
+            records={asRecords}
+            updateStatus={updateAsStatus}
+            onEdit={openAsEdit}
+            onDelete={deleteAsRecord}
+          />
         </div>
       )}
 
       {/* 반품 탭 */}
       {activeTab === 'return' && (
-        <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm overflow-hidden">
-          {returnRecords.length === 0 ? (
-            <div className="py-8 text-center text-[var(--toss-gray-3)] font-semibold text-sm">
-              <p className="mb-2 text-2xl">↩</p>
-              <p>등록된 반품 내역이 없습니다.</p>
-              <p className="text-[11px] mt-1 text-[var(--toss-gray-3)]">우측 상단의 + 반품 등록 버튼을 눌러 새 항목을 추가하세요.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto no-scrollbar">
-              <table className="w-full text-left border-collapse min-w-[700px]">
-                <thead>
-                  <tr className="bg-[var(--muted)]/50 border-b border-[var(--border)]">
-                    <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">품목명</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-center">수량</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">반품사유</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">업체</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">반품일</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-center">상태</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-right">관리</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border)]">
-                  {returnRecords.map(record => (
-                    <tr key={record.id} className="hover:bg-[var(--toss-blue-light)]/40 transition-all group" data-testid={`return-record-row-${record.id}`}>
-                      <td className="px-4 py-3">
-                        <p className="text-xs font-semibold text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors">{record.item_name}</p>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <p className="text-xs font-semibold text-[var(--foreground)]">{record.quantity}</p>
-                      </td>
-                      <td className="px-4 py-3 max-w-[180px]">
-                        <p className="text-xs text-[var(--toss-gray-4)] truncate" title={record.return_reason}>
-                          {record.return_reason || '-'}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-xs font-semibold text-[var(--toss-gray-4)]">{record.company_name || '-'}</p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-xs font-semibold text-[var(--toss-gray-4)]">{record.return_date}</p>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <select
-                          value={record.status}
-                          onChange={e => updateReturnStatus(record.id, e.target.value as ReturnStatus)}
-                          data-testid={`return-status-${record.id}`}
-                          className={`px-2 py-1 rounded-full text-[11px] font-semibold border-0 cursor-pointer outline-none ${RETURN_STATUS_COLORS[record.status]}`}
-                        >
-                          {(['요청', '승인', '완료'] as ReturnStatus[]).map(s => (
-                            <option key={s} value={s}>{s}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-4 py-3 text-right space-x-1">
-                        <button
-                          onClick={() => openReturnEdit(record)}
-                          data-testid={`return-edit-${record.id}`}
-                          className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--accent)] text-[11px] font-semibold rounded-md hover:opacity-80"
-                        >
-                          수정
-                        </button>
-                        <button
-                          onClick={() => deleteReturnRecord(record.id)}
-                          data-testid={`return-delete-${record.id}`}
-                          className="px-2 py-1 bg-red-500/10 text-red-600 text-[11px] font-semibold rounded-md hover:bg-red-500/20"
-                        >
-                          삭제
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+        <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm p-3 md:p-2" data-testid="return-record-list">
+          <ReturnRecordGrid
+            records={returnRecords}
+            updateStatus={updateReturnStatus}
+            onEdit={openReturnEdit}
+            onDelete={deleteReturnRecord}
+          />
         </div>
       )}
 
