@@ -9,6 +9,7 @@ import {
   ApprovalRiskReviewDialog,
   buildApprovalWorkflowSummary,
 } from './ApprovalRiskReviewDialog';
+import { ResponsiveTable, type Column, type ResponsiveTableSelection } from '@/app/components/ResponsiveTable';
 
 type ApprovalRecord = Record<string, unknown>;
 type TemplateMeta = { slug?: string | null; name?: string | null };
@@ -153,6 +154,160 @@ export default function ApprovalInboxView({
   };
 
   const [searchExpanded, setSearchExpanded] = useState(false);
+
+  // ResponsiveTable: 결재함일 때만 selection 활성화
+  const selection: ResponsiveTableSelection | undefined = useMemo(() => {
+    if (viewMode !== '결재함' || bulkTargetList.length === 0) return undefined;
+    const bulkTargetIds = new Set(bulkTargetList.map((item) => String(item.id || '')));
+    return {
+      selected: new Set(selectedApprovalIds),
+      onToggle: (key: string) => toggleSelectOne(key),
+      onToggleAll: () => toggleSelectAll(),
+      allSelected: allBulkSelected,
+      indeterminate: selectedApprovalIds.length > 0 && !allBulkSelected,
+      isRowSelectable: (key: string) => bulkTargetIds.has(key),
+      getRowAriaLabel: (key: string) => {
+        const target = listForView.find((item) => String(item.id || '') === key);
+        return `${String(target?.title || '결재 문서')} 선택`;
+      },
+    };
+  }, [viewMode, bulkTargetList, selectedApprovalIds, allBulkSelected, toggleSelectOne, toggleSelectAll, listForView]);
+
+  // 컬럼 정의 — viewMode 무관 (selection은 별도 prop)
+  const columns: Column<ApprovalRecord>[] = useMemo(() => [
+    {
+      key: 'title',
+      label: '문서 제목',
+      primary: true,
+      render: (item) => (
+        <div className="min-w-[220px]" data-testid={`approval-card-${String(item.id || '')}`}>
+          <p className="font-bold text-[var(--foreground)]">{String(item.title || '제목 없음')}</p>
+          <ApprovalProgressSummary
+            item={item}
+            staffs={lookupStaffsForDisplay}
+            resolveApprovalLineIds={resolveApprovalLineIds}
+            resolveCurrentApproverId={resolveCurrentApproverId}
+            resolveApprovalDelaySnapshot={resolveApprovalDelaySnapshot}
+            compact
+          />
+        </div>
+      ),
+    },
+    {
+      key: 'sender_name',
+      label: '기안자',
+      render: (item) => String(item.sender_name || '사용자'),
+    },
+    {
+      key: 'type',
+      label: '문서 유형',
+      render: (item) => {
+        const templateMeta = resolveApprovalTemplateMeta(item);
+        return <span className="erp-status erp-status-blue">{templateMeta.name || String(item.type || '결재')}</span>;
+      },
+    },
+    {
+      key: 'created_at',
+      label: '기안일',
+      render: (item) => formatDraftDate(item.created_at),
+    },
+    {
+      key: 'status',
+      label: '상태',
+      render: (item) => {
+        const status = statusTone(item.status);
+        const workflowSummary = buildApprovalWorkflowSummary({
+          item,
+          staffs: lookupStaffsForDisplay,
+          resolveApprovalLineIds,
+          resolveCurrentApproverId,
+        });
+        return (
+          <div className="flex flex-col items-start gap-1">
+            <span className={status.className}>{status.label}</span>
+            {String(item.status || '').includes('대기') && (
+              <span className="text-[10px] font-bold text-[var(--muted-foreground)]">
+                {workflowSummary.currentApproverName}
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: '__actions',
+      label: '관리',
+      align: 'right',
+      render: (item) => {
+        const itemId = String(item.id || '');
+        return (
+          <div
+            className="flex items-center justify-end gap-2"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {canUserRecallItem(item) && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void handleRecallAction(item);
+                }}
+                className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--toss-gray-4)] shadow-sm transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--accent-light)] hover:text-[var(--accent)]"
+              >
+                회수 후 수정
+              </button>
+            )}
+            {canUserApproveItem(item) && String(item.status || '').includes('대기') && (
+              <>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void handleApproveAction(item);
+                  }}
+                  className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--success)] shadow-sm transition-all hover:bg-[var(--success-light)]"
+                >
+                  승인
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void handleRejectAction(item);
+                  }}
+                  className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--danger)] shadow-sm transition-all hover:bg-[var(--danger-light)]"
+                >
+                  반려
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setSelectedApprovalId(itemId);
+              }}
+              className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--foreground)] shadow-sm transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--accent-light)] hover:text-[var(--accent)]"
+            >
+              상세
+            </button>
+          </div>
+        );
+      },
+    },
+  ], [
+    lookupStaffsForDisplay,
+    resolveApprovalLineIds,
+    resolveCurrentApproverId,
+    resolveApprovalDelaySnapshot,
+    resolveApprovalTemplateMeta,
+    canUserRecallItem,
+    canUserApproveItem,
+    handleRecallAction,
+    handleApproveAction,
+    handleRejectAction,
+    setSelectedApprovalId,
+  ]);
 
   const closeBulkReview = () => {
     setBulkReviewAction(null);
@@ -350,134 +505,15 @@ export default function ApprovalInboxView({
       {listForView.length === 0 ? null : (
         <section className="erp-table-card">
           <div className="overflow-x-auto">
-            <table className="erp-table min-w-[860px]">
-              <thead>
-                <tr>
-                  {viewMode === '결재함' && <th className="w-10" />}
-                  <th>문서 제목</th>
-                  <th>기안자</th>
-                  <th>문서 유형</th>
-                  <th>기안일</th>
-                  <th>상태</th>
-                  <th className="text-right">관리</th>
-                </tr>
-              </thead>
-              <tbody>
-                {listForView.map((item) => {
-                  const itemId = String(item.id || '');
-                  const isBulkTarget = viewMode === '결재함' && canUserApproveItem(item);
-                  const isChecked = selectedApprovalIds.includes(itemId);
-                  const templateMeta = resolveApprovalTemplateMeta(item);
-                  const status = statusTone(item.status);
-                  const workflowSummary = buildApprovalWorkflowSummary({
-                    item,
-                    staffs: lookupStaffsForDisplay,
-                    resolveApprovalLineIds,
-                    resolveCurrentApproverId,
-                  });
-
-                  return (
-                    <tr
-                      key={itemId}
-                      data-testid={`approval-card-${itemId}`}
-                      className="cursor-pointer"
-                      onClick={() => setSelectedApprovalId(itemId)}
-                    >
-                      {viewMode === '결재함' && (
-                        <td>
-                          {isBulkTarget ? (
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onClick={(event) => event.stopPropagation()}
-                              onChange={() => toggleSelectOne(itemId)}
-                              className="h-4 w-4 accent-[var(--accent)]"
-                              aria-label={`${String(item.title || '결재 문서')} 선택`}
-                            />
-                          ) : null}
-                        </td>
-                      )}
-                      <td>
-                        <div className="min-w-[220px]">
-                          <p className="font-bold text-[var(--foreground)]">{String(item.title || '제목 없음')}</p>
-                          <ApprovalProgressSummary
-                            item={item}
-                            staffs={lookupStaffsForDisplay}
-                            resolveApprovalLineIds={resolveApprovalLineIds}
-                            resolveCurrentApproverId={resolveCurrentApproverId}
-                            resolveApprovalDelaySnapshot={resolveApprovalDelaySnapshot}
-                            compact
-                          />
-                        </div>
-                      </td>
-                      <td>{String(item.sender_name || '사용자')}</td>
-                      <td><span className="erp-status erp-status-blue">{templateMeta.name || String(item.type || '결재')}</span></td>
-                      <td>{formatDraftDate(item.created_at)}</td>
-                      <td>
-                        <div className="flex flex-col items-start gap-1">
-                          <span className={status.className}>{status.label}</span>
-                          {String(item.status || '').includes('대기') && (
-                            <span className="text-[10px] font-bold text-[var(--muted-foreground)]">
-                              {workflowSummary.currentApproverName}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td>
-                        <div className="flex items-center justify-end gap-2">
-                          {canUserRecallItem(item) && (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                void handleRecallAction(item);
-                              }}
-                              className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--toss-gray-4)] shadow-sm transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--accent-light)] hover:text-[var(--accent)]"
-                            >
-                              회수 후 수정
-                            </button>
-                          )}
-                          {canUserApproveItem(item) && String(item.status || '').includes('대기') && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  void handleApproveAction(item);
-                                }}
-                                className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--success)] shadow-sm transition-all hover:bg-[var(--success-light)]"
-                              >
-                                승인
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  void handleRejectAction(item);
-                                }}
-                                className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--danger)] shadow-sm transition-all hover:bg-[var(--danger-light)]"
-                              >
-                                반려
-                              </button>
-                            </>
-                          )}
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setSelectedApprovalId(itemId);
-                            }}
-                            className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--foreground)] shadow-sm transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--accent-light)] hover:text-[var(--accent)]"
-                          >
-                            상세
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="min-w-[860px]">
+              <ResponsiveTable<ApprovalRecord>
+                columns={columns}
+                rows={listForView}
+                keyField="id"
+                onRowClick={(row) => setSelectedApprovalId(String(row.id || ''))}
+                selection={selection}
+              />
+            </div>
           </div>
         </section>
       )}
