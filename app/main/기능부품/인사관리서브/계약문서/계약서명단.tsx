@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
+import { isActiveStaff } from '@/lib/active-staff';
 
-type Staff = { id: number; name: string; employee_no?: string; company?: string; department?: string; position?: string };
+type Staff = { id: number; name: string; employee_no?: string; company?: string; department?: string; position?: string; status?: string | null };
 type Contract = { staff_id: number; status?: string };
 
 interface ContractListProps {
@@ -20,7 +21,9 @@ export default function ContractList({ selectedCo, staffs, contracts = [], onSel
   const checkedIds = (_checkedIds ?? []) as number[];
   const setCheckedIds = (_setCheckedIds ?? (() => {})) as (ids: number[]) => void;
 
+  // 계약 발송 대상 명부 — 퇴사자 제외 (현직 직원만 신규/변경 계약 발송)
   const filtered = (staffs ?? []).filter((s) =>
+    isActiveStaff(s) &&
     (selectedCo === '전체' || s.company === selectedCo) &&
     (s.name.includes(filter) || s.employee_no?.includes(filter))
   );

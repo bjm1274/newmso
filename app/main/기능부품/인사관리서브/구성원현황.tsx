@@ -21,12 +21,14 @@ import {
   getStaffContractEndDate,
   getStaffEmploymentType,
   getStaffExtension,
-  getStaffLicenseDate,
-  getStaffLicenseNo,
-  getStaffLicenseNote,
   getStaffProbationMonths,
   toIntegerOrFallback,
 } from '@/lib/staff-meta';
+import {
+  fetchStaffLicensesGrouped,
+  summarizeLicenses,
+  type StaffLicenseRow,
+} from './구성원현황/staff-license-link';
 import StaffHistoryTimeline from './인사이력타임라인';
 import OnboardingChecklist from './급여명세/입퇴사온보딩';
 import CertTransferPanel from './교육자격인사이동패널';
@@ -190,10 +192,12 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const [선택된직원ID, 선택된직원ID설정] = useState<string | number | null>(null);
   const [근무형태목록, 근무형태목록설정] = useState<any[]>([]);
   const [팀목록캐시, 팀목록캐시설정] = useState<Record<string, string[]>>({});
-  const [새근무형태표시, 새근무형태표시설정] = useState(false);
-  const [새근무형태, 새근무형태설정] = useState({ name: '', start_time: '09:00', end_time: '18:00', break_start_time: '12:00', break_end_time: '13:00' });
   const [activeTab, setActiveTab] = useState('기본'); // '기본', '소속', '급여'
   const [신규직원, 신규직원설정] = useState(() => createEmptyStaffForm(선택사업체 ?? undefined));
+  // staff_licenses 연동: staff_id별 면허 rows. 자격안전센터와 공유하는 단일 기준값.
+  const [licensesByStaff, licensesByStaff설정] = useState<Record<string, StaffLicenseRow[]>>({});
+  // 편집 중인 직원의 첫 번째 면허 row id (없으면 null → 저장 시 insert)
+  const [편집중면허ID, 편집중면허ID설정] = useState<string | null>(null);
   const [프로필사진파일, 프로필사진파일설정] = useState<File | null>(null);
   const [프로필사진미리보기, 프로필사진미리보기설정] = useState<string | null>(null);
   const previousModalOpenRef = useRef(false);
@@ -523,6 +527,20 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     fetchTeams();
   }, [새로고침]);
 
+  // 직원목록의 staff_licenses를 일괄 조회·그룹핑 (자격안전센터와 동기화). 새로고침 시에도 갱신.
+  useEffect(() => {
+    let cancelled = false;
+    const loadLicenses = async () => {
+      const staffIds = 직원목록.map((staff: StaffMember) => staff.id).filter(Boolean);
+      const grouped = await fetchStaffLicensesGrouped(staffIds);
+      if (!cancelled) licensesByStaff설정(grouped);
+    };
+    loadLicenses();
+    return () => {
+      cancelled = true;
+    };
+  }, [직원목록, 새로고침]);
+
   // 주당 근로시간 변경 시 연차 자동 계산 (비례 산정)
   useEffect(() => {
     const hours = 신규직원.working_hours_per_week || 0;
@@ -631,12 +649,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   };
 
   const 직원고용형태 = (직원: StaffMember): string => getStaffEmploymentType(직원);
-  const 직원면허요약 = (직원: StaffMember) => {
-    const parts = [직원?.license, getStaffLicenseNo(직원), getStaffLicenseNote(직원)]
-      .map((value) => cleanOptionalText(value))
-      .filter(Boolean);
-    return parts.length ? parts.join(' · ') : '-';
-  };
+  // staff_licenses 기준 면허 요약 (0건 '-', 1건 이름, N건 'X 외 N-1건')
+  const 직원면허요약 = (직원: StaffMember) =>
+    summarizeLicenses(licensesByStaff[String(직원.id)]);
   const 직원연락요약 = (직원: StaffMember) => {
     const extension = getStaffExtension(직원);
     const parts = [
@@ -659,6 +674,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     const defaultTeam = 팀목록가져오기(defaultCompany)[0] ?? '원무팀';
     프로필사진파일설정(null);
     프로필사진미리보기설정(null);
+    편집중면허ID설정(null);
 
     신규직원설정({
       ...createEmptyStaffForm(defaultCompany),
@@ -683,6 +699,52 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       if (excludeId != null && String(staff.id) === String(excludeId)) return false;
       return normalizeResidentNo(String(staff.resident_no || '')) === normalizedResident;
     }) || null;
+  };
+
+  // 폼의 면허 입력값 → staff_licenses 컬럼 페이로드. license_type/expiry_date/renewed_date/issuing_body는 입력 UI가 없어 생략.
+  const buildLicensePayload = () => ({
+    license_name: 신규직원.면허사항?.trim() || '',
+    license_number: 신규직원.면허번호?.trim() || null,
+    issued_date: 신규직원.취득일자?.trim() || null,
+    memo: 신규직원.면허기타내용?.trim() || null,
+  });
+  const hasLicenseInput = () =>
+    Boolean(
+      신규직원.면허사항?.trim() ||
+        신규직원.면허번호?.trim() ||
+        신규직원.취득일자?.trim() ||
+        신규직원.면허기타내용?.trim(),
+    );
+
+  // staff_members 저장 성공 후 staff_licenses upsert. 실패해도 직원 저장은 막지 않고 warning 토스트만 노출(JM3).
+  const saveStaffLicense = async (staffId: string): Promise<string | null> => {
+    try {
+      const payload = buildLicensePayload();
+      if (편집중면허ID) {
+        // 입력값을 전부 비웠으면 기존 row를 건드리지 않는다(삭제·공란화 방지 — 자격안전센터에서 관리).
+        if (!hasLicenseInput()) return null;
+        const { error } = await supabase
+          .from('staff_licenses')
+          .update(payload)
+          .eq('id', 편집중면허ID);
+        if (error) throw error;
+        return null;
+      }
+      // 신규 row: 면허 입력값이 하나라도 있을 때만 insert
+      if (!hasLicenseInput()) return null;
+      const { error } = await supabase.from('staff_licenses').insert([
+        {
+          staff_id: String(staffId),
+          ...payload,
+          license_name: payload.license_name || '(이름 없음)',
+        },
+      ]);
+      if (error) throw error;
+      return null;
+    } catch (error) {
+      console.error('staff_licenses 저장 실패:', error);
+      return '직원 정보는 저장되었지만 면허/자격 정보 저장은 실패했습니다.';
+    }
   };
 
   const 정보저장 = async () => {
@@ -719,7 +781,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         resident_no: 신규직원.주민번호.trim(),
         email: 신규직원.이메일,
         address: 신규직원.주소,
-        license: 신규직원.면허사항,
+        // staff_licenses가 기준값 — license 컬럼은 타 화면 호환용 미러
+        license: 신규직원.면허사항?.trim() || '',
         bank_account: 신규직원.계좌정보,
         salary_info: 신규직원.임금정보,
         joined_at: dateOrNull(신규직원.입사일),
@@ -728,9 +791,6 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         permissions: {
           ...(편집모드 && 선택된직원ID ? 직원목록.find((s: StaffMember) => s.id === 선택된직원ID)?.permissions : {}),
           extension: 신규직원.내선번호 || null,
-          license_no: 신규직원.면허번호 || null,
-          license_date: dateOrNull(신규직원.취득일자),
-          license_note: 신규직원.면허기타내용?.trim() || null,
           employment_type: 신규직원.고용형태 || '정규직',
           contract_end_date: 신규직원.고용형태 === '계약직' ? dateOrNull(신규직원.계약종료일) : null,
           insurance: {
@@ -824,7 +884,10 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           }
         }
 
+        const 면허저장경고 = await saveStaffLicense(String(선택된직원ID));
+
         toast(프로필사진업로드경고 || '직원 정보가 수정되었습니다.', 프로필사진업로드경고 ? 'warning' : 'success');
+        if (면허저장경고) toast(면허저장경고, 'warning');
       } else {
         // 사번 부여 로직: 박철홍이면 1, 아니면 기존 숫자 사번의 최대값 다음 번호 사용
         let newEmployeeNo = '';
@@ -940,6 +1003,11 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           }
         }
 
+        let 면허저장경고: string | null = null;
+        if (insertedStaff?.id) {
+          면허저장경고 = await saveStaffLicense(String(insertedStaff.id));
+        }
+
         toast(
           onboardingChecklistInitFailed
             ? `직원 등록 완료!\n로그인 아이디: 사번 ${newEmployeeNo} 또는 이름 ${신규직원.성명}\n(온보딩 패키지 자동 생성은 실패해 직원 상세에서 다시 생성됩니다.)`
@@ -948,6 +1016,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         );
         if (프로필사진업로드경고) {
           toast(프로필사진업로드경고, 'warning');
+        }
+        if (면허저장경고) {
+          toast(면허저장경고, 'warning');
         }
       }
       닫기함수(); 새로고침?.();
@@ -965,15 +1036,20 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     프로필사진파일설정(null);
     프로필사진미리보기설정(getProfilePhotoUrl(직원));
     const extensionValue = getStaffExtension(직원);
+    // staff_licenses 첫 번째 row를 폼에 로드 (없으면 빈 값 + null)
+    const 직원면허목록 = licensesByStaff[String(직원.id)] || [];
+    const 첫면허 = 직원면허목록[0] ?? null;
+    편집중면허ID설정(첫면허?.id ?? null);
     const ins = (직원.permissions?.insurance as Record<string, unknown>) || { national: true, health: true, employment: true, injury: true };
     신규직원설정({
       성명: 직원.name || '', 전화번호: 직원.phone || '', 내선번호: extensionValue as string, 사업체: 직원.company || '박철홍정형외과',
       팀: 직원.department ?? '', 직함: 직원.position || '', 입사일: (직원.joined_at as string) || (직원.join_date as string) || '',
       퇴사일: (직원.resigned_at as string) || '', 주민번호: (직원.resident_no as string) || '', 이메일: 직원.email || '',
-      주소: 직원.address || '', 면허사항: (직원.license as string) || '',
-      면허번호: getStaffLicenseNo(직원),
-      취득일자: getStaffLicenseDate(직원),
-      면허기타내용: getStaffLicenseNote(직원),
+      주소: 직원.address || '',
+      면허사항: 첫면허?.license_name || '',
+      면허번호: 첫면허?.license_number || '',
+      취득일자: 첫면허?.issued_date || '',
+      면허기타내용: 첫면허?.memo || '',
       계좌정보: 직원.bank_account || '',
       임금정보: (직원.salary_info as string) || '', 상태: 직원.status || '재직',
       연차총개수: typeof 직원.annual_leave_total === 'number' ? 직원.annual_leave_total : 0,
@@ -1005,6 +1081,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
   const 닫기함수 = () => {
     편집모드설정(false); 선택된직원ID설정(null);
+    편집중면허ID설정(null);
     프로필사진파일설정(null);
     프로필사진미리보기설정(null);
     const defaultCompany = 선택사업체 && 선택사업체 !== '전체' ? 선택사업체 : '';
@@ -1098,7 +1175,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         });
       });
   }, [appliedStaffNameSearch, 보기상태, 선택사업체, 직원목록]);
-  const 면허등록인원수 = 필터목록.filter((직원: StaffMember) => Boolean(직원.license || getStaffLicenseNo(직원))).length;
+  const 면허등록인원수 = 필터목록.filter(
+    (직원: StaffMember) => (licensesByStaff[String(직원.id)]?.length ?? 0) > 0,
+  ).length;
   const 계약직인원수 = 필터목록.filter((직원: StaffMember) => 직원고용형태(직원) === '계약직').length;
   const 부서수 = new Set(필터목록.map((직원: StaffMember) => 직원.department).filter(Boolean)).size;
 
@@ -1257,7 +1336,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                   </td>
                   <td className="p-4">
                     <p className="text-xs font-bold text-[var(--foreground)]">{직원면허요약(직원)}</p>
-                    <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">취득일 {getStaffLicenseDate(직원) || '-'}</p>
+                    <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">취득일 {licensesByStaff[String(직원.id)]?.[0]?.issued_date || '-'}</p>
                   </td>
                   <td className="p-4">
                     <span className={`px-3 py-1 text-[11px] font-semibold rounded-full ${직원.status === '퇴사' ? 'bg-red-500/20 text-red-600' : 'bg-green-500/20 text-green-600'}`}>
@@ -1515,6 +1594,14 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       </div>
                       <div className="p-5 bg-amber-50 rounded-[var(--radius-xl)] border border-amber-100 space-y-4">
                         <h5 className="text-[11px] font-extrabold text-amber-800 flex items-center gap-1.5">📜 면허/자격 사항</h5>
+                        <p className="text-[10px] font-semibold text-amber-700">
+                          만료일·갱신일·다중 면허는 자격안전센터에서 관리됩니다.
+                        </p>
+                        {편집모드 && (licensesByStaff[String(선택된직원ID)]?.length ?? 0) >= 2 && (
+                          <p className="text-[10px] font-bold text-amber-800 bg-amber-100 rounded-[var(--radius-md)] px-2 py-1">
+                            이 직원은 면허 {licensesByStaff[String(선택된직원ID)]?.length}건 — 여기서는 첫 번째 면허만 수정됩니다
+                          </p>
+                        )}
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1.5">
                             <label className="text-[10px] font-bold text-amber-700 ml-1">자격 명칭</label>
@@ -1676,16 +1763,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         </div>
                       )}
                       <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <label className="text-[12px] font-bold text-[var(--toss-gray-4)] ml-1">지정 스케줄 (근무형태)</label>
-                          <button
-                            type="button"
-                            onClick={() => { 새근무형태표시설정(v => !v); 새근무형태설정({ name: '', start_time: '09:00', end_time: '18:00', break_start_time: '12:00', break_end_time: '13:00' }); }}
-                            className="text-[11px] font-bold text-[var(--accent)] flex items-center gap-0.5 hover:underline"
-                          >
-                            + 새 유형 추가
-                          </button>
-                        </div>
+                        <label className="text-[12px] font-bold text-[var(--toss-gray-4)] ml-1">지정 스케줄 (근무형태)</label>
                         <select value={신규직원.근무형태ID} onChange={e => 신규직원설정({ ...신규직원, 근무형태ID: e.target.value })} className="w-full p-4 bg-[var(--toss-blue-light)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm text-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none" data-testid="new-staff-shift-select">
                           <option value="">근무형태 선택</option>
                           {getVisibleShiftOptions(신규직원.사업체).map((s: StaffMember) => (
@@ -1694,64 +1772,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                             </option>
                           ))}
                         </select>
-                        {새근무형태표시 && (
-                          <div className="bg-blue-500/10 border border-blue-100 rounded-[var(--radius-lg)] p-3 space-y-2 animate-in fade-in slide-in-from-top-2">
-                            <p className="text-[11px] font-bold text-blue-700">새 근무형태 추가</p>
-                            <input
-                              type="text"
-                              placeholder="근무형태명 (예: 주간, 야간, 오전)"
-                              value={새근무형태.name}
-                              onChange={e => 새근무형태설정(v => ({ ...v, name: e.target.value }))}
-                              className="w-full p-2.5 text-xs font-bold bg-[var(--card)] rounded-[var(--radius-md)] border border-blue-100 outline-none"
-                            />
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <p className="text-[10px] font-bold text-blue-600 mb-1">출근</p>
-                                <input type="time" value={새근무형태.start_time} onChange={e => 새근무형태설정(v => ({ ...v, start_time: e.target.value }))} className="w-full p-2 text-xs bg-[var(--card)] rounded-[var(--radius-md)] border border-blue-100 outline-none" />
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-bold text-blue-600 mb-1">퇴근</p>
-                                <input type="time" value={새근무형태.end_time} onChange={e => 새근무형태설정(v => ({ ...v, end_time: e.target.value }))} className="w-full p-2 text-xs bg-[var(--card)] rounded-[var(--radius-md)] border border-blue-100 outline-none" />
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-bold text-blue-600 mb-1">휴게 시작</p>
-                                <input type="time" value={새근무형태.break_start_time} onChange={e => 새근무형태설정(v => ({ ...v, break_start_time: e.target.value }))} className="w-full p-2 text-xs bg-[var(--card)] rounded-[var(--radius-md)] border border-blue-100 outline-none" />
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-bold text-blue-600 mb-1">휴게 종료</p>
-                                <input type="time" value={새근무형태.break_end_time} onChange={e => 새근무형태설정(v => ({ ...v, break_end_time: e.target.value }))} className="w-full p-2 text-xs bg-[var(--card)] rounded-[var(--radius-md)] border border-blue-100 outline-none" />
-                              </div>
-                            </div>
-                            <div className="flex gap-2 pt-1">
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  if (!새근무형태.name.trim()) return toast('근무형태명을 입력하세요.', 'warning');
-                                  const { data: created, error } = await supabase.from('work_shifts').insert({
-                                    name: 새근무형태.name.trim(),
-                                    company_name: 신규직원.사업체 || null,
-                                    start_time: 새근무형태.start_time,
-                                    end_time: 새근무형태.end_time,
-                                    break_start_time: 새근무형태.break_start_time,
-                                    break_end_time: 새근무형태.break_end_time,
-                                    is_active: true,
-                                  }).select().single();
-                                  if (error || !created) { toast('근무형태 저장에 실패했습니다.', 'error'); return; }
-                                  근무형태목록설정(prev => [...prev, created]);
-                                  신규직원설정(prev => ({ ...prev, 근무형태ID: created.id }));
-                                  새근무형태표시설정(false);
-                                  toast(`'${created.name}' 근무형태가 추가되었습니다.`);
-                                }}
-                                className="flex-1 py-2 bg-[var(--accent)] text-white text-[11px] font-bold rounded-[var(--radius-md)]"
-                              >
-                                저장 후 선택
-                              </button>
-                              <button type="button" onClick={() => 새근무형태표시설정(false)} className="px-3 py-2 bg-[var(--card)] text-[11px] font-bold text-[var(--toss-gray-3)] rounded-[var(--radius-md)] border border-blue-100">
-                                취소
-                              </button>
-                            </div>
-                          </div>
-                        )}
+                        <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] ml-1">
+                          회사·조직에 등록된 근무유형만 선택할 수 있습니다. 새 근무유형은 근무유형 관리에서 추가하세요.
+                        </p>
                       </div>
                     </div>
                   </div>
