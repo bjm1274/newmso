@@ -776,64 +776,71 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
           </div>
 
           <div className="mt-4 grid grid-cols-1 gap-3 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 md:grid-cols-2 xl:grid-cols-4">
-            <label className="space-y-1">
-              <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">문서 제목</span>
+            <div className="space-y-1">
+              <label htmlFor="approval-design-title" className="block text-[11px] font-bold text-[var(--toss-gray-3)]">문서 제목</label>
               <input
+                id="approval-design-title"
                 value={previewDesign.title || ''}
                 onChange={(event) => updatePreviewDesign({ title: event.target.value })}
                 className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-2 text-sm font-semibold"
               />
-            </label>
-            <label className="space-y-1">
-              <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">회사명</span>
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="approval-design-company" className="block text-[11px] font-bold text-[var(--toss-gray-3)]">회사명</label>
               <input
+                id="approval-design-company"
                 value={previewDesign.companyLabel || ''}
                 onChange={(event) => updatePreviewDesign({ companyLabel: event.target.value })}
                 className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-2 text-sm font-semibold"
               />
-            </label>
-            <label className="space-y-1">
-              <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">로고 URL</span>
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="approval-design-logo-url" className="block text-[11px] font-bold text-[var(--toss-gray-3)]">로고 URL</label>
               <input
+                id="approval-design-logo-url"
                 value={previewDesign.backgroundLogoUrl || ''}
                 onChange={(event) => updatePreviewDesign({ backgroundLogoUrl: event.target.value })}
                 className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-2 text-sm font-semibold"
               />
-            </label>
-            <label className="space-y-1">
-              <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">직인 이미지 URL</span>
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="approval-design-seal-url" className="block text-[11px] font-bold text-[var(--toss-gray-3)]">직인 이미지 URL</label>
               <input
+                id="approval-design-seal-url"
                 value={previewDesign.sealImageUrl || ''}
                 onChange={(event) => updatePreviewDesign({ sealImageUrl: event.target.value })}
                 className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-2 text-sm font-semibold"
               />
-            </label>
-            <label className="space-y-1">
-              <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">주 색상</span>
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="approval-design-primary-color" className="block text-[11px] font-bold text-[var(--toss-gray-3)]">주 색상</label>
               <input
+                id="approval-design-primary-color"
                 type="color"
                 value={previewDesign.primaryColor || '#155eef'}
                 onChange={(event) => updatePreviewDesign({ primaryColor: event.target.value })}
                 className="h-10 w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-1"
               />
-            </label>
-            <label className="space-y-1">
-              <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">테두리 색상</span>
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="approval-design-border-color" className="block text-[11px] font-bold text-[var(--toss-gray-3)]">테두리 색상</label>
               <input
+                id="approval-design-border-color"
                 type="color"
                 value={previewDesign.borderColor || '#d7e3ff'}
                 onChange={(event) => updatePreviewDesign({ borderColor: event.target.value })}
                 className="h-10 w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-1"
               />
-            </label>
-            <label className="space-y-1">
-              <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">직인 문구</span>
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="approval-design-seal-label" className="block text-[11px] font-bold text-[var(--toss-gray-3)]">직인 문구</label>
               <input
+                id="approval-design-seal-label"
                 value={previewDesign.sealLabel || ''}
                 onChange={(event) => updatePreviewDesign({ sealLabel: event.target.value })}
                 className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-2 text-sm font-semibold"
               />
-            </label>
+            </div>
             <button
               type="button"
               onClick={savePreviewDesign}

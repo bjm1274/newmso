@@ -130,11 +130,12 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
     <div className="mx-auto max-w-4xl space-y-5 p-4 md:p-4" data-testid="attendance-analysis-leave-expiry">
       {dialog}
 
-      <div className="flex flex-wrap gap-2">
+      <div role="group" aria-label="연차 소멸 필터" className="flex flex-wrap gap-2">
         {FILTER_OPTIONS.map((option) => (
           <button
             key={option}
             type="button"
+            aria-pressed={filter === option}
             onClick={() => setFilter(option)}
             className={`rounded-[var(--radius-md)] px-3 py-1.5 text-xs font-bold transition-all ${
               filter === option

@@ -8,6 +8,9 @@ interface SmartDatePickerProps {
     className?: string; // Container className
     inputClassName?: string; // Internal input className
     disabled?: boolean;
+    id?: string;
+    'aria-required'?: boolean | 'true' | 'false';
+    'aria-label'?: string;
     'data-testid'?: string;
 }
 
@@ -18,6 +21,9 @@ export default function SmartDatePicker({
     className = "",
     inputClassName = "",
     disabled = false,
+    id,
+    'aria-required': ariaRequired,
+    'aria-label': ariaLabel,
     'data-testid': dataTestId
 }: SmartDatePickerProps) {
     const dateInputRef = useRef<HTMLInputElement>(null);
@@ -60,6 +66,9 @@ export default function SmartDatePicker({
     return (
         <div className={`relative flex w-full items-center group ${className}`}>
             <input
+                id={id}
+                aria-required={ariaRequired}
+                aria-label={ariaLabel}
                 data-testid={dataTestId}
                 type="text"
                 value={value || ''}
