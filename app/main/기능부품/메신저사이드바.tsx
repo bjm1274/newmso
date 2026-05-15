@@ -1,10 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import { Pin, PinOff, EyeOff, Eye } from 'lucide-react';
 import { MessengerAvatar } from './메신저공통';
 import { getGroupChatRoomBadgeText } from './메신저유틸';
 import { MenuIcon } from './조직도서브/조직도측면창';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
+import { SwipeableCard, type SwipeAction } from '@/app/components/SwipeableCard';
+import { useIsMobile } from '@/app/components/useIsMobile';
 import type { ChatRoom, StaffMember } from '@/types';
 
 export type MessengerViewMode = 'chat' | 'org';
@@ -101,6 +104,7 @@ export function MessengerSidebar({
   onOpenDirectChat,
 }: MessengerSidebarProps) {
   const [actionRoomId, setActionRoomId] = useState<string | null>(null);
+  const isMobile = useIsMobile();
   void onMovePinnedRoom;
 
   return (
@@ -192,10 +196,33 @@ export function MessengerSidebar({
                 isHidden,
               }) => {
                 const groupBadgeText = isGroupRoom ? getGroupChatRoomBadgeText(label) : '';
+                // 모바일 스와이프 액션: 공지 채널은 핀/숨김 의미가 없어 제외
+                const enableSwipe = isMobile && !isNoticeChannel;
+                const swipeLeftActions: SwipeAction[] = enableSwipe
+                  ? [{
+                      id: 'pin',
+                      label: isPinned ? '고정 해제' : '고정',
+                      icon: isPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />,
+                      tone: 'normal',
+                      onTrigger: () => onToggleRoomPinned(room.id, !isPinned),
+                    }]
+                  : [];
+                const swipeRightActions: SwipeAction[] = enableSwipe
+                  ? [{
+                      id: 'hide',
+                      label: isHidden ? '표시' : '숨김',
+                      icon: isHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />,
+                      tone: 'normal',
+                      onTrigger: () => onToggleRoomHidden(room.id, !isHidden),
+                    }]
+                  : [];
+                const handlePrimaryClick = () => {
+                  setActionRoomId((current) => current && current !== roomId ? null : current);
+                  onRoomClick(room.id);
+                };
 
-                return (
+                const cardBody = (
                   <div
-                    key={roomId}
                     onDoubleClick={(event) => {
                       event.preventDefault();
                       setActionRoomId((current) => current === roomId ? null : roomId);
@@ -209,14 +236,18 @@ export function MessengerSidebar({
                     {isSelected ? (
                       <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500/100"></div>
                     ) : null}
-                    <button
-                      type="button"
+                    <div
+                      role="button"
+                      tabIndex={0}
                       data-testid={`chat-room-${roomId}`}
-                      onClick={() => {
-                        setActionRoomId((current) => current && current !== roomId ? null : current);
-                        onRoomClick(room.id);
+                      onClick={handlePrimaryClick}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          handlePrimaryClick();
+                        }
                       }}
-                      className={`flex w-full min-w-0 flex-1 items-start ${isGroupRoom ? 'gap-2.5' : 'gap-3'} text-left`}
+                      className={`flex w-full min-w-0 flex-1 items-start ${isGroupRoom ? 'gap-2.5' : 'gap-3'} text-left touch-manipulation cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-[var(--radius-md)]`}
                     >
                       {isNoticeChannel ? (
                         <div
@@ -299,7 +330,7 @@ export function MessengerSidebar({
                           </div>
                         ) : null}
                       </div>
-                    </button>
+                    </div>
                   {actionRoomId === roomId && !isNoticeChannel ? (
                   <div
                     data-testid={`chat-room-actions-${roomId}`}
@@ -349,6 +380,21 @@ export function MessengerSidebar({
                   ) : null}
                   </div>
                 );
+
+                if (enableSwipe) {
+                  return (
+                    <SwipeableCard
+                      key={roomId}
+                      leftActions={swipeLeftActions}
+                      rightActions={swipeRightActions}
+                      className="bg-transparent"
+                    >
+                      {cardBody}
+                    </SwipeableCard>
+                  );
+                }
+
+                return <div key={roomId}>{cardBody}</div>;
               }
             )}
           </>
