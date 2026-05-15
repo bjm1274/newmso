@@ -1,10 +1,31 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { sendAdminNotifications } from '@/lib/notification-utils';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
-type InventoryExpiryItem = Record<string, any>;
+type InventoryExpiryItem = Record<string, unknown>;
+
+interface ExpiryRow {
+  _key: string;
+  itemName: string;
+  quantity: number;
+  expiryDate: string;
+  daysLeft: number;
+  badge: { text: string; color: string };
+  alertColor: string;
+  supplier: string;
+}
+
+interface ExpiredRow {
+  _key: string;
+  itemName: string;
+  quantity: number;
+  expiryDate: string;
+  daysExpired: number;
+  supplier: string;
+}
 
 function getItemName(item: InventoryExpiryItem) {
   return String(item?.item_name || item?.name || '미등록 품목');
@@ -31,9 +52,9 @@ function buildExpirationSummaryAlertKey(
   const itemKeys = [...expiring, ...expired]
     .map((item) =>
       String(
-        item?.id ||
-          item?.item_id ||
-          item?.barcode ||
+        item?.id ??
+          item?.item_id ??
+          item?.barcode ??
           getItemName(item),
       ).trim(),
     )
@@ -44,6 +65,113 @@ function buildExpirationSummaryAlertKey(
     ? `inventory-expiration-summary:${dateKey}:${itemKeys.join('|')}`
     : '';
 }
+
+function calculateDaysUntilExpiration(expirationDate: string) {
+  const today = new Date();
+  const expDate = new Date(expirationDate);
+  const diffTime = expDate.getTime() - today.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+function getAlertBadge(daysLeft: number) {
+  if (daysLeft < 0) return { text: '만료', color: 'bg-red-500/20 text-red-600' };
+  if (daysLeft < 30) return { text: '긴급', color: 'bg-red-500/20 text-red-600' };
+  if (daysLeft < 90) return { text: '주의', color: 'bg-orange-500/20 text-orange-600' };
+  return { text: '경고', color: 'bg-yellow-500/20 text-yellow-600' };
+}
+
+const EXPIRING_COLUMNS: Column<ExpiryRow>[] = [
+  {
+    key: 'itemName',
+    label: '품목명',
+    primary: true,
+    render: (row) => (
+      <span className="font-bold text-[var(--foreground)]">{row.itemName}</span>
+    ),
+  },
+  {
+    key: 'quantity',
+    label: '현재고',
+    align: 'center',
+    render: (row) => `${row.quantity}개`,
+  },
+  {
+    key: 'expiryDate',
+    label: '유효기간',
+    align: 'center',
+    showOnMobile: false,
+    render: (row) =>
+      row.expiryDate ? new Date(row.expiryDate).toLocaleDateString('ko-KR') : '-',
+  },
+  {
+    key: 'daysLeft',
+    label: '남은 일수',
+    align: 'center',
+    render: (row) => (
+      <span className="font-semibold text-red-600">
+        {row.daysLeft < 0 ? '만료' : `${row.daysLeft}일`}
+      </span>
+    ),
+  },
+  {
+    key: 'badge',
+    label: '상태',
+    align: 'center',
+    render: (row) => (
+      <span className={`px-2 py-0.5 rounded-[var(--radius-md)] text-xs font-semibold ${row.badge.color}`}>
+        {row.badge.text}
+      </span>
+    ),
+  },
+  {
+    key: 'supplier',
+    label: '공급처',
+    showOnMobile: false,
+  },
+];
+
+const EXPIRED_COLUMNS: Column<ExpiredRow>[] = [
+  {
+    key: 'itemName',
+    label: '품목명',
+    primary: true,
+    render: (row) => (
+      <span className="font-bold text-red-800">{row.itemName}</span>
+    ),
+  },
+  {
+    key: 'quantity',
+    label: '현재고',
+    align: 'center',
+    render: (row) => (
+      <span className="font-bold text-red-800">{row.quantity}개</span>
+    ),
+  },
+  {
+    key: 'expiryDate',
+    label: '만료일',
+    align: 'center',
+    showOnMobile: false,
+    render: (row) =>
+      row.expiryDate ? new Date(row.expiryDate).toLocaleDateString('ko-KR') : '-',
+  },
+  {
+    key: 'daysExpired',
+    label: '경과일',
+    align: 'center',
+    render: (row) => (
+      <span className="font-semibold text-red-600">{row.daysExpired}일 경과</span>
+    ),
+  },
+  {
+    key: 'supplier',
+    label: '공급처',
+    showOnMobile: false,
+    render: (row) => (
+      <span className="text-red-600">{row.supplier}</span>
+    ),
+  },
+];
 
 export default function ExpirationAlert() {
   const [expiringItems, setExpiringItems] = useState<InventoryExpiryItem[]>([]);
@@ -107,27 +235,6 @@ export default function ExpirationAlert() {
     }
   };
 
-  const calculateDaysUntilExpiration = (expirationDate: string) => {
-    const today = new Date();
-    const expDate = new Date(expirationDate);
-    const diffTime = expDate.getTime() - today.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  };
-
-  const getAlertColor = (daysLeft: number) => {
-    if (daysLeft < 0) return 'bg-red-500/10 border-red-500/20';
-    if (daysLeft < 30) return 'bg-red-500/10 border-red-500/20';
-    if (daysLeft < 90) return 'bg-orange-500/10 border-orange-500/20';
-    return 'bg-yellow-500/10 border-yellow-500/20';
-  };
-
-  const getAlertBadge = (daysLeft: number) => {
-    if (daysLeft < 0) return { text: '만료', color: 'bg-red-500/20 text-red-600' };
-    if (daysLeft < 30) return { text: '긴급', color: 'bg-red-500/20 text-red-600' };
-    if (daysLeft < 90) return { text: '주의', color: 'bg-orange-500/20 text-orange-600' };
-    return { text: '경고', color: 'bg-yellow-500/20 text-yellow-600' };
-  };
-
   const downloadExpirationReport = () => {
     const allItems = [...expiringItems, ...expiredItems];
     const csv = [
@@ -152,6 +259,42 @@ export default function ExpirationAlert() {
     link.download = `유효기간알림_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
   };
+
+  const expiringRows = useMemo<ExpiryRow[]>(
+    () =>
+      expiringItems.map((item, i) => {
+        const expiryDate = getItemExpiryDate(item);
+        const daysLeft = calculateDaysUntilExpiration(expiryDate);
+        return {
+          _key: String(item.id ?? `${getItemName(item)}-${expiryDate}-${i}`),
+          itemName: getItemName(item),
+          quantity: getItemQuantity(item),
+          expiryDate,
+          daysLeft,
+          badge: getAlertBadge(daysLeft),
+          alertColor: '',
+          supplier: getItemSupplier(item),
+        };
+      }),
+    [expiringItems],
+  );
+
+  const expiredRows = useMemo<ExpiredRow[]>(
+    () =>
+      expiredItems.map((item, i) => {
+        const expiryDate = getItemExpiryDate(item);
+        const daysExpired = Math.abs(calculateDaysUntilExpiration(expiryDate));
+        return {
+          _key: String(item.id ?? `${getItemName(item)}-${expiryDate}-${i}`),
+          itemName: getItemName(item),
+          quantity: getItemQuantity(item),
+          expiryDate,
+          daysExpired,
+          supplier: getItemSupplier(item),
+        };
+      }),
+    [expiredItems],
+  );
 
   return (
     <div className="space-y-4">
@@ -193,90 +336,27 @@ export default function ExpirationAlert() {
           </button>
         </div>
 
-        {expiringItems.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-[var(--muted)] border-b border-[var(--border)]">
-                <tr>
-                  <th className="px-4 py-2 text-left font-semibold text-[var(--toss-gray-3)] text-[10px] uppercase">품목명</th>
-                  <th className="px-4 py-2 text-center font-semibold text-[var(--toss-gray-3)] text-[10px] uppercase">현재고</th>
-                  <th className="px-4 py-2 text-center font-semibold text-[var(--toss-gray-3)] text-[10px] uppercase">유효기간</th>
-                  <th className="px-4 py-2 text-center font-semibold text-[var(--toss-gray-3)] text-[10px] uppercase">남은 일수</th>
-                  <th className="px-4 py-2 text-center font-semibold text-[var(--toss-gray-3)] text-[10px] uppercase">상태</th>
-                  <th className="px-4 py-2 text-left font-semibold text-[var(--toss-gray-3)] text-[10px] uppercase">공급처</th>
-                </tr>
-              </thead>
-              <tbody>
-                {expiringItems.map((item) => {
-                  const expiryDate = getItemExpiryDate(item);
-                  const daysLeft = calculateDaysUntilExpiration(expiryDate);
-                  const badge = getAlertBadge(daysLeft);
-                  return (
-                    <tr key={String(item.id || `${getItemName(item)}-${expiryDate}`)} className={`border-b border-[var(--border)] ${getAlertColor(daysLeft)}`}>
-                      <td className="px-4 py-2 font-bold text-[var(--foreground)]">{getItemName(item)}</td>
-                      <td className="px-4 py-2 text-center font-bold text-[var(--foreground)]">{getItemQuantity(item)}개</td>
-                      <td className="px-4 py-2 text-center font-bold text-[var(--foreground)]">
-                        {expiryDate ? new Date(expiryDate).toLocaleDateString('ko-KR') : '-'}
-                      </td>
-                      <td className="px-4 py-2 text-center font-semibold text-red-600">
-                        {daysLeft < 0 ? '만료' : `${daysLeft}일`}
-                      </td>
-                      <td className="px-4 py-2 text-center">
-                        <span className={`px-2 py-0.5 rounded-[var(--radius-md)] text-xs font-semibold ${badge.color}`}>
-                          {badge.text}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2 text-left text-[var(--toss-gray-4)]">{getItemSupplier(item)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="p-5 text-center">
-            <p className="text-[var(--toss-gray-3)] font-bold">
-              유효기간 6개월 이내 품목이 없습니다.
-            </p>
-          </div>
-        )}
+        <ResponsiveTable<ExpiryRow>
+          columns={EXPIRING_COLUMNS}
+          rows={expiringRows}
+          keyField="_key"
+          emptyMessage="유효기간 6개월 이내 품목이 없습니다."
+          className="px-0"
+        />
       </div>
 
-      {expiredItems.length > 0 && (
+      {expiredRows.length > 0 && (
         <div className="bg-[var(--card)] border border-red-500/20 shadow-sm rounded-[var(--radius-lg)] overflow-hidden">
           <div className="px-4 py-3 border-b border-red-500/20 bg-red-500/10">
             <h3 className="text-sm font-bold text-red-800">유효기간 만료 품목</h3>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-red-500/10 border-b border-red-500/20">
-                <tr>
-                  <th className="px-4 py-2 text-left text-[10px] font-semibold text-red-700 uppercase">품목명</th>
-                  <th className="px-4 py-2 text-center text-[10px] font-semibold text-red-700 uppercase">현재고</th>
-                  <th className="px-4 py-2 text-center text-[10px] font-semibold text-red-700 uppercase">만료일</th>
-                  <th className="px-4 py-2 text-center text-[10px] font-semibold text-red-700 uppercase">경과일</th>
-                  <th className="px-4 py-2 text-left text-[10px] font-semibold text-red-700 uppercase">공급처</th>
-                </tr>
-              </thead>
-              <tbody>
-                {expiredItems.map((item) => {
-                  const expiryDate = getItemExpiryDate(item);
-                  const daysExpired = Math.abs(calculateDaysUntilExpiration(expiryDate));
-                  return (
-                    <tr key={String(item.id || `${getItemName(item)}-${expiryDate}`)} className="border-b border-red-100 hover:bg-red-500/10">
-                      <td className="px-4 py-2 font-bold text-red-800">{getItemName(item)}</td>
-                      <td className="px-4 py-2 text-center font-bold text-red-800">{getItemQuantity(item)}개</td>
-                      <td className="px-4 py-2 text-center font-bold text-red-800">
-                        {expiryDate ? new Date(expiryDate).toLocaleDateString('ko-KR') : '-'}
-                      </td>
-                      <td className="px-4 py-2 text-center font-semibold text-red-600">{daysExpired}일 경과</td>
-                      <td className="px-4 py-2 text-left text-red-600">{getItemSupplier(item)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <ResponsiveTable<ExpiredRow>
+            columns={EXPIRED_COLUMNS}
+            rows={expiredRows}
+            keyField="_key"
+            emptyMessage="만료 품목이 없습니다."
+            className="px-0"
+          />
         </div>
       )}
     </div>

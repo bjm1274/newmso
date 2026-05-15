@@ -1,7 +1,8 @@
 'use client';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import { supabase } from '@/lib/supabase';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import SmartDatePicker from '../공통/SmartDatePicker';
@@ -105,6 +106,52 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
     return acc;
   }, {});
   const grandTotal = list.reduce((s, r) => s + (r.amount || 0), 0);
+
+  type TransactionRow = {
+    id: string;
+    transaction_date: string;
+    merchant: string;
+    category: string;
+    amount: number;
+    corporate_cards?: {
+      card_nickname?: string | null;
+      last_four?: string | null;
+    } | null;
+    [key: string]: unknown;
+  };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const transactionColumns = useMemo((): Column<TransactionRow>[] => [
+    {
+      key: 'transaction_date',
+      label: '날짜',
+      primary: true,
+    },
+    {
+      key: 'merchant',
+      label: '가맹점',
+    },
+    {
+      key: 'corporate_cards',
+      label: '카드',
+      showOnMobile: false,
+      render: (r): ReactNode => {
+        const card = r.corporate_cards;
+        if (!card) return '-';
+        return card.card_nickname || (card.last_four ? `****${card.last_four}` : '-');
+      },
+    },
+    {
+      key: 'category',
+      label: '항목',
+    },
+    {
+      key: 'amount',
+      label: '금액',
+      align: 'right',
+      render: (r): ReactNode => <span className="font-bold">{Number(r.amount).toLocaleString()}원</span>,
+    },
+  ], []);
 
   const cardsByCo = selectedCo === '전체'
     ? cards
@@ -331,30 +378,12 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">
-                  <th className="p-4 text-left">날짜</th>
-                  <th className="p-4 text-left">가맹점</th>
-                  <th className="p-4 text-left">카드</th>
-                  <th className="p-4 text-left">항목</th>
-                  <th className="p-4 text-right">금액</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.map((r) => (
-                  <tr key={r.id} className="border-b border-[var(--border)]">
-                    <td className="p-4">{r.transaction_date}</td>
-                    <td className="p-4">{r.merchant}</td>
-                    <td className="p-4 text-[11px] text-[var(--toss-gray-3)]">{r.corporate_cards?.card_nickname || (r.corporate_cards?.last_four ? `****${r.corporate_cards.last_four}` : null) || '-'}</td>
-                    <td className="p-4">{r.category}</td>
-                    <td className="p-4 text-right font-bold">{Number(r.amount).toLocaleString()}원</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ResponsiveTable
+            columns={transactionColumns}
+            rows={list as TransactionRow[]}
+            keyField="id"
+            emptyMessage="이 기간에 사용 내역이 없습니다."
+          />
 
           <div className="mt-4 p-4 bg-amber-50 rounded-[var(--radius-md)] border border-amber-100">
             <p className="text-[11px] font-semibold text-amber-800">💡 실시간 연동</p>

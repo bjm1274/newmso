@@ -4,6 +4,7 @@ import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 interface Props {
   staffs: any[];
@@ -12,11 +13,18 @@ interface Props {
 }
 
 interface StaffStat {
-  staff: any;
+  id: string;
+  staff: { id: string; name: string; department?: string; company?: string };
   lateCount: number;
   earlyLeaveCount: number;
   avgLateMin: number;
   grade: '정상' | '주의' | '경고';
+}
+
+function gradeColor(grade: '정상' | '주의' | '경고') {
+  if (grade === '경고') return 'text-red-600 bg-red-500/10';
+  if (grade === '주의') return 'text-amber-600 bg-amber-50';
+  return 'text-green-600 bg-green-500/10';
 }
 
 const PERIOD_MONTHS: Record<'1개월' | '3개월' | '6개월', number> = {
@@ -78,6 +86,7 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
             monthlyLate >= 5 ? '경고' : monthlyLate >= 3 ? '주의' : '정상';
 
           return {
+            id: String(staff.id),
             staff,
             lateCount,
             earlyLeaveCount: earlyLeaveRecords.length,
@@ -118,11 +127,59 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
     return Object.entries(map);
   }, [stats]);
 
-  const gradeColor = (grade: StaffStat['grade']) => {
-    if (grade === '경고') return 'text-red-600 bg-red-500/10';
-    if (grade === '주의') return 'text-amber-600 bg-amber-50';
-    return 'text-green-600 bg-green-500/10';
-  };
+  const statColumns = useMemo((): Column<StaffStat>[] => [
+    {
+      key: 'staff',
+      label: '직원명',
+      primary: true,
+      render: (item) => (
+        <span className="font-bold text-[var(--foreground)]">{item.staff.name}</span>
+      ),
+    },
+    {
+      key: 'lateCount',
+      label: '지각 횟수',
+      align: 'center',
+      render: (item) => <span className="font-bold">{item.lateCount}</span>,
+    },
+    {
+      key: 'earlyLeaveCount',
+      label: '조퇴 횟수',
+      align: 'center',
+      render: (item) => <span>{item.earlyLeaveCount}</span>,
+    },
+    {
+      key: 'avgLateMin',
+      label: '평균 지각분',
+      align: 'center',
+      render: (item) => <span>{item.avgLateMin}분</span>,
+      showOnMobile: false,
+    },
+    {
+      key: 'lateRatio',
+      label: '지각 비중',
+      align: 'left',
+      render: (item) => (
+        <div className="h-2 overflow-hidden rounded-full bg-[var(--muted)]">
+          <div
+            className="h-full rounded-full bg-amber-400"
+            style={{ width: `${Math.min((item.lateCount / maxLateCount) * 100, 100)}%` }}
+          />
+        </div>
+      ),
+      showOnMobile: false,
+    },
+    {
+      key: 'grade',
+      label: '등급',
+      align: 'center',
+      render: (item) => (
+        <span className={`rounded-[var(--radius-md)] px-2 py-0.5 text-[10px] font-bold ${gradeColor(item.grade)}`}>
+          {item.grade}
+        </span>
+      ),
+    },
+  ], [maxLateCount]);
 
   const handleSendAlert = async () => {
     const targets = stats.filter((item) => item.lateCount >= 3);
@@ -223,50 +280,13 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
       {loading ? (
         <div className="py-5 text-center text-sm text-[var(--toss-gray-3)]">분석 중...</div>
       ) : (
-        <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-[var(--muted)]">
-                <th className="p-2 text-left font-bold text-[var(--toss-gray-4)]">직원명</th>
-                <th className="p-2 text-center font-bold text-[var(--toss-gray-4)]">지각 횟수</th>
-                <th className="p-2 text-center font-bold text-[var(--toss-gray-4)]">조퇴 횟수</th>
-                <th className="p-2 text-center font-bold text-[var(--toss-gray-4)]">평균 지각분</th>
-                <th className="p-2 text-center font-bold text-[var(--toss-gray-4)]">지각 비중</th>
-                <th className="p-2 text-center font-bold text-[var(--toss-gray-4)]">등급</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stats.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="p-4 text-center text-[var(--toss-gray-3)]">
-                    표시할 데이터가 없습니다.
-                  </td>
-                </tr>
-              ) : (
-                stats.map((item) => (
-                  <tr key={item.staff.id} className="border-t border-[var(--border)] hover:bg-[var(--muted)]/50">
-                    <td className="p-2 font-bold text-[var(--foreground)]">{item.staff.name}</td>
-                    <td className="p-2 text-center font-bold">{item.lateCount}</td>
-                    <td className="p-2 text-center">{item.earlyLeaveCount}</td>
-                    <td className="p-2 text-center">{item.avgLateMin}분</td>
-                    <td className="p-2">
-                      <div className="h-2 overflow-hidden rounded-full bg-[var(--muted)]">
-                        <div
-                          className="h-full rounded-full bg-amber-400"
-                          style={{ width: `${Math.min((item.lateCount / maxLateCount) * 100, 100)}%` }}
-                        />
-                      </div>
-                    </td>
-                    <td className="p-2 text-center">
-                      <span className={`rounded-[var(--radius-md)] px-2 py-0.5 text-[10px] font-bold ${gradeColor(item.grade)}`}>
-                        {item.grade}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div className="rounded-[var(--radius-md)] border border-[var(--border)]">
+          <ResponsiveTable<StaffStat>
+            columns={statColumns}
+            rows={stats}
+            keyField="id"
+            emptyMessage="표시할 데이터가 없습니다."
+          />
         </div>
       )}
     </div>
