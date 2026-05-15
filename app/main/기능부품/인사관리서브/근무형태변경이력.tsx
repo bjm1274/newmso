@@ -6,6 +6,7 @@ import SmartDatePicker from '../공통/SmartDatePicker';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
+import { getScopedActiveStaffs } from '@/lib/active-staff';
 import type { StaffMember } from '@/types';
 
 type WorkType =
@@ -85,9 +86,9 @@ export default function WorkTypeChangeHistory({ staffs, selectedCo, user }: Prop
           : '',
   });
 
+  // 현재 근무형태 현황·변경 등록 대상은 현직 직원만 (퇴사자 제외)
   const filteredStaffs = useMemo(() => {
-    if (selectedCo === '전체') return staffs;
-    return staffs.filter((staff) => staff.company === selectedCo);
+    return getScopedActiveStaffs(staffs, selectedCo);
   }, [selectedCo, staffs]);
 
   const fetchRecords = useCallback(async () => {

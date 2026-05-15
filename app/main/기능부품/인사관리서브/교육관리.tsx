@@ -59,7 +59,13 @@ const StaffJobCatSchema = z.object({
 // ---------------------------------------------------------------------------
 // 메인 컴포넌트
 // ---------------------------------------------------------------------------
-export default function EducationMain({ staffs, selectedCo }: Record<string, unknown>) {
+interface EducationMainProps {
+  staffs?: unknown;
+  selectedCo?: unknown;
+  onHeaderActions?: (node: React.ReactNode) => void;
+}
+
+export default function EducationMain({ staffs, selectedCo, onHeaderActions }: EducationMainProps) {
   const { dialog, openConfirm } = useActionDialog();
   const [notifications, setNotifications] = useState<Record<string, unknown>[]>([]);
   const [licenseNotifications, setLicenseNotifications] = useState<LicenseAlert[]>([]);
@@ -288,6 +294,34 @@ export default function EducationMain({ staffs, selectedCo }: Record<string, unk
     scrollToSection(licenseDashboardRef.current);
   };
 
+  // 헤더 액션 버튼을 부모 탭바로 전달 (최신 핸들러 참조용 ref)
+  const handleAlertPanelRef = useRef(handleAlertPanel);
+  handleAlertPanelRef.current = handleAlertPanel;
+  const handlePrimaryActionRef = useRef(handlePrimaryAction);
+  handlePrimaryActionRef.current = handlePrimaryAction;
+
+  useEffect(() => {
+    onHeaderActions?.(
+      <>
+        <button
+          type="button"
+          onClick={() => handleAlertPanelRef.current()}
+          className="px-4 py-3 bg-[var(--card)] border border-[var(--border)] text-[11px] font-semibold shadow-sm hover:bg-[var(--muted)] transition-all"
+        >
+          {showNoti ? '알림 패널 닫기' : '알림 대상 보기'}
+        </button>
+        <button
+          type="button"
+          onClick={() => handlePrimaryActionRef.current()}
+          className="px-4 py-3 bg-[var(--accent)] text-white text-[11px] font-semibold shadow-sm hover:scale-105 transition-all"
+        >
+          {activeTab === '의무교육' ? '전체 명단으로 이동' : '자격면허 목록으로 이동'}
+        </button>
+      </>
+    );
+    return () => onHeaderActions?.(null);
+  }, [showNoti, activeTab, onHeaderActions]);
+
   // 직종 멀티셀렉트 토글
   const toggleJobCode = (code: string) => {
     setSelectedJobCodes((prev) =>
@@ -313,29 +347,7 @@ export default function EducationMain({ staffs, selectedCo }: Record<string, unk
       )}
 
       {/* 헤더 */}
-      <header className="px-5 pt-8 pb-4 border-b border-[var(--border)] bg-[var(--card)] flex flex-col gap-4 shrink-0">
-        <div className="flex justify-between items-center flex-wrap gap-2">
-          <div>
-            <span className="text-sm text-[var(--accent)] font-bold">[{selectedCo as string}]</span>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={handleAlertPanel}
-              className="px-4 py-3 bg-[var(--card)] border border-[var(--border)] text-[11px] font-semibold shadow-sm hover:bg-[var(--muted)] transition-all"
-            >
-              {showNoti ? '알림 패널 닫기' : '알림 대상 보기'}
-            </button>
-            <button
-              type="button"
-              onClick={handlePrimaryAction}
-              className="px-4 py-3 bg-[var(--accent)] text-white text-[11px] font-semibold shadow-sm hover:scale-105 transition-all"
-            >
-              {activeTab === '의무교육' ? '전체 명단으로 이동' : '자격면허 목록으로 이동'}
-            </button>
-          </div>
-        </div>
-
+      <header className="px-5 pt-4 pb-4 border-b border-[var(--border)] bg-[var(--card)] flex flex-col gap-4 shrink-0">
         {/* 직종 멀티셀렉트 필터 */}
         {jobCategories.length > 0 && (
           <div
@@ -529,7 +541,7 @@ export default function EducationMain({ staffs, selectedCo }: Record<string, unk
               </div>
             </div>
             <div ref={licenseDashboardRef}>
-              <LicenseTracking staffs={staffs} selectedCo={selectedCo} />
+              <LicenseTracking staffs={staffs as Record<string, unknown>[]} selectedCo={selectedCo as string} />
             </div>
           </>
         )}
