@@ -1,5 +1,6 @@
 'use client';
 import { useActionDialog } from '@/app/components/useActionDialog';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
 
@@ -17,6 +18,7 @@ const COPY_URL_FIELDS = ['file_url', 'attachment_url', 'copy_url', 'document_url
 
 interface LicenseItem {
   id: unknown;
+  rowId: string;
   staff_id?: unknown;
   staff?: StaffMember;
   copyUrl?: string | null;
@@ -100,14 +102,18 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
 
   const realLicenses = useMemo((): LicenseItem[] => {
     return licenses
-      .map((license: any) => {
+      .map((license: any, index: number) => {
         const staff = staffMap.get(String(license.staff_id));
         if (!staff) return null;
 
         const status = getLicenseStatus(license.expiry_date);
+        const rowId = license.id !== undefined && license.id !== null
+          ? String(license.id)
+          : `lic-${String(license.staff_id ?? 'unknown')}-${index}`;
 
         return {
           ...license,
+          rowId,
           staff,
           copyUrl: getCopyUrl(license),
           statusLabel: status.label,
@@ -181,6 +187,104 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
 
     window.open(item.copyUrl as string, '_blank', 'noopener,noreferrer');
   };
+
+  const columns = useMemo((): Column<LicenseItem>[] => [
+    {
+      key: 'staff',
+      label: '직원 정보',
+      primary: true,
+      render: (item) => (
+        <div>
+          <p className="text-xs font-black text-[var(--foreground)]">{(item.staff?.name as string) ?? '—'}</p>
+          <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">
+            {(item.staff?.company as string) ?? '—'} | {getStaffDepartment(item.staff)}
+            {getStaffPosition(item.staff) ? ` | ${getStaffPosition(item.staff)}` : ''}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: 'license_name',
+      label: '자격/면허명',
+      render: (item) => (item.license_name as string) || '—',
+    },
+    {
+      key: 'license_number',
+      label: '자격 번호',
+      render: (item) => (
+        <span className="font-mono text-[11px]">{(item.license_number as string) || '—'}</span>
+      ),
+    },
+    {
+      key: 'issuing_body',
+      label: '발급기관',
+      showOnMobile: false,
+      render: (item) => (item.issuing_body as string) || '—',
+    },
+    {
+      key: 'expiry_date',
+      label: '만료(갱신)',
+      render: (item) => {
+        const daysLeft = item.daysLeft ?? null;
+        return (
+          <span>
+            {(item.expiry_date as string) || '—'}
+            {daysLeft !== null && (
+              <span className={`ml-2 text-[10px] font-black ${(daysLeft as number) < 0 ? 'text-red-500' : (daysLeft as number) <= 30 ? 'text-orange-500' : 'text-green-600'}`}>
+                {(daysLeft as number) < 0 ? `${Math.abs(daysLeft as number)}일 경과` : `${daysLeft as number}일 남음`}
+              </span>
+            )}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'statusLabel',
+      label: '상태',
+      align: 'center',
+      render: (item) => {
+        const statusToneClass =
+          item.statusTone === 'success'
+            ? 'bg-green-500/10 text-green-700'
+            : item.statusTone === 'warning'
+              ? 'bg-orange-500/10 text-orange-600'
+              : item.statusTone === 'danger'
+                ? 'bg-red-500/10 text-red-600 animate-pulse'
+                : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]';
+        return (
+          <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest ${statusToneClass}`}>
+            {(item.statusLabel as string) ?? '—'}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'actions',
+      label: '관리',
+      align: 'right',
+      render: (item) => (
+        <div className="flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={() => handleOpenCopy(item)}
+            className="text-[11px] font-black text-primary hover:underline transition-all"
+          >
+            사본 보기
+          </button>
+          {item.statusLabel !== '정상' && (
+            <button
+              type="button"
+              onClick={() => handleSendNotification(item)}
+              className="text-[11px] font-black text-white bg-primary px-3 py-1.5 rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all"
+            >
+              알림톡
+            </button>
+          )}
+        </div>
+      ),
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], []);
 
   const handleSendNotification = async (item: LicenseItem) => {
     const confirmed = await openConfirm({
@@ -272,89 +376,13 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
         </div>
       </div>
 
-      <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)]/60 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[980px]">
-            <thead className="bg-[var(--tab-bg)] border-b border-[var(--border)]/60">
-              <tr>
-                <th className="p-4 text-[11px] font-black text-[var(--toss-gray-4)] uppercase tracking-widest">직원 정보</th>
-                <th className="p-4 text-[11px] font-black text-[var(--toss-gray-4)] uppercase tracking-widest">자격/면허명</th>
-                <th className="p-4 text-[11px] font-black text-[var(--toss-gray-4)] uppercase tracking-widest">자격 번호</th>
-                <th className="p-4 text-[11px] font-black text-[var(--toss-gray-4)] uppercase tracking-widest">발급기관</th>
-                <th className="p-4 text-[11px] font-black text-[var(--toss-gray-4)] uppercase tracking-widest">만료(갱신) 예정일</th>
-                <th className="p-4 text-[11px] font-black text-[var(--toss-gray-4)] uppercase tracking-widest text-center">상태</th>
-                <th className="p-4 text-[11px] font-black text-[var(--toss-gray-4)] uppercase tracking-widest text-right">관리</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((item: LicenseItem) => {
-                const statusToneClass =
-                  item.statusTone === 'success'
-                    ? 'bg-green-500/10 text-green-700'
-                    : item.statusTone === 'warning'
-                      ? 'bg-orange-500/10 text-orange-600'
-                      : item.statusTone === 'danger'
-                        ? 'bg-red-500/10 text-red-600 animate-pulse'
-                        : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]';
-
-                const daysLeft = item.daysLeft ?? null;
-
-                return (
-                  <tr key={item.id as string} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--tab-bg)]/50 transition-colors">
-                    <td className="p-4">
-                      <p className="text-xs font-black text-[var(--foreground)]">{item.staff?.name as string}</p>
-                      <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">
-                        {item.staff?.company as string} | {getStaffDepartment(item.staff)}
-                        {getStaffPosition(item.staff) ? ` | ${getStaffPosition(item.staff)}` : ''}
-                      </p>
-                    </td>
-                    <td className="p-4 text-xs font-bold text-[var(--toss-gray-5)]">{(item.license_name as string) || '-'}</td>
-                    <td className="p-4 text-[11px] font-mono text-[var(--toss-gray-4)] font-bold">{(item.license_number as string) || '-'}</td>
-                    <td className="p-4 text-xs font-bold text-[var(--toss-gray-5)]">{(item.issuing_body as string) || '-'}</td>
-                    <td className="p-4 text-xs font-bold text-[var(--toss-gray-5)]">
-                      {(item.expiry_date as string) || '-'}
-                      {daysLeft !== null && (
-                        <span className={`ml-2 text-[10px] font-black ${(daysLeft as number) < 0 ? 'text-red-500' : (daysLeft as number) <= 30 ? 'text-orange-500' : 'text-green-600'}`}>
-                          {(daysLeft as number) < 0 ? `${Math.abs(daysLeft as number)}일 경과` : `${daysLeft as number}일 남음`}
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-4 text-center">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest ${statusToneClass}`}>
-                        {item.statusLabel as string}
-                      </span>
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-3">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenCopy(item)}
-                          className="text-[11px] font-black text-primary hover:underline transition-all"
-                        >
-                          사본 보기
-                        </button>
-                        {item.statusLabel !== '정상' && (
-                          <button
-                            type="button"
-                            onClick={() => handleSendNotification(item)}
-                            className="text-[11px] font-black text-white bg-primary px-3 py-1.5 rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all"
-                          >
-                            알림톡
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="p-5 text-center text-xs font-bold text-[var(--toss-gray-3)]">데이터가 없습니다.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)]/60 shadow-sm overflow-hidden p-2">
+        <ResponsiveTable<LicenseItem>
+          columns={columns}
+          rows={filtered}
+          keyField="rowId"
+          emptyMessage="데이터가 없습니다."
+        />
       </div>
     </div>
   );

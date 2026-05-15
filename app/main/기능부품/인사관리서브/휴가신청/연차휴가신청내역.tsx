@@ -1,6 +1,7 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { isActiveStaff } from '@/lib/active-staff';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 type Leave = {
   id: string;
@@ -144,6 +145,124 @@ export default function LeaveRequestList({
 
   const pendingCount = leaves.filter((l) => l.status === '대기').length;
 
+  // 휴가 내역 테이블 컬럼 (직원 그룹 펼침 시 표시)
+  const leaveColumns = useMemo<Column<Leave>[]>(
+    () => [
+      {
+        key: 'leave_type',
+        label: '구분',
+        primary: true,
+        render: (l) => (
+          <span
+            className={`px-2 py-1 rounded-full text-[10px] font-semibold ${
+              isAnnualType(l.leave_type)
+                ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
+                : l.leave_type === '병가'
+                  ? 'bg-red-500/20 text-red-600'
+                  : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
+            }`}
+          >
+            {l.leave_type}
+          </span>
+        ),
+      },
+      {
+        key: 'period',
+        label: '기간',
+        render: (l) => (
+          <span className="text-[var(--toss-gray-3)] whitespace-nowrap">
+            {l.start_date}
+            {l.end_date && l.end_date !== l.start_date ? ` ~ ${l.end_date}` : ''}
+          </span>
+        ),
+      },
+      {
+        key: 'reason',
+        label: '사유',
+        render: (l) => (
+          <span className="text-[var(--toss-gray-3)] block max-w-xs truncate">
+            {l.reason || '—'}
+          </span>
+        ),
+      },
+      {
+        key: 'status',
+        label: '상태',
+        render: (l) => (
+          <span
+            className={`px-2 py-1 rounded-full text-[10px] font-semibold ${
+              l.status === '승인'
+                ? 'bg-green-500/20 text-green-600'
+                : l.status === '반려'
+                  ? 'bg-red-500/20 text-red-600'
+                  : 'bg-orange-500/20 text-orange-600'
+            }`}
+          >
+            {l.status}
+          </span>
+        ),
+      },
+      {
+        key: 'actions',
+        label: '관리',
+        align: 'right',
+        render: (l) => (
+          <div className="flex justify-end gap-2 flex-wrap">
+            {l.status === '대기' && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onStatusUpdate(l.id, '승인');
+                  }}
+                  className="px-3 py-1.5 min-h-[32px] bg-[var(--accent)] text-white text-[10px] font-semibold rounded-[var(--radius-md)] shadow-sm hover:scale-[0.98] transition-all"
+                >
+                  승인
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onStatusUpdate(l.id, '반려');
+                  }}
+                  className="px-3 py-1.5 min-h-[32px] bg-red-500/10 border border-red-500/20 text-[10px] font-semibold text-red-600 rounded-[var(--radius-md)] hover:bg-red-500/20 transition-all"
+                >
+                  반려
+                </button>
+              </>
+            )}
+            {canManage && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openEdit(l);
+                  }}
+                  className="px-3 py-1.5 min-h-[32px] bg-[var(--muted)] border border-[var(--border)] text-[10px] font-semibold text-[var(--toss-gray-4)] rounded-[var(--radius-md)] hover:bg-[var(--card)] transition-all"
+                >
+                  수정
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(l.id);
+                  }}
+                  className="px-3 py-1.5 min-h-[32px] bg-red-500/10 border border-red-500/20 text-[10px] font-semibold text-red-600 rounded-[var(--radius-md)] hover:bg-red-500/20 transition-all"
+                >
+                  삭제
+                </button>
+              </>
+            )}
+          </div>
+        ),
+      },
+    ],
+    [canManage, onStatusUpdate, onDelete],
+  );
+
   return (
     <div className="space-y-5">
       {/* 법적 기준 안내 */}
@@ -281,99 +400,14 @@ export default function LeaveRequestList({
 
                 {/* 펼침: 해당 직원 사용내역 */}
                 {isOpen && (
-                  <div className="bg-[var(--muted)]/30 px-3 pb-3">
-                    <div className="overflow-x-auto custom-scrollbar">
-                      <table className="w-full text-left border-collapse min-w-[640px]">
-                        <thead className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">
-                          <tr>
-                            <th className="px-3 py-2">구분</th>
-                            <th className="px-3 py-2">기간</th>
-                            <th className="px-3 py-2">사유</th>
-                            <th className="px-3 py-2">상태</th>
-                            <th className="px-3 py-2 text-right">관리</th>
-                          </tr>
-                        </thead>
-                        <tbody className="text-xs font-bold divide-y divide-[var(--border)]">
-                          {g.items.map((l) => (
-                            <tr key={l.id} className="bg-[var(--card)]">
-                              <td className="px-3 py-3">
-                                <span
-                                  className={`px-2 py-1 rounded-full text-[10px] font-semibold ${
-                                    isAnnualType(l.leave_type)
-                                      ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
-                                      : l.leave_type === '병가'
-                                        ? 'bg-red-500/20 text-red-600'
-                                        : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
-                                  }`}
-                                >
-                                  {l.leave_type}
-                                </span>
-                              </td>
-                              <td className="px-3 py-3 text-[var(--toss-gray-3)] whitespace-nowrap">
-                                {l.start_date}
-                                {l.end_date && l.end_date !== l.start_date ? ` ~ ${l.end_date}` : ''}
-                              </td>
-                              <td className="px-3 py-3 text-[var(--toss-gray-3)] max-w-xs truncate">
-                                {l.reason}
-                              </td>
-                              <td className="px-3 py-3">
-                                <span
-                                  className={`px-2 py-1 rounded-full text-[10px] font-semibold ${
-                                    l.status === '승인'
-                                      ? 'bg-green-500/20 text-green-600'
-                                      : l.status === '반려'
-                                        ? 'bg-red-500/20 text-red-600'
-                                        : 'bg-orange-500/20 text-orange-600'
-                                  }`}
-                                >
-                                  {l.status}
-                                </span>
-                              </td>
-                              <td className="px-3 py-3 text-right">
-                                <div className="flex justify-end gap-2">
-                                  {l.status === '대기' && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={() => onStatusUpdate(l.id, '승인')}
-                                        className="px-3 py-1.5 min-h-[32px] bg-[var(--accent)] text-white text-[10px] font-semibold rounded-[var(--radius-md)] shadow-sm hover:scale-[0.98] transition-all"
-                                      >
-                                        승인
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => onStatusUpdate(l.id, '반려')}
-                                        className="px-3 py-1.5 min-h-[32px] bg-red-500/10 border border-red-500/20 text-[10px] font-semibold text-red-600 rounded-[var(--radius-md)] hover:bg-red-500/20 transition-all"
-                                      >
-                                        반려
-                                      </button>
-                                    </>
-                                  )}
-                                  {canManage && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={() => openEdit(l)}
-                                        className="px-3 py-1.5 min-h-[32px] bg-[var(--muted)] border border-[var(--border)] text-[10px] font-semibold text-[var(--toss-gray-4)] rounded-[var(--radius-md)] hover:bg-[var(--card)] transition-all"
-                                      >
-                                        수정
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => onDelete(l.id)}
-                                        className="px-3 py-1.5 min-h-[32px] bg-red-500/10 border border-red-500/20 text-[10px] font-semibold text-red-600 rounded-[var(--radius-md)] hover:bg-red-500/20 transition-all"
-                                      >
-                                        삭제
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                  <div className="bg-[var(--muted)]/30 px-3 pb-3 pt-2">
+                    <ResponsiveTable<Leave>
+                      columns={leaveColumns}
+                      rows={g.items}
+                      keyField="id"
+                      emptyMessage="휴가 내역이 없습니다."
+                      className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-1"
+                    />
                   </div>
                 )}
               </div>
