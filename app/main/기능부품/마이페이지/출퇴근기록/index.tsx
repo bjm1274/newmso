@@ -1,5 +1,7 @@
 'use client';
 
+import { useIsMobile } from '@/app/components/useIsMobile';
+import { calculateDistance as calculateDistanceMeters } from '@/lib/geo';
 import { ALLOWED_DISTANCE_M,WORKPLACE_LOCATION } from '@/lib/location';
 import { logger } from '@/lib/logger';
 import {
@@ -15,6 +17,15 @@ import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import { toast } from '@/lib/toast';
 import { formatLocalDateKey } from '@/lib/use-local-date-key';
 import { useCallback,useEffect,useRef,useState } from 'react';
+import 모바일체크인 from '../../근태기록/모바일체크인';
+import {
+  buildFallbackShiftBoundary,
+  buildShiftBoundary,
+  calculateEarlyLeaveMinutes,
+  resolveLateThreshold as resolveLateThresholdHelper,
+  resolveStaleOpenLog,
+  syncToAttendances as syncToAttendancesHelper,
+} from './checkin-utils';
 import {
 COMMUTE_STATUS_LABELS,
 NON_ABSENT_DISPLAY_STATUSES,
@@ -34,83 +45,9 @@ interface CommuteRecordProps {
   onRequestCorrection?: (log: Record<string, unknown>) => void;
 }
 
-function buildFallbackShiftBoundary(department?: string): ShiftBoundary {
-  const isMedicalStaff = department === '의료진';
-
-  return {
-    hour: isMedicalStaff ? 8 : 9,
-    minute: isMedicalStaff ? 30 : 10,
-    label: isMedicalStaff ? '08:30' : '09:10',
-    endHour: null,
-    endMinute: null,
-    shiftKnown: false,
-  };
-}
-
-function parseShiftTime(value: string) {
-  const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})/);
-  if (!match) return null;
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
-  return { hour, minute };
-}
-
-function buildShiftBoundary(startTime: string, endTime: string, fallbackDepartment?: string): ShiftBoundary {
-  const start = parseShiftTime(startTime);
-  if (!start) {
-    return buildFallbackShiftBoundary(fallbackDepartment);
-  }
-
-  const end = parseShiftTime(endTime);
-  return {
-    hour: start.hour,
-    minute: start.minute,
-    label: `${String(start.hour).padStart(2, '0')}:${String(start.minute).padStart(2, '0')}`,
-    endHour: end?.hour ?? null,
-    endMinute: end?.minute ?? null,
-    shiftKnown: true,
-  };
-}
-
 function buildDateWithTime(dateStr: string, hour: number, minute: number) {
   const [year, month, day] = String(dateStr).slice(0, 10).split('-').map(Number);
   return new Date(year, (month || 1) - 1, day || 1, hour, minute, 0, 0);
-}
-
-function calculateEarlyLeaveMinutes(
-  workDate: string,
-  checkOutIso: string | null | undefined,
-  boundary: ShiftBoundary
-) {
-  if (!workDate || !checkOutIso || boundary.endHour === null || boundary.endMinute === null) {
-    return 0;
-  }
-
-  const actualCheckOut = new Date(checkOutIso);
-  if (Number.isNaN(actualCheckOut.getTime())) {
-    return 0;
-  }
-
-  const scheduledStart = buildDateWithTime(workDate, boundary.hour, boundary.minute);
-  const scheduledEnd = buildDateWithTime(workDate, boundary.endHour, boundary.endMinute);
-
-  if (scheduledEnd.getTime() <= scheduledStart.getTime()) {
-    scheduledEnd.setDate(scheduledEnd.getDate() + 1);
-  }
-
-  // 야간근무자가 자정 이후 날짜로 출근 체크인된 경우:
-  // workDate가 다음날로 저장되어 scheduledStart(22:00)보다 actualCheckOut(05:30)이 이른 상황
-  // → scheduledStart/End를 하루 앞당겨 올바른 날짜로 보정
-  const endMin = boundary.endHour * 60 + boundary.endMinute;
-  const startMin = boundary.hour * 60 + boundary.minute;
-  const isNightShift = endMin < startMin;
-  if (isNightShift && actualCheckOut.getTime() < scheduledStart.getTime()) {
-    scheduledStart.setDate(scheduledStart.getDate() - 1);
-    scheduledEnd.setDate(scheduledEnd.getDate() - 1);
-  }
-
-  return Math.max(0, Math.round((scheduledEnd.getTime() - actualCheckOut.getTime()) / 60000));
 }
 
 function getDisplayStatus(log: CommuteLog | null | undefined) {
@@ -187,6 +124,7 @@ function shouldTreatAsAbsent(log: CommuteLog, currentDateKey: string) {
 }
 
 export default function CommuteRecord({ user, onRequestCorrection }: CommuteRecordProps) {
+  const isMobile = useIsMobile();
   const normalizedUser = normalizeStaffLike((user ?? {}) as Record<string, unknown>);
   const [resolvedUser, setResolvedUser] = useState<Record<string, unknown>>(normalizedUser);
   const [logs, setLogs] = useState<CommuteLog[]>([]);
@@ -224,15 +162,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     todayLog && String((todayLog as Record<string, unknown>)?.date || '').slice(0, 10) === currentDateKey
       ? todayLog
       : null;
-  const staleOpenLog =
-    logs.find(
-      (log) =>
-        !log.isVirtual &&
-        !!log.check_in &&
-        !log.check_out &&
-        getDisplayStatus(log) !== '결근' &&
-        String(log.date || '').slice(0, 10) !== currentDateKey,
-    ) || null;
+  const staleOpenLog = resolveStaleOpenLog(logs, currentDateKey);
 
   const fetchLatestStaffShiftContext = useCallback(async () => {
     const userId = effectiveUserId;
@@ -617,11 +547,9 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     });
 
   const updateDistanceFromPosition = (latitude: number, longitude: number) => {
-    const dist = calculateDistance(
-      latitude,
-      longitude,
-      HOSPITAL_LOCATION.latitude,
-      HOSPITAL_LOCATION.longitude
+    const dist = calculateDistanceMeters(
+      { latitude, longitude },
+      { latitude: HOSPITAL_LOCATION.latitude, longitude: HOSPITAL_LOCATION.longitude },
     );
     const roundedDistance = Math.floor(dist);
     setDistance(roundedDistance);
@@ -733,154 +661,41 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     }
   }, []);
 
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371e3; // 지구 반경 (미터)
-    const φ1 = (lat1 * Math.PI) / 180;
-    const φ2 = (lat2 * Math.PI) / 180;
-    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-
-    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-      Math.cos(φ1) * Math.cos(φ2) *
-      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    return R * c; // 거리 (m)
-  };
-
-  // attendance → attendances 동기화 (근태관리메인·급여정산과 연계)
-  const syncToAttendances = async (
-    workDate: string,
-    checkIn: string | null,
-    checkOut: string | null,
-    status: string,
-    options?: { earlyLeaveMinutes?: number | null }
-  ) => {
-    try {
-      const statusMap: Record<string, string> = { '정상': 'present', '지각': 'late', '조퇴': 'early_leave', '결근': 'absent' };
-      const attStatus = statusMap[status] || 'present';
-      const mins = checkIn && checkOut
-        ? Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 60000)
-        : null;
+  const syncToAttendances = useCallback(
+    async (
+      workDate: string,
+      checkIn: string | null,
+      checkOut: string | null,
+      status: string,
+      options?: { earlyLeaveMinutes?: number | null },
+    ) => {
       const userId = effectiveUserId;
       if (!userId) return;
+      await syncToAttendancesHelper(userId, workDate, checkIn, checkOut, status, options);
+    },
+    [effectiveUserId],
+  );
 
-      const basePayload = {
-        staff_id: userId,
-        work_date: workDate,
-        check_in_time: checkIn,
-        check_out_time: checkOut,
-        status: attStatus,
-        work_hours_minutes: mins ?? undefined,
-      };
-
-      const earlyLeaveMinutes = attStatus === 'early_leave'
-        ? Math.max(0, Number(options?.earlyLeaveMinutes || 0))
-        : 0;
-
-      const result = await withMissingColumnFallback(
-        () => supabase.from('attendances').upsert({
-          ...basePayload,
-          early_leave_minutes: earlyLeaveMinutes,
-        }, { onConflict: 'staff_id,work_date' }),
-        () => supabase.from('attendances').upsert(basePayload, { onConflict: 'staff_id,work_date' }),
-        'early_leave_minutes'
-      );
-
-      if (result.error) {
-        throw result.error;
-      }
-    } catch (syncErr) {
-      console.error('출퇴근 동기화 실패:', syncErr);
-    }
-  };
-
-  const resolveLateThreshold = async (
-    workDate: string,
-    fallbackDepartment?: string
-  ): Promise<ShiftBoundary> => {
-    const userId = effectiveUserId;
-    if (!userId) return buildFallbackShiftBoundary(fallbackDepartment);
-
-    try {
-      const [{ shiftId: latestShiftId, department: latestDepartment, company: latestCompany }, assignmentResult] =
-        await Promise.all([
-          fetchLatestStaffShiftContext(),
-          withMissingColumnFallback(
-            () =>
-              supabase
-                .from('shift_assignments')
-                .select('shift_id, shift_name')
-                .eq('staff_id', userId)
-                .eq('work_date', workDate)
-                .maybeSingle(),
-            () =>
-              supabase
-                .from('shift_assignments')
-                .select('shift_id')
-                .eq('staff_id', userId)
-                .eq('work_date', workDate)
-                .maybeSingle(),
-            'shift_name'
-          ),
-        ]);
-
-      if (assignmentResult.error) {
-        throw assignmentResult.error;
-      }
-
-      const effectiveDepartment = latestDepartment || fallbackDepartment;
-      const effectiveCompany = latestCompany;
-
-      const assignment = (assignmentResult.data || null) as ShiftAssignmentReference | null;
-      const shiftIds = Array.from(
-        new Set(
-          [String(assignment?.shift_id || '').trim(), String(latestShiftId || '').trim()].filter(Boolean)
-        )
-      );
-      const shiftNames = Array.from(new Set([String(assignment?.shift_name || '').trim()].filter(Boolean)));
-
-      if (shiftIds.length === 0 && shiftNames.length === 0) {
-        return buildFallbackShiftBoundary(effectiveDepartment);
-      }
-
-      const [shiftIdsResult, shiftNamesResult] = await Promise.all([
-        shiftIds.length > 0
-          ? supabase.from('work_shifts').select('id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work').in('id', shiftIds)
-          : Promise.resolve({ data: [], error: null }),
-        shiftNames.length > 0
-          ? supabase.from('work_shifts').select('id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work').in('name', shiftNames)
-          : Promise.resolve({ data: [], error: null }),
-      ]);
-
-      if (shiftIdsResult.error) {
-        throw shiftIdsResult.error;
-      }
-      if (shiftNamesResult.error) {
-        throw shiftNamesResult.error;
-      }
-
-      const shiftLookup = buildShiftLookup([
-        ...((shiftIdsResult.data || []) as ShiftLookupRecord[]),
-        ...((shiftNamesResult.data || []) as ShiftLookupRecord[]),
-      ]);
-      const shiftRow = resolveAssignedShift(assignment, shiftLookup, {
-        fallbackShiftId: latestShiftId,
-        preferredCompany: effectiveCompany,
-        workDate,
+  const resolveLateThreshold = useCallback(
+    async (workDate: string, fallbackDepartment?: string): Promise<ShiftBoundary> => {
+      const userId = effectiveUserId;
+      if (!userId) return buildFallbackShiftBoundary(fallbackDepartment);
+      const fallbackCompany = String(
+        (resolvedUser as Record<string, unknown>)?.company ||
+          (resolvedUser as Record<string, unknown>)?.company_name ||
+          '',
+      ).trim() || undefined;
+      const fallbackShiftId = String(
+        (resolvedUser as Record<string, unknown>)?.shift_id || '',
+      ).trim();
+      return resolveLateThresholdHelper(userId, workDate, {
+        department: fallbackDepartment,
+        company: fallbackCompany,
+        shiftId: fallbackShiftId,
       });
-      if (!shiftRow) {
-        return buildFallbackShiftBoundary(effectiveDepartment);
-      }
-
-      const startTime = String((shiftRow as Record<string, unknown> | null | undefined)?.start_time || '').trim();
-      const endTime = String((shiftRow as Record<string, unknown> | null | undefined)?.end_time || '').trim();
-      return buildShiftBoundary(startTime, endTime, effectiveDepartment);
-    } catch (error) {
-      logger.warn('지각 기준 시간 조회 실패:', error);
-      return buildFallbackShiftBoundary(fallbackDepartment);
-    }
-  };
+    },
+    [effectiveUserId, resolvedUser],
+  );
 
   // 출퇴근 처리 (위치 검증 포함)
   const handleCommute = async (type: 'in' | 'out') => {
@@ -1049,6 +864,40 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   const lateCount = logs.filter((log) => getDisplayStatus(log) === '지각').length;
   const normalCount = logs.filter((log) => getDisplayStatus(log) === '정상').length;
 
+  // 모바일 통계: 평균 근무시간(분) — 출+퇴 둘 다 있는 로그만 평균
+  const completedLogs = logs.filter(
+    (log) => !!log.check_in && !!log.check_out && getDisplayStatus(log) !== '결근',
+  );
+  const avgWorkedMinutes = completedLogs.length
+    ? Math.round(
+        completedLogs.reduce((acc, log) => {
+          const inMs = new Date(log.check_in as string).getTime();
+          const outMs = new Date(log.check_out as string).getTime();
+          const diff = Math.max(0, outMs - inMs);
+          return acc + Math.round(diff / 60000);
+        }, 0) / completedLogs.length,
+      )
+    : 0;
+
+  if (isMobile) {
+    return (
+      <모바일체크인
+        staffId={effectiveUserId || null}
+        companyLocation={WORKPLACE_LOCATION}
+        monthlySummary={{
+          workedDays: workedDaysCount,
+          lateCount,
+          avgWorkedMinutes,
+        }}
+        onCheckedIn={() => {
+          void initCommuteData();
+        }}
+        onCheckedOut={() => {
+          void initCommuteData();
+        }}
+      />
+    );
+  }
 
   return (
     <div data-testid="commute-record-view" className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] px-4 py-4 sm:p-5 h-full flex flex-col space-y-5">
