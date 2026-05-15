@@ -1,10 +1,20 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import dynamic from 'next/dynamic';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { readLocalStorage, writeLocalStorage } from '@/lib/storage-utils';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
+
+// recharts는 번들 사이즈가 크므로 동적 로드
+const BudgetBarChart = dynamic(() => import('./charts/BudgetBarChart'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[260px] items-center justify-center text-xs text-[var(--toss-gray-3)]">
+      차트를 불러오는 중...
+    </div>
+  ),
+});
 
 const BUDGET_ITEMS = ['인건비', '운영비', '장비', '기타'] as const;
 type BudgetItem = typeof BUDGET_ITEMS[number];
@@ -316,13 +326,22 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
         <div className="space-y-4">
           {/* 집행 등록 모달 */}
           {showExecForm && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-              <div className="bg-[var(--card)] rounded-[var(--radius-xl)] p-4 w-full max-w-md shadow-sm border border-[var(--border)] mx-4">
-                <h3 className="text-base font-bold text-[var(--foreground)] mb-3">집행 등록</h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">부서</label>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="budget-exec-modal-title"
+                className="bg-[var(--card)] rounded-[var(--radius-xl)] p-4 w-full max-w-md shadow-sm border border-[var(--border)]"
+              >
+                <h3 id="budget-exec-modal-title" className="text-base font-bold text-[var(--foreground)] mb-3">집행 등록</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="sm:col-span-2">
+                    <label htmlFor="budget-exec-dept" className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">
+                      부서 <span className="text-red-500" aria-hidden>*</span>
+                    </label>
                     <input
+                      id="budget-exec-dept"
+                      aria-required="true"
                       list="dept-list-exec"
                       value={execForm.dept}
                       onChange={e => setExecForm(f => ({ ...f, dept: e.target.value }))}
@@ -334,8 +353,9 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
                     </datalist>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">항목</label>
+                    <label htmlFor="budget-exec-item" className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">항목</label>
                     <select
+                      id="budget-exec-item"
                       value={execForm.item}
                       onChange={e => setExecForm(f => ({ ...f, item: e.target.value as BudgetItem }))}
                       className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] transition-colors"
@@ -344,8 +364,12 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">금액 (원)</label>
+                    <label htmlFor="budget-exec-amount" className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">
+                      금액 (원) <span className="text-red-500" aria-hidden>*</span>
+                    </label>
                     <input
+                      id="budget-exec-amount"
+                      aria-required="true"
                       type="number"
                       value={execForm.amount}
                       onChange={e => setExecForm(f => ({ ...f, amount: e.target.value }))}
@@ -354,8 +378,9 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">날짜</label>
+                    <label htmlFor="budget-exec-date" className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">날짜</label>
                     <input
+                      id="budget-exec-date"
                       type="date"
                       value={execForm.date}
                       onChange={e => setExecForm(f => ({ ...f, date: e.target.value }))}
@@ -363,8 +388,9 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">메모</label>
+                    <label htmlFor="budget-exec-memo" className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">메모</label>
                     <input
+                      id="budget-exec-memo"
                       type="text"
                       value={execForm.memo}
                       onChange={e => setExecForm(f => ({ ...f, memo: e.target.value }))}
@@ -373,14 +399,16 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
                     />
                   </div>
                 </div>
-                <div className="flex gap-2 mt-4">
+                <div className="flex flex-col sm:flex-row gap-2 mt-4">
                   <button
+                    type="button"
                     onClick={() => setShowExecForm(false)}
                     className="flex-1 px-4 py-1.5 rounded-[var(--radius-md)] border border-[var(--border)] text-sm font-bold text-[var(--toss-gray-3)] hover:bg-[var(--muted)] transition-colors"
                   >
                     취소
                   </button>
                   <button
+                    type="button"
                     onClick={handleAddExecution}
                     disabled={!execForm.dept || !execForm.amount}
                     className="flex-1 px-4 py-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
@@ -396,23 +424,7 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
           {chartData.length > 0 ? (
             <div className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
               <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">부서별 예산 vs 집행 현황</h3>
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={chartData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="dept" tick={{ fontSize: 12, fill: 'var(--toss-gray-3)' }} />
-                  <YAxis tickFormatter={(v: number) => `${(v / 10000).toFixed(0)}만`} tick={{ fontSize: 11, fill: 'var(--toss-gray-3)' }} />
-                  <Tooltip
-                    formatter={(value: any, name: any) => [
-                      `${(value || 0).toLocaleString()}원`,
-                      name === 'budget' ? '예산' : name === 'executed' ? '집행' : '잔액'
-                    ]}
-                    contentStyle={{ borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)' }}
-                  />
-                  <Bar dataKey="budget" name="예산" fill="var(--accent)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="executed" name="집행" fill="var(--danger, #FF6B6B)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="remaining" name="잔액" fill="var(--success, #34C759)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <BudgetBarChart data={chartData} />
             </div>
           ) : (
             <div className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm text-center py-10 text-sm text-[var(--toss-gray-3)]">

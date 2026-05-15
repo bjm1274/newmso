@@ -1,8 +1,18 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart } from 'recharts';
+import dynamic from 'next/dynamic';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
+
+// recharts는 번들 사이즈가 크므로 동적 로드
+const ParetoChart = dynamic(() => import('./charts/ParetoChart'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[280px] items-center justify-center text-xs text-[var(--toss-gray-3)]">
+      차트를 불러오는 중...
+    </div>
+  ),
+});
 
 type InventoryItem = {
   id: string;
@@ -190,17 +200,7 @@ export default function ABCAnalysis({ user, inventory = [] }: Props) {
       {chartData.length > 0 && (
         <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
           <h3 className="mb-3 text-sm font-bold text-[var(--foreground)]">파레토 분석 (상위 30개 품목)</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="name" tick={{ fontSize: 9 }} />
-              <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
-              <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10 }} unit="%" />
-              <Tooltip />
-              <Bar yAxisId="left" dataKey="value" fill="var(--accent)" radius={[4, 4, 0, 0]} opacity={0.7} name="금액" />
-              <Line yAxisId="right" type="monotone" dataKey="cumulative" stroke="#ef4444" strokeWidth={2} dot={false} name="누적 %" />
-            </ComposedChart>
-          </ResponsiveContainer>
+          <ParetoChart data={chartData} />
         </div>
       )}
 
