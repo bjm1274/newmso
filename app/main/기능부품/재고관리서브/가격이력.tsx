@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 type PriceRecord = {
   id: string;
@@ -19,6 +20,37 @@ type Props = {
   user: Record<string, unknown>;
   inventory?: Array<{ id: string; name: string; category?: string }>;
 };
+
+const PRICE_COLUMNS: Column<PriceRecord>[] = [
+  {
+    key: 'recorded_at',
+    label: '일자',
+    primary: true,
+    render: (r) => <>{new Date(r.recorded_at).toLocaleDateString('ko-KR')}</>,
+  },
+  {
+    key: 'unit_price',
+    label: '단가',
+    align: 'right',
+    render: (r) => <span className="font-bold">{r.unit_price.toLocaleString()}원</span>,
+  },
+  {
+    key: 'quantity',
+    label: '수량',
+    align: 'right',
+    render: (r) => <>{r.quantity}</>,
+    showOnMobile: false,
+  },
+  {
+    key: 'source_type',
+    label: '출처',
+    render: (r) => (
+      <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2 py-0.5 text-[10px] font-bold text-[var(--toss-gray-4)]">
+        {r.source_type}
+      </span>
+    ),
+  },
+];
 
 export default function PriceHistory({ user, inventory = [] }: Props) {
   const [selectedItemId, setSelectedItemId] = useState('');
@@ -72,6 +104,11 @@ export default function PriceHistory({ user, inventory = [] }: Props) {
   }, [records]);
 
   const selectedItem = inventory.find((i) => i.id === selectedItemId);
+
+  const recentRecords = useMemo(
+    () => [...records].reverse().slice(0, 50),
+    [records],
+  );
 
   return (
     <div className="space-y-4">
@@ -175,36 +212,13 @@ export default function PriceHistory({ user, inventory = [] }: Props) {
                 <div className="border-b border-[var(--border)] px-4 py-3">
                   <h4 className="text-xs font-bold text-[var(--foreground)]">상세 이력</h4>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-[var(--border)] bg-[var(--muted)]">
-                        <th className="px-4 py-2.5 text-left font-bold text-[var(--toss-gray-4)]">일자</th>
-                        <th className="px-4 py-2.5 text-right font-bold text-[var(--toss-gray-4)]">단가</th>
-                        <th className="px-4 py-2.5 text-right font-bold text-[var(--toss-gray-4)]">수량</th>
-                        <th className="px-4 py-2.5 text-left font-bold text-[var(--toss-gray-4)]">출처</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...records].reverse().slice(0, 50).map((r) => (
-                        <tr key={r.id} className="border-b border-[var(--border)] last:border-0">
-                          <td className="px-4 py-2.5 text-[var(--foreground)]">
-                            {new Date(r.recorded_at).toLocaleDateString('ko-KR')}
-                          </td>
-                          <td className="px-4 py-2.5 text-right font-bold text-[var(--foreground)]">
-                            {r.unit_price.toLocaleString()}원
-                          </td>
-                          <td className="px-4 py-2.5 text-right text-[var(--foreground)]">{r.quantity}</td>
-                          <td className="px-4 py-2.5">
-                            <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2 py-0.5 text-[10px] font-bold text-[var(--toss-gray-4)]">
-                              {r.source_type}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <ResponsiveTable<PriceRecord>
+                  columns={PRICE_COLUMNS}
+                  rows={recentRecords}
+                  keyField="id"
+                  emptyMessage="가격 이력이 없습니다."
+                  className="px-0"
+                />
               </div>
             </>
           )}

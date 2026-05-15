@@ -1,10 +1,11 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { EmptyState, LoadingPanel, StatePanel } from '@/app/components/StatePanel';
+import { LoadingPanel, StatePanel } from '@/app/components/StatePanel';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import { supabase } from '@/lib/supabase';
 
 interface Props {
-  user: any;
+  user: unknown;
 }
 
 interface AccessLog {
@@ -19,7 +20,60 @@ interface AccessLog {
   created_at: string;
 }
 
-export default function AccessAuditLog({ user }: Props) {
+function isSuspicious(log: AccessLog) {
+  const h = new Date(log.created_at).getHours();
+  return h >= 0 && h < 6;
+}
+
+const AUDIT_COLUMNS: Column<AccessLog>[] = [
+    {
+      key: 'created_at',
+      label: '시각',
+      primary: true,
+      render: (log) => {
+        const suspicious = isSuspicious(log);
+        return (
+          <span className={`font-bold ${suspicious ? 'text-danger' : ''}`}>
+            {new Date(log.created_at).toLocaleString('ko-KR', {
+              month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+            })}
+            {suspicious && (
+              <span className="ml-1 text-[9px] bg-danger text-white px-1 rounded-[var(--radius-md)]">새벽</span>
+            )}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'user_name',
+      label: '직원명',
+      render: (log) => <span className="font-bold">{log.user_name || '-'}</span>,
+    },
+    {
+      key: 'company',
+      label: '소속',
+      render: (log) => <span className="text-[var(--toss-gray-4)]">{log.company || '-'}</span>,
+      showOnMobile: false,
+    },
+    {
+      key: 'menu',
+      label: '메뉴',
+      render: (log) => <>{log.menu || '-'}</>,
+    },
+    {
+      key: 'action',
+      label: '액션',
+      render: (log) => <>{log.action || '-'}</>,
+    },
+    {
+      key: 'ip_address',
+      label: 'IP',
+      render: (log) => <span className="text-[var(--toss-gray-3)]">{log.ip_address || '-'}</span>,
+      showOnMobile: false,
+    },
+];
+
+export default function AccessAuditLog({ user: _user }: Props) {
   const [logs, setLogs] = useState<AccessLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [tableExists, setTableExists] = useState(true);
@@ -62,12 +116,6 @@ export default function AccessAuditLog({ user }: Props) {
     };
     fetchLogs();
   }, [dateFrom, dateTo]);
-
-  const isSuspicious = (log: AccessLog) => {
-    const h = new Date(log.created_at).getHours();
-    if (h >= 0 && h < 6) return true;
-    return false;
-  };
 
   const filtered = logs.filter(l => {
     if (filterUser && !l.user_name?.includes(filterUser)) return false;
@@ -159,45 +207,14 @@ export default function AccessAuditLog({ user }: Props) {
       {/* 로그 테이블 */}
       {loading ? (
         <LoadingPanel title="접근 로그를 불러오는 중입니다" />
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          title="로그 데이터가 없습니다"
-          description="기간이나 필터 조건을 변경하면 더 많은 접근 이력을 확인할 수 있습니다."
-          compact
-        />
       ) : (
-        <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
-          <table className="w-full text-[11px]">
-            <thead>
-              <tr className="bg-[var(--muted)]">
-                <th className="p-2 text-left font-bold text-[var(--toss-gray-4)]">시각</th>
-                <th className="p-2 text-left font-bold text-[var(--toss-gray-4)]">직원명</th>
-                <th className="p-2 text-left font-bold text-[var(--toss-gray-4)]">소속</th>
-                <th className="p-2 text-left font-bold text-[var(--toss-gray-4)]">메뉴</th>
-                <th className="p-2 text-left font-bold text-[var(--toss-gray-4)]">액션</th>
-                <th className="p-2 text-left font-bold text-[var(--toss-gray-4)]">IP</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(log => {
-                const suspicious = isSuspicious(log);
-                return (
-                  <tr key={log.id} className={`border-t border-[var(--border)] ${suspicious ? 'bg-red-500/10' : 'hover:bg-[var(--muted)]/50'}`}>
-                    <td className={`p-2 font-bold ${suspicious ? 'text-danger' : ''}`}>
-                      {new Date(log.created_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                      {suspicious && <span className="ml-1 text-[9px] bg-danger text-white px-1 rounded-[var(--radius-md)]">새벽</span>}
-                    </td>
-                    <td className="p-2 font-bold">{log.user_name || '-'}</td>
-                    <td className="p-2 text-[var(--toss-gray-4)]">{log.company || '-'}</td>
-                    <td className="p-2">{log.menu || '-'}</td>
-                    <td className="p-2">{log.action || '-'}</td>
-                    <td className="p-2 text-[var(--toss-gray-3)]">{log.ip_address || '-'}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <ResponsiveTable<AccessLog>
+          columns={AUDIT_COLUMNS}
+          rows={filtered}
+          keyField="id"
+          emptyMessage="로그 데이터가 없습니다. 기간이나 필터 조건을 변경해 보세요."
+          className="rounded-[var(--radius-md)] border border-[var(--border)] overflow-hidden"
+        />
       )}
     </div>
   );

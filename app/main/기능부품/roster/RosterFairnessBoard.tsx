@@ -1,3 +1,6 @@
+import { useMemo } from 'react';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
+
 type FairnessRow = {
   staffId: string;
   staffName: string;
@@ -22,6 +25,85 @@ type RosterFairnessBoardProps = {
     rows: FairnessRow[];
   };
 };
+
+function fairnessTone(score: number) {
+  if (score >= 90) return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  if (score >= 75) return 'border-amber-200 bg-amber-50 text-amber-700';
+  return 'border-rose-200 bg-rose-50 text-rose-700';
+}
+
+function diversityTone(score: number) {
+  if (score >= 75) return 'border-sky-200 bg-sky-50 text-sky-700';
+  if (score >= 55) return 'border-indigo-200 bg-indigo-50 text-indigo-700';
+  return 'border-zinc-200 bg-zinc-100 text-zinc-700';
+}
+
+const COLUMNS: Column<FairnessRow>[] = [
+  {
+    key: 'staffName',
+    label: '직원',
+    primary: true,
+    align: 'left',
+  },
+  {
+    key: 'nightCount',
+    label: '나이트',
+    align: 'center',
+  },
+  {
+    key: 'weekendWorkCount',
+    label: '주말',
+    align: 'center',
+  },
+  {
+    key: 'holidayWorkCount',
+    label: '공휴일',
+    align: 'center',
+  },
+  {
+    key: 'maxConsecutiveWorkDays',
+    label: '최대 연속근무',
+    align: 'center',
+    render: (row) => `${row.maxConsecutiveWorkDays}일`,
+  },
+  {
+    key: 'diversityScore',
+    label: '다양성',
+    align: 'center',
+    render: (row) => (
+      <span
+        className={`inline-flex rounded-[var(--radius-md)] border px-3 py-1 text-[11px] font-bold ${diversityTone(row.diversityScore)}`}
+      >
+        {row.diversityScore}점
+      </span>
+    ),
+  },
+  {
+    key: 'longestSameBandStreak',
+    label: '최장 동일밴드',
+    align: 'center',
+    render: (row) => `${row.longestSameBandStreak}일`,
+    showOnMobile: false,
+  },
+  {
+    key: 'fairnessScore',
+    label: '균형 점수',
+    align: 'center',
+    render: (row) => (
+      <span
+        className={`inline-flex rounded-[var(--radius-md)] border px-3 py-1 text-[11px] font-bold ${fairnessTone(row.fairnessScore)}`}
+      >
+        {row.fairnessScore}점
+      </span>
+    ),
+  },
+  {
+    key: 'note',
+    label: '메모',
+    align: 'left',
+    showOnMobile: false,
+  },
+];
 
 export default function RosterFairnessBoard({ scoreboard }: RosterFairnessBoardProps) {
   if (scoreboard.rows.length === 0) return null;
@@ -62,99 +144,13 @@ export default function RosterFairnessBoard({ scoreboard }: RosterFairnessBoardP
       </div>
 
       <div className="mt-4 overflow-x-auto">
-        <table className="min-w-[920px] table-fixed border-collapse">
-          <thead>
-            <tr className="border-b border-[var(--border)]">
-              <th className="px-3 py-3 text-left text-[11px] font-bold text-[var(--toss-gray-3)]">
-                직원
-              </th>
-              <th className="px-3 py-3 text-center text-[11px] font-bold text-[var(--toss-gray-3)]">
-                나이트
-              </th>
-              <th className="px-3 py-3 text-center text-[11px] font-bold text-[var(--toss-gray-3)]">
-                주말
-              </th>
-              <th className="px-3 py-3 text-center text-[11px] font-bold text-[var(--toss-gray-3)]">
-                공휴일
-              </th>
-              <th className="px-3 py-3 text-center text-[11px] font-bold text-[var(--toss-gray-3)]">
-                최대 연속근무
-              </th>
-              <th className="px-3 py-3 text-center text-[11px] font-bold text-[var(--toss-gray-3)]">
-                다양성
-              </th>
-              <th className="px-3 py-3 text-center text-[11px] font-bold text-[var(--toss-gray-3)]">
-                최장 동일밴드
-              </th>
-              <th className="px-3 py-3 text-center text-[11px] font-bold text-[var(--toss-gray-3)]">
-                균형 점수
-              </th>
-              <th className="px-3 py-3 text-left text-[11px] font-bold text-[var(--toss-gray-3)]">
-                메모
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {scoreboard.rows.map((row) => {
-              const fairnessToneClass =
-                row.fairnessScore >= 90
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                  : row.fairnessScore >= 75
-                    ? 'border-amber-200 bg-amber-50 text-amber-700'
-                    : 'border-rose-200 bg-rose-50 text-rose-700';
-              const diversityToneClass =
-                row.diversityScore >= 75
-                  ? 'border-sky-200 bg-sky-50 text-sky-700'
-                  : row.diversityScore >= 55
-                    ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
-                    : 'border-zinc-200 bg-zinc-100 text-zinc-700';
-
-              return (
-                <tr
-                  key={row.staffId}
-                  className="border-b border-[var(--border)] last:border-b-0"
-                  data-testid={`roster-fairness-row-${row.staffId}`}
-                >
-                  <td className="px-3 py-3 text-sm font-bold text-[var(--foreground)]">
-                    {row.staffName}
-                  </td>
-                  <td className="px-3 py-3 text-center text-sm font-semibold text-[var(--foreground)]">
-                    {row.nightCount}
-                  </td>
-                  <td className="px-3 py-3 text-center text-sm font-semibold text-[var(--foreground)]">
-                    {row.weekendWorkCount}
-                  </td>
-                  <td className="px-3 py-3 text-center text-sm font-semibold text-[var(--foreground)]">
-                    {row.holidayWorkCount}
-                  </td>
-                  <td className="px-3 py-3 text-center text-sm font-semibold text-[var(--foreground)]">
-                    {row.maxConsecutiveWorkDays}일
-                  </td>
-                  <td className="px-3 py-3 text-center">
-                    <span
-                      className={`inline-flex rounded-[var(--radius-md)] border px-3 py-1 text-[11px] font-bold ${diversityToneClass}`}
-                    >
-                      {row.diversityScore}점
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 text-center text-sm font-semibold text-[var(--foreground)]">
-                    {row.longestSameBandStreak}일
-                  </td>
-                  <td className="px-3 py-3 text-center">
-                    <span
-                      className={`inline-flex rounded-[var(--radius-md)] border px-3 py-1 text-[11px] font-bold ${fairnessToneClass}`}
-                    >
-                      {row.fairnessScore}점
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 text-sm font-semibold text-[var(--toss-gray-3)]">
-                    {row.note}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <ResponsiveTable<FairnessRow>
+          columns={COLUMNS}
+          rows={scoreboard.rows}
+          keyField="staffId"
+          emptyMessage="데이터가 없습니다."
+          className="min-w-[920px] md:min-w-0"
+        />
       </div>
     </div>
   );

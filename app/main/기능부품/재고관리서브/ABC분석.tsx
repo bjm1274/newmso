@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart } from 'recharts';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 type InventoryItem = {
   id: string;
@@ -51,6 +52,73 @@ const GRADE_STYLES = {
   B: { bg: 'bg-amber-500/10', text: 'text-amber-600 dark:text-amber-400', border: 'border-amber-500/20', label: 'B등급 (중요)' },
   C: { bg: 'bg-[var(--muted)]', text: 'text-[var(--toss-gray-4)]', border: 'border-[var(--border)]', label: 'C등급 (일반)' },
 };
+
+const ABC_COLUMNS: Column<ABCItem>[] = [
+  {
+    key: 'grade',
+    label: '등급',
+    showOnMobile: false,
+    render: (row) => {
+      const style = GRADE_STYLES[row.grade];
+      return (
+        <span className={`rounded-[var(--radius-md)] px-2 py-0.5 text-[10px] font-bold ${style.bg} ${style.text}`}>
+          {row.grade}
+        </span>
+      );
+    },
+  },
+  {
+    key: 'name',
+    label: '품목명',
+    primary: true,
+    render: (row) => {
+      const style = GRADE_STYLES[row.grade];
+      return (
+        <span className="font-semibold text-[var(--foreground)]">
+          <span className={`mr-1.5 rounded-[var(--radius-md)] px-1.5 py-0.5 text-[10px] font-bold md:hidden ${style.bg} ${style.text}`}>
+            {row.grade}
+          </span>
+          {row.name}
+        </span>
+      );
+    },
+  },
+  {
+    key: 'category',
+    label: '분류',
+    render: (row) => <span className="text-[var(--toss-gray-3)]">{row.category ?? '-'}</span>,
+  },
+  {
+    key: 'quantity',
+    label: '수량',
+    align: 'right',
+    render: (row) => row.quantity.toLocaleString(),
+  },
+  {
+    key: 'unit_price',
+    label: '단가',
+    align: 'right',
+    showOnMobile: false,
+    render: (row) => `${row.unit_price.toLocaleString()}원`,
+  },
+  {
+    key: 'annualValue',
+    label: '연간 금액',
+    align: 'right',
+    render: (row) => (
+      <span className="font-bold">{Math.round(row.annualValue).toLocaleString()}원</span>
+    ),
+  },
+  {
+    key: 'cumulativePercent',
+    label: '누적 %',
+    align: 'right',
+    showOnMobile: false,
+    render: (row) => (
+      <span className="text-[var(--toss-gray-3)]">{row.cumulativePercent.toFixed(1)}%</span>
+    ),
+  },
+];
 
 export default function ABCAnalysis({ user, inventory = [] }: Props) {
   const [gradeFilter, setGradeFilter] = useState<'all' | 'A' | 'B' | 'C'>('all');
@@ -159,44 +227,12 @@ export default function ABCAnalysis({ user, inventory = [] }: Props) {
             ))}
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-[var(--border)] bg-[var(--muted)]">
-                <th className="px-4 py-2.5 text-left font-bold text-[var(--toss-gray-4)]">등급</th>
-                <th className="px-4 py-2.5 text-left font-bold text-[var(--toss-gray-4)]">품목명</th>
-                <th className="px-4 py-2.5 text-left font-bold text-[var(--toss-gray-4)]">분류</th>
-                <th className="px-4 py-2.5 text-right font-bold text-[var(--toss-gray-4)]">수량</th>
-                <th className="px-4 py-2.5 text-right font-bold text-[var(--toss-gray-4)]">단가</th>
-                <th className="px-4 py-2.5 text-right font-bold text-[var(--toss-gray-4)]">연간 금액</th>
-                <th className="px-4 py-2.5 text-right font-bold text-[var(--toss-gray-4)]">누적 %</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.slice(0, 100).map((item) => {
-                const style = GRADE_STYLES[item.grade];
-                return (
-                  <tr key={item.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--muted)]/50">
-                    <td className="px-4 py-2.5">
-                      <span className={`rounded-[var(--radius-md)] px-2 py-0.5 text-[10px] font-bold ${style.bg} ${style.text}`}>
-                        {item.grade}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 font-semibold text-[var(--foreground)]">{item.name}</td>
-                    <td className="px-4 py-2.5 text-[var(--toss-gray-3)]">{item.category || '-'}</td>
-                    <td className="px-4 py-2.5 text-right text-[var(--foreground)]">{item.quantity.toLocaleString()}</td>
-                    <td className="px-4 py-2.5 text-right text-[var(--foreground)]">{item.unit_price.toLocaleString()}원</td>
-                    <td className="px-4 py-2.5 text-right font-bold text-[var(--foreground)]">{Math.round(item.annualValue).toLocaleString()}원</td>
-                    <td className="px-4 py-2.5 text-right text-[var(--toss-gray-3)]">{item.cumulativePercent.toFixed(1)}%</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {filtered.length === 0 && (
-            <div className="py-10 text-center text-sm text-[var(--toss-gray-3)]">해당 등급의 품목이 없습니다.</div>
-          )}
-        </div>
+        <ResponsiveTable
+          columns={ABC_COLUMNS}
+          rows={filtered.slice(0, 100)}
+          keyField="id"
+          emptyMessage="해당 등급의 품목이 없습니다."
+        />
       </div>
     </div>
   );
