@@ -97,3 +97,4 @@ build.out
 __pycache__/
 *.pyc
 scripts/**/산출물/
+.open-next-yesterday-46bdac3f/

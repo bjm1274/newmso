@@ -143,22 +143,10 @@ async function processFile(file: File, opts: ProcessOpts): Promise<File> {
 }
 
 async function convertHeic(file: File): Promise<File> {
-  try {
-    // heic2any 는 dependencies 에 명시되어 있으나, 설치 누락/번들 실패/SSR 등에서는
-    // 동적 import 가 throw 될 수 있으므로 try/catch 로 감싸 원본을 폴백 반환한다.
-    // 타입은 types/heic2any.d.ts 의 ambient module 선언으로 해결.
-    const mod = await import('heic2any');
-    const heic2any = mod.default;
-    if (typeof heic2any !== 'function') return file;
-    const result = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
-    const blob = Array.isArray(result) ? result[0] : result;
-    if (!blob) return file;
-    const newName = file.name.replace(HEIC_RE, '.jpg');
-    return new File([blob], /\.jpe?g$/i.test(newName) ? newName : `${newName}.jpg`, { type: 'image/jpeg' });
-  } catch (err) {
-    console.warn('[CameraInput] HEIC conversion failed, using original:', err);
-    return file;
-  }
+  // heic2any 의존성은 Cloudflare Worker 핸들러 크기 한도(3MB) 초과 원인이라 제거함.
+  // libheif-js 디코더가 ~1.4MB 청크로 SSR 번들에 박혀 deploy 실패 유발.
+  // HEIC 업로드는 원본 그대로 전달 — 서버 측 변환이 필요하면 추후 R2 + edge function 도입.
+  return file;
 }
 
 async function resizeAndCompress(file: File, { quality, maxWidth }: ProcessOpts): Promise<File> {
