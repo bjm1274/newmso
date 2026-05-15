@@ -62,6 +62,8 @@ import {
 } from './게시판-view-utils';
 import { isAnonymousReadStatusPost, BODY_PARTS, VALID_BODY_IDS } from './게시판/post-helpers';
 import ReadStatusModal from './게시판/ReadStatusModal';
+import CommentComposerSticky from '@/app/components/CommentComposerSticky';
+import { useIsMobile } from '@/app/components/useIsMobile';
 
 interface BoardViewProps {
   user: StaffMember | null;
@@ -86,6 +88,7 @@ type BoardCommentRow = {
 };
 
 export default function BoardView({ user, subView, setSubView, selectedCo, selectedCompanyId, initialBoard, initialPostId, onConsumePostId, surgeries, mris, setMainMenu }: BoardViewProps) {
+  const isMobile = useIsMobile();
   const { dialog, openConfirm } = useActionDialog();
   const defaultBoard =
     BOARD_IDS.find((boardId) => canAccessBoard(user, boardId, 'read')) || '공지사항';
@@ -2839,25 +2842,51 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                       </div>
                     );
                   })()}
-                  <div className="flex gap-2">
-                    <input
-                      data-testid="board-comment-input"
+                  {isMobile ? (
+                    <CommentComposerSticky
                       value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      placeholder={user?.id ? '댓글을 입력하세요.' : '로그인한 후 댓글을 입력할 수 있습니다.'}
+                      onChange={setNewComment}
+                      onSubmit={() => handleAddComment(selectedPost.id, replyParentId)}
+                      placeholder={user?.id ? (replyParentId ? '답글을 입력하세요…' : '댓글을 입력하세요.') : '로그인한 후 댓글을 입력할 수 있습니다.'}
                       disabled={!user?.id}
-                      className="flex-1 px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-xs disabled:bg-[var(--page-bg)] disabled:text-[var(--toss-gray-3)]"
+                      ariaLabel={replyParentId ? '답글 작성' : '댓글 작성'}
+                      submitLabel="등록"
+                      withSpacer={false}
                     />
-                    <button
-                      type="button"
-                      data-testid="board-comment-submit"
-                      onClick={() => handleAddComment(selectedPost.id, replyParentId)}
-                      disabled={!user?.id}
-                      className="px-3 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-xs font-bold hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      등록
-                    </button>
-                  </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <label htmlFor="board-comment-input" className="sr-only">
+                        {replyParentId ? '답글 작성' : '댓글 작성'}
+                      </label>
+                      <input
+                        id="board-comment-input"
+                        data-testid="board-comment-input"
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && user?.id && newComment.trim()) {
+                            e.preventDefault();
+                            void handleAddComment(selectedPost.id, replyParentId);
+                          }
+                        }}
+                        placeholder={user?.id ? '댓글을 입력하세요.' : '로그인한 후 댓글을 입력할 수 있습니다.'}
+                        disabled={!user?.id}
+                        aria-label={replyParentId ? '답글 작성' : '댓글 작성'}
+                        maxLength={4000}
+                        className="flex-1 px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-xs disabled:bg-[var(--page-bg)] disabled:text-[var(--toss-gray-3)]"
+                      />
+                      <button
+                        type="button"
+                        data-testid="board-comment-submit"
+                        onClick={() => handleAddComment(selectedPost.id, replyParentId)}
+                        disabled={!user?.id || !newComment.trim()}
+                        aria-disabled={!user?.id || !newComment.trim()}
+                        className="px-3 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-xs font-bold hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        등록
+                      </button>
+                    </div>
+                  )}
                 </div>
 
               </div>
