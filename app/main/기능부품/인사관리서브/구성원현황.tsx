@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import type { StaffMember } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { isActiveStaff } from '@/lib/active-staff';
@@ -1181,6 +1182,133 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const 계약직인원수 = 필터목록.filter((직원: StaffMember) => 직원고용형태(직원) === '계약직').length;
   const 부서수 = new Set(필터목록.map((직원: StaffMember) => 직원.department).filter(Boolean)).size;
 
+  const staffTableColumns = useMemo((): Column<StaffMember>[] => [
+    {
+      key: 'employee_no',
+      label: '사번',
+      render: (직원) => (
+        <span className="font-semibold text-[var(--accent)] text-xs">{직원.employee_no ?? '-'}</span>
+      ),
+    },
+    {
+      key: 'name',
+      label: '성명/직함',
+      primary: true,
+      render: (직원) => (
+        <div>
+          <p className="text-sm font-semibold text-[var(--foreground)]">{직원.name}</p>
+          <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">{직원.position || '-'}</p>
+          <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+            {직원.resident_no ? '주민번호 등록' : '주민번호 미등록'}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: 'company',
+      label: '소속',
+      render: (직원) => (
+        <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">{직원.company}</span>
+      ),
+    },
+    {
+      key: 'department',
+      label: '부서/팀',
+      render: (직원) => (
+        <span className="text-xs font-bold text-[var(--toss-gray-4)]">{직원.department}</span>
+      ),
+    },
+    {
+      key: 'contact',
+      label: '연락/계정',
+      render: (직원) => (
+        <div>
+          <p className="text-xs font-bold text-[var(--foreground)]">{직원연락요약(직원)}</p>
+          <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+            입사일 {(직원.joined_at as string) || (직원.join_date as string) || '-'}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: 'work',
+      label: '근무정보',
+      render: (직원) => (
+        <div className="flex flex-col gap-1">
+          <span className="w-fit px-3 py-1 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-[var(--radius-md)]">
+            {(근무형태목록.find((s) => s.id === (직원.shift_id as string))?.name as string) || '-'}
+          </span>
+          <span
+            className={`w-fit px-3 py-1 text-[10px] font-semibold rounded-full ${
+              직원고용형태(직원) === '계약직'
+                ? 'bg-orange-500/20 text-orange-700'
+                : 'bg-emerald-100 text-emerald-700'
+            }`}
+          >
+            {직원고용형태(직원)}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: 'license',
+      label: '면허/자격',
+      render: (직원) => (
+        <div>
+          <p className="text-xs font-bold text-[var(--foreground)]">{직원면허요약(직원)}</p>
+          <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+            취득일 {licensesByStaff[String(직원.id)]?.[0]?.issued_date || '-'}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      label: '상태',
+      render: (직원) => (
+        <span
+          className={`px-3 py-1 text-[11px] font-semibold rounded-full ${
+            직원.status === '퇴사'
+              ? 'bg-red-500/20 text-red-600'
+              : 'bg-green-500/20 text-green-600'
+          }`}
+        >
+          {직원.status || '재직중'}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      label: '관리',
+      align: 'right',
+      render: (직원) => (
+        <div className="flex justify-end gap-2 flex-wrap">
+          <button
+            onClick={(e) => { e.stopPropagation(); 수정시작(직원); }}
+            className="px-4 py-2 bg-[var(--foreground)] text-white text-[11px] font-semibold rounded-[var(--radius-md)] hover:opacity-90 transition-all"
+          >
+            수정
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setPendingRetirementStaff(직원); }}
+            className="px-3 py-2 bg-red-500/10 text-red-600 text-[11px] font-semibold rounded-[var(--radius-md)] hover:bg-red-500/20 transition-all"
+          >
+            삭제
+          </button>
+          {onOpenDocumentRepoForStaff && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onOpenDocumentRepoForStaff(직원); }}
+              className="px-3 py-2 bg-[var(--toss-blue-light)] text-[var(--accent)] text-[11px] font-semibold rounded-[var(--radius-md)] hover:opacity-90 transition-all"
+            >
+              문서
+            </button>
+          )}
+        </div>
+      ),
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [근무형태목록, licensesByStaff, onOpenDocumentRepoForStaff]);
+
   return (
     <div className="flex flex-col h-full app-page">
       <header className="border-b border-[var(--border)] bg-[var(--card)] p-3 md:p-4">
@@ -1303,134 +1431,13 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
             <CertTransferPanel staffId={String(선택된직원ID)} staffName={필터목록.find((s: StaffMember) => s.id === 선택된직원ID)?.name || ''} />
           </div>
         )}
-        {/* PC 버전 테이블 */}
-        <div className="hidden md:block bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] overflow-x-auto shadow-sm">
-          <table className="w-full text-left border-collapse min-w-[900px]">
-            <thead className="bg-[var(--muted)] text-[11px] font-semibold text-[var(--toss-gray-3)] border-b border-[var(--border)] uppercase tracking-widest">
-              <tr><th className="p-3 lg:p-4">사번</th><th className="p-3 lg:p-4">성명/직함</th><th className="p-3 lg:p-4">소속</th><th className="p-3 lg:p-4">부서/팀</th><th className="p-3 lg:p-4">연락/계정</th><th className="p-3 lg:p-4">근무정보</th><th className="p-3 lg:p-4">면허/자격</th><th className="p-3 lg:p-4">상태</th><th className="p-3 lg:p-4 text-right">관리</th></tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {필터목록.map((직원: StaffMember) => (
-                <tr key={직원.id} className="hover:bg-[var(--toss-blue-light)]/30 transition-all">
-                  <td className="p-4 font-semibold text-[var(--accent)] text-xs">{직원.employee_no}</td>
-                  <td className="p-4">
-                    <p className="text-sm font-semibold text-[var(--foreground)]">{직원.name}</p>
-                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">{직원.position || '-'}</p>
-                    <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">{직원.resident_no ? '주민번호 등록' : '주민번호 미등록'}</p>
-                  </td>
-                  <td className="p-4 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">{직원.company}</td>
-                  <td className="p-4 text-xs font-bold text-[var(--toss-gray-4)]">{직원.department}</td>
-                  <td className="p-4">
-                    <p className="text-xs font-bold text-[var(--foreground)]">{직원연락요약(직원)}</p>
-                    <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">입사일 {(직원.joined_at as string) || (직원.join_date as string) || '-'}</p>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex flex-col gap-1">
-                      <span className="w-fit px-3 py-1 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-[var(--radius-md)]">
-                        {근무형태목록.find(s => s.id === (직원.shift_id as string))?.name as string || '-'}
-                      </span>
-                      <span className={`w-fit px-3 py-1 text-[10px] font-semibold rounded-full ${직원고용형태(직원) === '계약직' ? 'bg-orange-500/20 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                        {직원고용형태(직원)}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <p className="text-xs font-bold text-[var(--foreground)]">{직원면허요약(직원)}</p>
-                    <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">취득일 {licensesByStaff[String(직원.id)]?.[0]?.issued_date || '-'}</p>
-                  </td>
-                  <td className="p-4">
-                    <span className={`px-3 py-1 text-[11px] font-semibold rounded-full ${직원.status === '퇴사' ? 'bg-red-500/20 text-red-600' : 'bg-green-500/20 text-green-600'}`}>
-                      {직원.status || '재직중'}
-                    </span>
-                  </td>
-                  <td className="p-4 text-right space-x-2">
-                    <button
-                      onClick={() => 수정시작(직원)}
-                      className="px-4 py-2 bg-[var(--foreground)] text-white text-[11px] font-semibold rounded-[var(--radius-md)] hover:opacity-90 transition-all"
-                    >
-                      수정
-                    </button>
-                    <button
-                      onClick={() => setPendingRetirementStaff(직원)}
-                      className="px-3 py-2 bg-red-500/10 text-red-600 text-[11px] font-semibold rounded-[var(--radius-md)] hover:bg-red-500/20 transition-all"
-                    >
-                      삭제
-                    </button>
-                    {onOpenDocumentRepoForStaff && (
-                      <button
-                        onClick={() => onOpenDocumentRepoForStaff(직원)}
-                        className="px-3 py-2 bg-[var(--toss-blue-light)] text-[var(--accent)] text-[11px] font-semibold rounded-[var(--radius-md)] hover:opacity-90 transition-all"
-                      >
-                        문서
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* 모바일 버전 카드 리스트 */}
-        <div className="md:hidden grid grid-cols-1 gap-4">
-          {필터목록.map((직원: StaffMember) => (
-            <div key={직원.id} className="bg-[var(--card)] p-4 rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm flex flex-col gap-4">
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-[var(--toss-blue-light)] rounded-[var(--radius-md)] flex items-center justify-center text-[var(--accent)] font-semibold text-xs">#{직원.employee_no}</div>
-                  <div>
-                    <h4 className="text-base font-semibold text-[var(--foreground)]">{직원.name}</h4>
-                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">{직원.company} · {직원.position} · {(직원.joined_at as string) || (직원.join_date as string)}</p>
-                  </div>
-                </div>
-                <span className={`px-3 py-1 text-[11px] font-semibold rounded-full ${직원.status === '퇴사' ? 'bg-red-500/20 text-red-600' : 'bg-green-500/20 text-green-600'}`}>{직원.status || '재직중'}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[var(--border)]">
-                <div>
-                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">부서</p>
-                  <p className="text-[13px] font-bold text-[var(--foreground)]">{직원.department}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">근무형태</p>
-                  <p className="text-[13px] font-bold text-[var(--foreground)]">{근무형태목록.find(s => s.id === 직원.shift_id)?.name || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">연락처</p>
-                  <p className="text-[13px] font-bold text-[var(--foreground)] break-all">{직원연락요약(직원)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">고용형태</p>
-                  <p className="text-[13px] font-bold text-[var(--foreground)]">{직원고용형태(직원)}</p>
-                </div>
-              </div>
-              <div className="pt-4 border-t border-[var(--border)]">
-                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">면허/자격</p>
-                <p className="text-[13px] font-bold text-[var(--foreground)] break-words">{직원면허요약(직원)}</p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => 수정시작(직원)}
-                  className="flex-1 py-3 bg-[var(--muted)] text-[var(--foreground)] text-[11px] font-semibold rounded-[var(--radius-md)] hover:opacity-90 transition-all"
-                >
-                  정보 수정하기
-                </button>
-                <button
-                  onClick={() => setPendingRetirementStaff(직원)}
-                  className="px-3 py-3 bg-red-500/10 text-red-600 text-[11px] font-semibold rounded-[var(--radius-md)] hover:bg-red-500/20 transition-all"
-                >
-                  삭제
-                </button>
-                {onOpenDocumentRepoForStaff && (
-                  <button
-                    onClick={() => onOpenDocumentRepoForStaff(직원)}
-                    className="px-3 py-3 bg-[var(--toss-blue-light)] text-[var(--accent)] text-[11px] font-semibold rounded-[var(--radius-md)] hover:opacity-90 transition-all"
-                  >
-                    문서
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+        <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] overflow-x-auto shadow-sm">
+          <ResponsiveTable<StaffMember>
+            columns={staffTableColumns}
+            rows={필터목록}
+            keyField="id"
+            emptyMessage="표시할 직원이 없습니다."
+          />
         </div>
       </div>
 
