@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
@@ -553,6 +554,39 @@ export default function OffboardingView({
     }
   };
 
+  const historyColumns = useMemo<Column<StaffMember>[]>(() => [
+    {
+      key: 'name',
+      label: '직원명',
+      primary: true,
+      render: (s) => <span className="font-bold text-[var(--foreground)]">{s.name}</span>,
+    },
+    {
+      key: 'department',
+      label: '부서 / 회사',
+      render: (s) => `${s.department || '부서 미지정'} / ${s.company}`,
+    },
+    {
+      key: 'hire_date',
+      label: '입사일',
+      render: (s) => getDisplayText(s.hire_date),
+    },
+    {
+      key: 'resigned_at',
+      label: '퇴사일',
+      render: (s) => getDisplayText(s.resigned_at),
+    },
+    {
+      key: 'status',
+      label: '상태',
+      render: (s) => (
+        <span className="rounded-lg bg-[var(--tab-bg)] px-2 py-1 text-[11px] font-bold text-[var(--foreground)]">
+          {getDisplayText(s.status, '퇴사')}
+        </span>
+      ),
+    },
+  ], []);
+
   return (
     <div className="max-w-6xl space-y-4" data-testid="offboarding-view">
       {dialog}
@@ -760,45 +794,13 @@ export default function OffboardingView({
       )}
 
       {activeTab === 'history' && (
-        <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-[var(--muted)]">
-                <tr className="border-b border-[var(--border)] text-[11px] uppercase tracking-widest text-[var(--toss-gray-4)]">
-                  <th className="px-4 py-3 font-bold">직원명</th>
-                  <th className="px-4 py-3 font-bold">부서 / 회사</th>
-                  <th className="px-4 py-3 font-bold">입사일</th>
-                  <th className="px-4 py-3 font-bold text-danger">퇴사일</th>
-                  <th className="px-4 py-3 font-bold">상태</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pastList.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-12 text-center text-sm font-semibold text-[var(--toss-gray-3)]">
-                      퇴사 이력이 없습니다.
-                    </td>
-                  </tr>
-                ) : (
-                  pastList.map((staff) => (
-                    <tr key={staff.id} className="border-b border-[var(--border)] last:border-0">
-                      <td className="px-4 py-3 font-bold text-[var(--foreground)]">{staff.name}</td>
-                      <td className="px-4 py-3 text-[var(--toss-gray-4)]">
-                        {staff.department || '부서 미지정'} / {staff.company}
-                      </td>
-                      <td className="px-4 py-3 text-[var(--toss-gray-4)]">{getDisplayText(staff.hire_date)}</td>
-                      <td className="px-4 py-3 text-[var(--toss-gray-4)]">{getDisplayText(staff.resigned_at)}</td>
-                      <td className="px-4 py-3">
-                        <span className="rounded-lg bg-[var(--tab-bg)] px-2 py-1 text-[11px] font-bold text-[var(--foreground)]">
-                          {getDisplayText(staff.status, '퇴사')}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+        <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm">
+          <ResponsiveTable<StaffMember>
+            columns={historyColumns}
+            rows={pastList}
+            keyField="id"
+            emptyMessage="퇴사 이력이 없습니다."
+          />
         </div>
       )}
     </div>
