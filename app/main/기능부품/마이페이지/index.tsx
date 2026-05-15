@@ -28,6 +28,12 @@ import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 import { LucideIcon } from '../조직도서브/조직도측면창';
 import ShortcutManager from './단축키관리';
 import BetaFeatureToggle from '@/app/components/BetaFeatureToggle';
+import { useIsMobile } from '@/app/components/useIsMobile';
+import {
+  MobileAttendanceEntry,
+  MobileAttendanceViewContainer,
+  type MobileAttendanceView,
+} from './모바일근태진입점';
 import {
   FAVORITES_KEY,
   buildMenuEntry,
@@ -120,6 +126,8 @@ function MyPageMain({
 }: MyPageMainProps) {
   const { dialog, openConfirm, openPrompt } = useActionDialog();
   const isRetired = !isActiveStaff(user ?? {});
+  const isMobile = useIsMobile();
+  const [mobileView, setMobileView] = useState<MobileAttendanceView | null>(null);
   const [activeTab, setActiveTab] = useState<'profile' | 'records' | 'todo' | 'commute' | 'leave' | 'documents' | 'notifications' | 'shortcuts'>('profile');
   const [recordsView, setRecordsView] = useState<'salary' | 'certificates'>('salary');
   const [favorites, setFavorites] = useState<FavoriteEntry[]>([]);
@@ -649,6 +657,25 @@ function MyPageMain({
     </div>
   );
 
+  // 모바일 근태 화면 진입 시 마이페이지 전체를 해당 화면으로 대체 (뒤로 가기 헤더 포함)
+  if (isMobile && mobileView) {
+    const staffIdValue = typeof user.id === 'string' ? user.id : null;
+    const staffNameValue = typeof user.name === 'string' ? user.name : undefined;
+    return (
+      <>
+        {dialog}
+        <MobileAttendanceViewContainer
+          view={mobileView}
+          staffId={staffIdValue}
+          staffName={staffNameValue}
+          onBack={() => setMobileView(null)}
+          onCheckedIn={fetchMonthlyAttendanceSummary}
+          onCheckedOut={fetchMonthlyAttendanceSummary}
+        />
+      </>
+    );
+  }
+
   const joinedAt = user.joined_at || user.join_date || user.hire_date || user.created_at;
   const joinedAtLabel = formatCompactDate(joinedAt);
   const tenureLabel = getTenureLabel(joinedAt);
@@ -1029,6 +1056,10 @@ function MyPageMain({
                   );
                 })}
               </div>
+
+              {isMobile && !isRetired && (
+                <MobileAttendanceEntry onSelect={(view) => setMobileView(view)} />
+              )}
 
               {isEditingProfile && (
                 <section data-testid="mypage-profile-edit-panel" className="rounded-[var(--radius-lg)] border border-[var(--accent)]/20 bg-[var(--card)] p-4 shadow-sm">
