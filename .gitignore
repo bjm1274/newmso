@@ -92,3 +92,8 @@ build.out
 
 # Local Claude preview/launch config
 .claude/launch.json
+
+# Python tooling caches & run artifacts (스크립트 산출물은 직원 데이터 포함 — 커밋 금지)
+__pycache__/
+*.pyc
+scripts/**/산출물/

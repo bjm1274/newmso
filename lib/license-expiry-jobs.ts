@@ -4,11 +4,12 @@ import { computeCENextDue, getRenewalRule } from '@/lib/license-renewal-policy';
 
 // 만료 N일 전 — milestone(단계) 정의
 // 같은 단계 알림은 metadata.milestone으로 중복 발송 방지
-const MILESTONES = [60, 30, 7] as const;
+// 정책: 만료 도래 한 달 전(30일) 1회 + 일주일 전(7일) 1회
+const MILESTONES = [30, 7] as const;
 type Milestone = (typeof MILESTONES)[number];
 
-// 보수교육 마감 단계: 사전 알림(60/30/7) + 미이수 알림(0=마감 당일/이후 첫 발송)
-const CE_MILESTONES = [60, 30, 7, 0] as const;
+// 보수교육 마감 단계: 사전 알림(30/7) + 미이수 알림(0=마감 당일/이후 첫 발송)
+const CE_MILESTONES = [30, 7, 0] as const;
 type CEMilestone = (typeof CE_MILESTONES)[number];
 
 type LicenseRow = {
