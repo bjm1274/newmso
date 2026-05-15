@@ -8,6 +8,10 @@ export function isAnnualLeaveType(value: unknown): boolean {
   const normalized = String(value ?? '').trim().toLowerCase();
   if (!normalized) return false;
 
+  // '\uc5f0\ucc28(\uc774\ub825)': \ub9cc\ub8cc\ub41c \uc774\uc804 \uc0ac\uc774\ud074\uc758 \uc0ac\uc6a9 \uc774\ub825 \u2014 \uadfc\ud0dc \ud654\uba74\uc5d4 \ud45c\uc2dc\ud558\ub418
+  // \ud604\uc7ac \uc794\uc5ec \uacc4\uc0b0(annual_leave_used)\uc5d0\ub294 \ud569\uc0b0\ud558\uc9c0 \uc54a\ub294\ub2e4.
+  if (normalized.includes('\uc774\ub825')) return false;
+
   return (
     normalized === 'annual_leave' ||
     normalized === 'annual' ||

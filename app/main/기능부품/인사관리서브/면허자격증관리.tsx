@@ -15,6 +15,7 @@ import {
   type CEDueStatus,
 } from '@/lib/license-renewal-policy';
 import LicenseCEReviewModal from './면허보수교육검토';
+import SegmentedDateInput from '@/app/components/SegmentedDateInput';
 
 // ---------------------------------------------------------------------------
 // Zod 스키마
@@ -102,6 +103,8 @@ export default function LicenseManager({
     issuing_body: '',
     memo: '',
   });
+  const [customLicenseName, setCustomLicenseName] = useState('');
+  const [staffSearchTerm, setStaffSearchTerm] = useState('');
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
 
@@ -281,15 +284,35 @@ export default function LicenseManager({
       issuing_body: '',
       memo: '',
     });
+    setCustomLicenseName('');
+    setStaffSearchTerm('');
     setShowModal(true);
   };
 
   const openEdit = (l: EnrichedLicense) => {
+    const rawType = String(l.license_type ?? '');
+    const rawName = String(l.license_name ?? '');
+    const knownTypes = LICENSE_TYPE_OPTIONS as readonly string[];
+    // 기존 row에서 종류·명 분리:
+    // - license_type이 enum이면 그대로 사용
+    // - license_type 비었고 license_name이 enum이면 license_type으로 승격
+    // - 그 외는 '기타' + customName=license_name
+    let type = '';
+    let custom = '';
+    if (knownTypes.includes(rawType)) {
+      type = rawType;
+      if (rawType === '기타') custom = rawName;
+    } else if (knownTypes.includes(rawName)) {
+      type = rawName;
+    } else if (rawName) {
+      type = '기타';
+      custom = rawName;
+    }
     setEditId(String(l.id));
     setForm({
       staff_id: String(l.staff_id),
-      license_type: String(l.license_type ?? ''),
-      license_name: String(l.license_name ?? ''),
+      license_type: type,
+      license_name: rawName,
       license_number: String(l.license_number ?? ''),
       issued_date: String(l.issued_date ?? ''),
       expiry_date: String(l.expiry_date ?? ''),
@@ -297,18 +320,27 @@ export default function LicenseManager({
       issuing_body: String(l.issuing_body ?? ''),
       memo: String(l.memo ?? ''),
     });
+    setCustomLicenseName(custom);
+    setStaffSearchTerm('');
     setShowModal(true);
   };
 
   const handleSave = async () => {
-    if (!form.license_name.trim()) return toast('면허/자격증명을 입력하세요.', 'warning');
     if (!form.staff_id) return toast('직원을 선택하세요.', 'warning');
+    if (!form.license_type) return toast('면허·자격 종류를 선택하세요.', 'warning');
+    if (form.license_type === '기타' && !customLicenseName.trim()) {
+      return toast('"기타" 선택 시 명칭을 직접 입력하세요.', 'warning');
+    }
     if (!canEdit) return toast('수정 권한이 없습니다.', 'error');
     setSaving(true);
     try {
+      // license_name = (기타면 직접 입력값, 그 외엔 종류명) — 기존 NOT NULL 컬럼 유지
+      const resolvedName =
+        form.license_type === '기타' ? customLicenseName.trim() : form.license_type;
       // PostgreSQL date 컬럼은 빈 문자열을 거부하므로 null로 변환
       const payload = {
         ...form,
+        license_name: resolvedName,
         license_type: form.license_type || null,
         issued_date: form.issued_date || null,
         expiry_date: form.expiry_date || null,
@@ -619,22 +651,56 @@ export default function LicenseManager({
                 <label htmlFor="lic-staff-select" className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">
                   직원 *
                 </label>
-                <select
-                  id="lic-staff-select"
-                  value={form.staff_id}
-                  onChange={(e) => setForm((f) => ({ ...f, staff_id: e.target.value }))}
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
-                >
-                  {filteredStaffs.map((s) => (
-                    <option key={String(s.id)} value={String(s.id)}>
-                      {String(s.name)} ({String(s.position ?? '')})
-                    </option>
-                  ))}
-                </select>
+                <div className="flex gap-2">
+                  <select
+                    id="lic-staff-select"
+                    value={form.staff_id}
+                    onChange={(e) => setForm((f) => ({ ...f, staff_id: e.target.value }))}
+                    className="w-1/2 px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
+                  >
+                    {(() => {
+                      const term = staffSearchTerm.trim().toLowerCase();
+                      const list = term
+                        ? filteredStaffs.filter((s) =>
+                            String(s.name ?? '').toLowerCase().includes(term),
+                          )
+                        : filteredStaffs;
+                      // 검색 결과에서 빠진 현재 선택된 직원도 항상 보이도록 prepend
+                      if (form.staff_id && !list.some((s) => String(s.id) === form.staff_id)) {
+                        const cur = filteredStaffs.find((s) => String(s.id) === form.staff_id);
+                        if (cur) return [cur, ...list];
+                      }
+                      return list;
+                    })().map((s) => (
+                      <option key={String(s.id)} value={String(s.id)}>
+                        {String(s.name)} ({String(s.position ?? '')})
+                      </option>
+                    ))}
+                  </select>
+                  <div className="relative flex-1">
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--toss-gray-3)]"
+                    >
+                      <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.6" />
+                      <path d="M14 14l4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    </svg>
+                    <input
+                      type="text"
+                      value={staffSearchTerm}
+                      onChange={(e) => setStaffSearchTerm(e.target.value)}
+                      placeholder="이름 검색"
+                      aria-label="직원 이름 검색"
+                      className="w-full pl-10 pr-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
+                    />
+                  </div>
+                </div>
               </div>
               <div>
                 <label htmlFor="lic-type-select" className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">
-                  면허·자격 종류
+                  면허·자격 종류 *
                 </label>
                 <select
                   id="lic-type-select"
@@ -642,17 +708,26 @@ export default function LicenseManager({
                   onChange={(e) => setForm((f) => ({ ...f, license_type: e.target.value }))}
                   className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
                 >
-                  <option value="">선택 안 함</option>
+                  <option value="">종류를 선택하세요</option>
                   {LICENSE_TYPE_OPTIONS.map((t) => (
                     <option key={t} value={t}>
                       {t}
                     </option>
                   ))}
                 </select>
+                {form.license_type === '기타' && (
+                  <input
+                    type="text"
+                    value={customLicenseName}
+                    onChange={(e) => setCustomLicenseName(e.target.value)}
+                    placeholder="명칭을 직접 입력하세요 (예: 보건교사 자격)"
+                    aria-label="기타 면허·자격 명칭 직접 입력"
+                    className="mt-2 w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
+                  />
+                )}
               </div>
               {(
                 [
-                  { label: '면허·자격증명 *', key: 'license_name', type: 'text', placeholder: '예: 간호사 면허' },
                   { label: '자격증 번호', key: 'license_number', type: 'text', placeholder: '예: 제12345호' },
                   { label: '발급기관', key: 'issuing_body', type: 'text', placeholder: '예: 보건복지부' },
                   { label: '발급일', key: 'issued_date', type: 'date', placeholder: '' },
@@ -668,14 +743,23 @@ export default function LicenseManager({
                   >
                     {label}
                   </label>
-                  <input
-                    id={`lic-field-${key}`}
-                    type={type}
-                    value={form[key]}
-                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                    placeholder={placeholder}
-                    className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
-                  />
+                  {type === 'date' ? (
+                    <SegmentedDateInput
+                      id={`lic-field-${key}`}
+                      value={form[key]}
+                      onChange={(v) => setForm((f) => ({ ...f, [key]: v }))}
+                      ariaLabel={label.replace(/\s*\*\s*$/, '')}
+                    />
+                  ) : (
+                    <input
+                      id={`lic-field-${key}`}
+                      type={type}
+                      value={form[key]}
+                      onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                      placeholder={placeholder}
+                      className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
+                    />
+                  )}
                 </div>
               ))}
             </div>

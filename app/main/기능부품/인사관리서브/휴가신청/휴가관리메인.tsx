@@ -6,9 +6,11 @@ import { supabase } from '@/lib/supabase';
 import { syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
 import { recalculateLeaveBalance } from '@/lib/annual-leave-balance';
 import { logAudit, readClientAuditActor } from '@/lib/audit';
+import { isNamedSystemMasterAccount } from '@/lib/system-master';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import AnnualLeavePromotion from './연차촉진시스템';
 import AnnualLeaveLedger from './연차원장';
+import LeaveRequestList from './연차휴가신청내역';
 import HolidayWorkPolicySettings from './휴일근무규칙설정';
 import LeaveDashboard from '../급여명세/연차종합대시보드';
 import HolidayCalendar from '../공휴일달력';
@@ -73,6 +75,7 @@ export default function LeaveManagement({
   const [leaveConfig, setLeaveConfig] = useState<'입사일 기준' | '회계연도 기준'>('입사일 기준');
   const [leaveConfigLoading, setLeaveConfigLoading] = useState(false);
   const staffList = Array.isArray(staffs) ? staffs : [];
+  const canManageLeaves = isNamedSystemMasterAccount(user as Record<string, unknown> | null);
   const [currentUser, setCurrentUser] = useState<Record<string, unknown> | null>(null);
   const [showPendingModal, setShowPendingModal] = useState(false);
   const availableTabs = useMemo(
@@ -218,6 +221,117 @@ export default function LeaveManagement({
     }
   };
 
+  // 시스템마스터 전용 — 휴가 신청내역 수정
+  const handleEditLeave = async (id: string, patch: Partial<Leave>) => {
+    if (!canManageLeaves) {
+      toast('시스템마스터 관리자만 수정할 수 있습니다.', 'error');
+      return;
+    }
+    try {
+      const target = leaves.find((l) => l.id === id);
+      const nextStatus = patch.status ?? target?.status;
+      const { error } = await supabase
+        .from('leave_requests')
+        .update({
+          leave_type: patch.leave_type,
+          start_date: patch.start_date,
+          end_date: patch.end_date,
+          reason: patch.reason,
+          status: nextStatus,
+          approved_at: nextStatus === '승인' ? new Date().toISOString() : null,
+        })
+        .eq('id', id);
+      if (error) throw error;
+      setLeaves((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+
+      if (target?.staff_id) {
+        await syncAnnualLeaveUsedForStaff(target.staff_id);
+        recalculateLeaveBalance(target.staff_id).catch((err) => {
+          console.error('[handleEditLeave] recalculateLeaveBalance 실패:', err);
+          toast('연차 잔액 갱신에 실패했습니다. 잔액이 일시적으로 부정확할 수 있습니다.', 'warning');
+        });
+      }
+
+      const actor = readClientAuditActor();
+      await logAudit(
+        'leave_request_updated',
+        'leave_request',
+        id,
+        {
+          staff_id: target?.staff_id ?? null,
+          before: target
+            ? {
+                leave_type: target.leave_type,
+                start_date: target.start_date,
+                end_date: target.end_date,
+                reason: target.reason,
+                status: target.status,
+              }
+            : null,
+          after: patch,
+        },
+        actor.userId,
+        actor.userName
+      );
+
+      toast('휴가 신청내역이 수정되었습니다.', 'success');
+      if (onRefresh) (onRefresh as () => void)();
+    } catch (err) {
+      toast('수정에 실패했습니다.', 'error');
+    }
+  };
+
+  // 시스템마스터 전용 — 휴가 신청내역 삭제
+  const handleDeleteLeave = async (id: string) => {
+    if (!canManageLeaves) {
+      toast('시스템마스터 관리자만 삭제할 수 있습니다.', 'error');
+      return;
+    }
+    const target = leaves.find((l) => l.id === id);
+    const staffName = staffList.find((s: any) => s.id === target?.staff_id)?.name ?? '직원';
+    const confirmed = await openConfirm({
+      title: '휴가 신청내역 삭제',
+      description: `${staffName}의 ${target?.leave_type ?? '휴가'} 신청(${target?.start_date})을 삭제합니다.\n삭제 후 연차 사용일수가 재계산됩니다.`,
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+    try {
+      const { error } = await supabase.from('leave_requests').delete().eq('id', id);
+      if (error) throw error;
+      setLeaves((prev) => prev.filter((l) => l.id !== id));
+
+      if (target?.staff_id) {
+        await syncAnnualLeaveUsedForStaff(target.staff_id);
+        recalculateLeaveBalance(target.staff_id).catch((err) => {
+          console.error('[handleDeleteLeave] recalculateLeaveBalance 실패:', err);
+          toast('연차 잔액 갱신에 실패했습니다. 잔액이 일시적으로 부정확할 수 있습니다.', 'warning');
+        });
+      }
+
+      const actor = readClientAuditActor();
+      await logAudit(
+        'leave_request_deleted',
+        'leave_request',
+        id,
+        {
+          staff_id: target?.staff_id ?? null,
+          leave_type: target?.leave_type ?? null,
+          start_date: target?.start_date ?? null,
+          end_date: target?.end_date ?? null,
+          status: target?.status ?? null,
+        },
+        actor.userId,
+        actor.userName
+      );
+
+      toast('휴가 신청내역이 삭제되었습니다.', 'success');
+      if (onRefresh) (onRefresh as () => void)();
+    } catch (err) {
+      toast('삭제에 실패했습니다.', 'error');
+    }
+  };
+
   const handleApplyLeaveConfig = (type: '입사일 기준' | '회계연도 기준') => {
     setLeaveConfig(type);
     if (type === '입사일 기준') {
@@ -300,125 +414,15 @@ export default function LeaveManagement({
 
       <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-4 md:p-5">
         {activeTab === '연차/휴가 신청내역' && (
-          <div className="space-y-5">
-            {/* 법적 기준 안내 */}
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-100 rounded-[var(--radius-lg)] p-4 md:p-4">
-              <h3 className="text-sm font-semibold text-blue-900 mb-4 flex items-center gap-2">⚖️ 근로기준법 기준 연차·휴가 안내</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                <div className="space-y-2">
-                  <p className="font-semibold text-blue-800">제60조 (연차 유급휴가)</p>
-                  <ul className="text-blue-700 font-bold space-y-1 list-disc list-inside">
-                    <li>1년 미만: 1개월마다 1일 (최대 11일)</li>
-                    <li>1년 이상: 15일</li>
-                    <li>최초 1년 초과 후 매 2년마다 1일 가산 (최대 25일)</li>
-                  </ul>
-                </div>
-                <div className="space-y-2">
-                  <p className="font-semibold text-blue-800">제61조 (연차 사용 촉진)</p>
-                  <ul className="text-blue-700 font-bold space-y-1 list-disc list-inside">
-                    <li>1차 촉진: 발생일+1년 전 6개월 시점 10일 이내 서면 통보</li>
-                    <li>2차 촉진: 사용촉진 후 5일 이내 사용 시도</li>
-                  </ul>
-                </div>
-                <div className="md:col-span-2 p-4 bg-[var(--card)]/60 rounded-[var(--radius-lg)] border border-blue-100">
-                  <p className="font-semibold text-[var(--foreground)]">휴가 종류: 연차 · 반차 · 병가 · 경조 · 특별휴가 · 기타</p>
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div
-                onClick={() => setShowPendingModal(true)}
-                className="p-4 bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] text-center cursor-pointer hover:shadow-md transition-all group"
-              >
-                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase group-hover:text-[var(--accent)] transition-colors">승인 대기</p>
-                <p className="text-2xl font-semibold text-orange-500 mt-1">{leaves.filter(l => l.status === '대기').length}</p>
-              </div>
-              <div className="p-4 bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] text-center">
-                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">잔여 연차 (직원별)</p>
-                <p className="text-2xl font-semibold text-[var(--accent)] mt-1">
-                  {staffList.filter((s: any) => {
-                    const total = typeof s.annual_leave_total === 'number' ? s.annual_leave_total : 0;
-                    const used = s.annual_leave_used ?? 0;
-                    return (total - used) > 0;
-                  }).length}명
-                </p>
-                <p className="text-[11px] text-[var(--toss-gray-3)] mt-1">입사일·사용이력 기반</p>
-              </div>
-              <div className="p-4 bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] text-center">
-                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">연차 사용</p>
-                <p className="text-2xl font-semibold text-[var(--accent)] mt-1">{leaves.filter(l => l.leave_type === '연차' && l.status === '승인').length}</p>
-              </div>
-              <div className="p-4 bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] text-center">
-                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">기타 휴가</p>
-                <p className="text-2xl font-semibold text-purple-600 mt-1">{leaves.filter(l => l.leave_type !== '연차' && l.status === '승인').length}</p>
-              </div>
-              <div className="p-4 bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] text-center">
-                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">준수율</p>
-                <p className="text-2xl font-semibold text-green-600 mt-1">
-                  {staffList.length > 0 ? '100%' : '0%'}
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
-              <div className="overflow-x-auto custom-scrollbar">
-                <table className="w-full text-left border-collapse min-w-[800px]">
-                  <thead className="bg-[var(--muted)]/50 text-[11px] font-semibold text-[var(--toss-gray-3)] border-b border-[var(--border)] uppercase">
-                    <tr>
-                      <th className="px-5 py-5">신청자 정보</th>
-                      <th className="px-5 py-5">구분</th>
-                      <th className="px-5 py-5">신청 기간</th>
-                      <th className="px-5 py-5">사유</th>
-                      <th className="px-5 py-5">상태</th>
-                      <th className="px-5 py-5 text-right">관리</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50 text-xs font-bold">
-                    {leaves.map((l: any) => (
-                      <tr key={l.id} className="hover:bg-[var(--toss-blue-light)]/30 transition-all group">
-                        <td className="px-5 py-5">
-                          <div className="flex flex-col">
-                            <span className="font-semibold text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors">
-                              {staffList.find((s: any) => s.id === l.staff_id)?.name ?? l.staff_members?.name ?? '-'}
-                            </span>
-                            <span className="text-[11px] text-[var(--toss-gray-3)] uppercase">
-                              {staffList.find((s: any) => s.id === l.staff_id)?.company ?? l.staff_members?.company} / {staffList.find((s: any) => s.id === l.staff_id)?.department ?? l.staff_members?.department}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-5 py-5">
-                          <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${l.leave_type === '연차' ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]' :
-                            l.leave_type === '병가' ? 'bg-red-500/20 text-red-600' :
-                              'bg-[var(--muted)] text-[var(--toss-gray-4)]'
-                            }`}>
-                            {l.leave_type}
-                          </span>
-                        </td>
-                        <td className="px-5 py-5 text-[var(--toss-gray-3)]">{l.start_date} ~ {l.end_date}</td>
-                        <td className="px-5 py-5 text-[var(--toss-gray-3)] max-w-xs truncate">{l.reason}</td>
-                        <td className="px-5 py-5">
-                          <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${l.status === '승인' ? 'bg-green-500/20 text-green-600' :
-                            l.status === '반려' ? 'bg-red-500/20 text-red-600' :
-                              'bg-orange-500/20 text-orange-600'
-                            }`}>
-                            {l.status}
-                          </span>
-                        </td>
-                        <td className="px-5 py-5 text-right">
-                          {l.status === '대기' && (
-                            <div className="flex justify-end gap-2">
-                              <button type="button" onClick={() => handleStatusUpdate(l.id, '승인')} className="px-3 py-2 min-h-[36px] bg-[var(--accent)] text-white text-[11px] font-semibold rounded-[var(--radius-lg)] shadow-sm hover:scale-[0.98] transition-all">승인</button>
-                              <button type="button" onClick={() => handleStatusUpdate(l.id, '반려')} className="px-3 py-2 min-h-[36px] bg-red-500/10 border border-red-500/20 text-[11px] font-semibold text-red-600 rounded-[var(--radius-lg)] hover:bg-red-500/20 transition-all">반려</button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+          <LeaveRequestList
+            leaves={leaves}
+            staffList={staffList as any[]}
+            onStatusUpdate={handleStatusUpdate}
+            onShowPending={() => setShowPendingModal(true)}
+            canManage={canManageLeaves}
+            onEdit={handleEditLeave}
+            onDelete={handleDeleteLeave}
+          />
         )}
 
         {activeTab === '연차 대시보드' && (

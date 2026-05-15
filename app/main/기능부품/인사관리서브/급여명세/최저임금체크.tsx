@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { getScopedActiveStaffs } from '@/lib/active-staff';
 import {
   getMinimumWageByYear,
   MINIMUM_WAGE_2025,
@@ -47,7 +48,8 @@ export default function MinWageChecker({
   const [checkYear, setCheckYear] = useState(today.getFullYear());
   const [showViolationOnly, setShowViolationOnly] = useState(false);
 
-  const filteredStaffs = staffs.filter((staff) => selectedCo === '전체' || staff.company === selectedCo);
+  // 최저임금 점검 대상은 현직 직원만 (퇴사자 제외)
+  const filteredStaffs = getScopedActiveStaffs(staffs, selectedCo);
   const minWageHourly = getMinWage(checkYear);
   const minWageMonthly = getMonthlyMinWage(checkYear);
 
