@@ -83,6 +83,12 @@ analysis_artifacts/claude_design_handoff/uploads/
 app/main/*.Zip
 app/main/*.zip
 
+# Root-level source/backup zips (never commit)
+/*.zip
+/*.Zip
+/newmso-source-*.zip
+/snapshot-*.zip
+
 # Build/dev logs and root-level temp artifacts
 *.log
 *.Zip
