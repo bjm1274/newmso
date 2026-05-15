@@ -8,7 +8,9 @@
  * JM6: 시맨틱 section, 첨부 role="button", 댓글 form aria-label
  */
 
+import { useState, useCallback } from 'react';
 import type { AnyItem, DocItem, HandoverItem, TodoItem } from './dummy-data';
+import CommentComposerSticky from '@/app/components/CommentComposerSticky';
 
 // ── 공통 헬퍼 ─────────────────────────────────────────────────────────────────
 
@@ -29,6 +31,13 @@ function Avatar({ initial, size = 'sm' }: { initial: string; size?: 'xs' | 'sm' 
 // ── 자료 상세 ─────────────────────────────────────────────────────────────────
 
 function DocDetail({ item }: { item: DocItem }) {
+  // 댓글 입력 상태 (controlled). 실제 저장은 추후 라운드에서 supabase 연동 예정.
+  const [commentText, setCommentText] = useState('');
+  const handleCommentSubmit = useCallback(() => {
+    // TODO(P3-§7-후속): supabase insert + 낙관적 갱신. 현재 dummy-data 라운드에서는 입력 초기화만.
+    setCommentText('');
+  }, []);
+
   return (
     <>
       <div className="px-6 py-5 border-b border-[var(--border)] bg-[var(--card)] shrink-0">
@@ -103,24 +112,18 @@ function DocDetail({ item }: { item: DocItem }) {
                 </div>
               </div>
             ))}
-            <form
-              className="flex gap-2 mt-3"
-              onSubmit={(e) => e.preventDefault()}
-              aria-label="댓글 작성"
-            >
-              <input
-                type="text"
-                placeholder="댓글 작성…"
-                aria-label="댓글 내용"
-                className="flex-1 h-9 px-3 text-[13px] border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)] text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)] focus:outline-none focus:border-[var(--accent)] transition-colors"
-              />
-              <button type="submit" className="h-9 px-4 text-[13px] font-medium bg-[var(--accent)] text-white rounded-[var(--radius-md)] hover:bg-[var(--accent-hover)] transition-colors">
-                등록
-              </button>
-            </form>
           </section>
         </div>
       </div>
+
+      {/* 댓글 입력 — 모바일에서는 화면 하단 고정, 데스크톱에서는 일반 흐름 */}
+      <CommentComposerSticky
+        value={commentText}
+        onChange={setCommentText}
+        onSubmit={handleCommentSubmit}
+        placeholder="댓글 작성…"
+        ariaLabel="댓글 작성"
+      />
     </>
   );
 }
