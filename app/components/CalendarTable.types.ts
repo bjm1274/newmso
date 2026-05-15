@@ -29,6 +29,11 @@ export type CalendarCellInfo = {
   isHoliday?: boolean;
 };
 
+/** 정렬 키/방향 (month-grid sortableRowHeader 옵션용) */
+export type CalendarSortKey = 'name' | 'status';
+export type CalendarSortDir = 'asc' | 'desc';
+export type CalendarSortState = { key: CalendarSortKey; dir: CalendarSortDir };
+
 export type CalendarTableProps<R> = {
   mode: CalendarTableMode;
   /** 표시 범위 시작 (inclusive) */
@@ -50,4 +55,24 @@ export type CalendarTableProps<R> = {
   ariaLabel?: string;
   emptyMessage?: string;
   className?: string;
+
+  // ---------------------------------------------------------------------------
+  // 셀 드래그 페인팅 (옵션, staff-by-day 데스크톱 한정)
+  // ---------------------------------------------------------------------------
+  /** 셀에서 mousedown 발생 시 호출 (드래그 시작 / 클릭 페인팅) */
+  onCellPointerDown?: (cell: CalendarCellInfo, row?: CalendarRow<R>) => void;
+  /** 셀에 mouseenter (드래그 중 = e.buttons === 1)에서 호출. 호출 시점에 buttons 확인 후 위임. */
+  onCellPointerEnter?: (cell: CalendarCellInfo, row?: CalendarRow<R>) => void;
+  /** 셀에서 mouseup 발생 시 호출 (드래그 종료) */
+  onCellPointerUp?: () => void;
+
+  // ---------------------------------------------------------------------------
+  // thead 정렬 (옵션, month-grid 모드용 — 추후 확장 가능)
+  // ---------------------------------------------------------------------------
+  /** 좌측 행 헤더(직원) 클릭으로 정렬 변경을 허용 */
+  sortableRowHeader?: boolean;
+  /** 현재 정렬 상태 (제어형) */
+  sort?: CalendarSortState;
+  /** 정렬 변경 콜백 */
+  onSortChange?: (sort: CalendarSortState) => void;
 };
