@@ -1,5 +1,6 @@
 'use client';
 import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { isActiveStaff } from '@/lib/active-staff';
 import { buildAuditDiff,logAudit,readClientAuditActor } from '@/lib/audit';
@@ -1423,6 +1424,72 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
     URL.revokeObjectURL(url);
   };
 
+  const staffColumns = useMemo((): Column<StaffMember>[] => [
+    {
+      key: 'name',
+      label: '이름',
+      primary: true,
+      render: (직원) => (
+        <div className="flex items-center gap-3">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent-selected-subtle)] text-[12px] font-bold text-[var(--accent)]">
+            {String(직원.name || '?').slice(0, 1)}
+          </span>
+          <span className="font-bold text-[var(--foreground)]">{직원.name || '-'}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'department',
+      label: '부서',
+      render: (직원) => <span className="font-medium text-[var(--foreground)]">{직원.department || '-'}</span>,
+    },
+    {
+      key: 'position',
+      label: '직책',
+      render: (직원) => <span className="font-medium text-[var(--foreground)]">{직원.position || '-'}</span>,
+    },
+    {
+      key: 'joined_at',
+      label: '입사일',
+      render: (직원) => (
+        <span className="font-medium text-[var(--foreground)]">
+          {(직원.joined_at as string) || (직원.join_date as string) || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      label: '상태',
+      render: (직원) => {
+        const status = 직원.status || '재직';
+        const statusClass =
+          status === '퇴사'
+            ? 'erp-status-red'
+            : status === '휴직'
+              ? 'erp-status-yellow'
+              : 'erp-status-green';
+        return <span className={`erp-status ${statusClass}`}>{status}</span>;
+      },
+    },
+    {
+      key: '__detail',
+      label: '상세',
+      align: 'center',
+      render: (직원) => (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            수정시작(직원);
+          }}
+          className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--foreground)] transition hover:bg-[var(--surface-subtle)]"
+        >
+          상세
+        </button>
+      ),
+    },
+  ], []);
+
   return (
     <div className="flex flex-col h-full app-page">
       {dialog}
@@ -1526,59 +1593,13 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
         )}
 
         {/* PC 버전 테이블 */}
-        <div className="erp-table-card hidden md:block overflow-x-auto">
-          <table className="erp-table min-w-[780px]">
-            <thead>
-              <tr>
-                <th>이름</th>
-                <th>부서</th>
-                <th>직책</th>
-                <th>입사일</th>
-                <th>상태</th>
-                <th className="w-[110px] text-center">상세</th>
-              </tr>
-            </thead>
-            <tbody>
-              {필터목록.map((직원: StaffMember) => {
-                const status = 직원.status || '재직';
-                const statusClass =
-                  status === '퇴사'
-                    ? 'erp-status-red'
-                    : status === '휴직'
-                      ? 'erp-status-yellow'
-                      : 'erp-status-green';
-                return (
-                  <tr key={직원.id}>
-                    <td>
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent-selected-subtle)] text-[12px] font-bold text-[var(--accent)]">
-                          {String(직원.name || '?').slice(0, 1)}
-                        </span>
-                        <span className="font-bold text-[var(--foreground)]">{직원.name || '-'}</span>
-                      </div>
-                    </td>
-                    <td className="font-medium text-[var(--foreground)]">{직원.department || '-'}</td>
-                    <td className="font-medium text-[var(--foreground)]">{직원.position || '-'}</td>
-                    <td className="font-medium text-[var(--foreground)]">
-                      {(직원.joined_at as string) || (직원.join_date as string) || '-'}
-                    </td>
-                    <td>
-                      <span className={`erp-status ${statusClass}`}>{status}</span>
-                    </td>
-                    <td className="text-center">
-                      <button
-                        type="button"
-                        onClick={() => 수정시작(직원)}
-                        className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--foreground)] transition hover:bg-[var(--surface-subtle)]"
-                      >
-                        상세
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="hidden md:block rounded-[var(--radius-md)] border border-[var(--border)]">
+          <ResponsiveTable<StaffMember>
+            columns={staffColumns}
+            rows={필터목록}
+            keyField="id"
+            emptyMessage="표시할 직원이 없습니다."
+          />
         </div>
 
         {/* 모바일 버전 카드 리스트 */}
