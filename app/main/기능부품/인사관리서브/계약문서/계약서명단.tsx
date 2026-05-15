@@ -1,6 +1,7 @@
 'use client';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { isActiveStaff } from '@/lib/active-staff';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 type Staff = { id: number; name: string; employee_no?: string; company?: string; department?: string; position?: string; status?: string | null };
 type Contract = { staff_id: number; status?: string };
@@ -15,31 +16,134 @@ interface ContractListProps {
   isCompact?: boolean;
 }
 
-export default function ContractList({ selectedCo, staffs, contracts = [], onSelect, checkedIds: _checkedIds, setCheckedIds: _setCheckedIds, isCompact }: ContractListProps) {
+type Row = Staff & { __status: string; __statusClass: string };
+
+const statusClass = (status: string) => {
+  if (status === '서명완료') return 'text-emerald-500 bg-emerald-50';
+  if (status === '서명대기') return 'text-blue-500 bg-blue-500/10';
+  return 'text-[var(--toss-gray-3)] bg-[var(--tab-bg)]';
+};
+
+export default function ContractList({
+  selectedCo,
+  staffs,
+  contracts = [],
+  onSelect,
+  checkedIds: _checkedIds,
+  setCheckedIds: _setCheckedIds,
+  isCompact,
+}: ContractListProps) {
   const [filter, setFilter] = useState('');
 
   const checkedIds = (_checkedIds ?? []) as number[];
   const setCheckedIds = (_setCheckedIds ?? (() => {})) as (ids: number[]) => void;
 
   // 계약 발송 대상 명부 — 퇴사자 제외 (현직 직원만 신규/변경 계약 발송)
-  const filtered = (staffs ?? []).filter((s) =>
-    isActiveStaff(s) &&
-    (selectedCo === '전체' || s.company === selectedCo) &&
-    (s.name.includes(filter) || s.employee_no?.includes(filter))
+  const filtered = useMemo(
+    () =>
+      (staffs ?? []).filter(
+        (s) =>
+          isActiveStaff(s) &&
+          (selectedCo === '전체' || s.company === selectedCo) &&
+          (s.name.includes(filter) || s.employee_no?.includes(filter)),
+      ),
+    [staffs, selectedCo, filter],
   );
+
+  const rows: Row[] = useMemo(
+    () =>
+      filtered.map((s) => {
+        const contract = contracts.find((c) => c.staff_id === s.id);
+        const status = contract?.status || '미발송';
+        return { ...s, __status: status, __statusClass: statusClass(status) };
+      }),
+    [filtered, contracts],
+  );
+
+  const selectedKeys = useMemo(() => new Set(checkedIds.map(String)), [checkedIds]);
+  const allSelected = filtered.length > 0 && checkedIds.length === filtered.length;
+  const indeterminate = checkedIds.length > 0 && checkedIds.length < filtered.length;
 
   const toggleAll = () => {
     if (checkedIds.length === filtered.length) setCheckedIds([]);
     else setCheckedIds(filtered.map((s) => s.id));
   };
 
-  const toggleOne = (id: number) => {
+  const toggleOne = (key: string) => {
+    const id = Number(key);
+    if (Number.isNaN(id)) return;
     if (checkedIds.includes(id)) setCheckedIds(checkedIds.filter((i) => i !== id));
     else setCheckedIds([...checkedIds, id]);
   };
 
+  const columns: Column<Row>[] = isCompact
+    ? [
+        {
+          key: 'name',
+          label: '성명',
+          primary: true,
+          render: (r) => (
+            <div>
+              <p className="text-xs font-bold text-[var(--foreground)]">{r.name}</p>
+              <p className="text-[10px] text-[var(--toss-gray-3)] font-medium">
+                {r.department} · {r.position}
+              </p>
+            </div>
+          ),
+        },
+        {
+          key: '__status',
+          label: '상태',
+          align: 'right',
+          render: (r) => (
+            <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-black ${r.__statusClass}`}>
+              {r.__status}
+            </span>
+          ),
+        },
+      ]
+    : [
+        {
+          key: 'employee_no',
+          label: '사번',
+          render: (r) => (
+            <span className="text-xs font-medium text-[var(--toss-gray-3)]">{r.employee_no || '-'}</span>
+          ),
+        },
+        {
+          key: 'name',
+          label: '성명',
+          primary: true,
+          render: (r) => <span className="text-xs font-bold text-[var(--foreground)]">{r.name}</span>,
+        },
+        {
+          key: 'department',
+          label: '부서 / 직위',
+          render: (r) => (
+            <span className="text-xs font-medium text-[var(--toss-gray-3)]">
+              {r.department} / {r.position}
+            </span>
+          ),
+        },
+        {
+          key: '__status',
+          label: '상태',
+          render: (r) => (
+            <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${r.__statusClass}`}>
+              {r.__status}
+            </span>
+          ),
+        },
+      ];
+
   return (
-    <div className={`p-0 ${isCompact ? '' : 'bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm'}`}>
+    <div
+      className={`p-0 ${
+        isCompact
+          ? ''
+          : 'bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm'
+      }`}
+    >
       {!isCompact && (
         <div className="p-4 border-b border-[var(--border)] flex flex-col md:flex-row justify-between items-center gap-4">
           <h3 className="text-base font-bold text-[var(--foreground)]">계약 대상자 관리</h3>
@@ -50,6 +154,7 @@ export default function ContractList({ selectedCo, staffs, contracts = [], onSel
               placeholder="이름/사번 검색"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
+              aria-label="이름 또는 사번으로 검색"
               className="w-full pl-9 pr-4 py-2 bg-[var(--page-bg)] border border-[var(--border)] rounded-[var(--radius-md)] text-xs outline-none focus:border-[var(--accent)] transition-all"
             />
           </div>
@@ -64,77 +169,28 @@ export default function ContractList({ selectedCo, staffs, contracts = [], onSel
             placeholder="이름 검색"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
+            aria-label="이름 검색"
             className="w-full pl-8 pr-4 py-1.5 bg-[var(--tab-bg)] border border-[var(--border)] rounded-lg text-[10px] outline-none focus:border-[var(--accent)]"
           />
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-[var(--tab-bg)]/50 border-b border-[var(--border)]">
-              <th className="px-3 py-3 w-10 text-center">
-                <input
-                  type="checkbox"
-                  onChange={toggleAll}
-                  checked={checkedIds.length > 0 && checkedIds.length === filtered.length}
-                  className="w-4 h-4 rounded accent-[var(--accent)]"
-                />
-              </th>
-              {!isCompact && <th className="px-4 py-3 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">사번</th>}
-              <th className="px-4 py-3 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">성명</th>
-              {!isCompact && (
-                <>
-                  <th className="px-4 py-3 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">부서 / 직위</th>
-                  <th className="px-4 py-3 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">상태</th>
-                </>
-              )}
-              {isCompact && <th className="px-4 py-3 text-[10px] font-bold text-[var(--toss-gray-4)] text-right">상태</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((s) => {
-              const contract = contracts.find((c) => c.staff_id === s.id);
-              const status = contract?.status || '미발송';
-              const statusColor = status === '서명완료' ? 'text-emerald-500 bg-emerald-50' : status === '서명대기' ? 'text-blue-500 bg-blue-500/10' : 'text-[var(--toss-gray-3)] bg-[var(--tab-bg)]';
-
-              return (
-                <tr
-                  key={s.id}
-                  onClick={() => onSelect?.(s.id)}
-                  className="border-b border-[var(--border)] hover:bg-[var(--muted)] transition-colors cursor-pointer group"
-                >
-                  <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={checkedIds.includes(s.id)}
-                      onChange={() => toggleOne(s.id)}
-                      className="w-4 h-4 rounded accent-[var(--accent)]"
-                    />
-                  </td>
-                  {!isCompact && <td className="px-4 py-3 text-xs font-medium text-[var(--toss-gray-3)]">{s.employee_no || '-'}</td>}
-                  <td className="px-4 py-3">
-                    <p className="text-xs font-bold text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors">{s.name}</p>
-                    {isCompact && <p className="text-[9px] text-[var(--toss-gray-3)] font-medium">{s.department} · {s.position}</p>}
-                  </td>
-                  {!isCompact && (
-                    <>
-                      <td className="px-4 py-3 text-xs font-medium text-[var(--toss-gray-3)]">{s.department} / {s.position}</td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${statusColor}`}>{status}</span>
-                      </td>
-                    </>
-                  )}
-                  {isCompact && (
-                    <td className="px-4 py-3 text-right">
-                      <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-black ${statusColor}`}>{status}</span>
-                    </td>
-                  )}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className={isCompact ? 'px-1' : 'px-2 pb-2'}>
+        <ResponsiveTable<Row>
+          columns={columns}
+          rows={rows}
+          keyField={'id' as keyof Row}
+          onRowClick={(r) => onSelect?.(r.id)}
+          emptyMessage="대상자가 없습니다."
+          selection={{
+            selected: selectedKeys,
+            onToggle: toggleOne,
+            onToggleAll: toggleAll,
+            allSelected,
+            indeterminate,
+            getRowAriaLabel: (key) => `${key}번 직원 선택`,
+          }}
+        />
       </div>
     </div>
   );
