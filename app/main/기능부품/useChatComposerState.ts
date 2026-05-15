@@ -112,8 +112,13 @@ export function useChatComposerState({
   useEffect(() => {
     const composerEl = composerRef.current;
     if (!composerEl) return;
-    composerEl.style.height = '0px';
-    composerEl.style.height = `${Math.min(120, composerEl.scrollHeight)}px`;
+    // 매 입력마다 동기 강제 reflow 2번(height=0 → height=scrollHeight)이 발생하던 것을
+    // requestAnimationFrame 으로 다음 frame 에 묶어 빠른 입력 중 lag 를 완화한다 (JM2).
+    const raf = requestAnimationFrame(() => {
+      composerEl.style.height = '0px';
+      composerEl.style.height = `${Math.min(120, composerEl.scrollHeight)}px`;
+    });
+    return () => cancelAnimationFrame(raf);
   }, [composerRef, inputMsg]);
 
   return {
