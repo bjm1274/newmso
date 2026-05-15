@@ -774,8 +774,17 @@ async function erpHandleNotificationClick(event) {
 
   for (const client of clientList) {
     if (client.url.startsWith(baseUrl) && 'focus' in client) {
+      // SPA 라우터로 부드럽게 이동시키기 위해 deep link를 postMessage로 전달
+      try {
+        client.postMessage({
+          type: 'erp-push-deep-link',
+          payload: { deepLink: targetUrl },
+        });
+      } catch {
+        // postMessage 실패는 무시 — 아래 navigate 폴백
+      }
       if ('navigate' in client) {
-        const navigated = await client.navigate(targetUrl);
+        const navigated = await client.navigate(targetUrl).catch(() => null);
         if (navigated && 'focus' in navigated) {
           return navigated.focus();
         }
