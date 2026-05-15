@@ -2,12 +2,12 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { InventoryItem } from '@/types';
 import { formatWon } from '@/lib/date-formatter';
-import { isExpirySoon } from '@/app/main/inventory-utils';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import ExpirationAlert from './유효기간알림';
 import { InventorySummaryStrip, InventoryStepSummary } from './InventoryDesignPanels';
 import { MenuIcon } from '../조직도서브/조직도측면창';
+import InventoryStatusGrid from './재고현황뷰Grid';
 
 // ─────────────────────────────────────────────────────
 // Types
@@ -89,9 +89,6 @@ function minQty(item: InventoryItem): number {
 }
 function name(item: InventoryItem): string {
   return String((item as Record<string, unknown>).item_name || item.name || '');
-}
-function dept(item: InventoryItem): string {
-  return String((item as Record<string, unknown>).department || '');
 }
 const fmt = (v: number) => formatWon(v);
 
@@ -669,104 +666,17 @@ export default function InventoryStatusView({
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="erp-table min-w-[900px]">
-              <thead>
-                <tr>
-                  {batchMode && (
-                    <th className="w-8">
-                      <input type="checkbox" checked={batchSelectedIds.length === pagedItems.length && pagedItems.length > 0} onChange={() => toggleBatchAll(pagedItems.map((i) => i.id))} className="w-4 h-4 accent-[var(--accent)]" />
-                    </th>
-                  )}
-                  <th>품목명</th>
-                  <th>카테고리</th>
-                  <th>회사</th>
-                  <th className="text-center">현재 재고</th>
-                  <th>단위</th>
-                  <th className="text-center">최소 재고</th>
-                  <th>상태</th>
-                  <th className="text-right">관리</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pagedItems.map((item) => {
-                  const q = qty(item);
-                  const mq = minQty(item);
-                  const isLow = q <= mq;
-                  const isExpiry = isExpirySoon(item, expiryThreshold);
-                  const isOos = q === 0;
-                  const itemEx = item as Record<string, unknown>;
-                  const lot = itemEx.lot_number ? String(itemEx.lot_number) : null;
-                  const sn = itemEx.serial_number ? String(itemEx.serial_number) : null;
-                  const isUdi = Boolean(itemEx.is_udi);
-                  const expiryDate = itemEx.expiry_date ? String(itemEx.expiry_date) : null;
-
-                  const unit = String(itemEx.unit || '개');
-
-                  return (
-                    <tr key={item.id} className={`group ${batchMode && batchSelectedIds.includes(item.id) ? 'bg-[var(--accent)]/5' : ''}`}>
-                      {/* 배치 체크박스 */}
-                      {batchMode && (
-                        <td>
-                          <input type="checkbox" checked={batchSelectedIds.includes(item.id)} onChange={() => toggleBatchItem(item.id)} className="w-4 h-4 accent-[var(--accent)]" />
-                        </td>
-                      )}
-
-                      {/* 품목명 */}
-                      <td>
-                        <p className="font-bold text-[var(--foreground)]">{name(item)}</p>
-                        <div className="flex gap-1 mt-1 flex-wrap">
-                          {lot && <span className="text-[9px] font-semibold bg-[var(--muted)] text-[var(--toss-gray-4)] px-1.5 py-0.5 rounded">LOT: {lot}</span>}
-                          {sn && <span className="text-[9px] font-semibold bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded">S/N: {sn}</span>}
-                          {isUdi && <span className="text-[9px] font-bold bg-purple-500/10 text-purple-600 px-1.5 py-0.5 rounded uppercase">UDI</span>}
-                        </div>
-                      </td>
-
-                      <td>
-                        <span className="erp-chip">{item.category || '미분류'}</span>
-                      </td>
-
-                      <td>
-                        <p className="font-semibold text-[var(--zinc-600)]">{item.company || '-'}</p>
-                        {dept(item) && <p className="text-[10px] text-[var(--zinc-400)]">{dept(item)}</p>}
-                      </td>
-
-                      <td className="text-center">
-                        <span className={`font-black ${isOos || isLow ? 'text-red-500' : 'text-[var(--foreground)]'}`}>{q}</span>
-                      </td>
-
-                      <td>
-                        <span className="font-semibold text-[var(--foreground)]">{unit}</span>
-                      </td>
-
-                      <td className="text-center">
-                        <span className="font-semibold text-[var(--foreground)]">{mq}</span>
-                      </td>
-
-                      <td>
-                        {isOos || isLow ? (
-                          <span className="erp-status erp-status-red">{isOos ? '품절' : '부족'}</span>
-                        ) : isExpiry ? (
-                          <span className="erp-status erp-status-yellow">임박</span>
-                        ) : (
-                          <span className="erp-status erp-status-green">정상</span>
-                        )}
-                        {expiryDate && <p className="mt-1 text-[10px] text-[var(--zinc-400)]">{expiryDate}</p>}
-                      </td>
-
-                      <td className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => openEditModal(item)} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] shadow-sm hover:bg-[var(--muted)]">상세</button>
-                          {(isLow || isOos) && (
-                            <button onClick={() => onReorder(item)} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] shadow-sm hover:bg-[var(--muted)]">발주</button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="px-2 py-2">
+            <InventoryStatusGrid
+              items={pagedItems}
+              expiryThreshold={expiryThreshold}
+              batchMode={batchMode}
+              batchSelectedIds={batchSelectedIds}
+              toggleBatchItem={toggleBatchItem}
+              toggleBatchAll={toggleBatchAll}
+              onOpenDetail={openEditModal}
+              onReorder={onReorder}
+            />
           </div>
         )}
 
