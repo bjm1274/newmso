@@ -1532,7 +1532,7 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
       </header>
 
       <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
-        <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+        <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
           {[
             { label: '전체 직원', value: `${전체직원수}명`, icon: 'Users', tone: 'blue' },
             { label: '이번 달 입사', value: `${이번달입사수}명`, icon: 'Plus', tone: 'green' },

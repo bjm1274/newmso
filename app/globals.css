@@ -806,6 +806,20 @@ select:not(.no-style) {
   }
   .stat-card-value { font-size: var(--stat-value-font-size); }
   .caption-premium { font-size: var(--caption-font-size); }
+
+  /* P2-1: 모바일 스탯 카드 — 패딩 14×16, radius 12 (var(--radius-lg) 모바일에서 12px) */
+  .stat-card,
+  .erp-stat-card {
+    padding: 14px 16px;
+    border-radius: var(--radius-lg);
+  }
+
+  /* P2-1: 모바일 스탯 카드 그리드 — 2-col 강제 */
+  .stat-grid,
+  .erp-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
   .tab-item,
   .erp-chip,
   .erp-status {
@@ -1127,11 +1141,16 @@ button, a, [role="button"] {
 }
 
 /* ── Stat card ───────────────────────────────────── */
+/* P2-1: 라벨 위 / 숫자 아래 순서 (flex column-reverse).
+   HTML 구조는 기존대로 value→label 순서를 유지해도 시각적으로는 label→value로 표시. */
 .stat-card {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 16px;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 4px;
   transition: box-shadow var(--transition-base), border-color var(--transition-base);
 }
 .stat-card:hover {
@@ -1153,7 +1172,15 @@ button, a, [role="button"] {
   font-size: 0.75rem;
   font-weight: 500;
   color: var(--zinc-500);
-  margin-top: 4px;
+  /* column-reverse 사용으로 margin-top 불필요 — gap으로 간격 제어 */
+  margin-top: 0;
+}
+
+/* P2-1: 스탯 카드 그리드 — 모바일 2-col 강제, 데스크탑은 부모 컨테이너 책임 */
+.stat-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 /* ── Divider ─────────────────────────────────────── */
