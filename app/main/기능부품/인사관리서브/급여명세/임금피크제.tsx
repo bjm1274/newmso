@@ -1,8 +1,50 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useState } from 'react';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 // 임금피크제: 일정 나이/근속 이후 급여를 단계적으로 감액
+
+interface EnrichedStaff {
+  id: string | number;
+  name: string;
+  age: number;
+  position: string;
+  department: string;
+  base: number;
+  rate: number;
+  adjustedSalary: number;
+  reduction: number;
+  isPeakTarget: boolean;
+}
+
+const WAGE_PEAK_COLUMNS: Column<EnrichedStaff>[] = [
+  { key: 'name', label: '성명', primary: true },
+  { key: 'age', label: '나이', render: (r) => r.age > 0 ? `${r.age}세` : '-', align: 'center', showOnMobile: false },
+  { key: 'position', label: '직위', align: 'left' },
+  {
+    key: 'base', label: '기본급', align: 'right',
+    render: (r) => r.base.toLocaleString(),
+  },
+  {
+    key: 'rate', label: '적용 비율', align: 'center',
+    render: (r) => (
+      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${r.isPeakTarget ? 'bg-orange-500/20 text-orange-700' : 'bg-green-500/20 text-green-700'}`}>
+        {Math.round(r.rate * 100)}%
+      </span>
+    ),
+  },
+  {
+    key: 'adjustedSalary', label: '적용 후 급여', align: 'right',
+    render: (r) => <span className="font-bold">{r.adjustedSalary.toLocaleString()}</span>,
+  },
+  {
+    key: 'reduction', label: '월 감액', align: 'right',
+    render: (r) => r.reduction > 0
+      ? <span className="text-red-500">-{r.reduction.toLocaleString()}</span>
+      : '-',
+  },
+];
+
 const DEFAULT_STEPS = [
   { ageFrom: 55, ageTo: 56, rate: 0.9 },
   { ageFrom: 56, ageTo: 57, rate: 0.8 },
@@ -19,7 +61,19 @@ function calcAge(birthDate: string): number {
   return age;
 }
 
-export default function WagePeakCalculator({ staffs = [], selectedCo, user }: { staffs: any[]; selectedCo: string; user: any }) {
+interface StaffRecord {
+  id: string | number;
+  name: string;
+  company?: string | null;
+  birth_date?: string | null;
+  birthdate?: string | null;
+  position?: string | null;
+  department?: string | null;
+  base_salary?: number | null;
+  base?: number | null;
+}
+
+export default function WagePeakCalculator({ staffs = [], selectedCo }: { staffs: StaffRecord[]; selectedCo: string; user?: unknown }) {
   const [peakAge, setPeakAge] = useState(55);
   const [steps, setSteps] = useState(DEFAULT_STEPS);
   const [showSettings, setShowSettings] = useState(false);
@@ -32,14 +86,25 @@ export default function WagePeakCalculator({ staffs = [], selectedCo, user }: { 
     return step ? step.rate : (age >= steps[steps.length - 1]?.ageTo ? steps[steps.length - 1].rate : 1.0);
   };
 
-  const enriched = filteredStaffs.map(s => {
+  const enriched: EnrichedStaff[] = filteredStaffs.map(s => {
     const age = calcAge(s.birth_date || s.birthdate || '');
     const base = s.base_salary || s.base || 3000000;
     const rate = getWageRate(age);
     const adjustedSalary = Math.round(base * rate / 1000) * 1000;
     const reduction = base - adjustedSalary;
     const isPeakTarget = age >= peakAge;
-    return { ...s, age, base, rate, adjustedSalary, reduction, isPeakTarget };
+    return {
+      id: s.id,
+      name: s.name,
+      age,
+      position: s.position ?? '',
+      department: s.department ?? '',
+      base,
+      rate,
+      adjustedSalary,
+      reduction,
+      isPeakTarget,
+    };
   });
 
   const peakTargets = enriched.filter(s => s.isPeakTarget);
@@ -118,34 +183,12 @@ export default function WagePeakCalculator({ staffs = [], selectedCo, user }: { 
       <div>
         <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-2">전체 직원 현황</p>
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left" style={{ minWidth: '600px' }}>
-              <thead className="bg-[var(--muted)]/60 border-b border-[var(--border)]">
-                <tr>
-                  {['성명', '나이', '직위', '기본급', '적용 비율', '적용 후 급여', '월 감액'].map(h => (
-                    <th key={h} className="px-3 py-2.5 text-[10px] font-semibold text-[var(--toss-gray-3)]">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border)]">
-                {enriched.map(s => (
-                  <tr key={s.id} className={`${s.isPeakTarget ? 'bg-orange-500/10/50' : 'hover:bg-[var(--muted)]/30'}`}>
-                    <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{s.name}</td>
-                    <td className="px-3 py-2 text-xs">{s.age > 0 ? s.age + '세' : '-'}</td>
-                    <td className="px-3 py-2 text-xs text-[var(--toss-gray-3)]">{s.position}</td>
-                    <td className="px-3 py-2 text-xs text-right">{s.base.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-xs text-center">
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${s.isPeakTarget ? 'bg-orange-500/20 text-orange-700' : 'bg-green-500/20 text-green-700'}`}>
-                        {Math.round(s.rate * 100)}%
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-xs text-right font-bold">{s.adjustedSalary.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-xs text-right text-red-500">{s.reduction > 0 ? '-' + s.reduction.toLocaleString() : '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ResponsiveTable<EnrichedStaff>
+            columns={WAGE_PEAK_COLUMNS}
+            rows={enriched}
+            keyField="id"
+            emptyMessage="직원 데이터가 없습니다."
+          />
         </div>
       </div>
       <p className="text-[10px] text-[var(--toss-gray-3)]">* 생년월일이 등록된 직원에게만 나이 계산이 적용됩니다.</p>

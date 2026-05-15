@@ -1,17 +1,56 @@
 'use client';
 import { useActionDialog } from '@/app/components/useActionDialog';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import { getRecommendedOrderQuantity, getItemQuantity, requestInventoryReorder } from '@/app/main/inventory-utils';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
+
+// ---- 타입 정의 ----
+interface InventoryItem {
+  id: string;
+  name?: string;
+  item_name?: string;
+  category?: string;
+  stock?: number;
+  quantity?: number;
+  min_stock?: number;
+  min_quantity?: number;
+  department?: string;
+  company?: string;
+  [key: string]: unknown;
+}
+
+interface AssetLoan {
+  id: string | number;
+  asset_type: string;
+  asset_name?: string;
+  loaned_at: string;
+  returned_at?: string | null;
+  staff_id: string;
+  staff?: { name?: string; department?: string; company?: string };
+}
+
+interface TransferRecord {
+  id: string | number;
+  item_name?: string;
+  quantity?: number;
+  from_company?: string;
+  from_department?: string;
+  to_company?: string;
+  to_department?: string;
+  transferred_by?: string;
+  created_at?: string;
+  status?: string;
+}
 
 // ESLint 규칙에 맞게 컴포넌트 이름을 영문 대문자로 시작하게 변경합니다.
 // default export 이므로 외부에서의 import 이름(부서별물품장비현황)은 그대로 유지됩니다.
-export default function DepartmentAssetOverview({ user, inventory: inventoryProp }: { user: any; inventory?: any[] }) {
+export default function DepartmentAssetOverview({ user, inventory: inventoryProp }: { user: { department?: string; company?: string } | null; inventory?: InventoryItem[] }) {
   const { dialog, openConfirm } = useActionDialog();
-  const [assetLoans, setAssetLoans] = useState<any[]>([]);
-  const [inventoryFetched, setInventoryFetched] = useState<any[]>([]);
-  const [transferHistory, setTransferHistory] = useState<any[]>([]);
+  const [assetLoans, setAssetLoans] = useState<AssetLoan[]>([]);
+  const [inventoryFetched, setInventoryFetched] = useState<InventoryItem[]>([]);
+  const [transferHistory, setTransferHistory] = useState<TransferRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [orderingItemId, setOrderingItemId] = useState<string | null>(null);
   const [viewDept, setViewDept] = useState<string>('');
@@ -27,7 +66,7 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
       setLoading(true);
       if (!inventoryProp?.length) {
         const { data: inv } = await supabase.from('inventory').select('*').order('name');
-        setInventoryFetched(inv || []);
+        setInventoryFetched((inv as InventoryItem[]) || []);
       }
       const { data } = await supabase
         .from('asset_loans')
@@ -38,32 +77,32 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
         .select('id, item_name, quantity, from_company, from_department, to_company, to_department, transferred_by, created_at, status')
         .order('created_at', { ascending: false })
         .limit(100);
-      const list = data || [];
-      setTransferHistory(transfers || []);
+      const list = (data as Omit<AssetLoan, 'staff'>[]) || [];
+      setTransferHistory((transfers as TransferRecord[]) || []);
       if (list.length === 0) {
         setAssetLoans([]);
         setLoading(false);
         return;
       }
-      const staffIds = [...new Set(list.map((r: any) => r.staff_id))];
+      const staffIds = [...new Set(list.map((r) => r.staff_id))];
       const { data: staffs } = await supabase.from('staff_members').select('id, name, department, company').in('id', staffIds);
-      const staffMap: Record<string, any> = {};
-      (staffs || []).forEach((s: any) => { staffMap[s.id] = s; });
-      setAssetLoans(list.map((r: any) => ({ ...r, staff: staffMap[r.staff_id] })));
+      const staffMap: Record<string, { id: string; name?: string; department?: string; company?: string }> = {};
+      ((staffs ?? []) as { id: string; name?: string; department?: string; company?: string }[]).forEach((s) => { staffMap[s.id] = s; });
+      setAssetLoans(list.map((r) => ({ ...r, staff: staffMap[r.staff_id] })));
       setLoading(false);
     })();
   }, [inventoryProp?.length]);
 
   // 우리 부서 물품: 회사 일치 + 부서 일치(또는 부서 미지정만 보려면 effectiveDept 있을 때만)
-  const deptItems = inventory.filter((item: any) => {
+  const deptItems = inventory.filter((item) => {
     const coMatch = !myCompany || item.company === myCompany;
     const deptMatch = !effectiveDept || (item.department || '').trim() === effectiveDept;
     return coMatch && deptMatch;
   });
 
   // 우리 부서 장비: 미반납 대여 중 직원의 부서가 우리 부서인 것
-  const deptAssets = assetLoans.filter((r: any) => (r.staff?.department || '').trim() === effectiveDept);
-  const deptTransfers = transferHistory.filter((transfer: any) => {
+  const deptAssets = assetLoans.filter((r) => (r.staff?.department || '').trim() === effectiveDept);
+  const deptTransfers = transferHistory.filter((transfer) => {
     const fromDept = String(transfer.from_department || '').trim();
     const toDept = String(transfer.to_department || '').trim();
     const fromCompany = String(transfer.from_company || '').trim();
@@ -78,11 +117,11 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
   }).slice(0, 12);
 
   const departments = Array.from(new Set([
-    ...inventory.map((i: any) => (i.department || '').trim()).filter(Boolean),
-    ...assetLoans.map((r: any) => (r.staff?.department || '').trim()).filter(Boolean)
+    ...inventory.map((i) => (i.department || '').trim()).filter(Boolean),
+    ...assetLoans.map((r) => (r.staff?.department || '').trim()).filter(Boolean)
   ])).sort();
 
-  const handleQuickReorder = async (item: any) => {
+  const handleQuickReorder = useCallback(async (item: InventoryItem) => {
     const orderQty = getRecommendedOrderQuantity(item);
     const confirmed = await openConfirm({
       title: '부서 재고 발주 신청',
@@ -107,7 +146,83 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
     } finally {
       setOrderingItemId(null);
     }
-  };
+  }, [openConfirm, user, effectiveDept, myDept]);
+
+  // ---- 컬럼 정의 ----
+  const deptItemColumns = useMemo((): Column<InventoryItem>[] => [
+    {
+      key: 'name',
+      label: '품목명',
+      primary: true,
+      render: (item) => item.name ?? item.item_name ?? '-',
+    },
+    {
+      key: 'category',
+      label: '분류',
+      render: (item) => item.category ?? '-',
+    },
+    {
+      key: 'stock',
+      label: '잔여 수량',
+      align: 'right',
+      render: (item) => String(item.stock ?? item.quantity ?? 0),
+    },
+    {
+      key: 'min_stock',
+      label: '최소재고',
+      align: 'right',
+      showOnMobile: false,
+      render: (item) => String(item.min_stock ?? item.min_quantity ?? '-'),
+    },
+    {
+      key: 'status',
+      label: '상태',
+      align: 'center',
+      render: (item) => {
+        const qty = item.stock ?? item.quantity ?? 0;
+        const minQty = item.min_stock ?? item.min_quantity ?? 0;
+        return qty <= minQty ? (
+          <span className="text-red-600 text-[11px] font-semibold">발주 필요</span>
+        ) : (
+          <span className="text-emerald-600 text-[11px] font-semibold">정상</span>
+        );
+      },
+    },
+    {
+      key: 'action',
+      label: '빠른 작업',
+      align: 'center',
+      showOnMobile: false,
+      render: (item) => {
+        const qty = item.stock ?? item.quantity ?? 0;
+        const minQty = item.min_stock ?? item.min_quantity ?? 0;
+        return qty <= minQty ? (
+          <button
+            type="button"
+            onClick={() => void handleQuickReorder(item)}
+            disabled={orderingItemId === String(item.id)}
+            className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {orderingItemId === String(item.id) ? '신청 중...' : `자동 발주 ${getRecommendedOrderQuantity(item)}개`}
+          </button>
+        ) : (
+          <span className="text-[11px] text-[var(--toss-gray-3)]">-</span>
+        );
+      },
+    },
+  ], [orderingItemId, handleQuickReorder]);
+
+  const assetColumns = useMemo((): Column<AssetLoan>[] => [
+    { key: 'asset_type', label: '장비 종류', primary: true },
+    { key: 'asset_name', label: '장비명', render: (r) => r.asset_name ?? '-' },
+    { key: 'staff', label: '사용자', render: (r) => r.staff?.name ?? '-' },
+    {
+      key: 'loaned_at',
+      label: '대여일',
+      showOnMobile: false,
+      render: (r) => r.loaned_at,
+    },
+  ], []);
 
   return (
     <div className="space-y-4">
@@ -144,54 +259,13 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
         </h3>
         {loading ? (
           <p className="text-[var(--toss-gray-3)] text-sm">로딩 중...</p>
-        ) : deptItems.length === 0 ? (
-          <p className="text-[var(--toss-gray-3)] text-sm">해당 부서에 배정된 물품이 없습니다.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">
-                  <th className="pb-2 pr-4">품목명</th>
-                  <th className="pb-2 pr-4">분류</th>
-                  <th className="pb-2 pr-4">잔여 수량</th>
-                  <th className="pb-2 pr-4">최소재고</th>
-                  <th className="pb-2 pr-4">상태</th>
-                  <th className="pb-2 pr-4">빠른 작업</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deptItems.map((item: any) => (
-                  <tr key={item.id} className="border-b border-[var(--border-subtle)]">
-                    <td className="py-3 pr-4 font-bold text-[var(--foreground)]">{item.name || item.item_name}</td>
-                    <td className="py-3 pr-4 text-[var(--toss-gray-3)]">{item.category || '-'}</td>
-                    <td className="py-3 pr-4 font-semibold text-[var(--foreground)]">{item.stock ?? item.quantity ?? 0}</td>
-                    <td className="py-3 pr-4 text-[var(--toss-gray-3)]">{item.min_stock ?? item.min_quantity ?? '-'}</td>
-                    <td className="py-3 pr-4">
-                      {(item.stock ?? item.quantity ?? 0) <= (item.min_stock ?? item.min_quantity ?? 0) ? (
-                        <span className="text-red-600 text-[11px] font-semibold">발주 필요</span>
-                      ) : (
-                        <span className="text-emerald-600 text-[11px] font-semibold">정상</span>
-                      )}
-                    </td>
-                    <td className="py-3 pr-4">
-                      {(item.stock ?? item.quantity ?? 0) <= (item.min_stock ?? item.min_quantity ?? 0) ? (
-                        <button
-                          type="button"
-                          onClick={() => void handleQuickReorder(item)}
-                          disabled={orderingItemId === String(item.id)}
-                          className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {orderingItemId === String(item.id) ? '신청 중...' : `자동 발주 ${getRecommendedOrderQuantity(item)}개`}
-                        </button>
-                      ) : (
-                        <span className="text-[11px] text-[var(--toss-gray-3)]">-</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ResponsiveTable<InventoryItem>
+            columns={deptItemColumns}
+            rows={deptItems}
+            keyField="id"
+            emptyMessage="해당 부서에 배정된 물품이 없습니다."
+          />
         )}
       </div>
 
@@ -202,31 +276,13 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
         </h3>
         {loading ? (
           <p className="text-[var(--toss-gray-3)] text-sm">로딩 중...</p>
-        ) : deptAssets.length === 0 ? (
-          <p className="text-[var(--toss-gray-3)] text-sm">해당 부서에서 사용 중인 장비가 없습니다.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">
-                  <th className="pb-2 pr-4">장비 종류</th>
-                  <th className="pb-2 pr-4">장비명</th>
-                  <th className="pb-2 pr-4">사용자</th>
-                  <th className="pb-2 pr-4">대여일</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deptAssets.map((r: any) => (
-                  <tr key={r.id} className="border-b border-[var(--border-subtle)]">
-                    <td className="py-3 pr-4 font-bold text-[var(--foreground)]">{r.asset_type}</td>
-                    <td className="py-3 pr-4 text-[var(--toss-gray-4)]">{r.asset_name || '-'}</td>
-                    <td className="py-3 pr-4 text-[var(--foreground)]">{r.staff?.name ?? '-'}</td>
-                    <td className="py-3 pr-4 text-[var(--toss-gray-3)]">{r.loaned_at}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ResponsiveTable<AssetLoan>
+            columns={assetColumns}
+            rows={deptAssets}
+            keyField="id"
+            emptyMessage="해당 부서에서 사용 중인 장비가 없습니다."
+          />
         )}
       </div>
 
@@ -240,7 +296,7 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
           <p className="text-[var(--toss-gray-3)] text-sm">표시할 이동 이력이 없습니다.</p>
         ) : (
           <div className="space-y-2">
-            {deptTransfers.map((transfer: any) => {
+            {deptTransfers.map((transfer) => {
               const fromLabel = [transfer.from_company, transfer.from_department].filter(Boolean).join(' · ') || '-';
               const toLabel = [transfer.to_company, transfer.to_department].filter(Boolean).join(' · ') || '-';
               return (

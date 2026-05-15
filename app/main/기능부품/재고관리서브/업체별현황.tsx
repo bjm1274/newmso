@@ -1,11 +1,39 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
+
+// ---- 타입 정의 ----
+interface VendorItem {
+  name: string;
+  quantity: number;
+  unit_price: number;
+  amount: number;
+}
+
+interface VendorRow {
+  vendor_name: string;
+  total_purchase_amount: number;
+  total_quantity: number;
+  item_count: number;
+  items: VendorItem[];
+}
+
+interface PrescriptionRow {
+  _idx: number;
+  patient_name?: string;
+  patient_id?: string;
+  item_name?: string;
+  quantity?: number;
+  unit_price?: number;
+  total_amount?: number;
+  prescription_date?: string;
+}
 
 export default function VendorAnalysis() {
-  const [vendorData, setVendorData] = useState<any[]>([]);
-  const [prescriptionData, setPrescriptionData] = useState<any[]>([]);
+  const [vendorData, setVendorData] = useState<VendorRow[]>([]);
+  const [prescriptionData, setPrescriptionData] = useState<PrescriptionRow[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -23,8 +51,8 @@ export default function VendorAnalysis() {
       .eq('type', 'purchase');
 
     if (purchases) {
-      const vendorSales: any = {};
-      purchases.forEach((purchase: any) => {
+      const vendorSales: Record<string, VendorRow> = {};
+      (purchases as { vendor_name: string; quantity: number; unit_price: number; item_name: string }[]).forEach((purchase) => {
         if (!vendorSales[purchase.vendor_name]) {
           vendorSales[purchase.vendor_name] = {
             vendor_name: purchase.vendor_name,
@@ -55,7 +83,9 @@ export default function VendorAnalysis() {
       .like('date', `${selectedMonth}%`);
 
     if (prescriptions) {
-      setPrescriptionData(prescriptions);
+      setPrescriptionData(
+        (prescriptions as Omit<PrescriptionRow, '_idx'>[]).map((p, idx) => ({ ...p, _idx: idx }))
+      );
     }
   };
 
@@ -70,15 +100,25 @@ export default function VendorAnalysis() {
     const lines = text.split('\n');
     const headers = lines[0].split(',');
 
-    const prescriptions = lines.slice(1).map((line) => {
+    type PrescriptionInsert = {
+      patient_name: string | undefined;
+      patient_id: string | undefined;
+      item_name: string | undefined;
+      quantity: number;
+      unit_price: number;
+      total_amount: number;
+      prescription_date: string;
+      status: string;
+    };
+    const prescriptions: PrescriptionInsert[] = lines.slice(1).map((line) => {
       const values = line.split(',');
       return {
         patient_name: values[0]?.trim(),
         patient_id: values[1]?.trim(),
         item_name: values[2]?.trim(),
-        quantity: parseInt(values[3]) || 0,
-        unit_price: parseInt(values[4]) || 0,
-        total_amount: (parseInt(values[3]) || 0) * (parseInt(values[4]) || 0),
+        quantity: parseInt(values[3] ?? '0') || 0,
+        unit_price: parseInt(values[4] ?? '0') || 0,
+        total_amount: (parseInt(values[3] ?? '0') || 0) * (parseInt(values[4] ?? '0') || 0),
         prescription_date: selectedMonth,
         status: '분류완료',
       };
@@ -100,7 +140,7 @@ export default function VendorAnalysis() {
   const downloadVendorReport = () => {
     const csv = [
       ['업체명', '총 구매액', '총 수량', '품목 수'].join(','),
-      ...vendorData.map(v => [
+      ...vendorData.map((v) => [
         v.vendor_name,
         v.total_purchase_amount,
         v.total_quantity,
@@ -118,7 +158,7 @@ export default function VendorAnalysis() {
   const downloadPrescriptionReport = () => {
     const csv = [
       ['환자명', '환자ID', '품목명', '수량', '단가', '합계', '처방일'].join(','),
-      ...prescriptionData.map(p => [
+      ...prescriptionData.map((p) => [
         p.patient_name,
         p.patient_id,
         p.item_name,
@@ -135,6 +175,98 @@ export default function VendorAnalysis() {
     link.download = `환자처방_${selectedMonth}.csv`;
     link.click();
   };
+
+  // ---- 컬럼 정의 ----
+  const vendorColumns = useMemo((): Column<VendorRow>[] => [
+    { key: 'vendor_name', label: '업체명', primary: true },
+    {
+      key: 'total_purchase_amount',
+      label: '총 구매액',
+      align: 'right',
+      render: (v) => (
+        <span className="font-semibold text-[var(--accent)]">
+          ₩{v.total_purchase_amount.toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      key: 'total_quantity',
+      label: '총 수량',
+      align: 'right',
+      render: (v) => `${v.total_quantity}개`,
+    },
+    {
+      key: 'item_count',
+      label: '품목 수',
+      align: 'right',
+      showOnMobile: false,
+      render: (v) => `${v.item_count}개`,
+    },
+    {
+      key: 'items',
+      label: '상세',
+      align: 'center',
+      showOnMobile: false,
+      render: (v) => (
+        <details className="cursor-pointer">
+          <summary className="px-3 py-1 bg-[var(--muted)] rounded text-xs font-semibold hover:opacity-90">
+            보기
+          </summary>
+          <div className="mt-3 p-3 bg-[var(--muted)] rounded text-xs space-y-1">
+            {v.items.map((item, idx) => (
+              <div key={idx} className="flex justify-between">
+                <span>{item.name}</span>
+                <span className="font-bold">
+                  {item.quantity}개 × ₩{item.unit_price.toLocaleString()} = ₩{item.amount.toLocaleString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        </details>
+      ),
+    },
+  ], []);
+
+  const prescriptionColumns = useMemo((): Column<PrescriptionRow>[] => [
+    { key: 'patient_name', label: '환자명', primary: true, render: (p) => p.patient_name ?? '-' },
+    {
+      key: 'patient_id',
+      label: '환자ID',
+      showOnMobile: false,
+      render: (p) => <span className="text-[var(--toss-gray-4)]">{p.patient_id ?? '-'}</span>,
+    },
+    { key: 'item_name', label: '품목명', render: (p) => p.item_name ?? '-' },
+    {
+      key: 'quantity',
+      label: '수량',
+      align: 'right',
+      render: (p) => String(p.quantity ?? 0),
+    },
+    {
+      key: 'unit_price',
+      label: '단가',
+      align: 'right',
+      showOnMobile: false,
+      render: (p) => `₩${p.unit_price?.toLocaleString() ?? 0}`,
+    },
+    {
+      key: 'total_amount',
+      label: '합계',
+      align: 'right',
+      render: (p) => (
+        <span className="font-semibold text-green-600">
+          ₩{p.total_amount?.toLocaleString() ?? 0}
+        </span>
+      ),
+    },
+    {
+      key: 'prescription_date',
+      label: '처방일',
+      align: 'center',
+      showOnMobile: false,
+      render: (p) => p.prescription_date ? new Date(p.prescription_date).toLocaleDateString('ko-KR') : '-',
+    },
+  ], []);
 
   return (
     <div className="space-y-4">
@@ -192,52 +324,12 @@ export default function VendorAnalysis() {
             </button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-[var(--muted)] border-b border-[var(--border)]">
-                <tr>
-                  <th className="px-4 py-2 text-left font-semibold text-[var(--toss-gray-3)] text-[10px] uppercase">업체명</th>
-                  <th className="px-4 py-2 text-right font-semibold text-[var(--toss-gray-3)] text-[10px] uppercase">총 구매액</th>
-                  <th className="px-4 py-2 text-right font-semibold text-[var(--toss-gray-3)] text-[10px] uppercase">총 수량</th>
-                  <th className="px-4 py-2 text-right font-semibold text-[var(--toss-gray-3)] text-[10px] uppercase">품목 수</th>
-                  <th className="px-4 py-2 text-center font-semibold text-[var(--toss-gray-3)] text-[10px] uppercase">상세</th>
-                </tr>
-              </thead>
-              <tbody>
-                {vendorData.map((vendor) => (
-                  <tr key={vendor.vendor_name} className="border-b border-[var(--border)] hover:bg-[var(--muted)]">
-                    <td className="px-4 py-2 font-bold text-[var(--foreground)]">{vendor.vendor_name}</td>
-                    <td className="px-4 py-2 text-right font-semibold text-[var(--accent)]">
-                      ₩{vendor.total_purchase_amount.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-2 text-right font-bold text-[var(--foreground)]">
-                      {vendor.total_quantity}개
-                    </td>
-                    <td className="px-4 py-2 text-right font-bold text-[var(--foreground)]">
-                      {vendor.item_count}개
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      <details className="cursor-pointer">
-                        <summary className="px-3 py-1 bg-[var(--muted)] rounded text-xs font-semibold hover:opacity-90">
-                          보기
-                        </summary>
-                        <div className="mt-3 p-3 bg-[var(--muted)] rounded text-xs space-y-1">
-                          {vendor.items.map((item: any, idx: number) => (
-                            <div key={idx} className="flex justify-between">
-                              <span>{item.name}</span>
-                              <span className="font-bold">
-                                {item.quantity}개 × ₩{item.unit_price.toLocaleString()} = ₩{item.amount.toLocaleString()}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </details>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ResponsiveTable<VendorRow>
+            columns={vendorColumns}
+            rows={vendorData}
+            keyField="vendor_name"
+            emptyMessage="이 달의 업체별 구매 내역이 없습니다."
+          />
         </div>
       </div>
 
@@ -284,40 +376,12 @@ export default function VendorAnalysis() {
             </button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-[var(--muted)] border-b border-[var(--border)]">
-                <tr>
-                  <th className="px-4 py-2 text-left font-semibold text-[var(--toss-gray-3)] text-[10px] uppercase">환자명</th>
-                  <th className="px-4 py-2 text-left font-semibold text-[var(--toss-gray-3)] text-[10px] uppercase">환자ID</th>
-                  <th className="px-4 py-2 text-left font-semibold text-[var(--toss-gray-3)] text-[10px] uppercase">품목명</th>
-                  <th className="px-4 py-2 text-right font-semibold text-[var(--toss-gray-3)] text-[10px] uppercase">수량</th>
-                  <th className="px-4 py-2 text-right font-semibold text-[var(--toss-gray-3)] text-[10px] uppercase">단가</th>
-                  <th className="px-4 py-2 text-right font-semibold text-[var(--toss-gray-3)] text-[10px] uppercase">합계</th>
-                  <th className="px-4 py-2 text-center font-semibold text-[var(--toss-gray-3)] text-[10px] uppercase">처방일</th>
-                </tr>
-              </thead>
-              <tbody>
-                {prescriptionData.slice(0, 20).map((prescription, idx) => (
-                  <tr key={idx} className="border-b border-[var(--border)] hover:bg-[var(--muted)]">
-                    <td className="px-4 py-2 font-bold text-[var(--foreground)]">{prescription.patient_name}</td>
-                    <td className="px-4 py-2 text-[var(--toss-gray-4)]">{prescription.patient_id}</td>
-                    <td className="px-4 py-2 text-[var(--foreground)]">{prescription.item_name}</td>
-                    <td className="px-4 py-2 text-right font-bold text-[var(--foreground)]">{prescription.quantity}</td>
-                    <td className="px-4 py-2 text-right text-[var(--toss-gray-4)]">
-                      ₩{prescription.unit_price?.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-2 text-right font-semibold text-green-600">
-                      ₩{prescription.total_amount?.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-2 text-center text-[var(--toss-gray-4)]">
-                      {new Date(prescription.prescription_date).toLocaleDateString('ko-KR')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ResponsiveTable<PrescriptionRow>
+            columns={prescriptionColumns}
+            rows={prescriptionData.slice(0, 20)}
+            keyField="_idx"
+            emptyMessage="이 달의 처방 내역이 없습니다."
+          />
         </div>
       </div>
 
@@ -362,10 +426,8 @@ export default function VendorAnalysis() {
               </button>
               <button
                 onClick={() => {
-                  if (uploadFile) {
-                    const input = document.getElementById('file-upload') as HTMLInputElement;
-                    handleFileUpload({ target: input } as any);
-                  }
+                  const input = document.getElementById('file-upload') as HTMLInputElement | null;
+                  input?.click();
                 }}
                 disabled={!uploadFile}
                 className="flex-1 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] font-bold hover:opacity-90 transition-all disabled:opacity-50"

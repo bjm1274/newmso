@@ -1,14 +1,38 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
-interface Props {
-  staffs: any[];
-  selectedCo: string;
-  user: any;
+interface StaffRecord {
+  id: string | number;
+  name: string;
+  company?: string;
 }
 
-const TAX_FREE_LIMITS: Record<string, { label: string; limit: number }> = {
+interface TaxFreeKey {
+  meal: number;
+  car: number;
+  research: number;
+  childcare: number;
+  night: number;
+  overseas: number;
+}
+
+interface TaxFreeRow {
+  id: string | number;
+  name: string;
+  exceeded: boolean;
+  meal: number;
+  car: number;
+  research: number;
+  childcare: number;
+  night: number;
+  overseas: number;
+}
+
+type TaxFreeItemKey = keyof TaxFreeKey;
+
+const TAX_FREE_LIMITS: Record<TaxFreeItemKey, { label: string; limit: number }> = {
   meal: { label: '식대', limit: 200000 },
   car: { label: '자가운전보조금', limit: 200000 },
   research: { label: '연구활동비', limit: 200000 },
@@ -17,19 +41,29 @@ const TAX_FREE_LIMITS: Record<string, { label: string; limit: number }> = {
   overseas: { label: '국외근로소득(비파견)', limit: 1000000 },
 };
 
-export default function TaxFreeLimitChecker({ staffs, selectedCo, user }: Props) {
+const TAX_FREE_KEYS = Object.keys(TAX_FREE_LIMITS) as TaxFreeItemKey[];
+
+const fmt = (n: number) => n.toLocaleString('ko-KR');
+
+interface Props {
+  staffs: StaffRecord[];
+  selectedCo: string;
+  user?: unknown;
+}
+
+export default function TaxFreeLimitChecker({ staffs, selectedCo }: Props) {
   const [yearMonth, setYearMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [records, setRecords] = useState<any[]>([]);
+  const [records, setRecords] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(false);
   const [onlyExceeded, setOnlyExceeded] = useState(false);
 
-  const filtered = selectedCo === '전체' ? staffs : staffs.filter((s: any) => s.company === selectedCo);
+  const filtered = selectedCo === '전체' ? staffs : staffs.filter((s) => s.company === selectedCo);
 
   useEffect(() => {
     const fetchRecords = async () => {
       setLoading(true);
       try {
-        const staffIds = filtered.map((s: any) => s.id);
+        const staffIds = filtered.map((s) => s.id);
         if (staffIds.length === 0) { setRecords([]); setLoading(false); return; }
         const { data, error } = await supabase
           .from('payroll_records')
@@ -37,7 +71,7 @@ export default function TaxFreeLimitChecker({ staffs, selectedCo, user }: Props)
           .eq('year_month', yearMonth)
           .in('staff_id', staffIds);
         if (error) throw error;
-        setRecords(data || []);
+        setRecords(data ?? []);
       } catch {
         setRecords([]);
       } finally {
@@ -45,30 +79,53 @@ export default function TaxFreeLimitChecker({ staffs, selectedCo, user }: Props)
       }
     };
     fetchRecords();
+  // filtered는 참조가 매 렌더마다 바뀌므로 의존성에서 제외하고 원본 deps만 사용
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [yearMonth, selectedCo]);
 
-  const getAmounts = (record: any) => {
-    const meta = record?.meta_data || {};
+  const getAmounts = (record: Record<string, unknown>): TaxFreeKey => {
+    const meta = (record?.meta_data ?? {}) as Record<string, number>;
     return {
-      meal: meta.meal_allowance || meta.식대 || 0,
-      car: meta.car_allowance || meta.자가운전보조금 || 0,
-      research: meta.research_allowance || meta.연구활동비 || 0,
-      childcare: meta.childcare_allowance || meta.보육수당 || 0,
-      night: meta.night_allowance || meta.야간근로수당 || 0,
-      overseas: meta.overseas_income || meta.국외근로소득 || 0,
+      meal: (meta.meal_allowance ?? meta['식대'] ?? 0) as number,
+      car: (meta.car_allowance ?? meta['자가운전보조금'] ?? 0) as number,
+      research: (meta.research_allowance ?? meta['연구활동비'] ?? 0) as number,
+      childcare: (meta.childcare_allowance ?? meta['보육수당'] ?? 0) as number,
+      night: (meta.night_allowance ?? meta['야간근로수당'] ?? 0) as number,
+      overseas: (meta.overseas_income ?? meta['국외근로소득'] ?? 0) as number,
     };
   };
 
-  const rows = filtered.map((staff: any) => {
-    const record = records.find((r: any) => String(r.staff_id) === String(staff.id));
+  const rows: TaxFreeRow[] = filtered.map((staff) => {
+    const record = records.find((r) => String(r.staff_id) === String(staff.id));
     const amounts = record ? getAmounts(record) : { meal: 0, car: 0, research: 0, childcare: 0, night: 0, overseas: 0 };
-    const exceeded = Object.entries(TAX_FREE_LIMITS).some(([key, { limit }]) => (amounts as any)[key] > limit);
-    return { staff, amounts, exceeded };
+    const exceeded = TAX_FREE_KEYS.some((key) => amounts[key] > TAX_FREE_LIMITS[key].limit);
+    return { id: staff.id, name: staff.name, exceeded, ...amounts };
   });
 
-  const displayRows = onlyExceeded ? rows.filter(r => r.exceeded) : rows;
+  const displayRows = onlyExceeded ? rows.filter((r) => r.exceeded) : rows;
 
-  const fmt = (n: number) => n.toLocaleString('ko-KR');
+  const columns = useMemo((): Column<TaxFreeRow>[] => [
+    { key: 'name', label: '직원명', primary: true },
+    ...TAX_FREE_KEYS.map((key): Column<TaxFreeRow> => ({
+      key,
+      label: TAX_FREE_LIMITS[key].label,
+      align: 'right',
+      render: (row) => {
+        const val = row[key];
+        const over = val > TAX_FREE_LIMITS[key].limit;
+        return (
+          <div className={over ? 'text-red-600 font-bold' : undefined}>
+            <div>{fmt(val)}</div>
+            {over && (
+              <div className="text-[9px] text-red-500">
+                초과 {fmt(val - TAX_FREE_LIMITS[key].limit)}원
+              </div>
+            )}
+          </div>
+        );
+      },
+    })),
+  ], []);
 
   return (
     <div className="p-4 md:p-4 space-y-5 max-w-5xl mx-auto">
@@ -108,37 +165,12 @@ export default function TaxFreeLimitChecker({ staffs, selectedCo, user }: Props)
         <div className="text-center py-5 text-sm text-[var(--toss-gray-3)]">로딩 중...</div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-xs border-collapse">
-            <thead>
-              <tr className="bg-[var(--muted)]">
-                <th className="p-2 text-left font-bold text-[var(--toss-gray-4)] border border-[var(--border)]">직원명</th>
-                {Object.values(TAX_FREE_LIMITS).map(({ label }) => (
-                  <th key={label} className="p-2 text-center font-bold text-[var(--toss-gray-4)] border border-[var(--border)] whitespace-nowrap">{label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {displayRows.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="p-4 text-center text-[var(--toss-gray-3)]">데이터가 없습니다.</td>
-                </tr>
-              ) : displayRows.map(({ staff, amounts }) => (
-                <tr key={staff.id} className="hover:bg-[var(--muted)]/50">
-                  <td className="p-2 font-bold border border-[var(--border)]">{staff.name}</td>
-                  {Object.entries(TAX_FREE_LIMITS).map(([key, { limit }]) => {
-                    const val = (amounts as any)[key] || 0;
-                    const over = val > limit;
-                    return (
-                      <td key={key} className={`p-2 text-right border border-[var(--border)] ${over ? 'bg-red-500/10 text-red-600 font-bold' : 'text-[var(--foreground)]'}`}>
-                        <div>{fmt(val)}</div>
-                        {over && <div className="text-[9px] text-red-500">초과 {fmt(val - limit)}원</div>}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <ResponsiveTable<TaxFreeRow>
+            columns={columns}
+            rows={displayRows}
+            keyField="id"
+            emptyMessage="데이터가 없습니다."
+          />
         </div>
       )}
     </div>
