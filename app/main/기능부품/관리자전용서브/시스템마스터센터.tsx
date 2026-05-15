@@ -29,7 +29,9 @@ import type {
   SystemMasterPermissionDiffPayload,
   SystemMasterChatsPayload,
   SystemMasterActionId,
+  SystemMasterSensitiveStaff,
 } from './시스템마스터센터-modules/types';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 const formatCurrency = (value: unknown) => formatWon(Number(value || 0));
 
@@ -561,6 +563,62 @@ export default function SystemMasterCenter({
     ];
   }, [overview]);
 
+  const sensitiveStaffColumns = useMemo((): Column<SystemMasterSensitiveStaff>[] => [
+    {
+      key: 'name',
+      label: '직원',
+      primary: true,
+      render: (s) => (
+        <div>
+          <p className="font-bold text-[var(--foreground)]">{s.name}</p>
+          <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">#{s.employee_no || '-'}</p>
+        </div>
+      ),
+    },
+    {
+      key: 'company',
+      label: '소속',
+      render: (s) => (
+        <span className="text-[var(--toss-gray-4)]">{s.company || '-'} / {s.department || '-'}</span>
+      ),
+    },
+    {
+      key: 'resident_no',
+      label: '주민번호',
+      render: (s) => (
+        <span className="font-mono text-[var(--foreground)]">{maskResidentNo(s.resident_no || '', showSensitiveRaw)}</span>
+      ),
+    },
+    {
+      key: 'phone',
+      label: '연락처',
+      render: (s) => <span className="text-[var(--toss-gray-4)]">{s.phone || '-'}</span>,
+    },
+    {
+      key: 'email',
+      label: '이메일',
+      render: (s) => <span className="text-[var(--toss-gray-4)]">{s.email || '-'}</span>,
+    },
+    {
+      key: 'bank_account',
+      label: '은행 / 계좌',
+      render: (s) => (
+        <div>
+          <p className="font-semibold text-[var(--foreground)]">{s.bank_name || '-'}</p>
+          <p className="mt-1 font-mono text-[11px] text-[var(--toss-gray-3)]">{maskAccount(s.bank_account || '', showSensitiveRaw)}</p>
+        </div>
+      ),
+    },
+    {
+      key: 'base_salary',
+      label: '기본급',
+      align: 'right',
+      render: (s) => (
+        <span className="font-semibold text-[var(--foreground)]">{formatCurrency(s.base_salary)}</span>
+      ),
+    },
+  ], [showSensitiveRaw]);
+
   if (!isSystemMaster) {
     return (
       <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 text-center shadow-sm">
@@ -695,39 +753,13 @@ export default function SystemMasterCenter({
                 민감정보 원문 보기
               </label>
             </div>
-            <div className="mt-4 overflow-x-auto">
-              <table className="min-w-full text-left text-xs">
-                <thead className="bg-[var(--page-bg)] text-[11px] uppercase tracking-[0.14em] text-[var(--toss-gray-3)]">
-                  <tr>
-                    <th className="px-3 py-3">직원</th>
-                    <th className="px-3 py-3">소속</th>
-                    <th className="px-3 py-3">주민번호</th>
-                    <th className="px-3 py-3">연락처</th>
-                    <th className="px-3 py-3">이메일</th>
-                    <th className="px-3 py-3">은행 / 계좌</th>
-                    <th className="px-3 py-3">기본급</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(overview.sensitiveStaffs || []).map((staff) => (
-                    <tr key={staff.id} className="border-t border-[var(--border)]">
-                      <td className="px-3 py-3">
-                        <p className="font-bold text-[var(--foreground)]">{staff.name}</p>
-                        <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">#{staff.employee_no || '-'}</p>
-                      </td>
-                      <td className="px-3 py-3 text-[var(--toss-gray-4)]">{staff.company || '-'} / {staff.department || '-'}</td>
-                      <td className="px-3 py-3 font-mono text-[var(--foreground)]">{maskResidentNo(staff.resident_no || '', showSensitiveRaw)}</td>
-                      <td className="px-3 py-3 text-[var(--toss-gray-4)]">{staff.phone || '-'}</td>
-                      <td className="px-3 py-3 text-[var(--toss-gray-4)]">{staff.email || '-'}</td>
-                      <td className="px-3 py-3">
-                        <p className="font-semibold text-[var(--foreground)]">{staff.bank_name || '-'}</p>
-                        <p className="mt-1 font-mono text-[11px] text-[var(--toss-gray-3)]">{maskAccount(staff.bank_account || '', showSensitiveRaw)}</p>
-                      </td>
-                      <td className="px-3 py-3 font-semibold text-[var(--foreground)]">{formatCurrency(staff.base_salary)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border)]">
+              <ResponsiveTable<SystemMasterSensitiveStaff>
+                columns={sensitiveStaffColumns}
+                rows={overview.sensitiveStaffs || []}
+                keyField="id"
+                emptyMessage="민감정보 대상 직원이 없습니다."
+              />
             </div>
           </section>
         </>
