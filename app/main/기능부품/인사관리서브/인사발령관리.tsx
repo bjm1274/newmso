@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import { getScopedActiveStaffs } from '@/lib/active-staff';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import type { StaffMember } from '@/types';
 
 const ORDER_TYPES = ['승진', '전보(부서이동)', '퇴직/면직'] as const;
@@ -113,6 +114,66 @@ export default function PersonnelAppointment({
       return true;
     });
   }, [filter, records]);
+
+  type AppointmentRow = AppointmentRecord & { rowKey: string };
+  const tableRows = useMemo<AppointmentRow[]>(() => {
+    return filteredRecords.map((record, index) => ({
+      ...record,
+      rowKey: record.id != null ? String(record.id) : `idx-${index}`,
+    }));
+  }, [filteredRecords]);
+
+  const columns = useMemo<Column<AppointmentRow>[]>(() => [
+    {
+      key: 'staff_name',
+      label: '직원',
+      primary: true,
+      render: (r) => <span className="font-bold text-[var(--foreground)]">{r.staff_name}</span>,
+    },
+    {
+      key: 'order_type',
+      label: '유형',
+      render: (r) => (
+        <span className="rounded-lg bg-blue-500/10 px-2 py-1 font-bold text-blue-700">
+          {r.order_type}
+        </span>
+      ),
+    },
+    {
+      key: 'change',
+      label: '변경 내용',
+      render: (r) => (
+        <span className="text-[var(--toss-gray-4)]">
+          {(r.before_dept || r.after_dept) && (
+            <span>
+              {r.before_dept || '-'} →{' '}
+              <strong className="text-[var(--foreground)]">
+                {r.after_dept || r.before_dept || '-'}
+              </strong>
+            </span>
+          )}
+          {(r.before_position || r.after_position) && (
+            <span className="ml-2">
+              {r.before_position || '-'} →{' '}
+              <strong className="text-[var(--foreground)]">
+                {r.after_position || r.before_position || '-'}
+              </strong>
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'effective_date',
+      label: '발령일',
+      render: (r) => <span className="text-[var(--toss-gray-4)]">{r.effective_date}</span>,
+    },
+    {
+      key: 'reason',
+      label: '사유',
+      render: (r) => <span className="text-[var(--toss-gray-4)]">{r.reason || '-'}</span>,
+    },
+  ], []);
 
   const resetForm = () => {
     setForm({
@@ -456,60 +517,13 @@ export default function PersonnelAppointment({
         </div>
 
         {activeTab === '발령목록' && (
-          <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-[11px]">
-                <thead className="bg-[var(--muted)]">
-                  <tr className="border-b border-[var(--border)] text-left text-[var(--toss-gray-4)]">
-                    <th className="px-4 py-3 font-bold">직원</th>
-                    <th className="px-4 py-3 font-bold">유형</th>
-                    <th className="px-4 py-3 font-bold">변경 내용</th>
-                    <th className="px-4 py-3 font-bold">발령일</th>
-                    <th className="px-4 py-3 font-bold">사유</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRecords.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-10 text-center font-bold text-[var(--toss-gray-3)]">
-                        발령 이력이 없습니다.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredRecords.map((record) => (
-                      <tr key={record.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--muted)]/50">
-                        <td className="px-4 py-3 font-bold text-[var(--foreground)]">{record.staff_name}</td>
-                        <td className="px-4 py-3">
-                          <span className="rounded-lg bg-blue-500/10 px-2 py-1 font-bold text-blue-700">
-                            {record.order_type}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-[var(--toss-gray-4)]">
-                          {(record.before_dept || record.after_dept) && (
-                            <span>
-                              {record.before_dept || '-'} →{' '}
-                              <strong className="text-[var(--foreground)]">
-                                {record.after_dept || record.before_dept || '-'}
-                              </strong>
-                            </span>
-                          )}
-                          {(record.before_position || record.after_position) && (
-                            <span className="ml-2">
-                              {record.before_position || '-'} →{' '}
-                              <strong className="text-[var(--foreground)]">
-                                {record.after_position || record.before_position || '-'}
-                              </strong>
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-[var(--toss-gray-4)]">{record.effective_date}</td>
-                        <td className="px-4 py-3 text-[var(--toss-gray-4)]">{record.reason || '-'}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+          <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] p-2 shadow-sm">
+            <ResponsiveTable<AppointmentRow>
+              columns={columns}
+              rows={tableRows}
+              keyField="rowKey"
+              emptyMessage="발령 이력이 없습니다."
+            />
           </div>
         )}
 
