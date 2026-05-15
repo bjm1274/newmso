@@ -1,48 +1,164 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 const REWARD_TYPES = ['우수사원', '근속상', '모범직원', '특별공로', '사내공모 수상', '기타포상'] as const;
 const DISCIPLINE_TYPES = ['구두경고', '서면경고', '감봉', '정직', '해임', '기타'] as const;
 
+type RewardRecord = {
+    id: string;
+    staff_name: string;
+    department: string;
+    category: '포상' | '징계';
+    type: string;
+    date: string | null;
+    reason: string;
+    amount: number;
+    committee_date: string | null;
+    committee_members: string;
+    committee_result: string;
+    company: string;
+    memo: string;
+};
+
+type ActiveTab = '포상' | '징계' | '징계위원회';
+
+type FormState = {
+    staff_id: string;
+    category: '포상' | '징계';
+    type: string;
+    date: string;
+    reason: string;
+    detail: string;
+    amount: number;
+    committee_date: string;
+    committee_members: string;
+    committee_result: string;
+    memo: string;
+};
+
+const INITIAL_FORM: FormState = {
+    staff_id: '', category: '포상', type: '', date: '', reason: '', detail: '',
+    amount: 0, committee_date: '', committee_members: '', committee_result: '', memo: '',
+};
+
 export default function RewardDisciplineManagement({ staffs = [], selectedCo, user }: Record<string, unknown>) {
     const _staffs = (staffs as Record<string, unknown>[]) ?? [];
-    const [records, setRecords] = useState<any[]>([]);
+    const [records, setRecords] = useState<RewardRecord[]>([]);
     const [showForm, setShowForm] = useState(false);
-    const [activeTab, setActiveTab] = useState<'포상' | '징계' | '징계위원회'>('포상');
-    const [form, setForm] = useState({ staff_id: '', category: '포상' as '포상' | '징계', type: '', date: '', reason: '', detail: '', amount: 0, committee_date: '', committee_members: '', committee_result: '', memo: '' });
+    const [activeTab, setActiveTab] = useState<ActiveTab>('포상');
+    const [form, setForm] = useState<FormState>(INITIAL_FORM);
 
     useEffect(() => { fetchRecords(); }, []);
+
     const fetchRecords = async () => {
         const { data } = await supabase.from('reward_discipline').select('*').order('date', { ascending: false });
-        if (data) setRecords(data);
+        if (data) setRecords(data as RewardRecord[]);
     };
 
-    const filtered = _staffs.filter((s: any) => (selectedCo === '전체' || s.company === selectedCo));
-    const rewards = records.filter((r: any) => r.category === '포상' && (selectedCo === '전체' || r.company === selectedCo));
-    const disciplines = records.filter((r: any) => r.category === '징계' && (selectedCo === '전체' || r.company === selectedCo));
-    const committees = disciplines.filter((r: any) => r.committee_date);
+    const filtered = _staffs.filter((s) => (selectedCo === '전체' || s.company === selectedCo));
+    const rewards = records.filter((r) => r.category === '포상' && (selectedCo === '전체' || r.company === selectedCo));
+    const disciplines = records.filter((r) => r.category === '징계' && (selectedCo === '전체' || r.company === selectedCo));
+    const committees = disciplines.filter((r) => r.committee_date);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const staff = _staffs.find((s: any) => s.id === form.staff_id);
+        const staff = _staffs.find((s) => s.id === form.staff_id);
         if (!staff) return toast('직원을 선택해주세요.', 'warning');
         const cat = activeTab === '포상' ? '포상' : '징계';
-        const newRec = { ...form, category: cat, staff_name: staff.name as string, company: staff.company, department: (staff.department as string) || '', issued_by: (user as any)?.name || '관리자', date: form.date || null, committee_date: form.committee_date || null };
+        const newRec = {
+            ...form, category: cat,
+            staff_name: staff.name as string,
+            company: staff.company,
+            department: (staff.department as string) || '',
+            issued_by: (user as Record<string, unknown>)?.name || '관리자',
+            date: form.date || null,
+            committee_date: form.committee_date || null,
+        };
         const { data, error } = await supabase.from('reward_discipline').insert([newRec]).select();
         if (error) {
             console.error('reward_discipline insert failed:', error);
             toast('포상/징계 기록 저장에 실패했습니다.', 'error');
             return;
         }
-        if (data?.[0]) { setRecords([data[0], ...records]); }
+        if (data?.[0]) setRecords([data[0] as RewardRecord, ...records]);
         setShowForm(false);
-        setForm({ staff_id: '', category: '포상', type: '', date: '', reason: '', detail: '', amount: 0, committee_date: '', committee_members: '', committee_result: '', memo: '' });
+        setForm(INITIAL_FORM);
     };
 
     const currentList = activeTab === '포상' ? rewards : activeTab === '징계' ? disciplines : committees;
+
+    const columns = useMemo<Column<RewardRecord>[]>(() => {
+        const base: Column<RewardRecord>[] = [
+            {
+                key: 'staff_name',
+                label: '직원',
+                primary: true,
+                render: (r) => (
+                    <span className="font-bold text-[var(--foreground)]">
+                        {r.staff_name}
+                        <br />
+                        <span className="text-[9px] text-[var(--toss-gray-3)]">{r.department}</span>
+                    </span>
+                ),
+            },
+            {
+                key: 'type',
+                label: '유형',
+                render: (r) => (
+                    <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${r.category === '포상' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                        {r.type}
+                    </span>
+                ),
+            },
+            {
+                key: 'date',
+                label: '일자',
+                render: (r) => <span className="text-[var(--toss-gray-4)]">{r.date ?? '—'}</span>,
+                showOnMobile: false,
+            },
+            {
+                key: 'reason',
+                label: '사유',
+                render: (r) => <span className="text-[var(--toss-gray-4)]">{r.reason}</span>,
+            },
+        ];
+
+        if (activeTab === '포상') {
+            base.push({
+                key: 'amount',
+                label: '포상금',
+                align: 'right',
+                showOnMobile: false,
+                render: (r) => <span className="font-bold text-[var(--foreground)]">{(r.amount || 0).toLocaleString()}원</span>,
+            });
+        }
+
+        if (activeTab === '징계위원회') {
+            base.push({
+                key: 'committee_result',
+                label: '심의 결과',
+                render: (r) => (
+                    <span className="text-[var(--toss-gray-4)]">
+                        {r.committee_result || '—'}
+                        <br />
+                        <span className="text-[9px]">심의일: {r.committee_date} · 위원: {r.committee_members}</span>
+                    </span>
+                ),
+                showOnMobile: false,
+            });
+        }
+
+        return base;
+    }, [activeTab]);
+
+    const emptyMessage =
+        activeTab === '포상' ? '포상 이력이 없습니다' :
+        activeTab === '징계' ? '징계 이력이 없습니다' :
+        '징계위원회 심의 기록이 없습니다';
 
     return (
         <div className="flex flex-col h-full animate-in fade-in duration-300">
@@ -51,16 +167,20 @@ export default function RewardDisciplineManagement({ staffs = [], selectedCo, us
                     <div>
                         <span className="text-sm text-[var(--accent)] font-bold">[{selectedCo as string}]</span>
                     </div>
-                    <button onClick={() => setShowForm(!showForm)} className="px-5 py-2.5 bg-[var(--accent)] text-white text-[11px] font-bold rounded-xl shadow-md hover:opacity-90 transition-all">{showForm ? '취소' : '+ 등록'}</button>
+                    <button onClick={() => setShowForm(!showForm)} className="px-5 py-2.5 bg-[var(--accent)] text-white text-[11px] font-bold rounded-xl shadow-md hover:opacity-90 transition-all">
+                        {showForm ? '취소' : '+ 등록'}
+                    </button>
                 </div>
                 <div className="flex gap-1 mt-4 border-b border-[var(--border)] -mb-5">
                     {(['포상', '징계', '징계위원회'] as const).map(tab => (
-                        <button key={tab} onClick={() => { setActiveTab(tab); setShowForm(false); }} className={`px-5 py-3 text-[11px] font-bold border-b-2 transition-all ${activeTab === tab ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--toss-gray-3)]'}`}>
+                        <button key={tab} onClick={() => { setActiveTab(tab); setShowForm(false); }}
+                            className={`px-5 py-3 text-[11px] font-bold border-b-2 transition-all ${activeTab === tab ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--toss-gray-3)]'}`}>
                             {tab === '포상' ? '🏅 포상 이력' : tab === '징계' ? '⚖️ 징계 이력' : '🏛️ 징계위원회'}
                         </button>
                     ))}
                 </div>
             </header>
+
             <div className="flex-1 overflow-y-auto p-4 md:p-5 space-y-4 custom-scrollbar bg-[var(--page-bg)]">
                 {/* 요약 카드 */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -78,7 +198,7 @@ export default function RewardDisciplineManagement({ staffs = [], selectedCo, us
                     </div>
                     <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm">
                         <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">포상금 합계</p>
-                        <p className="text-2xl font-black text-[var(--accent)]">{rewards.reduce((s: number, r: any) => s + (r.amount || 0), 0).toLocaleString()}<span className="text-sm ml-1 font-bold text-[var(--toss-gray-3)]">원</span></p>
+                        <p className="text-2xl font-black text-[var(--accent)]">{rewards.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}<span className="text-sm ml-1 font-bold text-[var(--toss-gray-3)]">원</span></p>
                     </div>
                 </div>
 
@@ -88,7 +208,7 @@ export default function RewardDisciplineManagement({ staffs = [], selectedCo, us
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <select value={form.staff_id} onChange={e => setForm({ ...form, staff_id: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required>
                                 <option value="">직원 선택</option>
-                                {filtered.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.department || '미배정'})</option>)}
+                                {filtered.map((s) => <option key={s.id as string} value={s.id as string}>{s.name as string} ({(s.department as string) || '미배정'})</option>)}
                             </select>
                             <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required>
                                 <option value="">유형 선택</option>
@@ -109,38 +229,21 @@ export default function RewardDisciplineManagement({ staffs = [], selectedCo, us
                                 </div>
                             </div>
                         )}
-                        <div className="flex justify-end"><button type="submit" className="px-4 py-2.5 bg-[var(--accent)] text-white text-[11px] font-bold rounded-xl shadow-md">등록</button></div>
+                        <div className="flex justify-end">
+                            <button type="submit" className="px-4 py-2.5 bg-[var(--accent)] text-white text-[11px] font-bold rounded-xl shadow-md">등록</button>
+                        </div>
                     </form>
                 )}
 
                 {/* 이력 테이블 */}
-                <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-x-auto shadow-sm">
-                    <table className="w-full text-[11px]">
-                        <thead><tr className="bg-[var(--muted)] border-b border-[var(--border)]">
-                            <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">직원</th>
-                            <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">유형</th>
-                            <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">일자</th>
-                            <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">사유</th>
-                            {activeTab === '포상' && <th className="px-4 py-3 text-right font-bold text-[var(--toss-gray-4)]">포상금</th>}
-                            {activeTab === '징계위원회' && <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">심의 결과</th>}
-                        </tr></thead>
-                        <tbody>
-                            {currentList.length === 0 ? (
-                                <tr><td colSpan={5} className="px-4 py-10 text-center text-[var(--toss-gray-3)] font-bold">
-                                    {activeTab === '포상' ? '포상 이력이 없습니다' : activeTab === '징계' ? '징계 이력이 없습니다' : '징계위원회 심의 기록이 없습니다'}
-                                </td></tr>
-                            ) : currentList.map((r: any) => (
-                                <tr key={r.id} className="border-b border-[var(--border)] hover:bg-[var(--muted)]/50">
-                                    <td className="px-4 py-3 font-bold text-[var(--foreground)]">{r.staff_name}<br /><span className="text-[9px] text-[var(--toss-gray-3)]">{r.department}</span></td>
-                                    <td className="px-4 py-3"><span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${r.category === '포상' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{r.type}</span></td>
-                                    <td className="px-4 py-3 text-[var(--toss-gray-4)]">{r.date}</td>
-                                    <td className="px-4 py-3 text-[var(--toss-gray-4)]">{r.reason}</td>
-                                    {activeTab === '포상' && <td className="px-4 py-3 text-right font-bold text-[var(--foreground)]">{(r.amount || 0).toLocaleString()}원</td>}
-                                    {activeTab === '징계위원회' && <td className="px-4 py-3 text-[var(--toss-gray-4)]">{r.committee_result || '-'}<br /><span className="text-[9px]">심의일: {r.committee_date} · 위원: {r.committee_members}</span></td>}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
+                    <ResponsiveTable<RewardRecord>
+                        columns={columns}
+                        rows={currentList}
+                        keyField="id"
+                        emptyMessage={emptyMessage}
+                        className="text-[11px]"
+                    />
                 </div>
             </div>
         </div>
