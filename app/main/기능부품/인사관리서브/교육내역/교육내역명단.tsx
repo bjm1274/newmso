@@ -3,6 +3,7 @@ import { toast } from '@/lib/toast';
 
 import { useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { MatrixTable, type MatrixColumn, type MatrixCellTone } from '@/app/components/MatrixTable';
 import {
   EDUCATION_ITEMS,
   getApplicableEducationItems,
@@ -13,12 +14,19 @@ import {
   removeEducationCompletionWithFallback,
   serializeEducationQueryError,
   upsertEducationCompletionWithFallback,
+  type EducationItem,
 } from './education-utils';
+
+type StaffRow = Record<string, unknown> & {
+  id: string | number;
+  name: string;
+  company?: string;
+};
 
 interface EducationListProps {
   selectedCo: string;
-  staffs: any[];
-  notifications?: any[];
+  staffs: Record<string, unknown>[];
+  notifications?: Record<string, unknown>[];
   completions?: Record<string, { is_completed: boolean; certificate_url?: string | null }>;
   onStatusChanged?: () => Promise<void> | void;
 }
@@ -30,17 +38,22 @@ export default function EducationList({
   completions = {},
   onStatusChanged,
 }: EducationListProps) {
-  const filtered = useMemo(() => getScopedActiveStaffs(staffs, selectedCo), [staffs, selectedCo]);
-  const visibleEducationItems = useMemo(
+  const filtered = useMemo(
+    () => getScopedActiveStaffs(staffs, selectedCo) as unknown as StaffRow[],
+    [staffs, selectedCo]
+  );
+  const visibleEducationItems = useMemo<EducationItem[]>(
     () => (selectedCo === '전체' ? EDUCATION_ITEMS : getApplicableEducationItems(selectedCo)),
     [selectedCo]
   );
   const notificationMap = useMemo(() => {
     const next = new Map<string, { daysLeft: number; type: string }>();
-    notifications.forEach((item: any) => {
+    notifications.forEach((rawItem) => {
+      const item = rawItem as { id?: string | number; education?: string; daysLeft?: number; type?: string };
+      if (item.id == null || !item.education) return;
       next.set(getEducationCompletionKey(item.id, item.education), {
-        daysLeft: item.daysLeft,
-        type: item.type,
+        daysLeft: Number(item.daysLeft ?? 0),
+        type: String(item.type ?? ''),
       });
     });
     return next;
@@ -57,7 +70,7 @@ export default function EducationList({
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  const openActionModal = (staff: any, eduName: string) => {
+  const openActionModal = (staff: StaffRow, eduName: string) => {
     const key = getEducationCompletionKey(staff.id, eduName);
     const completion = completions[key];
 
@@ -69,6 +82,56 @@ export default function EducationList({
       certificateUrl: completion?.certificate_url ?? null,
     });
     setUploadFile(null);
+  };
+
+  // 셀 상태 계산을 단일 함수로 통합 (renderCell/cellTone 양쪽에서 재사용)
+  type CellState =
+    | { kind: 'not-applicable' }
+    | { kind: 'urgent'; daysLabel: string | null }
+    | { kind: 'pending'; daysLabel: string | null }
+    | { kind: 'completed'; hasCertificate: boolean };
+
+  const getCellState = (staff: StaffRow, item: EducationItem): CellState => {
+    const applicableItems = new Set(
+      getApplicableEducationItems(staff.company).map((it) => it.name)
+    );
+    if (!applicableItems.has(item.name)) return { kind: 'not-applicable' };
+
+    const key = getEducationCompletionKey(staff.id, item.name);
+    const completion = completions[key];
+    const alertInfo = notificationMap.get(key);
+    const isCompleted = !!completion;
+
+    if (isCompleted) {
+      return { kind: 'completed', hasCertificate: !!completion?.certificate_url };
+    }
+
+    const daysLabel = alertInfo
+      ? alertInfo.daysLeft < 0
+        ? `${Math.abs(alertInfo.daysLeft)}일 경과`
+        : `${alertInfo.daysLeft}일 남음`
+      : null;
+
+    if (alertInfo?.type === 'URGENT') return { kind: 'urgent', daysLabel };
+    return { kind: 'pending', daysLabel };
+  };
+
+  const educationColumns: MatrixColumn<EducationItem>[] = visibleEducationItems.map((item) => ({
+    id: item.code,
+    label: item.name,
+    shortLabel: item.name,
+    data: item,
+    subLabel:
+      item.category === 'hospital' ? '병원' : item.category === 'company' ? '일반' : '공통',
+  }));
+
+  const computeRowSummary = (staff: StaffRow) => {
+    const applicableItems = getApplicableEducationItems(staff.company);
+    const total = applicableItems.length;
+    const completedCount = applicableItems.filter(
+      (it) => !!completions[getEducationCompletionKey(staff.id, it.name)]
+    ).length;
+    return { completedCount, total };
   };
 
   const handleUpdateStatus = async () => {
@@ -146,116 +209,99 @@ export default function EducationList({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[1000px]">
-          <thead className="bg-[var(--card)] text-[11px] font-semibold text-[var(--toss-gray-3)] border-b border-[var(--border)] uppercase">
-            <tr>
-              <th className="p-4 sticky left-0 bg-[var(--card)] z-10 w-40 border-r border-[var(--border-subtle)]">성명 / 소속</th>
-              {visibleEducationItems.map((item) => (
-                <th key={item.name} className="p-4 text-center">
-                  <div className="flex flex-col items-center gap-1">
-                    <span>{item.name}</span>
-                    <span className="text-[8px] font-bold text-[var(--toss-gray-3)]">
-                      {item.category === 'hospital' ? '병원' : item.category === 'company' ? '일반' : '공통'}
-                    </span>
-                  </div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {filtered.map((staff: any) => {
-              const applicableItems = new Set(getApplicableEducationItems(staff.company).map((item) => item.name));
-              const position = getStaffPosition(staff);
+      <div className="p-3">
+        <MatrixTable<StaffRow, EducationItem>
+          rows={filtered}
+          columns={educationColumns}
+          rowKey={(staff) => String(staff.id)}
+          rowHeaderLabel="성명 / 소속"
+          rowHeader={(staff) => {
+            const position = getStaffPosition(staff as Parameters<typeof getStaffPosition>[0]);
+            const department = getStaffDepartment(staff as Parameters<typeof getStaffDepartment>[0]);
+            return (
+              <div className="flex flex-col text-left min-w-[140px]">
+                <span className="text-xs font-semibold text-[var(--foreground)]">{staff.name}</span>
+                <span className="text-[10px] text-[var(--toss-gray-3)] font-bold">
+                  {staff.company ?? '-'} · {department}
+                  {position ? ` · ${position}` : ''}
+                </span>
+              </div>
+            );
+          }}
+          renderCell={(staff, col) => {
+            const state = getCellState(staff, col.data);
+            const eduName = col.data.name;
 
+            if (state.kind === 'not-applicable') {
               return (
-                <tr key={staff.id} className="hover:bg-gray-25 transition-colors">
-                  <td className="p-4 sticky left-0 bg-[var(--card)] z-10 border-r border-[var(--border-subtle)]">
-                    <div className="flex flex-col">
-                      <span className="text-xs font-semibold text-[var(--foreground)]">{staff.name}</span>
-                      <span className="text-[11px] text-[var(--toss-gray-3)] font-bold">
-                        {staff.company} · {getStaffDepartment(staff)}
-                        {position ? ` · ${position}` : ''}
-                      </span>
-                    </div>
-                  </td>
-                  {visibleEducationItems.map((item) => {
-                    const isApplicable = applicableItems.has(item.name);
-                    const alertInfo = notificationMap.get(getEducationCompletionKey(staff.id, item.name));
-                    const completion = completions[getEducationCompletionKey(staff.id, item.name)];
-                    const isCompleted = !!completion;
-                    const daysLabel = alertInfo
-                      ? alertInfo.daysLeft < 0
-                        ? `${Math.abs(alertInfo.daysLeft)}일 경과`
-                        : `${alertInfo.daysLeft}일 남음`
-                      : null;
-
-                    if (!isApplicable) {
-                      return (
-                        <td key={item.name} className="p-4 text-center">
-                          <span className="px-2 py-1 text-[10px] font-semibold border rounded-md bg-[var(--tab-bg)] text-[var(--toss-gray-3)] border-[var(--border-subtle)] whitespace-nowrap">
-                            해당 없음
-                          </span>
-                        </td>
-                      );
-                    }
-
-                    if (!isCompleted && alertInfo) {
-                      return (
-                        <td key={item.name} className="p-4 text-center">
-                          <button
-                            type="button"
-                            className="flex flex-col items-center gap-1 mx-auto"
-                            onClick={() => openActionModal(staff, item.name)}
-                          >
-                            <span
-                              className={`px-2 py-1 text-[11px] font-semibold border rounded-md transition-opacity whitespace-nowrap ${
-                                alertInfo.type === 'URGENT'
-                                  ? 'bg-orange-500/10 text-orange-600 border-orange-100 animate-pulse'
-                                  : 'bg-red-500/10 text-red-600 border-red-100 hover:bg-red-500/20'
-                              }`}
-                            >
-                              {alertInfo.type === 'URGENT' ? '기한임박' : '미이수'}
-                            </span>
-                            {daysLabel && (
-                              <span className="text-[8px] font-bold text-orange-400">{daysLabel}</span>
-                            )}
-                          </button>
-                        </td>
-                      );
-                    }
-
-                    return (
-                      <td key={item.name} className="p-4 text-center">
-                        <div className="flex flex-col items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => openActionModal(staff, item.name)}
-                            className={`px-2 py-1 text-[11px] font-semibold border rounded-md transition-all hover:scale-105 active:scale-95 whitespace-nowrap flex items-center gap-1 ${
-                              isCompleted
-                                ? 'bg-green-500/10 text-green-600 border-green-100'
-                                : 'bg-red-500/10 text-red-600 border-red-100 hover:bg-red-500/20'
-                            }`}
-                          >
-                            {isCompleted ? '이수완료' : '미이수'}
-                            {completion?.certificate_url && <span title="이수증 원본 존재">첨부</span>}
-                          </button>
-                        </div>
-                      </td>
-                    );
-                  })}
-                </tr>
+                <span
+                  className="inline-block px-2 py-1 text-[10px] font-semibold border rounded-md bg-[var(--tab-bg)] text-[var(--toss-gray-3)] border-[var(--border-subtle)] whitespace-nowrap"
+                  aria-label={`${staff.name} ${eduName} 해당 없음`}
+                >
+                  해당 없음
+                </span>
               );
-            })}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={visibleEducationItems.length + 1} className="p-5 text-center text-xs font-bold text-[var(--toss-gray-3)]">
-                  확인할 직원 교육 데이터가 없습니다.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+            }
+
+            if (state.kind === 'urgent' || state.kind === 'pending') {
+              const labelText = state.kind === 'urgent' ? '기한임박' : '미이수';
+              return (
+                <button
+                  type="button"
+                  onClick={() => openActionModal(staff, eduName)}
+                  className="inline-flex flex-col items-center gap-0.5 focus:outline-none focus:ring-1 focus:ring-[var(--accent)] rounded-md"
+                  aria-label={`${staff.name} ${eduName} ${labelText}${state.daysLabel ? ` (${state.daysLabel})` : ''}`}
+                >
+                  <span
+                    className={`px-2 py-1 text-[11px] font-semibold border rounded-md whitespace-nowrap ${
+                      state.kind === 'urgent'
+                        ? 'bg-orange-500/10 text-orange-600 border-orange-100 animate-pulse'
+                        : 'bg-red-500/10 text-red-600 border-red-100 hover:bg-red-500/20'
+                    }`}
+                  >
+                    {labelText}
+                  </span>
+                  {state.daysLabel && (
+                    <span className="text-[8px] font-bold text-orange-400">{state.daysLabel}</span>
+                  )}
+                </button>
+              );
+            }
+
+            // completed
+            return (
+              <button
+                type="button"
+                onClick={() => openActionModal(staff, eduName)}
+                className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold border rounded-md bg-green-500/10 text-green-600 border-green-100 hover:scale-105 active:scale-95 transition-all whitespace-nowrap focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                aria-label={`${staff.name} ${eduName} 이수완료${state.hasCertificate ? ' · 이수증 첨부됨' : ''}`}
+              >
+                이수완료
+                {state.hasCertificate && <span title="이수증 원본 존재">첨부</span>}
+              </button>
+            );
+          }}
+          cellTone={(staff, col): MatrixCellTone => {
+            const state = getCellState(staff, col.data);
+            if (state.kind === 'completed') return 'ok';
+            if (state.kind === 'urgent') return 'warn';
+            if (state.kind === 'pending') return 'danger';
+            return 'normal';
+          }}
+          rowSummary={(staff) => {
+            const { completedCount, total } = computeRowSummary(staff);
+            const allDone = total > 0 && completedCount === total;
+            return (
+              <span className={allDone ? 'text-emerald-600' : 'text-[var(--toss-gray-4)]'}>
+                {completedCount}/{total}
+              </span>
+            );
+          }}
+          rowSummaryLabel="이수"
+          minWidth={1000}
+          ariaLabel="직원별 교육 이수 매트릭스"
+          emptyMessage="확인할 직원 교육 데이터가 없습니다."
+        />
       </div>
 
       {selectedAction && (
