@@ -4,6 +4,8 @@ import { toast } from '@/lib/toast';
 import dynamic from 'next/dynamic';
 import { useState, useEffect, useMemo } from 'react';
 import PageSkeleton from '@/app/components/PageSkeleton';
+import { useIsMobile } from '@/app/components/useIsMobile';
+import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { supabase } from '@/lib/supabase';
@@ -134,6 +136,7 @@ export default function PayrollMain({
   initialTab = '대시보드',
 }: PayrollMainProps) {
   const { dialog, openConfirm } = useActionDialog();
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState(initialTab);
   const [selectedStaffId, setSelectedStaffId] = useState<string | number | null>(null);
   const [checkedIds, setCheckedIds] = useState<(string | number)[]>([]);
@@ -374,6 +377,17 @@ export default function PayrollMain({
       setActiveTab(initialTab);
     }
   }, [initialTab]);
+
+  if (isMobile) {
+    return (
+      <div className="p-4">
+        <DesktopOnlyNotice
+          feature="급여 워크센터"
+          description="급여 정산·대장·연말정산·4대보험 EDI 등 관리자 작업은 PC 폭에 최적화되어 있어 모바일에서는 정상 동작하지 않습니다. 본인 급여명세서는 마이페이지 > 급여명세서 탭에서 확인할 수 있으며, 관리자 업무는 가로 768px 이상 데스크톱 브라우저로 접속해주세요."
+        />
+      </div>
+    );
+  }
 
   return (
     <div

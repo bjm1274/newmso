@@ -5,7 +5,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
+import { useIsMobile } from '@/app/components/useIsMobile';
 import SalaryDetail from '../../인사관리서브/급여명세/급여상세';
+import MobileSalarySlip from './모바일명세서';
 
 interface StaffInfo {
   company?: string;
@@ -117,6 +119,7 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
   const [issuedRecords, setIssuedRecords] = useState<SalaryRecord[]>([]);
   const [selectedYearMonth, setSelectedYearMonth] = useState('');
   const effectiveUserId = getStaffLikeId(resolvedUser);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     let cancelled = false;
@@ -323,6 +326,28 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
         <p className="text-sm text-[var(--toss-gray-3)] leading-relaxed">
           확정 후 발송된 급여명세서가 있으면 이곳에서 월별로 선택해 확인할 수 있습니다.
         </p>
+      </div>
+    );
+  }
+
+  // 모바일(<768px): A4 출력용 SalaryDetail 대신 모바일 전용 명세서 렌더.
+  if (isMobile) {
+    const mobileStaff = (resolvedUser || _user) as Record<string, unknown>;
+    return (
+      <div data-testid="mypage-salary-tab" className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] overflow-hidden">
+        <MobileSalarySlip
+          staff={{
+            company: typeof mobileStaff.company === 'string' ? mobileStaff.company : undefined,
+            name: typeof mobileStaff.name === 'string' ? mobileStaff.name : undefined,
+            employee_no: typeof mobileStaff.employee_no === 'string' ? mobileStaff.employee_no : undefined,
+            department: typeof mobileStaff.department === 'string' ? mobileStaff.department : undefined,
+            position: typeof mobileStaff.position === 'string' ? mobileStaff.position : undefined,
+          }}
+          record={salaryData}
+          availableMonths={availableMonths}
+          selectedYearMonth={selectedYearMonth}
+          onSelectMonth={setSelectedYearMonth}
+        />
       </div>
     );
   }
