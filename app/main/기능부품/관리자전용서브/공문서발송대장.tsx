@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { EmptyState, LoadingPanel } from '@/app/components/StatePanel';
+import { LoadingPanel } from '@/app/components/StatePanel';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import {
   buildOfficialDocumentApprovalContent,
@@ -283,6 +284,87 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
   const receivedCount = docs.filter((d) => d.is_received).length;
   const unreceivedCount = docs.length - receivedCount;
 
+  const docColumns = useMemo((): Column<OfficialDoc>[] => [
+    {
+      key: 'title',
+      label: '제목',
+      primary: true,
+      render: (doc) => (
+        <span className="block max-w-xs truncate font-bold text-[var(--foreground)]">{doc.title}</span>
+      ),
+    },
+    {
+      key: 'sent_date',
+      label: '발송일',
+      render: (doc) => <span className="font-bold text-[var(--foreground)]">{doc.sent_date ?? '—'}</span>,
+    },
+    {
+      key: 'doc_number',
+      label: '문서번호',
+      render: (doc) => doc.doc_number || '—',
+    },
+    {
+      key: 'recipient',
+      label: '수신처',
+      render: (doc) => doc.recipient ?? '—',
+    },
+    {
+      key: 'manager',
+      label: '담당자',
+      render: (doc) => doc.manager || '—',
+    },
+    {
+      key: 'is_received',
+      label: '수신확인',
+      render: (doc) => (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            void handleToggleReceived(doc);
+          }}
+          className={`rounded-lg px-2 py-1 text-[10px] font-extrabold transition-all ${doc.is_received ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-orange-500/20 text-orange-700 hover:bg-orange-200'}`}
+        >
+          {doc.is_received ? '✓ 확인' : '미확인'}
+        </button>
+      ),
+    },
+    {
+      key: 'note',
+      label: '비고',
+      showOnMobile: false,
+      render: (doc) => (
+        <span className="block max-w-[200px] truncate text-[var(--toss-gray-3)]">{doc.note || '—'}</span>
+      ),
+    },
+    {
+      key: '__actions',
+      label: '',
+      render: (doc) => (
+        <div className="flex gap-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              openEdit(doc);
+            }}
+            className="rounded-lg bg-blue-500/10 px-2 py-1 text-[10px] font-bold text-[var(--accent)] transition-colors hover:bg-blue-500/20"
+          >
+            수정
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (doc.id !== undefined) void handleDelete(doc.id);
+            }}
+            className="rounded-lg bg-red-500/10 px-2 py-1 text-[10px] font-bold text-red-500 transition-colors hover:bg-red-500/20"
+          >
+            삭제
+          </button>
+        </div>
+      ),
+    },
+  ], [handleToggleReceived, openEdit, handleDelete]);
+
   return (
     <div className="space-y-4 p-4 md:p-4">
       {dialog}
@@ -485,56 +567,19 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
         <span className="text-xs text-[var(--toss-gray-3)]">{displayDocs.length}건 표시</span>
       </div>
 
-      <div className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)]">
+      <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)]">
         {loading ? (
           <div className="p-4">
             <LoadingPanel title="공문 발송 기록을 불러오는 중입니다" />
           </div>
-        ) : displayDocs.length === 0 ? (
-          <div className="p-4">
-            <EmptyState
-              title="공문 발송 기록이 없습니다"
-              description="전자결재 승인 후 최종 반영된 공문 발송 이력이 이곳에 표시됩니다."
-              compact
-            />
-          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-[var(--muted)]">
-                <tr>
-                  {['발송일', '문서번호', '제목', '수신처', '담당자', '수신확인', '비고', ''].map((header) => (
-                    <th key={header} className="whitespace-nowrap px-4 py-2 text-left font-bold text-[var(--toss-gray-4)]">{header}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border)]">
-                {displayDocs.map((doc) => (
-                  <tr key={doc.id} className="transition-colors hover:bg-[var(--muted)]/50">
-                    <td className="whitespace-nowrap px-4 py-2 font-bold text-[var(--foreground)]">{doc.sent_date}</td>
-                    <td className="whitespace-nowrap px-4 py-2 text-[var(--toss-gray-4)]">{doc.doc_number || '-'}</td>
-                    <td className="max-w-xs truncate px-4 py-2 font-bold text-[var(--foreground)]">{doc.title}</td>
-                    <td className="whitespace-nowrap px-4 py-2 text-[var(--toss-gray-4)]">{doc.recipient}</td>
-                    <td className="whitespace-nowrap px-4 py-2 text-[var(--toss-gray-4)]">{doc.manager || '-'}</td>
-                    <td className="px-4 py-2">
-                      <button
-                        onClick={() => handleToggleReceived(doc)}
-                        className={`rounded-lg px-2 py-1 text-[10px] font-extrabold transition-all ${doc.is_received ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-orange-500/20 text-orange-700 hover:bg-orange-200'}`}
-                      >
-                        {doc.is_received ? '✓ 확인' : '미확인'}
-                      </button>
-                    </td>
-                    <td className="max-w-[200px] truncate px-4 py-3 text-[var(--toss-gray-3)]">{doc.note || '-'}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1">
-                        <button onClick={() => openEdit(doc)} className="rounded-lg bg-blue-500/10 px-2 py-1 text-[10px] font-bold text-[var(--accent)] transition-colors hover:bg-blue-500/20">수정</button>
-                        <button onClick={() => handleDelete(doc.id!)} className="rounded-lg bg-red-500/10 px-2 py-1 text-[10px] font-bold text-red-500 transition-colors hover:bg-red-500/20">삭제</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="p-2 md:p-0">
+            <ResponsiveTable<OfficialDoc>
+              columns={docColumns}
+              rows={displayDocs}
+              keyField="id"
+              emptyMessage="공문 발송 기록이 없습니다."
+            />
           </div>
         )}
       </div>

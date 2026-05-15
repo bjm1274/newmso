@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EmptyState, LoadingPanel, StatePanel } from '@/app/components/StatePanel';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { formatWon } from '@/lib/date-formatter';
 import { supabase } from '@/lib/supabase';
@@ -199,6 +200,62 @@ export default function InventoryClosingManagement({
   const currentSummary = useMemo(() => summarize(snapshotItems), [snapshotItems]);
   const selectedSnapshot = snapshots.find((snapshot) => snapshot.id === selectedSnapshotId) || snapshots[0] || null;
   const selectedItems = Array.isArray(selectedSnapshot?.items) ? selectedSnapshot.items : [];
+  const selectedItemRows = useMemo(
+    () =>
+      selectedItems.slice(0, 80).map((item, index) => ({
+        ...item,
+        _rowKey: `${item.item_id ?? item.item_name}-${index}`,
+      })),
+    [selectedItems],
+  );
+  type SnapshotItemRow = SnapshotItem & { _rowKey: string };
+  const snapshotColumns = useMemo<Column<SnapshotItemRow>[]>(
+    () => [
+      {
+        key: 'item_name',
+        label: '품목',
+        primary: true,
+        render: (row) => (
+          <>
+            <p className="font-black text-[var(--foreground)]">{row.item_name}</p>
+            <p className="text-[10px] text-[var(--toss-gray-3)]">{row.category} · {row.company}</p>
+          </>
+        ),
+      },
+      {
+        key: 'location',
+        label: '위치/LOT',
+        render: (row) => (
+          <div className="text-[var(--toss-gray-3)]">
+            <p>{row.location}</p>
+            <p className="text-[10px]">{row.lot_number || 'LOT 미등록'}</p>
+          </div>
+        ),
+      },
+      {
+        key: 'quantity',
+        label: '수량',
+        align: 'right',
+        render: (row) => <span className="tabular-nums">{row.quantity.toLocaleString('ko-KR')}</span>,
+      },
+      {
+        key: 'unit_price',
+        label: '단가',
+        align: 'right',
+        showOnMobile: false,
+        render: (row) => <span className="tabular-nums">{formatWon(Math.round(row.unit_price))}</span>,
+      },
+      {
+        key: 'stock_value',
+        label: '재고금액',
+        align: 'right',
+        render: (row) => (
+          <span className="tabular-nums font-black text-[var(--accent)]">{formatWon(Math.round(row.stock_value))}</span>
+        ),
+      },
+    ],
+    [],
+  );
   const previousSnapshot = selectedSnapshot
     ? snapshots.find((snapshot) => snapshot.id !== selectedSnapshot.id && String(snapshot.closing_month || '') < String(selectedSnapshot.closing_month || ''))
     : null;
@@ -419,35 +476,13 @@ export default function InventoryClosingManagement({
                 />
               </div>
 
-              <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-[var(--muted)] text-[var(--toss-gray-3)]">
-                    <tr>
-                      <th className="px-3 py-2">품목</th>
-                      <th className="px-3 py-2">위치/LOT</th>
-                      <th className="px-3 py-2 text-right">수량</th>
-                      <th className="px-3 py-2 text-right">단가</th>
-                      <th className="px-3 py-2 text-right">재고금액</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedItems.slice(0, 80).map((item, index) => (
-                      <tr key={`${item.item_id || item.item_name}-${index}`} className="border-t border-[var(--border)]">
-                        <td className="px-3 py-2 min-w-[180px]">
-                          <p className="font-black text-[var(--foreground)]">{item.item_name}</p>
-                          <p className="text-[10px] text-[var(--toss-gray-3)]">{item.category} · {item.company}</p>
-                        </td>
-                        <td className="px-3 py-2 min-w-[160px] text-[var(--toss-gray-3)]">
-                          <p>{item.location}</p>
-                          <p className="text-[10px]">{item.lot_number || 'LOT 미등록'}</p>
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">{item.quantity.toLocaleString('ko-KR')}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatWon(Math.round(item.unit_price))}</td>
-                        <td className="px-3 py-2 text-right font-black tabular-nums text-[var(--accent)]">{formatWon(Math.round(item.stock_value))}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="rounded-[var(--radius-md)] border border-[var(--border)] p-2">
+                <ResponsiveTable<SnapshotItemRow>
+                  columns={snapshotColumns}
+                  rows={selectedItemRows}
+                  keyField="_rowKey"
+                  emptyMessage="마감 품목이 없습니다."
+                />
               </div>
               {selectedItems.length > 80 && (
                 <p className="text-center text-xs font-bold text-[var(--toss-gray-3)]">상위 80개 표시 중 (전체 {selectedItems.length}개)</p>
