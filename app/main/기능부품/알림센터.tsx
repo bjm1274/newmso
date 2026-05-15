@@ -6,12 +6,14 @@ import {
   AtSign,
   Bell,
   BellOff,
+  Check,
   ClipboardList,
   Clock,
   FileText,
   GraduationCap,
   MessageCircle,
   Package,
+  Trash2,
   Users,
   Wallet,
   type LucideIcon,
@@ -25,6 +27,8 @@ import {
 } from '@/lib/notification-metadata';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { toNotificationText, timeAgo } from '@/lib/notification-utils';
+import { SwipeableCard, type SwipeAction } from '@/app/components/SwipeableCard';
+import { useIsMobile } from '@/app/components/useIsMobile';
 
 // 알림 타입별 Lucide 아이콘 매핑 — 이모지 대신 사용해 플랫폼 간 렌더 차이 제거 (P2-3, T-006)
 const TYPE_CFG: Record<string, { Icon: LucideIcon; color: string; label: string }> = {
@@ -58,6 +62,7 @@ export default function NotificationCenter({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const prevCountRef = useRef(0);
+  const isMobile = useIsMobile();
   const normalizedUser = useMemo(
     () => normalizeStaffLike((user ?? {}) as Record<string, unknown>),
     [user]
@@ -210,6 +215,27 @@ export default function NotificationCenter({
     }
   }, []);
 
+  const deleteNotification = useCallback(async (id: string) => {
+    // 낙관적 업데이트 — 실패 시 다음 fetch에서 복구된다(JM3)
+    let wasUnread = false;
+    setNotifications((prev) => {
+      const target = prev.find((notification) => notification.id === id);
+      wasUnread = !!target && !target.read_at;
+      return prev.filter((notification) => notification.id !== id);
+    });
+    if (wasUnread) {
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    }
+    try {
+      await supabase.from('notifications').delete().eq('id', id);
+    } catch (err) {
+      console.warn('[notification-center] delete failed', err);
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('erp-notification-read'));
+    }
+  }, []);
+
   const openNotificationTarget = useCallback((notification: any) => {
     const target = resolveNotificationTarget(
       notification.type,
@@ -330,15 +356,8 @@ export default function NotificationCenter({
                     {unread.map((notification) => {
                       const cfg = getTypeCfg(notification.type);
                       const TypeIcon = cfg.Icon;
-                      return (
-                        <button
-                          key={notification.id}
-                          type="button"
-                          data-testid={`notification-item-${notification.id}`}
-                          onClick={() => handleNotiClick(notification)}
-                          className="w-full text-left px-4 py-2.5 flex gap-3 hover:bg-[var(--muted)] transition-colors duration-100 border-b border-[var(--border-subtle)] last:border-0"
-                          style={{ background: 'rgba(37,99,235,0.03)' }}
-                        >
+                      const itemContent = (
+                        <div className="flex gap-3 w-full text-left">
                           <TypeIcon
                             className={`h-[18px] w-[18px] shrink-0 mt-0.5 ${cfg.color}`}
                             strokeWidth={1.8}
@@ -363,6 +382,61 @@ export default function NotificationCenter({
                             )}
                           </div>
                           <span className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full shrink-0 mt-1.5" />
+                        </div>
+                      );
+
+                      if (isMobile) {
+                        const leftActions: SwipeAction[] = [{
+                          id: 'mark-read',
+                          label: '읽음',
+                          icon: <Check className="w-4 h-4" />,
+                          tone: 'ok',
+                          onTrigger: () => { void markAsRead(notification.id); },
+                        }];
+                        const rightActions: SwipeAction[] = [{
+                          id: 'delete',
+                          label: '삭제',
+                          icon: <Trash2 className="w-4 h-4" />,
+                          tone: 'danger',
+                          onTrigger: () => { void deleteNotification(notification.id); },
+                        }];
+                        return (
+                          <SwipeableCard
+                            key={notification.id}
+                            leftActions={leftActions}
+                            rightActions={rightActions}
+                            className="border-b border-[var(--border-subtle)] last:border-0 rounded-none"
+                          >
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              data-testid={`notification-item-${notification.id}`}
+                              onClick={() => handleNotiClick(notification)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  handleNotiClick(notification);
+                                }
+                              }}
+                              className="px-4 py-2.5 hover:bg-[var(--muted)] transition-colors duration-100 cursor-pointer touch-manipulation"
+                              style={{ background: 'rgba(37,99,235,0.03)' }}
+                            >
+                              {itemContent}
+                            </div>
+                          </SwipeableCard>
+                        );
+                      }
+
+                      return (
+                        <button
+                          key={notification.id}
+                          type="button"
+                          data-testid={`notification-item-${notification.id}`}
+                          onClick={() => handleNotiClick(notification)}
+                          className="w-full text-left px-4 py-2.5 hover:bg-[var(--muted)] transition-colors duration-100 border-b border-[var(--border-subtle)] last:border-0"
+                          style={{ background: 'rgba(37,99,235,0.03)' }}
+                        >
+                          {itemContent}
                         </button>
                       );
                     })}
@@ -381,14 +455,8 @@ export default function NotificationCenter({
                     {read.map((notification) => {
                       const cfg = getTypeCfg(notification.type);
                       const TypeIcon = cfg.Icon;
-                      return (
-                        <button
-                          key={notification.id}
-                          type="button"
-                          data-testid={`notification-item-${notification.id}`}
-                          onClick={() => handleNotiClick(notification)}
-                          className="w-full text-left px-4 py-2.5 flex gap-3 hover:bg-[var(--muted)] transition-colors duration-100 border-b border-[var(--border-subtle)] opacity-55 last:border-0"
-                        >
+                      const itemContent = (
+                        <div className="flex gap-3 w-full text-left">
                           <TypeIcon
                             className={`h-4 w-4 shrink-0 mt-0.5 ${cfg.color}`}
                             strokeWidth={1.8}
@@ -409,6 +477,51 @@ export default function NotificationCenter({
                               </p>
                             )}
                           </div>
+                        </div>
+                      );
+
+                      if (isMobile) {
+                        const rightActions: SwipeAction[] = [{
+                          id: 'delete',
+                          label: '삭제',
+                          icon: <Trash2 className="w-4 h-4" />,
+                          tone: 'danger',
+                          onTrigger: () => { void deleteNotification(notification.id); },
+                        }];
+                        return (
+                          <SwipeableCard
+                            key={notification.id}
+                            rightActions={rightActions}
+                            className="border-b border-[var(--border-subtle)] last:border-0 rounded-none opacity-55"
+                          >
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              data-testid={`notification-item-${notification.id}`}
+                              onClick={() => handleNotiClick(notification)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  handleNotiClick(notification);
+                                }
+                              }}
+                              className="px-4 py-2.5 hover:bg-[var(--muted)] transition-colors duration-100 cursor-pointer touch-manipulation"
+                            >
+                              {itemContent}
+                            </div>
+                          </SwipeableCard>
+                        );
+                      }
+
+                      return (
+                        <button
+                          key={notification.id}
+                          type="button"
+                          data-testid={`notification-item-${notification.id}`}
+                          onClick={() => handleNotiClick(notification)}
+                          className="w-full text-left px-4 py-2.5 hover:bg-[var(--muted)] transition-colors duration-100 border-b border-[var(--border-subtle)] opacity-55 last:border-0"
+                        >
+                          {itemContent}
                         </button>
                       );
                     })}
