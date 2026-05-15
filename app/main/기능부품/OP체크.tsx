@@ -4,6 +4,8 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import { createPortal } from 'react-dom';
 import { EmptyState } from '@/app/components/StatePanel';
 import { useActionDialog } from '@/app/components/useActionDialog';
+import { useIsMobile } from '@/app/components/useIsMobile';
+import OpCheckMobileBoard from './OP체크/모바일보드';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
 import {
@@ -163,6 +165,7 @@ export default function OperationCheckView({
   title?: string;
 }) {
   const { dialog, openConfirm } = useActionDialog();
+  const isMobile = useIsMobile();
   const allowEmbeddedTemplateSettings = viewMode !== 'templates';
   const [activeTab, setActiveTab] = useState<OpCheckViewMode>(
     viewMode === 'templates' ? 'templates' : 'patients',
@@ -2703,6 +2706,21 @@ export default function OperationCheckView({
         <p className="mt-2 text-xs font-semibold text-amber-700">
           수술일정표 연동과 환자별 체크 저장을 위해 새 테이블이 먼저 생성되어야 합니다.
         </p>
+      </div>
+    );
+  }
+
+  // 모바일 + 환자 체크 모드: 경량 모바일 보드 시범 적용
+  // (템플릿 편집 모드는 모바일에서도 데스크톱 워크스페이스를 그대로 사용)
+  if (isMobile && activeTab === 'patients') {
+    return (
+      <div data-testid="op-check-view" className="h-full">
+        {dialog}
+        <OpCheckMobileBoard
+          date={selectedDate}
+          companyId={selectedCompanyId ?? null}
+          onSelectSchedule={(scheduleId) => setSelectedScheduleId(scheduleId)}
+        />
       </div>
     );
   }
