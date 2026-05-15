@@ -1,7 +1,8 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { useActionDialog } from '@/app/components/useActionDialog';
-import { useState, useEffect, useRef } from 'react';
+import { CameraInput } from '@/app/components/CameraInput';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 
@@ -87,7 +88,6 @@ export default function SealManager({ user, selectedCo }: Props) {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [previewSeal, setPreviewSeal] = useState<Seal | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const fetchSeals = async () => {
     setLoading(true);
@@ -115,8 +115,8 @@ export default function SealManager({ user, selectedCo }: Props) {
 
   useEffect(() => { fetchSeals(); }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFilesSelected = (files: File[]) => {
+    const file = files[0];
     if (!file) return;
     setImageFile(file);
     const reader = new FileReader();
@@ -250,8 +250,13 @@ export default function SealManager({ user, selectedCo }: Props) {
           </div>
           <div>
             <label className="text-[11px] font-bold text-[var(--toss-gray-4)] block mb-1">직인 이미지 (PNG, 투명 배경 권장)</label>
-            <input ref={fileRef} type="file" accept="image/png,image/jpeg" onChange={handleFileChange} className="hidden" />
-            <button onClick={() => fileRef.current?.click()} className="px-3 py-2 bg-[var(--muted)] text-xs font-bold rounded-[var(--radius-md)] border border-[var(--border)] hover:bg-[var(--toss-gray-2)]">파일 선택</button>
+            <CameraInput
+              accept="image/png,image/jpeg"
+              compress={false}
+              onFiles={handleFilesSelected}
+              label="파일 선택"
+              ariaLabel="직인 이미지 파일 선택"
+            />
             {imagePreview && <img src={imagePreview} alt="직인 미리보기" className="mt-2 h-20 border border-[var(--border)] rounded-[var(--radius-md)] p-1" />}
           </div>
           <div className="flex gap-2">
