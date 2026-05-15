@@ -250,56 +250,71 @@ export default function ContractAutoGenerator({ staffs, selectedCo, user }: Prop
         <h3 className="text-sm font-bold text-[var(--foreground)]">계약 정보 입력</h3>
 
         {/* 직원 선택 */}
-        <div>
-          <label className="text-xs font-bold text-[var(--toss-gray-4)] block mb-1">직원 선택 (자동 입력)</label>
+        <div className="flex flex-col md:flex-row md:items-center md:gap-3">
+          <label
+            htmlFor="contract-staff-select"
+            className="text-xs font-bold text-[var(--toss-gray-4)] block mb-1 md:mb-0 md:w-32 md:shrink-0"
+          >
+            직원 선택 (자동 입력)
+          </label>
           <select
+            id="contract-staff-select"
             onChange={(e) => handleStaffSelect(e.target.value)}
             data-testid="contract-generator-staff-select"
-            className="w-full sm:w-64 px-3 py-2 text-sm border border-[var(--border)] rounded-xl bg-[var(--card)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+            className="w-full md:w-64 px-3 py-2 text-sm border border-[var(--border)] rounded-xl bg-[var(--card)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
           >
             <option value="">-- 직원 선택하면 자동 입력 --</option>
             {filtered.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.position || '직위 없음'})</option>)}
           </select>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
           {[
-            { label: '성명', field: 'staff_name', placeholder: '홍길동' },
+            { label: '성명', field: 'staff_name', placeholder: '홍길동', required: true },
             { label: '직위/직책', field: 'position', placeholder: '팀장' },
             { label: '소속 부서', field: 'department', placeholder: '간호부' },
             { label: '회사명 (갑)', field: 'company_name', placeholder: '박철홍정형외과' },
             { label: '대표자', field: 'representative', placeholder: '박철홍' },
             { label: '근무 장소', field: 'work_location', placeholder: '서울시 강남구...' },
             { label: '급여/보수 (원)', field: 'salary', placeholder: '3000000', type: 'number' },
-            { label: '계약 시작일', field: 'start_date', type: 'date' },
+            { label: '계약 시작일', field: 'start_date', type: 'date', required: true },
             { label: '계약 종료일', field: 'end_date', type: 'date' },
-          ].map(({ label, field, placeholder, type = 'text' }) => (
-            <div key={field}>
-              <label className="text-xs font-bold text-[var(--toss-gray-4)] block mb-1">{label}</label>
-              <input
-                type={type}
-                value={(form as any)[field]}
-                onChange={(e) => setField(field as keyof ContractForm, e.target.value)}
-                data-testid={`contract-generator-field-${field}`}
-                placeholder={placeholder}
-                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-xl bg-[var(--card)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
-              />
-            </div>
-          ))}
-          <div>
-            <label className="text-xs font-bold text-[var(--toss-gray-4)] block mb-1">근무 시간</label>
-            <input
-              type="text"
-              value={form.work_hours}
-              onChange={(e) => setField('work_hours', e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-xl bg-[var(--card)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
-            />
-          </div>
+            { label: '근무 시간', field: 'work_hours', placeholder: '09:00~18:00' },
+          ].map(({ label, field, placeholder, type = 'text', required = false }) => {
+            const inputId = `contract-field-${field}`;
+            return (
+              <div key={field} className="flex flex-col md:flex-row md:items-center md:gap-3">
+                <label
+                  htmlFor={inputId}
+                  className="text-xs font-bold text-[var(--toss-gray-4)] block mb-1 md:mb-0 md:w-28 md:shrink-0"
+                >
+                  {label}
+                  {required && <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>}
+                </label>
+                <input
+                  id={inputId}
+                  type={type}
+                  value={(form as any)[field]}
+                  onChange={(e) => setField(field as keyof ContractForm, e.target.value)}
+                  data-testid={`contract-generator-field-${field}`}
+                  placeholder={placeholder}
+                  aria-required={required || undefined}
+                  className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-xl bg-[var(--card)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                />
+              </div>
+            );
+          })}
         </div>
 
-        <div>
-          <label className="text-xs font-bold text-[var(--toss-gray-4)] block mb-1">특약 사항</label>
+        <div className="flex flex-col md:flex-row md:gap-3">
+          <label
+            htmlFor="contract-field-note"
+            className="text-xs font-bold text-[var(--toss-gray-4)] block mb-1 md:mb-0 md:w-28 md:pt-2 md:shrink-0"
+          >
+            특약 사항
+          </label>
           <textarea
+            id="contract-field-note"
             value={form.note}
             onChange={(e) => setField('note', e.target.value)}
             rows={3}
