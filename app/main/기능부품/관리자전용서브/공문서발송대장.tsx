@@ -407,17 +407,22 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
           <h3 className="text-sm font-bold text-[var(--accent)]">{editingDoc ? '공문 대장 수정' : '공문 발송 승인 상신'}</h3>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
             <div>
-              <label className="mb-1 block text-xs font-bold text-[var(--toss-gray-4)]">발송 예정일 *</label>
+              <label htmlFor="official-doc-sent-date" className="mb-1 block text-xs font-bold text-[var(--toss-gray-4)]">
+                발송 예정일 <span className="text-red-500" aria-hidden>*</span>
+              </label>
               <input
+                id="official-doc-sent-date"
                 type="date"
+                aria-required="true"
                 value={form.sent_date ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, sent_date: e.target.value }))}
                 className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-bold text-[var(--toss-gray-4)]">문서번호</label>
+              <label htmlFor="official-doc-number" className="mb-1 block text-xs font-bold text-[var(--toss-gray-4)]">문서번호</label>
               <input
+                id="official-doc-number"
                 type="text"
                 value={form.doc_number ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, doc_number: e.target.value }))}
@@ -426,19 +431,27 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-bold text-[var(--toss-gray-4)]">수신처 *</label>
+              <label htmlFor="official-doc-recipient" className="mb-1 block text-xs font-bold text-[var(--toss-gray-4)]">
+                수신처 <span className="text-red-500" aria-hidden>*</span>
+              </label>
               <input
+                id="official-doc-recipient"
                 type="text"
+                aria-required="true"
                 value={form.recipient ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, recipient: e.target.value }))}
                 placeholder="예: 보건복지부"
                 className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
               />
             </div>
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-xs font-bold text-[var(--toss-gray-4)]">제목 *</label>
+            <div className="sm:col-span-2 md:col-span-3">
+              <label htmlFor="official-doc-title" className="mb-1 block text-xs font-bold text-[var(--toss-gray-4)]">
+                제목 <span className="text-red-500" aria-hidden>*</span>
+              </label>
               <input
+                id="official-doc-title"
                 type="text"
+                aria-required="true"
                 value={form.title ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
                 placeholder="공문서 제목 입력"
@@ -446,8 +459,9 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-bold text-[var(--toss-gray-4)]">담당자</label>
+              <label htmlFor="official-doc-manager" className="mb-1 block text-xs font-bold text-[var(--toss-gray-4)]">담당자</label>
               <input
+                id="official-doc-manager"
                 type="text"
                 value={form.manager ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, manager: e.target.value }))}
@@ -456,8 +470,9 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-bold text-[var(--toss-gray-4)]">비고</label>
+              <label htmlFor="official-doc-note" className="mb-1 block text-xs font-bold text-[var(--toss-gray-4)]">비고</label>
               <input
+                id="official-doc-note"
                 type="text"
                 value={form.note ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))}
@@ -465,7 +480,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
                 className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
               />
             </div>
-            <div className="flex items-center gap-3 pt-6">
+            <div className="flex items-center gap-3 sm:pt-6">
               <label className="flex cursor-pointer items-center gap-2">
                 <input
                   type="checkbox"
@@ -480,6 +495,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
           </div>
           <div className="flex gap-2">
             <button
+              type="button"
               onClick={handleSave}
               disabled={saving}
               className="rounded-[var(--radius-md)] bg-[var(--accent)] px-5 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
@@ -487,6 +503,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user, onOpenAp
               {editingDoc ? (saving ? '저장 중...' : '저장') : '전자결재 작성하기'}
             </button>
             <button
+              type="button"
               onClick={() => {
                 setShowForm(false);
                 setEditingDoc(null);

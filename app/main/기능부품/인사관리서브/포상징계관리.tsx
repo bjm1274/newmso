@@ -206,26 +206,61 @@ export default function RewardDisciplineManagement({ staffs = [], selectedCo, us
                     <form onSubmit={handleSubmit} className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm space-y-4 animate-in slide-in-from-top-4">
                         <h3 className="text-sm font-bold text-[var(--foreground)]">{activeTab === '포상' ? '🏅 포상 등록' : '⚖️ 징계 등록'}</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <select value={form.staff_id} onChange={e => setForm({ ...form, staff_id: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required>
-                                <option value="">직원 선택</option>
-                                {filtered.map((s) => <option key={s.id as string} value={s.id as string}>{s.name as string} ({(s.department as string) || '미배정'})</option>)}
-                            </select>
-                            <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required>
-                                <option value="">유형 선택</option>
-                                {(activeTab === '포상' ? REWARD_TYPES : DISCIPLINE_TYPES).map(t => <option key={t} value={t}>{t}</option>)}
-                            </select>
-                            <SmartDatePicker value={form.date} onChange={val => setForm({ ...form, date: val })} inputClassName="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" />
-                            <input type="text" value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} placeholder="사유" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" required />
-                            <textarea value={form.detail} onChange={e => setForm({ ...form, detail: e.target.value })} placeholder="상세 내용" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)] resize-none h-20" />
-                            {activeTab === '포상' && <input type="number" value={form.amount || ''} onChange={e => setForm({ ...form, amount: Number(e.target.value) })} placeholder="포상금(원)" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />}
+                            <div className="flex flex-col gap-1">
+                                <label htmlFor="reward-staff" className="text-[10px] font-bold text-[var(--toss-gray-3)]">
+                                    직원 <span className="text-red-500" aria-hidden>*</span>
+                                </label>
+                                <select id="reward-staff" aria-required="true" value={form.staff_id} onChange={e => setForm({ ...form, staff_id: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required>
+                                    <option value="">직원 선택</option>
+                                    {filtered.map((s) => <option key={s.id as string} value={s.id as string}>{s.name as string} ({(s.department as string) || '미배정'})</option>)}
+                                </select>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label htmlFor="reward-type" className="text-[10px] font-bold text-[var(--toss-gray-3)]">
+                                    유형 <span className="text-red-500" aria-hidden>*</span>
+                                </label>
+                                <select id="reward-type" aria-required="true" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required>
+                                    <option value="">유형 선택</option>
+                                    {(activeTab === '포상' ? REWARD_TYPES : DISCIPLINE_TYPES).map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-[var(--toss-gray-3)]">발생일</label>
+                                <SmartDatePicker value={form.date} onChange={val => setForm({ ...form, date: val })} inputClassName="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label htmlFor="reward-reason" className="text-[10px] font-bold text-[var(--toss-gray-3)]">
+                                    사유 <span className="text-red-500" aria-hidden>*</span>
+                                </label>
+                                <input id="reward-reason" aria-required="true" type="text" value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} placeholder="사유" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" required />
+                            </div>
+                            <div className="flex flex-col gap-1 md:col-span-2">
+                                <label htmlFor="reward-detail" className="text-[10px] font-bold text-[var(--toss-gray-3)]">상세 내용</label>
+                                <textarea id="reward-detail" value={form.detail} onChange={e => setForm({ ...form, detail: e.target.value })} placeholder="상세 내용" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)] resize-none h-20" />
+                            </div>
+                            {activeTab === '포상' && (
+                                <div className="flex flex-col gap-1">
+                                    <label htmlFor="reward-amount" className="text-[10px] font-bold text-[var(--toss-gray-3)]">포상금(원)</label>
+                                    <input id="reward-amount" type="number" value={form.amount || ''} onChange={e => setForm({ ...form, amount: Number(e.target.value) })} placeholder="포상금(원)" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />
+                                </div>
+                            )}
                         </div>
                         {activeTab === '징계' && (
                             <div className="p-4 bg-[var(--tab-bg)] rounded-xl border border-[var(--border)] space-y-3">
                                 <p className="text-[10px] font-bold text-[var(--toss-gray-4)]">징계위원회 정보 (해당 시)</p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                    <SmartDatePicker value={form.committee_date} onChange={val => setForm({ ...form, committee_date: val })} inputClassName="px-3 py-2 text-[11px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] outline-none" />
-                                    <input type="text" value={form.committee_members} onChange={e => setForm({ ...form, committee_members: e.target.value })} placeholder="위원 (쉼표 구분)" className="px-3 py-2 text-[11px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] outline-none placeholder:text-[var(--toss-gray-3)]" />
-                                    <input type="text" value={form.committee_result} onChange={e => setForm({ ...form, committee_result: e.target.value })} placeholder="심의 결과" className="px-3 py-2 text-[11px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] outline-none placeholder:text-[var(--toss-gray-3)]" />
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-[var(--toss-gray-3)]">위원회 일시</label>
+                                        <SmartDatePicker value={form.committee_date} onChange={val => setForm({ ...form, committee_date: val })} inputClassName="px-3 py-2 text-[11px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] outline-none" />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <label htmlFor="committee-members" className="text-[10px] font-bold text-[var(--toss-gray-3)]">위원</label>
+                                        <input id="committee-members" type="text" value={form.committee_members} onChange={e => setForm({ ...form, committee_members: e.target.value })} placeholder="위원 (쉼표 구분)" className="px-3 py-2 text-[11px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] outline-none placeholder:text-[var(--toss-gray-3)]" />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <label htmlFor="committee-result" className="text-[10px] font-bold text-[var(--toss-gray-3)]">심의 결과</label>
+                                        <input id="committee-result" type="text" value={form.committee_result} onChange={e => setForm({ ...form, committee_result: e.target.value })} placeholder="심의 결과" className="px-3 py-2 text-[11px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] outline-none placeholder:text-[var(--toss-gray-3)]" />
+                                    </div>
                                 </div>
                             </div>
                         )}

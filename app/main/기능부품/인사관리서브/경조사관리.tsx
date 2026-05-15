@@ -183,22 +183,43 @@ export default function CongratulationsCondolences({ staffs = [], selectedCo }: 
                     <form onSubmit={handleSubmit} className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm space-y-4 animate-in slide-in-from-top-4">
                         <h3 className="text-sm font-bold text-[var(--foreground)]">경조사 등록</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <select value={form.staff_id} onChange={e => setForm({ ...form, staff_id: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required>
-                                <option value="">직원 선택</option>
-                                {filtered.map((s) => <option key={s.id as string} value={s.id as string}>{s.name as string} ({(s.department as string) || '미배정'})</option>)}
-                            </select>
-                            <select value={form.event_type} onChange={e => setForm({ ...form, event_type: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none">
-                                {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                            </select>
-                            <SmartDatePicker value={form.event_date} onChange={val => setForm({ ...form, event_date: val })} inputClassName="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" />
                             <div className="flex flex-col gap-1">
-                                <input type="number" value={form.amount || ''} onChange={e => setForm({ ...form, amount: Number(e.target.value) })} placeholder="경조금 (원)" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />
+                                <label htmlFor="congrats-staff" className="text-[10px] font-bold text-[var(--toss-gray-3)]">
+                                    직원 <span className="text-red-500" aria-hidden>*</span>
+                                </label>
+                                <select id="congrats-staff" aria-required="true" value={form.staff_id} onChange={e => setForm({ ...form, staff_id: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required>
+                                    <option value="">직원 선택</option>
+                                    {filtered.map((s) => <option key={s.id as string} value={s.id as string}>{s.name as string} ({(s.department as string) || '미배정'})</option>)}
+                                </select>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label htmlFor="congrats-event-type" className="text-[10px] font-bold text-[var(--toss-gray-3)]">경조 유형</label>
+                                <select id="congrats-event-type" value={form.event_type} onChange={e => setForm({ ...form, event_type: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none">
+                                    {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-[var(--toss-gray-3)]">발생일</label>
+                                <SmartDatePicker value={form.event_date} onChange={val => setForm({ ...form, event_date: val })} inputClassName="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label htmlFor="congrats-amount" className="text-[10px] font-bold text-[var(--toss-gray-3)]">경조금 (원)</label>
+                                <input id="congrats-amount" type="number" value={form.amount || ''} onChange={e => setForm({ ...form, amount: Number(e.target.value) })} placeholder="경조금 (원)" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />
                                 <p className="text-[9px] text-[var(--toss-gray-3)] font-bold ml-1">가이드: {AMOUNT_GUIDE[form.event_type] || '—'}원</p>
                             </div>
-                            <input type="text" value={form.relation} onChange={e => setForm({ ...form, relation: e.target.value })} placeholder="관계 (본인/부모/배우자 등)" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />
-                            <input type="text" value={form.recipient} onChange={e => setForm({ ...form, recipient: e.target.value })} placeholder="대상자명" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />
-                            <input type="text" value={form.memo} onChange={e => setForm({ ...form, memo: e.target.value })} placeholder="비고" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />
-                            <label className="flex items-center gap-2 text-[11px] font-bold text-[var(--foreground)]">
+                            <div className="flex flex-col gap-1">
+                                <label htmlFor="congrats-relation" className="text-[10px] font-bold text-[var(--toss-gray-3)]">관계</label>
+                                <input id="congrats-relation" type="text" value={form.relation} onChange={e => setForm({ ...form, relation: e.target.value })} placeholder="관계 (본인/부모/배우자 등)" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label htmlFor="congrats-recipient" className="text-[10px] font-bold text-[var(--toss-gray-3)]">대상자명</label>
+                                <input id="congrats-recipient" type="text" value={form.recipient} onChange={e => setForm({ ...form, recipient: e.target.value })} placeholder="대상자명" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label htmlFor="congrats-memo" className="text-[10px] font-bold text-[var(--toss-gray-3)]">비고</label>
+                                <input id="congrats-memo" type="text" value={form.memo} onChange={e => setForm({ ...form, memo: e.target.value })} placeholder="비고" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />
+                            </div>
+                            <label className="flex items-center gap-2 text-[11px] font-bold text-[var(--foreground)] md:pt-6">
                                 <input type="checkbox" checked={form.wreath_sent} onChange={e => setForm({ ...form, wreath_sent: e.target.checked })} className="rounded" /> 화환/조화 발송
                             </label>
                         </div>
