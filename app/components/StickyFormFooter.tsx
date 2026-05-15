@@ -28,6 +28,7 @@
  */
 
 import React from 'react';
+import { useVisualViewportOffset } from '../hooks/useVisualViewportOffset';
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 
@@ -59,12 +60,18 @@ export default function StickyFormFooter({
 }: StickyFormFooterProps) {
   const footerClass = ['sticky-form-footer', className].filter(Boolean).join(' ');
 
+  // 모바일 키보드(IME) 가 떴을 때, fixed 푸터를 visual viewport 안으로 끌어올린다.
+  // 데스크톱(min-width:768px)에서는 position:static 이므로 transform이 시각적으로 무해.
+  const kbOffset = useVisualViewportOffset();
+  const footerStyle: React.CSSProperties | undefined =
+    kbOffset > 0 ? { transform: `translateY(-${kbOffset}px)` } : undefined;
+
   return (
     <>
       {/* 고정 푸터가 본문 콘텐츠를 가리지 않도록 모바일에서만 높이를 확보 */}
       {withSpacer && <div className="sticky-form-footer-spacer" aria-hidden="true" />}
 
-      <footer className={footerClass} aria-label="폼 액션">
+      <footer className={footerClass} style={footerStyle} aria-label="폼 액션">
         <div className="flex items-center justify-between gap-3">
           {/* 좌측: secondary 액션 */}
           <div className="flex items-center gap-2 flex-shrink-0">
