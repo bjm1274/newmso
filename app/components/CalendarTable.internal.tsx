@@ -15,6 +15,7 @@ import type {
   CalendarCellInfo,
   CalendarCellTone,
   CalendarRow,
+  CalendarSortState,
 } from './CalendarTable.types';
 
 // ---------------------------------------------------------------------------
@@ -42,6 +43,10 @@ type MonthGridViewProps<R> = {
   cellTone?: (cell: CalendarCellInfo, row?: CalendarRow<R>) => CalendarCellTone;
   ariaLabel?: string;
   className?: string;
+  /** 행 헤더 정렬 토글 허용 (현 month-grid 구현은 헤더 자체에 정렬 UI가 없으므로 props만 전파) */
+  sortableRowHeader?: boolean;
+  sort?: CalendarSortState;
+  onSortChange?: (sort: CalendarSortState) => void;
 };
 
 export function MonthGridView<R>({
@@ -52,8 +57,20 @@ export function MonthGridView<R>({
   cellTone,
   ariaLabel,
   className,
+  sortableRowHeader,
+  sort,
+  onSortChange,
 }: MonthGridViewProps<R>) {
   const dayLabels = weekStartsOn === 1 ? DAY_LABELS_MON : DAY_LABELS_SUN;
+  // 정렬 토글 헬퍼 (sortableRowHeader가 켜져 있고 onSortChange가 있을 때만 동작)
+  const handleSortToggle = (key: CalendarSortState['key']) => {
+    if (!sortableRowHeader || !onSortChange) return;
+    const cur = sort?.key === key ? sort : null;
+    const nextDir: CalendarSortState['dir'] = cur?.dir === 'asc' ? 'desc' : 'asc';
+    onSortChange({ key, dir: nextDir });
+  };
+  // month-grid는 행 헤더가 없어 현재 호출만 보존 (lint 회피)
+  void handleSortToggle;
   const firstDow = dates[0].getDay();
   const leadingBlanks = (firstDow - weekStartsOn + 7) % 7;
   const lastDow = dates[dates.length - 1].getDay();
@@ -122,6 +139,10 @@ type StaffByDayViewProps<R> = {
   rowHeaderLabel: ReactNode;
   ariaLabel?: string;
   className?: string;
+  /** 셀 드래그 페인팅 (데스크톱 한정). 모바일 칩은 호출자가 키보드/클릭 대안을 renderCell 내부에 둔다. */
+  onCellPointerDown?: (cell: CalendarCellInfo, row?: CalendarRow<R>) => void;
+  onCellPointerEnter?: (cell: CalendarCellInfo, row?: CalendarRow<R>) => void;
+  onCellPointerUp?: () => void;
 };
 
 export function StaffByDayView<R>({
@@ -133,7 +154,11 @@ export function StaffByDayView<R>({
   rowHeaderLabel,
   ariaLabel,
   className,
+  onCellPointerDown,
+  onCellPointerEnter,
+  onCellPointerUp,
 }: StaffByDayViewProps<R>) {
+  const isPaintable = Boolean(onCellPointerDown || onCellPointerEnter || onCellPointerUp);
   return (
     <div className={className}>
       {/* ===== 데스크톱 ===== */}
@@ -184,7 +209,23 @@ export function StaffByDayView<R>({
                     <td
                       key={d.getTime()}
                       role="gridcell"
-                      className={['p-1 text-center align-middle border', toneClass[tone]].join(' ')}
+                      className={[
+                        'p-1 text-center align-middle border',
+                        toneClass[tone],
+                        isPaintable ? 'cursor-pointer select-none' : '',
+                      ].join(' ')}
+                      onMouseDown={
+                        onCellPointerDown ? () => onCellPointerDown(info, row) : undefined
+                      }
+                      onMouseEnter={
+                        onCellPointerEnter
+                          ? (e) => {
+                              // 드래그 중(주 버튼 누른 상태)에만 페인팅 위임
+                              if (e.buttons === 1) onCellPointerEnter(info, row);
+                            }
+                          : undefined
+                      }
+                      onMouseUp={onCellPointerUp ? () => onCellPointerUp() : undefined}
                     >
                       {renderCell(info, row)}
                     </td>

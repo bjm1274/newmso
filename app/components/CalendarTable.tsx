@@ -32,6 +32,9 @@ export type {
   CalendarCellInfo,
   CalendarCellTone,
   CalendarRow,
+  CalendarSortDir,
+  CalendarSortKey,
+  CalendarSortState,
   CalendarTableMode,
   CalendarTableProps,
 } from './CalendarTable.types';
@@ -91,6 +94,12 @@ export function CalendarTable<R>({
   ariaLabel,
   emptyMessage = '표시할 데이터가 없습니다.',
   className = '',
+  onCellPointerDown,
+  onCellPointerEnter,
+  onCellPointerUp,
+  sortableRowHeader,
+  sort,
+  onSortChange,
 }: CalendarTableProps<R>) {
   const today = startOfDay(new Date());
   const holidaySet = new Set((holidays ?? []).map((d) => startOfDay(d).getTime()));
@@ -116,6 +125,9 @@ export function CalendarTable<R>({
         cellTone={cellTone}
         ariaLabel={ariaLabel}
         className={className}
+        sortableRowHeader={sortableRowHeader}
+        sort={sort}
+        onSortChange={onSortChange}
       />
     );
   }
@@ -138,6 +150,9 @@ export function CalendarTable<R>({
       rowHeaderLabel={rowHeaderLabel}
       ariaLabel={ariaLabel}
       className={className}
+      onCellPointerDown={onCellPointerDown}
+      onCellPointerEnter={onCellPointerEnter}
+      onCellPointerUp={onCellPointerUp}
     />
   );
 }
