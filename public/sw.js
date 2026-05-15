@@ -1,4 +1,4 @@
-// SW_VERSION: 2026-04-07-v2
+// SW_VERSION: 2026-05-15-v1-deep-link
 importScripts('/push-notification-shared.js');
 
 // 새 버전 배포 시 즉시 구 SW를 교체 (탭 닫기 불필요)
