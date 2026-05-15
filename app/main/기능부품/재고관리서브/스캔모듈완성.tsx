@@ -199,10 +199,12 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
 
         {/* 스캐너 입력 영역 */}
         <div className="mb-3 p-3 bg-[var(--muted)] rounded-[var(--radius-md)] border border-dashed border-[var(--border)]">
-          <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] mb-2 block">
-            스캐너 입력창
+          <label htmlFor="scan-module-code-input" className="text-[11px] font-semibold text-[var(--toss-gray-4)] mb-2 block">
+            스캐너 입력창 <span className="text-red-500" aria-hidden>*</span>
           </label>
           <input
+            id="scan-module-code-input"
+            aria-required="true"
             ref={inputRef}
             value={codeInput}
             onChange={e => setCodeInput(e.target.value)}

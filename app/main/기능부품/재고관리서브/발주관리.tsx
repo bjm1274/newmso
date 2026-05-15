@@ -490,19 +490,23 @@ export default function PurchaseOrderManagement({
                   {order.sourceType === 'purchase_order' && (
                     <div className="flex flex-wrap items-center gap-2 mt-2">
                       {editingDeliveryDateId === order.id ? (
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label htmlFor={`delivery-date-${order.id}`} className="sr-only">입고 예정일</label>
                           <input
+                            id={`delivery-date-${order.id}`}
                             type="date"
                             value={deliveryDateInput}
                             onChange={(e) => setDeliveryDateInput(e.target.value)}
                             className="border border-[var(--border)] rounded-[var(--radius-md)] px-2 py-1 text-[11px] bg-[var(--card)] text-[var(--foreground)]"
                           />
                           <button
+                            type="button"
                             onClick={() => handleSaveDeliveryDate(order.id)}
                             disabled={savingDeliveryDate}
                             className="px-2 py-1 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-[11px] font-semibold disabled:opacity-50"
                           >{savingDeliveryDate ? '저장 중...' : '저장'}</button>
                           <button
+                            type="button"
                             onClick={() => setEditingDeliveryDateId(null)}
                             className="px-2 py-1 bg-[var(--muted)] text-[var(--toss-gray-3)] rounded-[var(--radius-md)] text-[11px]"
                           >취소</button>

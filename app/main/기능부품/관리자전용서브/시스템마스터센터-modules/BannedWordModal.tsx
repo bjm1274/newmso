@@ -43,42 +43,48 @@ export function BannedWordModal({ onClose }: { onClose: () => void }) {
   return (
     <>
       {dialog}
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="banned-word-modal-title"
           className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm w-full max-w-md p-5"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold text-[var(--foreground)]">🔍 단어 필터</h3>
-            <button onClick={onClose} className="text-[var(--toss-gray-3)] hover:text-[var(--foreground)] text-lg">×</button>
+            <h3 id="banned-word-modal-title" className="text-sm font-bold text-[var(--foreground)]">단어 필터</h3>
+            <button type="button" onClick={onClose} aria-label="닫기" className="text-[var(--toss-gray-3)] hover:text-[var(--foreground)] text-lg">×</button>
           </div>
-          <div className="flex gap-2 mb-3">
+          <div className="flex flex-col sm:flex-row gap-2 mb-3">
+            <label htmlFor="banned-word-input" className="sr-only">금지어 입력</label>
             <input
+              id="banned-word-input"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && add()}
               placeholder="금지어 입력 후 Enter"
               className="flex-1 px-3 py-1.5 text-sm border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--page-bg)] text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
             />
-            <button onClick={add} className="px-3 py-1.5 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)]">추가</button>
+            <button type="button" onClick={add} className="px-3 py-1.5 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)]">추가</button>
           </div>
           <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto mb-4 p-2 bg-[var(--page-bg)] rounded-[var(--radius-md)] border border-[var(--border)]">
             {words.length === 0 && <p className="text-xs text-[var(--toss-gray-3)]">등록된 금지어 없음</p>}
             {words.map((w) => (
               <span key={w} className="inline-flex items-center gap-1 px-2 py-0.5 bg-danger/20 text-danger text-xs font-semibold rounded-full">
                 {w}
-                <button onClick={() => remove(w)} className="hover:opacity-70 font-bold">×</button>
+                <button type="button" onClick={() => remove(w)} aria-label={`${w} 삭제`} className="hover:opacity-70 font-bold">×</button>
               </span>
             ))}
           </div>
-          <div className="flex gap-2 justify-end">
+          <div className="flex flex-col sm:flex-row gap-2 justify-end">
             <button
+              type="button"
               onClick={reset}
               className="px-3 py-1.5 text-xs text-[var(--toss-gray-3)] border border-[var(--border)] rounded-[var(--radius-md)] hover:bg-[var(--muted)]"
             >
               기본값으로 초기화
             </button>
-            <button onClick={onClose} className="px-3 py-1.5 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)]">확인</button>
+            <button type="button" onClick={onClose} className="px-3 py-1.5 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)]">확인</button>
           </div>
         </div>
       </div>

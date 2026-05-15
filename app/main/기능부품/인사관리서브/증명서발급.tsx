@@ -368,11 +368,16 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
         <div className="space-y-4">
           <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
             <div className="space-y-4">
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">
-                  1. 발급 직원
-                </span>
+              <div>
+                <label
+                  htmlFor="certificate-staff-select"
+                  className="mb-1 block text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]"
+                >
+                  1. 발급 직원 <span className="text-red-500" aria-hidden>*</span>
+                </label>
                 <select
+                  id="certificate-staff-select"
+                  aria-required="true"
                   value={(selectedStaff?.id as string) || ''}
                   onChange={(event) => setSelectedStaff(filteredStaffs.find((staff: any) => staff.id === event.target.value) || null)}
                   className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
@@ -384,20 +389,24 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
                     </option>
                   ))}
                 </select>
-              </label>
+              </div>
 
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">
+              <div>
+                <label
+                  htmlFor="certificate-purpose-input"
+                  className="mb-1 block text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]"
+                >
                   2. 제출 용도
-                </span>
+                </label>
                 <input
+                  id="certificate-purpose-input"
                   type="text"
                   value={purpose}
                   onChange={(event) => setPurpose(event.target.value)}
                   className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                   placeholder="예: 금융기관 제출용"
                 />
-              </label>
+              </div>
             </div>
 
             <div className="mt-4">

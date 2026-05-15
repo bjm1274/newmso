@@ -835,6 +835,8 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
         <div className="shrink-0 border-t border-[var(--border)] px-2 py-2 md:sticky md:bottom-0 md:z-10 md:bg-[var(--card)] md:px-3">
           <div className="flex gap-1.5 md:flex-col md:gap-1.5">
             <select
+              id="hr-company-select"
+              aria-label="사업체 선택"
               data-testid="hr-company-select"
               value={선택사업체}
               onChange={(event) => 사업체설정(event.target.value)}
@@ -847,6 +849,8 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
               ))}
             </select>
             <select
+              id="hr-status-select"
+              aria-label="직원 상태 필터"
               data-testid="hr-status-select"
               value={직원상태필터}
               onChange={(event) => 직원상태필터설정(event.target.value as StaffStatus)}

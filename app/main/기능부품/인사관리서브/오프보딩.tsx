@@ -625,36 +625,56 @@ export default function OffboardingView({
                   퇴사 예정일을 설정하면 계정 회수와 정산 체크리스트가 함께 열립니다.
                 </p>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                  <select
-                    data-testid="offboarding-staff-select"
-                    value={selectedStaff}
-                    onChange={(event) => setSelectedStaff(event.target.value)}
-                    className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
-                  >
-                    <option value="">대상 직원 선택</option>
-                    {eligibleStaffs.map((staff) => (
-                      <option key={staff.id} value={String(staff.id)}>
-                        {staff.name} ({staff.department || '부서 미지정'} / {staff.company})
-                      </option>
-                    ))}
-                  </select>
-                  <SmartDatePicker
-                    data-testid="offboarding-date-input"
-                    value={exitDate}
-                    onChange={setExitDate}
-                    inputClassName="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
-                  />
-                  <select
-                    data-testid="offboarding-reason-select"
-                    value={reason}
-                    onChange={(event) => setReason(event.target.value)}
-                    className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
-                  >
-                    <option value="개인 사유">개인 사유</option>
-                    <option value="권고사직">권고사직</option>
-                    <option value="계약만료">계약만료</option>
-                    <option value="조직개편">조직개편</option>
-                  </select>
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="offboarding-staff-select" className="text-[11px] font-bold text-slate-300">
+                      대상 직원 <span className="text-red-400" aria-hidden>*</span>
+                    </label>
+                    <select
+                      id="offboarding-staff-select"
+                      aria-required="true"
+                      data-testid="offboarding-staff-select"
+                      value={selectedStaff}
+                      onChange={(event) => setSelectedStaff(event.target.value)}
+                      className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                    >
+                      <option value="">대상 직원 선택</option>
+                      {eligibleStaffs.map((staff) => (
+                        <option key={staff.id} value={String(staff.id)}>
+                          {staff.name} ({staff.department || '부서 미지정'} / {staff.company})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="offboarding-date-input" className="text-[11px] font-bold text-slate-300">
+                      퇴사 예정일 <span className="text-red-400" aria-hidden>*</span>
+                    </label>
+                    <SmartDatePicker
+                      id="offboarding-date-input"
+                      aria-required="true"
+                      data-testid="offboarding-date-input"
+                      value={exitDate}
+                      onChange={setExitDate}
+                      inputClassName="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="offboarding-reason-select" className="text-[11px] font-bold text-slate-300">
+                      퇴사 사유
+                    </label>
+                    <select
+                      id="offboarding-reason-select"
+                      data-testid="offboarding-reason-select"
+                      value={reason}
+                      onChange={(event) => setReason(event.target.value)}
+                      className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                    >
+                      <option value="개인 사유">개인 사유</option>
+                      <option value="권고사직">권고사직</option>
+                      <option value="계약만료">계약만료</option>
+                      <option value="조직개편">조직개편</option>
+                    </select>
+                  </div>
                 </div>
               </div>
               <button
