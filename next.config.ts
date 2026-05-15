@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { createRequire } from "module";
 
 const r2PublicBaseUrl = (
   process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL ||
@@ -68,4 +69,32 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+/**
+ * Bundle analyzer — `ANALYZE=true npm run build` 로 활성화.
+ * `@next/bundle-analyzer` 패키지가 설치되지 않은 환경(CI 등)에서도 빌드가
+ * 깨지지 않도록 require 실패를 graceful 하게 처리한다 (JM3).
+ */
+type BundleAnalyzerWrapper = (config: NextConfig) => NextConfig;
+
+function loadBundleAnalyzer(): BundleAnalyzerWrapper {
+  if (process.env.ANALYZE !== 'true') {
+    return (config) => config;
+  }
+  try {
+    const require = createRequire(import.meta.url);
+    const bundleAnalyzer = require('@next/bundle-analyzer') as (
+      options: { enabled: boolean }
+    ) => BundleAnalyzerWrapper;
+    return bundleAnalyzer({ enabled: true });
+  } catch {
+    console.warn(
+      '[next.config] ANALYZE=true 가 설정되었지만 @next/bundle-analyzer 가 설치되지 않아 분석을 건너뜁니다. ' +
+        'npm install --save-dev @next/bundle-analyzer 후 다시 시도하세요.'
+    );
+    return (config) => config;
+  }
+}
+
+const withBundleAnalyzer = loadBundleAnalyzer();
+
+export default withBundleAnalyzer(nextConfig);

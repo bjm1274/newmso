@@ -1,7 +1,9 @@
 'use client';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
+import dynamic from 'next/dynamic';
 import { useState, useEffect, useMemo } from 'react';
+import PageSkeleton from '@/app/components/PageSkeleton';
 import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { supabase } from '@/lib/supabase';
@@ -13,7 +15,11 @@ import PayrollTable from './급여명세/급여대장표';
 import InterimSettlement from './급여명세/중간정산';
 import DailyWorkerSettlement from './급여명세/일용근로정산';
 import PayrollLockPanel from './급여명세/급여월마감잠금';
-import YearEndSettlement from './급여명세/연말정산';
+// 연말정산은 659줄로 진입 빈도가 낮은 탭에서만 사용되므로 dynamic import 적용 (JM2)
+const YearEndSettlement = dynamic(() => import('./급여명세/연말정산'), {
+  ssr: false,
+  loading: () => <PageSkeleton label="연말정산" rows={4} />,
+});
 import SalarySettlement from './급여명세/급여정산';
 import SeveranceCalculator from './급여명세/퇴직금계산기';
 import PayrollEmailSender from './급여명세/급여명세서발송';
@@ -29,7 +35,16 @@ import RetirementPensionManager from './급여명세/퇴직연금관리';
 import WagePeakCalculator from './급여명세/임금피크제';
 import OrdinaryWageCalculator from './급여명세/통상임금계산기';
 import UnpaidAllowanceAlert from './급여명세/미지급수당알림';
-import PayrollAdvancedCenter from './급여명세/급여고도화센터';
+/**
+ * PayrollAdvancedCenter (급여고도화센터) 는 1200줄+ 의 대형 컴포넌트로 화면 진입
+ * 시 초기 번들에서 분리하기 위해 dynamic import 로 로딩한다. (JM2)
+ * - ssr: false 로 클라이언트 측에서만 로드해 초기 페이로드 절감.
+ * - 로딩 중에는 PageSkeleton 으로 시각적 자리표시 (JM6 reduced-motion 가드 포함).
+ */
+const PayrollAdvancedCenter = dynamic(() => import('./급여명세/급여고도화센터'), {
+  ssr: false,
+  loading: () => <PageSkeleton label="급여 고도화" rows={5} />,
+});
 import UnpaidAbsenceDeduction from './급여명세/무급결근차감';
 
 type Staff = StaffMember & {
