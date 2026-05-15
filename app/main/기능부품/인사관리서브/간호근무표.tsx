@@ -3,6 +3,7 @@ import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { isActiveStaff } from '@/lib/active-staff';
+import { MatrixTable, type MatrixColumn, type MatrixCellTone } from '@/app/components/MatrixTable';
 
 // ─────────────────────── 타입 ───────────────────────
 type StaffMember = {
@@ -97,33 +98,44 @@ function ShiftBlock({
   const r = role ?? 'OFF';
   const meta = ROLE_META[r];
   const hasViolation = (violations?.length ?? 0) > 0;
+  const violationLabel = hasViolation
+    ? violations?.map(v => v === 'N_THEN_D' ? 'N→D 위반' : '연속야간 위반').join(', ')
+    : '';
+  const ariaLabel = `${meta.label}${hasViolation ? ` (${violationLabel})` : ''}${editMode ? ' - 클릭하여 변경' : ''}`;
+  const baseFocus = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1';
 
   if (r === 'OFF') {
     return (
-      <div
+      <button
+        type="button"
         onClick={onClick}
-        title={hasViolation ? violations?.map(v => v === 'N_THEN_D' ? 'N→D 위반' : '연속야간 위반').join(', ') : ''}
-        className={`w-8 h-9 rounded-md flex items-center justify-center mx-auto
-          ${editMode ? 'cursor-pointer hover:bg-[var(--muted)] transition-colors' : ''}
+        disabled={!editMode}
+        aria-label={ariaLabel}
+        title={hasViolation ? violationLabel : ''}
+        className={`w-8 h-9 rounded-md flex items-center justify-center mx-auto ${baseFocus}
+          ${editMode ? 'cursor-pointer hover:bg-[var(--muted)] transition-colors' : 'cursor-default'}
           ${hasViolation ? 'ring-2 ring-red-500' : ''}`}
       >
         <span className="text-[9px] text-[var(--toss-gray-3)] font-bold">—</span>
-      </div>
+      </button>
     );
   }
 
   return (
-    <div
+    <button
+      type="button"
       onClick={onClick}
-      title={hasViolation ? violations?.map(v => v === 'N_THEN_D' ? 'N→D 위반' : '연속야간 위반').join(', ') : meta.label}
-      className={`w-8 h-9 rounded-md flex items-center justify-center mx-auto font-black text-[11px] tracking-tight
+      disabled={!editMode}
+      aria-label={ariaLabel}
+      title={hasViolation ? violationLabel : meta.label}
+      className={`w-8 h-9 rounded-md flex items-center justify-center mx-auto font-black text-[11px] tracking-tight ${baseFocus}
         ${meta.bg} ${meta.text}
-        ${editMode ? 'cursor-pointer hover:opacity-80 active:scale-95 transition-all' : ''}
+        ${editMode ? 'cursor-pointer hover:opacity-80 active:scale-95 transition-all' : 'cursor-default'}
         ${hasViolation ? 'ring-2 ring-red-500 ring-offset-1' : ''}
         shadow-sm`}
     >
       {meta.short}
-    </div>
+    </button>
   );
 }
 
@@ -136,9 +148,9 @@ export default function NurseSchedule({
   selectedCo: string;
   user?: unknown;
 }) {
-  const today = new Date();
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth() + 1);
+  const today = useMemo(() => new Date(), []);
+  const [year, setYear] = useState(() => today.getFullYear());
+  const [month, setMonth] = useState(() => today.getMonth() + 1);
   const [schedule, setSchedule] = useState<ScheduleMap>({});
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -264,7 +276,40 @@ export default function NurseSchedule({
     setYear(y); setMonth(m);
   };
 
-  const dayArr = Array.from({ length: days }, (_, i) => i + 1);
+  const dayArr = useMemo(() => Array.from({ length: days }, (_, i) => i + 1), [days]);
+
+  // ─────────────── MatrixTable 컬럼 (일자 동적) ───────────────
+  type DayCol = { day: number; dow: number; isSun: boolean; isSat: boolean; isToday: boolean };
+  const matrixColumns: MatrixColumn<DayCol>[] = useMemo(
+    () => dayArr.map((d) => {
+      const dow = getDayOfWeek(year, month, d);
+      const isSun = dow === 0;
+      const isSat = dow === 6;
+      const isToday = year === today.getFullYear()
+        && month === (today.getMonth() + 1)
+        && d === today.getDate();
+      return {
+        id: `day-${d}`,
+        label: (
+          <div className="flex flex-col items-center gap-0.5">
+            <span className={`text-[11px] font-black ${isToday ? 'text-[var(--accent)]' : ''}`}>{d}</span>
+            <span className={`text-[9px] font-bold ${isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'opacity-60'}`}>
+              {WEEKDAY_KO[dow]}
+            </span>
+          </div>
+        ),
+        shortLabel: `${d}일(${WEEKDAY_KO[dow]})`,
+        data: { day: d, dow, isSun, isSat, isToday },
+      };
+    }),
+    [year, month, days, dayArr, today]
+  );
+
+  const getCellTone = (sid: string, day: number): MatrixCellTone => {
+    const viols = violationMap[sid]?.[day];
+    if (viols && viols.length > 0) return 'danger';
+    return 'normal';
+  };
 
   return (
     <div className="h-full flex flex-col overflow-hidden relative">
@@ -370,7 +415,7 @@ export default function NurseSchedule({
         </div>
 
         {/* ── 스케줄 보드 ── */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto p-3">
           {visibleStaffs.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-4 text-[var(--toss-gray-3)]">
               <div className="text-6xl">🏥</div>
@@ -382,133 +427,97 @@ export default function NurseSchedule({
               <p className="text-sm">인사관리에서 직원의 부서와 근무유형을 확인하세요.</p>
             </div>
           ) : (
-            <table className="w-full border-collapse" style={{ minWidth: `${200 + days * 40}px` }}>
-              {/* 날짜 헤더 */}
-              <thead className="sticky top-0 z-20">
-                <tr className="bg-[var(--foreground)]">
-                  {/* 직원 열 */}
-                  <th className="sticky left-0 z-30 bg-[var(--foreground)] w-44 min-w-[176px] px-4 py-3 text-left text-[11px] font-black text-white/60 tracking-widest uppercase border-r border-white/10">
-                    직원
-                  </th>
-                  {dayArr.map(d => {
-                    const dow = getDayOfWeek(year, month, d);
-                    const isSun = dow === 0;
-                    const isSat = dow === 6;
-                    const isToday = year === today.getFullYear() && month === (today.getMonth() + 1) && d === today.getDate();
-                    return (
-                      <th key={d}
-                        className={`w-10 min-w-[40px] px-1 py-2 text-center border-r border-white/10
-                          ${isToday ? 'bg-[var(--accent)]' : isSun ? 'bg-red-900/40' : isSat ? 'bg-blue-900/20' : ''}`}
-                      >
-                        <div className="text-[11px] font-black text-white/90">{d}</div>
-                        <div className={`text-[9px] font-bold mt-0.5 ${isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-white/40'}`}>
-                          {WEEKDAY_KO[dow]}
-                        </div>
-                      </th>
-                    );
-                  })}
-                  {/* 통계 열들 */}
-                  <th className="px-2 py-3 text-center text-[10px] font-black text-white/50 min-w-[36px]">D</th>
-                  <th className="px-2 py-3 text-center text-[10px] font-black text-white/50 min-w-[36px]">E</th>
-                  <th className="px-2 py-3 text-center text-[10px] font-black text-white/50 min-w-[36px]">N</th>
-                  <th className="px-2 py-3 text-center text-[10px] font-black text-white/50 min-w-[44px]">합계</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {/* 직원 행들 */}
-                {visibleStaffs.map((staff, staffIdx) => {
+            <>
+              <MatrixTable<StaffMember, DayCol>
+                rows={visibleStaffs}
+                columns={matrixColumns}
+                rowKey={(staff) => String(staff.id)}
+                rowHeaderLabel="직원"
+                ariaLabel={`${year}년 ${month}월 ${dept} 근무표`}
+                minWidth={200 + days * 40}
+                cellTone={(staff, col) => getCellTone(String(staff.id), col.data.day)}
+                rowHeader={(staff) => (
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-[var(--accent)]/10 flex items-center justify-center shrink-0 text-[var(--accent)] font-black text-sm">
+                      {getInitials(staff.name)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-black text-[var(--foreground)] truncate leading-tight">{staff.name}</p>
+                      <p className="text-[10px] text-[var(--toss-gray-3)] font-bold truncate">{staff.position || '—'}</p>
+                    </div>
+                  </div>
+                )}
+                renderCell={(staff, col) => {
                   const sid = String(staff.id);
-                  const row = schedule[sid] ?? {};
-                  const violations = violationMap[sid] ?? {};
+                  const role = schedule[sid]?.[col.data.day] as ShiftRole | undefined;
+                  const viols = violationMap[sid]?.[col.data.day];
+                  return (
+                    <ShiftBlock
+                      role={role}
+                      violations={viols}
+                      editMode={editMode}
+                      onClick={() => cycleRole(sid, col.data.day)}
+                    />
+                  );
+                }}
+                rowSummary={(staff) => {
+                  const row = schedule[String(staff.id)] ?? {};
                   const counts = countRoles(row);
                   const totalHours = counts.D * 8 + counts.E * 8 + counts.N * 8;
                   const isOverwork = totalHours > 208;
-
                   return (
-                    <tr key={sid}
-                      className={`border-b border-[var(--border-subtle)] transition-colors
-                        ${staffIdx % 2 === 0 ? 'bg-[var(--card)]' : 'bg-[var(--tab-bg)]/40'}
-                        hover:bg-blue-50/40 dark:hover:bg-blue-950/20`}
-                    >
-                      {/* 직원 정보 */}
-                      <td className={`sticky left-0 z-10 border-r border-[var(--border-subtle)] px-3 py-2
-                        ${staffIdx % 2 === 0 ? 'bg-[var(--card)]' : 'bg-[var(--tab-bg)]/40'} transition-colors`}>
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-[var(--accent)]/10 flex items-center justify-center shrink-0 text-[var(--accent)] font-black text-sm">
-                            {getInitials(staff.name)}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-[12px] font-black text-[var(--foreground)] truncate leading-tight">{staff.name}</p>
-                            <p className="text-[10px] text-[var(--toss-gray-3)] font-bold truncate">{staff.position || '—'}</p>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* 날짜별 셀 */}
-                      {dayArr.map(d => {
-                        const role = row[d] as ShiftRole | undefined;
-                        const viols = violations[d];
-                        const dow = getDayOfWeek(year, month, d);
-                        const isWeekend = dow === 0 || dow === 6;
-                        return (
-                          <td key={d}
-                            className={`border-r border-[var(--border-subtle)] py-1 px-0.5
-                              ${isWeekend ? 'bg-red-50/30 dark:bg-red-950/10' : ''}`}
-                          >
-                            <ShiftBlock
-                              role={role}
-                              violations={viols}
-                              editMode={editMode}
-                              onClick={() => cycleRole(sid, d)}
-                            />
-                          </td>
-                        );
-                      })}
-
-                      {/* 통계 */}
-                      <td className="px-1 py-2 text-center">
-                        <span className="text-[11px] font-black text-sky-600">{counts.D}</span>
-                      </td>
-                      <td className="px-1 py-2 text-center">
-                        <span className="text-[11px] font-black text-amber-600">{counts.E}</span>
-                      </td>
-                      <td className="px-1 py-2 text-center">
-                        <span className="text-[11px] font-black text-indigo-600">{counts.N}</span>
-                      </td>
-                      <td className="px-2 py-2 text-center">
-                        <span className={`text-[11px] font-black ${isOverwork ? 'text-red-500 animate-pulse' : 'text-[var(--toss-gray-5)]'}`}>
-                          {totalHours}h
-                        </span>
-                      </td>
-                    </tr>
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-black">
+                      <span className="text-sky-600">D {counts.D}</span>
+                      <span className="text-amber-600">E {counts.E}</span>
+                      <span className="text-indigo-600">N {counts.N}</span>
+                      <span className={isOverwork ? 'text-red-500 animate-pulse' : 'text-[var(--toss-gray-5)]'}>
+                        {totalHours}h
+                      </span>
+                    </span>
                   );
-                })}
+                }}
+                rowSummaryLabel="D/E/N/시간"
+              />
 
-                {/* 일별 합계 행 */}
-                <tr className="sticky bottom-0 z-10 bg-[var(--foreground)] border-t-2 border-[var(--border)]">
-                  <td className="sticky left-0 z-20 bg-[var(--foreground)] px-3 py-2 border-r border-white/10">
-                    <span className="text-[10px] font-black text-white/60 tracking-widest uppercase">일별 인원</span>
-                  </td>
+              {/* ── 일별 인원 합계 (모바일=세로 카드 그리드 / 데스크톱=가로 스크롤) ── */}
+              <section
+                className="mt-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3"
+                aria-label="일별 D/E/N 인원 합계"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-[11px] font-black tracking-widest uppercase text-[var(--toss-gray-4)]">
+                    일별 인원 (D / E / N)
+                  </h3>
+                  {minViolationDays > 0 && (
+                    <span className="badge badge-red text-[10px]">최소 인원 미달 {minViolationDays}일</span>
+                  )}
+                </div>
+                <div className="grid grid-cols-7 sm:grid-cols-10 md:flex md:flex-nowrap md:overflow-x-auto gap-1.5">
                   {dayArr.map(d => {
                     const c = dayRoleCounts[d] ?? { D: 0, E: 0, N: 0, OFF: 0, LEAVE: 0, TRAINING: 0 };
                     const minV = minStaffViolations[d];
+                    const dow = getDayOfWeek(year, month, d);
+                    const isSun = dow === 0;
+                    const isSat = dow === 6;
                     return (
-                      <td key={d} className="border-r border-white/10 py-1 px-0.5">
-                        <div className="flex flex-col gap-0.5 items-center">
-                          <span className={`text-[9px] font-black w-6 text-center rounded ${minV?.D ? 'bg-red-500 text-white' : 'text-sky-400'}`}>{c.D}</span>
-                          <span className={`text-[9px] font-black w-6 text-center rounded ${minV?.E ? 'bg-red-500 text-white' : 'text-amber-400'}`}>{c.E}</span>
-                          <span className={`text-[9px] font-black w-6 text-center rounded ${minV?.N ? 'bg-red-500 text-white' : 'text-indigo-400'}`}>{c.N}</span>
+                      <div
+                        key={d}
+                        className="flex flex-col items-center shrink-0 min-w-[44px] px-1.5 py-1 rounded-[var(--radius-md)] border border-[var(--border)]"
+                      >
+                        <span className={`text-[10px] font-black ${isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-[var(--foreground)]'}`}>
+                          {d}({WEEKDAY_KO[dow]})
+                        </span>
+                        <div className="flex flex-col gap-0.5 items-center mt-0.5">
+                          <span className={`text-[9px] font-black w-7 text-center rounded ${minV?.D ? 'bg-red-500 text-white' : 'text-sky-600'}`}>{c.D}</span>
+                          <span className={`text-[9px] font-black w-7 text-center rounded ${minV?.E ? 'bg-red-500 text-white' : 'text-amber-600'}`}>{c.E}</span>
+                          <span className={`text-[9px] font-black w-7 text-center rounded ${minV?.N ? 'bg-red-500 text-white' : 'text-indigo-600'}`}>{c.N}</span>
                         </div>
-                      </td>
+                      </div>
                     );
                   })}
-                  <td colSpan={4} className="px-3 py-2 text-[10px] text-white/40 font-bold">
-                    D / E / N
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                </div>
+              </section>
+            </>
           )}
         </div>
       </div>
