@@ -1,12 +1,39 @@
 'use client';
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { EmptyState, LoadingPanel } from '@/app/components/StatePanel';
 import { supabase } from '@/lib/supabase';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
-} from 'recharts';
-// XLSX: dynamic import로 전환 (번들 사이즈 최적화)
+// recharts(차트)와 XLSX는 모두 dynamic import로 분리 — 번들 사이즈 최적화
+
+const ChartLoader = ({ height }: { height: number }) => (
+  <div
+    className="flex items-center justify-center text-xs text-[var(--toss-gray-3)]"
+    style={{ height }}
+  >
+    차트를 불러오는 중...
+  </div>
+);
+
+const HrBarChart = dynamic(
+  () => import('./charts/ReportCharts').then((m) => m.HrBarChart),
+  { ssr: false, loading: () => <ChartLoader height={220} /> },
+);
+const EmploymentPieChart = dynamic(
+  () => import('./charts/ReportCharts').then((m) => m.EmploymentPieChart),
+  { ssr: false, loading: () => <ChartLoader height={220} /> },
+);
+const SalaryBarChart = dynamic(
+  () => import('./charts/ReportCharts').then((m) => m.SalaryBarChart),
+  { ssr: false, loading: () => <ChartLoader height={260} /> },
+);
+const InventoryPieChart = dynamic(
+  () => import('./charts/ReportCharts').then((m) => m.InventoryPieChart),
+  { ssr: false, loading: () => <ChartLoader height={220} /> },
+);
+const InventoryBarChart = dynamic(
+  () => import('./charts/ReportCharts').then((m) => m.InventoryBarChart),
+  { ssr: false, loading: () => <ChartLoader height={220} /> },
+);
 
 type ReportTab = '인사현황' | '급여요약' | '재고현황';
 
@@ -19,7 +46,6 @@ interface StaffMember {
   [key: string]: unknown;
 }
 
-const PIE_COLORS = ['var(--accent)', 'var(--success, #34C759)', 'var(--warning, #FF9500)', 'var(--danger, #FF6B6B)', '#AF52DE', '#5AC8FA'];
 
 function ReportEmptyState({ description }: { description: string }) {
   return <EmptyState title="데이터가 없습니다" description={description} compact />;
@@ -204,19 +230,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
               {hrChartData.length === 0 ? (
                 <ReportEmptyState description="직원 소속 정보가 있으면 부서별 인원 분포가 표시됩니다." />
               ) : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={hrChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--toss-gray-3)' }} />
-                    <YAxis tick={{ fontSize: 11, fill: 'var(--toss-gray-3)' }} />
-                    <Tooltip
-                      formatter={(value: any) => [`${value || 0}명`]}
-                      contentStyle={{ borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)' }}
-                    />
-                    <Bar dataKey="regular" name="정규직" stackId="a" fill="#4F8EF7" radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="contract" name="계약직" stackId="a" fill="var(--warning, #FF9500)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <HrBarChart data={hrChartData} />
               )}
             </div>
 
@@ -226,30 +240,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
               {employmentPieData.length === 0 ? (
                 <ReportEmptyState description="직원 고용형태가 있으면 정규직/계약직 비율이 표시됩니다." />
               ) : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie
-                      data={employmentPieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={85}
-                      paddingAngle={3}
-                      dataKey="value"
-                      label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      labelLine={false}
-                    >
-                      {employmentPieData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value: any) => [`${value || 0}명`]}
-                      contentStyle={{ borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)' }}
-                    />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
+                <EmploymentPieChart data={employmentPieData} />
               )}
             </div>
           </div>
@@ -312,18 +303,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
             {salaryChartData.length === 0 ? (
               <ReportEmptyState description="직원 급여 정보가 있으면 부서별 인건비가 표시됩니다." />
             ) : (
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={salaryChartData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="dept" tick={{ fontSize: 12, fill: 'var(--toss-gray-3)' }} />
-                  <YAxis tickFormatter={(v: number) => `${(v / 10000).toFixed(0)}만`} tick={{ fontSize: 11, fill: 'var(--toss-gray-3)' }} />
-                  <Tooltip
-                    formatter={(value: any) => [`${(value || 0).toLocaleString()}원`, '인건비']}
-                    contentStyle={{ borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)' }}
-                  />
-                  <Bar dataKey="total" name="인건비" fill="#4F8EF7" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <SalaryBarChart data={salaryChartData} />
             )}
           </div>
 
@@ -392,28 +372,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
                   {inventoryChartData.length === 0 ? (
                     <ReportEmptyState description="재고 품목이 등록되면 카테고리별 품목 수가 표시됩니다." />
                   ) : (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <PieChart>
-                        <Pie
-                          data={inventoryChartData.map(d => ({ name: d.category, value: d.count }))}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={50}
-                          outerRadius={80}
-                          paddingAngle={3}
-                          dataKey="value"
-                        >
-                          {inventoryChartData.map((_, index) => (
-                            <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(value: any) => [`${value || 0}개`]}
-                          contentStyle={{ borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)' }}
-                        />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <InventoryPieChart data={inventoryChartData} />
                   )}
                 </div>
 
@@ -423,18 +382,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
                   {inventoryChartData.length === 0 ? (
                     <ReportEmptyState description="단가와 수량이 있는 재고 품목이 있으면 금액 분석이 표시됩니다." />
                   ) : (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={inventoryChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                        <XAxis dataKey="category" tick={{ fontSize: 11, fill: 'var(--toss-gray-3)' }} />
-                        <YAxis tickFormatter={(v: number) => `${(v / 10000).toFixed(0)}만`} tick={{ fontSize: 11, fill: 'var(--toss-gray-3)' }} />
-                        <Tooltip
-                          formatter={(value: any) => [`${(value || 0).toLocaleString()}원`, '재고 금액']}
-                          contentStyle={{ borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)' }}
-                        />
-                        <Bar dataKey="totalAmount" name="재고 금액" fill="var(--success, #34C759)" radius={[6, 6, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <InventoryBarChart data={inventoryChartData} />
                   )}
                 </div>
               </div>
