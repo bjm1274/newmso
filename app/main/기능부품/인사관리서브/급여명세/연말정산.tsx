@@ -1,7 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getPayrollGrossPay } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
 import { STAFF_BOOTSTRAP_SELECT } from '@/lib/staff-query-columns';
@@ -12,6 +12,24 @@ import {
   type TaxInsuranceRates,
 } from '@/lib/use-tax-insurance-rates';
 import { calculateEmployeeInsuranceDeductions } from '@/lib/payroll-insurance-rates';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
+
+type SettlementRow = {
+  staff_id: string;
+  staff_name: string;
+  staff_email: string;
+  total_salary: number;
+  total_tax_paid: number;
+  total_insurance: number;
+  monthly_count: number;
+  standard_deduction: number;
+  taxable_income: number;
+  calculated_tax: number;
+  tax_paid: number;
+  refund_or_additional: number;
+  settlement_status: string;
+  is_manual?: boolean;
+};
 
 interface YearEndSettlementProps {
   staffs?: unknown[];
@@ -247,6 +265,133 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: YearEndSe
 
   void legacySendCertificateEmail;
 
+  const settlementColumns = useMemo((): Column<SettlementRow>[] => [
+    {
+      key: 'staff_name',
+      label: '직원명',
+      primary: true,
+      render: (r) => (
+        <span className="font-medium text-[var(--foreground)]">
+          {r.staff_name}
+          {r.is_manual && <span className="ml-1 text-[9px] bg-[var(--tab-bg)] text-[var(--toss-gray-4)] px-1 rounded">수기</span>}
+        </span>
+      ),
+    },
+    {
+      key: 'total_salary',
+      label: '연간급여',
+      align: 'right',
+      render: (r) => `₩${r.total_salary.toLocaleString()}`,
+    },
+    {
+      key: 'standard_deduction',
+      label: '기본공제',
+      align: 'right',
+      showOnMobile: false,
+      render: (r) => `₩${r.standard_deduction.toLocaleString()}`,
+    },
+    {
+      key: 'taxable_income',
+      label: '과세표준',
+      align: 'right',
+      showOnMobile: false,
+      render: (r) => `₩${r.taxable_income.toLocaleString()}`,
+    },
+    {
+      key: 'calculated_tax',
+      label: '산출세액',
+      align: 'right',
+      render: (r) => `₩${r.calculated_tax.toLocaleString()}`,
+    },
+    {
+      key: 'tax_paid',
+      label: '기납부세액',
+      align: 'right',
+      showOnMobile: false,
+      render: (r) => `₩${r.tax_paid.toLocaleString()}`,
+    },
+    {
+      key: 'refund_or_additional',
+      label: '환급/추가',
+      align: 'right',
+      render: (r) => (
+        <span
+          className={
+            r.refund_or_additional > 0
+              ? 'font-semibold text-emerald-600'
+              : r.refund_or_additional < 0
+              ? 'font-semibold text-red-600'
+              : 'text-[var(--toss-gray-4)]'
+          }
+        >
+          ₩{Math.abs(r.refund_or_additional).toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      key: 'settlement_status',
+      label: '상태',
+      align: 'center',
+      render: (r) => (
+        <span
+          className={`inline-block px-2.5 py-0.5 rounded-md text-xs font-medium ${
+            r.settlement_status === '환급'
+              ? 'bg-emerald-100 text-emerald-700'
+              : r.settlement_status === '추가납부'
+              ? 'bg-red-100 text-red-700'
+              : 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
+          }`}
+        >
+          {r.settlement_status}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      label: '액션',
+      align: 'center',
+      render: (r) => (
+        <div className="flex items-center justify-center gap-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedStaff(r as unknown as Record<string, unknown>);
+              setShowCertificate(true);
+            }}
+            className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--accent)] rounded-md text-xs font-medium hover:opacity-90"
+          >
+            보기
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setManualForm({
+                staff_id: String(r.staff_id),
+                total_salary: r.total_salary,
+                tax_paid: r.tax_paid,
+                insurance: r.total_insurance || 0,
+                is_edit: true,
+              });
+              setShowManualModal(true);
+            }}
+            className="px-2 py-1 bg-amber-50 text-amber-600 border border-amber-100 rounded-md text-xs font-medium hover:bg-amber-100"
+          >
+            수정
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              downloadCertificate(r as unknown as Record<string, unknown>);
+            }}
+            className="px-2 py-1 bg-[var(--muted)] text-[var(--toss-gray-4)] rounded-md text-xs font-medium hover:opacity-90"
+          >
+            다운
+          </button>
+        </div>
+      ),
+    },
+  ], []);
+
   const sendCertificateEmail = async (staff: Record<string, unknown>) => {
     if (!staff?.staff_email) {
       toast('직원 이메일이 등록되지 않아 발송할 수 없습니다.', 'success');
@@ -389,98 +534,13 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: YearEndSe
           <h3 className="text-sm font-semibold text-[var(--foreground)]">연말정산 현황</h3>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead className="bg-[var(--tab-bg)] border-b border-[var(--border)]">
-              <tr>
-                <th className="px-4 py-2.5 text-left font-semibold text-[var(--foreground)]">직원명</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)]">연간급여</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)]">기본공제</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)]">과세표준</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)]">산출세액</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)]">기납부세액</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)]">환급/추가</th>
-                <th className="px-4 py-2.5 text-center font-semibold text-[var(--foreground)]">상태</th>
-                <th className="px-4 py-2.5 text-center font-semibold text-[var(--foreground)]">액션</th>
-              </tr>
-            </thead>
-            <tbody>
-              {settlementData.map((item) => (
-                <tr key={item.staff_id} className="border-b border-[var(--border)] hover:bg-[var(--page-bg)]">
-                  <td className="px-4 py-2.5 font-medium text-[var(--foreground)]">
-                    {item.staff_name}
-                    {item.is_manual && <span className="ml-1 text-[9px] bg-[var(--tab-bg)] text-[var(--toss-gray-4)] px-1 rounded">수기</span>}
-                  </td>
-                  <td className="px-4 py-2.5 text-right font-medium text-[var(--foreground)]">
-                    ₩{item.total_salary.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2.5 text-right text-[var(--toss-gray-4)]">
-                    ₩{item.standard_deduction.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2.5 text-right text-[var(--toss-gray-4)]">
-                    ₩{item.taxable_income.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2.5 text-right font-medium text-[var(--foreground)]">
-                    ₩{item.calculated_tax.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2.5 text-right text-[var(--toss-gray-4)]">
-                    ₩{item.tax_paid.toLocaleString()}
-                  </td>
-                  <td className={`px-4 py-2.5 text-right font-semibold ${item.refund_or_additional > 0 ? 'text-emerald-600' : item.refund_or_additional < 0 ? 'text-red-600' : 'text-[var(--toss-gray-4)]'
-                    }`}>
-                    ₩{Math.abs(item.refund_or_additional).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2.5 text-center">
-                    <span className={`px-2.5 py-0.5 rounded-md text-xs font-medium ${item.settlement_status === '환급'
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : item.settlement_status === '추가납부'
-                        ? 'bg-red-100 text-red-700'
-                        : 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
-                      }`}>
-                      {item.settlement_status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5 text-center space-x-1 flex items-center justify-center">
-                    <button
-                      onClick={() => {
-                        setSelectedStaff(item);
-                        setShowCertificate(true);
-                      }}
-                      className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--accent)] rounded-md text-xs font-medium hover:opacity-90"
-                    >
-                      보기
-                    </button>
-                    <button
-                      onClick={() => {
-                        setManualForm({
-                          staff_id: String(item.staff_id),
-                          total_salary: item.total_salary,
-                          tax_paid: item.tax_paid,
-                          insurance: item.total_insurance || 0,
-                          is_edit: true
-                        } as any);
-                        setShowManualModal(true);
-                      }}
-                      className="px-2 py-1 bg-amber-50 text-amber-600 border border-amber-100 rounded-md text-xs font-medium hover:bg-amber-100"
-                    >
-                      수정
-                    </button>
-                    <button
-                      onClick={() => downloadCertificate(item)}
-                      className="px-2 py-1 bg-[var(--muted)] text-[var(--toss-gray-4)] rounded-md text-xs font-medium hover:opacity-90"
-                    >
-                      다운
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {settlementData.length === 0 && (
-            <div className="py-20 text-center text-[var(--toss-gray-3)]">
-              해당 년도에 확정된 급여 데이터가 없습니다.
-            </div>
-          )}
+        <div className="p-2">
+          <ResponsiveTable<SettlementRow>
+            columns={settlementColumns}
+            rows={settlementData as SettlementRow[]}
+            keyField="staff_id"
+            emptyMessage="해당 년도에 확정된 급여 데이터가 없습니다."
+          />
         </div>
       </div>
 

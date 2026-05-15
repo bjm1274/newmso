@@ -9,6 +9,7 @@ import {
   getIndustrialAccidentInsuranceInfo,
 } from '@/lib/payroll-insurance-rates';
 import { supabase } from '@/lib/supabase';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 type Row = {
   id: string;
@@ -202,6 +203,75 @@ export default function InsuranceEDI({
     setGenerating(false);
   };
 
+  const columns = useMemo((): Column<Row>[] => [
+    {
+      key: 'name',
+      label: '성명',
+      primary: true,
+      render: (row) => <span className="font-semibold">{row.name}</span>,
+    },
+    {
+      key: 'position',
+      label: '직위',
+      showOnMobile: false,
+      render: (row) => row.position || '—',
+    },
+    {
+      key: 'base',
+      label: '보험기준금액',
+      align: 'right',
+      render: (row) => row.base.toLocaleString(),
+    },
+    {
+      key: 'nps',
+      label: '국민연금',
+      align: 'right',
+      render: (row) => row.nps.toLocaleString(),
+    },
+    {
+      key: 'hi',
+      label: '건강보험',
+      align: 'right',
+      render: (row) => row.hi.toLocaleString(),
+    },
+    {
+      key: 'lci',
+      label: '장기요양',
+      align: 'right',
+      showOnMobile: false,
+      render: (row) => row.lci.toLocaleString(),
+    },
+    {
+      key: 'ei',
+      label: '고용보험',
+      align: 'right',
+      render: (row) => row.ei.toLocaleString(),
+    },
+    {
+      key: 'wc',
+      label: '산재보험(사업주)',
+      align: 'right',
+      render: (row) => <span className="text-rose-600">{row.wc.toLocaleString()}</span>,
+    },
+    {
+      key: 'employeeTotal',
+      label: '근로자 부담',
+      align: 'right',
+      render: (row) => (
+        <span className="font-bold text-[var(--accent)]">{row.employeeTotal.toLocaleString()}</span>
+      ),
+    },
+    {
+      key: 'employerOnlyTotal',
+      label: '사업주 부담',
+      align: 'right',
+      showOnMobile: false,
+      render: (row) => (
+        <span className="font-bold text-rose-600">{row.employerOnlyTotal.toLocaleString()}</span>
+      ),
+    },
+  ], []);
+
   const rateCards = [
     {
       id: 'NPS',
@@ -304,78 +374,13 @@ export default function InsuranceEDI({
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left" style={{ minWidth: '980px' }}>
-            <thead className="border-b border-[var(--border)] bg-[var(--muted)]/60">
-              <tr>
-                {[
-                  '성명',
-                  '직위',
-                  '보험기준금액',
-                  '국민연금',
-                  '건강보험',
-                  '장기요양',
-                  '고용보험',
-                  '산재보험(사업주)',
-                  '근로자 부담',
-                  '사업주 부담',
-                ].map((header) => (
-                  <th
-                    key={header}
-                    className="whitespace-nowrap px-3 py-3 text-[10px] font-semibold text-[var(--toss-gray-3)]"
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={10} className="px-3 py-8 text-center text-sm text-[var(--toss-gray-3)]">
-                    불러오는 중입니다...
-                  </td>
-                </tr>
-              ) : rows.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="px-3 py-8 text-center text-sm text-[var(--toss-gray-3)]">
-                    확정된 급여 데이터가 없습니다.
-                  </td>
-                </tr>
-              ) : (
-                rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    data-testid={`insurance-edi-row-${row.id}`}
-                    className="border-b border-[var(--border-subtle)] last:border-0"
-                  >
-                    <td className="whitespace-nowrap px-3 py-3 text-sm font-semibold text-[var(--foreground)]">
-                      {row.name}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3 text-xs text-[var(--toss-gray-3)]">
-                      {row.position || '-'}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3 text-sm font-medium text-[var(--foreground)]">
-                      {row.base.toLocaleString()}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3 text-sm">{row.nps.toLocaleString()}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-sm">{row.hi.toLocaleString()}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-sm">{row.lci.toLocaleString()}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-sm">{row.ei.toLocaleString()}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-sm text-rose-600">{row.wc.toLocaleString()}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-sm font-bold text-[var(--accent)]">
-                      {row.employeeTotal.toLocaleString()}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3 text-sm font-bold text-rose-600">
-                      {row.employerOnlyTotal.toLocaleString()}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-2 shadow-sm">
+        <ResponsiveTable<Row>
+          columns={columns}
+          rows={rows}
+          keyField="id"
+          emptyMessage={loading ? '불러오는 중입니다...' : '확정된 급여 데이터가 없습니다.'}
+        />
       </div>
     </div>
   );

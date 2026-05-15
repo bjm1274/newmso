@@ -1,11 +1,28 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
+
+type TransferRow = {
+  id: string;
+  staff_id: string | number;
+  staff_name: string;
+  bank_name: string;
+  account_number: string;
+  account_holder: string;
+  salary_amount: number;
+  deduction_amount: number;
+  transfer_amount: number;
+  transfer_date: string | null;
+  transfer_status: string;
+  tax_amount: number;
+  insurance_amount: number;
+};
 
 export default function SalaryAutoTransfer() {
   const [staffList, setStaffList] = useState<any[]>([]);
-  const [transferData, setTransferData] = useState<any[]>([]);
+  const [transferData, setTransferData] = useState<TransferRow[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferStatus, setTransferStatus] = useState('대기');
@@ -107,6 +124,85 @@ export default function SalaryAutoTransfer() {
     return bankCodes[bankName] || '004';
   };
 
+  const rowsWithIndex = useMemo(
+    () => transferData.map((row, idx) => ({ ...row, _idx: idx + 1 })),
+    [transferData],
+  );
+
+  const columns = useMemo(
+    (): Column<TransferRow & { _idx: number }>[] => [
+      { key: '_idx', label: '순번', showOnMobile: false },
+      {
+        key: 'staff_name',
+        label: '직원명',
+        primary: true,
+        render: (row) => row.staff_name || '—',
+      },
+      {
+        key: 'bank_name',
+        label: '은행',
+        render: (row) => row.bank_name || '—',
+      },
+      {
+        key: 'account_number',
+        label: '계좌번호',
+        render: (row) => (
+          <span className="font-mono text-[var(--toss-gray-4)]">{row.account_number || '—'}</span>
+        ),
+      },
+      {
+        key: 'account_holder',
+        label: '예금주명',
+        showOnMobile: false,
+        render: (row) => row.account_holder || '—',
+      },
+      {
+        key: 'salary_amount',
+        label: '급여액',
+        align: 'right',
+        render: (row) => `₩${Number(row.salary_amount || 0).toLocaleString()}`,
+      },
+      {
+        key: 'deduction_amount',
+        label: '공제액',
+        align: 'right',
+        showOnMobile: false,
+        render: (row) => (
+          <span className="font-medium text-red-600">
+            ₩{Number(row.deduction_amount || 0).toLocaleString()}
+          </span>
+        ),
+      },
+      {
+        key: 'transfer_amount',
+        label: '이체액',
+        align: 'right',
+        render: (row) => (
+          <span className="font-semibold text-emerald-600">
+            ₩{Number(row.transfer_amount || 0).toLocaleString()}
+          </span>
+        ),
+      },
+      {
+        key: 'transfer_status',
+        label: '상태',
+        align: 'center',
+        render: (row) => (
+          <span
+            className={`inline-block px-2.5 py-0.5 rounded-md text-xs font-medium ${
+              row.transfer_status === '완료'
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'bg-amber-100 text-amber-700'
+            }`}
+          >
+            {row.transfer_status}
+          </span>
+        ),
+      },
+    ],
+    [],
+  );
+
   const downloadTransferFile = () => {
     const table = generateTransferTable();
     const csv = [
@@ -181,51 +277,13 @@ export default function SalaryAutoTransfer() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-[var(--tab-bg)] border-b border-[var(--border)]">
-              <tr>
-                <th className="px-4 py-2.5 text-left font-semibold text-[var(--foreground)] text-sm">순번</th>
-                <th className="px-4 py-2.5 text-left font-semibold text-[var(--foreground)] text-sm">직원명</th>
-                <th className="px-4 py-2.5 text-left font-semibold text-[var(--foreground)] text-sm">은행</th>
-                <th className="px-4 py-2.5 text-left font-semibold text-[var(--foreground)] text-sm">계좌번호</th>
-                <th className="px-4 py-2.5 text-left font-semibold text-[var(--foreground)] text-sm">예금주명</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)] text-sm">급여액</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)] text-sm">공제액</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)] text-sm">이체액</th>
-                <th className="px-4 py-2.5 text-center font-semibold text-[var(--foreground)] text-sm">상태</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transferData.map((item, idx) => (
-                <tr key={item.id} className="border-b border-[var(--border)] hover:bg-[var(--page-bg)]">
-                  <td className="px-4 py-2.5 font-medium text-[var(--foreground)] text-sm">{idx + 1}</td>
-                  <td className="px-4 py-2.5 font-medium text-[var(--foreground)] text-sm">{item.staff_name}</td>
-                  <td className="px-4 py-2.5 font-medium text-[var(--foreground)] text-sm">{item.bank_name}</td>
-                  <td className="px-4 py-2.5 font-mono text-[var(--toss-gray-4)] text-sm">{item.account_number}</td>
-                  <td className="px-4 py-2.5 font-medium text-[var(--foreground)] text-sm">{item.account_holder}</td>
-                  <td className="px-4 py-2.5 text-right font-medium text-[var(--foreground)] text-sm">
-                    ₩{item.salary_amount.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2.5 text-right font-medium text-red-600 text-sm">
-                    ₩{item.deduction_amount.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2.5 text-right font-semibold text-emerald-600 text-sm">
-                    ₩{item.transfer_amount.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2.5 text-center">
-                    <span className={`px-2.5 py-0.5 rounded-md text-xs font-medium ${
-                      item.transfer_status === '완료'
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      {item.transfer_status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="p-2 sm:p-3">
+          <ResponsiveTable<TransferRow & { _idx: number }>
+            columns={columns}
+            rows={rowsWithIndex}
+            keyField="id"
+            emptyMessage="이체 대상 직원이 없습니다."
+          />
         </div>
       </div>
 

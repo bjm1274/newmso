@@ -4,6 +4,7 @@ import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
 import { getPayrollGrossPay } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 type TaxRow = {
   staff_id: string;
@@ -158,6 +159,82 @@ export default function TaxAutoReport({ selectedCo = '전체' }: Record<string, 
     [taxData]
   );
 
+  const columns = useMemo((): Column<TaxRow>[] => [
+    {
+      key: 'staff_name',
+      label: '직원명',
+      primary: true,
+      render: (row) => <span className="font-semibold">{row.staff_name}</span>,
+    },
+    {
+      key: 'total_salary',
+      label: '연간총급여',
+      align: 'right',
+      render: (row) => `₩${row.total_salary.toLocaleString()}`,
+    },
+    {
+      key: 'health_insurance',
+      label: '건강보험',
+      align: 'right',
+      showOnMobile: false,
+      render: (row) => `₩${row.health_insurance.toLocaleString()}`,
+    },
+    {
+      key: 'long_term_care',
+      label: '장기요양',
+      align: 'right',
+      showOnMobile: false,
+      render: (row) => `₩${row.long_term_care.toLocaleString()}`,
+    },
+    {
+      key: 'employment_insurance',
+      label: '고용보험',
+      align: 'right',
+      showOnMobile: false,
+      render: (row) => `₩${row.employment_insurance.toLocaleString()}`,
+    },
+    {
+      key: 'pension',
+      label: '국민연금',
+      align: 'right',
+      showOnMobile: false,
+      render: (row) => `₩${row.pension.toLocaleString()}`,
+    },
+    {
+      key: 'income_tax',
+      label: '소득세',
+      align: 'right',
+      render: (row) => (
+        <span className="font-medium text-red-600">₩{row.income_tax.toLocaleString()}</span>
+      ),
+    },
+    {
+      key: 'local_tax',
+      label: '지방소득세',
+      align: 'right',
+      showOnMobile: false,
+      render: (row) => (
+        <span className="font-medium text-red-600">₩{row.local_tax.toLocaleString()}</span>
+      ),
+    },
+    {
+      key: 'total_deduction',
+      label: '총공제',
+      align: 'right',
+      render: (row) => (
+        <span className="font-semibold text-red-600">₩{row.total_deduction.toLocaleString()}</span>
+      ),
+    },
+    {
+      key: 'net_pay',
+      label: '실수령액',
+      align: 'right',
+      render: (row) => (
+        <span className="font-semibold text-emerald-600">₩{row.net_pay.toLocaleString()}</span>
+      ),
+    },
+  ], []);
+
   const submitTaxReport = async () => {
     if (!taxData.length) {
       toast('신고할 급여 데이터가 없습니다.');
@@ -281,46 +358,13 @@ export default function TaxAutoReport({ selectedCo = '전체' }: Record<string, 
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead className="bg-[var(--tab-bg)] border-b border-[var(--border)]">
-              <tr>
-                <th className="px-4 py-2.5 text-left font-semibold text-[var(--foreground)] text-xs">직원명</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)] text-xs">연간총급여</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)] text-xs">건강보험</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)] text-xs">장기요양</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)] text-xs">고용보험</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)] text-xs">국민연금</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)] text-xs">소득세</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)] text-xs">지방소득세</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)] text-xs">총공제</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)] text-xs">실수령액</th>
-              </tr>
-            </thead>
-            <tbody>
-              {taxData.map((item) => (
-                <tr key={item.staff_id} className="border-b border-[var(--border)] hover:bg-[var(--page-bg)]">
-                  <td className="px-4 py-2.5 font-medium text-[var(--foreground)] text-xs">{item.staff_name}</td>
-                  <td className="px-4 py-2.5 text-right font-medium text-[var(--foreground)] text-xs">₩{item.total_salary.toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-right text-[var(--toss-gray-4)] text-xs">₩{item.health_insurance.toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-right text-[var(--toss-gray-4)] text-xs">₩{item.long_term_care.toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-right text-[var(--toss-gray-4)] text-xs">₩{item.employment_insurance.toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-right text-[var(--toss-gray-4)] text-xs">₩{item.pension.toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-right font-medium text-red-600 text-xs">₩{item.income_tax.toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-right font-medium text-red-600 text-xs">₩{item.local_tax.toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-right font-semibold text-red-600 text-xs">₩{item.total_deduction.toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-right font-semibold text-emerald-600 text-xs">₩{item.net_pay.toLocaleString()}</td>
-                </tr>
-              ))}
-              {!taxData.length && (
-                <tr>
-                  <td colSpan={10} className="px-4 py-10 text-center text-xs font-medium text-[var(--toss-gray-3)]">
-                    {loading ? '급여 데이터를 불러오는 중입니다.' : '해당 연도에 확정된 급여 레코드가 없습니다.'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="p-2">
+          <ResponsiveTable<TaxRow>
+            columns={columns}
+            rows={taxData}
+            keyField="staff_id"
+            emptyMessage={loading ? '급여 데이터를 불러오는 중입니다.' : '해당 연도에 확정된 급여 레코드가 없습니다.'}
+          />
         </div>
       </div>
     </div>
