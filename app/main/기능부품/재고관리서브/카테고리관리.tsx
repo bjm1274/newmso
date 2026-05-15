@@ -172,38 +172,39 @@ export default function CategoryManager({ user }: { user: any }) {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setShowModal(false)} role="dialog" aria-modal="true" aria-label={editId ? '카테고리 편집' : '카테고리 추가'}>
           <div className="bg-[var(--card)] rounded-[var(--radius-xl)] shadow-sm w-full max-w-sm p-4" onClick={e => e.stopPropagation()} data-testid="category-modal">
             <h3 className="text-base font-bold text-[var(--foreground)] mb-4">{editId ? '카테고리 편집' : '카테고리 추가'}</h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">카테고리명 *</label>
-                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} data-testid="category-field-name" placeholder="예: 진단용품" className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none" />
+                <label htmlFor="category-field-name" className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">카테고리명 <span className="text-red-500" aria-hidden>*</span></label>
+                <input id="category-field-name" aria-required="true" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} data-testid="category-field-name" placeholder="예: 진단용품" className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none" />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">상위 카테고리</label>
-                <select value={form.parent_id} onChange={e => setForm(f => ({ ...f, parent_id: e.target.value }))} data-testid="category-field-parent" className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none">
+                <label htmlFor="category-field-parent" className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">상위 카테고리</label>
+                <select id="category-field-parent" value={form.parent_id} onChange={e => setForm(f => ({ ...f, parent_id: e.target.value }))} data-testid="category-field-parent" className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none">
                   <option value="">최상위 (없음)</option>
                   {categories.filter(c => c.id !== editId).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">설명</label>
-                <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} data-testid="category-field-description" placeholder="카테고리 설명" className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none" />
+                <label htmlFor="category-field-description" className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">설명</label>
+                <input id="category-field-description" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} data-testid="category-field-description" placeholder="카테고리 설명" className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none" />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">색상</label>
-                <div className="flex gap-2 flex-wrap">
+                <span className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1" id="category-color-label">색상</span>
+                <div className="flex gap-2 flex-wrap" role="radiogroup" aria-labelledby="category-color-label">
                   {CAT_COLORS.map(c => (
-                    <button key={c} onClick={() => setForm(f => ({ ...f, color: c }))}
+                    <button key={c} type="button" onClick={() => setForm(f => ({ ...f, color: c }))}
+                      role="radio" aria-checked={form.color === c} aria-label={`색상 ${c}`}
                       className={`w-7 h-7 rounded-full ${c} ${form.color === c ? 'ring-2 ring-offset-2 ring-gray-400' : ''}`} />
                   ))}
                 </div>
               </div>
             </div>
             <div className="flex gap-2 mt-5">
-              <button onClick={() => setShowModal(false)} className="flex-1 py-3 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
-              <button onClick={handleSave} disabled={saving} className="flex-1 py-3 rounded-[var(--radius-md)] bg-[var(--accent)] text-white font-semibold text-sm disabled:opacity-50">{saving ? '저장 중...' : '저장'}</button>
+              <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
+              <button type="button" onClick={handleSave} disabled={saving} className="flex-1 py-3 rounded-[var(--radius-md)] bg-[var(--accent)] text-white font-semibold text-sm disabled:opacity-50">{saving ? '저장 중...' : '저장'}</button>
             </div>
           </div>
         </div>

@@ -222,40 +222,42 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
 
       {/* 장비 모달 */}
       {showDeviceModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setShowDeviceModal(false)}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setShowDeviceModal(false)} role="dialog" aria-modal="true" aria-label={editDeviceId ? '장비 편집' : '장비 등록'}>
           <div className="bg-[var(--card)] rounded-[var(--radius-xl)] shadow-sm w-full max-w-sm p-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-bold text-[var(--foreground)] mb-4">{editDeviceId ? '장비 편집' : '장비 등록'}</h3>
             <div className="space-y-3">
-              {[
-                { label: '장비명 *', key: 'name', type: 'text', placeholder: '예: 초음파 진단기' },
-                { label: '모델명', key: 'model', type: 'text', placeholder: '예: GE Voluson E10' },
-                { label: '시리얼 번호', key: 'serial', type: 'text', placeholder: '' },
-                { label: '위치', key: 'location', type: 'text', placeholder: '예: 3층 초음파실' },
-                { label: '다음 점검일', key: 'next_inspection_date', type: 'date', placeholder: '' },
-                { label: '메모', key: 'memo', type: 'text', placeholder: '' },
-              ].map(({ label, key, type, placeholder }) => (
+              {([
+                { label: '장비명', key: 'name', type: 'text', placeholder: '예: 초음파 진단기', required: true },
+                { label: '모델명', key: 'model', type: 'text', placeholder: '예: GE Voluson E10', required: false },
+                { label: '시리얼 번호', key: 'serial', type: 'text', placeholder: '', required: false },
+                { label: '위치', key: 'location', type: 'text', placeholder: '예: 3층 초음파실', required: false },
+                { label: '다음 점검일', key: 'next_inspection_date', type: 'date', placeholder: '', required: false },
+                { label: '메모', key: 'memo', type: 'text', placeholder: '', required: false },
+              ] as const).map(({ label, key, type, placeholder, required }) => (
                 <div key={key}>
-                  <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">{label}</label>
-                  <input type={type} value={(deviceForm as any)[key]} onChange={e => setDeviceForm(f => ({ ...f, [key]: e.target.value }))}
+                  <label htmlFor={`device-field-${key}`} className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">
+                    {label} {required && <span className="text-red-500" aria-hidden>*</span>}
+                  </label>
+                  <input id={`device-field-${key}`} aria-required={required || undefined} type={type} value={(deviceForm as any)[key]} onChange={e => setDeviceForm(f => ({ ...f, [key]: e.target.value }))}
                     placeholder={placeholder} className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none" />
                 </div>
               ))}
               <div>
-                <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">카테고리</label>
-                <select value={deviceForm.category} onChange={e => setDeviceForm(f => ({ ...f, category: e.target.value }))} className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none">
+                <label htmlFor="device-category" className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">카테고리</label>
+                <select id="device-category" value={deviceForm.category} onChange={e => setDeviceForm(f => ({ ...f, category: e.target.value }))} className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none">
                   {DEVICE_CATEGORIES.map(c => <option key={c}>{c}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">점검 주기</label>
-                <select value={deviceForm.cycle} onChange={e => setDeviceForm(f => ({ ...f, cycle: e.target.value }))} className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none">
+                <label htmlFor="device-cycle" className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">점검 주기</label>
+                <select id="device-cycle" value={deviceForm.cycle} onChange={e => setDeviceForm(f => ({ ...f, cycle: e.target.value }))} className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none">
                   {INSPECTION_CYCLE.map(c => <option key={c}>{c}</option>)}
                 </select>
               </div>
             </div>
             <div className="flex gap-2 mt-4">
-              <button onClick={() => setShowDeviceModal(false)} className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
-              <button onClick={handleSaveDevice} disabled={saving} className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white font-semibold text-sm disabled:opacity-50">{saving ? '저장 중...' : '저장'}</button>
+              <button type="button" onClick={() => setShowDeviceModal(false)} className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
+              <button type="button" onClick={handleSaveDevice} disabled={saving} className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white font-semibold text-sm disabled:opacity-50">{saving ? '저장 중...' : '저장'}</button>
             </div>
           </div>
         </div>
@@ -263,33 +265,35 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
 
       {/* 점검 기록 모달 */}
       {showInspectModal && selectedDevice && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setShowInspectModal(false)}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setShowInspectModal(false)} role="dialog" aria-modal="true" aria-label="점검 기록 등록">
           <div className="bg-[var(--card)] rounded-[var(--radius-xl)] shadow-sm w-full max-w-sm p-4" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-bold text-[var(--foreground)] mb-1">점검 기록</h3>
             <p className="text-xs text-[var(--toss-gray-3)] mb-4">{selectedDevice.name as string}</p>
             <div className="space-y-3">
-              {[
-                { label: '점검일 *', key: 'inspected_at', type: 'date' },
-                { label: '점검자', key: 'inspector', type: 'text', placeholder: '점검자 이름' },
-                { label: '다음 점검일', key: 'next_inspection_date', type: 'date' },
-                { label: '특이사항', key: 'notes', type: 'text', placeholder: '점검 내용 요약' },
-              ].map(({ label, key, type, placeholder }) => (
+              {([
+                { label: '점검일', key: 'inspected_at', type: 'date', placeholder: '', required: true },
+                { label: '점검자', key: 'inspector', type: 'text', placeholder: '점검자 이름', required: false },
+                { label: '다음 점검일', key: 'next_inspection_date', type: 'date', placeholder: '', required: false },
+                { label: '특이사항', key: 'notes', type: 'text', placeholder: '점검 내용 요약', required: false },
+              ] as const).map(({ label, key, type, placeholder, required }) => (
                 <div key={key}>
-                  <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">{label}</label>
-                  <input type={type} value={(inspectForm as any)[key]} onChange={e => setInspectForm(f => ({ ...f, [key]: e.target.value }))}
+                  <label htmlFor={`inspect-field-${key}`} className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">
+                    {label} {required && <span className="text-red-500" aria-hidden>*</span>}
+                  </label>
+                  <input id={`inspect-field-${key}`} aria-required={required || undefined} type={type} value={(inspectForm as any)[key]} onChange={e => setInspectForm(f => ({ ...f, [key]: e.target.value }))}
                     placeholder={placeholder} className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none" />
                 </div>
               ))}
               <div>
-                <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">점검 결과</label>
-                <select value={inspectForm.result} onChange={e => setInspectForm(f => ({ ...f, result: e.target.value }))} className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none">
+                <label htmlFor="inspect-result" className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">점검 결과</label>
+                <select id="inspect-result" value={inspectForm.result} onChange={e => setInspectForm(f => ({ ...f, result: e.target.value }))} className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none">
                   {['정상', '요주의', '수리필요', '교체필요'].map(r => <option key={r}>{r}</option>)}
                 </select>
               </div>
             </div>
             <div className="flex gap-2 mt-4">
-              <button onClick={() => setShowInspectModal(false)} className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
-              <button onClick={handleSaveInspection} disabled={saving} className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white font-semibold text-sm disabled:opacity-50">{saving ? '저장 중...' : '기록'}</button>
+              <button type="button" onClick={() => setShowInspectModal(false)} className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
+              <button type="button" onClick={handleSaveInspection} disabled={saving} className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white font-semibold text-sm disabled:opacity-50">{saving ? '저장 중...' : '기록'}</button>
             </div>
           </div>
         </div>
