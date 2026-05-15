@@ -14,6 +14,7 @@ import LeaveManagement from '../휴가신청/휴가관리메인';
 import AttendanceDeductionSimulator from '../휴가신청/근태차감시뮬레이터';
 import AttendanceAnomalyPanel from '../휴가신청/근태이상탐지';
 import { MenuIcon } from '../../조직도서브/조직도측면창';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 type StaffMember = {
   id: string;
@@ -1082,49 +1083,71 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
     return { total, present, late, earlyLeave, absent, rate, atRiskStaff };
   }, [attendanceData, filtered]);
 
+  const dayPanelColumns = useMemo((): Column<StaffMember>[] => [
+    {
+      key: 'name',
+      label: '직원 정보',
+      primary: true,
+      render: (s) => (
+        <div className="flex flex-col">
+          <span className="font-bold text-sm text-foreground">{s.name}</span>
+          <span className="text-[11px] text-[var(--toss-gray-4)] font-medium mt-0.5">
+            {s.department} · {s.position}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      label: '상태',
+      render: (s) => {
+        const att = attendanceMap.get(buildAttendanceKey(s.id, selectedDate));
+        const status = resolveAttendanceStatus(att, isWeekendDate(selectedDate));
+        const meta = getAttendanceStatusMeta(status || 'missing');
+        return (
+          <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold ring-1 ring-inset ${meta.color} ${meta.bg} ${meta.ring}`}>
+            <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${meta.dot}`}></span>
+            {meta.label}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'time',
+      label: '출퇴근 시간',
+      render: (s) => {
+        const att = attendanceMap.get(buildAttendanceKey(s.id, selectedDate));
+        const checkIn = att?.check_in_time ? new Date(att.check_in_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-';
+        const checkOut = att?.check_out_time ? new Date(att.check_out_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-';
+        return <span className="font-mono text-sm font-bold text-foreground">{checkIn} / {checkOut}</span>;
+      },
+    },
+    {
+      key: 'work_minutes',
+      label: '근무 시간',
+      render: (s) => {
+        const att = attendanceMap.get(buildAttendanceKey(s.id, selectedDate));
+        return (
+          <span className="font-mono text-sm font-bold text-blue-600 dark:text-blue-500">
+            {formatAttendanceMinutes(att?.work_hours_minutes)}
+          </span>
+        );
+      },
+    },
+  ], [attendanceMap, selectedDate]);
+
   const renderIntegratedDayPanel = () => (
     <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm" data-testid="attendance-calendar-day-panel">
       <div className="p-4 border-b border-[var(--border)] dark:border-zinc-800 bg-[var(--tab-bg)]/40">
         <h3 className="text-lg font-bold text-foreground">일별 출퇴근 현황 <span className="text-[var(--toss-gray-4)] text-sm font-medium ml-2">{selectedDate}</span></h3>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead className="bg-[var(--tab-bg)] dark:bg-zinc-900/50 border-b border-[var(--border)] dark:border-zinc-800">
-            <tr>
-              <th className="px-4 py-4 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">직원 정보</th>
-              <th className="px-4 py-4 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">상태</th>
-              <th className="px-4 py-4 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">출퇴근 시간</th>
-              <th className="px-4 py-4 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">근무 시간</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-            {filtered.map((s: StaffMember) => {
-              const att = attendanceMap.get(buildAttendanceKey(s.id, selectedDate));
-              const status = resolveAttendanceStatus(att, isWeekendDate(selectedDate));
-              const meta = getAttendanceStatusMeta(status || 'missing');
-              const checkIn = att?.check_in_time ? new Date(att.check_in_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-';
-              const checkOut = att?.check_out_time ? new Date(att.check_out_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-';
-              return (
-                <tr key={`calendar-day-${s.id}`} className="hover:bg-[var(--tab-bg)]/50 dark:hover:bg-zinc-800/30 transition-colors">
-                  <td className="px-4 py-4">
-                    <div className="flex flex-col">
-                      <span className="font-bold text-sm text-foreground">{s.name}</span>
-                      <span className="text-[11px] text-[var(--toss-gray-4)] font-medium mt-0.5">{s.department} · {s.position}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold ring-1 ring-inset ${meta.color} ${meta.bg} ${meta.ring}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${meta.dot}`}></span>
-                      {meta.label}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4 font-mono text-sm font-bold text-foreground">{checkIn} / {checkOut}</td>
-                  <td className="px-4 py-4 font-mono text-sm font-bold text-blue-600 dark:text-blue-500">{formatAttendanceMinutes(att?.work_hours_minutes)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <ResponsiveTable<StaffMember>
+          columns={dayPanelColumns}
+          rows={filtered}
+          keyField="id"
+          emptyMessage="표시할 직원이 없습니다."
+        />
       </div>
     </div>
   );
