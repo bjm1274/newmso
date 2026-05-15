@@ -7,6 +7,7 @@ import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import { getScopedActiveStaffs } from '@/lib/active-staff';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import type { StaffMember } from '@/types';
 
 type WorkType =
@@ -125,6 +126,13 @@ export default function WorkTypeChangeHistory({ staffs, selectedCo, user }: Prop
     if (!keyword) return records;
     return records.filter((record) => record.staff_name?.includes(keyword));
   }, [records, searchName]);
+
+  const tableRows = useMemo<WorkTypeRow[]>(() => {
+    return filteredRecords.map((record, index) => ({
+      ...record,
+      rowKey: record.id != null ? `${record.id}-${record.staff_id}` : `idx-${index}`,
+    }));
+  }, [filteredRecords]);
 
   const latestByStaff = useMemo(() => {
     const map = new Map<string, WorkTypeRecord>();
@@ -458,63 +466,96 @@ export default function WorkTypeChangeHistory({ staffs, selectedCo, user }: Prop
         </button>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-[var(--muted)]">
-              <tr className="border-b border-[var(--border)] text-[11px] uppercase tracking-widest text-[var(--toss-gray-4)]">
-                <th className="px-4 py-3 font-bold">변경일</th>
-                <th className="px-4 py-3 font-bold">직원</th>
-                <th className="px-4 py-3 font-bold">이전</th>
-                <th className="px-4 py-3 font-bold">변경 후</th>
-                <th className="px-4 py-3 font-bold">승인자</th>
-                <th className="px-4 py-3 font-bold">사유</th>
-                <th className="px-4 py-3 font-bold text-right">관리</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRecords.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm font-semibold text-[var(--toss-gray-3)]">
-                    표시할 근무형태 변경 이력이 없습니다.
-                  </td>
-                </tr>
-              ) : (
-                filteredRecords.map((record) => (
-                  <tr key={`${record.id}-${record.staff_id}`} className="border-b border-[var(--border)] last:border-0">
-                    <td className="px-4 py-3 font-semibold text-[var(--foreground)]">{record.changed_date}</td>
-                    <td className="px-4 py-3">
-                      <div className="font-bold text-[var(--foreground)]">{record.staff_name}</div>
-                      <div className="text-[11px] text-[var(--toss-gray-3)]">{record.company}</div>
-                    </td>
-                    <td className="px-4 py-3 text-[var(--toss-gray-4)]">{record.prev_type || '-'}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`rounded-lg border px-2 py-1 text-[11px] font-black ${
-                          TYPE_STYLES[record.new_type] || 'bg-[var(--tab-bg)] text-[var(--foreground)] border-[var(--border)]'
-                        }`}
-                      >
-                        {record.new_type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-[var(--toss-gray-4)]">{record.approver || '-'}</td>
-                    <td className="px-4 py-3 text-[var(--toss-gray-4)]">{record.reason || '-'}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(record)}
-                        className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-[11px] font-bold text-red-600 transition-colors hover:bg-red-500/20"
-                      >
-                        삭제
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      <WorkTypeTable
+        rows={tableRows}
+        onDelete={handleDelete}
+      />
+    </div>
+  );
+}
+
+type WorkTypeRow = WorkTypeRecord & { rowKey: string };
+
+function WorkTypeTable({
+  rows,
+  onDelete,
+}: {
+  rows: WorkTypeRow[];
+  onDelete: (record: WorkTypeRecord) => void;
+}) {
+  const columns: Column<WorkTypeRow>[] = [
+    {
+      key: 'staff_name',
+      label: '직원',
+      primary: true,
+      render: (r) => (
+        <div>
+          <div className="font-bold text-[var(--foreground)]">{r.staff_name}</div>
+          <div className="text-[11px] text-[var(--toss-gray-3)]">{r.company}</div>
         </div>
-      </div>
+      ),
+    },
+    {
+      key: 'changed_date',
+      label: '변경일',
+      render: (r) => <span className="font-semibold text-[var(--foreground)]">{r.changed_date}</span>,
+    },
+    {
+      key: 'prev_type',
+      label: '이전',
+      render: (r) => <span className="text-[var(--toss-gray-4)]">{r.prev_type || '—'}</span>,
+    },
+    {
+      key: 'new_type',
+      label: '변경 후',
+      render: (r) => (
+        <span
+          className={`rounded-lg border px-2 py-1 text-[11px] font-black ${
+            TYPE_STYLES[r.new_type] || 'bg-[var(--tab-bg)] text-[var(--foreground)] border-[var(--border)]'
+          }`}
+        >
+          {r.new_type}
+        </span>
+      ),
+    },
+    {
+      key: 'approver',
+      label: '승인자',
+      render: (r) => <span className="text-[var(--toss-gray-4)]">{r.approver || '—'}</span>,
+    },
+    {
+      key: 'reason',
+      label: '사유',
+      showOnMobile: false,
+      render: (r) => <span className="text-[var(--toss-gray-4)]">{r.reason || '—'}</span>,
+    },
+    {
+      key: 'actions',
+      label: '관리',
+      align: 'right',
+      render: (r) => (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete(r);
+          }}
+          className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-[11px] font-bold text-red-600 transition-colors hover:bg-red-500/20"
+        >
+          삭제
+        </button>
+      ),
+    },
+  ];
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] p-2 shadow-sm">
+      <ResponsiveTable<WorkTypeRow>
+        columns={columns}
+        rows={rows}
+        keyField="rowKey"
+        emptyMessage="표시할 근무형태 변경 이력이 없습니다."
+      />
     </div>
   );
 }

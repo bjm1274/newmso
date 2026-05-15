@@ -4,6 +4,7 @@ import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 const DEFAULT_ASSET_TYPES = ['노트북', 'PC', '모니터', '키보드', '마우스', '회의실키', '기타'];
 
@@ -277,6 +278,50 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: Record<str
     setList((prev) => prev.map((row) => (row.id === id ? { ...row, returned_at: returnedAt } : row)));
   };
 
+  const columns = useMemo((): Column<AssetLoanRow>[] => [
+    {
+      key: 'staff_name',
+      label: '직원',
+      primary: true,
+      render: (row) => row.staff_members?.name ?? '—',
+    },
+    {
+      key: 'asset',
+      label: '물품',
+      render: (row) => (
+        <>
+          {row.asset_type ?? '—'}
+          {row.asset_name ? ` (${row.asset_name})` : ''}
+        </>
+      ),
+    },
+    {
+      key: 'loaned_at',
+      label: '대여일',
+      render: (row) => row.loaned_at ?? '—',
+    },
+    {
+      key: 'returned_at',
+      label: '반납일',
+      render: (row) =>
+        row.returned_at ? row.returned_at : <span className="text-orange-600 font-bold">미반납</span>,
+    },
+    {
+      key: 'actions',
+      label: '관리',
+      align: 'right',
+      render: (row) =>
+        !row.returned_at ? (
+          <button
+            onClick={() => handleReturn(row.id)}
+            className="px-3 py-1 bg-green-500/20 text-green-700 text-[11px] font-semibold rounded-[var(--radius-md)]"
+          >
+            반납
+          </button>
+        ) : null,
+    },
+  ], []);
+
   return (
     <div className="bg-[var(--card)] p-4 md:p-5 rounded-2xl border border-[var(--border)] shadow-sm">
       <div className="flex flex-wrap justify-between items-center gap-3 mb-5">
@@ -322,43 +367,13 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: Record<str
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-[var(--border)] text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">
-              <th className="p-2 sm:p-4 text-left">직원</th>
-              <th className="p-2 sm:p-4 text-left">물품</th>
-              <th className="p-2 sm:p-4 text-left hidden sm:table-cell">대여일</th>
-              <th className="p-2 sm:p-4 text-left">반납일</th>
-              <th className="p-2 sm:p-4 text-right">관리</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((row) => (
-              <tr key={row.id} className="border-b border-[var(--border-subtle)]">
-                <td className="p-2 sm:p-4">{row.staff_members?.name}</td>
-                <td className="p-2 sm:p-4">
-                  {row.asset_type}
-                  {row.asset_name ? ` (${row.asset_name})` : ''}
-                </td>
-                <td className="p-2 sm:p-4 hidden sm:table-cell">{row.loaned_at}</td>
-                <td className="p-2 sm:p-4">
-                  {row.returned_at ? row.returned_at : <span className="text-orange-600 font-bold">미반납</span>}
-                </td>
-                <td className="p-2 sm:p-4 text-right">
-                  {!row.returned_at && (
-                    <button
-                      onClick={() => handleReturn(row.id)}
-                      className="px-3 py-1 bg-green-500/20 text-green-700 text-[11px] font-semibold rounded-[var(--radius-md)]"
-                    >
-                      반납
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="rounded-[var(--radius-md)] border border-[var(--border)] overflow-x-auto">
+        <ResponsiveTable<AssetLoanRow>
+          columns={columns}
+          rows={list}
+          keyField="id"
+          emptyMessage="대여 기록이 없습니다."
+        />
       </div>
 
       {adding && (

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { calculateLeaveDays, isAnnualLeaveType, isApprovedLeaveStatus } from '@/lib/annual-leave-ledger';
 import { isActiveStaff } from '@/lib/active-staff';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 type StaffLite = {
   id: string;
@@ -167,6 +168,7 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
           const expired = balance?.expired ?? 0;
           const compensated = balance?.compensated ?? 0;
           return {
+            id: staff.id,
             staff,
             total,
             approvedDays,
@@ -179,6 +181,62 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
         })
         .sort((a, b) => a.staff.name.localeCompare(b.staff.name, 'ko')),
     [approvedAnnualLeaveRows, balancesByStaff, filteredStaffs]
+  );
+
+  type SummaryRow = (typeof summaryRows)[number];
+
+  const summaryColumns = useMemo(
+    (): Column<SummaryRow>[] => [
+      {
+        key: 'name',
+        label: '직원',
+        primary: true,
+        render: (row) => <span className="font-semibold text-[var(--foreground)]">{row.staff.name}</span>,
+      },
+      {
+        key: 'company',
+        label: '회사/부서',
+        render: (row) =>
+          `${row.staff.company || '회사 미지정'} / ${row.staff.department || '부서 미지정'}`,
+      },
+      {
+        key: 'total',
+        label: '총 연차',
+        align: 'right',
+        render: (row) => <span className="font-semibold">{row.total.toFixed(1)}</span>,
+      },
+      {
+        key: 'used',
+        label: '사용',
+        align: 'right',
+        render: (row) => <span className="font-semibold text-[var(--accent)]">{row.used.toFixed(1)}</span>,
+      },
+      {
+        key: 'expired',
+        label: '소멸',
+        align: 'right',
+        render: (row) => <span className="font-semibold text-red-500">{row.expired.toFixed(1)}</span>,
+      },
+      {
+        key: 'compensated',
+        label: '수당지급',
+        align: 'right',
+        render: (row) => <span className="font-semibold text-amber-600">{row.compensated.toFixed(1)}</span>,
+      },
+      {
+        key: 'remaining',
+        label: '잔여',
+        align: 'right',
+        render: (row) => <span className="font-semibold text-green-600">{row.remaining.toFixed(1)}</span>,
+      },
+      {
+        key: 'approvedCount',
+        label: '승인 건수',
+        align: 'right',
+        render: (row) => <span className="text-[var(--toss-gray-4)]">{row.approvedCount}</span>,
+      },
+    ],
+    []
   );
 
   const rollbackTimelineRows = useMemo(
@@ -227,46 +285,13 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
         <div className="border-b border-[var(--border)] px-4 py-3">
           <h4 className="text-sm font-bold text-[var(--foreground)]">직원별 연차 잔여 현황</h4>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-[var(--hover-bg)]">
-              <tr className="text-left text-[11px] font-bold text-[var(--toss-gray-4)]">
-                <th className="px-4 py-3">직원</th>
-                <th className="px-4 py-3">회사/부서</th>
-                <th className="px-4 py-3 text-right">총 연차</th>
-                <th className="px-4 py-3 text-right">사용</th>
-                <th className="px-4 py-3 text-right">소멸</th>
-                <th className="px-4 py-3 text-right">수당지급</th>
-                <th className="px-4 py-3 text-right">잔여</th>
-                <th className="px-4 py-3 text-right">승인 건수</th>
-              </tr>
-            </thead>
-            <tbody>
-              {summaryRows.map((row) => (
-                <tr key={row.staff.id} className="border-t border-[var(--border)] align-top">
-                  <td className="px-4 py-3">
-                    <p className="font-semibold text-[var(--foreground)]">{row.staff.name}</p>
-                  </td>
-                  <td className="px-4 py-3 text-[var(--toss-gray-4)]">
-                    {(row.staff.company || '회사 미지정')} / {(row.staff.department || '부서 미지정')}
-                  </td>
-                  <td className="px-4 py-3 text-right font-semibold">{row.total.toFixed(1)}</td>
-                  <td className="px-4 py-3 text-right text-[var(--accent)] font-semibold">{row.used.toFixed(1)}</td>
-                  <td className="px-4 py-3 text-right text-red-500 font-semibold">{row.expired.toFixed(1)}</td>
-                  <td className="px-4 py-3 text-right text-amber-600 font-semibold">{row.compensated.toFixed(1)}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-green-600">{row.remaining.toFixed(1)}</td>
-                  <td className="px-4 py-3 text-right text-[var(--toss-gray-4)]">{row.approvedCount}</td>
-                </tr>
-              ))}
-              {!loading && summaryRows.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-[var(--toss-gray-4)]">
-                    표시할 직원이 없습니다.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="p-2 md:p-0">
+          <ResponsiveTable<SummaryRow>
+            columns={summaryColumns}
+            rows={summaryRows}
+            keyField="id"
+            emptyMessage={loading ? '불러오는 중입니다…' : '표시할 직원이 없습니다.'}
+          />
         </div>
       </div>
 
