@@ -144,13 +144,19 @@ async function processFile(file: File, opts: ProcessOpts): Promise<File> {
 
 async function convertHeic(file: File): Promise<File> {
   try {
-    // TODO: heic2any 라이브러리 설치 시 활성화 — 현재 package.json 에 없음
-    // const heic2any = (await import('heic2any')).default;
-    // const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 }) as Blob;
-    // return new File([blob], file.name.replace(HEIC_RE, '.jpg'), { type: 'image/jpeg' });
-    return file;
+    // heic2any 는 dependencies 에 명시되어 있으나, 설치 누락/번들 실패/SSR 등에서는
+    // 동적 import 가 throw 될 수 있으므로 try/catch 로 감싸 원본을 폴백 반환한다.
+    // 타입은 types/heic2any.d.ts 의 ambient module 선언으로 해결.
+    const mod = await import('heic2any');
+    const heic2any = mod.default;
+    if (typeof heic2any !== 'function') return file;
+    const result = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+    const blob = Array.isArray(result) ? result[0] : result;
+    if (!blob) return file;
+    const newName = file.name.replace(HEIC_RE, '.jpg');
+    return new File([blob], /\.jpe?g$/i.test(newName) ? newName : `${newName}.jpg`, { type: 'image/jpeg' });
   } catch (err) {
-    console.warn('[CameraInput] HEIC conversion failed:', err);
+    console.warn('[CameraInput] HEIC conversion failed, using original:', err);
     return file;
   }
 }
