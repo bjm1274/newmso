@@ -5,15 +5,9 @@ import { supabase } from '@/lib/supabase';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { getItemName, getItemQuantity, validateInventoryQuantity } from '@/app/main/inventory-utils';
 import { InventorySummaryStrip, InventoryStepSummary } from './InventoryDesignPanels';
+import InventoryCountGrid, { type CountRow } from './재고실사Grid';
 
-type CountItem = {
-  id: string;
-  item_name: string;
-  category: string;
-  company: string;
-  expected: number;
-  actual: string; // 입력값 (string)
-};
+type CountItem = CountRow;
 
 export default function InventoryCount({ user, inventory, fetchInventory }: { user: any; inventory: any[]; fetchInventory: () => void }) {
   const { dialog, openConfirm } = useActionDialog();
@@ -305,56 +299,8 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
         </button>
       </div>
 
-      <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[600px]">
-            <thead>
-              <tr className="bg-[var(--muted)]/60 border-b border-[var(--border)]">
-                {['회사/분류', '품목명', '장부 수량', '실물 수량 입력', '차이'].map(h => (
-                  <th key={h} className="px-4 py-2 text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border)]">
-              {filtered.map(it => {
-                const { quantity: actualNum, error: actualError } = validateInventoryQuantity(it.actual, {
-                  label: '실물 수량',
-                  allowEmpty: true,
-                });
-                const diff = actualNum !== null ? actualNum - it.expected : null;
-                const hasError = Boolean(actualError);
-                const hasDiff = diff !== null && diff !== 0;
-                return (
-                  <tr key={it.id} className={`transition-colors ${hasError ? 'bg-red-500/10/60' : hasDiff ? 'bg-orange-500/10/50' : ''}`}>
-                    <td className="px-4 py-3">
-                      <p className="text-[10px] font-bold text-[var(--accent)]">{it.company}</p>
-                      <p className="text-[9px] text-[var(--toss-gray-3)]">{it.category}</p>
-                    </td>
-                    <td className="px-4 py-3 text-xs font-semibold text-[var(--foreground)]">{it.item_name}</td>
-                    <td className="px-4 py-3 text-center text-sm font-bold text-[var(--toss-gray-4)]">{it.expected}</td>
-                    <td className="px-4 py-3">
-                      <input
-                        type="number"
-                        min={0}
-                        step={1}
-                        value={it.actual}
-                        onChange={e => setActual(it.id, e.target.value)}
-                        placeholder="실물 수량"
-                        className={`w-20 sm:w-24 px-2 py-2.5 border rounded-[var(--radius-md)] text-sm font-bold text-center outline-none focus:ring-2 focus:ring-[var(--accent)]/20 ${hasError ? 'border-red-400 bg-red-500/10' : hasDiff ? 'border-orange-400 bg-orange-500/10' : 'border-[var(--border)] bg-[var(--card)]'}`}
-                      />
-                      {actualError && (
-                        <p className="mt-1 text-[10px] font-semibold text-red-500">{actualError}</p>
-                      )}
-                    </td>
-                    <td className={`px-4 py-3 text-center text-sm font-bold ${hasError || diff === null ? 'text-[var(--toss-gray-3)]' : diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
-                      {diff === null ? '-' : diff === 0 ? '✓' : `${diff > 0 ? '+' : ''}${diff}`}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm overflow-hidden p-2">
+        <InventoryCountGrid rows={filtered} onChangeActual={setActual} />
       </div>
     </div>
     </>
