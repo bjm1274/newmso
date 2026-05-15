@@ -55,10 +55,10 @@ export default defineConfig({
       },
     },
     {
-      // 320px 폭 회귀 — 가로 오버플로우 자동 탐지 전용.
+      // 320px 폭 회귀 — 가로 오버플로우/모바일 카드 변형/시트 popstate 등 좁은 폭 전용.
       // 기존 .mobile.spec.ts는 iPhone 13(390px) 기준이라 여기서 돌리지 않는다.
       name: 'mobile-320',
-      testMatch: /mobile-overflow\.mobile\.spec\.ts/,
+      testMatch: /(mobile-overflow|mobile-components|mobile-sheet-history)\.mobile\.spec\.ts/,
       use: {
         browserName: 'chromium',
         viewport: { width: 320, height: 568 },
