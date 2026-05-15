@@ -649,11 +649,12 @@ export default function LicenseManager({
             <div className="space-y-3">
               <div>
                 <label htmlFor="lic-staff-select" className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">
-                  직원 *
+                  직원 <span className="text-red-500" aria-hidden>*</span>
                 </label>
                 <div className="flex gap-2">
                   <select
                     id="lic-staff-select"
+                    aria-required="true"
                     value={form.staff_id}
                     onChange={(e) => setForm((f) => ({ ...f, staff_id: e.target.value }))}
                     className="w-1/2 px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
@@ -700,10 +701,11 @@ export default function LicenseManager({
               </div>
               <div>
                 <label htmlFor="lic-type-select" className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">
-                  면허·자격 종류 *
+                  면허·자격 종류 <span className="text-red-500" aria-hidden>*</span>
                 </label>
                 <select
                   id="lic-type-select"
+                  aria-required="true"
                   value={form.license_type}
                   onChange={(e) => setForm((f) => ({ ...f, license_type: e.target.value }))}
                   className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
@@ -765,12 +767,14 @@ export default function LicenseManager({
             </div>
             <div className="flex gap-2 mt-4">
               <button
+                type="button"
                 onClick={() => setShowModal(false)}
                 className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] font-semibold text-sm"
               >
                 취소
               </button>
               <button
+                type="button"
                 onClick={handleSave}
                 disabled={saving}
                 className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white font-semibold text-sm disabled:opacity-50"

@@ -342,22 +342,35 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
                         <h3 className="text-sm font-bold text-[var(--foreground)]">{editId ? '검진 일정 수정' : '검진 일정 등록'}</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="flex gap-2">
-                                <select value={form.staff_id} onChange={e => setForm({ ...form, staff_id: e.target.value })} className="flex-1 min-w-0 px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required disabled={!!editId}>
+                                <label htmlFor="checkup-staff-select" className="sr-only">직원 선택</label>
+                                <select id="checkup-staff-select" aria-required="true" value={form.staff_id} onChange={e => setForm({ ...form, staff_id: e.target.value })} className="flex-1 min-w-0 px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required disabled={!!editId}>
                                     <option value="">직원 선택</option>
                                     {allStaffs.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.company || ''} / {s.department || '미배정'})</option>)}
                                 </select>
                                 <button type="button" onClick={() => setShowStaffSearch(true)} disabled={!!editId} aria-label="직원 검색" title="직원 검색" className="shrink-0 px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--border)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">🔍</button>
                             </div>
-                            <select value={form.checkup_type} onChange={e => setForm({ ...form, checkup_type: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none">
-                                {CHECKUP_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                            </select>
+                            <div>
+                                <label htmlFor="checkup-type-select" className="sr-only">검진 종류</label>
+                                <select id="checkup-type-select" value={form.checkup_type} onChange={e => setForm({ ...form, checkup_type: e.target.value })} className="w-full px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none">
+                                    {CHECKUP_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                            </div>
                             <div>
                                 <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">완료일</p>
                                 <SmartDatePicker value={form.completed_date} onChange={val => setForm({ ...form, completed_date: val })} inputClassName="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none w-full" />
                             </div>
-                            <input type="text" value={form.hospital} onChange={e => setForm({ ...form, hospital: e.target.value })} placeholder="검진 병원명" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />
-                            <input type="text" value={form.result} onChange={e => setForm({ ...form, result: e.target.value })} placeholder="검진 결과" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)] md:col-span-2" />
-                            <input type="text" value={form.memo} onChange={e => setForm({ ...form, memo: e.target.value })} placeholder="비고" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)] md:col-span-3" />
+                            <div>
+                                <label htmlFor="checkup-hospital" className="sr-only">검진 병원명</label>
+                                <input id="checkup-hospital" type="text" value={form.hospital} onChange={e => setForm({ ...form, hospital: e.target.value })} placeholder="검진 병원명" className="w-full px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label htmlFor="checkup-result" className="sr-only">검진 결과</label>
+                                <input id="checkup-result" type="text" value={form.result} onChange={e => setForm({ ...form, result: e.target.value })} placeholder="검진 결과" className="w-full px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />
+                            </div>
+                            <div className="md:col-span-3">
+                                <label htmlFor="checkup-memo" className="sr-only">비고</label>
+                                <input id="checkup-memo" type="text" value={form.memo} onChange={e => setForm({ ...form, memo: e.target.value })} placeholder="비고" className="w-full px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />
+                            </div>
                         </div>
                         <div className="flex justify-end gap-2">
                             <button type="button" onClick={closeForm} className="px-4 py-2.5 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[11px] font-bold rounded-xl">취소</button>

@@ -1564,9 +1564,9 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                       <span className="rounded-[var(--radius-sm)] bg-[var(--accent)] px-2 py-1 text-[10px] font-black text-white">필수</span>
                     </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">날짜 (YYYY-MM-DD)</label>
+                        <label htmlFor="board-schedule-date" className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">날짜 (YYYY-MM-DD)</label>
                         <SmartDatePicker
                           data-testid="board-schedule-date"
                           value={scheduleDate}
@@ -1576,10 +1576,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                         />
                       </div>
                       <div>
-                        <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">시간</label>
-                        <div className="grid grid-cols-3 gap-2">
+                        <span id="board-schedule-time-label" className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">시간</span>
+                        <div className="grid grid-cols-3 gap-2" role="group" aria-labelledby="board-schedule-time-label">
                           <select
                             data-testid="board-schedule-period"
+                            aria-label="오전/오후"
                             value={schedulePeriod}
                             onChange={(e) => {
                               const v = e.target.value;
@@ -1594,6 +1595,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                           </select>
                           <select
                             data-testid="board-schedule-hour"
+                            aria-label="시간"
                             value={scheduleHour}
                             onChange={(e) => {
                               const v = e.target.value;
@@ -1613,6 +1615,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                           </select>
                           <select
                             data-testid="board-schedule-minute"
+                            aria-label="분"
                             value={scheduleMinute}
                             onChange={(e) => {
                               const v = e.target.value;
@@ -1630,16 +1633,16 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">수술실/검사실</label>
-                        <input value={scheduleRoom} onChange={e => setScheduleRoom(e.target.value)} placeholder="예: 수술실 1" className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20" />
+                        <label htmlFor="board-schedule-room" className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">수술실/검사실</label>
+                        <input id="board-schedule-room" value={scheduleRoom} onChange={e => setScheduleRoom(e.target.value)} placeholder="예: 수술실 1" className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20" />
                       </div>
                       <div>
-                        <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">환자명</label>
-                        <input value={schedulePatient} onChange={e => setSchedulePatient(e.target.value)} placeholder="환자명 입력" className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20" />
+                        <label htmlFor="board-schedule-patient" className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">환자명</label>
+                        <input id="board-schedule-patient" value={schedulePatient} onChange={e => setSchedulePatient(e.target.value)} placeholder="환자명 입력" className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20" />
                       </div>
                       <div>
-                        <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">차트번호</label>
-                        <input value={scheduleChartNo} onChange={e => setScheduleChartNo(e.target.value)} placeholder="예: 12345" className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20" />
+                        <label htmlFor="board-schedule-chart" className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">차트번호</label>
+                        <input id="board-schedule-chart" value={scheduleChartNo} onChange={e => setScheduleChartNo(e.target.value)} placeholder="예: 12345" className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20" />
                       </div>
                     </div>
                     {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (

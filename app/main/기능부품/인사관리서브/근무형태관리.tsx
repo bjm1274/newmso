@@ -965,13 +965,14 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
             </h3>
             <div className="space-y-4">
               <div>
-                <label className="caption uppercase block mb-1">명칭 (예: 3교대-데이, 나이트전담)</label>
-                <input type="text" value={newShift.name} onChange={e => setNewShift({ ...newShift, name: e.target.value })} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs outline-none focus:border-[var(--foreground)] radius-toss" placeholder="근무 형태 이름을 입력하세요" data-testid="shift-name-input" />
+                <label htmlFor="shift-name-input" className="caption uppercase block mb-1">명칭 (예: 3교대-데이, 나이트전담) <span className="text-red-500" aria-hidden>*</span></label>
+                <input id="shift-name-input" aria-required="true" type="text" value={newShift.name} onChange={e => setNewShift({ ...newShift, name: e.target.value })} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs outline-none focus:border-[var(--foreground)] radius-toss" placeholder="근무 형태 이름을 입력하세요" data-testid="shift-name-input" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="caption uppercase block mb-1">기본 출근 시간</label>
+                  <label htmlFor="shift-start-time" className="caption uppercase block mb-1">기본 출근 시간</label>
                   <input
+                    id="shift-start-time"
                     type="time"
                     value={newShift.start_time}
                     onChange={e => {
@@ -986,8 +987,9 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                   />
                 </div>
                 <div>
-                  <label className="caption uppercase block mb-1">기본 퇴근 시간</label>
+                  <label htmlFor="shift-end-time" className="caption uppercase block mb-1">기본 퇴근 시간</label>
                   <input
+                    id="shift-end-time"
                     type="time"
                     value={newShift.end_time}
                     onChange={e => {
@@ -1217,10 +1219,11 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                   요일별 표의 &apos;휴게 플랜&apos; 열에서 각 요일에 적용할 플랜(A·B·C)을 선택하세요. 선택한 플랜의 휴게시간만큼 근무시간에서 차감됩니다.
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="caption uppercase block mb-1">근무 패턴</label>
+                  <label htmlFor="shift-pattern-select" className="caption uppercase block mb-1">근무 패턴</label>
                   <select
+                    id="shift-pattern-select"
                     value={newShift.shift_type}
                     onChange={e =>
                       setNewShift((prev) =>
@@ -1304,7 +1307,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                   3교대/전담 근무자 또는 주 40시간 초과 근무자 기준입니다.
                     </p>
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <label className="flex flex-col gap-1">
                       <span className="text-[11px] font-bold text-orange-700">월간 나이트 일수</span>
                       <input

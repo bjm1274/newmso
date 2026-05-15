@@ -347,37 +347,37 @@ export default function ContractMain({
                         </div>
                       </div>
                       <div className="grid grid-cols-1 gap-2.5">
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-bold">기본급 (월)</label>
+                        <label className="space-y-1 block">
+                          <span className="text-[11px] font-bold">기본급 (월)</span>
                           <input type="number" value={salaryInfo.base_salary} onChange={(e) => setSalaryInfo({ ...salaryInfo, base_salary: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-bold">식대 (한도 20만)</label>
+                        </label>
+                        <label className="space-y-1 block">
+                          <span className="text-[11px] font-bold">식대 (한도 20만)</span>
                           <input type="number" value={salaryInfo.meal_allowance} onChange={(e) => setSalaryInfo({ ...salaryInfo, meal_allowance: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-bold">적용일자</label>
+                        </label>
+                        <label className="space-y-1 block">
+                          <span className="text-[11px] font-bold">적용일자</span>
                           <input type="text" value={salaryInfo.effective_date} onChange={(e) => setSalaryInfo({ ...salaryInfo, effective_date: e.target.value })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white selection:bg-[var(--card)]/30" placeholder="0000-00-00" />
-                        </div>
+                        </label>
                         <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-white/10 mt-1">
-                          <div className="space-y-1">
-                            <label className="text-[11px] font-bold">주당 시간</label>
+                          <label className="space-y-1 block">
+                            <span className="text-[11px] font-bold">주당 시간</span>
                             <input type="number" value={salaryInfo.working_hours_per_week} onChange={(e) => setSalaryInfo({ ...salaryInfo, working_hours_per_week: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" inputMode="decimal" step="0.1" />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[11px] font-bold">주당 일수</label>
+                          </label>
+                          <label className="space-y-1 block">
+                            <span className="text-[11px] font-bold">주당 일수</span>
                             <input type="number" value={salaryInfo.working_days_per_week} onChange={(e) => setSalaryInfo({ ...salaryInfo, working_days_per_week: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
-                          </div>
+                          </label>
                         </div>
                         <div className="grid grid-cols-2 gap-2.5">
-                          <div className="space-y-1">
-                            <label className="text-[11px] font-bold">출근시간</label>
+                          <label className="space-y-1 block">
+                            <span className="text-[11px] font-bold">출근시간</span>
                             <input type="text" value={salaryInfo.shift_start_time} onChange={(e) => setSalaryInfo({ ...salaryInfo, shift_start_time: e.target.value })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" placeholder="09:00" />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[11px] font-bold">퇴근시간</label>
+                          </label>
+                          <label className="space-y-1 block">
+                            <span className="text-[11px] font-bold">퇴근시간</span>
                             <input type="text" value={salaryInfo.shift_end_time} onChange={(e) => setSalaryInfo({ ...salaryInfo, shift_end_time: e.target.value })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" placeholder="18:00" />
-                          </div>
+                          </label>
                         </div>
                       </div>
                     </div>
@@ -386,14 +386,14 @@ export default function ContractMain({
                     <div className="mb-4 p-4 bg-[var(--foreground)] text-white rounded-[var(--radius-lg)] shadow-sm space-y-3 animate-in slide-in-from-top-4 duration-500">
                       <h3 className="text-sm font-bold text-[var(--accent)]">연봉 계약 갱신 설정</h3>
                       <div className="grid grid-cols-1 gap-2.5">
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-bold">갱신 기본급</label>
+                        <label className="space-y-1 block">
+                          <span className="text-[11px] font-bold">갱신 기본급</span>
                           <input type="number" value={salaryInfo.base_salary} onChange={(e) => setSalaryInfo({ ...salaryInfo, base_salary: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/5 border border-white/10 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/10 text-white" />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-bold">적용 시작일</label>
+                        </label>
+                        <label className="space-y-1 block">
+                          <span className="text-[11px] font-bold">적용 시작일</span>
                           <input type="text" value={salaryInfo.effective_date} onChange={(e) => setSalaryInfo({ ...salaryInfo, effective_date: e.target.value })} className="w-full px-3 py-2.5 bg-[var(--card)]/5 border border-white/10 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/10 text-white selection:bg-[var(--card)]/20" placeholder="0000-00-00" />
-                        </div>
+                        </label>
                       </div>
                     </div>
                   )}
@@ -424,37 +424,37 @@ export default function ContractMain({
                     </div>
                   </div>
                   <div className="grid grid-cols-1 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold">기본급 (월)</label>
+                    <label className="space-y-1 block">
+                      <span className="text-[11px] font-bold">기본급 (월)</span>
                       <input type="number" value={salaryInfo.base_salary} onChange={(e) => setSalaryInfo({ ...salaryInfo, base_salary: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold">식대 (한도 20만)</label>
+                    </label>
+                    <label className="space-y-1 block">
+                      <span className="text-[11px] font-bold">식대 (한도 20만)</span>
                       <input type="number" value={salaryInfo.meal_allowance} onChange={(e) => setSalaryInfo({ ...salaryInfo, meal_allowance: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold">적용일자</label>
+                    </label>
+                    <label className="space-y-1 block">
+                      <span className="text-[11px] font-bold">적용일자</span>
                       <input type="text" value={salaryInfo.effective_date} onChange={(e) => setSalaryInfo({ ...salaryInfo, effective_date: e.target.value })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white selection:bg-[var(--card)]/30" placeholder="0000-00-00" />
-                    </div>
+                    </label>
                     <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/10 mt-2">
-                      <div className="space-y-1">
-                        <label className="text-[11px] font-bold">주당 시간</label>
+                      <label className="space-y-1 block">
+                        <span className="text-[11px] font-bold">주당 시간</span>
                         <input type="number" value={salaryInfo.working_hours_per_week} onChange={(e) => setSalaryInfo({ ...salaryInfo, working_hours_per_week: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" inputMode="decimal" step="0.1" />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[11px] font-bold">주당 일수</label>
+                      </label>
+                      <label className="space-y-1 block">
+                        <span className="text-[11px] font-bold">주당 일수</span>
                         <input type="number" value={salaryInfo.working_days_per_week} onChange={(e) => setSalaryInfo({ ...salaryInfo, working_days_per_week: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
-                      </div>
+                      </label>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-[11px] font-bold">출근시간</label>
+                      <label className="space-y-1 block">
+                        <span className="text-[11px] font-bold">출근시간</span>
                         <input type="text" value={salaryInfo.shift_start_time} onChange={(e) => setSalaryInfo({ ...salaryInfo, shift_start_time: e.target.value })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" placeholder="09:00" />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[11px] font-bold">퇴근시간</label>
+                      </label>
+                      <label className="space-y-1 block">
+                        <span className="text-[11px] font-bold">퇴근시간</span>
                         <input type="text" value={salaryInfo.shift_end_time} onChange={(e) => setSalaryInfo({ ...salaryInfo, shift_end_time: e.target.value })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" placeholder="18:00" />
-                      </div>
+                      </label>
                     </div>
                   </div>
                 </div>
@@ -463,14 +463,14 @@ export default function ContractMain({
                 <div className="mb-4 p-5 bg-[var(--foreground)] text-white rounded-[var(--radius-lg)] shadow-sm space-y-4 animate-in slide-in-from-top-4 duration-500">
                   <h3 className="text-sm font-bold text-[var(--accent)]">연봉 계약 갱신 설정</h3>
                   <div className="grid grid-cols-1 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold">갱신 기본급</label>
+                    <label className="space-y-1 block">
+                      <span className="text-[11px] font-bold">갱신 기본급</span>
                       <input type="number" value={salaryInfo.base_salary} onChange={(e) => setSalaryInfo({ ...salaryInfo, base_salary: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/5 border border-white/10 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/10 text-white" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold">적용 시작일</label>
+                    </label>
+                    <label className="space-y-1 block">
+                      <span className="text-[11px] font-bold">적용 시작일</span>
                       <input type="text" value={salaryInfo.effective_date} onChange={(e) => setSalaryInfo({ ...salaryInfo, effective_date: e.target.value })} className="w-full px-3 py-2.5 bg-[var(--card)]/5 border border-white/10 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/10 text-white selection:bg-[var(--card)]/20" placeholder="0000-00-00" />
-                    </div>
+                    </label>
                   </div>
                 </div>
               )}

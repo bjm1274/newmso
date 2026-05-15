@@ -398,51 +398,65 @@ export default function PersonnelAppointment({
           >
             <h3 className="text-sm font-bold text-[var(--foreground)]">인사발령 등록</h3>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <select
-                value={form.staff_id}
-                onChange={(event) => handleStaffSelect(event.target.value)}
-                className="rounded-xl border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2.5 text-[11px] font-bold text-[var(--foreground)] outline-none"
-                required
-              >
-                <option value="">직원 선택</option>
-                {filteredStaffs.map((staff) => (
-                  <option key={staff.id} value={String(staff.id)}>
-                    {staff.name} ({staff.department || '부서 미지정'} · {staff.position || '직급 미지정'})
-                  </option>
-                ))}
-              </select>
+              <div>
+                <label htmlFor="order-staff-select" className="sr-only">직원 선택</label>
+                <select
+                  id="order-staff-select"
+                  aria-required="true"
+                  value={form.staff_id}
+                  onChange={(event) => handleStaffSelect(event.target.value)}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2.5 text-[11px] font-bold text-[var(--foreground)] outline-none"
+                  required
+                >
+                  <option value="">직원 선택</option>
+                  {filteredStaffs.map((staff) => (
+                    <option key={staff.id} value={String(staff.id)}>
+                      {staff.name} ({staff.department || '부서 미지정'} · {staff.position || '직급 미지정'})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-              <select
-                value={form.order_type}
-                onChange={(event) => setForm((prev) => ({ ...prev, order_type: event.target.value as typeof ORDER_TYPES[number] }))}
-                className="rounded-xl border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2.5 text-[11px] font-bold text-[var(--foreground)] outline-none"
-              >
-                {ORDER_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
+              <div>
+                <label htmlFor="order-type-select" className="sr-only">발령 유형</label>
+                <select
+                  id="order-type-select"
+                  value={form.order_type}
+                  onChange={(event) => setForm((prev) => ({ ...prev, order_type: event.target.value as typeof ORDER_TYPES[number] }))}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2.5 text-[11px] font-bold text-[var(--foreground)] outline-none"
+                >
+                  {ORDER_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-              <SmartDatePicker
-                value={form.effective_date}
-                onChange={(value) => setForm((prev) => ({ ...prev, effective_date: value }))}
-                inputClassName="rounded-xl border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2.5 text-[11px] font-bold text-[var(--foreground)] outline-none"
-              />
+              <div>
+                <span className="sr-only">발령 일자</span>
+                <SmartDatePicker
+                  value={form.effective_date}
+                  onChange={(value) => setForm((prev) => ({ ...prev, effective_date: value }))}
+                  inputClassName="rounded-xl border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2.5 text-[11px] font-bold text-[var(--foreground)] outline-none"
+                />
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 rounded-xl border border-[var(--border)] bg-[var(--tab-bg)] p-4 md:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 rounded-xl border border-[var(--border)] bg-[var(--tab-bg)] p-4 sm:grid-cols-2 md:grid-cols-4">
               <div>
-                <label className="mb-1 block text-[9px] font-bold text-[var(--toss-gray-4)]">현재 부서</label>
+                <label htmlFor="order-before-dept" className="mb-1 block text-[9px] font-bold text-[var(--toss-gray-4)]">현재 부서</label>
                 <input
+                  id="order-before-dept"
                   value={form.before_dept}
                   readOnly
                   className="w-full rounded-lg bg-[var(--tab-bg)] px-2 py-2 text-[11px] font-bold text-[var(--toss-gray-4)]"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-[9px] font-bold text-[var(--accent)]">변경 부서</label>
+                <label htmlFor="order-after-dept" className="mb-1 block text-[9px] font-bold text-[var(--accent)]">변경 부서</label>
                 <input
+                  id="order-after-dept"
                   value={form.after_dept}
                   onChange={(event) => setForm((prev) => ({ ...prev, after_dept: event.target.value }))}
                   placeholder="변경 부서"
@@ -450,16 +464,18 @@ export default function PersonnelAppointment({
                 />
               </div>
               <div>
-                <label className="mb-1 block text-[9px] font-bold text-[var(--toss-gray-4)]">현재 직급</label>
+                <label htmlFor="order-before-position" className="mb-1 block text-[9px] font-bold text-[var(--toss-gray-4)]">현재 직급</label>
                 <input
+                  id="order-before-position"
                   value={form.before_position}
                   readOnly
                   className="w-full rounded-lg bg-[var(--tab-bg)] px-2 py-2 text-[11px] font-bold text-[var(--toss-gray-4)]"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-[9px] font-bold text-[var(--accent)]">변경 직급</label>
+                <label htmlFor="order-after-position" className="mb-1 block text-[9px] font-bold text-[var(--accent)]">변경 직급</label>
                 <input
+                  id="order-after-position"
                   value={form.after_position}
                   onChange={(event) => setForm((prev) => ({ ...prev, after_position: event.target.value }))}
                   placeholder="변경 직급"
@@ -469,20 +485,28 @@ export default function PersonnelAppointment({
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <input
-                type="text"
-                value={form.reason}
-                onChange={(event) => setForm((prev) => ({ ...prev, reason: event.target.value }))}
-                placeholder="발령 사유"
-                className="rounded-xl border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2.5 text-[11px] font-bold text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]"
-              />
-              <input
-                type="text"
-                value={form.memo}
-                onChange={(event) => setForm((prev) => ({ ...prev, memo: event.target.value }))}
-                placeholder="비고"
-                className="rounded-xl border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2.5 text-[11px] font-bold text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]"
-              />
+              <div>
+                <label htmlFor="order-reason" className="sr-only">발령 사유</label>
+                <input
+                  id="order-reason"
+                  type="text"
+                  value={form.reason}
+                  onChange={(event) => setForm((prev) => ({ ...prev, reason: event.target.value }))}
+                  placeholder="발령 사유"
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2.5 text-[11px] font-bold text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]"
+                />
+              </div>
+              <div>
+                <label htmlFor="order-memo" className="sr-only">비고</label>
+                <input
+                  id="order-memo"
+                  type="text"
+                  value={form.memo}
+                  onChange={(event) => setForm((prev) => ({ ...prev, memo: event.target.value }))}
+                  placeholder="비고"
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2.5 text-[11px] font-bold text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]"
+                />
+              </div>
             </div>
 
             <div className="flex justify-end">
