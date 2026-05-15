@@ -26,11 +26,22 @@ import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import { formatLocalDateKey } from '@/lib/use-local-date-key';
 
+export type 모바일체크인MonthlySummary = {
+  /** 이번 달 출근일 수 */
+  workedDays: number;
+  /** 이번 달 지각 횟수 */
+  lateCount: number;
+  /** 이번 달 평균 근무시간(분) */
+  avgWorkedMinutes: number;
+};
+
 export type 모바일체크인Props = {
   /** 직원 ID (staff_members.id). 없으면 버튼 비활성. */
   staffId: string | null | undefined;
   /** 회사 위치. 미지정 시 WORKPLACE_LOCATION 사용. */
   companyLocation?: LatLng;
+  /** 부모(CommuteRecord)에서 이번 달 요약을 주입하면 통계 카드 렌더. */
+  monthlySummary?: 모바일체크인MonthlySummary;
   /** 체크인/체크아웃 성공 후 호출(부모에서 재조회 등). */
   onCheckedIn?: () => void;
   onCheckedOut?: () => void;
@@ -45,9 +56,20 @@ type CheckInOpenLog = {
 
 const ACCURACY_WARN_M = 200;
 
+function formatWorkedMinutes(minutes: number): string {
+  const safe = Math.max(0, Math.round(minutes));
+  if (!safe) return '0분';
+  const hours = Math.floor(safe / 60);
+  const mins = safe % 60;
+  if (!hours) return `${mins}분`;
+  if (!mins) return `${hours}시간`;
+  return `${hours}시간 ${mins}분`;
+}
+
 export default function 모바일체크인({
   staffId,
   companyLocation = WORKPLACE_LOCATION,
+  monthlySummary,
   onCheckedIn,
   onCheckedOut,
 }: 모바일체크인Props) {
@@ -234,6 +256,35 @@ export default function 모바일체크인({
           )}
         </div>
       </section>
+
+      {/* 이번 달 통계 카드 (부모 주입 시) */}
+      {monthlySummary && (
+        <section
+          aria-label="이번 달 출근 통계"
+          className="grid grid-cols-3 gap-2"
+        >
+          <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-3 text-center">
+            <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">출근일</p>
+            <p className="mt-1 text-lg font-bold text-[var(--foreground)]">
+              {monthlySummary.workedDays}일
+            </p>
+          </div>
+          <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-3 text-center">
+            <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">지각</p>
+            <p
+              className={`mt-1 text-lg font-bold ${monthlySummary.lateCount > 0 ? 'text-red-600' : 'text-[var(--foreground)]'}`}
+            >
+              {monthlySummary.lateCount}회
+            </p>
+          </div>
+          <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-3 text-center">
+            <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">평균</p>
+            <p className="mt-1 text-base font-bold text-[var(--foreground)]">
+              {formatWorkedMinutes(monthlySummary.avgWorkedMinutes)}
+            </p>
+          </div>
+        </section>
+      )}
 
       {/* 위치 확인 / 출근 / 퇴근 버튼 */}
       <div className="flex flex-col gap-3">
