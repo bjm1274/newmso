@@ -9,6 +9,8 @@ import {
   fetchOrgTeams,
   type OrgTeam,
 } from '@/lib/data/org';
+import { useIsMobile } from '@/app/components/useIsMobile';
+import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 
 const HOSPITAL_DIVISIONS = ['진료부', '간호부', '총무부'];
 const MSO_DIVISIONS = ['운영본부', '전략기획본부'];
@@ -21,7 +23,15 @@ type TeamManagerProps = {
   disabled?: boolean;
 };
 
-export default function TeamManager({
+export default function TeamManager(props: TeamManagerProps) {
+  const isMobile = useIsMobile();
+  if (isMobile) {
+    return <DesktopOnlyNotice feature="팀 관리" />;
+  }
+  return <TeamManagerDesktop {...props} />;
+}
+
+function TeamManagerDesktop({
   onRefresh,
   selectedCompany,
   hideCompanySelect = false,

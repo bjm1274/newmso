@@ -1,8 +1,18 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useIsMobile } from '@/app/components/useIsMobile';
+import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 
-export default function NotificationAutomation({ user: userRaw }: Record<string, unknown>) {
+export default function NotificationAutomation(props: Record<string, unknown>) {
+  const isMobile = useIsMobile();
+  if (isMobile) {
+    return <DesktopOnlyNotice feature="알림 자동화 설정" />;
+  }
+  return <NotificationAutomationDesktop {...props} />;
+}
+
+function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown>) {
   const user = userRaw as Record<string, unknown> | undefined;
   const [payrollDay, setPayrollDay] = useState(25);
   const [enabled, setEnabled] = useState(true);

@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import { LoadingPanel, StatePanel } from '@/app/components/StatePanel';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import { supabase } from '@/lib/supabase';
+import { useIsMobile } from '@/app/components/useIsMobile';
+import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 
 interface Props {
   user: unknown;
@@ -73,7 +75,15 @@ const AUDIT_COLUMNS: Column<AccessLog>[] = [
     },
 ];
 
-export default function AccessAuditLog({ user: _user }: Props) {
+export default function AccessAuditLog(props: Props) {
+  const isMobile = useIsMobile();
+  if (isMobile) {
+    return <DesktopOnlyNotice feature="접근 감사 로그" />;
+  }
+  return <AccessAuditLogDesktop {...props} />;
+}
+
+function AccessAuditLogDesktop({ user: _user }: Props) {
   const [logs, setLogs] = useState<AccessLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [tableExists, setTableExists] = useState(true);

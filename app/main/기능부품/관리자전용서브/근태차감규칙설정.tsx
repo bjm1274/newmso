@@ -2,6 +2,8 @@
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useIsMobile } from '@/app/components/useIsMobile';
+import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 
 type AttendanceDeductionRulesProps = {
   selectedCo?: string;
@@ -9,7 +11,15 @@ type AttendanceDeductionRulesProps = {
   disabled?: boolean;
 };
 
-export default function AttendanceDeductionRules({
+export default function AttendanceDeductionRules(props: AttendanceDeductionRulesProps) {
+  const isMobile = useIsMobile();
+  if (isMobile) {
+    return <DesktopOnlyNotice feature="근태 차감 규칙 설정" />;
+  }
+  return <AttendanceDeductionRulesDesktop {...props} />;
+}
+
+function AttendanceDeductionRulesDesktop({
   selectedCo = '전체',
   compact = false,
   disabled = false,

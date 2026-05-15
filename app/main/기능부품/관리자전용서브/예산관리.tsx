@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { readLocalStorage, writeLocalStorage } from '@/lib/storage-utils';
+import { useIsMobile } from '@/app/components/useIsMobile';
+import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 
 const BUDGET_ITEMS = ['인건비', '운영비', '장비', '기타'] as const;
 type BudgetItem = typeof BUDGET_ITEMS[number];
@@ -28,7 +30,15 @@ interface BudgetExecution {
 }
 
 
-export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
+export default function BudgetManagement(props: { staffs: any[] }) {
+  const isMobile = useIsMobile();
+  if (isMobile) {
+    return <DesktopOnlyNotice feature="예산 관리" />;
+  }
+  return <BudgetManagementDesktop {...props} />;
+}
+
+function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
   const [activeTab, setActiveTab] = useState<'설정' | '집행현황'>('설정');
 
   // 예산 설정 상태
