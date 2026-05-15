@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { canAccessExtraFeature, isAdminUser } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from './공통/SmartDatePicker';
+import ClosureItemsGrid from './마감보고Grid';
 
 interface ClosureItem {
     id?: string;
@@ -234,9 +235,16 @@ export default function DailyClosurePage({
         setItems(items.filter((_, i) => i !== index));
     };
 
-    const updateItem = (index: number, field: keyof ClosureItem, value: any) => {
+    const updateItem = (index: number, field: keyof ClosureItem, value: unknown) => {
         const newItems = [...items];
-        newItems[index] = { ...newItems[index], [field]: value };
+        const target = { ...newItems[index] };
+        if (field === 'amount') {
+            const num = typeof value === 'number' ? value : Number(value);
+            target.amount = Number.isFinite(num) ? num : 0;
+        } else {
+            target[field] = String(value ?? '') as never;
+        }
+        newItems[index] = target;
         setItems(newItems);
     };
 
@@ -541,44 +549,11 @@ export default function DailyClosurePage({
                             <h3 className="text-sm font-bold text-[var(--foreground)]">📊 수납 내역 상세</h3>
                             <button data-testid="daily-closure-add-item" onClick={addItem} className="px-3 py-1.5 text-[11px] font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700">➕ 항목 추가</button>
                         </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs">
-                                <thead>
-                                    <tr className="border-b border-[var(--border-subtle)]">
-                                        <th className="py-3 px-2 font-bold text-[var(--toss-gray-3)]">환자명</th>
-                                        <th className="py-3 px-2 font-bold text-[var(--toss-gray-3)]">금액</th>
-                                        <th className="py-3 px-2 font-bold text-[var(--toss-gray-3)]">수납방식</th>
-                                        <th className="py-3 px-2 font-bold text-[var(--toss-gray-3)]">항목</th>
-                                        <th className="py-3 px-2 font-bold text-[var(--toss-gray-3)]">메모</th>
-                                        <th className="py-3 px-2"></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {items.map((item, idx) => (
-                                        <tr key={idx} className="border-b border-[var(--border-subtle)] last:border-0">
-                                            <td className="py-2 px-1"><input data-testid={`daily-closure-item-patient-${idx}`} value={item.patient_name} onChange={e => updateItem(idx, 'patient_name', e.target.value)} className="w-full bg-transparent outline-none font-medium" placeholder="환자명" /></td>
-                                            <td className="py-2 px-1"><input data-testid={`daily-closure-item-amount-${idx}`} type="number" value={item.amount} onChange={e => updateItem(idx, 'amount', Number(e.target.value))} className="w-full bg-transparent outline-none font-bold text-blue-600" /></td>
-                                            <td className="py-2 px-1">
-                                                <select value={item.payment_method} onChange={e => updateItem(idx, 'payment_method', e.target.value)} className="bg-transparent outline-none">
-                                                    <option value="카드">카드</option>
-                                                    <option value="현금">현금</option>
-                                                    <option value="계좌이체">계좌이체</option>
-                                                </select>
-                                            </td>
-                                            <td className="py-2 px-1">
-                                                <select value={item.receipt_type} onChange={e => updateItem(idx, 'receipt_type', e.target.value)} className="bg-transparent outline-none">
-                                                    <option value="진료비">진료비</option>
-                                                    <option value="제증명">제증명</option>
-                                                    <option value="기타">기타</option>
-                                                </select>
-                                            </td>
-                                            <td className="py-2 px-1"><input value={item.memo} onChange={e => updateItem(idx, 'memo', e.target.value)} className="w-full bg-transparent outline-none text-[var(--toss-gray-3)]" placeholder="비고" /></td>
-                                            <td className="py-2 px-1"><button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600">✕</button></td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                        <ClosureItemsGrid
+                            items={items}
+                            updateItem={updateItem}
+                            removeItem={removeItem}
+                        />
                     </div>
 
                     {/* 수표 조회/기록 */}
