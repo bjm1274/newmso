@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
+import { getScopedActiveStaffs } from '@/lib/active-staff';
 import type { StaffMember } from '@/types';
 
 const ORDER_TYPES = ['승진', '전보(부서이동)', '퇴직/면직'] as const;
@@ -33,6 +34,7 @@ type Props = {
   staffs?: StaffMember[];
   selectedCo?: string;
   user?: StaffMember | Record<string, unknown> | null;
+  onHeaderActions?: (node: React.ReactNode) => void;
 };
 
 type AppointmentFormState = {
@@ -53,6 +55,7 @@ export default function PersonnelAppointment({
   staffs = [],
   selectedCo = '전체',
   user = null,
+  onHeaderActions,
 }: Props) {
   const [records, setRecords] = useState<AppointmentRecord[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -73,8 +76,9 @@ export default function PersonnelAppointment({
     memo: '',
   });
 
+  // 발령 등록 대상은 현직 직원만 (퇴사자 제외 — 이미 status=퇴사면 발령 불필요)
   const filteredStaffs = useMemo(() => {
-    return staffs.filter((staff) => selectedCo === '전체' || staff.company === selectedCo);
+    return getScopedActiveStaffs(staffs, selectedCo);
   }, [selectedCo, staffs]);
 
   const fetchRecords = useCallback(async () => {
@@ -278,34 +282,36 @@ export default function PersonnelAppointment({
     toast('관보 내용이 클립보드에 복사되었습니다.', 'success');
   };
 
+  // 헤더 액션 버튼을 부모 탭바로 전달 (최신 핸들러 참조용 ref)
+  const generateGazetteRef = useRef(generateGazette);
+  generateGazetteRef.current = generateGazette;
+
+  useEffect(() => {
+    onHeaderActions?.(
+      <>
+        <button
+          type="button"
+          onClick={() => generateGazetteRef.current()}
+          className="rounded-xl bg-[var(--foreground)] px-4 py-2.5 text-[11px] font-bold text-[var(--card)] shadow-md transition-opacity hover:opacity-90"
+        >
+          관보 생성
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowForm((prev) => !prev)}
+          className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-[11px] font-bold text-white shadow-md transition-opacity hover:opacity-90"
+        >
+          {showForm ? '등록 닫기' : '+ 발령 등록'}
+        </button>
+      </>
+    );
+    return () => onHeaderActions?.(null);
+  }, [showForm, selectedCo, onHeaderActions]);
+
   return (
     <div className="flex h-full flex-col animate-in fade-in duration-300">
-      <header className="shrink-0 border-b border-[var(--border)] bg-[var(--card)] p-4 md:p-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <span className="text-sm text-[var(--accent)] font-bold">[{selectedCo}]</span>
-            <p className="text-xs text-[var(--toss-gray-3)]">
-              승진, 전보, 퇴직/면직 이력을 저장하고 직원 최신 정보를 함께 반영합니다.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={generateGazette}
-              className="rounded-xl bg-[var(--foreground)] px-4 py-2.5 text-[11px] font-bold text-[var(--card)] shadow-md transition-opacity hover:opacity-90"
-            >
-              관보 생성
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowForm((prev) => !prev)}
-              className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-[11px] font-bold text-white shadow-md transition-opacity hover:opacity-90"
-            >
-              {showForm ? '등록 닫기' : '+ 발령 등록'}
-            </button>
-          </div>
-        </div>
-        <div className="mt-4 flex gap-1 border-b border-[var(--border)] -mb-5">
+      <header className="shrink-0 border-b border-[var(--border)] bg-[var(--card)] px-4 md:px-5">
+        <div className="flex gap-1">
           {(['발령목록', '관보생성'] as const).map((tab) => (
             <button
               key={tab}

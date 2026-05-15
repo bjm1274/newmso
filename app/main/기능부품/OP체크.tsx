@@ -11,6 +11,7 @@ import {
   withMissingColumnFallback,
   withMissingColumnsFallback,
 } from '@/lib/supabase-compat';
+import { isActiveStaff } from '@/lib/active-staff';
 import type {
   BoardPost,
   InventoryItem,
@@ -102,6 +103,7 @@ type WardStaffRow = {
   position?: string | null;
   company?: string | null;
   company_id?: string | null;
+  status?: string | null;
 };
 
 type ChatRoomMemberLookupRow = {
@@ -1725,20 +1727,24 @@ export default function OperationCheckView({
       ).trim();
       const hasPrefetchedStaffs = Array.isArray(staffs) && staffs.length > 0;
       if (hasPrefetchedStaffs) {
+        // 병동 메시지 수신자 후보는 현직 직원만 (퇴사자 제외)
+        const activeStaffs = staffs.filter((staff) => isActiveStaff(staff));
         setWardStaffs(
           normalizeWardStaffList(
-            resolveWardStaffCandidates(staffs, companyId, companyName) as WardStaffRow[],
+            resolveWardStaffCandidates(activeStaffs, companyId, companyName) as WardStaffRow[],
             senderId,
           ),
         );
       } else {
         const { data } = await supabase
           .from('staff_members')
-          .select('id, name, department, position, company, company_id')
+          .select('id, name, department, position, company, company_id, status')
           .order('name');
+        // 병동 메시지 수신자 후보는 현직 직원만 (퇴사자 제외)
+        const activeRows = ((data || []) as WardStaffRow[]).filter((row) => isActiveStaff(row));
         setWardStaffs(
           normalizeWardStaffList(
-            resolveWardStaffCandidates((data || []) as WardStaffRow[], companyId, companyName),
+            resolveWardStaffCandidates(activeRows, companyId, companyName),
             senderId,
           ),
         );

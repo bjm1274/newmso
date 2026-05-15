@@ -4,6 +4,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { isActiveStaff } from '@/lib/active-staff';
 import { FEATURE_PERMISSION_GROUPS } from '@/lib/feature-permissions';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 
@@ -13,7 +14,7 @@ import { buildPermissionReview, normalizeApprovalReferenceDefaults } from './직
 import { PermissionDiffPanel } from './직원권한통합/PermissionDiffPanel';
 
 const STAFF_LIST_SELECT =
-  'id, employee_no, name, company, department, position, role, permissions';
+  'id, employee_no, name, company, department, position, role, permissions, status';
 
 const APPROVAL_REFERENCE_DEFAULTS_PERMISSION_KEY = 'approval_reference_defaults';
 const APPROVAL_DELEGATE_ID_PERMISSION_KEY = 'approval_delegate_id';
@@ -61,7 +62,8 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       return;
     }
     if (data) {
-      const sortedData = [...data].sort(sortStaffRows);
+      // 퇴사자는 권한 관리 대상이 아니므로 제외 (재직자만 노출)
+      const sortedData = data.filter(isActiveStaff).sort(sortStaffRows);
       setStaffs(sortedData);
       setSelectedStaff((current: any) => {
         if (!current?.id) return current;
