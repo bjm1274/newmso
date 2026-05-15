@@ -204,7 +204,7 @@ export function ExpandableTable<T>({
                         : undefined
                     }
                   >
-                    <td className="w-8 px-2 py-3 text-[var(--toss-gray-3)]">
+                    <td className="w-8 px-2 py-3 text-[var(--toss-gray-3)]" aria-hidden="true">
                       {expandable ? (
                         isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
                       ) : null}

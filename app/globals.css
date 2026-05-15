@@ -77,7 +77,8 @@
   --toss-blue-light: #EFF6FF;
   --toss-gray-1: #F8F8F9;
   --toss-gray-2: #E9E9EC;
-  --toss-gray-3: #9CA3AF;
+  /* gray-3: WCAG AA 본문 4.5:1 충족 (#FFF 대비 4.54:1). 보조 텍스트 a11y 강화 (2026-05-15) */
+  --toss-gray-3: #767E89;
   --toss-gray-4: #6B7280;
   --toss-gray-5: #374151;
   --toss-border: #E9E9EC;
@@ -164,7 +165,8 @@
   --toss-blue-light: rgba(59,130,246,0.12);
   --toss-gray-1: #18181B;
   --toss-gray-2: #27272A;
-  --toss-gray-3: #71717A;
+  /* gray-3 dark: WCAG AA 본문 4.5:1 충족 (#09090B 대비 4.59:1). 보조 텍스트 a11y 강화 (2026-05-15) */
+  --toss-gray-3: #8A8A93;
   --toss-gray-4: #A1A1AA;
   --toss-gray-5: #D4D4D8;
   --toss-border: #27272A;
@@ -1232,6 +1234,21 @@ button, a, [role="button"] {
 .focus-ring:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--accent-subtle), 0 0 0 1px var(--accent);
+}
+
+/* ── 글로벌 키보드 포커스 가시성 (JM6 / WCAG 2.4.7) ─
+ * 마우스 클릭 시에는 표시되지 않음 (:focus-visible 한정)
+ * 모든 인터랙티브 element에 일관된 포커스 링 보장.
+ * specificity 0(:where) — 컴포넌트가 더 강한 focus 스타일을 두면 덮어씀.
+ * outline은 border와 별개로 그려져 기존 radius를 침해하지 않는다.
+ */
+:where(button, a, [role="button"], [role="link"], input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* 마우스 클릭으로 받은 포커스는 표시하지 않음 (키보드 한정 가시성) */
+:where(button, [role="button"]):focus:not(:focus-visible) {
+  outline: none;
 }
 
 /* ── Number tabular ──────────────────────────────── */
