@@ -189,19 +189,27 @@ export default function SupplierManagement({ user }: { user: unknown }) {
     },
   ], [today, openEdit, handleDelete]);
 
-  const F = ({ label, k, type = 'text', placeholder = '' }: { label: string; k: keyof typeof EMPTY_FORM; type?: string; placeholder?: string }) => (
-    <div>
-      <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">{label}</label>
-      <input
-        type={type}
-        value={form[k]}
-        onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))}
-        placeholder={placeholder}
-        data-testid={`supplier-field-${String(k).replace(/_/g, '-')}`}
-        className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm font-medium bg-[var(--card)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)]"
-      />
-    </div>
-  );
+  const F = ({ label, k, type = 'text', placeholder = '', required = false }: { label: string; k: keyof typeof EMPTY_FORM; type?: string; placeholder?: string; required?: boolean }) => {
+    const inputId = `supplier-field-${String(k).replace(/_/g, '-')}`;
+    return (
+      <div>
+        <label htmlFor={inputId} className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">
+          {label}
+          {required && <span className="text-red-500 ml-0.5" aria-hidden>*</span>}
+        </label>
+        <input
+          id={inputId}
+          type={type}
+          value={form[k]}
+          onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))}
+          placeholder={placeholder}
+          aria-required={required || undefined}
+          data-testid={inputId}
+          className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm font-medium bg-[var(--card)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)]"
+        />
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-4" data-testid="supplier-management-view">
@@ -263,20 +271,21 @@ export default function SupplierManagement({ user }: { user: unknown }) {
               <button onClick={() => setShowModal(false)} className="p-1.5 hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-[var(--toss-gray-3)]">✕</button>
             </div>
             <div className="p-4 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2"><F label="거래처명 *" k="name" placeholder="(주)예시거래처" /></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2"><F label="거래처명" k="name" placeholder="(주)예시거래처" required /></div>
                 <F label="분류" k="category" placeholder="의료기기 / 소모품 / 의약품" />
                 <F label="사업자번호" k="business_number" placeholder="000-00-00000" />
                 <F label="담당자" k="contact_name" />
                 <F label="연락처" k="phone" type="tel" placeholder="010-0000-0000" />
-                <div className="col-span-2"><F label="이메일" k="email" type="email" /></div>
-                <div className="col-span-2"><F label="주소" k="address" /></div>
+                <div className="sm:col-span-2"><F label="이메일" k="email" type="email" /></div>
+                <div className="sm:col-span-2"><F label="주소" k="address" /></div>
                 <F label="계약 시작일" k="contract_start" type="date" />
                 <F label="계약 만료일" k="contract_end" type="date" />
-                <div className="col-span-2"><F label="결제 조건" k="payment_terms" placeholder="예: 월말 정산 30일" /></div>
-                <div className="col-span-2">
-                  <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">메모</label>
+                <div className="sm:col-span-2"><F label="결제 조건" k="payment_terms" placeholder="예: 월말 정산 30일" /></div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="supplier-field-notes" className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">메모</label>
                   <textarea
+                    id="supplier-field-notes"
                     value={form.notes}
                     onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                     rows={3}
@@ -287,8 +296,8 @@ export default function SupplierManagement({ user }: { user: unknown }) {
               </div>
             </div>
             <div className="p-4 border-t border-[var(--border)] flex gap-3">
-              <button onClick={() => setShowModal(false)} className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
-              <button onClick={handleSave} disabled={saving} data-testid="supplier-save-button" className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white font-semibold text-sm disabled:opacity-50">
+              <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
+              <button type="button" onClick={handleSave} disabled={saving} data-testid="supplier-save-button" className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white font-semibold text-sm disabled:opacity-50">
                 {saving ? '저장 중...' : '저장'}
               </button>
             </div>

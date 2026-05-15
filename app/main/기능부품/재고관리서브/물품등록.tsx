@@ -216,9 +216,13 @@ export default function ProductRegistration({
 
         <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">제품명 *</label>
+            <label htmlFor="inventory-registration-item-name" className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">
+              제품명 <span className="text-red-500" aria-hidden>*</span>
+            </label>
             <input
+              id="inventory-registration-item-name"
               data-testid="inventory-registration-item-name"
+              aria-required="true"
               value={productForm.item_name}
               list="inventory-registration-item-name-options"
               onChange={(event) => {
@@ -248,9 +252,13 @@ export default function ProductRegistration({
           </div>
 
           <div className="space-y-2">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">분류 *</label>
+            <label htmlFor="inventory-registration-category" className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">
+              분류 <span className="text-red-500" aria-hidden>*</span>
+            </label>
             <select
+              id="inventory-registration-category"
               data-testid="inventory-registration-category"
+              aria-required="true"
               value={productForm.category}
               onChange={(event) => updateForm({ category: event.target.value })}
               className="w-full rounded-[var(--radius-md)] bg-[var(--input-bg)] p-4 text-sm font-bold outline-none transition focus:ring-2 focus:ring-[var(--accent)]/20"
@@ -265,8 +273,9 @@ export default function ProductRegistration({
           </div>
 
           <div className="space-y-2">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">현재 수량</label>
+            <label htmlFor="inventory-registration-quantity" className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">현재 수량</label>
             <input
+              id="inventory-registration-quantity"
               data-testid="inventory-registration-quantity"
               type="number"
               min={0}
@@ -278,9 +287,13 @@ export default function ProductRegistration({
           </div>
 
           <div className="space-y-2">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">단위 *</label>
+            <label htmlFor="inventory-registration-unit" className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">
+              단위 <span className="text-red-500" aria-hidden>*</span>
+            </label>
             <select
+              id="inventory-registration-unit"
               data-testid="inventory-registration-unit"
+              aria-required="true"
               value={productForm.unit}
               onChange={(event) => updateForm({ unit: normalizeInventoryUnit(event.target.value) })}
               className="w-full rounded-[var(--radius-md)] bg-[var(--input-bg)] p-4 text-sm font-bold outline-none transition focus:ring-2 focus:ring-[var(--accent)]/20"
@@ -291,8 +304,9 @@ export default function ProductRegistration({
           </div>
 
           <div className="space-y-2">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">단가 (원)</label>
+            <label htmlFor="inventory-registration-unit-price" className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">단가 (원)</label>
             <input
+              id="inventory-registration-unit-price"
               type="number"
               min={0}
               max={99999999}
@@ -313,8 +327,9 @@ export default function ProductRegistration({
           </div>
 
           <div className="space-y-2">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">LOT 번호 (선택)</label>
+            <label htmlFor="inventory-registration-lot-number" className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">LOT 번호 (선택)</label>
             <input
+              id="inventory-registration-lot-number"
               value={productForm.lot_number}
               onChange={(event) => updateForm({ lot_number: event.target.value })}
               className="w-full rounded-[var(--radius-md)] bg-[var(--input-bg)] p-4 text-sm font-bold outline-none transition focus:ring-2 focus:ring-[var(--accent)]/20"
@@ -323,8 +338,9 @@ export default function ProductRegistration({
           </div>
 
           <div className="space-y-2">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">시리얼 번호 (선택)</label>
+            <label htmlFor="inventory-registration-serial-number" className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">시리얼 번호 (선택)</label>
             <input
+              id="inventory-registration-serial-number"
               value={productForm.serial_number}
               onChange={(event) => updateForm({ serial_number: event.target.value })}
               className="w-full rounded-[var(--radius-md)] bg-[var(--input-bg)] p-4 text-sm font-bold outline-none transition focus:ring-2 focus:ring-[var(--accent)]/20"
@@ -333,8 +349,9 @@ export default function ProductRegistration({
           </div>
 
           <div className="space-y-2">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">안전 재고</label>
+            <label htmlFor="inventory-registration-min-quantity" className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">안전 재고</label>
             <input
+              id="inventory-registration-min-quantity"
               type="number"
               value={productForm.min_quantity}
               onChange={(event) => updateForm({ min_quantity: Math.max(0, parseInt(event.target.value, 10) || 0) })}
@@ -343,8 +360,9 @@ export default function ProductRegistration({
           </div>
 
           <div className="space-y-2">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">공급 업체</label>
+            <label htmlFor="inventory-registration-supplier" className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">공급 업체</label>
             <select
+              id="inventory-registration-supplier"
               value={productForm.supplier_name}
               onChange={(event) => updateForm({ supplier_name: event.target.value })}
               className="w-full rounded-[var(--radius-md)] bg-[var(--input-bg)] p-4 text-sm font-bold outline-none transition focus:ring-2 focus:ring-[var(--accent)]/20"
@@ -359,8 +377,9 @@ export default function ProductRegistration({
           </div>
 
           <div className="space-y-2">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">보험코드 (선택)</label>
+            <label htmlFor="inventory-registration-insurance-code" className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">보험코드 (선택)</label>
             <input
+              id="inventory-registration-insurance-code"
               value={productForm.insurance_code}
               onChange={(event) => updateForm({ insurance_code: event.target.value })}
               className="w-full rounded-[var(--radius-md)] bg-[var(--input-bg)] p-4 text-sm font-bold outline-none transition focus:ring-2 focus:ring-[var(--accent)]/20"
@@ -369,9 +388,13 @@ export default function ProductRegistration({
           </div>
 
           <div className="space-y-2">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">보유 회사 *</label>
+            <label htmlFor="inventory-registration-company" className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">
+              보유 회사 <span className="text-red-500" aria-hidden>*</span>
+            </label>
             <select
+              id="inventory-registration-company"
               data-testid="inventory-registration-company"
+              aria-required="true"
               value={productForm.company}
               onChange={(event) => updateForm({ company: event.target.value })}
               className="w-full rounded-[var(--radius-md)] bg-[var(--input-bg)] p-4 text-sm font-bold outline-none transition focus:ring-2 focus:ring-[var(--accent)]/20"
@@ -385,8 +408,9 @@ export default function ProductRegistration({
           </div>
 
           <div className="space-y-2">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">배정 부서</label>
+            <label htmlFor="inventory-registration-department" className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">배정 부서</label>
             <select
+              id="inventory-registration-department"
               data-testid="inventory-registration-department"
               value={productForm.department}
               onChange={(event) => updateForm({ department: event.target.value })}
@@ -420,6 +444,7 @@ export default function ProductRegistration({
         </div>
 
         <button
+          type="button"
           data-testid="inventory-registration-submit"
           aria-label="물품 자산 저장하기"
           onClick={handleRegisterProduct}
