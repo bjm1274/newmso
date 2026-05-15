@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { EmptyState } from '@/app/components/StatePanel';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { useIsMobile } from '@/app/components/useIsMobile';
+import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 import OpCheckMobileBoard from './OP체크/모바일보드';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
@@ -2710,16 +2711,42 @@ export default function OperationCheckView({
     );
   }
 
-  // 모바일 + 환자 체크 모드: 경량 모바일 보드 시범 적용
-  // (템플릿 편집 모드는 모바일에서도 데스크톱 워크스페이스를 그대로 사용)
-  if (isMobile && activeTab === 'patients') {
+  // 모바일은 OP체크 전체를 한 화면으로 통합한다.
+  // - patients: 보드 + 상세 시트(BottomSheet) 자체 관리
+  // - templates: 편집이 복잡해 모바일 미지원 — DesktopOnlyNotice 로 안내하고 환자 보드로 복귀 유도
+  if (isMobile) {
+    if (activeTab !== 'patients') {
+      return (
+        <div data-testid="op-check-view" className="p-4">
+          {dialog}
+          <DesktopOnlyNotice
+            feature="OP체크 템플릿 설정"
+            description="템플릿 편집은 PC 폭에 최적화되어 있어 모바일에서는 지원되지 않습니다. 현장 점검은 환자 보드에서 가능합니다."
+            action={
+              <button
+                type="button"
+                onClick={() => setActiveTab('patients')}
+                className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white"
+              >
+                환자 보드로 이동
+              </button>
+            }
+          />
+        </div>
+      );
+    }
     return (
       <div data-testid="op-check-view" className="h-full">
         {dialog}
         <OpCheckMobileBoard
           date={selectedDate}
           companyId={selectedCompanyId ?? null}
-          onSelectSchedule={(scheduleId) => setSelectedScheduleId(scheduleId)}
+          user={{
+            id: user?.id ? String(user.id) : null,
+            name: user?.name ? String(user.name) : null,
+            company: user?.company ? String(user.company) : null,
+            company_id: user?.company_id ? String(user.company_id) : null,
+          }}
         />
       </div>
     );

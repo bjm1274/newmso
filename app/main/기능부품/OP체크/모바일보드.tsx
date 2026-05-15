@@ -17,7 +17,7 @@
  * JM6: 시맨틱 button + aria-label, 키보드 새로고침 버튼 별도 제공
  */
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { RefreshCw, Clock, MapPin, User } from 'lucide-react';
 import { PullToRefresh } from '@/app/components/PullToRefresh';
 import { EmptyState } from '@/app/components/StatePanel';
@@ -28,14 +28,25 @@ import {
 import { haptics } from '@/app/lib/haptics';
 import { STATUS_OPTIONS } from './constants';
 import { formatDateLabel, type ScheduleStatus } from './schedule-helpers';
+import OpCheckMobileDetailSheet from './모바일상세시트';
 
 export type OpCheckMobileBoardProps = {
   /** YYYY-MM-DD. 미지정 시 오늘. */
   date?: string;
   /** 회사 필터 */
   companyId?: string | null;
-  /** 카드 클릭 시 호출 (워크스페이스 진입 등) */
+  /**
+   * 카드 클릭 시 호출. 미지정 시 보드 내부에서 상세 시트를 직접 연다.
+   * 데스크톱 OP체크.tsx 에서 외부 워크스페이스로 빠지고 싶을 때만 지정.
+   */
   onSelectSchedule?: (scheduleId: string) => void;
+  /** 상세 시트 저장 시 감사 컬럼에 기록할 사용자 정보 */
+  user?: {
+    id?: string | null;
+    name?: string | null;
+    company?: string | null;
+    company_id?: string | null;
+  } | null;
 };
 
 const STATUS_BADGE_CLASS: Record<ScheduleStatus, string> = {
@@ -117,10 +128,12 @@ export default function OpCheckMobileBoard({
   date,
   companyId,
   onSelectSchedule,
+  user,
 }: OpCheckMobileBoardProps) {
   const [selectedDate, setSelectedDate] = useState<string>(
     () => date || new Date().toISOString().slice(0, 10),
   );
+  const [activeScheduleId, setActiveScheduleId] = useState<string | null>(null);
   const { items, loading, error, refresh } = useOpCheckBoardStream({
     date: selectedDate,
     companyId: companyId ?? null,
@@ -132,6 +145,27 @@ export default function OpCheckMobileBoard({
     haptics.light();
     await refresh();
   };
+
+  const handleCardSelect = useCallback(
+    (scheduleId: string) => {
+      // 외부 핸들러가 있으면 위임 (데스크톱 OP체크.tsx 가 워크스페이스로 빠질 때)
+      if (onSelectSchedule) {
+        onSelectSchedule(scheduleId);
+        return;
+      }
+      setActiveScheduleId(scheduleId);
+    },
+    [onSelectSchedule],
+  );
+
+  const handleSheetClose = useCallback(() => {
+    setActiveScheduleId(null);
+  }, []);
+
+  const handleSheetSaved = useCallback(() => {
+    // 저장 후 즉시 새로 불러와 카드 상태 반영
+    void refresh();
+  }, [refresh]);
 
   return (
     <div className="flex h-full flex-col bg-[var(--background)]">
@@ -186,12 +220,20 @@ export default function OpCheckMobileBoard({
           <ul className="flex flex-col gap-3 p-4" aria-busy={loading} aria-live="polite">
             {items.map((item) => (
               <li key={item.id}>
-                <OpCheckMobileCard item={item} onSelect={onSelectSchedule} />
+                <OpCheckMobileCard item={item} onSelect={handleCardSelect} />
               </li>
             ))}
           </ul>
         )}
       </PullToRefresh>
+
+      <OpCheckMobileDetailSheet
+        open={activeScheduleId !== null}
+        scheduleId={activeScheduleId}
+        onClose={handleSheetClose}
+        onSaved={handleSheetSaved}
+        user={user ?? null}
+      />
     </div>
   );
 }
