@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { getPayrollGrossPay } from '@/lib/payroll-records';
 import { calculateEmployeeInsuranceDeductions } from '@/lib/payroll-insurance-rates';
 import { supabase } from '@/lib/supabase';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 interface Props {
   staffs: any[];
@@ -12,6 +13,7 @@ interface Props {
 }
 
 type ComparisonRow = {
+  id: string;
   staff: any;
   gross: number;
   deduction: number;
@@ -80,6 +82,7 @@ export default function GrossNetComparison({ staffs, selectedCo }: Props) {
       const insuranceFallback = calculateEmployeeInsuranceDeductions(gross);
 
       return {
+        id: String(staff?.id ?? ''),
         staff,
         gross,
         deduction,
@@ -126,6 +129,83 @@ export default function GrossNetComparison({ staffs, selectedCo }: Props) {
 
   const maxBucket = Math.max(...Object.values(buckets), 1);
 
+  const columns = useMemo((): Column<ComparisonRow>[] => [
+    {
+      key: 'name',
+      label: '직원명',
+      primary: true,
+      render: (row) => <span className="font-bold">{row.staff?.name ?? '—'}</span>,
+    },
+    {
+      key: 'gross',
+      label: '총급여',
+      align: 'right',
+      render: (row) => formatNumber(row.gross),
+    },
+    {
+      key: 'pension',
+      label: '국민연금',
+      align: 'right',
+      render: (row) => (
+        <span className="text-[var(--toss-gray-4)]">{formatNumber(row.breakdown.pension)}</span>
+      ),
+    },
+    {
+      key: 'health',
+      label: '건강보험',
+      align: 'right',
+      render: (row) => (
+        <span className="text-[var(--toss-gray-4)]">{formatNumber(row.breakdown.health)}</span>
+      ),
+    },
+    {
+      key: 'ltcare',
+      label: '장기요양보험',
+      align: 'right',
+      render: (row) => (
+        <span className="text-[var(--toss-gray-4)]">{formatNumber(row.breakdown.ltcare)}</span>
+      ),
+    },
+    {
+      key: 'employment',
+      label: '고용보험',
+      align: 'right',
+      render: (row) => (
+        <span className="text-[var(--toss-gray-4)]">{formatNumber(row.breakdown.employment)}</span>
+      ),
+    },
+    {
+      key: 'incomeTax',
+      label: '소득세',
+      align: 'right',
+      render: (row) => (
+        <span className="text-[var(--toss-gray-4)]">{formatNumber(row.breakdown.incomeTax)}</span>
+      ),
+    },
+    {
+      key: 'deduction',
+      label: '총공제',
+      align: 'right',
+      render: (row) => (
+        <span className="font-bold text-red-600">{formatNumber(row.deduction)}</span>
+      ),
+    },
+    {
+      key: 'net',
+      label: '실수령액',
+      align: 'right',
+      render: (row) => (
+        <span className="font-bold text-[var(--accent)]">{formatNumber(row.net)}</span>
+      ),
+    },
+    {
+      key: 'deductionRate',
+      label: '공제율',
+      align: 'right',
+      render: (row) => `${row.deductionRate}%`,
+    },
+  ], []);
+
   const handleCsvDownload = () => {
     const header = ['직원명', '총급여', '총공제', '실수령액', '공제율'];
     const body = rows.map((row) => [
@@ -168,64 +248,40 @@ export default function GrossNetComparison({ staffs, selectedCo }: Props) {
         <div className="py-10 text-center text-sm text-[var(--toss-gray-3)]">불러오는 중입니다...</div>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="bg-[var(--muted)]">
-                  <th className="p-2 text-left font-bold text-[var(--toss-gray-4)]">직원명</th>
-                  <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">총급여</th>
-                  <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">국민연금</th>
-                  <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">건강보험</th>
-                  <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">장기요양보험</th>
-                  <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">고용보험</th>
-                  <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">소득세</th>
-                  <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">총공제</th>
-                  <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">실수령액</th>
-                  <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">공제율</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="p-4 text-center text-[var(--toss-gray-3)]">
-                      데이터가 없습니다.
-                    </td>
-                  </tr>
-                ) : (
-                  rows.map((row) => (
-                    <tr
-                      key={row.staff.id}
-                      className="border-t border-[var(--border)] hover:bg-[var(--muted)]/50"
-                    >
-                      <td className="p-2 font-bold">{row.staff.name}</td>
-                      <td className="p-2 text-right">{formatNumber(row.gross)}</td>
-                      <td className="p-2 text-right text-[var(--toss-gray-4)]">{formatNumber(row.breakdown.pension)}</td>
-                      <td className="p-2 text-right text-[var(--toss-gray-4)]">{formatNumber(row.breakdown.health)}</td>
-                      <td className="p-2 text-right text-[var(--toss-gray-4)]">{formatNumber(row.breakdown.ltcare)}</td>
-                      <td className="p-2 text-right text-[var(--toss-gray-4)]">
-                        {formatNumber(row.breakdown.employment)}
-                      </td>
-                      <td className="p-2 text-right text-[var(--toss-gray-4)]">{formatNumber(row.breakdown.incomeTax)}</td>
-                      <td className="p-2 text-right font-bold text-red-600">{formatNumber(row.deduction)}</td>
-                      <td className="p-2 text-right font-bold text-[var(--accent)]">{formatNumber(row.net)}</td>
-                      <td className="p-2 text-right">{row.deductionRate}%</td>
-                    </tr>
-                  ))
-                )}
-                {rows.length > 0 && (
-                  <tr className="border-t-2 border-[var(--accent)] bg-[var(--accent)]/5 font-bold">
-                    <td className="p-2 text-[var(--accent)]">전체 합계</td>
-                    <td className="p-2 text-right">{formatNumber(totals.totalGross)}</td>
-                    <td className="p-2" colSpan={4} />
-                    <td className="p-2" />
-                    <td className="p-2 text-right text-red-600">{formatNumber(totals.totalDeduction)}</td>
-                    <td className="p-2 text-right text-[var(--accent)]">{formatNumber(totals.totalNet)}</td>
-                    <td className="p-2 text-right">{totals.totalRate}%</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          <div className="rounded-[var(--radius-md)] border border-[var(--border)]">
+            <ResponsiveTable<ComparisonRow>
+              columns={columns}
+              rows={rows}
+              keyField="id"
+              emptyMessage="데이터가 없습니다."
+            />
           </div>
+
+          {rows.length > 0 && (
+            <div className="rounded-[var(--radius-md)] border-2 border-[var(--accent)] bg-[var(--accent)]/5 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold">
+                <span className="text-[var(--accent)]">전체 합계</span>
+                <div className="flex flex-wrap items-center gap-4">
+                  <span>
+                    <span className="text-[var(--toss-gray-4)]">총급여 </span>
+                    {formatNumber(totals.totalGross)}
+                  </span>
+                  <span>
+                    <span className="text-[var(--toss-gray-4)]">총공제 </span>
+                    <span className="text-red-600">{formatNumber(totals.totalDeduction)}</span>
+                  </span>
+                  <span>
+                    <span className="text-[var(--toss-gray-4)]">실수령액 </span>
+                    <span className="text-[var(--accent)]">{formatNumber(totals.totalNet)}</span>
+                  </span>
+                  <span>
+                    <span className="text-[var(--toss-gray-4)]">공제율 </span>
+                    {totals.totalRate}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {Object.keys(buckets).length > 0 && (
             <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-4">

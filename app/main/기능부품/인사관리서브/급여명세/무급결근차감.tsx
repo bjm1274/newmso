@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import { supabase } from '@/lib/supabase';
 
 interface Props {
@@ -154,6 +155,84 @@ export default function UnpaidAbsenceDeduction({ staffs, selectedCo, user }: Pro
   };
 
   const totalDeduction = records.reduce((sum, r) => sum + (r.deduction_amount || 0), 0);
+  const totalAbsentDays = records.reduce((s, r) => s + (r.absent_days || 0), 0);
+
+  // 행 id 안정화 — DB id가 없으면 staff_id+year_month 복합키 사용
+  type RowWithKey = AbsenceRecord & { __key: string };
+  const tableRows = useMemo<RowWithKey[]>(
+    () => records.map((r) => ({ ...r, __key: r.id != null ? `id-${r.id}` : `${r.staff_id}-${r.year_month}` })),
+    [records]
+  );
+
+  const columns = useMemo<Column<RowWithKey>[]>(() => [
+    {
+      key: 'staff_name',
+      label: '직원명',
+      primary: true,
+      render: (r) => <span className="font-bold text-[var(--foreground)]">{r.staff_name ?? '—'}</span>,
+    },
+    {
+      key: 'absent_days',
+      label: '결근일수',
+      render: (r) => <span className="font-bold text-orange-600">{r.absent_days ?? 0}일</span>,
+    },
+    {
+      key: 'monthly_salary',
+      label: '월기본급',
+      align: 'right',
+      render: (r) => <span className="text-[var(--toss-gray-4)]">{(r.monthly_salary ?? 0).toLocaleString()}원</span>,
+    },
+    {
+      key: 'working_days',
+      label: '월근무일수',
+      render: (r) => <span className="text-[var(--toss-gray-4)]">{r.working_days ?? 0}일</span>,
+    },
+    {
+      key: 'daily_wage',
+      label: '일급',
+      align: 'right',
+      render: (r) => <span className="text-[var(--toss-gray-4)]">{(r.daily_wage ?? 0).toLocaleString()}원</span>,
+    },
+    {
+      key: 'deduction_amount',
+      label: '차감금액',
+      align: 'right',
+      render: (r) => <span className="font-extrabold text-red-600">{(r.deduction_amount ?? 0).toLocaleString()}원</span>,
+    },
+    {
+      key: 'note',
+      label: '비고',
+      render: (r) => <span className="text-[var(--toss-gray-3)]">{r.note?.trim() ? r.note : '—'}</span>,
+    },
+    {
+      key: 'actions',
+      label: '작업',
+      align: 'right',
+      render: (r) => (
+        <div className="flex gap-1 justify-end">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); openEdit(r); }}
+            className="px-2 py-1 text-[10px] font-bold bg-blue-500/10 text-[var(--accent)] rounded-lg hover:bg-blue-500/20 transition-colors"
+          >
+            수정
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (r.id != null) handleDelete(r.id);
+            }}
+            disabled={r.id == null}
+            className="px-2 py-1 text-[10px] font-bold bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors disabled:opacity-40"
+          >
+            삭제
+          </button>
+        </div>
+      ),
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [records]);
 
   return (
     <div className="p-4 md:p-4 space-y-4">
@@ -289,48 +368,24 @@ export default function UnpaidAbsenceDeduction({ staffs, selectedCo, user }: Pro
         </div>
         {loading ? (
           <div className="p-5 text-center text-sm text-[var(--toss-gray-3)]">불러오는 중...</div>
-        ) : records.length === 0 ? (
-          <div className="p-5 text-center text-sm text-[var(--toss-gray-3)]">해당 월 결근 기록이 없습니다.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-[var(--muted)]">
-                <tr>
-                  {['직원명', '결근일수', '월기본급', '월근무일수', '일급', '차감금액', '비고', ''].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border)]">
-                {records.map((rec) => (
-                  <tr key={rec.id} className="hover:bg-[var(--muted)]/50 transition-colors">
-                    <td className="px-4 py-3 font-bold text-[var(--foreground)]">{rec.staff_name}</td>
-                    <td className="px-4 py-3 font-bold text-orange-600">{rec.absent_days}일</td>
-                    <td className="px-4 py-3 text-[var(--toss-gray-4)]">{(rec.monthly_salary || 0).toLocaleString()}원</td>
-                    <td className="px-4 py-3 text-[var(--toss-gray-4)]">{rec.working_days}일</td>
-                    <td className="px-4 py-3 text-[var(--toss-gray-4)]">{(rec.daily_wage || 0).toLocaleString()}원</td>
-                    <td className="px-4 py-3 font-extrabold text-red-600">{(rec.deduction_amount || 0).toLocaleString()}원</td>
-                    <td className="px-4 py-3 text-[var(--toss-gray-3)]">{rec.note || '-'}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1">
-                        <button onClick={() => openEdit(rec)} className="px-2 py-1 text-[10px] font-bold bg-blue-500/10 text-[var(--accent)] rounded-lg hover:bg-blue-500/20 transition-colors">수정</button>
-                        <button onClick={() => handleDelete(rec.id!)} className="px-2 py-1 text-[10px] font-bold bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors">삭제</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-[var(--muted)] border-t-2 border-[var(--border)]">
-                <tr>
-                  <td className="px-4 py-3 font-extrabold text-[var(--foreground)]">합계</td>
-                  <td className="px-4 py-3 font-extrabold text-orange-600">{records.reduce((s, r) => s + (r.absent_days || 0), 0)}일</td>
-                  <td colSpan={4} />
-                  <td className="px-4 py-3 font-extrabold text-red-600">{totalDeduction.toLocaleString()}원</td>
-                  <td colSpan={2} />
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          <>
+            <div className="p-3">
+              <ResponsiveTable<RowWithKey>
+                columns={columns}
+                rows={tableRows}
+                keyField="__key"
+                emptyMessage="해당 월 결근 기록이 없습니다."
+              />
+            </div>
+            {records.length > 0 && (
+              <div className="flex flex-wrap items-center justify-end gap-4 px-4 py-3 bg-[var(--muted)] border-t-2 border-[var(--border)] text-xs">
+                <span className="font-extrabold text-[var(--foreground)]">합계</span>
+                <span className="font-extrabold text-orange-600">{totalAbsentDays}일</span>
+                <span className="font-extrabold text-red-600">{totalDeduction.toLocaleString()}원</span>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { getScopedActiveStaffs } from '@/lib/active-staff';
 import {
   getMinimumWageByYear,
@@ -8,6 +8,7 @@ import {
   MINIMUM_WAGE_2026,
   MONTHLY_STANDARD_HOURS,
 } from '@/lib/tax-free-limits';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 const MIN_WAGE_TABLE: Record<number, number> = {
   2024: 9860,
@@ -73,6 +74,73 @@ export default function MinWageChecker({
   const violations = checks.filter((check) => check.isViolation);
   const displayed = showViolationOnly ? violations : checks;
   const totalShortfall = violations.reduce((sum, check) => sum + Math.abs(check.diff), 0);
+
+  const columns = useMemo((): Column<StaffCheck>[] => [
+    {
+      key: 'name',
+      label: '성명',
+      primary: true,
+      render: (check) => (
+        <span className="font-bold text-[var(--foreground)]">{check.name || '—'}</span>
+      ),
+    },
+    {
+      key: 'position',
+      label: '직위',
+      render: (check) => check.position || '—',
+    },
+    {
+      key: 'department',
+      label: '부서',
+      render: (check) => check.department || '—',
+    },
+    {
+      key: 'comparablePay',
+      label: '비교 급여',
+      align: 'right',
+      render: (check) => (
+        <span className="font-bold">
+          {check.comparablePay > 0 ? check.comparablePay.toLocaleString() : '미등록'}
+        </span>
+      ),
+    },
+    {
+      key: 'minWage',
+      label: '최저임금 기준',
+      align: 'right',
+      render: (check) => check.minWage.toLocaleString(),
+    },
+    {
+      key: 'diff',
+      label: '차액',
+      align: 'right',
+      render: (check) => (
+        <span className={`font-bold ${check.isViolation ? 'text-red-600' : 'text-green-600'}`}>
+          {check.comparablePay > 0
+            ? `${check.diff >= 0 ? '+' : ''}${check.diff.toLocaleString()}`
+            : '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      label: '상태',
+      render: (check) =>
+        check.comparablePay === 0 ? (
+          <span className="rounded-[var(--radius-md)] bg-[var(--tab-bg)] px-2 py-0.5 text-[9px] font-bold text-[var(--toss-gray-4)]">
+            미등록
+          </span>
+        ) : check.isViolation ? (
+          <span className="rounded-[var(--radius-md)] bg-red-500/20 px-2 py-0.5 text-[9px] font-bold text-red-600">
+            미달
+          </span>
+        ) : (
+          <span className="rounded-[var(--radius-md)] bg-green-500/20 px-2 py-0.5 text-[9px] font-bold text-green-700">
+            준수
+          </span>
+        ),
+    },
+  ], []);
 
   return (
     <div className="space-y-5 p-4 md:p-4">
@@ -158,68 +226,13 @@ export default function MinWageChecker({
         <span className="text-xs text-[var(--toss-gray-3)]">{displayed.length}명</span>
       </div>
 
-      <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left" style={{ minWidth: '600px' }}>
-            <thead className="border-b border-[var(--border)] bg-[var(--muted)]/60">
-              <tr>
-                {['성명', '직위', '부서', '비교 급여', '최저임금 기준', '차액', '상태'].map((header) => (
-                  <th
-                    key={header}
-                    className="whitespace-nowrap px-3 py-2.5 text-[10px] font-semibold text-[var(--toss-gray-3)]"
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border)]">
-              {displayed.map((check) => (
-                <tr
-                  key={check.id}
-                  className={check.isViolation ? 'bg-red-500/10' : 'hover:bg-[var(--muted)]/30'}
-                >
-                  <td className="px-3 py-2.5 text-xs font-bold text-[var(--foreground)]">{check.name}</td>
-                  <td className="px-3 py-2.5 text-xs text-[var(--toss-gray-3)]">{check.position}</td>
-                  <td className="px-3 py-2.5 text-xs text-[var(--toss-gray-3)]">{check.department}</td>
-                  <td className="px-3 py-2.5 text-right text-xs font-bold">
-                    {check.comparablePay > 0 ? check.comparablePay.toLocaleString() : '미등록'}
-                  </td>
-                  <td className="px-3 py-2.5 text-right text-xs">{check.minWage.toLocaleString()}</td>
-                  <td
-                    className={`px-3 py-2.5 text-right text-xs font-bold ${
-                      check.isViolation ? 'text-red-600' : 'text-green-600'
-                    }`}
-                  >
-                    {check.comparablePay > 0 ? `${check.diff >= 0 ? '+' : ''}${check.diff.toLocaleString()}` : '-'}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    {check.comparablePay === 0 ? (
-                      <span className="rounded-[var(--radius-md)] bg-[var(--tab-bg)] px-2 py-0.5 text-[9px] font-bold text-[var(--toss-gray-4)]">
-                        미등록
-                      </span>
-                    ) : check.isViolation ? (
-                      <span className="rounded-[var(--radius-md)] bg-red-500/20 px-2 py-0.5 text-[9px] font-bold text-red-600">
-                        미달
-                      </span>
-                    ) : (
-                      <span className="rounded-[var(--radius-md)] bg-green-500/20 px-2 py-0.5 text-[9px] font-bold text-green-700">
-                        준수
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {displayed.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-3 py-5 text-center text-xs text-[var(--toss-gray-3)]">
-                    {showViolationOnly ? '최저임금 미달 직원이 없습니다.' : '직원이 없습니다.'}
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
+      <div className="rounded-[var(--radius-md)] border border-[var(--border)]">
+        <ResponsiveTable<StaffCheck>
+          columns={columns}
+          rows={displayed}
+          keyField="id"
+          emptyMessage={showViolationOnly ? '최저임금 미달 직원이 없습니다.' : '직원이 없습니다.'}
+        />
       </div>
 
       <p className="text-[10px] text-[var(--toss-gray-3)]">
