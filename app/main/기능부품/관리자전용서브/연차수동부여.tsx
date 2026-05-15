@@ -3,7 +3,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { SYSTEM_MASTER_ACCOUNT_ID, isNamedSystemMasterAccount } from '@/lib/system-master';
-import { calculateAnnualLeaveExpiryDate } from '@/lib/annual-leave-promotion';
+import ManualGrantGrid, {
+  type CompanyPolicy,
+  type EditState,
+} from './연차수동부여Grid';
 
 type ManualGrantUpdate = {
   staffId: string;
@@ -24,63 +27,6 @@ type CompanyPolicyRow = {
   leave_policy: string | null;
   fiscal_year_start_month: number | null;
 };
-
-type CompanyPolicy = {
-  basis: 'fiscal' | 'hire';
-  fiscalStartMonth: number;
-};
-
-type CycleInfo = {
-  start: Date;
-  end: Date;
-  basis: '입사일' | '회계연도';
-};
-
-type EditState = {
-  total: number;
-  used: number;
-  expired: number;
-  compensated: number;
-};
-
-function fmtYmd(d: Date) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-// 회계연도 기준 현재 사이클: 가장 최근 fiscalStartMonth 1일 ~ 다음 fiscalStartMonth 전날
-function fiscalYearCycle(refDate: Date, fiscalStartMonth: number): CycleInfo {
-  const month = fiscalStartMonth - 1;
-  let start = new Date(refDate.getFullYear(), month, 1);
-  if (refDate.getTime() < start.getTime()) {
-    start = new Date(refDate.getFullYear() - 1, month, 1);
-  }
-  const end = new Date(start.getFullYear() + 1, month, 0); // 다음 시작월의 0일 = 직전월 말일
-  return { start, end, basis: '회계연도' };
-}
-
-// 입사일 기준 현재 사이클: 다음 만료일 - 1년 ~ 다음 만료일 전날
-function hireDateCycle(hireDate: string, refDate: Date): CycleInfo | null {
-  const hire = new Date(`${hireDate}T00:00:00`);
-  if (Number.isNaN(hire.getTime())) return null;
-  const nextExpiry = calculateAnnualLeaveExpiryDate(hire, refDate);
-  const start = new Date(nextExpiry);
-  start.setFullYear(start.getFullYear() - 1);
-  const end = new Date(nextExpiry);
-  end.setDate(end.getDate() - 1);
-  return { start, end, basis: '입사일' };
-}
-
-function computeCycleInfo(staff: any, policy: CompanyPolicy | undefined, refDate: Date): CycleInfo | null {
-  if (policy?.basis === 'fiscal') {
-    return fiscalYearCycle(refDate, policy.fiscalStartMonth);
-  }
-  const hire = staff.hire_date || staff.join_date || staff.joined_at;
-  if (!hire) return null;
-  return hireDateCycle(String(hire), refDate);
-}
 
 async function saveManualGrant(updates: ManualGrantUpdate[]) {
   const response = await fetch('/api/admin/annual-leave/manual-grant', {
@@ -354,116 +300,19 @@ export default function AnnualLeaveManualGrant({
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-left">
-          <thead>
-            <tr className="border-b border-[var(--border)]">
-              <th className="pb-3 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">이름</th>
-              <th className="pb-3 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">회사/부서</th>
-              <th className="pb-3 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">입사일</th>
-              <th className="pb-3 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">부여 기간</th>
-              <th className="pb-3 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">부여</th>
-              <th className="pb-3 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">사용</th>
-              <th className="pb-3 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">소멸</th>
-              <th className="pb-3 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">수당지급</th>
-              <th className="pb-3 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)] text-right">잔여</th>
-              <th className="pb-3 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">동작</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((staff: any) => {
-              const remaining = getRemaining(staff);
-              const over = getUsed(staff) + getExpired(staff) + getCompensated(staff) > getTotal(staff) + 0.001;
-              const policy = staff.company ? companyPolicies[staff.company] : undefined;
-              const cycle = computeCycleInfo(staff, policy, today);
-              return (
-                <tr key={staff.id} className="border-b border-[var(--border)]">
-                  <td className="py-3 font-bold text-[var(--foreground)]">{staff.name}</td>
-                  <td className="py-3 text-xs text-[var(--toss-gray-3)]">
-                    {staff.company} / {staff.department || '-'}
-                  </td>
-                  <td className="py-3 text-xs text-[var(--toss-gray-4)]">
-                    {staff.hire_date || staff.join_date || staff.joined_at || '-'}
-                  </td>
-                  <td className="py-3 text-xs">
-                    {cycle ? (
-                      <div className="flex flex-col leading-tight">
-                        <span className="font-bold text-[var(--foreground)]">
-                          {fmtYmd(cycle.start)} ~ {fmtYmd(cycle.end)}
-                        </span>
-                        <span className="text-[10px] text-[var(--toss-gray-3)] mt-0.5">{cycle.basis} 기준</span>
-                      </div>
-                    ) : (
-                      <span className="text-[var(--toss-gray-4)]">-</span>
-                    )}
-                  </td>
-                  <td className="py-3">
-                    <input
-                      type="number"
-                      min={0}
-                      step={0.5}
-                      value={getTotal(staff)}
-                      onChange={(event) => setField(staff.id, 'total', Number(event.target.value))}
-                      className="w-20 rounded-[var(--radius-md)] border border-[var(--border)] p-2 text-sm font-bold"
-                      aria-label={`${staff.name} 부여 연차`}
-                    />
-                  </td>
-                  <td className="py-3">
-                    <input
-                      type="number"
-                      min={0}
-                      step={0.5}
-                      value={getUsed(staff)}
-                      onChange={(event) => setField(staff.id, 'used', Number(event.target.value))}
-                      className="w-20 rounded-[var(--radius-md)] border border-[var(--border)] p-2 text-sm font-bold"
-                      aria-label={`${staff.name} 사용 연차`}
-                    />
-                  </td>
-                  <td className="py-3">
-                    <input
-                      type="number"
-                      min={0}
-                      step={0.5}
-                      value={getExpired(staff)}
-                      onChange={(event) => setField(staff.id, 'expired', Number(event.target.value))}
-                      className="w-20 rounded-[var(--radius-md)] border border-[var(--border)] p-2 text-sm font-bold"
-                      aria-label={`${staff.name} 소멸 연차`}
-                    />
-                  </td>
-                  <td className="py-3">
-                    <input
-                      type="number"
-                      min={0}
-                      step={0.5}
-                      value={getCompensated(staff)}
-                      onChange={(event) => setField(staff.id, 'compensated', Number(event.target.value))}
-                      className="w-20 rounded-[var(--radius-md)] border border-[var(--border)] p-2 text-sm font-bold"
-                      aria-label={`${staff.name} 수당지급 연차`}
-                    />
-                  </td>
-                  <td className={`py-3 text-right text-sm font-bold ${over ? 'text-red-600' : 'text-green-600'}`}>
-                    {remaining.toFixed(1)}일
-                  </td>
-                  <td className="py-3">
-                    <button
-                      type="button"
-                      onClick={() => void handleSaveOne(staff)}
-                      disabled={saving || over}
-                      className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      저장
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {filtered.length === 0 && (
-        <p className="py-5 text-center font-bold text-[var(--toss-gray-3)]">표시할 직원이 없습니다.</p>
-      )}
+      <ManualGrantGrid
+        rows={filtered}
+        companyPolicies={companyPolicies}
+        today={today}
+        saving={saving}
+        getTotal={getTotal}
+        getUsed={getUsed}
+        getExpired={getExpired}
+        getCompensated={getCompensated}
+        getRemaining={getRemaining}
+        setField={setField}
+        onSaveOne={handleSaveOne}
+      />
 
       {filtered.length > 0 && (
         <button
