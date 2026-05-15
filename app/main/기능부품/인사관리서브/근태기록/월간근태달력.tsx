@@ -1,127 +1,197 @@
 'use client';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import {
+  CalendarTable,
+  type CalendarCellTone,
+  type CalendarRow,
+} from '@/app/components/CalendarTable';
 
-export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick, onBulkNormal }: Record<string, unknown>) {
-  // [상태] 현재 보고 있는 주차 (기본 1주차)
+/**
+ * 월간근태달력
+ *
+ * 직원 × 일자 매트릭스를 주차 단위(7일)로 보여주는 화면.
+ * 매트릭스 부분은 CalendarTable(staff-by-day 모드)로 위임.
+ *
+ * 기존 prop 시그니처 보존:
+ *  - calendarData: { staff, days: { date: 'YYYY-MM-DD', status, check_in, check_out, ... } }[]
+ *  - targetMonth: 'YYYY-MM'
+ *  - onCellClick(event, day, staff)
+ *  - onBulkNormal(staff)
+ */
+
+type DayCell = {
+  date: string;
+  status: string;
+  check_in?: string;
+  check_out?: string;
+};
+
+type StaffRow = {
+  staff: { id: string | number; name: string };
+  days: DayCell[];
+};
+
+function statusToTone(status: string | undefined): CalendarCellTone {
+  if (!status || status === 'none') return 'muted';
+  if (status === '정상') return 'ok';
+  if (status === '지각') return 'danger';
+  if (status.includes('휴가')) return 'warn';
+  return 'normal';
+}
+
+export default function MonthlyCalendar({
+  calendarData,
+  targetMonth,
+  onCellClick,
+  onBulkNormal,
+}: Record<string, unknown>) {
   const [activeWeek, setActiveWeek] = useState(1);
 
   const _targetMonth = (targetMonth as string) ?? '';
-  const _calendarData = (calendarData as Record<string, unknown>[]) ?? [];
-  const _onBulkNormal = onBulkNormal as (staff: unknown) => void;
-  const _onCellClick = onCellClick as (e: unknown, d: unknown, staff: unknown) => void;
+  const _calendarData = (calendarData as StaffRow[]) ?? [];
+  const _onBulkNormal = onBulkNormal as ((staff: StaffRow['staff']) => void) | undefined;
+  const _onCellClick = onCellClick as
+    | ((e: React.MouseEvent, d: DayCell, staff: StaffRow['staff']) => void)
+    | undefined;
 
-  // 1. 해당 월의 마지막 날짜 계산 (30일인지 31일인지)
-  const lastDay = new Date(Number(_targetMonth.split('-')[0]), Number(_targetMonth.split('-')[1]), 0).getDate();
-  
-  // 2. 주차별 날짜 범위 계산 함수 (7일 단위)
+  // 1. 해당 월의 마지막 날짜 (30/31/28...)
+  const [yearStr, monthStr] = _targetMonth.split('-');
+  const yearNum = Number(yearStr);
+  const monthNum = Number(monthStr);
+  const lastDay = useMemo(
+    () => (yearNum && monthNum ? new Date(yearNum, monthNum, 0).getDate() : 31),
+    [yearNum, monthNum],
+  );
+
   const getWeekRange = (week: number) => {
     const start = (week - 1) * 7 + 1;
     let end = week * 7;
-    if (end > lastDay) end = lastDay; // 31일이 넘어가면 마지막 날짜로 고정
+    if (end > lastDay) end = lastDay;
     return { start, end };
   };
 
-  // 3. 현재 주차에 해당하는 날짜 배열 생성
   const { start: startDay, end: endDay } = getWeekRange(activeWeek);
-  const daysArray = Array.from({ length: endDay - startDay + 1 }, (_, i) => startDay + i);
-
-  // 4. 총 필요한 주차 수 (28일=4주, 31일=5주)
   const totalWeeks = Math.ceil(lastDay / 7);
+
+  // CalendarTable에 넘길 시작·끝 날짜
+  const startDate = useMemo(
+    () => new Date(yearNum || 2000, (monthNum || 1) - 1, startDay),
+    [yearNum, monthNum, startDay],
+  );
+  const endDate = useMemo(
+    () => new Date(yearNum || 2000, (monthNum || 1) - 1, endDay),
+    [yearNum, monthNum, endDay],
+  );
+
+  // 일자별 데이터 lookup용 인덱스 (staffId + date → DayCell)
+  const dayIndex = useMemo(() => {
+    const map = new Map<string, DayCell>();
+    _calendarData.forEach((r) => {
+      r.days.forEach((d) => {
+        map.set(`${r.staff.id}__${d.date}`, d);
+      });
+    });
+    return map;
+  }, [_calendarData]);
+
+  // CalendarTable 행 데이터
+  const rows: CalendarRow<StaffRow>[] = useMemo(
+    () =>
+      _calendarData.map((r) => ({
+        id: String(r.staff.id),
+        data: r,
+        label: (
+          <button
+            type="button"
+            onClick={() => _onBulkNormal?.(r.staff)}
+            className="text-left hover:text-[var(--accent)] transition-colors w-full"
+          >
+            {r.staff.name}
+          </button>
+        ),
+      })),
+    [_calendarData, _onBulkNormal],
+  );
+
+  const isoDate = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  };
 
   return (
     <div className="flex flex-col h-full bg-[var(--card)] relative">
-      {/* 상단 컨트롤러: 주차 선택 버튼 */}
-      <div className="p-4 border-b bg-[var(--muted)] flex justify-between items-center shrink-0">
-        <div className="flex items-center gap-4">
-            <h3 className="font-semibold text-[var(--foreground)] text-lg">🗓️ {_targetMonth} 월간 근태 현황</h3>
-            <div className="flex p-1.5 bg-[var(--toss-gray-2)] rounded-[var(--radius-md)] gap-1 shadow-inner">
-                {Array.from({ length: totalWeeks }, (_, i) => i + 1).map(week => {
-                    const range = getWeekRange(week);
-                    return (
-                        <button 
-                            key={week}
-                            onClick={() => setActiveWeek(week)}
-                            className={`px-5 py-2 rounded-[var(--radius-lg)] text-sm font-bold transition-all flex flex-col items-center
-                                ${activeWeek === week ? 'bg-[var(--card)] shadow-md text-[var(--accent)]' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}
-                        >
-                            <span>{week}주차</span>
-                            <span className="text-[11px] opacity-60">{range.start}~{range.end}일</span>
-                        </button>
-                    );
-                })}
-            </div>
+      {/* 상단: 주차 선택 */}
+      <div className="p-3 sm:p-4 border-b bg-[var(--muted)] flex flex-wrap justify-between items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+          <h3 className="font-semibold text-[var(--foreground)] text-base sm:text-lg">
+            🗓️ {_targetMonth} 월간 근태 현황
+          </h3>
+          <div className="flex p-1 sm:p-1.5 bg-[var(--toss-gray-2)] rounded-[var(--radius-md)] gap-1 shadow-inner overflow-x-auto">
+            {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((week) => {
+              const range = getWeekRange(week);
+              const active = activeWeek === week;
+              return (
+                <button
+                  key={week}
+                  type="button"
+                  onClick={() => setActiveWeek(week)}
+                  aria-pressed={active}
+                  className={`px-3 sm:px-5 py-1.5 sm:py-2 rounded-[var(--radius-lg)] text-xs sm:text-sm font-bold transition-all flex flex-col items-center whitespace-nowrap
+                    ${active ? 'bg-[var(--card)] shadow-md text-[var(--accent)]' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}
+                >
+                  <span>{week}주차</span>
+                  <span className="text-[10px] sm:text-[11px] opacity-60">
+                    {range.start}~{range.end}일
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <div className="text-[11px] text-[var(--toss-gray-3)] font-bold bg-[var(--card)] px-3 py-1.5 rounded-[var(--radius-md)] border shadow-sm">
-            💡 31일까지 있는 달은 자동으로 5주차가 생성됩니다.
+        <div className="hidden sm:block text-[11px] text-[var(--toss-gray-3)] font-bold bg-[var(--card)] px-3 py-1.5 rounded-[var(--radius-md)] border shadow-sm">
+          💡 31일까지 있는 달은 자동으로 5주차가 생성됩니다.
         </div>
       </div>
 
-      {/* 7일 단위 근태 테이블 */}
-      <div className="flex-1 overflow-auto bg-[var(--card)]">
-        <table className="w-full border-collapse table-fixed">
-          <thead>
-            <tr className="bg-[var(--muted)]/50">
-              <th className="w-32 p-4 border-b border-r font-semibold text-[var(--toss-gray-3)] text-[11px] uppercase tracking-tight">직원명</th>
-              {daysArray.map(d => (
-                <th key={d} className="p-3 border-b text-center">
-                    <span className="text-[11px] text-[var(--toss-gray-3)] font-bold block mb-0.5">{_targetMonth}</span>
-                    <span className="text-base font-semibold text-[var(--foreground)]">{d}일</span>
-                </th>
-              ))}
-              {/* 7일이 안되는 마지막 주차(5주차)의 경우 빈 칸을 채워 레이아웃 유지 */}
-              {daysArray.length < 7 && Array.from({ length: 7 - daysArray.length }).map((_, i) => (
-                <th key={`empty-${i}`} className="p-3 border-b bg-gray-25/30"></th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--border)]">
-            {_calendarData.map((row: any) => (
-              <tr key={row.staff.id} className="hover:bg-blue-500/10/10 transition-colors group">
-                <td
-                  className="p-4 font-semibold border-r text-center text-sm cursor-pointer group-hover:text-[var(--accent)] transition-colors bg-[var(--card)] sticky left-0 z-10"
-                  onClick={() => _onBulkNormal(row.staff)}
-                >
-                  {row.staff.name}
-                </td>
-                
-                {/* 현재 주차 날짜 데이터 출력 */}
-                {row.days.filter((d: any) => {
-                    const dayNum = parseInt(d.date.split('-')[2]);
-                    return dayNum >= startDay && dayNum <= endDay;
-                }).map((d: any, i: number) => {
-                  let statusStyle = "bg-[var(--card)] text-[var(--toss-gray-3)] border-[var(--border)]";
-                  if (d.status === '정상') statusStyle = "bg-green-500/10 text-green-700 border-green-500/20";
-                  else if (d.status === '지각') statusStyle = "bg-red-500/10 text-red-600 border-red-500/20";
-                  else if (d.status?.includes('휴가')) statusStyle = "bg-purple-500/10 text-purple-600 border-purple-500/20";
-
-                  return (
-                    <td key={i} className="p-2 h-28">
-                      <div 
-                        onClick={(e) => _onCellClick(e, d, row.staff)}
-                        className={`w-full h-full rounded-[var(--radius-lg)] border flex flex-col items-center justify-center cursor-pointer hover:shadow-sm transition-all p-2 ${statusStyle}`}
-                      >
-                        {d.status !== 'none' ? (
-                          <>
-                            <div className="text-xs font-semibold mb-2">{d.status}</div>
-                            <div className="text-[11px] font-mono font-bold opacity-60 leading-tight text-center">
-                                {d.check_in?.slice(11, 16) || '--:--'}<br/>
-                                ~ {d.check_out?.slice(11, 16) || '--:--'}
-                            </div>
-                          </>
-                        ) : <span className="text-xs opacity-20 font-semibold">-</span>}
-                      </div>
-                    </td>
-                  );
-                })}
-                
-                {/* 5주차 빈 칸 보정 */}
-                {daysArray.length < 7 && Array.from({ length: 7 - daysArray.length }).map((_, i) => (
-                  <td key={`empty-td-${i}`} className="p-2 bg-[var(--muted)]/10"></td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* 매트릭스 */}
+      <div className="flex-1 overflow-auto bg-[var(--card)] p-2 sm:p-3">
+        <CalendarTable
+          mode="staff-by-day"
+          startDate={startDate}
+          endDate={endDate}
+          rows={rows}
+          ariaLabel={`${_targetMonth} ${activeWeek}주차 근태 매트릭스`}
+          rowHeaderLabel="직원명"
+          emptyMessage="표시할 직원이 없습니다."
+          cellTone={(cell, row) => {
+            if (!row) return 'muted';
+            const d = dayIndex.get(`${row.id}__${isoDate(cell.date)}`);
+            return statusToTone(d?.status);
+          }}
+          renderCell={(cell, row) => {
+            if (!row) return null;
+            const d = dayIndex.get(`${row.id}__${isoDate(cell.date)}`);
+            if (!d || d.status === 'none') {
+              return <span className="text-xs opacity-20 font-semibold">-</span>;
+            }
+            return (
+              <button
+                type="button"
+                onClick={(e) => _onCellClick?.(e, d, row.data.staff)}
+                className="w-full h-full flex flex-col items-center justify-center cursor-pointer hover:opacity-80 transition-all p-1 min-h-[56px]"
+                aria-label={`${row.data.staff.name} ${d.date} ${d.status}`}
+              >
+                <div className="text-[11px] font-semibold mb-1">{d.status}</div>
+                <div className="text-[10px] font-mono font-bold opacity-70 leading-tight text-center">
+                  {d.check_in?.slice(11, 16) || '--:--'}
+                  <br />~ {d.check_out?.slice(11, 16) || '--:--'}
+                </div>
+              </button>
+            );
+          }}
+        />
       </div>
     </div>
   );
