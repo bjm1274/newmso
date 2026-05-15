@@ -3,6 +3,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { MatrixTable, type MatrixColumn, type MatrixCellTone } from '@/app/components/MatrixTable';
 // jsPDF: dynamic import로 전환 (번들 사이즈 최적화)
 
 // Helper to sanitize filenames
@@ -235,92 +236,123 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
                 />
             )}
 
-            {activeTab === '관리자현황' && isAdmin && (
-                <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm overflow-hidden min-h-[500px]">
-                    <div className="p-3 border-b border-[var(--border-subtle)] flex justify-between items-center bg-[var(--tab-bg)]">
-                        <div>
-                            <h3 className="text-sm font-bold text-[var(--foreground)]">서류 누락자 현황판 (Compliance Board)</h3>
-                            <p className="text-[10px] text-[var(--toss-gray-3)] font-bold mt-0.5">입사 1주일 경과 미제출자는 빨간색으로 표시됩니다.</p>
-                        </div>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={async () => {
-                                    const lazyStaff = filteredStaffs.filter((s: any) => {
-                                        const joinDate = new Date(s.join_date);
-                                        const weekAgo = new Date();
-                                        weekAgo.setDate(weekAgo.getDate() - 7);
-                                        const staffDocs = allDocs.filter(d => d.created_by === s.id);
-                                        return joinDate < weekAgo && staffDocs.length < REQUIRED_DOCS.length;
-                                    });
-                                    if (lazyStaff.length === 0) return toast("독촉 대상자가 없습니다.");
-                                    const confirmed = await openConfirm({
-                                        title: '미제출자 일괄 독촉',
-                                        description: `${lazyStaff.length}명의 미제출자에게 독촉 알림을 발송합니다.\n입사 후 7일이 지나고 필수 서류가 부족한 직원만 대상입니다.`,
-                                        confirmText: '발송',
-                                        tone: 'accent',
-                                    });
-                                    if (!confirmed) return;
-                                    toast("독촉 알림이 전송되었습니다.", 'success');
-                                }}
-                                className="px-4 py-2 bg-rose-500 text-white text-[11px] font-bold rounded-lg hover:scale-105 transition-transform shadow-sm flex items-center gap-1"
-                            >
-                                🔔 미제출자 일괄 독촉
-                            </button>
-                        </div>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-[11px]">
-                            <thead className="bg-[var(--tab-bg)]/50">
-                                <tr className="border-b border-[var(--border-subtle)] text-[var(--toss-gray-4)] uppercase tracking-widest font-black">
-                                    <th className="px-4 py-3 text-left text-[11px] font-black text-[var(--toss-gray-3)] uppercase tracking-widest">성명</th>
-                                    <th className="px-4 py-3">부서 / 회사</th>
-                                    {REQUIRED_DOCS.map(doc => (
-                                        <th key={doc.id} className="px-1 py-3 text-center text-[9px] font-black text-[var(--toss-gray-3)] min-w-[75px] max-w-[75px] break-keep whitespace-normal leading-tight align-middle border-x border-[var(--border-subtle)]/50">{doc.label}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {filteredStaffs.map((s: any) => {
-                                    const staffDocs = allDocs.filter(d => d.created_by === s.id);
-                                    const joinDate = new Date(s.join_date);
-                                    const weekAgo = new Date();
-                                    weekAgo.setDate(weekAgo.getDate() - 7);
-                                    const isLazy = joinDate < weekAgo && staffDocs.length < REQUIRED_DOCS.length;
+            {activeTab === '관리자현황' && isAdmin && (() => {
+                const docColumns: MatrixColumn<typeof REQUIRED_DOCS[number]>[] = REQUIRED_DOCS.map((doc) => ({
+                    id: doc.id,
+                    label: doc.label,
+                    shortLabel: doc.id,
+                    data: doc,
+                }));
 
+                type StaffRow = Record<string, unknown> & { id: string | number; name: string; join_date?: string; department?: string; company?: string };
+                const weekAgo = new Date();
+                weekAgo.setDate(weekAgo.getDate() - 7);
+
+                const isLazyStaff = (s: StaffRow) => {
+                    const joinDate = new Date(s.join_date ?? '');
+                    const staffDocs = allDocs.filter((d) => d.created_by === s.id);
+                    return joinDate < weekAgo && staffDocs.length < REQUIRED_DOCS.length;
+                };
+
+                return (
+                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm overflow-hidden min-h-[500px]">
+                        <div className="p-3 border-b border-[var(--border-subtle)] flex justify-between items-center bg-[var(--tab-bg)]">
+                            <div>
+                                <h3 className="text-sm font-bold text-[var(--foreground)]">서류 누락자 현황판 (Compliance Board)</h3>
+                                <p className="text-[10px] text-[var(--toss-gray-3)] font-bold mt-0.5">입사 1주일 경과 미제출자는 빨간색으로 표시됩니다.</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={async () => {
+                                        const lazyStaff = (filteredStaffs as StaffRow[]).filter(isLazyStaff);
+                                        if (lazyStaff.length === 0) return toast("독촉 대상자가 없습니다.");
+                                        const confirmed = await openConfirm({
+                                            title: '미제출자 일괄 독촉',
+                                            description: `${lazyStaff.length}명의 미제출자에게 독촉 알림을 발송합니다.\n입사 후 7일이 지나고 필수 서류가 부족한 직원만 대상입니다.`,
+                                            confirmText: '발송',
+                                            tone: 'accent',
+                                        });
+                                        if (!confirmed) return;
+                                        toast("독촉 알림이 전송되었습니다.", 'success');
+                                    }}
+                                    className="px-4 py-2 bg-rose-500 text-white text-[11px] font-bold rounded-lg hover:scale-105 transition-transform shadow-sm flex items-center gap-1"
+                                >
+                                    🔔 미제출자 일괄 독촉
+                                </button>
+                            </div>
+                        </div>
+                        <div className="p-3">
+                            <MatrixTable<StaffRow, typeof REQUIRED_DOCS[number]>
+                                rows={filteredStaffs as StaffRow[]}
+                                columns={docColumns}
+                                rowKey={(s) => String(s.id)}
+                                rowHeaderLabel="직원"
+                                rowHeader={(s) => {
+                                    const isLazy = isLazyStaff(s);
                                     return (
-                                        <tr key={s.id} className={`hover:bg-[var(--tab-bg)] transition-colors ${isLazy ? 'bg-rose-50/30' : ''}`}>
-                                            <td className="px-4 py-3 font-black flex items-center gap-2 text-[var(--foreground)]">
-                                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[8px] ${isLazy ? 'bg-rose-100 text-rose-600' : 'bg-[var(--tab-bg)]'}`}>{s.name[0]}</div>
-                                                <div>
-                                                    <p>{s.name}</p>
-                                                    <p className="text-[9px] font-medium text-[var(--toss-gray-3)]">입사일: {s.join_date}</p>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3 font-bold text-[var(--toss-gray-4)]">{s.department} <br /> <span className="text-[9px] font-medium">{s.company}</span></td>
-                                            {REQUIRED_DOCS.map(doc => {
-                                                const sub = staffDocs.find(d => d.category === doc.id);
-                                                return (
-                                                    <td key={doc.id} className="px-1 py-4 text-center border-x border-[var(--border-subtle)]/50">
-                                                        {sub ? (
-                                                            <div className="flex flex-col items-center gap-1 group/item">
-                                                                <span className="text-emerald-500 font-extrabold text-sm">✓</span>
-                                                                <button
-                                                                    onClick={() => window.open(sub.file_url, '_blank')}
-                                                                    className="text-[8px] text-blue-500 font-bold hover:underline opacity-0 group-hover/item:opacity-100 transition-opacity"
-                                                                >열람</button>
-                                                            </div>
-                                                        ) : <span className={`${isLazy ? 'text-rose-400 font-black' : 'text-[var(--toss-gray-3)]'}`}>✕</span>}
-                                                    </td>
-                                                );
-                                            })}
-                                        </tr>
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[8px] ${isLazy ? 'bg-rose-100 text-rose-600' : 'bg-[var(--tab-bg)]'}`}>
+                                                {s.name?.[0] ?? '?'}
+                                            </div>
+                                            <div className="flex flex-col text-left">
+                                                <span className="text-[11px] font-bold text-[var(--foreground)]">{s.name}</span>
+                                                <span className="text-[9px] font-medium text-[var(--toss-gray-3)]">
+                                                    {s.department ?? '-'} · {s.company ?? '-'}
+                                                </span>
+                                                <span className="text-[9px] font-medium text-[var(--toss-gray-3)]">입사일: {s.join_date ?? '-'}</span>
+                                            </div>
+                                        </div>
                                     );
-                                })}
-                            </tbody>
-                        </table>
+                                }}
+                                renderCell={(s, col) => {
+                                    const staffDocs = allDocs.filter((d) => d.created_by === s.id);
+                                    const sub = staffDocs.find((d) => d.category === col.data.id);
+                                    if (sub) {
+                                        return (
+                                            <button
+                                                type="button"
+                                                onClick={() => window.open(sub.file_url, '_blank')}
+                                                className="inline-flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-[var(--radius-md)] text-emerald-600 hover:bg-emerald-500/10 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                                                aria-label={`${s.name} ${col.data.label} 제출 완료 · 열람`}
+                                            >
+                                                <span className="font-extrabold text-sm leading-none">✓</span>
+                                                <span className="text-[8px] font-bold text-blue-500">열람</span>
+                                            </button>
+                                        );
+                                    }
+                                    const isLazy = isLazyStaff(s);
+                                    return (
+                                        <span
+                                            className={isLazy ? 'text-rose-500 font-black' : 'text-[var(--toss-gray-3)]'}
+                                            aria-label={`${s.name} ${col.data.label} 미제출`}
+                                        >
+                                            ✕
+                                        </span>
+                                    );
+                                }}
+                                cellTone={(s, col): MatrixCellTone => {
+                                    const staffDocs = allDocs.filter((d) => d.created_by === s.id);
+                                    const sub = staffDocs.find((d) => d.category === col.data.id);
+                                    if (sub) return 'ok';
+                                    return isLazyStaff(s) ? 'danger' : 'normal';
+                                }}
+                                rowSummary={(s) => {
+                                    const submitted = allDocs.filter((d) => d.created_by === s.id).length;
+                                    return (
+                                        <span className={submitted >= REQUIRED_DOCS.length ? 'text-emerald-600' : isLazyStaff(s) ? 'text-rose-500' : 'text-[var(--toss-gray-4)]'}>
+                                            {submitted}/{REQUIRED_DOCS.length}
+                                        </span>
+                                    );
+                                }}
+                                rowSummaryLabel="제출"
+                                minWidth={900}
+                                ariaLabel="서류 제출 매트릭스"
+                                emptyMessage="표시할 직원이 없습니다."
+                            />
+                        </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
         </div>
     );
 }
