@@ -9,6 +9,7 @@ import { useSupplyWorkflow } from '@/app/main/hooks/useSupplyWorkflow';
 import { useStockModal } from '@/app/main/hooks/useStockModal';
 import { PageHeader } from '@/app/components/PageHeader';
 import { EmptyState } from '@/app/components/StatePanel';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import { INV_VIEW_KEY } from '@/app/main/navigation-state';
 import { INVENTORY_SUPPORT_COMPANY, INVENTORY_SUPPORT_DEPARTMENT } from '@/app/main/inventory-utils';
 import {
@@ -208,6 +209,81 @@ export default function IntegratedInventoryManagement({
 
   const currentViewMeta = INVENTORY_VIEW_META[activeView] || { title: activeView, description: '' };
 
+  // ── 입출고 이력 테이블용 컬럼/행 ──
+  type LogRow = Record<string, unknown> & { _rowKey: string };
+  const logRows = useMemo<LogRow[]>(
+    () => data.logs.map((log, idx) => ({ ...log, _rowKey: `${String(log.id ?? '')}-${idx}` })),
+    [data.logs],
+  );
+  const logColumns = useMemo<Column<LogRow>[]>(() => [
+    {
+      key: 'created_at',
+      label: '일시',
+      primary: true,
+      render: (r) => (
+        <span className="font-mono text-[11px] text-[var(--toss-gray-4)]">
+          {r.created_at ? new Date(String(r.created_at)).toLocaleString('ko-KR') : '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'change_type',
+      label: '유형',
+      render: (r) => {
+        const ct = String(r.change_type || r.type || '');
+        return (
+          <span className={`rounded-[var(--radius-md)] px-2.5 py-1 text-[10px] font-bold ${ct === '입고' ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>
+            {ct || '-'}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'quantity',
+      label: '수량',
+      render: (r) => <span className="font-bold text-[var(--foreground)]">{String(r.quantity ?? '-')}</span>,
+    },
+    {
+      key: 'prev_quantity',
+      label: '변동',
+      showOnMobile: false,
+      render: (r) => (
+        <span className="text-[var(--toss-gray-3)]">
+          {r.prev_quantity !== undefined && r.prev_quantity !== null
+            ? `${String(r.prev_quantity)} → ${String(r.next_quantity ?? '')}`
+            : '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'actor_name',
+      label: '처리자',
+      render: (r) => <span className="text-[var(--foreground)]">{String(r.actor_name || '') || '-'}</span>,
+    },
+    {
+      key: 'company',
+      label: '회사/추적정보',
+      showOnMobile: false,
+      render: (r) => {
+        const sn = String(r.serial_number || '').trim();
+        const lot = String(r.lot_number || '').trim();
+        const location = String(r.location || '').trim();
+        const unitPrice = Number(r.unit_price || 0);
+        return (
+          <div className="text-[var(--toss-gray-4)]">
+            <p>{String(r.company || '') || '-'}</p>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {sn && <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600">S/N {sn}</span>}
+              {lot && <span className="rounded bg-[var(--muted)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--toss-gray-4)]">LOT {lot}</span>}
+              {location && <span className="rounded bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-sky-600">{location}</span>}
+              {unitPrice > 0 && <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">{unitPrice.toLocaleString('ko-KR')}원</span>}
+            </div>
+          </div>
+        );
+      },
+    },
+  ], []);
+
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-x-hidden app-page" data-testid="inventory-view">
       {stockModal.dialog}
@@ -252,50 +328,20 @@ export default function IntegratedInventoryManagement({
                 <h3 className="text-base font-bold text-[var(--foreground)]">최근 입출고 이력</h3>
                 <button type="button" onClick={() => void data.fetchLogs()} className="rounded-[var(--radius-md)] bg-[var(--muted)] px-4 py-3 text-[11px] font-bold text-[var(--toss-gray-4)] transition-all hover:bg-[var(--border)]">새로고침</button>
               </div>
-              <div className="overflow-x-auto">
+              <div className="p-3">
                 {data.logs.length === 0 ? (
-                  <div className="p-4">
-                    <EmptyState
-                      title="입출고 이력이 없습니다"
-                      description="입고, 출고, 재고 조정이 발생하면 최근 이력이 이곳에 표시됩니다."
-                      compact
-                    />
-                  </div>
+                  <EmptyState
+                    title="입출고 이력이 없습니다"
+                    description="입고, 출고, 재고 조정이 발생하면 최근 이력이 이곳에 표시됩니다."
+                    compact
+                  />
                 ) : (
-                  <table className="min-w-[860px] w-full text-left text-xs">
-                    <thead className="bg-[var(--muted)]/50 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">
-                      <tr><th className="px-4 py-3">일시</th><th className="px-4 py-3">유형</th><th className="px-4 py-3">수량</th><th className="px-4 py-3">변동</th><th className="px-4 py-3">처리자</th><th className="px-4 py-3">회사/추적정보</th></tr>
-                    </thead>
-                    <tbody>
-                      {data.logs.map((log) => {
-                        const id = String(log.id ?? '');
-                        const at = log.created_at ? new Date(String(log.created_at)).toLocaleString('ko-KR') : '-';
-                        const ct = String(log.change_type || log.type || '');
-                        const sn = String(log.serial_number || '').trim();
-                        const lot = String(log.lot_number || '').trim();
-                        const location = String(log.location || '').trim();
-                        const unitPrice = Number(log.unit_price || 0);
-                        return (
-                          <tr key={id} className="border-t border-[var(--border)]">
-                            <td className="px-4 py-3 font-mono text-[11px] text-[var(--toss-gray-4)]">{at}</td>
-                            <td className="px-4 py-3"><span className={`rounded-[var(--radius-md)] px-2.5 py-1 text-[10px] font-bold ${ct === '입고' ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>{ct || '-'}</span></td>
-                            <td className="px-4 py-3 font-bold text-[var(--foreground)]">{String(log.quantity ?? '-')}</td>
-                            <td className="px-4 py-3 text-[var(--toss-gray-3)]">{log.prev_quantity !== undefined && log.prev_quantity !== null ? `${String(log.prev_quantity)} → ${String(log.next_quantity ?? '')}` : '-'}</td>
-                            <td className="px-4 py-3 text-[var(--foreground)]">{String(log.actor_name || '') || '-'}</td>
-                            <td className="px-4 py-3 text-[var(--toss-gray-4)]">
-                              <p>{String(log.company || '') || '-'}</p>
-                              <div className="mt-1 flex flex-wrap gap-1">
-                                {sn && <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600">S/N {sn}</span>}
-                                {lot && <span className="rounded bg-[var(--muted)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--toss-gray-4)]">LOT {lot}</span>}
-                                {location && <span className="rounded bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-sky-600">{location}</span>}
-                                {unitPrice > 0 && <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">{unitPrice.toLocaleString('ko-KR')}원</span>}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  <ResponsiveTable<LogRow>
+                    columns={logColumns}
+                    rows={logRows}
+                    keyField="_rowKey"
+                    emptyMessage="입출고 이력이 없습니다."
+                  />
                 )}
               </div>
             </section>
