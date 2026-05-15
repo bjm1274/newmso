@@ -2,6 +2,20 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import {
+  AtSign,
+  Bell,
+  BellOff,
+  ClipboardList,
+  Clock,
+  FileText,
+  GraduationCap,
+  MessageCircle,
+  Package,
+  Users,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { sound } from '@/lib/sounds';
 import {
@@ -12,39 +26,22 @@ import {
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { toNotificationText, timeAgo } from '@/lib/notification-utils';
 
-const TYPE_CFG: Record<string, { icon: string; color: string; label: string }> = {
-  message: { icon: '💬', color: 'text-blue-500', label: '채팅' },
-  mention: { icon: '@', color: 'text-indigo-500', label: '멘션' },
-  approval: { icon: '📝', color: 'text-violet-600', label: '전자결재' },
-  payroll: { icon: '💰', color: 'text-emerald-600', label: '급여' },
-  inventory: { icon: '📦', color: 'text-orange-500', label: '재고' },
-  attendance: { icon: '⏰', color: 'text-teal-500', label: '근태' },
-  board: { icon: '📋', color: 'text-pink-500', label: '게시판' },
-  hr: { icon: '👥', color: 'text-cyan-600', label: '인사' },
-  인사: { icon: '👥', color: 'text-cyan-600', label: '인사' },
-  education: { icon: '📚', color: 'text-purple-500', label: '교육' },
-  default: { icon: '🔔', color: 'text-[var(--toss-gray-4)]', label: '알림' },
+// 알림 타입별 Lucide 아이콘 매핑 — 이모지 대신 사용해 플랫폼 간 렌더 차이 제거 (P2-3, T-006)
+const TYPE_CFG: Record<string, { Icon: LucideIcon; color: string; label: string }> = {
+  message: { Icon: MessageCircle, color: 'text-blue-500', label: '채팅' },
+  mention: { Icon: AtSign, color: 'text-indigo-500', label: '멘션' },
+  approval: { Icon: FileText, color: 'text-violet-600', label: '전자결재' },
+  payroll: { Icon: Wallet, color: 'text-emerald-600', label: '급여' },
+  inventory: { Icon: Package, color: 'text-orange-500', label: '재고' },
+  attendance: { Icon: Clock, color: 'text-teal-500', label: '근태' },
+  board: { Icon: ClipboardList, color: 'text-pink-500', label: '게시판' },
+  hr: { Icon: Users, color: 'text-cyan-600', label: '인사' },
+  인사: { Icon: Users, color: 'text-cyan-600', label: '인사' },
+  education: { Icon: GraduationCap, color: 'text-purple-500', label: '교육' },
+  default: { Icon: Bell, color: 'text-[var(--toss-gray-4)]', label: '알림' },
 };
 
 const getTypeCfg = (type: string) => TYPE_CFG[type] || TYPE_CFG.default;
-
-function BellIcon({ className = 'h-5 w-5' }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-      <path d="M10 21h4" />
-    </svg>
-  );
-}
 
 
 export default function NotificationCenter({
@@ -275,7 +272,7 @@ export default function NotificationCenter({
           className={`block leading-none ${bellShaking ? 'animate-bell-shake' : ''}`}
           style={{ transformOrigin: 'top center' }}
         >
-          <BellIcon className="h-[22px] w-[22px]" />
+          <Bell className="h-[22px] w-[22px]" strokeWidth={1.8} aria-hidden="true" />
         </span>
         {unreadCount > 0 && (
           <span className="absolute right-1 top-1 min-w-[8px] h-[8px] rounded-full bg-red-500/100 text-[0px] leading-none">
@@ -314,7 +311,11 @@ export default function NotificationCenter({
           <div className="max-h-[360px] overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="py-10 text-center">
-                <p className="text-3xl mb-2 opacity-20">🔕</p>
+                <BellOff
+                  className="mx-auto mb-2 h-7 w-7 text-[var(--toss-gray-3)] opacity-30"
+                  strokeWidth={1.5}
+                  aria-hidden="true"
+                />
                 <p className="text-[12px] text-[var(--toss-gray-3)] font-medium">받은 알림이 없습니다.</p>
               </div>
             ) : (
@@ -328,6 +329,7 @@ export default function NotificationCenter({
                     </div>
                     {unread.map((notification) => {
                       const cfg = getTypeCfg(notification.type);
+                      const TypeIcon = cfg.Icon;
                       return (
                         <button
                           key={notification.id}
@@ -337,7 +339,11 @@ export default function NotificationCenter({
                           className="w-full text-left px-4 py-2.5 flex gap-3 hover:bg-[var(--muted)] transition-colors duration-100 border-b border-[var(--border-subtle)] last:border-0"
                           style={{ background: 'rgba(37,99,235,0.03)' }}
                         >
-                          <span className={`text-[18px] shrink-0 mt-0.5 leading-none ${cfg.color}`}>{cfg.icon}</span>
+                          <TypeIcon
+                            className={`h-[18px] w-[18px] shrink-0 mt-0.5 ${cfg.color}`}
+                            strokeWidth={1.8}
+                            aria-label={cfg.label}
+                          />
                           <div className="min-w-0 flex-1">
                             <div className="flex justify-between items-start gap-1">
                               <p className="text-[12px] font-semibold text-[var(--foreground)] truncate flex-1 leading-snug">
@@ -374,6 +380,7 @@ export default function NotificationCenter({
                     )}
                     {read.map((notification) => {
                       const cfg = getTypeCfg(notification.type);
+                      const TypeIcon = cfg.Icon;
                       return (
                         <button
                           key={notification.id}
@@ -382,7 +389,11 @@ export default function NotificationCenter({
                           onClick={() => handleNotiClick(notification)}
                           className="w-full text-left px-4 py-2.5 flex gap-3 hover:bg-[var(--muted)] transition-colors duration-100 border-b border-[var(--border-subtle)] opacity-55 last:border-0"
                         >
-                          <span className={`text-[16px] shrink-0 mt-0.5 leading-none ${cfg.color}`}>{cfg.icon}</span>
+                          <TypeIcon
+                            className={`h-4 w-4 shrink-0 mt-0.5 ${cfg.color}`}
+                            strokeWidth={1.8}
+                            aria-label={cfg.label}
+                          />
                           <div className="min-w-0 flex-1">
                             <div className="flex justify-between items-start gap-1">
                               <p className="text-[11px] font-medium text-[var(--toss-gray-3)] truncate flex-1 leading-snug">
