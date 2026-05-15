@@ -292,8 +292,8 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
       {/* 급여 요약 */}
       {activeTab === '급여요약' && (
         <div className="space-y-4">
-          {/* 요약 카드 */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* 요약 카드 (P2-1: 모바일 2컬럼) */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {[
               { label: '전체 인건비 합계', value: `${totalSalary.toLocaleString()}원`, color: 'text-[var(--accent)]' },
               { label: '1인 평균 급여', value: staffs.length > 0 ? `${Math.round(totalSalary / staffs.length).toLocaleString()}원` : '-', color: 'text-[var(--foreground)]' },

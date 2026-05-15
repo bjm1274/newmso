@@ -43,8 +43,8 @@ export default function FinancialDashboard() {
                 </div>
             </div>
 
-            {/* Top: Cash Flow Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {/* Top: Cash Flow Summary (P2-1: 모바일 2컬럼, 데스크탑 3컬럼) */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <div className="p-3 bg-success/10 rounded-[var(--radius-lg)] border border-success/20">
                     <div className="flex items-center gap-2 mb-1.5">
                         <span className="w-7 h-7 rounded-full bg-success/20 text-success flex items-center justify-center font-black text-sm">↓</span>
