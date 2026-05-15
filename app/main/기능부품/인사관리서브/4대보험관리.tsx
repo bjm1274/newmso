@@ -1,9 +1,10 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import { isActiveStaff } from '@/lib/active-staff';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 type InsuranceRecord = {
     id: string;
@@ -88,11 +89,11 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: Record<
         setForm({ staff_id: '', type: '취득', insurance_type: '국민연금', reason: '', effective_date: new Date().toISOString().slice(0, 10), memo: '' });
     };
 
-    const markReported = async (id: string) => {
+    const markReported = useCallback(async (id: string) => {
         const now = new Date().toISOString();
-        setRecords(records.map(r => r.id === id ? { ...r, status: '신고완료' as const, reported_at: now } : r));
+        setRecords(prev => prev.map(r => r.id === id ? { ...r, status: '신고완료' as const, reported_at: now } : r));
         await supabase.from('insurance_records').update({ status: '신고완료', reported_at: now }).eq('id', id);
-    };
+    }, []);
 
     const filteredStaffs = _staffs.filter((s: any) => {
         if (selectedCo !== '전체' && s.company !== selectedCo) return false;
@@ -111,6 +112,70 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: Record<
     });
 
     const pendingCount = records.filter(r => r.status === '미신고' && (selectedCo === '전체' || r.company === selectedCo)).length;
+
+    const insuranceColumns = useMemo((): Column<InsuranceRecord>[] => [
+        {
+            key: 'staff_name',
+            label: '직원',
+            primary: true,
+            render: (r) => (
+                <div>
+                    <div className="font-bold text-[var(--foreground)]">{r.staff_name}</div>
+                    <div className="text-[11px] text-[var(--toss-gray-3)]">{r.company} · {r.department}</div>
+                </div>
+            ),
+        },
+        {
+            key: 'type',
+            label: '유형',
+            render: (r) => (
+                <span className={`px-2 py-1 rounded-lg text-[11px] font-bold ${r.type === '취득' ? 'bg-blue-500/20 text-blue-700' : r.type === '상실' ? 'bg-red-500/20 text-red-700' : 'bg-purple-500/20 text-purple-700'}`}>
+                    {r.type}
+                </span>
+            ),
+        },
+        {
+            key: 'insurance_type',
+            label: '보험',
+        },
+        {
+            key: 'effective_date',
+            label: '적용일',
+            showOnMobile: false,
+        },
+        {
+            key: 'reason',
+            label: '사유',
+            showOnMobile: false,
+            render: (r) => <span>{r.reason || '-'}</span>,
+        },
+        {
+            key: 'status',
+            label: '상태',
+            align: 'center',
+            render: (r) => (
+                <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${STATUS_COLORS[r.status]}`}>{r.status}</span>
+            ),
+        },
+        {
+            key: 'id',
+            label: '액션',
+            align: 'center',
+            showOnMobile: false,
+            render: (r) => (
+                <>
+                    {r.status === '미신고' && (
+                        <button onClick={() => markReported(r.id)} className="px-3 py-1.5 bg-emerald-500 text-white text-[11px] font-bold rounded-lg hover:bg-emerald-600 transition-all shadow-sm">
+                            신고완료
+                        </button>
+                    )}
+                    {r.status === '신고완료' && r.reported_at && (
+                        <span className="text-[11px] text-[var(--toss-gray-3)]">{new Date(r.reported_at).toLocaleDateString()}</span>
+                    )}
+                </>
+            ),
+        },
+    ], [markReported]);
 
     // 4대보험 현황 요약 (간이)
     const activeStaffs = _staffs.filter((s: any) => isActiveStaff(s) && (selectedCo === '전체' || s.company === selectedCo));
@@ -224,54 +289,12 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: Record<
 
                 {/* 신고 이력 테이블 */}
                 <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-[11px]">
-                            <thead>
-                                <tr className="bg-[var(--muted)] border-b border-[var(--border)]">
-                                    <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">직원</th>
-                                    <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">유형</th>
-                                    <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">보험</th>
-                                    <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">적용일</th>
-                                    <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">사유</th>
-                                    <th className="px-4 py-3 text-center font-bold text-[var(--toss-gray-4)]">상태</th>
-                                    <th className="px-4 py-3 text-center font-bold text-[var(--toss-gray-4)]">액션</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredRecords.length === 0 ? (
-                                    <tr><td colSpan={7} className="px-4 py-10 text-center text-[var(--toss-gray-3)] font-bold">등록된 신고 이력이 없습니다</td></tr>
-                                ) : filteredRecords.map(r => (
-                                    <tr key={r.id} className="border-b border-[var(--border)] hover:bg-[var(--muted)]/50 transition-colors">
-                                        <td className="px-4 py-3 font-bold text-[var(--foreground)]">
-                                            <div>{r.staff_name}</div>
-                                            <div className="text-[11px] text-[var(--toss-gray-3)]">{r.company} · {r.department}</div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span className={`px-2 py-1 rounded-lg text-[11px] font-bold ${r.type === '취득' ? 'bg-blue-500/20 text-blue-700' : r.type === '상실' ? 'bg-red-500/20 text-red-700' : 'bg-purple-500/20 text-purple-700'}`}>
-                                                {r.type}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 font-bold text-[var(--foreground)]">{r.insurance_type}</td>
-                                        <td className="px-4 py-3 text-[var(--toss-gray-4)]">{r.effective_date}</td>
-                                        <td className="px-4 py-3 text-[var(--toss-gray-4)]">{r.reason || '-'}</td>
-                                        <td className="px-4 py-3 text-center">
-                                            <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${STATUS_COLORS[r.status]}`}>{r.status}</span>
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            {r.status === '미신고' && (
-                                                <button onClick={() => markReported(r.id)} className="px-3 py-1.5 bg-emerald-500 text-white text-[11px] font-bold rounded-lg hover:bg-emerald-600 transition-all shadow-sm">
-                                                    신고완료
-                                                </button>
-                                            )}
-                                            {r.status === '신고완료' && r.reported_at && (
-                                                <span className="text-[11px] text-[var(--toss-gray-3)]">{new Date(r.reported_at).toLocaleDateString()}</span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <ResponsiveTable
+                        columns={insuranceColumns}
+                        rows={filteredRecords}
+                        keyField="id"
+                        emptyMessage="등록된 신고 이력이 없습니다"
+                    />
                 </div>
 
                 {/* 자동 감지 영역 */}

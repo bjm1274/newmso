@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 interface Props {
   staffs: any[];
@@ -99,7 +100,6 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
     return list;
   }, [records, filterDept, filterApproved]);
 
-  // 부서별/개인별 통계
   const staffStats = useMemo<StaffStat[]>(() => {
     const map: Record<number, StaffStat> = {};
     records.forEach((r) => {
@@ -132,8 +132,116 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
   }, [records]);
 
   const maxDeptCount = deptStats.reduce((m, d) => Math.max(m, d.count), 1);
-
   const unapprovedCount = records.filter((r) => !r.is_approved).length;
+
+  const listColumns = useMemo<Column<EarlyLeaveRecord>[]>(() => [
+    {
+      key: 'work_date',
+      label: '날짜',
+      primary: true,
+      render: (row) => (
+        <span className="font-bold text-[var(--foreground)]">{row.work_date}</span>
+      ),
+    },
+    {
+      key: 'staff_name',
+      label: '직원명',
+      render: (row) => (
+        <span className="font-bold text-[var(--foreground)]">{row.staff_name}</span>
+      ),
+    },
+    {
+      key: 'dept',
+      label: '부서',
+      showOnMobile: false,
+      render: (row) => row.dept || '-',
+    },
+    {
+      key: 'scheduled_end',
+      label: '정상퇴근',
+      showOnMobile: false,
+    },
+    {
+      key: 'actual_end',
+      label: '실제퇴근',
+      showOnMobile: false,
+    },
+    {
+      key: 'early_minutes',
+      label: '조기분',
+      render: (row) => (
+        <span className="font-bold text-orange-600">{row.early_minutes}분</span>
+      ),
+    },
+    {
+      key: 'is_approved',
+      label: '상태',
+      render: (row) =>
+        row.is_approved ? (
+          <span className="px-2 py-0.5 text-[10px] font-extrabold bg-emerald-100 text-emerald-700 rounded-[var(--radius-md)]">승인</span>
+        ) : (
+          <span className="px-2 py-0.5 text-[10px] font-extrabold bg-red-500/20 text-red-700 rounded-[var(--radius-md)]">미신청</span>
+        ),
+    },
+    {
+      key: 'note',
+      label: '비고',
+      showOnMobile: false,
+      render: (row) => row.note || '-',
+    },
+    {
+      key: 'id',
+      label: '',
+      render: (row) =>
+        !row.is_approved ? (
+          <button
+            onClick={() => handleApprove(row.id)}
+            className="px-2 py-1 text-[10px] font-bold bg-blue-500/10 text-[var(--accent)] rounded-md hover:bg-blue-500/20 transition-colors"
+          >
+            승인
+          </button>
+        ) : null,
+    },
+  ], [handleApprove]);
+
+  const statsColumns = useMemo<Column<StaffStat>[]>(() => [
+    {
+      key: 'staff_name',
+      label: '직원명',
+      primary: true,
+      render: (row) => (
+        <span className="font-bold text-[var(--foreground)]">{row.staff_name}</span>
+      ),
+    },
+    {
+      key: 'dept',
+      label: '부서',
+      showOnMobile: false,
+    },
+    {
+      key: 'total_count',
+      label: '총횟수',
+      render: (row) => (
+        <span className="font-bold text-[var(--accent)]">{row.total_count}회</span>
+      ),
+    },
+    {
+      key: 'unapproved_count',
+      label: '미신청',
+      render: (row) =>
+        row.unapproved_count > 0 ? (
+          <span className="font-extrabold text-red-600">{row.unapproved_count}건</span>
+        ) : (
+          <span className="text-emerald-600 font-bold">-</span>
+        ),
+    },
+    {
+      key: 'total_minutes',
+      label: '총조기분',
+      showOnMobile: false,
+      render: (row) => `${row.total_minutes}분`,
+    },
+  ], []);
 
   return (
     <div className="p-4 md:p-4 space-y-4" data-testid="attendance-analysis-early-leaving">
@@ -200,7 +308,7 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
             </select>
             <select
               value={filterApproved}
-              onChange={(e) => setFilterApproved(e.target.value as any)}
+              onChange={(e) => setFilterApproved(e.target.value as '전체' | '미신청' | '승인')}
               className="px-3 py-1.5 text-sm border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)] text-[var(--foreground)] outline-none"
             >
               <option value="전체">전체</option>
@@ -214,47 +322,13 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] overflow-hidden">
             {loading ? (
               <div className="p-5 text-center text-sm text-[var(--toss-gray-3)]">불러오는 중...</div>
-            ) : displayRecords.length === 0 ? (
-              <div className="p-5 text-center text-sm text-[var(--toss-gray-3)]">조기 퇴근 기록이 없습니다.</div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-[var(--muted)]">
-                    <tr>
-                      {['날짜', '직원명', '부서', '정상퇴근', '실제퇴근', '조기분', '상태', '비고', ''].map((h) => (
-                        <th key={h} className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--border)]">
-                    {displayRecords.map((rec) => (
-                      <tr key={rec.id} className={`hover:bg-[var(--muted)]/50 transition-colors ${!rec.is_approved ? 'bg-red-500/10/30' : ''}`}>
-                        <td className="px-4 py-3 font-bold text-[var(--foreground)]">{rec.work_date}</td>
-                        <td className="px-4 py-3 font-bold text-[var(--foreground)]">{rec.staff_name}</td>
-                        <td className="px-4 py-3 text-[var(--toss-gray-4)]">{rec.dept || '-'}</td>
-                        <td className="px-4 py-3 text-[var(--toss-gray-4)]">{rec.scheduled_end}</td>
-                        <td className="px-4 py-3 text-[var(--toss-gray-4)]">{rec.actual_end}</td>
-                        <td className="px-4 py-3 font-bold text-orange-600">{rec.early_minutes}분</td>
-                        <td className="px-4 py-3">
-                          {rec.is_approved ? (
-                            <span className="px-2 py-0.5 text-[10px] font-extrabold bg-emerald-100 text-emerald-700 rounded-[var(--radius-md)]">승인</span>
-                          ) : (
-                            <span className="px-2 py-0.5 text-[10px] font-extrabold bg-red-500/20 text-red-700 rounded-[var(--radius-md)]">미신청</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-[var(--toss-gray-3)]">{rec.note || '-'}</td>
-                        <td className="px-4 py-3">
-                          {!rec.is_approved && (
-                            <button onClick={() => handleApprove(rec.id)} className="px-2 py-1 text-[10px] font-bold bg-blue-500/10 text-[var(--accent)] rounded-md hover:bg-blue-500/20 transition-colors">
-                              승인
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <ResponsiveTable<EarlyLeaveRecord>
+                columns={listColumns}
+                rows={displayRecords}
+                keyField="id"
+                emptyMessage="조기 퇴근 기록이 없습니다."
+              />
             )}
           </div>
         </>
@@ -295,36 +369,12 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
             <div className="px-4 py-3 border-b border-[var(--border)]">
               <h3 className="text-sm font-bold text-[var(--foreground)]">개인별 조기퇴근 통계</h3>
             </div>
-            {staffStats.length === 0 ? (
-              <div className="p-5 text-center text-sm text-[var(--toss-gray-3)]">데이터가 없습니다.</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-[var(--muted)]">
-                    <tr>
-                      {['직원명', '부서', '총횟수', '미신청', '총조기분'].map((h) => (
-                        <th key={h} className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--border)]">
-                    {staffStats.map((ss) => (
-                      <tr key={ss.staff_id} className="hover:bg-[var(--muted)]/50 transition-colors">
-                        <td className="px-4 py-3 font-bold text-[var(--foreground)]">{ss.staff_name}</td>
-                        <td className="px-4 py-3 text-[var(--toss-gray-4)]">{ss.dept}</td>
-                        <td className="px-4 py-3 font-bold text-[var(--accent)]">{ss.total_count}회</td>
-                        <td className="px-4 py-3">
-                          {ss.unapproved_count > 0 ? (
-                            <span className="font-extrabold text-red-600">{ss.unapproved_count}건</span>
-                          ) : <span className="text-emerald-600 font-bold">-</span>}
-                        </td>
-                        <td className="px-4 py-3 text-[var(--toss-gray-4)]">{ss.total_minutes}분</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <ResponsiveTable<StaffStat>
+              columns={statsColumns}
+              rows={staffStats}
+              keyField="staff_id"
+              emptyMessage="데이터가 없습니다."
+            />
           </div>
         </div>
       )}
