@@ -332,10 +332,14 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
             </div>
           ) : null}
 
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             <div>
-              <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">사고 날짜</label>
+              <label htmlFor="incident-report-date" className="text-[10px] font-bold text-[var(--toss-gray-4)]">
+                사고 날짜 <span className="text-red-500" aria-hidden>*</span>
+              </label>
               <input
+                id="incident-report-date"
+                aria-required="true"
                 data-testid="incident-report-date"
                 type="date"
                 value={form.incident_date}
@@ -344,8 +348,9 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
               />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">사고 시간</label>
+              <label htmlFor="incident-report-time" className="text-[10px] font-bold text-[var(--toss-gray-4)]">사고 시간</label>
               <input
+                id="incident-report-time"
                 data-testid="incident-report-time"
                 type="time"
                 value={form.incident_time}
@@ -354,8 +359,9 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
               />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">유형</label>
+              <label htmlFor="incident-report-type" className="text-[10px] font-bold text-[var(--toss-gray-4)]">유형</label>
               <select
+                id="incident-report-type"
                 data-testid="incident-report-type"
                 value={form.type}
                 onChange={(event) => setForm((prev) => ({ ...prev, type: event.target.value }))}
@@ -367,8 +373,9 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
               </select>
             </div>
             <div>
-              <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">심각도</label>
+              <label htmlFor="incident-report-severity" className="text-[10px] font-bold text-[var(--toss-gray-4)]">심각도</label>
               <select
+                id="incident-report-severity"
                 data-testid="incident-report-severity"
                 value={form.severity}
                 onChange={(event) => setForm((prev) => ({ ...prev, severity: event.target.value }))}
@@ -382,8 +389,9 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
           </div>
 
           <div>
-            <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">사고 장소</label>
+            <label htmlFor="incident-report-location" className="text-[10px] font-bold text-[var(--toss-gray-4)]">사고 장소</label>
             <input
+              id="incident-report-location"
               data-testid="incident-report-location"
               value={form.location}
               onChange={(event) => setForm((prev) => ({ ...prev, location: event.target.value }))}
@@ -393,8 +401,12 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
           </div>
 
           <div>
-            <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">사고 경위</label>
+            <label htmlFor="incident-report-description" className="text-[10px] font-bold text-[var(--toss-gray-4)]">
+              사고 경위 <span className="text-red-500" aria-hidden>*</span>
+            </label>
             <textarea
+              id="incident-report-description"
+              aria-required="true"
               data-testid="incident-report-description"
               value={form.description}
               onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}

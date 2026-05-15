@@ -433,11 +433,15 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
             <h3 className="mb-3 text-base font-bold text-[var(--foreground)]">
               {editing ? '회사 수정' : '회사 추가'}
             </h3>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="mb-1.5 block text-xs font-bold text-[var(--toss-gray-3)]">회사명</label>
+                <label htmlFor="company-manager-name-input" className="mb-1.5 block text-xs font-bold text-[var(--toss-gray-3)]">
+                  회사명 <span className="text-red-500" aria-hidden>*</span>
+                </label>
                 <input
+                  id="company-manager-name-input"
                   data-testid="company-manager-name-input"
+                  aria-required="true"
                   value={form.name}
                   onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
                   className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20"
@@ -445,8 +449,9 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-bold text-[var(--toss-gray-3)]">유형</label>
+                <label htmlFor="company-manager-type-select" className="mb-1.5 block text-xs font-bold text-[var(--toss-gray-3)]">유형</label>
                 <select
+                  id="company-manager-type-select"
                   data-testid="company-manager-type-select"
                   value={form.type}
                   onChange={(event) =>
@@ -460,8 +465,9 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
                 </select>
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-bold text-[var(--toss-gray-3)]">대표자명</label>
+                <label htmlFor="company-manager-ceo-input" className="mb-1.5 block text-xs font-bold text-[var(--toss-gray-3)]">대표자명</label>
                 <input
+                  id="company-manager-ceo-input"
                   value={form.ceo_name}
                   onChange={(event) => setForm((prev) => ({ ...prev, ceo_name: event.target.value }))}
                   className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
@@ -469,10 +475,11 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-bold text-[var(--toss-gray-3)]">
+                <label htmlFor="company-manager-business-no-input" className="mb-1.5 block text-xs font-bold text-[var(--toss-gray-3)]">
                   사업자등록번호
                 </label>
                 <input
+                  id="company-manager-business-no-input"
                   value={form.business_no}
                   onChange={(event) =>
                     setForm((prev) => ({ ...prev, business_no: event.target.value }))
@@ -481,9 +488,10 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
                   placeholder="예: 123-45-67890"
                 />
               </div>
-              <div className="md:col-span-2">
-                <label className="mb-1.5 block text-xs font-bold text-[var(--toss-gray-3)]">주소</label>
+              <div className="sm:col-span-2">
+                <label htmlFor="company-manager-address-input" className="mb-1.5 block text-xs font-bold text-[var(--toss-gray-3)]">주소</label>
                 <input
+                  id="company-manager-address-input"
                   value={form.address}
                   onChange={(event) => setForm((prev) => ({ ...prev, address: event.target.value }))}
                   className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
@@ -491,8 +499,9 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-bold text-[var(--toss-gray-3)]">대표 전화번호</label>
+                <label htmlFor="company-manager-phone-input" className="mb-1.5 block text-xs font-bold text-[var(--toss-gray-3)]">대표 전화번호</label>
                 <input
+                  id="company-manager-phone-input"
                   value={form.phone}
                   onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
                   className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
@@ -500,8 +509,9 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-bold text-[var(--toss-gray-3)]">급여일</label>
+                <label htmlFor="company-manager-payment-day-input" className="mb-1.5 block text-xs font-bold text-[var(--toss-gray-3)]">급여일</label>
                 <input
+                  id="company-manager-payment-day-input"
                   type="number"
                   min={1}
                   max={31}
@@ -511,9 +521,10 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
                   placeholder="예: 7"
                 />
               </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-bold text-[var(--toss-gray-3)]">메모</label>
+              <div className="sm:col-span-2">
+                <label htmlFor="company-manager-memo-input" className="mb-1.5 block text-xs font-bold text-[var(--toss-gray-3)]">메모</label>
                 <textarea
+                  id="company-manager-memo-input"
                   value={form.memo}
                   onChange={(event) => setForm((prev) => ({ ...prev, memo: event.target.value }))}
                   className="min-h-[72px] w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
@@ -521,19 +532,21 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
                 />
               </div>
             </div>
-            <div className="mt-4 flex gap-2.5">
+            <div className="mt-4 flex flex-col sm:flex-row gap-2.5">
               <button
+                type="button"
                 data-testid="company-manager-save-button"
                 onClick={handleSave}
                 disabled={saving}
-                className="rounded-[var(--radius-md)] bg-[var(--accent)] px-5 py-1.5 text-sm font-bold text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto rounded-[var(--radius-md)] bg-[var(--accent)] px-5 py-2 text-sm font-bold text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? '저장 중...' : editing ? '저장' : '추가'}
               </button>
               {editing ? (
                 <button
+                  type="button"
                   onClick={resetForm}
-                  className="rounded-[var(--radius-md)] bg-[var(--muted)] px-5 py-1.5 text-sm font-bold text-[var(--toss-gray-4)]"
+                  className="w-full sm:w-auto rounded-[var(--radius-md)] bg-[var(--muted)] px-5 py-2 text-sm font-bold text-[var(--toss-gray-4)]"
                 >
                   취소
                 </button>

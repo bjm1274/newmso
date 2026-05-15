@@ -187,10 +187,14 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
           {/* 등록 카드 */}
           <div className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
             <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">예산 등록</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">부서명</label>
+                <label htmlFor="budget-dept-input" className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">
+                  부서명 <span className="text-red-500" aria-hidden>*</span>
+                </label>
                 <input
+                  id="budget-dept-input"
+                  aria-required="true"
                   list="dept-list-budget"
                   value={settingForm.dept}
                   onChange={e => setSettingForm(f => ({ ...f, dept: e.target.value }))}
@@ -202,8 +206,9 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
                 </datalist>
               </div>
               <div>
-                <label className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">연도</label>
+                <label htmlFor="budget-year-input" className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">연도</label>
                 <input
+                  id="budget-year-input"
                   type="number"
                   value={settingForm.year}
                   onChange={e => setSettingForm(f => ({ ...f, year: Number(e.target.value) }))}
@@ -211,8 +216,9 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">월</label>
+                <label htmlFor="budget-month-select" className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">월</label>
                 <select
+                  id="budget-month-select"
                   value={settingForm.month}
                   onChange={e => setSettingForm(f => ({ ...f, month: Number(e.target.value) }))}
                   className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] transition-colors"
@@ -223,8 +229,9 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">예산 항목</label>
+                <label htmlFor="budget-item-select" className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">예산 항목</label>
                 <select
+                  id="budget-item-select"
                   value={settingForm.item}
                   onChange={e => setSettingForm(f => ({ ...f, item: e.target.value as BudgetItem }))}
                   className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] transition-colors"
@@ -233,8 +240,12 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">예산액 (원)</label>
+                <label htmlFor="budget-amount-input" className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">
+                  예산액 (원) <span className="text-red-500" aria-hidden>*</span>
+                </label>
                 <input
+                  id="budget-amount-input"
+                  aria-required="true"
                   type="number"
                   value={settingForm.amount}
                   onChange={e => setSettingForm(f => ({ ...f, amount: e.target.value }))}
@@ -242,8 +253,9 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
                   className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] transition-colors"
                 />
               </div>
-              <div className="flex items-end">
+              <div className="flex items-end sm:col-span-2 md:col-span-1">
                 <button
+                  type="button"
                   onClick={handleAddSetting}
                   disabled={!settingForm.dept || !settingForm.amount}
                   className="w-full px-4 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"

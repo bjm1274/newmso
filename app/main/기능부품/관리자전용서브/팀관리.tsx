@@ -176,18 +176,30 @@ export default function TeamManager({
       </div>
 
       {adding && !disabled && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]" onClick={() => setAdding(false)}>
-          <div data-testid="team-manager-add-modal" className="bg-[var(--card)] p-4 rounded-[var(--radius-md)] max-w-sm w-full space-y-3" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] p-4" onClick={() => setAdding(false)}>
+          <div data-testid="team-manager-add-modal" className="bg-[var(--card)] p-4 rounded-[var(--radius-md)] max-w-sm w-full space-y-3" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="팀 추가">
             <h4 className="font-semibold">팀 추가</h4>
-            <select data-testid="team-manager-division-select" value={newTeam.division} onChange={(e) => setNewTeam({ ...newTeam, division: e.target.value })} className="w-full p-2 border rounded-[var(--radius-md)]">
-              {currentDivisions.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-            <input data-testid="team-manager-name-input" type="text" value={newTeam.team_name} onChange={(e) => setNewTeam({ ...newTeam, team_name: e.target.value })} placeholder="팀명" className="w-full p-2 border rounded-[var(--radius-md)]" />
-            <div className="flex gap-2">
-              <button data-testid="team-manager-save-button" onClick={handleAdd} className="flex-1 py-2 bg-[var(--accent)] text-white font-semibold rounded-[var(--radius-md)]">추가</button>
-              <button onClick={() => setAdding(false)} className="flex-1 py-2 bg-[var(--toss-gray-2)] font-semibold rounded-[var(--radius-md)]">취소</button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="team-manager-division-select" className="text-xs font-bold text-[var(--toss-gray-3)]">
+                  본부 <span className="text-red-500" aria-hidden>*</span>
+                </label>
+                <select id="team-manager-division-select" aria-required="true" data-testid="team-manager-division-select" value={newTeam.division} onChange={(e) => setNewTeam({ ...newTeam, division: e.target.value })} className="w-full p-2 border rounded-[var(--radius-md)]">
+                  {currentDivisions.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="team-manager-name-input" className="text-xs font-bold text-[var(--toss-gray-3)]">
+                  팀명 <span className="text-red-500" aria-hidden>*</span>
+                </label>
+                <input id="team-manager-name-input" aria-required="true" data-testid="team-manager-name-input" type="text" value={newTeam.team_name} onChange={(e) => setNewTeam({ ...newTeam, team_name: e.target.value })} placeholder="팀명" className="w-full p-2 border rounded-[var(--radius-md)]" />
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button type="button" data-testid="team-manager-save-button" onClick={handleAdd} className="flex-1 py-2 bg-[var(--accent)] text-white font-semibold rounded-[var(--radius-md)]">추가</button>
+              <button type="button" onClick={() => setAdding(false)} className="flex-1 py-2 bg-[var(--toss-gray-2)] font-semibold rounded-[var(--radius-md)]">취소</button>
             </div>
           </div>
         </div>

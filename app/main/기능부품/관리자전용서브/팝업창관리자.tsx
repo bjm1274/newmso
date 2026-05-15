@@ -219,12 +219,14 @@ export default function PopupManager() {
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
-              팝업 제목
+            <label htmlFor="popup-title-input" className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
+              팝업 제목 <span className="text-red-500" aria-hidden>*</span>
             </label>
             <input
+              id="popup-title-input"
+              aria-required="true"
               className="w-full p-2 bg-[var(--muted)] border border-[var(--border)] text-xs font-bold outline-none"
               placeholder="예: 박철홍정형외과 설날 진료 안내"
               value={newPopup.title}
@@ -232,10 +234,11 @@ export default function PopupManager() {
             />
           </div>
           <div className="space-y-2">
-            <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
+            <label htmlFor="popup-media-type-select" className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
               미디어 타입
             </label>
             <select
+              id="popup-media-type-select"
               className="w-full p-2 bg-[var(--muted)] border border-[var(--border)] text-xs font-bold outline-none"
               value={newPopup.media_type}
               onChange={(e) => {
@@ -253,12 +256,14 @@ export default function PopupManager() {
         </div>
 
         <div className="mt-4 space-y-2">
-          <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
+          <label htmlFor="popup-media-file-input" className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
             {newPopup.media_type === 'video'
               ? '동영상 파일 선택 (MP4)'
-              : '이미지 파일 선택 (JPG, PNG)'}
+              : '이미지 파일 선택 (JPG, PNG)'} <span className="text-red-500" aria-hidden>*</span>
           </label>
           <input
+            id="popup-media-file-input"
+            aria-required="true"
             type="file"
             accept={newPopup.media_type === 'video' ? 'video/mp4' : 'image/png,image/jpeg,image/jpg'}
             className="w-full text-xs"
@@ -269,14 +274,16 @@ export default function PopupManager() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-2 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
           <button
+            type="button"
             onClick={() => setShowPreview(true)}
             className="w-full py-2.5 bg-orange-500/10 text-orange-600 border border-orange-100 text-[11px] font-semibold shadow-sm uppercase tracking-widest"
           >
             👁️ 홈페이지 실시간 시뮬레이션
           </button>
           <button
+            type="button"
             onClick={handleAddPopup}
             disabled={saving}
             className="w-full py-2.5 bg-[var(--foreground)] text-[var(--card)] text-[11px] font-semibold shadow-sm uppercase tracking-widest disabled:opacity-60 disabled:cursor-not-allowed"
