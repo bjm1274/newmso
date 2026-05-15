@@ -1,9 +1,61 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 type AnyRecord = Record<string, unknown>;
+
+type AssetItem = {
+  id: string;
+  item_name: string;
+  category: string;
+  quantity: number;
+  stock?: number;
+  company?: unknown;
+  [key: string]: unknown;
+};
+
+const ASSET_COLUMNS: Column<AssetItem>[] = [
+  {
+    key: 'category',
+    label: '분류',
+    render: (row) => (
+      <span className="text-[11px] font-bold text-[var(--accent)]">{row.category}</span>
+    ),
+  },
+  {
+    key: 'item_name',
+    label: '자산명',
+    primary: true,
+    render: (row) => (
+      <span className="text-xs font-bold text-[var(--foreground)]">{row.item_name}</span>
+    ),
+  },
+  {
+    key: 'quantity',
+    label: '잔여 수량',
+    render: (row) => (
+      <span className="text-xs font-bold text-[var(--toss-gray-4)]">
+        {Number(row.quantity ?? row.stock ?? 0)}
+      </span>
+    ),
+  },
+  {
+    key: '_qr',
+    label: '관리',
+    align: 'right',
+    showOnMobile: false,
+    render: () => (
+      <button
+        type="button"
+        className="px-2 py-1 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[10px] font-bold rounded hover:bg-[var(--border)]"
+      >
+        QR 출력
+      </button>
+    ),
+  },
+];
 
 // Mock Component for QR Asset Manager
 export default function QRAssetManager({ user, inventory, fetchInventory }: AnyRecord) {
@@ -12,8 +64,8 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: AnyR
     const [activeTab, setActiveTab] = useState<'대시보드' | '내대여'>('대시보드');
 
     // Filter only asset-type inventory (e.g. laptops, cards, monitors)
-    const _inventory = (inventory ?? []) as AnyRecord[];
-    const assets = _inventory.filter((item: AnyRecord) =>
+    const _inventory = (inventory ?? []) as AssetItem[];
+    const assets = _inventory.filter((item) =>
         item.category === '전자기기' ||
         item.category === '법인카드' ||
         item.category === '사무용품' ||
@@ -51,7 +103,7 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: AnyR
         }
     };
 
-    const handleReturn = async (item: AnyRecord) => {
+    const handleReturn = async (item: AssetItem) => {
         try {
             const newStock = (Number(item.quantity ?? item.stock ?? 0)) + 1;
             await supabase.from('inventory').update({ quantity: newStock, stock: newStock }).eq('id', item.id);
@@ -65,7 +117,7 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: AnyR
                 company: item.company
             }]);
 
-            toast(`[${item.item_name as string}] 반납 처리가 완료되었습니다.`, 'success');
+            toast(`[${item.item_name}] 반납 처리가 완료되었습니다.`, 'success');
             _fetchInventory?.();
         } catch (e) {
             console.error(e);
@@ -128,11 +180,11 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: AnyR
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="bg-[var(--card)] border border-[var(--border)] p-3 rounded-[var(--radius-md)] shadow-sm">
                                     <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest mb-0.5">전자기기</p>
-                                    <p className="text-lg font-bold text-[var(--foreground)]">{assets.filter((a: AnyRecord) => a.category === '전자기기' || String(a.item_name ?? '').includes('노트북')).length}대</p>
+                                    <p className="text-lg font-bold text-[var(--foreground)]">{assets.filter((a) => a.category === '전자기기' || String(a.item_name ?? '').includes('노트북')).length}대</p>
                                 </div>
                                 <div className="bg-[var(--card)] border border-[var(--border)] p-3 rounded-[var(--radius-md)] shadow-sm">
                                     <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest mb-0.5">법인카드</p>
-                                    <p className="text-lg font-bold text-[var(--foreground)]">{assets.filter((a: AnyRecord) => a.category === '법인카드').length}장</p>
+                                    <p className="text-lg font-bold text-[var(--foreground)]">{assets.filter((a) => a.category === '법인카드').length}장</p>
                                 </div>
                             </div>
                         )}
@@ -141,32 +193,13 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: AnyR
                             <div className="px-4 py-3 border-b border-[var(--border)] flex justify-between items-center">
                                 <h3 className="text-sm font-bold text-[var(--foreground)]">전체 자산 목록 (QR 생성 대상)</h3>
                             </div>
-                            <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
-                                <table className="w-full text-left">
-                                    <thead className="sticky top-0 bg-[var(--card)]">
-                                        <tr className="border-b border-[var(--border)] text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">
-                                            <th className="px-4 py-2">분류</th>
-                                            <th className="px-4 py-2">자산명</th>
-                                            <th className="px-4 py-2">잔여 수량</th>
-                                            <th className="px-4 py-2 text-right">관리</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-[var(--border)]">
-                                        {assets.length === 0 && (
-                                            <tr><td colSpan={4} className="px-4 py-10 text-center text-[var(--toss-gray-3)] text-xs font-bold">자산이 없습니다.</td></tr>
-                                        )}
-                                        {assets.map((item: AnyRecord) => (
-                                            <tr key={item.id as string} className="hover:bg-[var(--muted)]/50 transition-colors">
-                                                <td className="px-4 py-2 text-[11px] font-bold text-[var(--accent)]">{item.category as string}</td>
-                                                <td className="px-4 py-2 text-xs font-bold text-[var(--foreground)]">{item.item_name as string}</td>
-                                                <td className="px-4 py-2 text-xs font-bold text-[var(--toss-gray-4)]">{Number(item.quantity ?? item.stock ?? 0)}</td>
-                                                <td className="px-4 py-2 text-right">
-                                                    <button className="px-2 py-1 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[10px] font-bold rounded hover:bg-[var(--border)]">QR 출력</button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                            <div className="max-h-[300px] overflow-y-auto">
+                                <ResponsiveTable
+                                    columns={ASSET_COLUMNS}
+                                    rows={assets}
+                                    keyField="id"
+                                    emptyMessage="자산이 없습니다."
+                                />
                             </div>
                         </div>
                     </div>
