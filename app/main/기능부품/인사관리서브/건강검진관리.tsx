@@ -1,9 +1,10 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { Fragment, useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import { getScopedActiveStaffs } from '@/lib/active-staff';
+import { ExpandableTable, type ExpandableColumn } from '@/app/components/ExpandableTable';
 
 const CHECKUP_TYPES = ['일반검진', '특수검진', '배치전검진', '잠복결핵검진'] as const;
 const STATUS_OPTIONS = ['예정', '완료', '미수검'] as const;
@@ -24,6 +25,23 @@ type CheckupForm = {
     memo: string;
 };
 
+type CheckupRecord = {
+    id: string;
+    staff_id: string;
+    staff_name: string;
+    department?: string;
+    company?: string;
+    checkup_type?: string;
+    completed_date?: string | null;
+    hospital?: string;
+    status?: string;
+    result?: string;
+    memo?: string;
+    isVirtual?: boolean;
+};
+
+type Group = { sid: string; latest: CheckupRecord; history: CheckupRecord[] };
+
 const emptyForm: CheckupForm = {
     staff_id: '',
     checkup_type: '일반검진',
@@ -33,6 +51,11 @@ const emptyForm: CheckupForm = {
     result: '',
     memo: '',
 };
+
+const statusBadgeClass = (s?: string) =>
+    s === '완료' ? 'bg-emerald-100 text-emerald-700'
+    : s === '미수검' ? 'bg-red-500/20 text-red-700'
+    : 'bg-amber-100 text-amber-700';
 
 export default function HealthCheckupManagement({ staffs, selectedCo }: Record<string, unknown>) {
     const _staffs = (staffs as Record<string, unknown>[]) ?? [];
@@ -45,7 +68,6 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
     const [openColMenu, setOpenColMenu] = useState<string | null>(null);
     const [colFilter, setColFilter] = useState<{ checkup_type: string; status: string }>({ checkup_type: '', status: '' });
     const [colSort, setColSort] = useState<{ key: 'staff_name' | 'completed_date' | null; dir: 'asc' | 'desc' }>({ key: null, dir: 'desc' });
-    const [expandedStaffId, setExpandedStaffId] = useState<string | null>(null);
 
     useEffect(() => {
         if (!openColMenu) return;
@@ -90,7 +112,6 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
     };
 
     // 미수검 대상자: 회사 범위 내 활성 직원 중 "올해(현재 연도)"에 완료 검진이 없는 사람.
-    // 일자 기준이 아니라 연도 기준 — 예) 2025-05-30 검진 완료자도 2026-01-01부터 미수검.
     const checkupDue = useMemo(() => {
         const currentYear = new Date().getFullYear();
         return filtered.filter((s: any) => {
@@ -107,7 +128,6 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
         let rows = filteredRecords;
         if (colFilter.checkup_type) rows = rows.filter((r: any) => normalizeCheckupType(r.checkup_type) === colFilter.checkup_type);
         if (colFilter.status === '미수검') {
-            // DB의 status='미수검' row + checkupDue(기록 없는 직원)를 가상 row로 합쳐 표시.
             const dbMissed = rows.filter((r: any) => r.status === '미수검');
             const dbMissedStaffIds = new Set(dbMissed.map((r: any) => String(r.staff_id)));
             const virtuals = checkupDue
@@ -131,9 +151,8 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
         return rows;
     }, [filteredRecords, colFilter, checkupDue]);
 
-    // 직원별 그룹: 같은 staff_id의 검진 기록을 최신(completed_date desc)순으로 묶음.
-    // 메인 행 = latest, 펼침 영역 = history.
-    const groupedDisplay = useMemo(() => {
+    // 직원별 그룹: 같은 staff_id의 검진 기록을 최신순으로 묶음.
+    const groupedDisplay = useMemo<Group[]>(() => {
         const sorted = [...displayRecords].sort((a: any, b: any) => {
             const ad = String(a.completed_date ?? '');
             const bd = String(b.completed_date ?? '');
@@ -142,14 +161,14 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
             if (!bd) return -1;
             return bd.localeCompare(ad);
         });
-        const map = new Map<string, any[]>();
+        const map = new Map<string, CheckupRecord[]>();
         for (const r of sorted) {
             const sid = String(r.staff_id ?? '');
             if (!sid) continue;
             if (!map.has(sid)) map.set(sid, []);
-            map.get(sid)!.push(r);
+            map.get(sid)!.push(r as CheckupRecord);
         }
-        let groups = Array.from(map.entries()).map(([sid, rows]) => ({
+        let groups: Group[] = Array.from(map.entries()).map(([sid, rows]) => ({
             sid,
             latest: rows[0],
             history: rows.slice(1),
@@ -197,7 +216,7 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
         setShowForm(true);
     };
 
-    const openEdit = (rec: any) => {
+    const openEdit = (rec: CheckupRecord) => {
         setEditId(String(rec.id));
         setForm({
             staff_id: String(rec.staff_id ?? ''),
@@ -215,7 +234,6 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
         e.preventDefault();
         const staff = _staffs.find((s: any) => s.id === form.staff_id);
         if (!staff) return toast('직원을 선택해주세요.', 'warning');
-        // PostgreSQL date 컬럼은 빈 문자열을 거부하므로 null로 변환
         const payload = {
             staff_id: form.staff_id,
             staff_name: (staff as any).name,
@@ -258,6 +276,54 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
         }
         setRecords(records.map((r: any) => r.id === id ? { ...r, status: '완료', completed_date: now } : r));
     };
+
+    // 행 액션 버튼들 (이벤트 전파 차단 onClick으로 wrapping해서 expand toggle을 막음)
+    const renderActions = (r: CheckupRecord) => {
+        if (r.isVirtual) {
+            return (
+                <button onClick={(e) => { e.stopPropagation(); openAdd(String(r.staff_id)); }} className="px-2.5 py-1 bg-[var(--accent)] text-white text-[10px] font-bold rounded-lg">등록</button>
+            );
+        }
+        return (
+            <div className="flex justify-center gap-1.5">
+                <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="px-2.5 py-1 bg-blue-500/10 text-blue-600 text-[10px] font-bold rounded-lg hover:bg-blue-500/20">수정</button>
+                {r.status === '예정' && <button onClick={(e) => { e.stopPropagation(); markComplete(r.id); }} className="px-3 py-1.5 bg-emerald-500 text-white text-[10px] font-bold rounded-lg">완료</button>}
+                <button onClick={(e) => { e.stopPropagation(); handleDelete(String(r.id)); }} className="px-2.5 py-1 bg-red-500/10 text-red-600 text-[10px] font-bold rounded-lg hover:bg-red-500/20">삭제</button>
+            </div>
+        );
+    };
+
+    // ExpandableTable column 정의 (row 단위 = Group)
+    const columns: ExpandableColumn<Group>[] = useMemo(() => [
+        {
+            key: 'staff_name',
+            label: '직원',
+            primary: true,
+            render: (g) => {
+                const r = g.latest;
+                const count = g.history.length;
+                return (
+                    <span>
+                        {r.staff_name}
+                        {count > 0 && <span className="ml-1.5 text-[9px] font-bold text-[var(--accent)]">+{count}</span>}
+                        <br /><span className="text-[9px] font-medium text-[var(--toss-gray-3)]">{r.department}</span>
+                    </span>
+                );
+            },
+        },
+        { key: 'checkup_type', label: '종류', render: (g) => normalizeCheckupType(g.latest.checkup_type) },
+        { key: 'completed_date', label: '완료일', render: (g) => g.latest.completed_date || '-' },
+        { key: 'hospital', label: '기관', render: (g) => g.latest.hospital || '-' },
+        {
+            key: 'status',
+            label: '상태',
+            align: 'center',
+            render: (g) => (
+                <span className={`inline-block px-2.5 py-1 rounded-lg text-[10px] font-bold ${statusBadgeClass(g.latest.status)}`}>{g.latest.status}</span>
+            ),
+        },
+        { key: 'actions', label: '액션', align: 'center', render: (g) => renderActions(g.latest) },
+    ], []);
 
     return (
         <div className="flex flex-col h-full animate-in fade-in duration-300">
@@ -315,124 +381,69 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
                         </div>
                     </div>
                 )}
-                <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-x-auto shadow-sm">
-                    <table className="w-full text-[11px]">
-                        <thead><tr className="bg-[var(--muted)] border-b border-[var(--border)]">
-                            <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">
-                                <ColumnFilter
-                                    label="직원"
-                                    active={colSort.key === 'staff_name'}
-                                    open={openColMenu === 'staff_name'}
-                                    onToggle={() => setOpenColMenu(openColMenu === 'staff_name' ? null : 'staff_name')}
-                                >
-                                    <MenuItem selected={colSort.key !== 'staff_name'} onClick={() => { setColSort({ key: null, dir: 'desc' }); setOpenColMenu(null); }}>정렬 없음</MenuItem>
-                                    <MenuItem selected={colSort.key === 'staff_name' && colSort.dir === 'asc'} onClick={() => { setColSort({ key: 'staff_name', dir: 'asc' }); setOpenColMenu(null); }}>가나다순 ↑</MenuItem>
-                                    <MenuItem selected={colSort.key === 'staff_name' && colSort.dir === 'desc'} onClick={() => { setColSort({ key: 'staff_name', dir: 'desc' }); setOpenColMenu(null); }}>역순 ↓</MenuItem>
-                                </ColumnFilter>
-                            </th>
-                            <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">
-                                <ColumnFilter
-                                    label="종류"
-                                    active={!!colFilter.checkup_type}
-                                    open={openColMenu === 'checkup_type'}
-                                    onToggle={() => setOpenColMenu(openColMenu === 'checkup_type' ? null : 'checkup_type')}
-                                >
-                                    <MenuItem selected={!colFilter.checkup_type} onClick={() => { setColFilter(p => ({ ...p, checkup_type: '' })); setOpenColMenu(null); }}>전체</MenuItem>
-                                    {CHECKUP_TYPES.map(t => (
-                                        <MenuItem key={t} selected={colFilter.checkup_type === t} onClick={() => { setColFilter(p => ({ ...p, checkup_type: t })); setOpenColMenu(null); }}>{t}</MenuItem>
+
+                {/* 정렬/필터 컨트롤 (thead 외부 인라인 — ExpandableTable에 그대로 위임하기엔 정렬·미수검 가상행 로직이 외부에 있어 분리) */}
+                <div className="flex flex-wrap items-center gap-2 px-1 text-[10px] font-bold text-[var(--toss-gray-4)]">
+                    <label>정렬</label>
+                    <select
+                        value={colSort.key ? `${colSort.key}:${colSort.dir}` : ''}
+                        onChange={e => {
+                            const v = e.target.value;
+                            if (!v) return setColSort({ key: null, dir: 'desc' });
+                            const [k, d] = v.split(':');
+                            setColSort({ key: k as 'staff_name' | 'completed_date', dir: d as 'asc' | 'desc' });
+                        }}
+                        className="px-2 py-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none"
+                    >
+                        <option value="">기본순</option>
+                        <option value="staff_name:asc">이름 가나다순</option>
+                        <option value="staff_name:desc">이름 역순</option>
+                        <option value="completed_date:desc">완료일 최신순</option>
+                        <option value="completed_date:asc">완료일 오래된순</option>
+                    </select>
+                    <label className="ml-2">종류</label>
+                    <select value={colFilter.checkup_type} onChange={e => setColFilter(p => ({ ...p, checkup_type: e.target.value }))} className="px-2 py-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none">
+                        <option value="">전체</option>
+                        {CHECKUP_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    <label className="ml-2">상태</label>
+                    <select value={colFilter.status} onChange={e => setColFilter(p => ({ ...p, status: e.target.value }))} className="px-2 py-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none">
+                        <option value="">전체</option>
+                        {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                </div>
+
+                <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm p-2 md:p-3">
+                    <ExpandableTable<Group>
+                        columns={columns}
+                        rows={groupedDisplay}
+                        keyField="sid"
+                        hasExpandable={(g) => g.history.length > 0}
+                        emptyMessage="검진 이력이 없습니다"
+                        renderExpanded={(g) => (
+                            <div className="space-y-2">
+                                <h4 className="text-[10px] font-bold text-[var(--toss-gray-3)]">과거 이력 ({g.history.length})</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    {g.history.map((h) => (
+                                        <div key={h.id} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-2.5 text-[10px]">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="font-bold text-[var(--foreground)]">{normalizeCheckupType(h.checkup_type)}</span>
+                                                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${statusBadgeClass(h.status)}`}>{h.status}</span>
+                                            </div>
+                                            <div className="mt-1.5 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[var(--toss-gray-4)]">
+                                                <span>완료일: {h.completed_date || '-'}</span>
+                                                <span>기관: {h.hospital || '-'}</span>
+                                            </div>
+                                            <div className="mt-2 flex justify-end gap-1.5">
+                                                <button onClick={() => openEdit(h)} className="px-2.5 py-1 bg-blue-500/10 text-blue-600 text-[10px] font-bold rounded-lg hover:bg-blue-500/20">수정</button>
+                                                <button onClick={() => handleDelete(String(h.id))} className="px-2.5 py-1 bg-red-500/10 text-red-600 text-[10px] font-bold rounded-lg hover:bg-red-500/20">삭제</button>
+                                            </div>
+                                        </div>
                                     ))}
-                                </ColumnFilter>
-                            </th>
-                            <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">
-                                <ColumnFilter
-                                    label="완료일"
-                                    active={colSort.key === 'completed_date'}
-                                    open={openColMenu === 'completed_date'}
-                                    onToggle={() => setOpenColMenu(openColMenu === 'completed_date' ? null : 'completed_date')}
-                                >
-                                    <MenuItem selected={colSort.key !== 'completed_date'} onClick={() => { setColSort({ key: null, dir: 'desc' }); setOpenColMenu(null); }}>정렬 없음</MenuItem>
-                                    <MenuItem selected={colSort.key === 'completed_date' && colSort.dir === 'desc'} onClick={() => { setColSort({ key: 'completed_date', dir: 'desc' }); setOpenColMenu(null); }}>최신순 ↓</MenuItem>
-                                    <MenuItem selected={colSort.key === 'completed_date' && colSort.dir === 'asc'} onClick={() => { setColSort({ key: 'completed_date', dir: 'asc' }); setOpenColMenu(null); }}>오래된순 ↑</MenuItem>
-                                </ColumnFilter>
-                            </th>
-                            <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">기관</th>
-                            <th className="px-4 py-3 text-center font-bold text-[var(--toss-gray-4)]">
-                                <ColumnFilter
-                                    label="상태"
-                                    align="center"
-                                    active={!!colFilter.status}
-                                    open={openColMenu === 'status'}
-                                    onToggle={() => setOpenColMenu(openColMenu === 'status' ? null : 'status')}
-                                >
-                                    <MenuItem selected={!colFilter.status} onClick={() => { setColFilter(p => ({ ...p, status: '' })); setOpenColMenu(null); }}>전체</MenuItem>
-                                    {STATUS_OPTIONS.map(s => (
-                                        <MenuItem key={s} selected={colFilter.status === s} onClick={() => { setColFilter(p => ({ ...p, status: s })); setOpenColMenu(null); }}>{s}</MenuItem>
-                                    ))}
-                                </ColumnFilter>
-                            </th>
-                            <th className="px-4 py-3 text-center font-bold text-[var(--toss-gray-4)]">액션</th>
-                        </tr></thead>
-                        <tbody>
-                            {groupedDisplay.length === 0 ? <tr><td colSpan={6} className="px-4 py-10 text-center text-[var(--toss-gray-3)] font-bold">검진 이력이 없습니다</td></tr> : groupedDisplay.map(({ sid, latest: r, history }) => {
-                                const isExpanded = expandedStaffId === sid;
-                                const hasHistory = history.length > 0;
-                                return (
-                                    <Fragment key={sid}>
-                                        <tr className={`border-b border-[var(--border)] hover:bg-[var(--muted)]/50 ${isExpanded ? 'bg-[var(--muted)]/30' : ''}`}>
-                                            <td className="px-4 py-3 font-bold text-[var(--foreground)]">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setExpandedStaffId(isExpanded ? null : sid)}
-                                                    aria-label={hasHistory ? (isExpanded ? '과거 이력 접기' : '과거 이력 펼치기') : '직원'}
-                                                    aria-expanded={isExpanded}
-                                                    className="flex items-center gap-2 text-left hover:text-[var(--accent)] transition-colors"
-                                                >
-                                                    <span className={`text-[10px] text-[var(--toss-gray-3)] transition-transform ${isExpanded ? 'rotate-90' : ''} ${hasHistory ? '' : 'opacity-30'}`}>▶</span>
-                                                    <span>
-                                                        {r.staff_name}
-                                                        {hasHistory && <span className="ml-1.5 text-[9px] font-bold text-[var(--accent)]">+{history.length}</span>}
-                                                        <br /><span className="text-[9px] font-medium text-[var(--toss-gray-3)]">{r.department}</span>
-                                                    </span>
-                                                </button>
-                                            </td>
-                                            <td className="px-4 py-3">{normalizeCheckupType(r.checkup_type)}</td>
-                                            <td className="px-4 py-3 text-[var(--toss-gray-4)]">{r.completed_date || '-'}</td>
-                                            <td className="px-4 py-3 text-[var(--toss-gray-4)]">{r.hospital || '-'}</td>
-                                            <td className="px-4 py-3 text-center"><span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${r.status === '완료' ? 'bg-emerald-100 text-emerald-700' : r.status === '미수검' ? 'bg-red-500/20 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{r.status}</span></td>
-                                            <td className="px-4 py-3 text-center">
-                                                <div className="flex justify-center gap-1.5">
-                                                    {r.isVirtual ? (
-                                                        <button onClick={() => openAdd(String(r.staff_id))} className="px-2.5 py-1 bg-[var(--accent)] text-white text-[10px] font-bold rounded-lg">등록</button>
-                                                    ) : (
-                                                        <>
-                                                            <button onClick={() => openEdit(r)} className="px-2.5 py-1 bg-blue-500/10 text-blue-600 text-[10px] font-bold rounded-lg hover:bg-blue-500/20">수정</button>
-                                                            {r.status === '예정' && <button onClick={() => markComplete(r.id)} className="px-3 py-1.5 bg-emerald-500 text-white text-[10px] font-bold rounded-lg">완료</button>}
-                                                            <button onClick={() => handleDelete(String(r.id))} className="px-2.5 py-1 bg-red-500/10 text-red-600 text-[10px] font-bold rounded-lg hover:bg-red-500/20">삭제</button>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        {isExpanded && hasHistory && history.map((h: any) => (
-                                            <tr key={h.id} className="border-b border-[var(--border)] bg-[var(--muted)]/20 text-[var(--toss-gray-4)]">
-                                                <td className="pl-12 pr-4 py-2.5 text-[10px] font-bold">└ 과거 이력</td>
-                                                <td className="px-4 py-2.5">{normalizeCheckupType(h.checkup_type)}</td>
-                                                <td className="px-4 py-2.5">{h.completed_date || '-'}</td>
-                                                <td className="px-4 py-2.5">{h.hospital || '-'}</td>
-                                                <td className="px-4 py-2.5 text-center"><span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${h.status === '완료' ? 'bg-emerald-100 text-emerald-700' : h.status === '미수검' ? 'bg-red-500/20 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{h.status}</span></td>
-                                                <td className="px-4 py-2.5 text-center">
-                                                    <div className="flex justify-center gap-1.5">
-                                                        <button onClick={() => openEdit(h)} className="px-2.5 py-1 bg-blue-500/10 text-blue-600 text-[10px] font-bold rounded-lg hover:bg-blue-500/20">수정</button>
-                                                        <button onClick={() => handleDelete(String(h.id))} className="px-2.5 py-1 bg-red-500/10 text-red-600 text-[10px] font-bold rounded-lg hover:bg-red-500/20">삭제</button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </Fragment>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                </div>
+                            </div>
+                        )}
+                    />
                 </div>
             </div>
             {showStaffSearch && (
@@ -466,49 +477,5 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
                 </div>
             )}
         </div>
-    );
-}
-
-type ColumnFilterProps = {
-    label: string;
-    active: boolean;
-    open: boolean;
-    onToggle: () => void;
-    align?: 'left' | 'center';
-    children: React.ReactNode;
-};
-
-function ColumnFilter({ label, active, open, onToggle, align = 'left', children }: ColumnFilterProps) {
-    return (
-        <span data-col-menu className={`relative inline-flex items-center gap-1 ${align === 'center' ? 'justify-center' : ''}`}>
-            <span>{label}</span>
-            <button
-                type="button"
-                onClick={onToggle}
-                aria-label={`${label} 필터`}
-                aria-expanded={open}
-                title={`${label} 필터`}
-                className={`inline-flex items-center justify-center w-4 h-4 rounded text-[9px] leading-none transition-colors ${active ? 'text-[var(--accent)]' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}
-            >
-                ▾
-            </button>
-            {open && (
-                <div className={`absolute top-full mt-1 z-20 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-lg p-1 min-w-[120px] ${align === 'center' ? 'left-1/2 -translate-x-1/2' : 'left-0'}`}>
-                    {children}
-                </div>
-            )}
-        </span>
-    );
-}
-
-function MenuItem({ selected, onClick, children }: { selected?: boolean; onClick: () => void; children: React.ReactNode }) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={`w-full text-left px-3 py-1.5 text-[11px] font-bold rounded-lg whitespace-nowrap transition-colors ${selected ? 'bg-[var(--accent)] text-white' : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'}`}
-        >
-            {children}
-        </button>
     );
 }
