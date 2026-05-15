@@ -9,9 +9,10 @@
  * JM6: 키보드 포커스, 텍스트(%) 병행 표시
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { MatrixTable, type MatrixColumn, type MatrixCellTone } from '@/app/components/MatrixTable';
 
 // ---------------------------------------------------------------------------
 // Zod 스키마
@@ -77,6 +78,12 @@ function getCellAriaLabel(rate: number): string {
   if (rate >= 90) return '양호';
   if (rate >= 70) return '주의';
   return '위험';
+}
+
+function getCellTone(rate: number): MatrixCellTone {
+  if (rate >= 90) return 'ok';
+  if (rate >= 70) return 'warn';
+  return 'danger';
 }
 
 // ---------------------------------------------------------------------------
@@ -264,9 +271,58 @@ export default function JobCategoryTrainingMatrix({ staffs, selectedCo }: Props)
   };
 
   // 직종별로 그룹화된 교육 코드
-  const trainingCodes = Array.from(new Set(matrix.map((c) => c.trainingCode)));
-  const trainingNameMap = new Map(trainings.map((t) => [t.training_code, t.training_name]));
-  const trainingObligationMap = new Map(trainings.map((t) => [t.training_code, t.obligation_type]));
+  const trainingCodes = useMemo(
+    () => Array.from(new Set(matrix.map((c) => c.trainingCode))),
+    [matrix]
+  );
+  const trainingNameMap = useMemo(
+    () => new Map(trainings.map((t) => [t.training_code, t.training_name])),
+    [trainings]
+  );
+  const trainingObligationMap = useMemo(
+    () => new Map(trainings.map((t) => [t.training_code, t.obligation_type])),
+    [trainings]
+  );
+
+  // 셀 조회를 O(1)로 (jobCategoryId + trainingCode 키)
+  const matrixMap = useMemo(() => {
+    const m = new Map<string, MatrixCell>();
+    for (const c of matrix) m.set(`${c.jobCategoryId}_${c.trainingCode}`, c);
+    return m;
+  }, [matrix]);
+
+  // 표시할 행 (셀이 1개라도 있는 직종만)
+  const visibleRows = useMemo(
+    () => jobCategories.filter((jc) => matrix.some((c) => c.jobCategoryId === jc.id)),
+    [jobCategories, matrix]
+  );
+
+  // MatrixTable용 컬럼
+  type Col = { code: string };
+  const matrixColumns: MatrixColumn<Col>[] = useMemo(
+    () =>
+      trainingCodes.map((code) => {
+        const obligationType = trainingObligationMap.get(code);
+        const name = trainingNameMap.get(code) ?? code;
+        return {
+          id: code,
+          label: (
+            <div className="flex flex-col items-center gap-0.5">
+              <span>{name}</span>
+              {obligationType === 'legal' && (
+                <span className="badge badge-red text-[8px]">법정의무</span>
+              )}
+              {obligationType === 'recommended' && (
+                <span className="badge badge-gray text-[8px]">권장</span>
+              )}
+            </div>
+          ),
+          shortLabel: name,
+          data: { code },
+        };
+      }),
+    [trainingCodes, trainingNameMap, trainingObligationMap]
+  );
 
   if (loading) {
     return (
@@ -294,93 +350,41 @@ export default function JobCategoryTrainingMatrix({ staffs, selectedCo }: Props)
 
   return (
     <section aria-label="직종별 필수교육 이수율 매트릭스">
-      <div className="overflow-x-auto">
-        <table
-          className="w-full border-collapse text-xs min-w-[600px]"
-          role="grid"
-          aria-label="직종별 이수율 표"
-        >
-          <thead>
-            <tr>
-              <th
-                scope="col"
-                className="p-2 text-left text-[10px] font-bold text-[var(--toss-gray-4)] border-b border-[var(--border)] bg-[var(--tab-bg)]"
-              >
-                직종 / 교육
-              </th>
-              {trainingCodes.map((code) => {
-                const obligationType = trainingObligationMap.get(code);
-                return (
-                  <th
-                    key={code}
-                    scope="col"
-                    className="p-2 text-center text-[10px] font-bold text-[var(--toss-gray-4)] border-b border-[var(--border)] bg-[var(--tab-bg)] whitespace-nowrap"
-                  >
-                    <div className="flex flex-col items-center gap-0.5">
-                      <span>{trainingNameMap.get(code) ?? code}</span>
-                      {obligationType === 'legal' && (
-                        <span className="badge badge-red text-[8px]">법정의무</span>
-                      )}
-                      {obligationType === 'recommended' && (
-                        <span className="badge badge-gray text-[8px]">권장</span>
-                      )}
-                    </div>
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {jobCategories.map((jc) => {
-              const hasAnyCell = matrix.some((c) => c.jobCategoryId === jc.id);
-              if (!hasAnyCell) return null;
-              return (
-                <tr key={jc.id} className="border-b border-[var(--border)] last:border-0">
-                  <th
-                    scope="row"
-                    className="p-2 text-left text-[11px] font-semibold text-[var(--foreground)] bg-[var(--card)] whitespace-nowrap"
-                  >
-                    {jc.name}
-                  </th>
-                  {trainingCodes.map((code) => {
-                    const cell = matrix.find(
-                      (c) => c.jobCategoryId === jc.id && c.trainingCode === code
-                    );
-                    if (!cell) {
-                      return (
-                        <td
-                          key={code}
-                          className="p-2 text-center text-[10px] text-[var(--toss-gray-3)]"
-                        >
-                          —
-                        </td>
-                      );
-                    }
-                    const colorClass = getCellColor(cell.rate);
-                    const ariaStatus = getCellAriaLabel(cell.rate);
-                    return (
-                      <td key={code} className="p-1">
-                        <button
-                          type="button"
-                          onClick={() => openModal(cell)}
-                          onKeyDown={(e) => e.key === 'Enter' && openModal(cell)}
-                          className={`w-full px-2 py-1.5 rounded-[var(--radius-md)] border text-center cursor-pointer transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${colorClass}`}
-                          aria-label={`${jc.name} - ${trainingNameMap.get(code) ?? code}: ${cell.rate}% (${ariaStatus}, 클릭하면 미이수자 목록 표시)`}
-                        >
-                          <span className="text-[11px] font-bold">{cell.rate}%</span>
-                          <span className="block text-[9px] opacity-70">
-                            {cell.completedStaff}/{cell.totalStaff}명
-                          </span>
-                        </button>
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <MatrixTable<JobCategory, Col>
+        rows={visibleRows}
+        columns={matrixColumns}
+        rowKey={(jc) => jc.id}
+        rowHeaderLabel="직종 / 교육"
+        rowHeader={(jc) => jc.name}
+        ariaLabel="직종별 이수율 표"
+        emptyMessage="표시할 데이터가 없습니다."
+        cellTone={(jc, col) => {
+          const cell = matrixMap.get(`${jc.id}_${col.data.code}`);
+          return cell ? getCellTone(cell.rate) : 'normal';
+        }}
+        renderCell={(jc, col) => {
+          const cell = matrixMap.get(`${jc.id}_${col.data.code}`);
+          if (!cell) {
+            return <span className="text-[10px] text-[var(--toss-gray-3)]">—</span>;
+          }
+          const colorClass = getCellColor(cell.rate);
+          const ariaStatus = getCellAriaLabel(cell.rate);
+          const name = trainingNameMap.get(col.data.code) ?? col.data.code;
+          return (
+            <button
+              type="button"
+              onClick={() => openModal(cell)}
+              className={`w-full px-2 py-1.5 rounded-[var(--radius-md)] border text-center cursor-pointer transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${colorClass}`}
+              aria-label={`${jc.name} - ${name}: ${cell.rate}% (${ariaStatus}, 클릭하면 미이수자 목록 표시)`}
+            >
+              <span className="text-[11px] font-bold">{cell.rate}%</span>
+              <span className="block text-[9px] opacity-70">
+                {cell.completedStaff}/{cell.totalStaff}명
+              </span>
+            </button>
+          );
+        }}
+      />
 
       {/* 범례 */}
       <div className="flex gap-3 mt-2 flex-wrap" aria-label="이수율 색상 범례">
