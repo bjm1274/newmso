@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import type { Company, CompanyType } from '@/lib/company';
 import { buildSelectClause } from '@/lib/query-columns-utils';
 import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import TeamManager from './팀관리';
 import ContractManager from './계약관리도구';
 import CorporateCardTransactions from '../인사관리서브/법인카드사용내역';
@@ -320,6 +321,68 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
     });
   };
 
+  const companyColumns = useMemo((): Column<Company>[] => [
+    {
+      key: 'name',
+      label: '회사명',
+      primary: true,
+      render: (company) => (
+        <span className="font-bold text-[var(--foreground)]">{company.name}</span>
+      ),
+    },
+    {
+      key: 'type',
+      label: '유형',
+      render: (company) => (
+        <span
+          className={`rounded-[var(--radius-md)] px-2 py-0.5 text-xs font-bold ${
+            company.type === 'MSO'
+              ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
+              : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
+          }`}
+        >
+          {company.type === 'MSO'
+            ? '경영지원(MSO)'
+            : company.type === 'HOSPITAL'
+              ? '병원'
+              : '클리닉'}
+        </span>
+      ),
+    },
+    {
+      key: 'payment_day',
+      label: '급여일',
+      render: (company) => (
+        <span className="text-xs font-bold text-[var(--foreground)]">
+          매월 {company.payment_day ?? 7}일
+        </span>
+      ),
+    },
+    {
+      key: 'is_active',
+      label: '상태',
+      render: (company) => (company.is_active ? '활성' : '비활성'),
+    },
+    {
+      key: 'actions',
+      label: '관리',
+      align: 'right',
+      render: (company) => (
+        <button
+          type="button"
+          data-testid={`company-manager-edit-${company.id}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            handleEdit(company);
+          }}
+          className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1.5 text-xs font-bold text-[var(--accent)]"
+        >
+          수정
+        </button>
+      ),
+    },
+  ], []);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -356,57 +419,13 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
             <div className="border-b border-[var(--border)] p-3">
               <h3 className="text-base font-bold text-[var(--foreground)]">회사(병원) 목록</h3>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="border-b border-[var(--border)] bg-[var(--muted)]">
-                  <tr>
-                    <th className="px-4 py-2 text-left font-bold text-[var(--toss-gray-4)]">회사명</th>
-                    <th className="px-4 py-2 text-left font-bold text-[var(--toss-gray-4)]">유형</th>
-                    <th className="px-4 py-2 text-left font-bold text-[var(--toss-gray-4)]">급여일</th>
-                    <th className="px-4 py-2 text-left font-bold text-[var(--toss-gray-4)]">상태</th>
-                    <th className="px-4 py-2 text-right font-bold text-[var(--toss-gray-4)]">관리</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {companies.map((company) => (
-                    <tr
-                      key={company.id}
-                      className="border-b border-[var(--border)] hover:bg-[var(--muted)]/50"
-                    >
-                      <td className="px-4 py-2 font-bold text-[var(--foreground)]">{company.name}</td>
-                      <td className="px-4 py-2">
-                        <span
-                          className={`rounded-[var(--radius-md)] px-2 py-0.5 text-xs font-bold ${
-                            company.type === 'MSO'
-                              ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
-                              : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
-                          }`}
-                        >
-                          {company.type === 'MSO'
-                            ? '경영지원(MSO)'
-                            : company.type === 'HOSPITAL'
-                              ? '병원'
-                              : '클리닉'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2 text-xs font-bold text-[var(--foreground)]">
-                        매월 {company.payment_day || 7}일
-                      </td>
-                      <td className="px-4 py-2">{company.is_active ? '활성' : '비활성'}</td>
-                      <td className="px-4 py-2 text-right">
-                        <button
-                          type="button"
-                          data-testid={`company-manager-edit-${company.id}`}
-                          onClick={() => handleEdit(company)}
-                          className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1.5 text-xs font-bold text-[var(--accent)]"
-                        >
-                          수정
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="overflow-x-auto p-2">
+              <ResponsiveTable<Company>
+                columns={companyColumns}
+                rows={companies}
+                keyField="id"
+                emptyMessage="등록된 회사가 없습니다."
+              />
             </div>
           </div>
 

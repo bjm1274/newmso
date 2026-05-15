@@ -1,6 +1,7 @@
 'use client';
 
-import type { MouseEvent as ReactMouseEvent } from 'react';
+import { useMemo, type MouseEvent as ReactMouseEvent } from 'react';
+import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import { buildStorageDownloadUrl } from '@/lib/object-storage-url';
 import {
   formatApprovalAttachmentSize,
@@ -241,11 +242,73 @@ export function renderApprovalAttachmentsHtml(metaData: ApprovalMetaData) {
     `;
 }
 
+type SupplyRequestRow = SupplyRequestItem & {
+  _rowKey: string;
+  _isUnregistered: boolean;
+};
+
 export function SupplyRequestItemsPanel({ metaData }: { metaData: ApprovalMetaData }) {
   const items = getSupplyRequestItems(metaData);
-  if (items.length === 0) return null;
   const unregisteredNames = getSupplyRequestUnregisteredNames(metaData);
-  const unregisteredNameSet = buildUnregisteredNameSet(metaData);
+  const unregisteredNameSet = useMemo(
+    () => buildUnregisteredNameSet(metaData),
+    [metaData],
+  );
+
+  const rows = useMemo<SupplyRequestRow[]>(
+    () =>
+      items.map((row, index) => ({
+        ...row,
+        _rowKey: `${row.name}-${row.qty}-${row.unit}-${index}`,
+        _isUnregistered: unregisteredNameSet.has(normalizeInventoryText(row.name)),
+      })),
+    [items, unregisteredNameSet],
+  );
+
+  const columns = useMemo<Column<SupplyRequestRow>[]>(
+    () => [
+      {
+        key: 'name',
+        label: '품목명',
+        primary: true,
+        render: (row) => (
+          <>
+            <span className="inline-flex items-center gap-1 font-semibold text-[var(--foreground)]">
+              {row._isUnregistered ? (
+                <span className="font-black text-[var(--danger)]">!</span>
+              ) : null}
+              {row.name || '-'}
+            </span>
+            {row._isUnregistered ? (
+              <span className="mt-1 block text-[10px] font-bold text-[var(--danger)]">
+                주의: 미등록 품목
+              </span>
+            ) : null}
+          </>
+        ),
+      },
+      {
+        key: 'qty',
+        label: '수량',
+        render: (row) => (
+          <span className="font-bold text-[var(--accent)]">{`${row.qty} ${row.unit}`}</span>
+        ),
+      },
+      {
+        key: 'category',
+        label: '품목구분',
+        render: (row) => row.category || '-',
+      },
+      {
+        key: 'purpose',
+        label: '용도',
+        render: (row) => row.purpose || '-',
+      },
+    ],
+    [],
+  );
+
+  if (items.length === 0) return null;
 
   return (
     <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)]">
@@ -257,42 +320,12 @@ export function SupplyRequestItemsPanel({ metaData }: { metaData: ApprovalMetaDa
           주의: 재고관리에 등록되지 않은 품목이 포함되어 있습니다. ({unregisteredNames.join(', ')})
         </div>
       ) : null}
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-xs">
-          <thead className="bg-[var(--muted)]">
-            <tr>
-              <th className="px-3 py-2 text-left font-bold text-[var(--toss-gray-4)]">품목명</th>
-              <th className="px-3 py-2 text-left font-bold text-[var(--toss-gray-4)]">수량</th>
-              <th className="px-3 py-2 text-left font-bold text-[var(--toss-gray-4)]">품목구분</th>
-              <th className="px-3 py-2 text-left font-bold text-[var(--toss-gray-4)]">용도</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((row, index) => {
-              const isUnregistered = unregisteredNameSet.has(normalizeInventoryText(row.name));
-              return (
-                <tr
-                  key={`${row.name}-${row.qty}-${row.unit}-${index}`}
-                  className={`border-t border-[var(--border)] ${isUnregistered ? 'bg-[var(--danger-light)]/35' : ''}`}
-                >
-                  <td className="px-3 py-2 font-semibold text-[var(--foreground)]">
-                    <span className="inline-flex items-center gap-1">
-                      {isUnregistered ? <span className="font-black text-[var(--danger)]">!</span> : null}
-                      {row.name || '-'}
-                    </span>
-                    {isUnregistered ? (
-                      <span className="mt-1 block text-[10px] font-bold text-[var(--danger)]">주의: 미등록 품목</span>
-                    ) : null}
-                  </td>
-                  <td className="px-3 py-2 font-bold text-[var(--accent)]">{`${row.qty} ${row.unit}`}</td>
-                  <td className="px-3 py-2 text-[var(--toss-gray-4)]">{row.category || '-'}</td>
-                  <td className="px-3 py-2 text-[var(--toss-gray-4)]">{row.purpose || '-'}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <ResponsiveTable<SupplyRequestRow>
+        columns={columns}
+        rows={rows}
+        keyField="_rowKey"
+        emptyMessage="물품 신청 내역이 없습니다."
+      />
     </div>
   );
 }
