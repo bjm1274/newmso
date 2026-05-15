@@ -345,7 +345,7 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         <div className="bg-[var(--card)] p-4 rounded-2xl border border-[var(--border)]/60 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">총 등록 자격증</p>

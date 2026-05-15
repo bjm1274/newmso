@@ -79,7 +79,7 @@ export default function UDIManagement({ user, inventory, fetchInventory }: Recor
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
           <div className="bg-purple-500/10 p-3 rounded-[var(--radius-md)] border border-purple-100">
             <p className="text-[11px] font-semibold text-purple-500 uppercase tracking-widest mb-0.5">UDI 대상 품목</p>
             <p className="text-lg font-bold text-purple-700">{udiItems.length}개</p>
