@@ -1,10 +1,21 @@
 'use client';
 
+import { useIsMobile } from '@/app/components/useIsMobile';
+import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 import RosterPreferredOffManager from './RosterPreferredOffManager';
 
 type RosterPlannerDashboardProps = Record<string, any>;
 
 export default function RosterPlannerDashboard(props: RosterPlannerDashboardProps) {
+  const isMobile = useIsMobile();
+  if (isMobile) {
+    return (
+      <DesktopOnlyNotice
+        feature="근무표 자동편성"
+        description="패턴 편집과 매트릭스 셀 조작이 PC 폭에 최적화되어 있어 모바일에서는 정상 동작하지 않습니다. 가로 768px 이상 데스크톱 브라우저로 접속해주세요."
+      />
+    );
+  }
   const {
     PATTERN_GROUP_MODE_OPTIONS,
     SmartMonthPicker,
