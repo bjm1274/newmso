@@ -2,10 +2,13 @@
 import { useState, useEffect } from 'react';
 import { fetchPendingApprovalCount } from '@/lib/data/dashboard-widgets';
 import { MenuIcon } from '../조직도서브/조직도측면창';
+import { useIsMobile } from '@/app/components/useIsMobile';
+import 경영분석모바일대시보드 from './경영분석/모바일대시보드';
 
 export default function BusinessDashboard({ staffs = [], inventory = [] }: Record<string, unknown>) {
   const _staffs = (staffs as Record<string, unknown>[]) ?? [];
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     let cancelled = false;
@@ -78,6 +81,17 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
     { label: '운영 설정', icon: 'settings' },
   ];
 
+  if (isMobile) {
+    return (
+      <경영분석모바일대시보드
+        stats={stats}
+        notices={notices}
+        quickLinks={quickLinks}
+        leaveUsageRate={leaveUsageRate}
+      />
+    );
+  }
+
   return (
     <div className="space-y-4 animate-in fade-in duration-300" data-testid="admin-analysis-business">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -149,4 +163,3 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
     </div>
   );
 }
-
