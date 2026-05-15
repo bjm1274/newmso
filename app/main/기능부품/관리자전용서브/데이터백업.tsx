@@ -6,6 +6,8 @@ import { BACKUP_GROUPS, BACKUP_RESTORE_ORDER, resolveBackupTables } from '@/lib/
 import { supabase } from '@/lib/supabase';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { getStaffLikeId, normalizeStaffLike } from '@/lib/staff-identity';
+import { useIsMobile } from '@/app/components/useIsMobile';
+import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 
 const PAGE_SIZE = 1000;
 const RESTORE_BATCH_SIZE = 200;
@@ -149,7 +151,15 @@ function isMissingRestoreRunSchema(error: unknown) {
   return code === '42P01' || message.includes('backup_restore_runs');
 }
 
-export default function DataBackup({ user }: Props) {
+export default function DataBackup(props: Props) {
+  const isMobile = useIsMobile();
+  if (isMobile) {
+    return <DesktopOnlyNotice feature="데이터 백업/복원" />;
+  }
+  return <DataBackupDesktop {...props} />;
+}
+
+function DataBackupDesktop({ user }: Props) {
   const normalizedUser = useMemo(
     () => normalizeStaffLike((user ?? {}) as Record<string, unknown>),
     [user]

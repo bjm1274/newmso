@@ -12,6 +12,8 @@ import type { ApprovalReferenceSettingUser, PermissionReview } from './직원권
 import { getToneClasses, getToggleClasses, compareKoreanLabels, getStaffCompanyLabel, getStaffTeamLabel, sortStaffRows } from './직원권한통합/style-utils';
 import { buildPermissionReview, normalizeApprovalReferenceDefaults } from './직원권한통합/permission-review';
 import { PermissionDiffPanel } from './직원권한통합/PermissionDiffPanel';
+import { useIsMobile } from '@/app/components/useIsMobile';
+import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 
 const STAFF_LIST_SELECT =
   'id, employee_no, name, company, department, position, role, permissions, status';
@@ -41,7 +43,15 @@ const APPROVAL_REFERENCE_TARGETS = [
   { key: 'personnel_order', label: '인사명령' },
 ] as const;
 
-export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () => void }) {
+export default function StaffPermissionManager(props: { onRefresh?: () => void }) {
+  const isMobile = useIsMobile();
+  if (isMobile) {
+    return <DesktopOnlyNotice feature="직원 권한 통합 관리" />;
+  }
+  return <StaffPermissionManagerDesktop {...props} />;
+}
+
+function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }) {
   const { dialog, openConfirm } = useActionDialog();
   const [staffs, setStaffs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

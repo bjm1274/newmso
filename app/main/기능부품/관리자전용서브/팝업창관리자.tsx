@@ -4,6 +4,8 @@ import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useIsMobile } from '@/app/components/useIsMobile';
+import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg']);
@@ -57,6 +59,14 @@ function validatePopupFileSelection(file: File, mediaType: PopupDraft['media_typ
 }
 
 export default function PopupManager() {
+  const isMobile = useIsMobile();
+  if (isMobile) {
+    return <DesktopOnlyNotice feature="팝업 창 관리" />;
+  }
+  return <PopupManagerDesktop />;
+}
+
+function PopupManagerDesktop() {
   const { dialog, openConfirm } = useActionDialog();
   const [popups, setPopups] = useState<any[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);

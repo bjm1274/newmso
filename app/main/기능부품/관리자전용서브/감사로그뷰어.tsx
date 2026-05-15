@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback, type CSSProperties, type ReactElement
 import { List } from 'react-window';
 import { EmptyState, LoadingPanel } from '@/app/components/StatePanel';
 import { supabase } from '@/lib/supabase';
+import { useIsMobile } from '@/app/components/useIsMobile';
+import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 
 const PAGE_SIZE = 100;
 const ROW_HEIGHT = 36; // 각 행의 고정 높이 (px)
@@ -43,6 +45,14 @@ function AuditRow({ index, style, logs }: {
 }
 
 export default function AuditLogViewer() {
+  const isMobile = useIsMobile();
+  if (isMobile) {
+    return <DesktopOnlyNotice feature="감사 로그 뷰어" />;
+  }
+  return <AuditLogViewerDesktop />;
+}
+
+function AuditLogViewerDesktop() {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);

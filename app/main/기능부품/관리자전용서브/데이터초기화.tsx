@@ -3,6 +3,8 @@ import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ZERO_UUID } from '@/lib/constants';
+import { useIsMobile } from '@/app/components/useIsMobile';
+import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 
 type ResetActionType =
   | 'chat'
@@ -127,7 +129,15 @@ function formatDateTime(value?: string | null) {
   return date.toLocaleString('ko-KR');
 }
 
-export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
+export default function DataReseter(props: { onRefresh: () => void }) {
+  const isMobile = useIsMobile();
+  if (isMobile) {
+    return <DesktopOnlyNotice feature="데이터 초기화" />;
+  }
+  return <DataReseterDesktop {...props} />;
+}
+
+function DataReseterDesktop({ onRefresh }: { onRefresh: () => void }) {
   const [password, setPassword] = useState('');
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [resetting, setResetting] = useState<ResetActionType | null>(null);

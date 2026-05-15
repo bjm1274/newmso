@@ -32,6 +32,8 @@ import type {
   SystemMasterSensitiveStaff,
 } from './시스템마스터센터-modules/types';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
+import { useIsMobile } from '@/app/components/useIsMobile';
+import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 
 const formatCurrency = (value: unknown) => formatWon(Number(value || 0));
 
@@ -101,17 +103,27 @@ function isEmptyChatRoom(room: SystemMasterChatRoom | null | undefined) {
   return Boolean(room?.id) && !roomHasMessageHistory(room);
 }
 
-export default function SystemMasterCenter({
-  user,
-  staffs = [],
-  onRefresh,
-  initialTab,
-}: {
+type SystemMasterCenterProps = {
   user?: unknown;
   staffs?: StaffMember[];
   onRefresh?: () => void;
   initialTab?: MasterTabId;
-}) {
+};
+
+export default function SystemMasterCenter(props: SystemMasterCenterProps) {
+  const isMobile = useIsMobile();
+  if (isMobile) {
+    return <DesktopOnlyNotice feature="시스템 마스터 관리" />;
+  }
+  return <SystemMasterCenterDesktop {...props} />;
+}
+
+function SystemMasterCenterDesktop({
+  user,
+  staffs = [],
+  onRefresh,
+  initialTab,
+}: SystemMasterCenterProps) {
   const { dialog, openConfirm } = useActionDialog();
   const [activeTab, setActiveTab] = useState<MasterTabId>('개요');
   const [overview, setOverview] = useState<SystemMasterOverviewPayload | null>(null);
