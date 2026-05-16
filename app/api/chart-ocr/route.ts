@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { readSessionFromRequest } from '@/lib/server-session';
+import { withTimeout } from '@/lib/promise-timeout';
 
 const MODELS = [
     'gemini-2.5-pro',
@@ -23,10 +24,14 @@ async function callGeminiVision(prompt: string, imageBase64: string, mimeType: s
     for (const modelName of MODELS) {
         try {
             const model = genAI.getGenerativeModel({ model: modelName });
-            const result = await model.generateContent([
-                prompt,
-                { inlineData: { data: imageBase64, mimeType } }
-            ]);
+            const result = await withTimeout(
+                model.generateContent([
+                    prompt,
+                    { inlineData: { data: imageBase64, mimeType } }
+                ]),
+                30_000,
+                `Gemini[${modelName}]`,
+            );
             const response = await result.response;
             const text = response.text();
             if (text) return text;

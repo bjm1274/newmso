@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
 import { readSessionFromRequest } from '@/lib/server-session';
+import { withTimeout } from '@/lib/promise-timeout';
 
 export const runtime = 'nodejs';
 
@@ -61,10 +62,14 @@ async function callGemini(prompt: string, imageBase64: string, mimeType: string)
   for (const modelName of MODELS) {
     try {
       const model = genAI.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent([
-        prompt,
-        { inlineData: { data: imageBase64, mimeType } },
-      ]);
+      const result = await withTimeout(
+        model.generateContent([
+          prompt,
+          { inlineData: { data: imageBase64, mimeType } },
+        ]),
+        30_000,
+        `Gemini[${modelName}]`,
+      );
       const response = await result.response;
       const text = response.text();
       if (text) return text;

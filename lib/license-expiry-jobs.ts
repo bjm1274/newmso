@@ -1,6 +1,7 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { computeCENextDue, getRenewalRule } from '@/lib/license-renewal-policy';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 
 // 만료 N일 전 — milestone(단계) 정의
 // 같은 단계 알림은 metadata.milestone으로 중복 발송 방지
@@ -100,7 +101,7 @@ export async function processLicenseExpiry(supabase: SupabaseClient): Promise<Li
   const horizonDays = MILESTONES[0];
   const horizonDate = new Date(now.getTime());
   horizonDate.setDate(horizonDate.getDate() + horizonDays);
-  const horizonIso = horizonDate.toISOString().slice(0, 10);
+  const horizonIso = formatKoreanDateKey(horizonDate);
 
   const { data: licenseRows, error: licenseError } = await supabase
     .from('staff_licenses')

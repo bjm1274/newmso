@@ -5,6 +5,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { calculateAnnualLeaveExpiryDate } from './annual-leave-promotion';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 
 export type ExpiryResult = {
   staffId: string;
@@ -25,7 +26,7 @@ export async function processStaffLeaveExpiry(
 ): Promise<ExpiryResult | null> {
   if (remainingDays <= 0) return null;
 
-  const expiryDateStr = expiryDate.toISOString().slice(0, 10);
+  const expiryDateStr = formatKoreanDateKey(expiryDate);
   const now = new Date();
   if (now < expiryDate) return null; // 아직 만료 안 됨
 
@@ -127,7 +128,7 @@ export async function batchProcessExpiredLeaves(
     .from('leave_balances')
     .select('staff_id, remaining_days, expiry_date, staff_members(name, hire_date, join_date, joined_at)')
     .is('expired_at', null)
-    .lte('expiry_date', today.toISOString().slice(0, 10))
+    .lte('expiry_date', formatKoreanDateKey(today))
     .gt('remaining_days', 0);
 
   if (!balances || balances.length === 0) {

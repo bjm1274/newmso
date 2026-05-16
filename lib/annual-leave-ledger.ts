@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 
 const APPROVED_STATUS_LABELS = new Set(['\uc2b9\uc778', 'approved']);
 
@@ -119,8 +120,8 @@ export function calculateApprovedAnnualLeaveUsage(
     return (
       sum +
       calculateLeaveDays(
-        clippedRange.start.toISOString().slice(0, 10),
-        clippedRange.end.toISOString().slice(0, 10)
+        formatKoreanDateKey(clippedRange.start),
+        formatKoreanDateKey(clippedRange.end)
       )
     );
   }, 0);

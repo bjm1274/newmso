@@ -11,6 +11,7 @@ import { ensureApprovedAnnualLeaveRequest, isAnnualLeaveType, syncAnnualLeaveUse
 import { extractLeaveRequestMeta } from '@/lib/leave-notice';
 import { syncOfficialDocumentLogFromApproval } from '@/lib/official-document-approval';
 import { isMissingColumnError } from '@/lib/supabase-compat';
+import { formatKoreanDateKey, getKoreanTodayString } from '@/lib/seoul-time';
 
 type ApprovalRow = Record<string, unknown>;
 
@@ -281,7 +282,7 @@ export async function processFinalApprovalEffects(
           transfer_type: orderCategory,
           before_value: orderCategory === '부서이동(전보)' ? currentStaff?.department : currentStaff?.position,
           after_value: orderCategory === '부서이동(전보)' ? targetDept : newPosition,
-          effective_date: new Date().toISOString().split('T')[0],
+          effective_date: getKoreanTodayString(),
           approval_id: item.id,
         });
       }
@@ -327,7 +328,7 @@ export async function processFinalApprovalEffects(
         for (let index = 0; index < days; index += 1) {
           const date = new Date(start);
           date.setDate(date.getDate() + index);
-          const dateStr = date.toISOString().slice(0, 10);
+          const dateStr = formatKoreanDateKey(date);
 
           await supabase.from('attendance').upsert(
             {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { readSessionFromRequest } from '@/lib/server-session';
+import { withTimeout } from '@/lib/promise-timeout';
 
 const MODELS = ['gemini-2.5-pro', 'gemini-2.5-flash'];
 
@@ -20,15 +21,19 @@ async function extractWithGemini(prompt: string, base64Data: string, mimeType: s
                 generationConfig: { temperature: 0.1 }
             });
 
-            const result = await model.generateContent([
-                prompt,
-                {
-                    inlineData: {
-                        data: base64Data,
-                        mimeType,
+            const result = await withTimeout(
+                model.generateContent([
+                    prompt,
+                    {
+                        inlineData: {
+                            data: base64Data,
+                            mimeType,
+                        },
                     },
-                },
-            ]);
+                ]),
+                30_000,
+                `Gemini[${modelName}]`,
+            );
 
             const text = result.response.text();
             if (text) {

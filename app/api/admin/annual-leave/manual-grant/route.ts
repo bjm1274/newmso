@@ -9,6 +9,7 @@ import {
   getLeaveUnit,
   calculateLeaveDays,
 } from '@/lib/annual-leave-ledger';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 
 type ManualGrantUpdate = {
   staffId: string;
@@ -234,7 +235,7 @@ export async function POST(request: Request) {
           ? calculateAnnualLeaveExpiryDate(hireDate, new Date())
           : new Date(targetYear, 11, 31);
       }
-      const expiryDateStr = expiryDate.toISOString().slice(0, 10);
+      const expiryDateStr = formatKoreanDateKey(expiryDate);
 
       const remainingDays = Math.max(
         0,

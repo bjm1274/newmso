@@ -1,3 +1,5 @@
+import { formatKoreanDateKey } from '@/lib/seoul-time';
+
 export type ChecklistType = '입사' | '퇴사';
 
 export type ChecklistItem = {
@@ -73,7 +75,7 @@ export function getChecklistTargetDate(type: ChecklistType, baseDateValue?: stri
   if (Number.isNaN(baseDate.getTime())) return null;
   const offsetDays = type === '입사' ? 14 : 7;
   baseDate.setDate(baseDate.getDate() + offsetDays);
-  return baseDate.toISOString().slice(0, 10);
+  return formatKoreanDateKey(baseDate);
 }
 
 export function normalizeChecklistItems(rawItems: unknown, type: ChecklistType): ChecklistItem[] {

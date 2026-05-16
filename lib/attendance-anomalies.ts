@@ -1,6 +1,7 @@
 import { isApprovedLeaveStatus } from './annual-leave-ledger';
 import { isKoreanPublicHoliday } from './korean-public-holidays';
 import type { LeavePolicySettings } from './leave-policy-settings';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 
 export type AttendanceAnomalySeverity = 'critical' | 'warning' | 'review';
 
@@ -67,7 +68,7 @@ function enumerateDateRange(startDate: string, endDate: string) {
   const result: string[] = [];
   const cursor = new Date(start);
   while (cursor <= end) {
-    result.push(cursor.toISOString().slice(0, 10));
+    result.push(formatKoreanDateKey(cursor));
     cursor.setDate(cursor.getDate() + 1);
   }
   return result;

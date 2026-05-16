@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 
 export type OfficialDocRequest = {
   sent_date: string;
@@ -12,7 +13,7 @@ export type OfficialDocRequest = {
 };
 
 function getTodayDateKey() {
-  return new Date().toISOString().slice(0, 10);
+  return getKoreanTodayString();
 }
 
 export function extractOfficialDocRequest(metaData: unknown): OfficialDocRequest | null {

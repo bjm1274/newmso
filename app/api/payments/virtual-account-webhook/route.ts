@@ -20,8 +20,15 @@ function getAdminClient() {
 async function authorizeWebhookRequest(request: NextRequest) {
   const expectedToken = process.env.VIRTUAL_ACCOUNT_WEBHOOK_TOKEN?.trim() || '';
   const url = new URL(request.url);
-  const providedToken =
-    request.headers.get('x-webhook-token')?.trim() || url.searchParams.get('token')?.trim();
+  const headerToken = request.headers.get('x-webhook-token')?.trim();
+  const queryToken = url.searchParams.get('token')?.trim();
+  const providedToken = headerToken || queryToken;
+
+  // 보안: query string token은 URL/액세스 로그/리퍼러에 노출 위험.
+  // header(`x-webhook-token`)로 전환 권장 — 외부 발신측 전환 확인 후 query fallback 제거 예정.
+  if (queryToken && !headerToken) {
+    console.warn('[virtual-account-webhook] DEPRECATED: query string token detected. Sender must switch to x-webhook-token header.');
+  }
 
   if (expectedToken && providedToken === expectedToken) {
     return {

@@ -8,6 +8,7 @@
 
 import { fetcher } from '@/lib/fetcher';
 import { supabase } from '@/lib/supabase';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 
 const WIDGET_TTL = 60_000; // 1분
 
@@ -59,7 +60,7 @@ export async function fetchInventoryItems(): Promise<InventoryItem[]> {
 }
 
 export async function fetchTodayCheckedInCount(): Promise<number> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getKoreanTodayString();
   return fetcher(
     `dashboard:attendances:count:checked-in:${today}`,
     async () => {

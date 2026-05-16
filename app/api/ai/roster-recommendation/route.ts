@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isKoreanPublicHoliday } from '@/lib/korean-public-holidays';
 import { expandCoverageRoleTags, normalizeCoverageRoleTags } from '@/lib/roster-role-tags';
 import { readSessionFromRequest } from '@/lib/server-session';
+import { withTimeout } from '@/lib/promise-timeout';
 
 // 유저별 AI 근무표 생성 요청 횟수 제한 (인스턴스 내 메모리 기반)
 const rosterRateLimit = new Map<string, { count: number; resetAt: number }>();
@@ -1691,7 +1692,11 @@ async function requestRecommendation(payload: RequestBody): Promise<GeminiRecomm
         },
       });
 
-      const result = await model.generateContent(prompt);
+      const result = await withTimeout(
+        model.generateContent(prompt),
+        60_000,
+        `Gemini[${modelName}]`,
+      );
       const parsed = JSON.parse(result.response.text()) as GeminiRecommendationResponse;
 
       if (

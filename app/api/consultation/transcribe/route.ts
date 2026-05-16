@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { readAuthorizedExtraFeatureUser } from '@/lib/server-extra-feature-access';
+import { withTimeout } from '@/lib/promise-timeout';
 
 const MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro'];
 
@@ -50,10 +51,14 @@ async function analyzeWithGemini(audioBase64: string, mimeType: string): Promise
                 generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
             });
 
-            const result = await model.generateContent([
-                ANALYSIS_PROMPT,
-                { inlineData: { data: audioBase64, mimeType } },
-            ]);
+            const result = await withTimeout(
+                model.generateContent([
+                    ANALYSIS_PROMPT,
+                    { inlineData: { data: audioBase64, mimeType } },
+                ]),
+                60_000,
+                `Gemini[${modelName}]`,
+            );
             const text = result.response.text();
             if (text) return text;
         } catch (err: any) {
@@ -63,10 +68,14 @@ async function analyzeWithGemini(audioBase64: string, mimeType: string): Promise
                 // responseMimeType 미지원 모델 fallback (JSON 형식만 프롬프트로 강제)
                 try {
                     const model2 = genAI.getGenerativeModel({ model: modelName, generationConfig: { temperature: 0.1 } });
-                    const result2 = await model2.generateContent([
-                        ANALYSIS_PROMPT,
-                        { inlineData: { data: audioBase64, mimeType } },
-                    ]);
+                    const result2 = await withTimeout(
+                        model2.generateContent([
+                            ANALYSIS_PROMPT,
+                            { inlineData: { data: audioBase64, mimeType } },
+                        ]),
+                        60_000,
+                        `Gemini[${modelName}-fallback]`,
+                    );
                     const text2 = result2.response.text();
                     if (text2) return text2;
                 } catch {

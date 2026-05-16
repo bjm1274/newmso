@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
 import { calculateAnnualLeaveExpiryDate } from '@/lib/annual-leave-promotion';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 // ─── 입력 검증 스키마 ─────────────────────────────────────────────────────────
@@ -154,7 +155,7 @@ export async function recalculateLeaveBalance(
       : new Date(targetYear, 11, 31); // 입사일 없으면 12/31
   }
 
-  const expiryDateStr = expiryDate.toISOString().slice(0, 10);
+  const expiryDateStr = formatKoreanDateKey(expiryDate);
 
   // 6. 기존 소멸/수당지급 일수 조회 (이미 처리된 것은 유지)
   //    overrides가 있으면 그 값으로 덮어쓰기 (관리자 수동 입력 경로)

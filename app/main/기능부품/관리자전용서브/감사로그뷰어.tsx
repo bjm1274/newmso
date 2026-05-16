@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback, type CSSProperties, type ReactElement } from 'react';
+import { useState, useEffect, useCallback, useRef, type CSSProperties, type ReactElement } from 'react';
 import { List } from 'react-window';
 import { EmptyState, LoadingPanel } from '@/app/components/StatePanel';
 import { supabase } from '@/lib/supabase';
@@ -56,14 +56,17 @@ function AuditLogViewerDesktop() {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const requestIdRef = useRef(0);
 
   const fetchLogs = useCallback(async (offset = 0) => {
+    const myId = ++requestIdRef.current;
     setLoading(true);
     const { data } = await supabase
       .from('audit_logs')
       .select('*')
       .order('created_at', { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1);
+    if (myId !== requestIdRef.current) return; // stale response — 다음 요청이 이미 시작됨
     const rows = data || [];
     if (offset === 0) {
       setLogs(rows);
@@ -76,6 +79,9 @@ function AuditLogViewerDesktop() {
 
   useEffect(() => {
     fetchLogs(0);
+    return () => {
+      requestIdRef.current = -1; // unmount 후 응답은 모두 무효화
+    };
   }, [fetchLogs]);
 
   return (
