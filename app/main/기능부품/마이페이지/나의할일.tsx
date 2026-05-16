@@ -575,26 +575,26 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
   const currentRange = getDateRange(viewRange, selectedDate);
 
   return (
-    <div className="flex h-full flex-col space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
+    <div className="flex h-full flex-col space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm sm:space-y-4 sm:p-5">
       {dialog}
 
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-[var(--toss-gray-3)]">나의 할일 관리</h3>
-            <p className="mt-1 text-[12px] font-semibold text-[var(--toss-gray-4)]">
+      <div className="space-y-2 sm:space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+          <div className="w-full sm:w-auto">
+            <h3 className="text-[11px] font-semibold uppercase tracking-widest text-[var(--toss-gray-3)] sm:text-xs">나의 할일 관리</h3>
+            <p className="mt-0.5 text-[11px] font-semibold text-[var(--toss-gray-4)] sm:mt-1 sm:text-[12px]">
               우선순위와 리마인더를 함께 관리할 수 있습니다.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex gap-1 rounded-[var(--radius-md)] bg-[var(--muted)] p-1">
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <div className="flex flex-1 gap-1 rounded-[var(--radius-md)] bg-[var(--muted)] p-1 sm:flex-none">
               {(['day', 'week', 'month'] as const).map((range) => (
                 <button
                   key={range}
                   type="button"
                   onClick={() => setViewRange(range)}
-                  className={`rounded-md px-3 py-1.5 text-[11px] font-bold ${viewRange === range ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm' : 'text-[var(--toss-gray-3)]'}`}
+                  className={`flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-[11px] font-bold sm:flex-none ${viewRange === range ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm' : 'text-[var(--toss-gray-3)]'}`}
                 >
                   {range === 'day' ? '일별' : range === 'week' ? '주간' : '월간'}
                 </button>
@@ -605,7 +605,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
               type={viewRange === 'month' ? 'month' : 'date'}
               value={viewRange === 'month' ? selectedDate.slice(0, 7) : selectedDate}
               onChange={(event) => setSelectedDate(viewRange === 'month' ? `${event.target.value}-01` : event.target.value)}
-              className="cursor-pointer rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+              className="min-w-0 flex-1 cursor-pointer rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2 py-1.5 text-xs font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)] sm:flex-none sm:px-3"
             />
           </div>
         </div>
@@ -633,7 +633,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
         </div>
       </div>
 
-      <div className="space-y-2 rounded-[24px] border border-[var(--border)] bg-[var(--background)]/40 p-3">
+      <div className="space-y-2 rounded-[16px] border border-[var(--border)] bg-[var(--background)]/40 p-2.5 sm:rounded-[24px] sm:p-3">
         <div className="flex gap-2">
           <input
             type="text"
@@ -653,23 +653,23 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
                   : '사용자 정보를 확인하는 중입니다.'
             }
             disabled={!effectiveUserId}
-            className="flex-1 rounded-[18px] border border-[var(--border)] bg-[var(--input-bg)] px-4 py-3 text-sm font-bold text-[var(--foreground)] outline-none transition-colors focus:border-[var(--accent)] focus:bg-[var(--card)] disabled:bg-[var(--muted)]"
+            className="min-w-0 flex-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2.5 text-[13px] font-bold text-[var(--foreground)] outline-none transition-colors focus:border-[var(--accent)] focus:bg-[var(--card)] disabled:bg-[var(--muted)] sm:rounded-[18px] sm:px-4 sm:py-3 sm:text-sm"
           />
           <button
             type="button"
             onClick={() => void handleAddTask()}
             disabled={!effectiveUserId || !newTask.trim()}
-            className="rounded-[18px] bg-[var(--foreground)] px-4 py-3 text-sm font-bold text-white transition-opacity hover:opacity-95 disabled:opacity-50"
+            className="shrink-0 rounded-[var(--radius-md)] bg-[var(--foreground)] px-3 py-2.5 text-[13px] font-bold text-white transition-opacity hover:opacity-95 disabled:opacity-50 sm:rounded-[18px] sm:px-4 sm:py-3 sm:text-sm"
           >
             등록
           </button>
         </div>
 
-        <div className="grid gap-2 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
           <select
             value={newPriority}
             onChange={(event) => setNewPriority(event.target.value as TodoPriority)}
-            className="h-11 rounded-[16px] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+            className="h-9 min-w-0 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 text-[11px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)] sm:h-11 sm:rounded-[16px] sm:px-3 sm:text-[12px]"
           >
             {PRIORITY_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -681,7 +681,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
           <select
             value={newRepeatType}
             onChange={(event) => setNewRepeatType(event.target.value as TodoRepeatType)}
-            className="h-11 rounded-[16px] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+            className="h-9 min-w-0 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 text-[11px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)] sm:h-11 sm:rounded-[16px] sm:px-3 sm:text-[12px]"
           >
             {REPEAT_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -693,7 +693,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
           <select
             value={newAssigneeKind}
             onChange={(event) => setNewAssigneeKind(event.target.value as TodoAssigneeKind)}
-            className="h-11 rounded-[16px] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+            className="h-9 min-w-0 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 text-[11px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)] sm:h-11 sm:rounded-[16px] sm:px-3 sm:text-[12px]"
           >
             {ASSIGNEE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -702,18 +702,18 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
             ))}
           </select>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
             <input
               type="date"
               value={newReminderDate}
               onChange={(event) => setNewReminderDate(event.target.value)}
-              className="h-11 rounded-[16px] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+              className="h-9 min-w-0 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 text-[11px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)] sm:h-11 sm:rounded-[16px] sm:px-3 sm:text-[12px]"
             />
             <input
               type="time"
               value={newReminderTime}
               onChange={(event) => setNewReminderTime(event.target.value)}
-              className="h-11 rounded-[16px] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+              className="h-9 min-w-0 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 text-[11px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)] sm:h-11 sm:rounded-[16px] sm:px-3 sm:text-[12px]"
             />
           </div>
         </div>
@@ -809,53 +809,68 @@ function TodoItem({
   const repeatLabel = getRepeatLabel(task.repeat_type);
   const assigneeLabel = getAssigneeLabel(task.assignee_kind);
 
+  const chatButton = isChatSource && onChatNavigate ? (
+    <button
+      type="button"
+      data-testid={`todo-open-chat-${task.id}`}
+      onClick={() => onChatNavigate(task)}
+      className="shrink-0 rounded-md bg-[var(--toss-blue-light)] px-2 py-1 text-[11px] font-semibold text-[var(--accent)] transition-all hover:bg-[var(--accent)] hover:text-white"
+      title="채팅 메시지로 이동"
+    >
+      ↗ 채팅
+    </button>
+  ) : null;
+
+  const deleteButton = (
+    <button
+      type="button"
+      onClick={() => void onDelete(task.id)}
+      className="shrink-0 rounded-md bg-[var(--muted)] px-2 py-1 text-[11px] font-semibold text-[var(--toss-gray-3)] transition-all hover:bg-red-500/10 hover:text-red-500 sm:opacity-0 sm:group-hover:opacity-100"
+    >
+      삭제
+    </button>
+  );
+
   return (
-    <div className="group flex items-start gap-3 rounded-[20px] border border-[var(--border)] bg-[var(--card)] p-4 transition-all hover:border-[var(--accent)] hover:shadow-sm">
-      <button
-        type="button"
-        onClick={() => onToggle(task.id, task.is_complete)}
-        className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-[var(--radius-md)] border-2 transition-all ${task.is_complete ? 'border-green-500 bg-green-500/100 text-white' : 'border-[var(--border)] hover:border-[var(--accent)]'}`}
-      >
-        {task.is_complete ? <span className="text-[11px] font-bold">V</span> : null}
-      </button>
+    <div className="group rounded-[14px] border border-[var(--border)] bg-[var(--card)] p-2.5 transition-all hover:border-[var(--accent)] hover:shadow-sm sm:rounded-[20px] sm:p-4">
+      <div className="flex items-start gap-2 sm:gap-3">
+        <button
+          type="button"
+          onClick={() => onToggle(task.id, task.is_complete)}
+          aria-label={task.is_complete ? '완료 해제' : '완료 표시'}
+          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-[var(--radius-md)] border-2 transition-all sm:h-6 sm:w-6 ${task.is_complete ? 'border-green-500 bg-green-500/100 text-white' : 'border-[var(--border)] hover:border-[var(--accent)]'}`}
+        >
+          {task.is_complete ? <span className="text-[10px] font-bold sm:text-[11px]">V</span> : null}
+        </button>
 
-      <div className="min-w-0 flex-1 space-y-2">
-        <span className={`block whitespace-normal break-words text-sm font-bold leading-snug ${task.is_complete ? 'text-[var(--toss-gray-3)] line-through decoration-2' : 'text-[var(--foreground)]'}`}>
-          {task.content}
-        </span>
+        <div className="min-w-0 flex-1 space-y-1.5 sm:space-y-2">
+          <span className={`block whitespace-normal break-words text-[13px] font-bold leading-snug sm:text-sm ${task.is_complete ? 'text-[var(--toss-gray-3)] line-through decoration-2' : 'text-[var(--foreground)]'}`}>
+            {task.content}
+          </span>
 
-        <div className="flex flex-wrap gap-1.5 text-[11px] font-bold">
-          <span className={`rounded-full px-2.5 py-1 ${priorityMeta.className}`}>{priorityMeta.label}</span>
-          <span className="rounded-full bg-[var(--muted)] px-2.5 py-1 text-[var(--toss-gray-4)]">{assigneeLabel}</span>
-          {repeatLabel ? (
-            <span className="rounded-full bg-violet-100 px-2.5 py-1 text-violet-600">{repeatLabel}</span>
-          ) : null}
-          {reminderLabel ? (
-            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-600">알림 {reminderLabel}</span>
-          ) : null}
-          <span className="rounded-full bg-[var(--background)] px-2.5 py-1 text-[var(--toss-gray-3)]">{task.task_date}</span>
+          <div className="flex flex-wrap gap-1 text-[10px] font-bold sm:gap-1.5 sm:text-[11px]">
+            <span className={`rounded-full px-2 py-0.5 sm:px-2.5 sm:py-1 ${priorityMeta.className}`}>{priorityMeta.label}</span>
+            <span className="rounded-full bg-[var(--muted)] px-2 py-0.5 text-[var(--toss-gray-4)] sm:px-2.5 sm:py-1">{assigneeLabel}</span>
+            {repeatLabel ? (
+              <span className="rounded-full bg-violet-100 px-2 py-0.5 text-violet-600 sm:px-2.5 sm:py-1">{repeatLabel}</span>
+            ) : null}
+            {reminderLabel ? (
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-600 sm:px-2.5 sm:py-1">알림 {reminderLabel}</span>
+            ) : null}
+            <span className="rounded-full bg-[var(--background)] px-2 py-0.5 text-[var(--toss-gray-3)] sm:px-2.5 sm:py-1">{task.task_date}</span>
+          </div>
+        </div>
+
+        <div className="hidden shrink-0 items-center gap-1.5 sm:flex">
+          {chatButton}
+          {deleteButton}
         </div>
       </div>
 
-      {isChatSource && onChatNavigate ? (
-        <button
-          type="button"
-          data-testid={`todo-open-chat-${task.id}`}
-          onClick={() => onChatNavigate(task)}
-          className="shrink-0 rounded-md bg-[var(--toss-blue-light)] px-2 py-1 text-[11px] font-semibold text-[var(--accent)] transition-all hover:bg-[var(--accent)] hover:text-white"
-          title="채팅 메시지로 이동"
-        >
-          ↗ 채팅
-        </button>
-      ) : null}
-
-      <button
-        type="button"
-        onClick={() => void onDelete(task.id)}
-        className="rounded-md bg-[var(--muted)] px-2 py-1 text-[11px] font-semibold text-[var(--toss-gray-3)] transition-all hover:bg-red-500/10 hover:text-red-500 md:opacity-0 md:group-hover:opacity-100"
-      >
-        삭제
-      </button>
+      <div className="mt-2 flex justify-end gap-1.5 sm:hidden">
+        {chatButton}
+        {deleteButton}
+      </div>
     </div>
   );
 }
