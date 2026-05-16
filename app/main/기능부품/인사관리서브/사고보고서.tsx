@@ -233,9 +233,18 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
     const win = window.open('', '_blank');
     if (!win) return;
 
+    const esc = (v: unknown) =>
+      String(v ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
     win.document.write(`
       <html>
         <head>
+          <meta charset="utf-8" />
           <title>사고보고서</title>
           <style>
             body { font-family: sans-serif; padding: 40px; }
@@ -247,14 +256,14 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
         <body>
           <h1>사고 보고서</h1>
           <table>
-            <tr><th>사고일시</th><td>${report.incident_date} ${report.incident_time}</td><th>장소</th><td>${report.location}</td></tr>
-            <tr><th>유형</th><td>${report.type}</td><th>심각도</th><td>${report.severity}</td></tr>
-            <tr><th>사고 경위</th><td colspan="3">${report.description}</td></tr>
-            <tr><th>즉시 조치</th><td colspan="3">${report.immediate_action || '-'}</td></tr>
-            <tr><th>근본 원인</th><td colspan="3">${report.root_cause || '-'}</td></tr>
-            <tr><th>재발 방지</th><td colspan="3">${report.preventive_measures || '-'}</td></tr>
-            <tr><th>관련자</th><td colspan="3">${normalizeInvolvedPersons(report.involved_persons).join(', ') || '-'}</td></tr>
-            <tr><th>보고자</th><td>${report.reporter_name || '-'}</td><th>상태</th><td>${report.status}</td></tr>
+            <tr><th>사고일시</th><td>${esc(report.incident_date)} ${esc(report.incident_time)}</td><th>장소</th><td>${esc(report.location)}</td></tr>
+            <tr><th>유형</th><td>${esc(report.type)}</td><th>심각도</th><td>${esc(report.severity)}</td></tr>
+            <tr><th>사고 경위</th><td colspan="3">${esc(report.description)}</td></tr>
+            <tr><th>즉시 조치</th><td colspan="3">${esc(report.immediate_action || '-')}</td></tr>
+            <tr><th>근본 원인</th><td colspan="3">${esc(report.root_cause || '-')}</td></tr>
+            <tr><th>재발 방지</th><td colspan="3">${esc(report.preventive_measures || '-')}</td></tr>
+            <tr><th>관련자</th><td colspan="3">${esc(normalizeInvolvedPersons(report.involved_persons).join(', ') || '-')}</td></tr>
+            <tr><th>보고자</th><td>${esc(report.reporter_name || '-')}</td><th>상태</th><td>${esc(report.status)}</td></tr>
           </table>
         </body>
       </html>

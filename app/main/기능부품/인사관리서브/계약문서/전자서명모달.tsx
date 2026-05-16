@@ -248,7 +248,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                     .contract-wrapper { padding: 20px; }
                 `;
 
-            printWindow.document.write(`<html><head><title>계약서_통합본_${user?.name}</title><style>${styles}</style></head><body>${fullContractHTML}</body></html>`);
+            printWindow.document.write(`<html><head><meta charset="utf-8" /><title>계약서_통합본_${user?.name}</title><style>${styles}</style></head><body>${fullContractHTML}</body></html>`);
             printWindow.document.close();
 
             window.setTimeout(() => {
