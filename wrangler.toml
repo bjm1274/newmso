@@ -9,6 +9,17 @@ directory = ".open-next/assets"
 [vars]
 NEXT_PUBLIC_R2_PUBLIC_BASE_URL = "https://r2.pchos.kr"
 
+# Firebase Cloud Messaging (FCM) — 모바일 푸시 알림
+# 모두 NEXT_PUBLIC_* 접두사라 클라이언트 번들에 노출됨 (정상 — Firebase Console 도메인 화이트리스트로 보호).
+# FIREBASE_SERVICE_ACCOUNT(server-only secret)는 `wrangler secret put`으로 별도 등록.
+NEXT_PUBLIC_FIREBASE_API_KEY = "AIzaSyBGqA18_a00XlYSRvoRu2KpdKfVJHJnikA"
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN = "mso-system.firebaseapp.com"
+NEXT_PUBLIC_FIREBASE_PROJECT_ID = "mso-system"
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = "mso-system.firebasestorage.app"
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID = "873459384687"
+NEXT_PUBLIC_FIREBASE_APP_ID = "1:873459384687:web:4fd03a6b1090683a58689a"
+NEXT_PUBLIC_FCM_VAPID_KEY = "BCk7ISKIUPeXrOw0GwuRH4a8zBHKdKospS3rCQc5CWxiI8ukae0gJ5wE7Svn1RDOWsFTadEUdxlFu1R_HVJ5izQ"
+
 # Cron Triggers
 # Daily full backup stays paused to avoid unnecessary Supabase egress.
 [triggers]
