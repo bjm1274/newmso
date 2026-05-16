@@ -45,6 +45,8 @@ const STAFF_BOOTSTRAP_COLUMNS = [
   'presence_status',
   'permissions',
   'bank_account',
+  'bank_name',
+  'shift_id',
   'auth_user_id',
   'created_at',
 ];
@@ -81,6 +83,7 @@ export const STAFF_BOOTSTRAP_OPTIONAL_COLUMNS = [
   'extension',
   'bank_name',
   'bank_account',
+  'shift_id',
   'auth_user_id',
   'employment_type',
   'contract_type',

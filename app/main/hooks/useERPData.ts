@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useState, useCallback, useEffect, type Dispatch, type SetStateAction } from 'react';
 import { supabase } from '@/lib/supabase';
 import { normalizeProfileUser } from '@/lib/profile-photo';
 import { hasUserPayloadChanged } from '@/lib/access-control';
@@ -18,6 +18,8 @@ export interface ERPDataState {
   hasLoadedInitialData: boolean;
   fetchERPData: (currentUser?: ErpUser | null) => Promise<void>;
 }
+
+const REFETCH_DEBOUNCE_MS = 500;
 
 export function useERPData(
   persistClientUser: (nextUser: ErpUser | null) => void,
@@ -91,6 +93,32 @@ export function useERPData(
     },
     [persistClientUser, getUser]
   );
+
+  // staff_members realtime: 직원 추가/수정/삭제·퇴사 처리 시 자동 갱신.
+  // 디바운스로 연속 변경(예: 대량 인사발령)에서 fetch 폭주 방지.
+  useEffect(() => {
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleRefetch = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        void fetchERPData(getUser());
+      }, REFETCH_DEBOUNCE_MS);
+    };
+
+    const channel = supabase
+      .channel('erp-data-staff_members-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'staff_members' },
+        scheduleRefetch,
+      )
+      .subscribe();
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      supabase.removeChannel(channel);
+    };
+  }, [fetchERPData, getUser]);
 
   return {
     data,
