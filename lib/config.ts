@@ -44,7 +44,6 @@ export const config = {
   ai: {
     geminiKey: optionalEnv('GEMINI_API_KEY'),
     googleApiKey: optionalEnv('GOOGLE_API_KEY'),
-    openaiKey: optionalEnv('OPENAI_API_KEY'),
   },
 
   /** Web Push / VAPID */

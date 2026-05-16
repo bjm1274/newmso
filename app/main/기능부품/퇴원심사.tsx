@@ -334,7 +334,8 @@ export default function DischargeReviewPage({ user }: { user: any }) {
         });
         setSelectedReview({ ...review, items: updatedItems });
         setReviews(prev => prev.map(r => r.id === review.id ? { ...r, items: updatedItems } : r));
-        try { await supabase.from('discharge_reviews').update({ items: updatedItems }).eq('id', review.id); } catch { }
+        try { await supabase.from('discharge_reviews').update({ items: updatedItems }).eq('id', review.id); }
+        catch (e) { toast(`자동비교 결과 저장 실패: ${String((e as Error)?.message || e)}`, 'error'); }
     };
 
     const autoCompare = () => {
@@ -350,7 +351,12 @@ export default function DischargeReviewPage({ user }: { user: any }) {
         const updated = selectedReview.items.map(i => i.id === itemId ? { ...i, checked: !i.checked } : i);
         setSelectedReview({ ...selectedReview, items: updated });
         setReviews(reviews.map(r => r.id === reviewId ? { ...r, items: updated } : r));
-        try { await supabase.from('discharge_reviews').update({ items: updated }).eq('id', reviewId); } catch { }
+        try { await supabase.from('discharge_reviews').update({ items: updated }).eq('id', reviewId); }
+        catch (e) {
+            toast(`체크 상태 저장 실패: ${String((e as Error)?.message || e)}`, 'error');
+            setSelectedReview(selectedReview);
+            setReviews(reviews);
+        }
     };
 
     const toggleAll = async (check: boolean) => {
@@ -358,7 +364,12 @@ export default function DischargeReviewPage({ user }: { user: any }) {
         const updated = selectedReview.items.map(i => ({ ...i, checked: check }));
         setSelectedReview({ ...selectedReview, items: updated });
         setReviews(reviews.map(r => r.id === selectedReview.id ? { ...r, items: updated } : r));
-        try { await supabase.from('discharge_reviews').update({ items: updated }).eq('id', selectedReview.id); } catch { }
+        try { await supabase.from('discharge_reviews').update({ items: updated }).eq('id', selectedReview.id); }
+        catch (e) {
+            toast(`전체 체크 저장 실패: ${String((e as Error)?.message || e)}`, 'error');
+            setSelectedReview(selectedReview);
+            setReviews(reviews);
+        }
     };
 
     const approveReview = async (id: string) => {
@@ -384,7 +395,13 @@ export default function DischargeReviewPage({ user }: { user: any }) {
         }
         setSelectedReview({ ...selectedReview, status: 'approved' });
         setReviews(reviews.map(r => r.id === id ? { ...r, status: 'approved' } : r));
-        try { await supabase.from('discharge_reviews').update({ status: 'approved' }).eq('id', id); } catch { }
+        try {
+            await supabase.from('discharge_reviews').update({ status: 'approved' }).eq('id', id);
+        } catch (e) {
+            toast(`승인 처리 실패: ${String((e as Error)?.message || e)}`, 'error');
+            setSelectedReview(selectedReview);
+            setReviews(reviews);
+        }
     };
 
     const deleteReview = async (id: string) => {
@@ -398,7 +415,13 @@ export default function DischargeReviewPage({ user }: { user: any }) {
         if (!confirmed) return;
         setReviews(reviews.filter(r => r.id !== id));
         if (selectedReview?.id === id) setSelectedReview(null);
-        try { await supabase.from('discharge_reviews').delete().eq('id', id); } catch { }
+        try {
+            await supabase.from('discharge_reviews').delete().eq('id', id);
+        } catch (e) {
+            toast(`삭제 실패: ${String((e as Error)?.message || e)}`, 'error');
+            setReviews(reviews);
+            if (selectedReview?.id === id) setSelectedReview(selectedReview);
+        }
     };
 
     const handleStartEdit = () => {
