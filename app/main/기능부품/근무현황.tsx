@@ -6,6 +6,7 @@ import { isActiveStaff } from '@/lib/active-staff';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import { buildShiftLookup, resolveAssignedShift } from '@/lib/shift-resolution';
 import { getStaffShiftsBatch, type StaffShiftEntry } from '@/lib/staff-shift-resolver';
+import { useAppData } from '@/app/main/contexts/AppDataContext';
 
 type WorkShiftRow = {
   id?: string | null;
@@ -205,6 +206,7 @@ function cloneCounts(source: DayShiftCounts) {
 }
 
 function WorkStatus({ user }: { user?: any }) {
+  const { data: appData } = useAppData();
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [workShifts, setWorkShifts] = useState<WorkShiftRow[]>([]);
   const [staffs, setStaffs] = useState<StaffRow[]>([]);
@@ -243,12 +245,11 @@ function WorkStatus({ user }: { user?: any }) {
     const load = async () => {
       setLoading(true);
       try {
-        const [shiftRes, staffRes, assignmentRes, attendanceRes, attendancesRes] = await Promise.allSettled([
+        const [shiftRes, assignmentRes, attendanceRes, attendancesRes] = await Promise.allSettled([
           supabase
             .from('work_shifts')
             .select('id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work')
             .eq('is_active', true),
-          supabase.from('staff_members').select('id, name, shift_id, department, position, status'),
           withMissingColumnFallback(
             () =>
               supabase
@@ -281,10 +282,15 @@ function WorkStatus({ user }: { user?: any }) {
             ? (shiftRes.value.data as WorkShiftRow[])
             : [],
         );
-        const loadedStaffs =
-          staffRes.status === 'fulfilled' && Array.isArray(staffRes.value.data)
-            ? (staffRes.value.data as StaffRow[])
-            : [];
+        // AppDataContext.staffs[]에서 가져옴 (별도 supabase 호출 제거)
+        const loadedStaffs = appData.staffs.map((s) => ({
+          id: s.id,
+          name: s.name ?? null,
+          shift_id: (s as any).shift_id ?? null,
+          department: s.department ?? null,
+          position: s.position ?? null,
+          status: s.status ?? null,
+        })) as StaffRow[];
         setStaffs(loadedStaffs);
 
         // 직원 목록 확정 후 다중 근무유형 배치 조회 (N+1 방지)
@@ -346,7 +352,7 @@ function WorkStatus({ user }: { user?: any }) {
     return () => {
       cancelled = true;
     };
-  }, [queryRange.endKey, queryRange.startKey, refreshNonce, todayKey]);
+  }, [queryRange.endKey, queryRange.startKey, refreshNonce, todayKey, appData.staffs]);
 
   useEffect(() => {
     const scheduleRefresh = () => {
