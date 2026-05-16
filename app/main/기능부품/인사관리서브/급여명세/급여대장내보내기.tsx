@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 // XLSX: dynamic import로 전환 (번들 사이즈 최적화)
 import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
+import { useAppData } from '@/app/main/contexts/AppDataContext';
 
 export default function PayrollExport({ checkedIds = [], selectedCo, yearMonth: initialYm }: Record<string, unknown>) {
   const _checkedIds = (checkedIds as string[]) ?? [];
@@ -11,6 +12,13 @@ export default function PayrollExport({ checkedIds = [], selectedCo, yearMonth: 
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const { data: appData } = useAppData();
+
+  // AppDataContext.staffs[]에서 staff 맵 구성 (별도 supabase 호출 제거)
+  const staffMap = useMemo(
+    () => Object.fromEntries(appData.staffs.map((s) => [String(s.id), s])),
+    [appData.staffs],
+  );
 
   useEffect(() => {
     setYearMonth((initialYm as string) || new Date().toISOString().slice(0, 7));
@@ -40,14 +48,7 @@ export default function PayrollExport({ checkedIds = [], selectedCo, yearMonth: 
       }
 
       let list = filterNonInterimPayrollRecords((prData || []) as any[]);
-      // staff_members 별도 조회 후 병합
       if (list.length > 0) {
-        const staffIds = [...new Set(list.map((r: any) => r.staff_id))];
-        const { data: staffData } = await supabase
-          .from('staff_members')
-          .select('id, name, company, department, bank_account, employee_no')
-          .in('id', staffIds);
-        const staffMap = Object.fromEntries((staffData || []).map((s: any) => [String(s.id), s]));
         list = list.map((r: any) => ({ ...r, staff_members: staffMap[String(r.staff_id)] || null }));
       }
       if (selectedCo && selectedCo !== '전체') {

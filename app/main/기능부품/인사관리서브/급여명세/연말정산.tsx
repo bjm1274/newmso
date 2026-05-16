@@ -4,7 +4,7 @@ import type { StaffMember } from '@/types';
 import { useState, useEffect, useMemo } from 'react';
 import { getPayrollGrossPay } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
-import { STAFF_BOOTSTRAP_SELECT } from '@/lib/staff-query-columns';
+import { useAppData } from '@/app/main/contexts/AppDataContext';
 import {
   calculateAnnualIncomeTax,
   DEFAULT_TAX_INSURANCE_RATES,
@@ -43,6 +43,7 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: YearEndSe
   const [selectedStaff, setSelectedStaff] = useState<Record<string, unknown> | null>(null);
   const [showCertificate, setShowCertificate] = useState(false);
   const [taxInsuranceRates, setTaxInsuranceRates] = useState<TaxInsuranceRates>(DEFAULT_TAX_INSURANCE_RATES);
+  const { data: appData } = useAppData();
 
   // New OCR states
   const [isScanning, setIsScanning] = useState(false);
@@ -83,11 +84,11 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: YearEndSe
   };
 
   const fetchSettlementData = async () => {
-    const staffQuery = supabase.from('staff_members').select(STAFF_BOOTSTRAP_SELECT);
-    const { data: staff } = await (selectedCo && selectedCo !== '전체'
-      ? staffQuery.eq('company', selectedCo).returns<StaffMember[]>()
-      : staffQuery.returns<StaffMember[]>());
-    setStaffList(staff ?? []);
+    // AppDataContext.staffs[]에서 client-side filter (별도 supabase 호출 제거)
+    const staff = selectedCo && selectedCo !== '전체'
+      ? appData.staffs.filter((s) => s.company === selectedCo)
+      : appData.staffs;
+    setStaffList(staff);
 
     const { data: payroll } = await supabase
       .from('payroll_records')

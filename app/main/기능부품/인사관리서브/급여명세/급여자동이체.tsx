@@ -3,6 +3,7 @@ import { toast } from '@/lib/toast';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
+import { useAppData } from '@/app/main/contexts/AppDataContext';
 
 type TransferRow = {
   id: string;
@@ -26,18 +27,16 @@ export default function SalaryAutoTransfer() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferStatus, setTransferStatus] = useState('대기');
+  const { data: appData } = useAppData();
 
   useEffect(() => {
     fetchStaffAndSalary();
-  }, [selectedMonth]);
+  }, [selectedMonth, appData.staffs]);
 
   const fetchStaffAndSalary = async () => {
-    // 직원 정보 조회
-    const { data: staff } = await supabase
-      .from('staff_members')
-      .select('id, name, bank_name, bank_account');
-    setStaffList(staff || []);
-    const staffById = new Map((staff || []).map((row: any) => [String(row.id), row]));
+    // AppDataContext.staffs[]에서 직접 사용 (bank_name/bank_account는 OPTIONAL 컬럼이라 DB에 있으면 포함됨)
+    setStaffList(appData.staffs);
+    const staffById = new Map<string, any>(appData.staffs.map((s) => [String(s.id), s]));
 
     // 급여 정보 조회
     const { data: salaries } = await supabase

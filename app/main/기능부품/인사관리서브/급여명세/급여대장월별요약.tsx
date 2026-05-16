@@ -1,11 +1,19 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useAppData } from '@/app/main/contexts/AppDataContext';
 
 export default function PayrollMonthlySummary({ selectedCo }: Record<string, unknown>) {
   const [yearMonth, setYearMonth] = useState(new Date().toISOString().slice(0, 7));
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const { data: appData } = useAppData();
+
+  // AppDataContext.staffs[]에서 회사 매핑 (별도 supabase 호출 제거)
+  const staffCompanyMap = useMemo(
+    () => Object.fromEntries(appData.staffs.map((s) => [String(s.id), s.company])),
+    [appData.staffs],
+  );
 
   useEffect(() => {
     const fetchRecords = async () => {
@@ -22,21 +30,14 @@ export default function PayrollMonthlySummary({ selectedCo }: Record<string, unk
         return;
       }
       let list = prData || [];
-      // selectedCo 필터링: staff_id 기준으로 staff_members 별도 조회
       if (selectedCo && selectedCo !== '전체' && list.length > 0) {
-        const staffIds = [...new Set(list.map((r: any) => r.staff_id))];
-        const { data: staffData } = await supabase
-          .from('staff_members')
-          .select('id, company')
-          .in('id', staffIds);
-        const staffCompanyMap = Object.fromEntries((staffData || []).map((s: any) => [String(s.id), s.company]));
         list = list.filter((r: any) => staffCompanyMap[String(r.staff_id)] === selectedCo);
       }
       setRecords(list);
       setLoading(false);
     };
     fetchRecords();
-  }, [yearMonth, selectedCo]);
+  }, [yearMonth, selectedCo, staffCompanyMap]);
 
   const totalNet = records.reduce((s, r) => s + (Number(r.net_pay) || 0), 0);
   const totalTaxable = records.reduce((s, r) => s + (Number(r.total_taxable) || 0), 0);
