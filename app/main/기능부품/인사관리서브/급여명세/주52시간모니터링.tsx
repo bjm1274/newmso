@@ -2,11 +2,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { WEEKLY_MAX_HOURS } from '@/lib/tax-free-limits';
+import { useAppData } from '@/app/main/contexts/AppDataContext';
 
 export default function WeeklyHoursMonitor({ selectedCo, yearMonth: initialYm }: Record<string, unknown>) {
   const [yearMonth, setYearMonth] = useState((initialYm as string) || new Date().toISOString().slice(0, 7));
   const [weeklyData, setWeeklyData] = useState<{ staffId: string; name: string; company?: string; weekStart: string; hours: number; exceeds: boolean }[]>([]);
   const [loading, setLoading] = useState(false);
+  const { data: appData } = useAppData();
 
   useEffect(() => {
     (async () => {
@@ -32,15 +34,13 @@ export default function WeeklyHoursMonitor({ selectedCo, yearMonth: initialYm }:
         return;
       }
 
-      const [{ data: att }, { data: staffRows }] = await Promise.all([
-        supabase
-          .from('attendances')
-          .select('*')
-          .gte('work_date', start.toISOString().slice(0, 10))
-          .lte('work_date', end.toISOString().slice(0, 10)),
-        supabase.from('staff_members').select('id, name, company'),
-      ]);
-      const staffById = new Map((staffRows || []).map((staff: any) => [String(staff.id), staff]));
+      // AppDataContext.staffs[]에서 staff 정보 사용 (별도 supabase 호출 제거)
+      const { data: att } = await supabase
+        .from('attendances')
+        .select('*')
+        .gte('work_date', start.toISOString().slice(0, 10))
+        .lte('work_date', end.toISOString().slice(0, 10));
+      const staffById = new Map(appData.staffs.map((staff) => [String(staff.id), staff]));
 
       const byStaffWeek: Record<string, { name: string; company?: string; hours: number }> = {};
       (att || []).forEach((a: any) => {
@@ -53,10 +53,10 @@ export default function WeeklyHoursMonitor({ selectedCo, yearMonth: initialYm }:
         const key = `${a.staff_id}_${weekStart}`;
         const hrs = (a.work_hours_minutes || 0) / 60;
         if (!byStaffWeek[key]) {
-          const staff = staffById.get(String(a.staff_id)) || {};
+          const staff = staffById.get(String(a.staff_id));
           byStaffWeek[key] = {
-            name: staff.name || '',
-            company: staff.company,
+            name: staff?.name || '',
+            company: staff?.company,
             hours: 0,
           };
         }

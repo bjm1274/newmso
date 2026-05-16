@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import { getRecommendedOrderQuantity, getItemQuantity, requestInventoryReorder } from '@/app/main/inventory-utils';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
+import { useAppData } from '@/app/main/contexts/AppDataContext';
 
 // ---- 타입 정의 ----
 interface InventoryItem {
@@ -54,6 +55,7 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
   const [loading, setLoading] = useState(true);
   const [orderingItemId, setOrderingItemId] = useState<string | null>(null);
   const [viewDept, setViewDept] = useState<string>('');
+  const { data: appData } = useAppData();
 
   const inventory = (inventoryProp?.length ? inventoryProp : inventoryFetched) || [];
 
@@ -84,10 +86,19 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
         setLoading(false);
         return;
       }
-      const staffIds = [...new Set(list.map((r) => r.staff_id))];
-      const { data: staffs } = await supabase.from('staff_members').select('id, name, department, company').in('id', staffIds);
+      const staffIds = new Set(list.map((r) => r.staff_id));
+      // AppDataContext.staffs[]에서 client-side filter (별도 supabase 호출 제거)
       const staffMap: Record<string, { id: string; name?: string; department?: string; company?: string }> = {};
-      ((staffs ?? []) as { id: string; name?: string; department?: string; company?: string }[]).forEach((s) => { staffMap[s.id] = s; });
+      appData.staffs
+        .filter((s) => staffIds.has(s.id))
+        .forEach((s) => {
+          staffMap[s.id] = {
+            id: s.id,
+            name: s.name ?? undefined,
+            department: s.department ?? undefined,
+            company: s.company ?? undefined,
+          };
+        });
       setAssetLoans(list.map((r) => ({ ...r, staff: staffMap[r.staff_id] })));
       setLoading(false);
     })();

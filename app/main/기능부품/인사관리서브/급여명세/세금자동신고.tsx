@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { getPayrollGrossPay } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
+import { useAppData } from '@/app/main/contexts/AppDataContext';
 
 type TaxRow = {
   staff_id: string;
@@ -32,6 +33,7 @@ export default function TaxAutoReport({ selectedCo = '전체' }: Record<string, 
   const [reportStatus, setReportStatus] = useState('미신고');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const { data: appData } = useAppData();
 
   useEffect(() => {
     let active = true;
@@ -41,15 +43,12 @@ export default function TaxAutoReport({ selectedCo = '전체' }: Record<string, 
       setErrorMessage('');
 
       try {
-        const staffQuery = supabase.from('staff_members').select('id, name, company');
-        const { data: staffRows, error: staffError } =
-          selectedCo && selectedCo !== '전체'
-            ? await staffQuery.eq('company', selectedCo)
-            : await staffQuery;
+        // AppDataContext.staffs[]에서 client-side filter (별도 supabase 호출 제거)
+        const staffRows = selectedCo && selectedCo !== '전체'
+          ? appData.staffs.filter((s) => s.company === selectedCo)
+          : appData.staffs;
 
-        if (staffError) throw staffError;
-
-        const staffIds = (staffRows || []).map((staff: any) => staff.id);
+        const staffIds = staffRows.map((staff) => staff.id);
         if (!staffIds.length) {
           if (active) {
             setTaxData([]);

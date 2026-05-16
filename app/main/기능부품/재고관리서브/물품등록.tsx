@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import { InventoryStepSummary } from './InventoryDesignPanels';
+import { useAppData } from '@/app/main/contexts/AppDataContext';
 
 type InventoryUnit = 'EA' | 'BOX';
 
@@ -69,6 +70,7 @@ export default function ProductRegistration({
   const [departments, setDepartments] = useState<string[]>([]);
   const [companies, setCompanies] = useState<string[]>(['SY INC.', '박철홍정형외과', '수연의원']);
   const [productForm, setProductForm] = useState<ProductFormState>(() => createInitialProductForm(user));
+  const { data: appData } = useAppData();
 
   const inventoryCatalog = useMemo(() => {
     const merged = new Map<string, InventoryCatalogEntry>();
@@ -104,14 +106,16 @@ export default function ProductRegistration({
   }, [inventoryCatalog, productForm.item_name]);
 
   useEffect(() => {
+    // AppDataContext.staffs[]에서 부서 추출 (별도 supabase 호출 제거)
+    const deptList = appData.staffs
+      .map((staff) => String(staff?.department || '').trim())
+      .filter(Boolean);
+    setDepartments(
+      Array.from(new Set(deptList)).sort((left, right) => left.localeCompare(right, 'ko')),
+    );
+
     const loadDeptsAndComps = async () => {
       try {
-        const { data: deptData, error: deptError } = await supabase.from('staff_members').select('department, company');
-        if (!deptError && deptData) {
-          const list = deptData.map((staff: any) => String(staff?.department || '').trim()).filter(Boolean);
-          setDepartments(Array.from(new Set(list)).sort((left, right) => left.localeCompare(right, 'ko')));
-        }
-
         const { data: compData, error: compError } = await supabase
           .from('companies')
           .select('name')
