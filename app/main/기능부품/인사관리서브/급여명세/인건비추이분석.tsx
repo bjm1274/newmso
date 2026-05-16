@@ -1,10 +1,19 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
+import { useAppData } from '@/app/main/contexts/AppDataContext';
 
 export default function LaborCostTrend({ selectedCo }: Record<string, unknown>) {
   const [months, setMonths] = useState<{ ym: string; total: number; count: number }[]>([]);
+  const { data: appData } = useAppData();
+
+  // staffs[]를 AppDataContext에서 가져와 month별 fetch에서 중복 staff_members 조회 12회 제거.
+  // staff 변경 시 자동 재계산.
+  const staffCompanyMap = useMemo(
+    () => Object.fromEntries(appData.staffs.map((s) => [String(s.id), s.company])),
+    [appData.staffs],
+  );
 
   useEffect(() => {
     (async () => {
@@ -19,14 +28,7 @@ export default function LaborCostTrend({ selectedCo }: Record<string, unknown>) 
           .eq('year_month', ym);
         let rows = filterNonInterimPayrollRecords((data || []) as any[]);
         if (selectedCo && selectedCo !== '전체') {
-          if (rows.length > 0) {
-            const staffIds = [...new Set(rows.map((r: any) => r.staff_id))];
-            const { data: staffData } = await supabase.from('staff_members').select('id, company').in('id', staffIds);
-            const staffCompanyMap = Object.fromEntries((staffData || []).map((s: any) => [String(s.id), s.company]));
-            rows = rows.filter((r: any) => staffCompanyMap[String(r.staff_id)] === selectedCo);
-          } else {
-            rows = [];
-          }
+          rows = rows.filter((r: any) => staffCompanyMap[String(r.staff_id)] === selectedCo);
         }
         list.push({
           ym,
@@ -36,7 +38,7 @@ export default function LaborCostTrend({ selectedCo }: Record<string, unknown>) 
       }
       setMonths(list.reverse());
     })();
-  }, [selectedCo]);
+  }, [selectedCo, staffCompanyMap]);
 
   const maxVal = Math.max(...months.map((m) => m.total), 1);
 
