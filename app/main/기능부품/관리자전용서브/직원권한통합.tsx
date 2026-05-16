@@ -5,6 +5,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { isActiveStaff } from '@/lib/active-staff';
+import { useAppData } from '@/app/main/contexts/AppDataContext';
 import { FEATURE_PERMISSION_GROUPS } from '@/lib/feature-permissions';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 
@@ -53,6 +54,7 @@ export default function StaffPermissionManager(props: { onRefresh?: () => void }
 
 function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }) {
   const { dialog, openConfirm } = useActionDialog();
+  const { data: appData } = useAppData();
   const [staffs, setStaffs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedStaff, setSelectedStaff] = useState<Record<string, unknown> | null>(null);
@@ -63,29 +65,27 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
   const [selectedApprovalReferenceFormKey, setSelectedApprovalReferenceFormKey] = useState<string>('all');
   const [permissionReview, setPermissionReview] = useState<PermissionReview | null>(null);
 
-  const fetchStaffs = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase.from('staff_members').select(STAFF_LIST_SELECT).order('employee_no');
-    if (error) {
-      console.error('직원 권한 목록 조회 실패:', error);
-      setLoading(false);
-      return;
-    }
-    if (data) {
-      // 퇴사자는 권한 관리 대상이 아니므로 제외 (재직자만 노출)
-      const sortedData = data.filter(isActiveStaff).sort(sortStaffRows);
-      setStaffs(sortedData);
-      setSelectedStaff((current: any) => {
-        if (!current?.id) return current;
-        return sortedData.find((staff: any) => staff.id === current.id) ?? current;
-      });
-    }
-    setLoading(false);
-  }, []);
+  // STAFF_LIST_SELECT 모든 컬럼이 STAFF_BOOTSTRAP_COLUMNS에 포함되므로 Context로 대체.
+  // update 호출은 그대로 직접 호출 유지 (CRUD는 Context 우회).
+  const sortedStaffs = useMemo(
+    () => appData.staffs.filter(isActiveStaff).sort(sortStaffRows),
+    [appData.staffs],
+  );
 
   useEffect(() => {
-    fetchStaffs();
-  }, [fetchStaffs]);
+    setStaffs(sortedStaffs);
+    setSelectedStaff((current: any) => {
+      if (!current?.id) return current;
+      return sortedStaffs.find((staff: any) => staff.id === current.id) ?? current;
+    });
+    setLoading(false);
+  }, [sortedStaffs]);
+
+  // update 후 새로고침용 wrapper (Context가 realtime으로 자동 갱신하므로 사실상 no-op이나
+  // 호출자 호환성 유지)
+  const fetchStaffs = useCallback(async () => {
+    // AppDataContext realtime이 staff_members 변경 시 자동 갱신
+  }, []);
 
   const updateStaffRecord = useCallback(
     async (staffId: string, updates: Record<string, any>) => {
