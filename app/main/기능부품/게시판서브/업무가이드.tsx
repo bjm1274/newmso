@@ -16,6 +16,7 @@ import { toast } from '@/lib/toast';
 import type { AttachmentItem, BoardPost, StaffMember } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
 import { uploadBoardAttachmentFile } from '../게시판업로드';
+import { useAppData } from '@/app/main/contexts/AppDataContext';
 
 const GUIDE_BOARD_TYPE = '업무가이드';
 const GUIDE_DISPLAY_NAME = '업무공유';
@@ -572,10 +573,22 @@ function matchesTeamScope(item: { companyName: string; company?: string | null; 
 
 export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Props) {
   const { dialog, openConfirm } = useActionDialog();
+  const { data: appData } = useAppData();
   const [resources, setResources] = useState<GuideResource[]>([]);
   const [teamTasks, setTeamTasks] = useState<GuideTask[]>([]);
   const [orgTeams, setOrgTeams] = useState<OrgTeamRow[]>([]);
-  const [staffDirectory, setStaffDirectory] = useState<OrgStaffRow[]>([]);
+  // staff_members는 AppDataContext로 동기화 (수동 fetch 제거)
+  const staffDirectory = useMemo<OrgStaffRow[]>(
+    () =>
+      appData.staffs.map((s) => ({
+        id: s.id ?? null,
+        company: s.company ?? null,
+        company_id: (s as any).company_id ?? null,
+        department: s.department ?? null,
+        status: s.status ?? null,
+      })),
+    [appData.staffs],
+  );
   const [loading, setLoading] = useState(true);
   const [savingResource, setSavingResource] = useState(false);
   const [savingTask, setSavingTask] = useState(false);
@@ -671,7 +684,8 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
     try {
       setLoading(true);
 
-      const [resourceResult, taskResult, orgTeamResult, staffResult] = await Promise.all([
+      // staff_members는 AppDataContext에서 가져오므로 별도 fetch 제거
+      const [resourceResult, taskResult, orgTeamResult] = await Promise.all([
         withMissingColumnsFallback<GuideRow[]>(
           async (omittedColumns): Promise<QueryResult<GuideRow[]>> => {
             const result = await supabase
@@ -695,13 +709,11 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
           [...GUIDE_POST_OPTIONAL_COLUMNS],
         ),
         supabase.from('org_teams').select('id, company_name, division, team_name, sort_order').order('company_name').order('division').order('sort_order'),
-        supabase.from('staff_members').select('id, company, company_id, department, status').order('company').order('department'),
       ]);
 
       setResources(((resourceResult.data || []) as GuideRow[]).map((item) => normalizeGuideResource(item)));
       setTeamTasks(sortGuideTasks(((taskResult.data || []) as GuideRow[]).map((item) => normalizeGuideTask(item))));
       setOrgTeams(((orgTeamResult.data || []) as OrgTeamRow[]) ?? []);
-      setStaffDirectory(((staffResult.data || []) as OrgStaffRow[]) ?? []);
     } catch (error) {
       console.error('guide workspace load failed', error);
       toast(`${GUIDE_DISPLAY_NAME} 화면을 불러오지 못했습니다.`, 'error');
@@ -715,12 +727,12 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
   }, [loadGuideWorkspace]);
 
   useEffect(() => {
+    // staff_members realtime은 AppDataContext가 처리하므로 여기선 제거
     const unsubscribe = subscribeRealtime(
       'guide-workspace',
       [
         { table: 'board_posts', event: '*' },
         { table: 'org_teams', event: '*' },
-        { table: 'staff_members', event: '*' },
       ],
       () => { void loadGuideWorkspace(); },
       { batchWindowMs: 1000 },
