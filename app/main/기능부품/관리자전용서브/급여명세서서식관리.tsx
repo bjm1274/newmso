@@ -4,6 +4,7 @@ import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useAppData } from '@/app/main/contexts/AppDataContext';
 import {
   DEFAULT_DOCUMENT_DESIGNS,
   DocumentDesign,
@@ -506,6 +507,7 @@ function DesignFieldRow({
 
 export default function PayrollSlipDesignManager() {
   const { dialog, openConfirm } = useActionDialog();
+  const { data: appData } = useAppData();
   const [store, setStore] = useState<DocumentDesignStore | null>(null);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [selectedType, setSelectedType] = useState<DocumentDesignType>('payroll_slip');
@@ -516,15 +518,15 @@ export default function PayrollSlipDesignManager() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [designStore, companyResult, staffResult] = await Promise.all([
+        // staff_members는 AppDataContext에서 (별도 supabase 호출 제거)
+        const [designStore, companyResult] = await Promise.all([
           fetchDocumentDesignStore(),
           supabase.from('companies').select('id, name').eq('is_active', true).order('name'),
-          supabase.from('staff_members').select('company'),
         ]);
 
         const staffCompanies = Array.from(
-          new Set((staffResult.data || []).map((row: any) => row.company).filter(Boolean)),
-        ).map((name) => ({ id: name, name }));
+          new Set(appData.staffs.map((row) => row.company).filter(Boolean)),
+        ).map((name) => ({ id: name as string, name: name as string }));
 
         const companyMap = new Map<string, CompanyOption>();
         (companyResult.data || []).forEach((company: any) => {
@@ -553,7 +555,7 @@ export default function PayrollSlipDesignManager() {
     };
 
     void load();
-  }, []);
+  }, [appData.staffs]);
 
   const workingStore = store || {
     version: 2,
