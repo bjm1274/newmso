@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { dispatchChatPushForMessage } from '@/lib/chat-push-dispatch';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
-import { insertNotificationsOrThrow, type NotificationRow } from '@/lib/notification-utils';
+import {
+  insertNotificationsOrThrow,
+  type NotificationRow,
+} from '@/lib/notification-utils';
 import {
   getD1Binding,
   getD1Drizzle,
   resolveDataBackend,
   staff_members as staffMembersTable,
+  board_posts as boardPostsTable,
+  messages as messagesTable,
+  eq,
 } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
@@ -41,13 +46,15 @@ type StaffSummary = {
   role?: string | null;
 };
 
-function getAdminClient(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new Error('Supabase service role configuration is missing.');
+// D1 binding 필수 — Phase 8-F: supabase 의존 제거
+async function requireD1ForNoticeBroadcast(label: string) {
+  const backend = await resolveDataBackend();
+  const d1 = await getD1Binding();
+  if (!d1) {
+    logD1BindingMissing({ label, backend });
+    throw new Error(`[notice-broadcast] D1 binding not available (${label})`);
   }
-  return createClient(url, key);
+  return getD1Drizzle(d1);
 }
 
 function stripBoardMeta(content: string): string {
@@ -87,17 +94,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'postId is required.' }, { status: 400 });
     }
 
-    const supabase = getAdminClient();
+    const db = await requireD1ForNoticeBroadcast('main');
 
-    const { data: postRaw, error: postError } = await supabase
-      .from('board_posts')
-      .select('id, title, content, board_type, author_id, scheduled_publish_at')
-      .eq('id', postId)
-      .maybeSingle();
-    if (postError) {
-      return NextResponse.json({ error: '게시글 조회 실패', detail: postError.message }, { status: 500 });
+    // 게시글 조회 — D1 직접
+    let post: BoardPostRow | null = null;
+    try {
+      const rows = await db
+        .select({
+          id: boardPostsTable.id,
+          title: boardPostsTable.title,
+          content: boardPostsTable.content,
+          board_type: boardPostsTable.board_type,
+          author_id: boardPostsTable.author_id,
+          scheduled_publish_at: boardPostsTable.scheduled_publish_at,
+        })
+        .from(boardPostsTable)
+        .where(eq(boardPostsTable.id, postId))
+        .limit(1);
+      post = (rows[0] as BoardPostRow | undefined) ?? null;
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      return NextResponse.json(
+        { error: '게시글 조회 실패', detail },
+        { status: 500 },
+      );
     }
-    const post = postRaw as BoardPostRow | null;
+
     if (!post) {
       return NextResponse.json({ error: '게시글을 찾을 수 없습니다.' }, { status: 404 });
     }
@@ -121,12 +143,20 @@ export async function POST(request: NextRequest) {
     let allowed = isAuthor;
     let sessionStaff: StaffSummary | null = null;
     if (!allowed) {
-      const { data: staffRow } = await supabase
-        .from('staff_members')
-        .select('id, name, role')
-        .eq('id', sessionUserId)
-        .maybeSingle();
-      sessionStaff = (staffRow as StaffSummary | null) || null;
+      try {
+        const rows = await db
+          .select({
+            id: staffMembersTable.id,
+            name: staffMembersTable.name,
+            role: staffMembersTable.role,
+          })
+          .from(staffMembersTable)
+          .where(eq(staffMembersTable.id, sessionUserId))
+          .limit(1);
+        sessionStaff = (rows[0] as StaffSummary | undefined) ?? null;
+      } catch {
+        sessionStaff = null;
+      }
       allowed = isAdminRole(sessionStaff?.role);
     }
     if (!allowed) {
@@ -137,43 +167,44 @@ export async function POST(request: NextRequest) {
     }
 
     if (!sessionStaff) {
-      const { data: staffRow } = await supabase
-        .from('staff_members')
-        .select('id, name, role')
-        .eq('id', sessionUserId)
-        .maybeSingle();
-      sessionStaff = (staffRow as StaffSummary | null) || null;
+      try {
+        const rows = await db
+          .select({
+            id: staffMembersTable.id,
+            name: staffMembersTable.name,
+            role: staffMembersTable.role,
+          })
+          .from(staffMembersTable)
+          .where(eq(staffMembersTable.id, sessionUserId))
+          .limit(1);
+        sessionStaff = (rows[0] as StaffSummary | undefined) ?? null;
+      } catch {
+        sessionStaff = null;
+      }
     }
     const senderName = useAnonymous ? '관리자' : String(sessionStaff?.name || '관리자');
 
-    // 1) 공지 채팅방에 메시지 insert
+    // 1) 공지 채팅방에 메시지 insert — D1 직접
     const chatContent = buildChatContent(boardType, String(post.title || ''), post.content);
-    const { data: insertedMsgRaw, error: msgError } = await supabase
-      .from('messages')
-      .insert([
-        {
-          room_id: NOTICE_ROOM_ID,
-          sender_id: sessionUserId,
-          sender_name: senderName,
-          content: chatContent,
-        },
-      ])
-      .select('id')
-      .single();
-
-    if (msgError || !insertedMsgRaw) {
+    const messageId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    try {
+      await db.insert(messagesTable).values({
+        id: messageId,
+        room_id: NOTICE_ROOM_ID,
+        sender_id: sessionUserId,
+        sender_name: senderName,
+        content: chatContent,
+      });
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
       return NextResponse.json(
         {
           error: '공지 채팅방 메시지 저장에 실패했습니다.',
-          detail: msgError?.message || 'insert returned null',
+          detail,
         },
-        { status: 500 },
-      );
-    }
-    const messageId = String((insertedMsgRaw as { id?: string }).id || '');
-    if (!messageId) {
-      return NextResponse.json(
-        { error: '공지 채팅방 메시지 ID를 확인할 수 없습니다.' },
         { status: 500 },
       );
     }
@@ -181,13 +212,6 @@ export async function POST(request: NextRequest) {
     // 2) 전 직원 알림 행 일괄 insert (board 타입) — D1 직접 사용
     let notificationCount = 0;
     try {
-      const backend = await resolveDataBackend();
-      const d1 = await getD1Binding();
-      if (!d1) {
-        logD1BindingMissing({ label: 'notice-broadcast:staff_lookup', backend });
-        throw new Error('[notice-broadcast] D1 binding not available');
-      }
-      const db = getD1Drizzle(d1);
       const staffList = await db
         .select({ id: staffMembersTable.id })
         .from(staffMembersTable);
@@ -209,6 +233,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 3) 채팅 푸시 디스패치 (전 직원 대상 — chat-push-dispatch가 공지방 폴백 처리)
+    // 본 호출은 Phase 8-I에서 별도 변환 예정 — supabase 인자 생략 시 dispatch 내부에서
+    // admin client를 생성하므로 시그니처 호환 유지.
     let pushResult: Awaited<ReturnType<typeof dispatchChatPushForMessage>> | null = null;
     let pushError: string | null = null;
     try {
@@ -216,7 +242,6 @@ export async function POST(request: NextRequest) {
         roomId: NOTICE_ROOM_ID,
         messageId,
         expectedSenderId: sessionUserId,
-        supabase,
       });
     } catch (err) {
       pushError = String((err as Error)?.message || err);

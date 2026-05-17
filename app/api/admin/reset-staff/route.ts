@@ -1,11 +1,201 @@
 /**
- * 관리자 제외 전 직원 삭제 (RLS 우회)
- * 서버에서 Service Role 키로 삭제하므로 Supabase RLS 정책 없이 동작합니다.
+ * 관리자 제외 전 직원 삭제
+ * D1 binding 직접 사용 — RLS 없이 직접 SQL 실행 (service-role 우회 동등).
+ * Phase 8-F: supabase 의존 제거. 모든 24개 의존 테이블이 D1 schema에 존재함을 확인.
  */
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { SQL } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { isAdminSession, readSessionFromRequest } from '@/lib/server-session';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+  // 의존 테이블 import
+  approvals as approvalsTable,
+  employment_contracts as employmentContractsTable,
+  attendance as attendanceTable,
+  shift_assignments as shiftAssignmentsTable,
+  leave_requests as leaveRequestsTable,
+  staff_certifications as staffCertificationsTable,
+  todos as todosTable,
+  notifications as notificationsTable,
+  handover_notes as handoverNotesTable,
+  pinned_messages as pinnedMessagesTable,
+  message_reactions as messageReactionsTable,
+  message_reads as messageReadsTable,
+  messages as messagesTable,
+  room_notification_settings as roomNotificationSettingsTable,
+  polls as pollsTable,
+  poll_votes as pollVotesTable,
+  chat_rooms as chatRoomsTable,
+  board_post_likes as boardPostLikesTable,
+  board_post_comments as boardPostCommentsTable,
+  board_posts as boardPostsTable,
+  posts as postsTable,
+  document_repository as documentRepositoryTable,
+  audit_logs as auditLogsTable,
+  staff_members as staffMembersTable,
+  // 연산자
+  eq,
+  ne,
+  or,
+  isNull,
+  and,
+  inArray,
+} from '@/lib/db';
+import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
+
+export const dynamic = 'force-dynamic';
+
+// D1 binding 필수
+async function requireD1ForResetStaff(label: string) {
+  const backend = await resolveDataBackend();
+  const d1 = await getD1Binding();
+  if (!d1) {
+    logD1BindingMissing({ label, backend });
+    throw new Error(`[reset-staff] D1 binding not available (${label})`);
+  }
+  return getD1Drizzle(d1);
+}
+
+// 의존 테이블 → (table, where(ids) builder) 매핑
+// inArray bind 한도 가드를 위해 chunk(<=100) 호출
+type DepDeletion = {
+  label: string;
+  delete: (ids: string[]) => Promise<void>;
+};
+
+function buildDeletions(db: ReturnType<typeof getD1Drizzle>): DepDeletion[] {
+  const wrap = <T>(
+    label: string,
+    runner: (chunk: string[]) => Promise<T>,
+  ): DepDeletion => ({
+    label,
+    delete: async (ids) => {
+      const BATCH = 100;
+      for (let i = 0; i < ids.length; i += BATCH) {
+        const chunk = ids.slice(i, i + BATCH);
+        if (chunk.length === 0) continue;
+        await runner(chunk);
+      }
+    },
+  });
+
+  return [
+    // 전자결재
+    wrap('approvals.sender_id', (c) =>
+      db.delete(approvalsTable).where(inArray(approvalsTable.sender_id, c)),
+    ),
+    // 근로계약
+    wrap('employment_contracts.staff_id', (c) =>
+      db
+        .delete(employmentContractsTable)
+        .where(inArray(employmentContractsTable.staff_id, c)),
+    ),
+    // 근태/출퇴근
+    wrap('attendance.staff_id', (c) =>
+      db.delete(attendanceTable).where(inArray(attendanceTable.staff_id, c)),
+    ),
+    wrap('shift_assignments.staff_id', (c) =>
+      db
+        .delete(shiftAssignmentsTable)
+        .where(inArray(shiftAssignmentsTable.staff_id, c)),
+    ),
+    // 휴가
+    wrap('leave_requests.staff_id', (c) =>
+      db
+        .delete(leaveRequestsTable)
+        .where(inArray(leaveRequestsTable.staff_id, c)),
+    ),
+    // 자격면허
+    wrap('staff_certifications.staff_id', (c) =>
+      db
+        .delete(staffCertificationsTable)
+        .where(inArray(staffCertificationsTable.staff_id, c)),
+    ),
+    // 할일
+    wrap('todos.user_id', (c) =>
+      db.delete(todosTable).where(inArray(todosTable.user_id, c)),
+    ),
+    // 알림
+    wrap('notifications.user_id', (c) =>
+      db
+        .delete(notificationsTable)
+        .where(inArray(notificationsTable.user_id, c)),
+    ),
+    // 인수인계
+    wrap('handover_notes.author_id', (c) =>
+      db
+        .delete(handoverNotesTable)
+        .where(inArray(handoverNotesTable.author_id, c)),
+    ),
+    // 채팅
+    wrap('pinned_messages.pinned_by', (c) =>
+      db
+        .delete(pinnedMessagesTable)
+        .where(inArray(pinnedMessagesTable.pinned_by, c)),
+    ),
+    wrap('message_reactions.user_id', (c) =>
+      db
+        .delete(messageReactionsTable)
+        .where(inArray(messageReactionsTable.user_id, c)),
+    ),
+    wrap('message_reads.user_id', (c) =>
+      db
+        .delete(messageReadsTable)
+        .where(inArray(messageReadsTable.user_id, c)),
+    ),
+    wrap('messages.sender_id', (c) =>
+      db.delete(messagesTable).where(inArray(messagesTable.sender_id, c)),
+    ),
+    wrap('room_notification_settings.user_id', (c) =>
+      db
+        .delete(roomNotificationSettingsTable)
+        .where(inArray(roomNotificationSettingsTable.user_id, c)),
+    ),
+    wrap('polls.creator_id', (c) =>
+      db.delete(pollsTable).where(inArray(pollsTable.creator_id, c)),
+    ),
+    wrap('poll_votes.user_id', (c) =>
+      db.delete(pollVotesTable).where(inArray(pollVotesTable.user_id, c)),
+    ),
+    wrap('chat_rooms.created_by', (c) =>
+      db.delete(chatRoomsTable).where(inArray(chatRoomsTable.created_by, c)),
+    ),
+    // 게시판
+    wrap('board_post_likes.user_id', (c) =>
+      db
+        .delete(boardPostLikesTable)
+        .where(inArray(boardPostLikesTable.user_id, c)),
+    ),
+    wrap('board_post_comments.author_id', (c) =>
+      db
+        .delete(boardPostCommentsTable)
+        .where(inArray(boardPostCommentsTable.author_id, c)),
+    ),
+    wrap('board_posts.author_id', (c) =>
+      db
+        .delete(boardPostsTable)
+        .where(inArray(boardPostsTable.author_id, c)),
+    ),
+    wrap('posts.author_id', (c) =>
+      db.delete(postsTable).where(inArray(postsTable.author_id, c)),
+    ),
+    // 문서/감사
+    wrap('document_repository.created_by', (c) =>
+      db
+        .delete(documentRepositoryTable)
+        .where(inArray(documentRepositoryTable.created_by, c)),
+    ),
+    wrap('audit_logs.user_id', (c) =>
+      db.delete(auditLogsTable).where(inArray(auditLogsTable.user_id, c)),
+    ),
+    wrap('audit_logs.target_id', (c) =>
+      db.delete(auditLogsTable).where(inArray(auditLogsTable.target_id, c)),
+    ),
+  ];
+}
 
 export async function POST(req: Request) {
   try {
@@ -14,104 +204,64 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await req.json();
-    const { password } = body || {};
+    const body = await req.json().catch(() => null);
+    const password = (body as { password?: unknown } | null)?.password;
     const resetHash = process.env.RESET_SECRET_HASH;
-    if (!resetHash || !(await bcrypt.compare(password, resetHash))) {
+    if (
+      !resetHash ||
+      typeof password !== 'string' ||
+      !(await bcrypt.compare(password, resetHash))
+    ) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !serviceKey) {
-      return NextResponse.json(
-        { error: '서버 설정 오류: Supabase URL 또는 Service Role Key가 없습니다.' },
-        { status: 500 }
-      );
-    }
+    const db = await requireD1ForResetStaff('staff_lookup');
 
-    const supabase = createClient(supabaseUrl, serviceKey);
+    // 관리자(role='admin') 및 시스템마스터(is_system_master=1)는 항상 제외하고 삭제
+    // D1: boolean is_system_master는 integer(0/1). NULL 또는 0 이면 일반 직원.
+    const condition = and(
+      ne(staffMembersTable.role, 'admin'),
+      or(
+        isNull(staffMembersTable.is_system_master),
+        eq(staffMembersTable.is_system_master, 0),
+      ),
+    ) as SQL<unknown>;
 
-    // 관리자(role='admin') 및 시스템마스터(is_system_master=true)는 항상 제외하고 삭제
-    const { data: toDelete, error: selectErr } = await supabase
-      .from('staff_members')
-      .select('id')
-      .neq('role', 'admin')
-      .or('is_system_master.is.null,is_system_master.eq.false');
+    const toDelete = await db
+      .select({ id: staffMembersTable.id })
+      .from(staffMembersTable)
+      .where(condition);
 
-    if (selectErr) {
-      return NextResponse.json(
-        { error: selectErr.message },
-        { status: 500 }
-      );
-    }
+    const ids = (toDelete ?? [])
+      .map((r) => String(r.id || '').trim())
+      .filter(Boolean);
 
-    if (!toDelete?.length) {
+    if (ids.length === 0) {
       return NextResponse.json({
         deleted: 0,
         message: '삭제할 직원이 없습니다. (관리자만 있음)',
       });
     }
 
-    const ids = toDelete.map((r) => r.id);
-
     // 종속 테이블 데이터 먼저 삭제 (외래키 제약조건 해소)
-    const dependentTables = [
-      // 전자결재
-      { table: 'approvals', column: 'sender_id' },
-      // 근로계약
-      { table: 'employment_contracts', column: 'staff_id' },
-      // 근태/출퇴근
-      { table: 'attendance', column: 'staff_id' },
-      { table: 'shift_assignments', column: 'staff_id' },
-      // 휴가
-      { table: 'leave_requests', column: 'staff_id' },
-      // 자격면허
-      { table: 'staff_certifications', column: 'staff_id' },
-      // 할일
-      { table: 'todos', column: 'user_id' },
-      // 알림
-      { table: 'notifications', column: 'user_id' },
-      // 인수인계
-      { table: 'handover_notes', column: 'author_id' },
-      // 채팅
-      { table: 'pinned_messages', column: 'pinned_by' },
-      { table: 'message_reactions', column: 'user_id' },
-      { table: 'message_reads', column: 'user_id' },
-      { table: 'messages', column: 'sender_id' },
-      { table: 'room_notification_settings', column: 'user_id' },
-      { table: 'polls', column: 'creator_id' },
-      { table: 'poll_votes', column: 'user_id' },
-      { table: 'chat_rooms', column: 'created_by' },
-      // 게시판
-      { table: 'board_post_likes', column: 'user_id' },
-      { table: 'board_post_comments', column: 'author_id' },
-      { table: 'board_posts', column: 'author_id' },
-      { table: 'posts', column: 'author_id' },
-      // 문서/감사
-      { table: 'document_repository', column: 'created_by' },
-      { table: 'audit_logs', column: 'user_id' },
-      { table: 'audit_logs', column: 'target_id' },
-    ];
-
-    const BATCH = 100;
-    for (const dep of dependentTables) {
-      for (let i = 0; i < ids.length; i += BATCH) {
-        const chunk = ids.slice(i, i + BATCH);
-        await supabase.from(dep.table).delete().in(dep.column, chunk);
+    const deletions = buildDeletions(db);
+    for (const dep of deletions) {
+      try {
+        await dep.delete(ids);
+      } catch (err) {
+        // 일부 의존 테이블이 비어 있거나 컬럼 누락이어도 다음 단계 진행
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[reset-staff] ${dep.label} 삭제 실패:`, msg);
       }
     }
 
-    // 직원 데이터 삭제
+    // 직원 데이터 삭제 (chunked)
+    const BATCH = 100;
     for (let i = 0; i < ids.length; i += BATCH) {
       const chunk = ids.slice(i, i + BATCH);
-      const { error } = await supabase.from('staff_members').delete().in('id', chunk);
-      if (error) {
-        return NextResponse.json(
-          { error: error.message },
-          { status: 500 }
-        );
-      }
+      await db
+        .delete(staffMembersTable)
+        .where(inArray(staffMembersTable.id, chunk));
     }
 
     return NextResponse.json({
@@ -120,9 +270,6 @@ export async function POST(req: Request) {
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json(
-      { error: msg },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
