@@ -1,11 +1,18 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import {
   isAdminSession,
   isSystemMasterSession,
   readSessionFromRequest,
 } from '@/lib/server-session';
 import { collectChatPushQueueHealth } from '@/lib/chat-push-health';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+  push_subscriptions as pushSubscriptionsTable,
+  staff_members as staffMembersTable,
+} from '@/lib/db';
+import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 
 export const dynamic = 'force-dynamic';
@@ -16,15 +23,14 @@ type PushSubscriptionRow = {
   endpoint: string | null;
 };
 
-function createAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase service role configuration is missing.');
+async function requireD1ForPushHealth(label: string) {
+  const backend = await resolveDataBackend();
+  const d1 = await getD1Binding();
+  if (!d1) {
+    logD1BindingMissing({ label, backend });
+    throw new Error(`[push-health] D1 binding not available (${label})`);
   }
-
-  return createClient(supabaseUrl, serviceKey);
+  return getD1Drizzle(d1);
 }
 
 function groupDuplicateEndpoints(rows: PushSubscriptionRow[]) {
@@ -53,26 +59,28 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = createAdminClient();
+    // Phase 8-H — admin 진단 read 호출은 D1 binding 직접 사용으로 전환.
+    const queueSummary = await collectChatPushQueueHealth(null);
 
-    const queueSummary = await collectChatPushQueueHealth(supabase);
-
-    const [subscriptionRes, staffRes] = await Promise.all([
-      supabase.from('push_subscriptions').select('id, staff_id, endpoint'),
-      supabase.from('staff_members').select('id'),
+    const db = await requireD1ForPushHealth('push-health:select');
+    const [subscriptionData, staffData] = await Promise.all([
+      db
+        .select({
+          id: pushSubscriptionsTable.id,
+          staff_id: pushSubscriptionsTable.staff_id,
+          endpoint: pushSubscriptionsTable.endpoint,
+        })
+        .from(pushSubscriptionsTable),
+      db.select({ id: staffMembersTable.id }).from(staffMembersTable),
     ]);
 
-    if (subscriptionRes.error) {
-      throw subscriptionRes.error;
-    }
-
-    if (staffRes.error) {
-      throw staffRes.error;
-    }
-
-    const subscriptionRows = (subscriptionRes.data || []) as PushSubscriptionRow[];
+    const subscriptionRows: PushSubscriptionRow[] = subscriptionData.map((row) => ({
+      id: String(row.id || ''),
+      staff_id: row.staff_id ?? null,
+      endpoint: row.endpoint ?? null,
+    }));
     const validStaffIds = new Set(
-      (staffRes.data || []).map((row: { id: string | null }) => String(row.id || '')),
+      staffData.map((row) => String(row.id || '')),
     );
     const duplicateEndpointInfo = groupDuplicateEndpoints(subscriptionRows);
 

@@ -5,6 +5,16 @@ import {
   readAuthorizedDepositUser,
 } from '@/lib/server-deposit-access';
 import { normalizeDepositDraft } from '@/lib/virtual-account-deposits';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+  virtual_account_deposits as virtualAccountDepositsTable,
+  and,
+  eq,
+  desc,
+} from '@/lib/db';
+import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 
 export const dynamic = 'force-dynamic';
@@ -18,6 +28,31 @@ function getAdminClient() {
   }
 
   return createClient(supabaseUrl, serviceKey);
+}
+
+async function requireD1ForDeposits(label: string) {
+  const backend = await resolveDataBackend();
+  const d1 = await getD1Binding();
+  if (!d1) {
+    logD1BindingMissing({ label, backend });
+    throw new Error(`[virtual_account_deposits] D1 binding not available (${label})`);
+  }
+  return getD1Drizzle(d1);
+}
+
+// D1 row → API 응답용 row. raw_payload 는 text(JSON)이므로 파싱해 호출자에게
+// 기존 jsonb 응답과 동일한 형태(객체)로 전달한다.
+function deserializeDepositRow(row: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...row };
+  const raw = next.raw_payload;
+  if (typeof raw === 'string' && raw.length > 0) {
+    try {
+      next.raw_payload = JSON.parse(raw) as unknown;
+    } catch {
+      next.raw_payload = null;
+    }
+  }
+  return next;
 }
 
 function applyTextFilter(rows: Array<Record<string, unknown>>, query: string | null) {
@@ -84,26 +119,32 @@ export async function GET(request: NextRequest) {
     const access = await authorizeDepositRequest(request);
     if (access.response) return access.response;
 
-    const supabase = getAdminClient();
     const url = new URL(request.url);
     const { companyId, isSystemMaster } = access.scope;
-    let query = supabase
-      .from('virtual_account_deposits')
-      .select('*')
-      .order('deposited_at', { ascending: false, nullsFirst: false })
-      .order('created_at', { ascending: false })
+
+    // Phase 8-H — list read 호출 D1 binding 직접 사용.
+    // 기존 .order('deposited_at', { nullsFirst: false }) 동작과 동일하게
+    // NULL 을 뒤로 보내기 위해 SQL CASE 사용.
+    const db = await requireD1ForDeposits('virtual_account_deposits:list');
+    const whereExpr =
+      companyId && !isSystemMaster
+        ? eq(virtualAccountDepositsTable.company_id, companyId)
+        : undefined;
+
+    const baseQuery = db
+      .select()
+      .from(virtualAccountDepositsTable)
+      .orderBy(
+        desc(virtualAccountDepositsTable.deposited_at),
+        desc(virtualAccountDepositsTable.created_at),
+      )
       .limit(300);
 
-    if (companyId && !isSystemMaster) {
-      query = query.eq('company_id', companyId);
-    }
+    const data = whereExpr ? await baseQuery.where(whereExpr) : await baseQuery;
 
-    const { data, error } = await query;
-    if (error) {
-      return NextResponse.json({ error: '입금 목록을 불러오는 중 오류가 발생했습니다.' }, { status: 500 });
-    }
-
-    let rows = (data || []) as Array<Record<string, unknown>>;
+    let rows = (data || []).map((row) =>
+      deserializeDepositRow(row as Record<string, unknown>),
+    );
     rows = applyTextFilter(rows, url.searchParams.get('q'));
     rows = applyStateFilter(rows, 'deposit_status', url.searchParams.get('depositStatus'));
     rows = applyStateFilter(rows, 'match_status', url.searchParams.get('matchStatus'));
@@ -229,21 +270,34 @@ export async function PATCH(request: NextRequest) {
     const supabase = getAdminClient();
     const { companyId, isSystemMaster } = access.scope;
 
-    let existingQuery = supabase
-      .from('virtual_account_deposits')
-      .select('id, company_id')
-      .eq('id', id);
+    // Phase 8-H — existing 조회 read 호출 D1 binding 직접 사용.
+    const db = await requireD1ForDeposits('virtual_account_deposits:patch:existing');
+    const existingWhere =
+      companyId && !isSystemMaster
+        ? and(
+            eq(virtualAccountDepositsTable.id, id),
+            eq(virtualAccountDepositsTable.company_id, companyId),
+          )
+        : eq(virtualAccountDepositsTable.id, id);
 
-    if (companyId && !isSystemMaster) {
-      existingQuery = existingQuery.eq('company_id', companyId);
-    }
-
-    const existing = await existingQuery.limit(1).maybeSingle();
-    if (existing.error) {
+    let existingRow: { id: string | null; company_id: string | null } | null = null;
+    try {
+      const rows = await db
+        .select({
+          id: virtualAccountDepositsTable.id,
+          company_id: virtualAccountDepositsTable.company_id,
+        })
+        .from(virtualAccountDepositsTable)
+        .where(existingWhere)
+        .limit(1);
+      existingRow = rows[0]
+        ? { id: rows[0].id ?? null, company_id: rows[0].company_id ?? null }
+        : null;
+    } catch {
       return NextResponse.json({ error: '입금 내역 조회 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
-    if (!existing.data) {
+    if (!existingRow) {
       return NextResponse.json({ error: '수정할 입금 내역을 찾을 수 없습니다.' }, { status: 404 });
     }
 
