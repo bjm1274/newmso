@@ -31,15 +31,19 @@ const realSupabase: SupabaseClient = createClient(url, key, {
   accessToken: async () => getStoredSupabaseAccessToken(),
 });
 
-// Phase 6-B-3 — 클라이언트(브라우저)에서 DATA_BACKEND='d1'일 때 d1-supabase-compat
-// 으로 자동 라우팅. 서버(Node.js)에서는 항상 realSupabase 사용.
-// 서버는 fetch('/api/d1/...')로 self-call이 무한 루프라 d1Client 사용 금지.
+// Phase 7 — Cloudflare D1 cutover.
+// ENABLE_D1_CLIENT=true 면 클라이언트(브라우저)의 모든 supabase.from() 호출이
+// /api/d1/query (SELECT) 또는 /api/d1/mutate (INSERT/UPDATE/DELETE)로 라우팅됨.
+// 서버(Node.js)에서는 항상 realSupabase 사용 — self-call 무한 루프 방지 + 서버
+// dual-write 헬퍼는 D1 binding을 직접 사용하므로 무관.
 //
 // 100+ 클라이언트 파일이 import 라인 그대로 두고도 D1 백엔드로 동작.
 // 미호환 호출(rpc, channel 등)은 d1Client 안의 fallback이 처리.
-const isClientD1 =
-  typeof window !== 'undefined' &&
-  process.env.NEXT_PUBLIC_DATA_BACKEND === 'd1';
+//
+// 운영 영향 발생 시 (예: 화면 깨짐, 'rpc() not supported' 다발) 이 플래그를
+// false로 되돌리고 재배포로 즉시 롤백.
+const ENABLE_D1_CLIENT = true;
+const isClientD1 = typeof window !== 'undefined' && ENABLE_D1_CLIENT;
 
 export const supabase = (isClientD1
   ? (d1Client as unknown as SupabaseClient)
