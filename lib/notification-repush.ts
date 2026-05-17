@@ -3,6 +3,14 @@ import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push
 import { sendFcmBatch } from '@/lib/fcm-http';
 import { isWithinPushQuietHours } from '@/lib/push-quiet-hours';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+  push_subscriptions as pushSubscriptionsTable,
+  inArray,
+} from '@/lib/db';
+import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 type NotificationRow = {
   id: string;
@@ -337,7 +345,23 @@ export async function processUnreadNotificationRepushServer(
     }
 
     if (expiredSubscriptionIds.length > 0) {
-      await supabase.from('push_subscriptions').delete().in('id', expiredSubscriptionIds);
+      // Phase 8-G — D1 직접 delete. inArray(D1)는 bind 한도(약 100) 이내 청크 분할.
+      try {
+        const backend = await resolveDataBackend();
+        const d1 = await getD1Binding();
+        if (!d1) {
+          logD1BindingMissing({ label: 'notification-repush:push_subscriptions', backend });
+          throw new Error('[notification-repush] D1 binding not available');
+        }
+        const db = getD1Drizzle(d1);
+        const CHUNK = 100;
+        for (let idx = 0; idx < expiredSubscriptionIds.length; idx += CHUNK) {
+          const slice = expiredSubscriptionIds.slice(idx, idx + CHUNK);
+          await db.delete(pushSubscriptionsTable).where(inArray(pushSubscriptionsTable.id, slice));
+        }
+      } catch (err) {
+        errors.push(`${row.id}: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
 
     try {

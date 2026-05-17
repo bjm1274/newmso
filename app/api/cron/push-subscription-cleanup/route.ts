@@ -1,6 +1,25 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { runLicenseExpiryJobs, type LicenseExpiryJobsResult } from '@/lib/license-expiry-jobs';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+  push_subscriptions as pushSubscriptionsTable,
+  staff_members as staffMembersTable,
+  inArray,
+} from '@/lib/db';
+import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
+
+async function requireD1ForCleanup(label: string) {
+  const backend = await resolveDataBackend();
+  const d1 = await getD1Binding();
+  if (!d1) {
+    logD1BindingMissing({ label, backend });
+    throw new Error(`[push-subscription-cleanup] D1 binding not available (${label})`);
+  }
+  return getD1Drizzle(d1);
+}
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -23,17 +42,15 @@ function createAdminClient() {
   return createClient(supabaseUrl, serviceKey);
 }
 
-async function deleteSubscriptionsByIds(
-  supabase: ReturnType<typeof createAdminClient>,
-  ids: string[],
-) {
+async function deleteSubscriptionsByIds(ids: string[]) {
   if (ids.length === 0) return;
 
-  const chunkSize = 200;
+  // Phase 8-G — D1 직접 delete. inArray bind 한도(100)에 맞춰 청크 분할.
+  const db = await requireD1ForCleanup('push_subscriptions:delete');
+  const chunkSize = 100;
   for (let index = 0; index < ids.length; index += chunkSize) {
     const chunk = ids.slice(index, index + chunkSize);
-    const { error } = await supabase.from('push_subscriptions').delete().in('id', chunk);
-    if (error) throw error;
+    await db.delete(pushSubscriptionsTable).where(inArray(pushSubscriptionsTable.id, chunk));
   }
 }
 
@@ -94,26 +111,24 @@ async function cleanupRetentionLogs(supabase: ReturnType<typeof createAdminClien
 }
 
 async function cleanupPushSubscriptions() {
-  const supabase = createAdminClient();
-
-  const [subscriptionRes, staffRes] = await Promise.all([
-    supabase.from('push_subscriptions').select('id, staff_id, endpoint'),
-    supabase.from('staff_members').select('id'),
+  // Phase 8-G — D1 직접 select.
+  const db = await requireD1ForCleanup('cleanup:select');
+  const [subscriptionRows, staffRows] = await Promise.all([
+    db
+      .select({
+        id: pushSubscriptionsTable.id,
+        staff_id: pushSubscriptionsTable.staff_id,
+        endpoint: pushSubscriptionsTable.endpoint,
+      })
+      .from(pushSubscriptionsTable),
+    db.select({ id: staffMembersTable.id }).from(staffMembersTable),
   ]);
 
-  if (subscriptionRes.error) {
-    throw subscriptionRes.error;
-  }
-
-  if (staffRes.error) {
-    throw staffRes.error;
-  }
-
   const validStaffIds = new Set(
-    (staffRes.data || []).map((row: { id: string | null }) => String(row.id || '')),
+    staffRows.map((row) => String(row.id || '')),
   );
 
-  const rows = (subscriptionRes.data || []) as PushSubscriptionRow[];
+  const rows = subscriptionRows as PushSubscriptionRow[];
   const deleteIds = new Set<string>();
   const validRows: PushSubscriptionRow[] = [];
 
@@ -176,7 +191,7 @@ async function cleanupPushSubscriptions() {
     }
   }
 
-  await deleteSubscriptionsByIds(supabase, Array.from(deleteIds));
+  await deleteSubscriptionsByIds(Array.from(deleteIds));
 
   return {
     totalBefore: rows.length,

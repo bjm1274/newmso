@@ -5,7 +5,13 @@ import {
   generateMonthlyPayrollReport,
   notifyRecipients,
 } from '@/lib/auto-report-generator';
-import { mirrorRowsToD1, generated_reports as generatedReportsTable } from '@/lib/db';
+import {
+  generated_reports as generatedReportsTable,
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+} from '@/lib/db';
+import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -55,7 +61,7 @@ export async function GET(request: Request) {
           summary = report.summary;
         }
 
-        // generated_reports에 기록 — Supabase + D1 미러
+        // Phase 8-G — generated_reports D1 직접 INSERT
         const reportRow = {
           schedule_id: schedule.id,
           report_type: reportType,
@@ -63,10 +69,15 @@ export async function GET(request: Request) {
           status: 'completed',
           summary,
         };
-        await supabase.from('generated_reports').insert(reportRow);
-        await mirrorRowsToD1(
-          generatedReportsTable,
-          {
+        {
+          const backend = await resolveDataBackend();
+          const d1 = await getD1Binding();
+          if (!d1) {
+            logD1BindingMissing({ label: 'auto-report:generated_reports', backend });
+            throw new Error('[auto-report] D1 binding not available');
+          }
+          const db = getD1Drizzle(d1);
+          await db.insert(generatedReportsTable).values({
             id: crypto.randomUUID(),
             schedule_id: reportRow.schedule_id,
             report_type: reportRow.report_type,
@@ -74,9 +85,8 @@ export async function GET(request: Request) {
             status: reportRow.status,
             summary: JSON.stringify(reportRow.summary),
             created_at: new Date().toISOString(),
-          },
-          { label: 'generated_reports' },
-        );
+          });
+        }
 
         // 스케줄 last_generated_at 업데이트
         await supabase

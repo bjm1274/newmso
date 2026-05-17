@@ -2,7 +2,42 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { computeCENextDue, getRenewalRule } from '@/lib/license-renewal-policy';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
-import { mirrorNotificationsToD1, type NotificationRow } from './notification-utils';
+import type { NotificationRow } from './notification-utils';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+  notifications as notificationsTable,
+} from './db';
+import { logD1BindingMissing } from './db/mirror-metrics';
+
+// Phase 8-G — notifications 테이블 D1 직접 INSERT 전용 normalizer
+type NotificationsD1Row = typeof notificationsTable.$inferInsert;
+function normalizeNotificationForD1(row: NotificationRow): NotificationsD1Row {
+  return {
+    id: row.id ?? crypto.randomUUID(),
+    user_id: row.user_id ?? null,
+    type: row.type ?? null,
+    title: row.title ?? null,
+    body: row.body ?? null,
+    metadata:
+      row.metadata === null || row.metadata === undefined
+        ? null
+        : JSON.stringify(row.metadata),
+    read_at: row.read_at ?? null,
+    created_at: row.created_at ?? new Date().toISOString(),
+  };
+}
+
+async function requireD1ForLicenseJobs(label: string) {
+  const backend = await resolveDataBackend();
+  const d1 = await getD1Binding();
+  if (!d1) {
+    logD1BindingMissing({ label, backend });
+    throw new Error(`[license-expiry-jobs] D1 binding not available (${label})`);
+  }
+  return getD1Drizzle(d1);
+}
 
 // 만료 N일 전 — milestone(단계) 정의
 // 같은 단계 알림은 metadata.milestone으로 중복 발송 방지
@@ -160,16 +195,20 @@ export async function processLicenseExpiry(supabase: SupabaseClient): Promise<Li
 
   const errors: string[] = [];
   let sent = 0;
+  // Phase 8-G — D1 직접 INSERT. D1 max bind 100 한도 고려해 chunkSize=100 유지.
+  // notifications 컬럼이 ~8개라 100*8=800 bind로 한 statement 한도(약 999) 이내.
+  const db = await requireD1ForLicenseJobs('processLicenseExpiry');
   const chunkSize = 100;
   for (let i = 0; i < toInsert.length; i += chunkSize) {
     const chunk = toInsert.slice(i, i + chunkSize);
-    const { error } = await supabase.from('notifications').insert(chunk);
-    await mirrorNotificationsToD1(chunk as NotificationRow[]);
-    if (error) {
-      errors.push(error.message);
+    try {
+      const values = (chunk as NotificationRow[]).map(normalizeNotificationForD1);
+      await db.insert(notificationsTable).values(values);
+      sent += chunk.length;
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : String(err));
       continue;
     }
-    sent += chunk.length;
   }
 
   return {
@@ -301,16 +340,19 @@ export async function processCEDue(supabase: SupabaseClient): Promise<LicenseExp
 
   const errors: string[] = [];
   let sent = 0;
+  // Phase 8-G — D1 직접 INSERT, chunkSize 100 유지 (bind 한도 가드)
+  const db = await requireD1ForLicenseJobs('processCEDue');
   const chunkSize = 100;
   for (let i = 0; i < toInsert.length; i += chunkSize) {
     const chunk = toInsert.slice(i, i + chunkSize);
-    const { error: insErr } = await supabase.from('notifications').insert(chunk);
-    await mirrorNotificationsToD1(chunk as NotificationRow[]);
-    if (insErr) {
-      errors.push(insErr.message);
+    try {
+      const values = (chunk as NotificationRow[]).map(normalizeNotificationForD1);
+      await db.insert(notificationsTable).values(values);
+      sent += chunk.length;
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : String(err));
       continue;
     }
-    sent += chunk.length;
   }
 
   return {

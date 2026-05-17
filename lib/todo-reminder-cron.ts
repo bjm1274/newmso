@@ -1,7 +1,42 @@
 import { createHash } from 'node:crypto';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { mirrorNotificationsToD1, type NotificationRow } from './notification-utils';
-import { mirrorRowsToD1, todo_reminder_logs as todoReminderLogsTable } from './db';
+import type { NotificationRow } from './notification-utils';
+import {
+  todo_reminder_logs as todoReminderLogsTable,
+  notifications as notificationsTable,
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+} from './db';
+import { logD1BindingMissing } from './db/mirror-metrics';
+
+// Phase 8-G — notifications/todo_reminder_logs D1 직접 사용 헬퍼
+type NotificationsD1Row = typeof notificationsTable.$inferInsert;
+function normalizeNotificationForD1(row: NotificationRow): NotificationsD1Row {
+  return {
+    id: row.id ?? crypto.randomUUID(),
+    user_id: row.user_id ?? null,
+    type: row.type ?? null,
+    title: row.title ?? null,
+    body: row.body ?? null,
+    metadata:
+      row.metadata === null || row.metadata === undefined
+        ? null
+        : JSON.stringify(row.metadata),
+    read_at: row.read_at ?? null,
+    created_at: row.created_at ?? new Date().toISOString(),
+  };
+}
+
+async function requireD1ForTodoReminder(label: string) {
+  const backend = await resolveDataBackend();
+  const d1 = await getD1Binding();
+  if (!d1) {
+    logD1BindingMissing({ label, backend });
+    throw new Error(`[todo-reminder-cron] D1 binding not available (${label})`);
+  }
+  return getD1Drizzle(d1);
+}
 
 type DueTodoRow = {
   id: string | number;
@@ -132,54 +167,46 @@ export async function processDueTodoRemindersServer(
     const notificationId = buildDeterministicNotificationId(userId, dedupeKey);
     const body = buildReminderBody(todo);
 
-    const { error: notificationError } = await supabase.from('notifications').insert([
-      {
-        id: notificationId,
-        user_id: userId,
+    const notificationRow: NotificationRow = {
+      id: notificationId,
+      user_id: userId,
+      type: 'todo',
+      title: '할 일 리마인더',
+      body,
+      metadata: {
         type: 'todo',
-        title: '할 일 리마인더',
-        body,
-        metadata: {
-          type: 'todo',
-          todo_id: todoId,
-          task_date: todo.task_date || null,
-          reminder_at: reminderAt,
-          dedupe_key: dedupeKey,
-        },
-        read_at: null,
-        created_at: nowIso,
+        todo_id: todoId,
+        task_date: todo.task_date || null,
+        reminder_at: reminderAt,
+        dedupe_key: dedupeKey,
       },
-    ]);
-    await mirrorNotificationsToD1([
-      {
-        id: notificationId,
-        user_id: userId,
-        type: 'todo',
-        title: '할 일 리마인더',
-        body,
-        metadata: {
-          type: 'todo',
-          todo_id: todoId,
-          task_date: todo.task_date || null,
-          reminder_at: reminderAt,
-          dedupe_key: dedupeKey,
-        },
-        read_at: null,
-        created_at: nowIso,
-      },
-    ] as NotificationRow[]);
+      read_at: null,
+      created_at: nowIso,
+    };
 
-    const duplicateNotification =
-      Boolean(notificationError) &&
-      (String((notificationError as { code?: string } | null)?.code || '') === '23505' ||
-        /duplicate key|unique constraint/i.test(
-          String((notificationError as { message?: string } | null)?.message || '')
-        ));
+    // Phase 8-G — D1 직접 INSERT. notification id가 결정적이므로
+    // onConflictDoNothing 결과(returning) 길이로 중복 여부 판정.
+    let duplicateNotification = false;
+    let notificationInsertFailed = false;
+    let notificationErrorMessage = '';
+    try {
+      const db = await requireD1ForTodoReminder('notifications:insert');
+      const result = await db
+        .insert(notificationsTable)
+        .values(normalizeNotificationForD1(notificationRow))
+        .onConflictDoNothing()
+        .returning({ id: notificationsTable.id });
+      if (result.length === 0) duplicateNotification = true;
+    } catch (err) {
+      notificationInsertFailed = true;
+      notificationErrorMessage = err instanceof Error ? err.message : String(err);
+    }
 
-    if (notificationError && !duplicateNotification) {
+    if (notificationInsertFailed) {
       failed += 1;
-      errors.push(`${todoId}: ${String(notificationError.message || notificationError)}`);
+      errors.push(`${todoId}: ${notificationErrorMessage}`);
       const failedLogRow = {
+        id: crypto.randomUUID(),
         todo_id: todoId,
         user_id: userId,
         reminder_at: reminderAt,
@@ -188,20 +215,26 @@ export async function processDueTodoRemindersServer(
         title: '할 일 리마인더',
         body: String(todo.content || '할 일'),
       };
-      await supabase.from('todo_reminder_logs').upsert(
-        [failedLogRow],
-        { onConflict: 'user_id,todo_id,reminder_at' }
-      );
-      // D1 미러 — unique index(user_id, todo_id, reminder_at)로 idempotent
-      await mirrorRowsToD1(
-        todoReminderLogsTable,
-        { id: crypto.randomUUID(), ...failedLogRow },
-        { label: 'todo_reminder_logs', onConflict: 'do_nothing' }
-      );
+      try {
+        const db = await requireD1ForTodoReminder('todo_reminder_logs:failed-upsert');
+        await db
+          .insert(todoReminderLogsTable)
+          .values(failedLogRow)
+          .onConflictDoNothing({
+            target: [
+              todoReminderLogsTable.user_id,
+              todoReminderLogsTable.todo_id,
+              todoReminderLogsTable.reminder_at,
+            ],
+          });
+      } catch (logErr) {
+        errors.push(`${todoId}: ${logErr instanceof Error ? logErr.message : String(logErr)}`);
+      }
       continue;
     }
 
     const sentLogRow = {
+      id: crypto.randomUUID(),
       todo_id: todoId,
       user_id: userId,
       reminder_at: reminderAt,
@@ -210,15 +243,21 @@ export async function processDueTodoRemindersServer(
       title: '할 일 리마인더',
       body: String(todo.content || '할 일'),
     };
-    await supabase.from('todo_reminder_logs').upsert(
-      [sentLogRow],
-      { onConflict: 'user_id,todo_id,reminder_at' }
-    );
-    await mirrorRowsToD1(
-      todoReminderLogsTable,
-      { id: crypto.randomUUID(), ...sentLogRow },
-      { label: 'todo_reminder_logs', onConflict: 'do_nothing' }
-    );
+    try {
+      const db = await requireD1ForTodoReminder('todo_reminder_logs:sent-upsert');
+      await db
+        .insert(todoReminderLogsTable)
+        .values(sentLogRow)
+        .onConflictDoNothing({
+          target: [
+            todoReminderLogsTable.user_id,
+            todoReminderLogsTable.todo_id,
+            todoReminderLogsTable.reminder_at,
+          ],
+        });
+    } catch (logErr) {
+      errors.push(`${todoId}: ${logErr instanceof Error ? logErr.message : String(logErr)}`);
+    }
 
     loggedKeys.add(logKey);
     if (duplicateNotification) {
