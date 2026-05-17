@@ -61,6 +61,26 @@ npx wrangler d1 execute pchos-d1 --command="SELECT COUNT(*) FROM notifications" 
 > 측 테이블이 아직 없어 backfill 대상에서 제외. Supabase에 생성된 뒤
 > [tables.mjs](./tables.mjs)에 항목 복원하면 된다.
 
+## 부모(FK 참조) 테이블 — 1회성 backfill 필수
+
+dual-write 적용 테이블의 FK 참조를 만족시키려면 다음 부모 테이블을
+**자식 테이블보다 먼저** import해야 한다. 이들은 dual-write 대상이
+아니므로 cutover 후 변경분은 D1에 sync 안 된다. 그래서 cutover 직전
+다시 backfill하는 운영 규약이 필요.
+
+| 부모 테이블 | 비고 |
+|---|---|
+| companies | leave_policy/payment_day 등 단순 컬럼 |
+| staff_members | permissions jsonb→text, is_system_master 0/1 |
+| chat_rooms | members/member_ids jsonb→text |
+| approvals | meta_data/approver_line/approval_line jsonb→text |
+
+적용 순서: `companies → staff_members → chat_rooms → approvals → (자식 15개)`
+
+이 순서는 `BACKFILL_ORDER_PARENTS`/`BACKFILL_ORDER_CHILDREN` 상수로
+[tables.mjs](./tables.mjs) 마지막에 export. dump/적용 스크립트가
+사용한다.
+
 자세한 컬럼/변환 정의는 [tables.mjs](./tables.mjs) 참고.
 
 ## 변환 규칙

@@ -34,12 +34,23 @@ chat_rooms (server delete만 일부), work_shifts, inventory
 
 ### 1.2 D1 스키마 준비
 
-- [x] `lib/db/migrations/0000_lovely_alice.sql` 136 테이블 적용
-- [x] `0001_unique_indexes_for_upsert.sql` 적용 (attendance 등 4개 unique)
-- [x] `0002_payroll_records_unique.sql` 적용 (payroll_records 복합 unique)
-- [ ] 위 마이그레이션이 **production D1**(`pchos-d1`,
-      `e6e054c7-2bba-4a97-a740-b39a42906a74`)에 모두 적용됐는지 확인:
-  ```bash
+production D1에 실제로 적용해야 하는 SQL은 `scripts/migrate-d1/output/d1_schema_final.sql`
+이다. `lib/db/migrations/0000_lovely_alice.sql`은 Drizzle ORM이 schema.ts와
+매칭하기 위한 introspect 산출물로 통째로 주석 처리되어 있어 직접 실행하면
+"SQL code did not contain a statement"로 실패한다.
+
+적용 순서 (이미 production에 적용됐다면 IF NOT EXISTS라 멱등):
+```powershell
+npx wrangler d1 execute pchos-d1 --remote --file=scripts\migrate-d1\output\d1_schema_final.sql
+npx wrangler d1 execute pchos-d1 --remote --file=lib\db\migrations\0001_unique_indexes_for_upsert.sql
+npx wrangler d1 execute pchos-d1 --remote --file=lib\db\migrations\0002_payroll_records_unique.sql
+```
+
+- [x] `d1_schema_final.sql` 314 commands (136 테이블 / 177 인덱스)
+- [x] `0001_unique_indexes_for_upsert.sql` 4 commands (attendance 등 4개 unique)
+- [x] `0002_payroll_records_unique.sql` 1 command (payroll_records 복합 unique)
+- [ ] production D1에 모두 적용됐는지 확인:
+  ```powershell
   npx wrangler d1 execute pchos-d1 --remote --command="SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%';"
   ```
 
@@ -72,13 +83,39 @@ node scripts/backfill-d1/dump.mjs --table notifications
 
 ### 2.2 SQL 파일 생성
 
+부모 4개(companies, work_shifts, staff_members, chat_rooms, approvals)는 자식보다
+먼저 적용해야 한다. dual-write 적용 안 됐지만 FK 만족용 1회성 backfill.
+
+큰 jsonb 컬럼이 있는 테이블(staff_members, approvals, payroll_records, audit_logs)은
+`--chunk 10`, 매우 큰 metadata가 섞인 notifications는 `--chunk 1`이 필요하다.
+나머지는 기본 200. D1 단일 SQL statement 한도는 ~100KB.
+
+PowerShell 예시:
+```powershell
+New-Item -ItemType Directory -Path tmp\backfill -Force | Out-Null
+
+# 기본 chunk=200으로 dump
+$tables = 'companies','work_shifts','staff_members','chat_rooms','approvals','system_settings','generated_reports','todo_reminder_logs','staff_transfer_history','org_teams','official_doc_log','certificate_issuances','attendance','attendance_corrections','attendances','push_subscriptions','payroll_records','audit_logs','messages','notifications'
+foreach ($t in $tables) {
+  node scripts/backfill-d1/dump.mjs --table $t --output "tmp\backfill\$t.sql" --chunk 200
+}
+
+# jsonb 큰 테이블만 chunk 축소 재dump
+node scripts/backfill-d1/dump.mjs --table staff_members  --output tmp\backfill\staff_members.sql  --chunk 10
+node scripts/backfill-d1/dump.mjs --table approvals      --output tmp\backfill\approvals.sql      --chunk 10
+node scripts/backfill-d1/dump.mjs --table payroll_records --output tmp\backfill\payroll_records.sql --chunk 10
+node scripts/backfill-d1/dump.mjs --table audit_logs     --output tmp\backfill\audit_logs.sql     --chunk 10
+node scripts/backfill-d1/dump.mjs --table notifications  --output tmp\backfill\notifications.sql  --chunk 1
+```
+
+(legacy bash 예시 — 위 PowerShell 권장)
 ```bash
 mkdir -p tmp/backfill
 for t in system_settings org_teams notifications audit_logs \
          todo_reminder_logs generated_reports official_doc_log \
          attendance attendances attendance_corrections \
          staff_transfer_history certificate_issuances \
-         roster_policy_settings messages payroll_records \
+         messages payroll_records \
          push_subscriptions; do
   node scripts/backfill-d1/dump.mjs --table "$t" \
     --output "tmp/backfill/$t.sql" --chunk 200 || break
@@ -87,25 +124,45 @@ done
 
 ### 2.3 로컬 적용 + 카운트 검증
 
-```bash
-# 로컬 D1에 먼저 (sandbox)
-for f in tmp/backfill/*.sql; do
-  npx wrangler d1 execute pchos-d1 --file="$f" --local || break
-done
+부모 → 자식 순서 준수.
 
-# 로컬 row count
-npx wrangler d1 execute pchos-d1 --local \
-  --command="SELECT 'notifications' AS t, COUNT(*) FROM notifications UNION ALL SELECT 'audit_logs', COUNT(*) FROM audit_logs;"
+```powershell
+# 로컬 D1 sandbox 초기화 (production 무관)
+Remove-Item -Recurse -Force .wrangler\state\v3\d1 -ErrorAction SilentlyContinue
+
+# schema 적용
+npx wrangler d1 execute pchos-d1 --local --file=scripts\migrate-d1\output\d1_schema_final.sql
+npx wrangler d1 execute pchos-d1 --local --file=lib\db\migrations\0001_unique_indexes_for_upsert.sql
+npx wrangler d1 execute pchos-d1 --local --file=lib\db\migrations\0002_payroll_records_unique.sql
+
+# backfill 적용 (부모 5개 → 자식 15개)
+$order = 'companies','work_shifts','staff_members','chat_rooms','approvals','system_settings','generated_reports','todo_reminder_logs','staff_transfer_history','org_teams','official_doc_log','certificate_issuances','attendance','attendance_corrections','attendances','push_subscriptions','payroll_records','audit_logs','messages','notifications'
+foreach ($name in $order) {
+  npx wrangler d1 execute pchos-d1 --file="tmp\backfill\$name.sql" --local
+  if ($LASTEXITCODE -ne 0) { Write-Host "FAILED on $name"; break }
+}
+
+# row count (D1 compound SELECT 한도 작아 테이블 하나씩)
+foreach ($t in $order) {
+  Write-Host "--- $t"
+  npx wrangler d1 execute pchos-d1 --local --command="SELECT COUNT(*) FROM $t;"
+}
 ```
 
 ### 2.4 production D1 적용
 
-```bash
-# 한 테이블씩, 결과 확인하며 진행
-npx wrangler d1 execute pchos-d1 --remote --file=tmp/backfill/system_settings.sql
-npx wrangler d1 execute pchos-d1 --remote \
-  --command="SELECT COUNT(*) FROM system_settings;"
+로컬 검증이 끝나면 동일 SQL 파일을 `--remote`로 적용. 부모 → 자식 순서.
+
+```powershell
+$order = 'companies','work_shifts','staff_members','chat_rooms','approvals','system_settings','generated_reports','todo_reminder_logs','staff_transfer_history','org_teams','official_doc_log','certificate_issuances','attendance','attendance_corrections','attendances','push_subscriptions','payroll_records','audit_logs','messages','notifications'
+foreach ($name in $order) {
+  Write-Host "--- $name"
+  npx wrangler d1 execute pchos-d1 --file="tmp\backfill\$name.sql" --remote
+  if ($LASTEXITCODE -ne 0) { Write-Host "FAILED on $name"; break }
+}
 ```
+
+> Production 적용 전 `npx wrangler login` 필요. 한 번 인증되면 세션 유지.
 
 ### 2.5 Supabase ↔ D1 row count 비교
 
