@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { bindPageRefresh } from '@/lib/realtime-maintenance';
 import { supabase } from '@/lib/supabase';
+import { subscribeRealtime, subscribeRealtimeBatched } from '@/lib/realtime-bus';
 import { toast } from '@/lib/toast';
 import type { ChatMessage, ChatRoom } from '@/types';
 import { bindMockChatMessageInsert } from './메신저테스트이벤트';
@@ -235,101 +236,33 @@ export function useChatRealtimeSubscriptions({
     };
   }, [globalRealtimeRetryTimerRef, roomRealtimeRetryTimerRef]);
 
+  // Phase 5-C-2 — presence 채널 비활성화.
+  // polling으로는 즉각적 online/offline 추적 불가. presence 표시는 사라짐.
+  // (UI는 빈 presenceMap을 받아 자동으로 표시 안 됨)
   useEffect(() => {
-    if (!(effectiveChatUserId || userId)) return;
+    setPresenceMap({});
+  }, [setPresenceMap]);
 
-    const channel = supabase.channel('chat-presence-hub', {
-      config: { presence: { key: String(effectiveChatUserId || userId) } },
-    });
-
-    const syncPresence = () => {
-      const next: Record<string, PresenceInfo> = {};
-      const state = channel.presenceState();
-      Object.values(state).forEach((entries: unknown[]) => {
-        if (!Array.isArray(entries) || entries.length === 0) return;
-        const latest = entries[entries.length - 1] as Partial<PresenceInfo>;
-        if (!latest?.userId) return;
-        next[String(latest.userId)] = {
-          userId: String(latest.userId),
-          name: latest.name || 'Unknown',
-          roomId: latest.roomId || null,
-          onlineAt: latest.onlineAt || new Date().toISOString(),
-        };
-      });
-      setPresenceMap(next);
-    };
-
-    channel
-      .on('presence', { event: 'sync' }, syncPresence)
-      .subscribe(async (status: string) => {
-        if (status !== 'SUBSCRIBED') return;
-        presenceChannelRef.current = channel;
-        await channel.track({
-          userId: String(effectiveChatUserId || userId),
-          name: userName || 'Unknown',
-          roomId: selectedRoomId || null,
-          onlineAt: new Date().toISOString(),
-        });
-      });
-
-    return () => {
-      if (presenceChannelRef.current === channel) {
-        presenceChannelRef.current = null;
-      }
-      supabase.removeChannel(channel);
-    };
-  }, [effectiveChatUserId, presenceChannelRef, selectedRoomId, setPresenceMap, userId, userName]);
-
-  useEffect(() => {
-    if (!presenceChannelRef.current || !(effectiveChatUserId || userId)) return;
-    presenceChannelRef.current.track({
-      userId: String(effectiveChatUserId || userId),
-      name: userName || 'Unknown',
-      roomId: selectedRoomId || null,
-      onlineAt: new Date().toISOString(),
-    });
-  }, [selectedRoomId, effectiveChatUserId, userId, userName, presenceChannelRef]);
-
+  // Phase 5-C-3 — global messages 채널 → polling.
+  // 모든 방의 messages 변경 감지 시 fetchData refresh.
+  // payload 기반 increment 처리 불가 → 콜백에서 메시지 재조회.
   useEffect(() => {
     if (!userId) return;
-    let disposed = false;
-    setGlobalRealtimeState((prev) => (prev === 'connected' ? prev : 'connecting'));
-    const channel = supabase
-      .channel('chat-global-messages')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
-        async (payload: Record<string, unknown>) => {
-          const message = payload.new as ChatMessage;
-          if (!message) return;
-          await handleIncomingRealtimeMessage(message);
-        }
-      )
-      .subscribe((status: string) => {
-        if (disposed) return;
-        if (status === 'SUBSCRIBED') {
-          globalRealtimeHealthyRef.current = true;
-          setGlobalRealtimeState('connected');
-          return;
-        }
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          globalRealtimeHealthyRef.current = false;
-          setGlobalRealtimeState('reconnecting');
-          scheduleRealtimeReconnect('global');
-          return;
-        }
-        if (status === 'CLOSED') {
-          globalRealtimeHealthyRef.current = false;
-          setGlobalRealtimeState('reconnecting');
-        }
-      });
-
+    setGlobalRealtimeState('connected');
+    globalRealtimeHealthyRef.current = true;
+    const unsubscribe = subscribeRealtime(
+      'chat-global-messages',
+      [{ table: 'messages' }],
+      () => {
+        void fetchDataLatestRef.current({ force: true });
+      },
+      { pollIntervalMs: 3000 },
+    );
     return () => {
-      disposed = true;
       globalRealtimeHealthyRef.current = false;
-      supabase.removeChannel(channel);
+      unsubscribe();
     };
-  }, [globalRealtimeRetryToken, handleIncomingRealtimeMessage, scheduleRealtimeReconnect, setGlobalRealtimeState, userId]);
+  }, [globalRealtimeRetryToken, setGlobalRealtimeState, userId]);
 
   useEffect(() => {
     if (!selectedRoomId) {
@@ -361,69 +294,57 @@ export function useChatRealtimeSubscriptions({
       void fetchDataLatestRef.current();
     }
 
-    const channel = supabase.channel(`chat-realtime-${selectedRoomId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, (payload: Record<string, unknown>) => {
-        const row = payload.new as ChatMessage;
-        if (!row?.id) return;
-        void handleIncomingRealtimeMessageRef.current(row);
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, triggerDebouncedMessageFetch)
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, triggerDebouncedMessageFetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'room_read_cursors' }, (payload: Record<string, unknown>) => {
-        const updatedRow =
-          (payload.new as Record<string, unknown> | null) ||
-          (payload.old as Record<string, unknown> | null) ||
-          null;
-        const updatedRoomId = String(updatedRow?.room_id || '').trim();
-        if (!updatedRoomId) return;
-        // 현재 열린 대화방의 커서 변경(타인)은 fetchData로 읽음수 즉시 갱신
-        if (isRoomInSelectedConversationRef.current(updatedRoomId, chatRoomsRef.current)) {
-          const updatedUserId = updatedRow?.user_id;
-          // 내 자신의 커서 변경은 무시 (이미 setRoomUnreadCounts로 처리됨)
-          if (updatedUserId && String(updatedUserId) === String(effectiveChatUserId || '')) return;
-          applyReadCursorFromRealtimeRef.current?.(updatedRow);
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, () => {
-        triggerDebouncedMetadataRefresh(refreshVisibleMessageReactionsRef.current);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_bookmarks', filter: `user_id=eq.${effectiveTodoUserId || userId}` }, () => {
-        triggerDebouncedMetadataRefresh(refreshVisibleMessageBookmarksRef.current);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pinned_messages' }, () => {
-        triggerDebouncedMetadataRefresh(refreshRoomPinnedMessagesRef.current);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'polls' }, () => {
-        triggerDebouncedMetadataRefresh(refreshRoomPollsRef.current);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, () => {
-        triggerDebouncedMetadataRefresh(refreshRoomPollsRef.current);
-      })
-      .subscribe((status: string) => {
+    // Phase 5-C-3 — room realtime 채널 → polling.
+    // tail endpoint는 room별 filter를 지원하지 않으므로 messages 전체 변경 감지
+    // (다른 방 변경에도 반응하나 fetchDataLatestRef.current가 selectedRoomId 기준이라 무해).
+    // 메시지/메타 테이블 변경 감지 시 해당 refresh 함수 호출.
+    roomRealtimeHealthyRef.current = true;
+    setRoomRealtimeState('connected');
+    const unsubscribe = subscribeRealtimeBatched(
+      `chat-realtime-${selectedRoomId}`,
+      [
+        { table: 'messages' },
+        { table: 'room_read_cursors' },
+        { table: 'message_reactions' },
+        { table: 'message_bookmarks' },
+        { table: 'pinned_messages' },
+        { table: 'polls' },
+        { table: 'poll_votes' },
+      ],
+      (payloads) => {
         if (disposed) return;
-        if (status === 'SUBSCRIBED') {
-          roomRealtimeHealthyRef.current = true;
-          setRoomRealtimeState('connected');
-          return;
+        const tables = new Set(
+          payloads.map((p) => String((p as { table?: string }).table || '')),
+        );
+        if (tables.has('messages')) {
+          triggerDebouncedMessageFetch();
         }
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          roomRealtimeHealthyRef.current = false;
-          setRoomRealtimeState('reconnecting');
-          scheduleRealtimeReconnect('room');
-          return;
+        if (tables.has('room_read_cursors')) {
+          // payload 기반 detailed 처리 불가 → fetchData로 일괄 갱신
+          triggerDebouncedMessageFetch();
         }
-        if (status === 'CLOSED') {
-          roomRealtimeHealthyRef.current = false;
-          setRoomRealtimeState('reconnecting');
+        if (tables.has('message_reactions')) {
+          triggerDebouncedMetadataRefresh(refreshVisibleMessageReactionsRef.current);
         }
-      });
+        if (tables.has('message_bookmarks')) {
+          triggerDebouncedMetadataRefresh(refreshVisibleMessageBookmarksRef.current);
+        }
+        if (tables.has('pinned_messages')) {
+          triggerDebouncedMetadataRefresh(refreshRoomPinnedMessagesRef.current);
+        }
+        if (tables.has('polls') || tables.has('poll_votes')) {
+          triggerDebouncedMetadataRefresh(refreshRoomPollsRef.current);
+        }
+      },
+      { pollIntervalMs: 1500 },
+    );
 
     return () => {
       disposed = true;
       roomRealtimeHealthyRef.current = false;
       if (messageRefreshTimeoutId) clearTimeout(messageRefreshTimeoutId);
       if (metadataRefreshTimeoutId) clearTimeout(metadataRefreshTimeoutId);
-      supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, [
     selectedRoomId,
@@ -437,57 +358,13 @@ export function useChatRealtimeSubscriptions({
   ]);
 
   useEffect(() => {
+    // Phase 5-C-2 — typing 채널 비활성화 (broadcast는 polling으로 대체 불가).
+    // 타이핑 표시 UI는 빈 typingUsers를 받아 자동으로 안 보임.
     if (!selectedRoomId) {
       setTypingUsers({});
-      if (typingChannelRef.current) {
-        supabase.removeChannel(typingChannelRef.current);
-        typingChannelRef.current = null;
-      }
       return;
     }
-
-    const channel = supabase.channel(`chat-typing-${selectedRoomId}`);
-    typingChannelRef.current = channel;
-
-    channel
-      .on('broadcast', { event: 'typing' }, ({ payload }: { payload: Record<string, unknown> }) => {
-        if (!payload || payload.roomId !== selectedRoomId || payload.userId === String(effectiveChatUserId || userId || '')) return;
-
-        const peerId = String(payload.userId);
-        if (typingPeersTimeoutRef.current[peerId]) {
-          clearTimeout(typingPeersTimeoutRef.current[peerId]);
-          delete typingPeersTimeoutRef.current[peerId];
-        }
-
-        if (!payload.isTyping) {
-          setTypingUsers((prev) => {
-            const next = { ...prev };
-            delete next[peerId];
-            return next;
-          });
-          return;
-        }
-
-        setTypingUsers((prev) => ({
-          ...prev,
-          [peerId]: (payload.name as string) || 'Unknown',
-        }));
-
-        typingPeersTimeoutRef.current[peerId] = setTimeout(() => {
-          setTypingUsers((prev) => {
-            const next = { ...prev };
-            delete next[peerId];
-            return next;
-          });
-          delete typingPeersTimeoutRef.current[peerId];
-        }, 2500);
-      })
-      .subscribe((status: string) => {
-        if (status === 'SUBSCRIBED') {
-          emitTypingState(false);
-        }
-      });
-
+    setTypingUsers({});
     return () => {
       if (typingClearRef.current) {
         clearTimeout(typingClearRef.current);
@@ -496,18 +373,10 @@ export function useChatRealtimeSubscriptions({
       Object.values(typingPeersTimeoutRef.current).forEach((timer) => clearTimeout(timer));
       typingPeersTimeoutRef.current = {};
       setTypingUsers({});
-      if (typingChannelRef.current === channel) {
-        typingChannelRef.current = null;
-      }
-      supabase.removeChannel(channel);
     };
   }, [
     selectedRoomId,
-    effectiveChatUserId,
-    userId,
-    emitTypingState,
     setTypingUsers,
-    typingChannelRef,
     typingClearRef,
     typingPeersTimeoutRef,
   ]);
