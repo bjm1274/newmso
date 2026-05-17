@@ -4,24 +4,28 @@
 //
 // 권한: 로그인 사용자
 // 동작:
-//   1) body.id가 있으면: Supabase upsert (id 충돌 시 name/type/members
-//      update). NOTICE/SELF 방 idempotent 처리에 사용.
-//   2) body.id가 없으면: Supabase insert (id 자동 생성, created_by는
+//   1) body.id가 있으면: D1 insert + onConflictDoUpdate (NOTICE/SELF 방
+//      같은 fixed-id 케이스 idempotent 처리)
+//   2) body.id가 없으면: D1 insert with crypto.randomUUID() (created_by는
 //      세션 user.id)
-//   3) D1 미러 — members/member_ids jsonb → text 변환
+//   3) D1 drizzle .returning() 으로 클라이언트 호환 row 반환
 //
-// Phase 2.11 — 클라이언트 supabase.from('chat_rooms').insert/update
-// 호출 제거를 위한 신규 라우트
+// Phase 8-E — service-role supabase 의존 제거. chat_rooms 쓰기는 D1을
+// primary 로 한다 (RLS 우회 자동). 외부 시그니처(createOrUpsertChatRoom)는
+// 변경 없음.
+// members/member_ids 는 jsonb → text(JSON.stringify) 변환.
 // ============================================================
 import { NextResponse } from 'next/server';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
 import {
-  mirrorRowsToD1,
   chat_rooms as chatRoomsTable,
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
   sql,
 } from '@/lib/db';
+import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,9 +40,6 @@ const PayloadSchema = z.object({
 
 type ChatRoomPayload = z.infer<typeof PayloadSchema>;
 
-const SELECT_FIELDS =
-  'id, name, type, members, created_by, created_at, last_message_at, last_message, last_message_preview, member_ids, is_announcement';
-
 function userId(user: SessionUser | null | undefined): string | null {
   if (!user) return null;
   const candidate = (user.id ?? user.user_id ?? '') as string;
@@ -46,66 +47,57 @@ function userId(user: SessionUser | null | undefined): string | null {
   return trimmed || null;
 }
 
-function createAdminClient(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase server configuration is missing.');
-  return createClient(url, key);
+// D1 binding 필수 — Workers env 가 없으면 throw.
+async function requireD1ForChatRooms(label: string) {
+  const backend = await resolveDataBackend();
+  const d1 = await getD1Binding();
+  if (!d1) {
+    logD1BindingMissing({ label, backend });
+    throw new Error(`[chat_rooms] D1 binding not available (${label})`);
+  }
+  return getD1Drizzle(d1);
 }
 
-function buildInsertRow(payload: ChatRoomPayload, currentUserId: string) {
-  const row: Record<string, unknown> = {
+type ChatRoomInsert = typeof chatRoomsTable.$inferInsert;
+type ChatRoomSelect = typeof chatRoomsTable.$inferSelect;
+
+function buildD1Row(payload: ChatRoomPayload, currentUserId: string): ChatRoomInsert {
+  return {
+    id: payload.id ?? crypto.randomUUID(),
     name: payload.name,
     type: payload.type,
-    members: payload.members ?? [],
+    // members는 D1 스키마에서 text — 배열을 JSON 문자열로 직렬화
+    members: JSON.stringify(payload.members ?? []),
     created_by: payload.created_by ?? currentUserId,
+    is_announcement: payload.is_announcement ? 1 : 0,
+    created_at: new Date().toISOString(),
   };
-  if (payload.id) row.id = payload.id;
-  if (typeof payload.is_announcement === 'boolean') {
-    row.is_announcement = payload.is_announcement;
-  }
-  return row;
 }
 
-async function mirrorToD1(row: Record<string, unknown>) {
-  await mirrorRowsToD1(
-    chatRoomsTable,
-    {
-      id: String(row.id),
-      name: (row.name as string | null | undefined) ?? null,
-      type: (row.type as string | null | undefined) ?? null,
-      members:
-        row.members === null || row.members === undefined
-          ? null
-          : JSON.stringify(row.members),
-      is_announcement: row.is_announcement ? 1 : 0,
-      created_by: (row.created_by as string | null | undefined) ?? null,
-      created_at:
-        typeof row.created_at === 'string' ? row.created_at : new Date().toISOString(),
-      last_message_at: (row.last_message_at as string | null | undefined) ?? null,
-      last_message: (row.last_message as string | null | undefined) ?? null,
-      last_message_preview: (row.last_message_preview as string | null | undefined) ?? null,
-      member_ids:
-        row.member_ids === null || row.member_ids === undefined
-          ? null
-          : JSON.stringify(row.member_ids),
-    },
-    {
-      label: 'mirror:chat_rooms.upsert',
-      onConflict: 'update',
-      target: [chatRoomsTable.id],
-      set: {
-        name: sql`excluded.name`,
-        type: sql`excluded.type`,
-        members: sql`excluded.members`,
-        is_announcement: sql`excluded.is_announcement`,
-        last_message_at: sql`excluded.last_message_at`,
-        last_message: sql`excluded.last_message`,
-        last_message_preview: sql`excluded.last_message_preview`,
-        member_ids: sql`excluded.member_ids`,
-      },
-    },
-  );
+// 클라이언트 호환을 위해 row의 jsonb-유사 필드(members/member_ids)를 parse 해서 반환.
+function presentRoomRow(row: ChatRoomSelect): Record<string, unknown> {
+  const parseJson = (raw: string | null | undefined): unknown => {
+    if (raw === null || raw === undefined) return null;
+    if (typeof raw !== 'string') return raw;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return raw;
+    }
+  };
+  return {
+    id: row.id,
+    name: row.name ?? null,
+    type: row.type ?? null,
+    members: parseJson(row.members),
+    created_by: row.created_by ?? null,
+    created_at: row.created_at ?? null,
+    last_message_at: row.last_message_at ?? null,
+    last_message: row.last_message ?? null,
+    last_message_preview: row.last_message_preview ?? null,
+    member_ids: parseJson(row.member_ids),
+    is_announcement: Boolean(row.is_announcement),
+  };
 }
 
 export async function POST(request: Request) {
@@ -124,40 +116,39 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = createAdminClient();
-    const insertRow = buildInsertRow(parsed.data, currentUserId);
+    const db = await requireD1ForChatRooms('POST');
+    const insertRow = buildD1Row(parsed.data, currentUserId);
     const hasFixedId = Boolean(parsed.data.id);
 
     if (hasFixedId) {
       // idempotent upsert (NOTICE/SELF 방 같은 fixed-id 케이스)
-      const upsertResult = await supabase
-        .from('chat_rooms')
-        .upsert(insertRow, { onConflict: 'id' })
-        .select(SELECT_FIELDS)
-        .maybeSingle();
-      if (upsertResult.error || !upsertResult.data) {
-        return NextResponse.json(
-          { ok: false, error: upsertResult.error?.message || 'Upsert failed' },
-          { status: 500 },
-        );
+      const upserted = await db
+        .insert(chatRoomsTable)
+        .values(insertRow)
+        .onConflictDoUpdate({
+          target: chatRoomsTable.id,
+          set: {
+            name: sql`excluded.name`,
+            type: sql`excluded.type`,
+            members: sql`excluded.members`,
+            is_announcement: sql`excluded.is_announcement`,
+          },
+        })
+        .returning();
+
+      const row = upserted[0];
+      if (!row) {
+        return NextResponse.json({ ok: false, error: 'Upsert returned no row' }, { status: 500 });
       }
-      await mirrorToD1(upsertResult.data as Record<string, unknown>);
-      return NextResponse.json({ ok: true, room: upsertResult.data });
+      return NextResponse.json({ ok: true, room: presentRoomRow(row) });
     }
 
-    const insertResult = await supabase
-      .from('chat_rooms')
-      .insert([insertRow])
-      .select(SELECT_FIELDS)
-      .single();
-    if (insertResult.error || !insertResult.data) {
-      return NextResponse.json(
-        { ok: false, error: insertResult.error?.message || 'Insert failed' },
-        { status: 500 },
-      );
+    const inserted = await db.insert(chatRoomsTable).values(insertRow).returning();
+    const row = inserted[0];
+    if (!row) {
+      return NextResponse.json({ ok: false, error: 'Insert returned no row' }, { status: 500 });
     }
-    await mirrorToD1(insertResult.data as Record<string, unknown>);
-    return NextResponse.json({ ok: true, room: insertResult.data });
+    return NextResponse.json({ ok: true, room: presentRoomRow(row) });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal error';
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

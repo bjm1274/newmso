@@ -1,11 +1,26 @@
 /**
  * 정기 보고서 자동 생성
  * 인사/급여/재고 보고서를 크론 스케줄로 자동 생성
+ *
+ * Phase 8-E — supabase.from() 의존 제거. staff_members / payroll_records
+ * 조회와 notifications.insert를 D1 binding 직접 사용으로 전환. 외부 시그니처
+ * (supabase 인자 포함) 는 호출처 호환을 위해 유지하나 내부에선 사용하지 않음.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getStaffEmploymentType } from './staff-meta';
-import { mirrorNotificationsToD1, type NotificationRow } from './notification-utils';
+import { insertNotificationsOrThrow, type NotificationRow } from './notification-utils';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+  staff_members as staffMembersTable,
+  payroll_records as payrollRecordsTable,
+  eq,
+  and,
+  inArray,
+} from './db';
+import { logD1BindingMissing } from './db/mirror-metrics';
 
 export type ReportType = 'monthly_hr' | 'monthly_payroll' | 'quarterly_inventory' | 'quarterly_business';
 
@@ -29,28 +44,62 @@ export type GeneratedReport = {
   created_at: string;
 };
 
+// D1 binding 필수 — Workers env 가 없으면 throw. (서버 라우트 안에서만 호출)
+async function requireD1ForAutoReport(label: string) {
+  const backend = await resolveDataBackend();
+  const d1 = await getD1Binding();
+  if (!d1) {
+    logD1BindingMissing({ label, backend });
+    throw new Error(`[auto-report-generator] D1 binding not available (${label})`);
+  }
+  return getD1Drizzle(d1);
+}
+
 /**
  * 인사현황 보고서 데이터 생성
+ *
+ * NOTE: supabase 파라미터는 호환을 위해 유지하나 내부 구현은 D1 binding을
+ * 사용한다. 호출처(app/api/cron/auto-report/route.ts)가 인자를 그대로 넘기는
+ * 형태를 유지하기 위함.
  */
 export async function generateMonthlyHRReport(
-  supabase: SupabaseClient,
+  _supabase: SupabaseClient,
   companyId: string | null,
   period: string, // YYYY-MM
 ): Promise<{ summary: Record<string, unknown> }> {
-  let query = supabase.from('staff_members').select('id, department, position, status, permissions');
-  if (companyId) query = query.eq('company', companyId);
+  const db = await requireD1ForAutoReport('generateMonthlyHRReport');
 
-  const { data: staffs } = await query;
-  const list = staffs || [];
+  const rows = companyId
+    ? await db
+        .select({
+          id: staffMembersTable.id,
+          department: staffMembersTable.department,
+          position: staffMembersTable.position,
+          status: staffMembersTable.status,
+          permissions: staffMembersTable.permissions,
+        })
+        .from(staffMembersTable)
+        .where(eq(staffMembersTable.company, companyId))
+    : await db
+        .select({
+          id: staffMembersTable.id,
+          department: staffMembersTable.department,
+          position: staffMembersTable.position,
+          status: staffMembersTable.status,
+          permissions: staffMembersTable.permissions,
+        })
+        .from(staffMembersTable);
 
+  const list = rows ?? [];
   const byDept: Record<string, number> = {};
   const byStatus: Record<string, number> = {};
   const byType: Record<string, number> = {};
 
   for (const s of list) {
-    const dept = String((s as Record<string, unknown>).department || '미지정');
-    const status = String((s as Record<string, unknown>).status || '기타');
-    const empType = getStaffEmploymentType(s, '정규직');
+    const dept = String(s.department || '미지정');
+    const status = String(s.status || '기타');
+    // getStaffEmploymentType는 permissions(jsonb/text) 등을 보고 판정
+    const empType = getStaffEmploymentType(s as Record<string, unknown>, '정규직');
     byDept[dept] = (byDept[dept] || 0) + 1;
     byStatus[status] = (byStatus[status] || 0) + 1;
     byType[empType] = (byType[empType] || 0) + 1;
@@ -72,17 +121,29 @@ export async function generateMonthlyHRReport(
  * 급여 요약 보고서 데이터 생성
  */
 export async function generateMonthlyPayrollReport(
-  supabase: SupabaseClient,
-  companyId: string | null,
+  _supabase: SupabaseClient,
+  _companyId: string | null,
   period: string,
 ): Promise<{ summary: Record<string, unknown> }> {
-  const { data: records } = await supabase
-    .from('payroll_records')
-    .select('base_salary, total_taxable, total_deduction, net_pay, status')
-    .eq('year_month', period)
-    .in('status', ['확정', 'finalized']);
+  const db = await requireD1ForAutoReport('generateMonthlyPayrollReport');
 
-  const list = (records || []) as Record<string, unknown>[];
+  const records = await db
+    .select({
+      base_salary: payrollRecordsTable.base_salary,
+      total_taxable: payrollRecordsTable.total_taxable,
+      total_deduction: payrollRecordsTable.total_deduction,
+      net_pay: payrollRecordsTable.net_pay,
+      status: payrollRecordsTable.status,
+    })
+    .from(payrollRecordsTable)
+    .where(
+      and(
+        eq(payrollRecordsTable.year_month, period),
+        inArray(payrollRecordsTable.status, ['확정', 'finalized']),
+      ),
+    );
+
+  const list = records ?? [];
 
   const totalBaseSalary = list.reduce((s, r) => s + (Number(r.base_salary) || 0), 0);
   const totalTaxable = list.reduce((s, r) => s + (Number(r.total_taxable) || 0), 0);
@@ -103,14 +164,16 @@ export async function generateMonthlyPayrollReport(
 }
 
 /**
- * 보고서 생성 후 알림 발송
+ * 보고서 생성 후 알림 발송 — notifications 테이블 직접 INSERT
  */
 export async function notifyRecipients(
-  supabase: SupabaseClient,
+  _supabase: SupabaseClient,
   recipients: string[],
   reportType: string,
   period: string,
 ): Promise<void> {
+  if (recipients.length === 0) return;
+
   const typeLabels: Record<string, string> = {
     monthly_hr: '월간 인사현황',
     monthly_payroll: '월간 급여 요약',
@@ -120,15 +183,14 @@ export async function notifyRecipients(
 
   const label = typeLabels[reportType] || reportType;
 
-  for (const userId of recipients) {
-    const reportNotificationRow = {
-      user_id: userId,
-      type: '보고서',
-      title: `${label} 보고서 생성 완료`,
-      body: `${period} ${label} 보고서가 자동 생성되었습니다. 관리자 메뉴에서 확인하세요.`,
-      read_at: null,
-    };
-    await supabase.from('notifications').insert(reportNotificationRow);
-    await mirrorNotificationsToD1([reportNotificationRow] as NotificationRow[]);
-  }
+  const rows: NotificationRow[] = recipients.map((userId) => ({
+    user_id: userId,
+    type: '보고서',
+    title: `${label} 보고서 생성 완료`,
+    body: `${period} ${label} 보고서가 자동 생성되었습니다. 관리자 메뉴에서 확인하세요.`,
+    read_at: null,
+  }));
+
+  // D1 직접 insert — insertNotificationsOrThrow 가 metadata jsonb→text 변환 처리
+  await insertNotificationsOrThrow(rows as unknown as Record<string, unknown>[]);
 }

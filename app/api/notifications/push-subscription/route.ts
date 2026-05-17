@@ -1,21 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { readSessionFromRequest } from '@/lib/server-session';
-import { mirrorRowsToD1, push_subscriptions, sql } from '@/lib/db';
-
+import {
+  getD1Binding,
+  getD1Drizzle,
+  push_subscriptions,
+  resolveDataBackend,
+  sql,
+  and,
+  eq,
+  ne,
+  isNull,
+  asc,
+  inArray,
+} from '@/lib/db';
+import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 export const dynamic = 'force-dynamic';
-
-function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase service role configuration is missing.');
-  }
-
-  return createClient(supabaseUrl, serviceKey);
-}
 
 type PushSubscriptionPayload = {
   endpoint?: string;
@@ -26,12 +26,6 @@ type PushSubscriptionPayload = {
   platform?: string;
   user_agent?: string;
 };
-
-function isMissingColumnError(error: unknown, columnName: string) {
-  const payload = error as { code?: string; message?: string; details?: string } | null;
-  const message = `${payload?.message || ''} ${payload?.details || ''}`.toLowerCase();
-  return String(payload?.code || '') === '42703' && message.includes(columnName.toLowerCase());
-}
 
 function parsePayload(body: PushSubscriptionPayload | null) {
   const endpoint = String(body?.endpoint || '').trim();
@@ -44,30 +38,21 @@ function parsePayload(body: PushSubscriptionPayload | null) {
   return { endpoint, p256dh, auth, fcmToken, deviceId, platform, userAgent };
 }
 
-async function detectExtendedColumnSupport(supabase: ReturnType<typeof getAdminClient>) {
-  const { error } = await supabase.from('push_subscriptions').select('device_id').limit(1);
-  if (!error) return true;
-  if (isMissingColumnError(error, 'device_id')) return false;
-  throw error;
+// D1 binding 필수 — Workers env 가 없으면 throw.
+async function requireD1ForPushSubscriptions(label: string) {
+  const backend = await resolveDataBackend();
+  const d1 = await getD1Binding();
+  if (!d1) {
+    logD1BindingMissing({ label, backend });
+    throw new Error(`[push_subscriptions] D1 binding not available (${label})`);
+  }
+  return getD1Drizzle(d1);
 }
 
-async function upsertPushSubscription(
-  supabase: ReturnType<typeof getAdminClient>,
-  record: Record<string, unknown>,
-  supportsExtendedColumns: boolean
-) {
-  const baseRecord = {
-    staff_id: record.staff_id,
-    endpoint: record.endpoint,
-    p256dh: record.p256dh,
-    auth: record.auth,
-    fcm_token: record.fcm_token,
-  };
-  const payload = supportsExtendedColumns ? record : baseRecord;
-  const { error } = await supabase
-    .from('push_subscriptions')
-    .upsert(payload, { onConflict: 'staff_id,endpoint' });
-  return error;
+// D1 스키마는 device_id/platform/user_agent 컬럼이 항상 존재 → 단순히 true 반환.
+// (Supabase 시절 health check 잔재 — 변경 최소화 위해 형태 유지)
+function detectExtendedColumnSupport(): boolean {
+  return true;
 }
 
 export async function POST(request: NextRequest) {
@@ -87,86 +72,76 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid push subscription payload.' }, { status: 400 });
     }
 
-    const supabase = getAdminClient();
+    const db = await requireD1ForPushSubscriptions('POST');
     const staffId = String(session.user.id);
-    const supportsExtendedColumns = await detectExtendedColumnSupport(supabase);
-    const effectiveEndpoint = endpoint || (deviceId ? `fcm:${staffId}:${deviceId}` : `fcm:${staffId}`);
+    const supportsExtendedColumns = detectExtendedColumnSupport();
+    const effectiveEndpoint =
+      endpoint || (deviceId ? `fcm:${staffId}:${deviceId}` : `fcm:${staffId}`);
 
     if (endpoint) {
-      const { error: deleteNullError } = await supabase
-        .from('push_subscriptions')
-        .delete()
-        .eq('endpoint', endpoint)
-        .is('staff_id', null);
+      // 같은 endpoint를 보유한 staff_id=NULL 잔재 정리
+      await db
+        .delete(push_subscriptions)
+        .where(
+          and(
+            eq(push_subscriptions.endpoint, endpoint),
+            isNull(push_subscriptions.staff_id),
+          ),
+        );
 
-      if (deleteNullError) {
-        return NextResponse.json({ error: '구독 정보를 처리하는 중 오류가 발생했습니다.' }, { status: 500 });
-      }
-
-      const { error: deleteError } = await supabase
-        .from('push_subscriptions')
-        .delete()
-        .eq('endpoint', endpoint)
-        .neq('staff_id', staffId);
-
-      if (deleteError) {
-        return NextResponse.json({ error: '구독 정보를 처리하는 중 오류가 발생했습니다.' }, { status: 500 });
-      }
+      // 같은 endpoint를 다른 staff가 보유 중이면 그 행은 무효화
+      await db
+        .delete(push_subscriptions)
+        .where(
+          and(
+            eq(push_subscriptions.endpoint, endpoint),
+            ne(push_subscriptions.staff_id, staffId),
+          ),
+        );
     }
 
     if (fcmToken && !endpoint) {
-      await supabase
-        .from('push_subscriptions')
-        .delete()
-        .eq('staff_id', staffId)
-        .is('fcm_token', null);
+      // fcm-only 갱신 시 같은 staff의 fcm_token IS NULL 행 정리
+      await db
+        .delete(push_subscriptions)
+        .where(
+          and(
+            eq(push_subscriptions.staff_id, staffId),
+            isNull(push_subscriptions.fcm_token),
+          ),
+        );
     }
 
     if (fcmToken && endpoint) {
-      await supabase
-        .from('push_subscriptions')
-        .delete()
-        .eq('staff_id', staffId)
-        .is('fcm_token', null)
-        .neq('endpoint', endpoint);
+      // endpoint가 있으면, 같은 staff의 fcm_token IS NULL이고 endpoint가 다른 행 정리
+      await db
+        .delete(push_subscriptions)
+        .where(
+          and(
+            eq(push_subscriptions.staff_id, staffId),
+            isNull(push_subscriptions.fcm_token),
+            ne(push_subscriptions.endpoint, endpoint),
+          ),
+        );
     }
 
     if (supportsExtendedColumns && deviceId) {
-      const cleanupQuery = supabase
-        .from('push_subscriptions')
-        .delete()
-        .eq('staff_id', staffId)
-        .eq('device_id', deviceId)
-        .neq('endpoint', effectiveEndpoint);
-      const { error: cleanupError } = await cleanupQuery;
-      if (cleanupError) {
-        return NextResponse.json({ error: '구독 정보를 처리하는 중 오류가 발생했습니다.' }, { status: 500 });
-      }
+      // 같은 device가 다른 endpoint로 등록되어 있던 잔재 제거
+      await db
+        .delete(push_subscriptions)
+        .where(
+          and(
+            eq(push_subscriptions.staff_id, staffId),
+            eq(push_subscriptions.device_id, deviceId),
+            ne(push_subscriptions.endpoint, effectiveEndpoint),
+          ),
+        );
     }
 
-    const upsertError = await upsertPushSubscription(
-      supabase,
-      {
-        staff_id: staffId,
-        endpoint: effectiveEndpoint,
-        p256dh,
-        auth,
-        fcm_token: fcmToken,
-        device_id: deviceId,
-        platform,
-        user_agent: userAgent,
-      },
-      supportsExtendedColumns
-    );
-
-    if (upsertError) {
-      return NextResponse.json({ error: '구독 정보를 처리하는 중 오류가 발생했습니다.' }, { status: 500 });
-    }
-
-    // Phase 2.9 — D1 미러 (staff_id+endpoint UNIQUE 충돌 시 update)
-    await mirrorRowsToD1(
-      push_subscriptions,
-      {
+    // upsert — (staff_id, endpoint) UNIQUE 충돌 시 update
+    await db
+      .insert(push_subscriptions)
+      .values({
         id: crypto.randomUUID(),
         staff_id: staffId,
         endpoint: effectiveEndpoint,
@@ -177,9 +152,8 @@ export async function POST(request: NextRequest) {
         platform,
         user_agent: userAgent,
         created_at: new Date().toISOString(),
-      },
-      {
-        onConflict: 'update',
+      })
+      .onConflictDoUpdate({
         target: [push_subscriptions.staff_id, push_subscriptions.endpoint],
         set: {
           p256dh: sql`excluded.p256dh`,
@@ -189,43 +163,50 @@ export async function POST(request: NextRequest) {
           platform: sql`excluded.platform`,
           user_agent: sql`excluded.user_agent`,
         },
-        label: 'mirror:push_subscriptions',
-      },
-    );
+      });
 
     if (fcmToken) {
-      let dedupeQuery = supabase
-        .from('push_subscriptions')
-        .delete()
-        .eq('staff_id', staffId)
-        .eq('fcm_token', fcmToken)
-        .neq('endpoint', effectiveEndpoint);
+      // 같은 fcm_token이 같은 staff의 다른 endpoint에 남아 있으면 dedupe
+      const conditions = [
+        eq(push_subscriptions.staff_id, staffId),
+        eq(push_subscriptions.fcm_token, fcmToken),
+        ne(push_subscriptions.endpoint, effectiveEndpoint),
+      ];
       if (supportsExtendedColumns && deviceId) {
-        dedupeQuery = dedupeQuery.eq('device_id', deviceId);
+        conditions.push(eq(push_subscriptions.device_id, deviceId));
       }
-      await dedupeQuery;
+      await db.delete(push_subscriptions).where(and(...conditions));
     }
 
     // 사용자당 구독 최대 10개 초과 시 오래된 것부터 정리
     const MAX_SUBSCRIPTIONS_PER_USER = 10;
-    const { data: allSubs } = await supabase
-      .from('push_subscriptions')
-      .select('id, created_at')
-      .eq('staff_id', staffId)
-      .order('created_at', { ascending: true });
+    const allSubs = await db
+      .select({
+        id: push_subscriptions.id,
+        created_at: push_subscriptions.created_at,
+      })
+      .from(push_subscriptions)
+      .where(eq(push_subscriptions.staff_id, staffId))
+      .orderBy(asc(push_subscriptions.created_at));
 
     if (allSubs && allSubs.length > MAX_SUBSCRIPTIONS_PER_USER) {
       const excessIds = allSubs
         .slice(0, allSubs.length - MAX_SUBSCRIPTIONS_PER_USER)
-        .map((s: { id: string }) => s.id);
+        .map((s) => String(s.id))
+        .filter(Boolean);
       if (excessIds.length > 0) {
-        await supabase.from('push_subscriptions').delete().in('id', excessIds);
+        await db
+          .delete(push_subscriptions)
+          .where(inArray(push_subscriptions.id, excessIds));
       }
     }
 
     return NextResponse.json({ ok: true });
   } catch {
-    return NextResponse.json({ error: '구독 정보를 처리하는 중 오류가 발생했습니다.' }, { status: 500 });
+    return NextResponse.json(
+      { error: '구독 정보를 처리하는 중 오류가 발생했습니다.' },
+      { status: 500 },
+    );
   }
 }
 
@@ -243,29 +224,32 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Endpoint is required.' }, { status: 400 });
     }
 
-    const supabase = getAdminClient();
-    const { error } = await supabase
-      .from('push_subscriptions')
-      .delete()
-      .eq('staff_id', String(session.user.id))
-      .eq('endpoint', endpoint);
+    const db = await requireD1ForPushSubscriptions('DELETE');
 
-    if (error) {
-      return NextResponse.json({ error: '구독 정보를 처리하는 중 오류가 발생했습니다.' }, { status: 500 });
-    }
+    await db
+      .delete(push_subscriptions)
+      .where(
+        and(
+          eq(push_subscriptions.staff_id, String(session.user.id)),
+          eq(push_subscriptions.endpoint, endpoint),
+        ),
+      );
 
-    const { error: deleteNullError } = await supabase
-      .from('push_subscriptions')
-      .delete()
-      .eq('endpoint', endpoint)
-      .is('staff_id', null);
-
-    if (deleteNullError) {
-      return NextResponse.json({ error: '구독 정보를 처리하는 중 오류가 발생했습니다.' }, { status: 500 });
-    }
+    // staff_id=NULL 잔재(이전 익명 등록) 정리
+    await db
+      .delete(push_subscriptions)
+      .where(
+        and(
+          eq(push_subscriptions.endpoint, endpoint),
+          isNull(push_subscriptions.staff_id),
+        ),
+      );
 
     return NextResponse.json({ ok: true });
   } catch {
-    return NextResponse.json({ error: '구독 정보를 처리하는 중 오류가 발생했습니다.' }, { status: 500 });
+    return NextResponse.json(
+      { error: '구독 정보를 처리하는 중 오류가 발생했습니다.' },
+      { status: 500 },
+    );
   }
 }

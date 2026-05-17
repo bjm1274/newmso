@@ -3,7 +3,14 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { dispatchChatPushForMessage } from '@/lib/chat-push-dispatch';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
-import { mirrorNotificationsToD1, type NotificationRow } from '@/lib/notification-utils';
+import { insertNotificationsOrThrow, type NotificationRow } from '@/lib/notification-utils';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+  staff_members as staffMembersTable,
+} from '@/lib/db';
+import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 export const dynamic = 'force-dynamic';
 
@@ -171,25 +178,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2) 전 직원 알림 행 일괄 insert (board 타입)
+    // 2) 전 직원 알림 행 일괄 insert (board 타입) — D1 직접 사용
     let notificationCount = 0;
     try {
-      const { data: staffList } = await supabase.from('staff_members').select('id');
-      const staffIds = ((staffList || []) as Array<{ id: string | null }>)
+      const backend = await resolveDataBackend();
+      const d1 = await getD1Binding();
+      if (!d1) {
+        logD1BindingMissing({ label: 'notice-broadcast:staff_lookup', backend });
+        throw new Error('[notice-broadcast] D1 binding not available');
+      }
+      const db = getD1Drizzle(d1);
+      const staffList = await db
+        .select({ id: staffMembersTable.id })
+        .from(staffMembersTable);
+      const staffIds = (staffList ?? [])
         .map((row) => String(row.id || '').trim())
         .filter(Boolean);
       if (staffIds.length > 0) {
-        const rows = staffIds.map((userId) => ({
+        const rows: NotificationRow[] = staffIds.map((userId) => ({
           user_id: userId,
           type: 'board',
           title: NOTIFICATION_LABEL[boardType] || `🔔 ${boardType}`,
           body: String(post.title || '(제목 없음)').slice(0, 80),
         }));
-        const { error: notifError } = await supabase.from('notifications').insert(rows);
-        await mirrorNotificationsToD1(rows as NotificationRow[]);
-        if (!notifError) {
-          notificationCount = staffIds.length;
-        }
+        await insertNotificationsOrThrow(rows as unknown as Record<string, unknown>[]);
+        notificationCount = staffIds.length;
       }
     } catch {
       // 알림 행 실패해도 메시지/푸시는 계속 진행
