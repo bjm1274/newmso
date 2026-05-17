@@ -149,16 +149,19 @@ async function main() {
   }
 
   await mkdir(dirname(args.output), { recursive: true });
+  // D1 production은 BEGIN TRANSACTION/COMMIT/SAVEPOINT를 거부한다
+  // ("To execute a transaction, please use state.storage.transaction()...").
+  // wrangler는 statement 단위 implicit transaction을 사용하므로 명시 호출 불필요.
+  // PRAGMA foreign_keys도 connection scope라 wrangler가 매 statement에서
+  // reset하므로 의미 없다 — 부모→자식 순서 적용으로 FK 만족시킨다.
   const header = [
     `-- D1 backfill: ${def.name}`,
     `-- generated_at: ${new Date().toISOString()}`,
     `-- total_rows: ${totalRows}`,
     `-- conflict_policy: ${args.conflict}`,
-    `PRAGMA foreign_keys = OFF;`,
-    'BEGIN TRANSACTION;',
     '',
   ].join('\n');
-  const footer = ['', 'COMMIT;', 'PRAGMA foreign_keys = ON;', ''].join('\n');
+  const footer = '\n';
   await writeFile(args.output, header + sqlChunks.join('\n') + footer, 'utf8');
   console.error(`[backfill] wrote ${totalRows} rows → ${args.output}`);
 }
