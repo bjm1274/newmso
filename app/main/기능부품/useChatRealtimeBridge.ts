@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { supabase } from '@/lib/supabase';
+import { createOrUpsertChatRoom } from '@/lib/chat-rooms-client';
 import { subscribeRealtimeBatched } from '@/lib/realtime-bus';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 import { fetchAllChatRooms, readCachedChatRooms, writeCachedChatRooms } from './chatQueryService';
@@ -434,19 +435,14 @@ export function useChatRealtimeBridge({
         rooms = roomResult.data;
 
         if (!rooms.some((room: ChatRoom) => String(room.id) === NOTICE_ROOM_ID)) {
-          const { error: noticeInsertError } = await supabase.from('chat_rooms').insert([
-            { id: NOTICE_ROOM_ID, name: NOTICE_ROOM_NAME, type: 'notice', members: noticeRoomMemberIds },
-          ]);
-          const isDuplicateNoticeRoom = Boolean(
-            noticeInsertError &&
-            typeof noticeInsertError === 'object' &&
-            noticeInsertError !== null &&
-            'code' in noticeInsertError &&
-            (noticeInsertError as { code?: string }).code === '23505',
-          );
-          if (noticeInsertError && !isDuplicateNoticeRoom) {
-            throw noticeInsertError;
-          }
+          // 서버 라우트 upsert: id 충돌(중복 생성)도 자동으로 update 처리됨.
+          const result = await createOrUpsertChatRoom({
+            id: NOTICE_ROOM_ID,
+            name: NOTICE_ROOM_NAME,
+            type: 'notice',
+            members: noticeRoomMemberIds,
+          });
+          if (!result.ok) throw new Error(result.error || 'NOTICE_ROOM upsert failed');
 
           const refetchedRoomResult = await fetchAllChatRooms({ force: true });
           if (refetchedRoomResult.error) {

@@ -5,6 +5,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
 import { CHAT_ROOM_SELECT } from '@/lib/chat-query-columns';
+import { createOrUpsertChatRoom, patchChatRoom } from '@/lib/chat-rooms-client';
 import type { ChatRoom, StaffMember } from '@/types';
 import {
   NOTICE_ROOM_ID,
@@ -70,8 +71,8 @@ export function useChatRoomManagement({
 }: UseChatRoomManagementParams) {
   const { dialog, openConfirm } = useActionDialog();
   const persistRoomMembers = useCallback(async (roomId: string, members: string[]) => {
-    const { error } = await supabase.from('chat_rooms').update({ members }).eq('id', roomId);
-    if (error) throw error;
+    const result = await patchChatRoom(roomId, { members });
+    if (!result.ok) throw new Error(result.error);
   }, []);
 
   const updateRoomMembersLocally = useCallback(
@@ -251,8 +252,8 @@ export function useChatRoomManagement({
     if (!name || !selectedRoom) return;
 
     try {
-      const { error } = await supabase.from('chat_rooms').update({ name }).eq('id', selectedRoom.id);
-      if (error) throw error;
+      const result = await patchChatRoom(String(selectedRoom.id), { name });
+      if (!result.ok) throw new Error(result.error);
 
       setChatRooms((prev) =>
         prev.map((room) => (room.id === selectedRoom.id ? { ...room, name } : room)),
@@ -285,21 +286,14 @@ export function useChatRoomManagement({
     }
 
     try {
-      const { data: room, error } = (await supabase
-        .from('chat_rooms')
-        .insert([
-          {
-            name: groupName,
-            type: 'group',
-            created_by: effectiveChatUserId,
-            members: [effectiveChatUserId, ...selectedMembers],
-          },
-        ])
-        .select(CHAT_ROOM_SELECT)
-        .single()) as { data: ChatRoom | null; error: unknown };
-
-      if (error) throw error;
-      if (!room) return;
+      const result = await createOrUpsertChatRoom({
+        name: groupName,
+        type: 'group',
+        created_by: effectiveChatUserId,
+        members: [effectiveChatUserId, ...selectedMembers],
+      });
+      if (!result.ok || !result.room) throw new Error(result.error || 'Create failed');
+      const room = result.room as unknown as ChatRoom;
 
       setChatRooms((prev) =>
         sortChatRoomsWithNoticeFirst([
@@ -384,18 +378,15 @@ export function useChatRoomManagement({
           return;
         }
 
-        const { data: room, error: insertError } = (await supabase
-          .from('chat_rooms')
-          .insert([
-            {
-              name: isSelfTarget ? SELF_ROOM_NAME : `${staff.name}`,
-              type: 'direct',
-              members: isSelfTarget ? [effectiveChatUserId] : [effectiveChatUserId, otherId],
-            },
-          ])
-          .select(CHAT_ROOM_SELECT)
-          .single()) as { data: ChatRoom | null; error: unknown };
-        if (insertError) throw insertError;
+        const directResult = await createOrUpsertChatRoom({
+          name: isSelfTarget ? SELF_ROOM_NAME : `${staff.name}`,
+          type: 'direct',
+          members: isSelfTarget ? [effectiveChatUserId] : [effectiveChatUserId, otherId],
+        });
+        if (!directResult.ok || !directResult.room) {
+          throw new Error(directResult.error || 'Direct chat create failed');
+        }
+        const room = directResult.room as unknown as ChatRoom;
 
         if (room) {
           setChatRooms((prev) =>

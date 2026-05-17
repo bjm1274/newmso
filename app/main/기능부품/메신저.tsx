@@ -4,6 +4,7 @@ import { logger } from '@/lib/logger';
 import { toast } from '@/lib/toast';
 import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { createOrUpsertChatRoom, patchChatRoom } from '@/lib/chat-rooms-client';
 import {
   isRelationMarkedMissing,
   rememberMissingRelation,
@@ -1601,11 +1602,12 @@ export default function ChatView({
         if (!needsUpdate) return sourceRooms;
 
         try {
-          const { error } = await supabase
-            .from('chat_rooms')
-            .update({ name: SELF_ROOM_NAME, type: 'direct', members: nextMembers })
-            .eq('id', existingSelfRoom.id);
-          if (error) throw error;
+          const result = await patchChatRoom(String(existingSelfRoom.id), {
+            name: SELF_ROOM_NAME,
+            type: 'direct',
+            members: nextMembers,
+          });
+          if (!result.ok) throw new Error(result.error);
         } catch (error) {
           logger.error('나와의 채팅방 업데이트 실패:', error);
         }
@@ -1628,14 +1630,13 @@ export default function ChatView({
 
       selfChatCreationInFlightRef.current = true;
       try {
-        const { data: insertedRoom, error } = (await supabase
-          .from('chat_rooms')
-          .insert([{ name: SELF_ROOM_NAME, type: 'direct', members: [currentUserId] }])
-          .select('id, name, type, members, created_at')
-          .single()) as { data: ChatRoom | null; error: unknown };
-        if (error) throw error;
-        if (!insertedRoom) return sourceRooms;
-        return [...sourceRooms, insertedRoom];
+        const result = await createOrUpsertChatRoom({
+          name: SELF_ROOM_NAME,
+          type: 'direct',
+          members: [currentUserId],
+        });
+        if (!result.ok || !result.room) throw new Error(result.error || 'Self chat create failed');
+        return [...sourceRooms, result.room as unknown as ChatRoom];
       } catch (error) {
         logger.error('나와의 채팅방 생성 실패:', error);
         return sourceRooms;
@@ -1807,14 +1808,18 @@ export default function ChatView({
           .maybeSingle();
 
         if (!noticeRoom) {
-          await supabase.from('chat_rooms').insert([
-            { id: NOTICE_ROOM_ID, name: NOTICE_ROOM_NAME, type: 'notice', members: noticeRoomMemberIds },
-          ]);
+          await createOrUpsertChatRoom({
+            id: NOTICE_ROOM_ID,
+            name: NOTICE_ROOM_NAME,
+            type: 'notice',
+            members: noticeRoomMemberIds,
+          });
         } else {
-          await supabase
-            .from('chat_rooms')
-            .update({ name: NOTICE_ROOM_NAME, type: 'notice', members: noticeRoomMemberIds })
-            .eq('id', NOTICE_ROOM_ID);
+          await patchChatRoom(NOTICE_ROOM_ID, {
+            name: NOTICE_ROOM_NAME,
+            type: 'notice',
+            members: noticeRoomMemberIds,
+          });
         }
 
         const roomResult = await fetchAllChatRooms({ force: true });
