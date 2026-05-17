@@ -1,19 +1,26 @@
-import { supabase } from './supabase';
-import { getD1Binding, resolveDataBackend, getD1Drizzle, notifications as notificationsTable } from './db';
+import {
+  getD1Binding,
+  resolveDataBackend,
+  getD1Drizzle,
+  notifications as notificationsTable,
+  staff_members as staffMembersTable,
+  or,
+} from './db';
 import { logD1MirrorFailure, logD1BindingMissing } from './db/mirror-metrics';
-import { sql } from 'drizzle-orm';
+import { sql, eq } from 'drizzle-orm';
 
 const recentAdminAlertDispatches = new Map<string, number>();
 
 // ─────────────────────────────────────────────────────────────
-// Phase 2 dual-write: notifications 테이블 D1 미러
+// Phase 8-B — notifications 테이블 서버측 D1 직접 사용
 // ─────────────────────────────────────────────────────────────
 //
-// DATA_BACKEND='supabase'   → 미러 안 함 (기존 동작)
-// DATA_BACKEND='dual-write' → Supabase 성공 후 D1에도 시도, 실패는 warn만
-// DATA_BACKEND='d1'         → D1 INSERT 결과를 throw까지 전달
+// 본 파일은 Phase 8 이전엔 Supabase insert + mirrorNotificationsToD1 으로
+// 동작했지만, Phase 8-B 부터는 D1 binding 을 직접 사용해 INSERT 한다.
+// mirrorNotificationsToD1 함수 자체는 다른 곳에서 import 되므로 유지.
 //
 // metadata는 Supabase에선 jsonb, D1에선 text(JSON 직렬화) 보관.
+// (mirrorNotificationsToD1 안에 normalizeForD1 가 그대로 처리)
 
 export type NotificationRow = {
   id?: string | null;
@@ -140,15 +147,35 @@ function pruneRecentAdminAlertDispatches(referenceTime: number) {
   }
 }
 
+// D1 binding 필수 — Workers env 가 없으면 throw. (서버 라우트 안에서만 호출)
+async function requireD1ForNotifications(label: string) {
+  const backend = await resolveDataBackend();
+  const d1 = await getD1Binding();
+  if (!d1) {
+    logD1BindingMissing({ label, backend });
+    throw new Error(`[notifications] D1 binding not available (${label})`);
+  }
+  return getD1Drizzle(d1);
+}
+
 export async function sendAdminNotifications(
   alerts: AdminAlertPayload[],
 ): Promise<number> {
   if (alerts.length === 0) return 0;
 
-  const { data: adminUsers } = await supabase
-    .from('staff_members')
-    .select('id')
-    .or('department.eq.행정팀,department.eq.총무팀,department.eq.원무팀,department.eq.행정부');
+  const db = await requireD1ForNotifications('sendAdminNotifications:lookup');
+
+  const adminUsers = await db
+    .select({ id: staffMembersTable.id })
+    .from(staffMembersTable)
+    .where(
+      or(
+        eq(staffMembersTable.department, '행정팀'),
+        eq(staffMembersTable.department, '총무팀'),
+        eq(staffMembersTable.department, '원무팀'),
+        eq(staffMembersTable.department, '행정부'),
+      ),
+    );
 
   if (!adminUsers?.length) return 0;
 
@@ -181,17 +208,46 @@ export async function sendAdminNotifications(
       new Set(alertsWithDedupe.map((alert) => alert.type).filter(Boolean)),
     );
 
-    const { data: existingRows, error: existingError } = await supabase
-      .from('notifications')
-      .select('user_id, type, created_at, metadata')
-      .in('user_id', adminUserIds)
-      .in('type', alertTypes)
-      .gte('created_at', cutoffIso);
+    try {
+      // alertTypes가 빈 경우 lookup 자체를 건너뜀 (adminUserIds는 이미 가드됨)
+      if (alertTypes.length > 0) {
+        const rows = await db
+          .select({
+            user_id: notificationsTable.user_id,
+            type: notificationsTable.type,
+            created_at: notificationsTable.created_at,
+            metadata: notificationsTable.metadata,
+          })
+          .from(notificationsTable)
+          .where(
+            sql`${notificationsTable.user_id} IN ${adminUserIds}
+                AND ${notificationsTable.type} IN ${alertTypes}
+                AND ${notificationsTable.created_at} >= ${cutoffIso}`,
+          );
 
-    if (existingError) {
-      console.error('admin notification dedupe lookup failed', existingError);
-    } else {
-      existingNotifications = (existingRows || []) as ExistingAdminNotificationRow[];
+        existingNotifications = rows.map((row) => {
+          // D1은 metadata를 text(JSON)로 보관 → 객체로 parse
+          let parsedMetadata: Record<string, unknown> | null = null;
+          if (typeof row.metadata === 'string' && row.metadata.length > 0) {
+            try {
+              const parsed = JSON.parse(row.metadata) as unknown;
+              if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                parsedMetadata = parsed as Record<string, unknown>;
+              }
+            } catch {
+              parsedMetadata = null;
+            }
+          }
+          return {
+            user_id: row.user_id ?? null,
+            type: row.type ?? null,
+            created_at: row.created_at ?? null,
+            metadata: parsedMetadata,
+          };
+        });
+      }
+    } catch (err) {
+      console.error('admin notification dedupe lookup failed', err);
     }
   }
 
@@ -268,8 +324,14 @@ export async function sendAdminNotifications(
   });
 
   if (notifications.length > 0) {
-    await supabase.from('notifications').insert(notifications);
-    await mirrorNotificationsToD1(notifications as NotificationRow[]);
+    // D1 직접 INSERT — mirror 호출 불필요 (자기 자신이 primary)
+    const values = (notifications as NotificationRow[]).map(normalizeForD1);
+    try {
+      await db.insert(notificationsTable).values(values);
+    } catch (err) {
+      console.error('sendAdminNotifications: D1 insert failed', err);
+      throw err;
+    }
   }
 
   return notifications.length;
@@ -278,17 +340,28 @@ export async function sendAdminNotifications(
 export async function insertNotificationsOrThrow(
   notifications: Record<string, unknown> | Record<string, unknown>[],
 ) {
-  const { data, error } = await supabase
-    .from('notifications')
-    .insert(notifications)
-    .select();
-
-  if (error) throw error;
-
   const asArray = Array.isArray(notifications) ? notifications : [notifications];
-  await mirrorNotificationsToD1(asArray as NotificationRow[]);
+  if (asArray.length === 0) return [] as NotificationRow[];
 
-  return data;
+  // 외부 입력은 unknown 으로 받기 때문에 NotificationRow 형식으로 안전 변환
+  const rows: NotificationRow[] = asArray.map((entry) => {
+    if (!entry || typeof entry !== 'object') {
+      throw new Error('insertNotificationsOrThrow: notification 항목이 객체가 아닙니다');
+    }
+    return entry as NotificationRow;
+  });
+
+  const db = await requireD1ForNotifications('insertNotificationsOrThrow');
+  const values = rows.map(normalizeForD1);
+
+  // RETURNING 으로 insert 결과를 그대로 반환 (기존 .select() 와 호환)
+  try {
+    const inserted = await db.insert(notificationsTable).values(values).returning();
+    return inserted;
+  } catch (err) {
+    console.error('insertNotificationsOrThrow: D1 insert failed', err);
+    throw err;
+  }
 }
 
 // SHA-256 기반 결정적 UUID v5 스타일 ID — 같은 dedupeKey는 동일 ID가 되어
@@ -335,21 +408,19 @@ export async function upsertNotificationWithDedupe(input: DedupedNotificationInp
     created_at: new Date().toISOString(),
   };
 
-  const { error } = await supabase
-    .from('notifications')
-    .upsert([row], { onConflict: 'id', ignoreDuplicates: true });
+  // D1 직접 upsert (id PK 충돌 시 무시 — race condition 가드)
+  const db = await requireD1ForNotifications('upsertNotificationWithDedupe');
+  const value = normalizeForD1(row as NotificationRow);
 
-  if (error) {
-    const code = String((error as { code?: string } | null)?.code || '');
-    const message = String((error as { message?: string } | null)?.message || '');
-    const isDuplicate = code === '23505' || /duplicate key|unique constraint/i.test(message);
+  try {
+    await db.insert(notificationsTable).values(value).onConflictDoNothing();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const isDuplicate = /UNIQUE constraint failed|duplicate key/i.test(message);
     if (!isDuplicate) {
-      throw error;
+      throw err;
     }
   }
-
-  // D1 미러 — 결정적 ID라 onConflictDoNothing으로 중복 race 처리.
-  await mirrorNotificationsToD1([row as NotificationRow], { onConflict: 'do_nothing' });
 
   return { id };
 }
