@@ -1,5 +1,7 @@
+import { sql } from 'drizzle-orm';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { mirrorRowsToD1, payroll_records as payrollRecordsTable } from '@/lib/db';
 
 type SupabaseMutationResult<T = unknown> = {
   data: T | null;
@@ -69,6 +71,85 @@ function hasNonRegularPayrollRecordType(payload: PayrollRecordPayload) {
   });
 }
 
+// jsonb 컬럼 목록 — D1에선 text라 JSON.stringify 필요
+const PAYROLL_JSONB_COLUMNS: ReadonlySet<string> = new Set([
+  'attendance_deduction_detail',
+  'deduction_detail',
+  'settlement_reason',
+]);
+
+// D1 컬럼이 아닌 키들 (supabase에만 존재) — D1 미러에서 제외
+const PAYROLL_D1_OMIT_COLUMNS: ReadonlySet<string> = new Set([
+  'company_id',
+  'company_name',
+  'updated_at',
+]);
+
+function normalizePayrollRecordForD1(record: Record<string, unknown>): Record<string, unknown> {
+  const next: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (PAYROLL_D1_OMIT_COLUMNS.has(key)) continue;
+    if (PAYROLL_JSONB_COLUMNS.has(key) && value !== null && typeof value === 'object') {
+      next[key] = JSON.stringify(value);
+    } else {
+      next[key] = value;
+    }
+  }
+  if (typeof next.id !== 'string' || next.id === '') {
+    next.id = crypto.randomUUID();
+  }
+  if (typeof next.record_type !== 'string' || (next.record_type as string).trim() === '') {
+    next.record_type = 'regular';
+  }
+  return next;
+}
+
+async function mirrorPayrollUpsertToD1(payload: PayrollRecordPayload): Promise<void> {
+  const records = Array.isArray(payload) ? payload : [payload];
+  if (records.length === 0) return;
+  const normalized = records.map(normalizePayrollRecordForD1);
+  await mirrorRowsToD1(payrollRecordsTable, normalized as never, {
+    label: 'payroll_records',
+    onConflict: 'update',
+    target: [
+      payrollRecordsTable.staff_id,
+      payrollRecordsTable.year_month,
+      payrollRecordsTable.record_type,
+    ],
+    set: {
+      base_salary: sql`excluded.base_salary`,
+      meal_allowance: sql`excluded.meal_allowance`,
+      vehicle_allowance: sql`excluded.vehicle_allowance`,
+      childcare_allowance: sql`excluded.childcare_allowance`,
+      research_allowance: sql`excluded.research_allowance`,
+      other_taxfree: sql`excluded.other_taxfree`,
+      extra_allowance: sql`excluded.extra_allowance`,
+      overtime_pay: sql`excluded.overtime_pay`,
+      bonus: sql`excluded.bonus`,
+      night_duty_allowance: sql`excluded.night_duty_allowance`,
+      total_taxable: sql`excluded.total_taxable`,
+      total_taxfree: sql`excluded.total_taxfree`,
+      total_deduction: sql`excluded.total_deduction`,
+      net_pay: sql`excluded.net_pay`,
+      gross_pay: sql`excluded.gross_pay`,
+      attendance_deduction: sql`excluded.attendance_deduction`,
+      attendance_deduction_detail: sql`excluded.attendance_deduction_detail`,
+      deduction_detail: sql`excluded.deduction_detail`,
+      status: sql`excluded.status`,
+      severance_pay: sql`excluded.severance_pay`,
+      settlement_reason: sql`excluded.settlement_reason`,
+      settlement_date: sql`excluded.settlement_date`,
+      advance_pay: sql`excluded.advance_pay`,
+      national_pension: sql`excluded.national_pension`,
+      health_insurance: sql`excluded.health_insurance`,
+      long_term_care: sql`excluded.long_term_care`,
+      employment_insurance: sql`excluded.employment_insurance`,
+      income_tax: sql`excluded.income_tax`,
+      local_tax: sql`excluded.local_tax`,
+    },
+  });
+}
+
 async function runPayrollRecordUpsert(
   payload: PayrollRecordPayload,
   conflictTarget: string,
@@ -76,16 +157,16 @@ async function runPayrollRecordUpsert(
   cacheKey?: string,
 ): Promise<SupabaseMutationResult> {
   return withMissingColumnsFallback(
-    (omittedColumns) => {
+    async (omittedColumns) => {
       if (
         omittedColumns.has('record_type') &&
         conflictTarget.includes('record_type') &&
         hasNonRegularPayrollRecordType(payload)
       ) {
-        return Promise.resolve({
+        return {
           data: null,
           error: PAYROLL_RECORD_TYPE_MIGRATION_REQUIRED_ERROR,
-        });
+        };
       }
 
       const nextPayload = omitPayloadColumns(payload, omittedColumns);
@@ -94,9 +175,16 @@ async function runPayrollRecordUpsert(
           ? PAYROLL_RECORD_LEGACY_CONFLICT_TARGET
           : conflictTarget;
 
-      return supabase.from('payroll_records').upsert(nextPayload, {
+      const result = await supabase.from('payroll_records').upsert(nextPayload, {
         onConflict: nextConflictTarget,
       });
+
+      // Supabase 성공한 경우에만 D1 미러 (실패한 row를 미러하지 않음)
+      if (!result.error) {
+        await mirrorPayrollUpsertToD1(nextPayload);
+      }
+
+      return result;
     },
     [...optionalColumns],
     cacheKey ? { cacheKey } : undefined,

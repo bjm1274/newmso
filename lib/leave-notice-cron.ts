@@ -7,6 +7,14 @@ import {
   LEAVE_NOTICE_ROOM_ID,
   LEAVE_NOTICE_TIMEZONE,
 } from '@/lib/leave-notice';
+import {
+  mirrorRowsToD1,
+  messages as messagesTable,
+  getD1Binding,
+  getD1Drizzle,
+  updateChatRoomLastMessage,
+  resolveDataBackend,
+} from '@/lib/db';
 
 type LeaveApprovalRow = {
   id: string;
@@ -174,14 +182,15 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
       delegateName: leaveMeta.delegateName,
     });
 
-    const { error: messageError } = await supabase.from('messages').insert({
+    const messageRow = {
       id: messageId,
       room_id: LEAVE_NOTICE_ROOM_ID,
       sender_id: String(approval.sender_id || '').trim() || null,
       sender_name: senderName,
       content,
       created_at: nowIso,
-    });
+    };
+    const { error: messageError } = await supabase.from('messages').insert(messageRow);
 
     const duplicateMessage =
       Boolean(messageError) &&
@@ -194,6 +203,31 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
       failed += 1;
       errors.push(`${approval.id}: ${String(messageError.message || messageError)}`);
       continue;
+    }
+
+    // D1 미러 — id가 결정적(deterministic)이라 중복 INSERT는 onConflictDoNothing.
+    // chat_rooms.last_message_at / preview도 함께 업데이트 (Postgres 트리거 대체).
+    await mirrorRowsToD1(messagesTable, messageRow, {
+      label: 'messages',
+      onConflict: 'do_nothing',
+    });
+    if (!duplicateMessage) {
+      // 중복이 아닐 때만 last_message 갱신 (이미 더 최신 메시지가 있을 수 있음)
+      try {
+        const backend = await resolveDataBackend();
+        if (backend !== 'supabase') {
+          const d1 = await getD1Binding();
+          if (d1) {
+            await updateChatRoomLastMessage(getD1Drizzle(d1), {
+              room_id: LEAVE_NOTICE_ROOM_ID,
+              created_at: nowIso,
+              content,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[leave-notice-cron] chat_rooms last_message D1 sync failed', err);
+      }
     }
 
     const nextMetaData = {

@@ -1560,6 +1560,7 @@ export const payroll_records = sqliteTable("payroll_records", {
 	local_tax: real(),
 },
 (table) => [
+	uniqueIndex("idx_payroll_records_staff_ym_type_unique").on(table.staff_id, table.year_month, table.record_type),
 	index("idx_payroll_records_staff_ym").on(table.staff_id, table.year_month),
 ]);
 
