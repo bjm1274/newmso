@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   buildSupplyRequestWorkflowItems,
@@ -13,6 +14,14 @@ import { syncOfficialDocumentLogFromApproval } from '@/lib/official-document-app
 import { isMissingColumnError } from '@/lib/supabase-compat';
 import { formatKoreanDateKey, getKoreanTodayString } from '@/lib/seoul-time';
 import { mirrorNotificationsToD1, type NotificationRow } from './notification-utils';
+import {
+  mirrorRowsToD1,
+  attendance as attendanceTable,
+  attendances as attendancesTable,
+  attendance_corrections as attendanceCorrectionsTable,
+  staff_transfer_history as staffTransferHistoryTable,
+  certificate_issuances as certificateIssuancesTable,
+} from '@/lib/db';
 
 type ApprovalRow = Record<string, unknown>;
 
@@ -61,6 +70,29 @@ async function upsertAttendanceCorrectionRows(
 
   if (!isAttendanceCorrectionApprovalSchemaError(primaryResult.error)) {
     if (primaryResult.error) throw primaryResult.error;
+    // D1 미러 — (staff_id, attendance_date) 충돌 시 update
+    const d1Rows = correctionRows.map((r) => ({
+      id: crypto.randomUUID(),
+      staff_id: r.staff_id as string | null,
+      original_date: (r.original_date ?? null) as string | null,
+      attendance_date: (r.attendance_date ?? null) as string | null,
+      correction_type: (r.correction_type ?? null) as string | null,
+      reason: (r.reason ?? null) as string | null,
+      status: (r.status ?? '대기') as string,
+      requested_at: (r.requested_at ?? new Date().toISOString()) as string,
+      created_at: new Date().toISOString(),
+    }));
+    await mirrorRowsToD1(attendanceCorrectionsTable, d1Rows, {
+      label: 'attendance_corrections',
+      onConflict: 'update',
+      target: [attendanceCorrectionsTable.staff_id, attendanceCorrectionsTable.attendance_date],
+      set: {
+        correction_type: sql`excluded.correction_type`,
+        reason: sql`excluded.reason`,
+        status: sql`excluded.status`,
+        requested_at: sql`excluded.requested_at`,
+      },
+    });
     return;
   }
 
@@ -99,6 +131,19 @@ async function upsertAttendanceCorrectionRows(
     });
 
     if (insertError) throw insertError;
+
+    // D1 미러 — 폴백 경로 단일 INSERT (attendance_date 부재 → onConflict 부적용)
+    await mirrorRowsToD1(attendanceCorrectionsTable, {
+      id: crypto.randomUUID(),
+      staff_id: row.staff_id as string | null,
+      original_date: (row.original_date ?? null) as string | null,
+      attendance_date: null,
+      correction_type: (row.correction_type ?? null) as string | null,
+      reason: (row.reason ?? null) as string | null,
+      status: '승인',
+      requested_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    }, { label: 'attendance_corrections' });
   }
 }
 
@@ -279,14 +324,25 @@ export async function processFinalApprovalEffects(
           .eq('id', orderTargetId);
         if (updateError) throw updateError;
 
-        await supabase.from('staff_transfer_history').insert({
+        const transferRow = {
           staff_id: orderTargetId,
           transfer_type: orderCategory,
           before_value: orderCategory === '부서이동(전보)' ? currentStaff?.department : currentStaff?.position,
           after_value: orderCategory === '부서이동(전보)' ? targetDept : newPosition,
           effective_date: getKoreanTodayString(),
           approval_id: item.id,
-        });
+        };
+        await supabase.from('staff_transfer_history').insert(transferRow);
+        await mirrorRowsToD1(staffTransferHistoryTable, {
+          id: crypto.randomUUID(),
+          staff_id: orderTargetId as string | null,
+          transfer_type: orderCategory as string | null,
+          before_value: (transferRow.before_value ?? null) as string | null,
+          after_value: (transferRow.after_value ?? null) as string | null,
+          effective_date: transferRow.effective_date,
+          approval_id: (item.id ?? null) as string | null,
+          created_at: new Date().toISOString(),
+        }, { label: 'staff_transfer_history' });
       }
 
       steps.push('personnel_order');
@@ -340,6 +396,18 @@ export async function processFinalApprovalEffects(
             },
             { onConflict: 'staff_id,date' },
           );
+          await mirrorRowsToD1(attendanceTable, {
+            id: crypto.randomUUID(),
+            staff_id: senderId,
+            date: dateStr,
+            status: leaveStatus.legacy,
+            created_at: new Date().toISOString(),
+          }, {
+            label: 'attendance',
+            onConflict: 'update',
+            target: [attendanceTable.staff_id, attendanceTable.date],
+            set: { status: sql`excluded.status` },
+          });
 
           await supabase.from('attendances').upsert(
             {
@@ -352,6 +420,26 @@ export async function processFinalApprovalEffects(
             },
             { onConflict: 'staff_id,work_date' },
           );
+          await mirrorRowsToD1(attendancesTable, {
+            id: crypto.randomUUID(),
+            staff_id: senderId,
+            work_date: dateStr,
+            status: leaveStatus.modern,
+            check_in_time: null,
+            check_out_time: null,
+            work_hours_minutes: 0,
+            created_at: new Date().toISOString(),
+          }, {
+            label: 'attendances',
+            onConflict: 'update',
+            target: [attendancesTable.staff_id, attendancesTable.work_date],
+            set: {
+              status: sql`excluded.status`,
+              check_in_time: sql`excluded.check_in_time`,
+              check_out_time: sql`excluded.check_out_time`,
+              work_hours_minutes: sql`excluded.work_hours_minutes`,
+            },
+          });
         }
 
         if (isAnnualLeaveType(leaveType)) {
@@ -393,9 +481,34 @@ export async function processFinalApprovalEffects(
         await supabase
           .from('attendance')
           .upsert({ staff_id: item.sender_id, date: dateStr, status: att }, { onConflict: 'staff_id,date' });
+        await mirrorRowsToD1(attendanceTable, {
+          id: crypto.randomUUID(),
+          staff_id: item.sender_id as string | null,
+          date: dateStr,
+          status: att,
+          created_at: new Date().toISOString(),
+        }, {
+          label: 'attendance',
+          onConflict: 'update',
+          target: [attendanceTable.staff_id, attendanceTable.date],
+          set: { status: sql`excluded.status` },
+        });
+
         await supabase
           .from('attendances')
           .upsert({ staff_id: item.sender_id, work_date: dateStr, status: atts }, { onConflict: 'staff_id,work_date' });
+        await mirrorRowsToD1(attendancesTable, {
+          id: crypto.randomUUID(),
+          staff_id: item.sender_id as string,
+          work_date: dateStr,
+          status: atts,
+          created_at: new Date().toISOString(),
+        }, {
+          label: 'attendances',
+          onConflict: 'update',
+          target: [attendancesTable.staff_id, attendancesTable.work_date],
+          set: { status: sql`excluded.status` },
+        });
       }
 
       steps.push('attendance_fix');
@@ -407,13 +520,23 @@ export async function processFinalApprovalEffects(
   if (item.type === '양식요청' && itemMetaData?.form_type && itemMetaData?.target_staff && itemMetaData?.auto_issue) {
     try {
       const serialNo = `CERT-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(Date.now()).slice(-6)}`;
-      await supabase.from('certificate_issuances').insert({
-        staff_id: itemMetaData.target_staff,
-        cert_type: itemMetaData.form_type,
+      const certRow = {
+        staff_id: itemMetaData.target_staff as string,
+        cert_type: itemMetaData.form_type as string,
         serial_no: serialNo,
-        purpose: itemMetaData.purpose || '제출용',
+        purpose: (itemMetaData.purpose as string) || '제출용',
         issued_by: actorId || null,
-      });
+      };
+      await supabase.from('certificate_issuances').insert(certRow);
+      await mirrorRowsToD1(certificateIssuancesTable, {
+        id: crypto.randomUUID(),
+        staff_id: certRow.staff_id,
+        cert_type: certRow.cert_type,
+        serial_no: certRow.serial_no,
+        purpose: certRow.purpose,
+        issued_by: certRow.issued_by,
+        issued_at: new Date().toISOString(),
+      }, { label: 'certificate_issuances' });
       steps.push('certificate_issue');
     } catch (error) {
       warnings.push(`증명서 발급 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);

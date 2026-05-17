@@ -144,6 +144,7 @@ export const attendance = sqliteTable("attendance", {
 	company_id: text().references(() => companies.id),
 },
 (table) => [
+	uniqueIndex("idx_attendance_staff_date_unique").on(table.staff_id, table.date),
 	index("idx_attendance_staff_date").on(table.staff_id, table.date),
 	index("idx_attendance_company_id").on(table.company_id),
 ]);
@@ -158,7 +159,10 @@ export const attendance_corrections = sqliteTable("attendance_corrections", {
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
 	attendance_date: text(),
 	requested_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+},
+(table) => [
+	uniqueIndex("idx_attendance_corrections_staff_date_unique").on(table.staff_id, table.attendance_date),
+]);
 
 export const attendance_deduction_rules = sqliteTable("attendance_deduction_rules", {
 	id: text().primaryKey().notNull(),
@@ -186,6 +190,7 @@ export const attendances = sqliteTable("attendances", {
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
 },
 (table) => [
+	uniqueIndex("idx_attendances_staff_date_unique").on(table.staff_id, table.work_date),
 	index("idx_attendances_work_date").on(table.work_date),
 	index("idx_attendances_staff_date").on(table.staff_id, table.work_date),
 ]);
@@ -1841,7 +1846,10 @@ export const roster_policy_settings = sqliteTable("roster_policy_settings", {
 	updated_by: numeric().references(() => staff_members.id, { onDelete: "set null" } ),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`).notNull(),
 	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`).notNull(),
-});
+},
+(table) => [
+	uniqueIndex("idx_roster_policy_settings_type_id_unique").on(table.policy_type, table.policy_id),
+]);
 
 export const roster_swap_requests = sqliteTable("roster_swap_requests", {
 	id: numeric().primaryKey(),

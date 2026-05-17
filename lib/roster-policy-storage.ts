@@ -1,4 +1,6 @@
+import { sql } from 'drizzle-orm';
 import { supabase } from '@/lib/supabase';
+import { mirrorRowsToD1, roster_policy_settings as rosterPolicySettingsTable } from '@/lib/db';
 
 export type RosterPolicyType = 'pattern_profile' | 'generation_rule' | 'shift_custom_pattern';
 
@@ -99,22 +101,21 @@ export async function loadRosterPolicyStorageRecords(policyType: RosterPolicyTyp
 }
 
 export async function upsertRosterPolicyStorageRecord(record: RosterPolicyStorageRecord) {
-  const { error } = await supabase.from('roster_policy_settings').upsert(
-    {
-      policy_type: record.policyType,
-      policy_id: record.policyId,
-      company_id: record.companyId ?? null,
-      company_name: record.companyName || '전체',
-      name: record.name,
-      payload: record.payload,
-      created_by: record.createdBy ?? null,
-      updated_by: record.updatedBy ?? null,
-      updated_at: record.updatedAt ?? new Date().toISOString(),
-    },
-    {
-      onConflict: 'policy_type,policy_id',
-    }
-  );
+  const updatedAt = record.updatedAt ?? new Date().toISOString();
+  const payload = {
+    policy_type: record.policyType,
+    policy_id: record.policyId,
+    company_id: record.companyId ?? null,
+    company_name: record.companyName || '전체',
+    name: record.name,
+    payload: record.payload,
+    created_by: record.createdBy ?? null,
+    updated_by: record.updatedBy ?? null,
+    updated_at: updatedAt,
+  };
+  const { error } = await supabase.from('roster_policy_settings').upsert(payload, {
+    onConflict: 'policy_type,policy_id',
+  });
 
   if (error) {
     if (isMissingRosterPolicyStorageError(error)) {
@@ -122,6 +123,37 @@ export async function upsertRosterPolicyStorageRecord(record: RosterPolicyStorag
     }
     throw error;
   }
+
+  // D1 미러 — (policy_type, policy_id) 충돌 시 update. payload는 jsonb→text.
+  // id는 INTEGER PK rowid 자동 할당.
+  await mirrorRowsToD1(
+    rosterPolicySettingsTable,
+    {
+      policy_type: payload.policy_type,
+      policy_id: payload.policy_id,
+      company_id: payload.company_id as never,
+      company_name: payload.company_name,
+      name: payload.name,
+      payload: JSON.stringify(payload.payload ?? {}),
+      created_by: payload.created_by as never,
+      updated_by: payload.updated_by as never,
+      created_at: updatedAt,
+      updated_at: updatedAt,
+    } as never,
+    {
+      label: 'roster_policy_settings',
+      onConflict: 'update',
+      target: [rosterPolicySettingsTable.policy_type, rosterPolicySettingsTable.policy_id],
+      set: {
+        company_id: sql`excluded.company_id`,
+        company_name: sql`excluded.company_name`,
+        name: sql`excluded.name`,
+        payload: sql`excluded.payload`,
+        updated_by: sql`excluded.updated_by`,
+        updated_at: sql`excluded.updated_at`,
+      },
+    },
+  );
 
   return { storageAvailable: true as const };
 }
