@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { readSessionFromRequest } from '@/lib/server-session';
+import { mirrorRowsToD1, push_subscriptions, sql } from '@/lib/db';
 
 
 export const dynamic = 'force-dynamic';
@@ -161,6 +162,36 @@ export async function POST(request: NextRequest) {
     if (upsertError) {
       return NextResponse.json({ error: '구독 정보를 처리하는 중 오류가 발생했습니다.' }, { status: 500 });
     }
+
+    // Phase 2.9 — D1 미러 (staff_id+endpoint UNIQUE 충돌 시 update)
+    await mirrorRowsToD1(
+      push_subscriptions,
+      {
+        id: crypto.randomUUID(),
+        staff_id: staffId,
+        endpoint: effectiveEndpoint,
+        p256dh,
+        auth,
+        fcm_token: fcmToken,
+        device_id: deviceId,
+        platform,
+        user_agent: userAgent,
+        created_at: new Date().toISOString(),
+      },
+      {
+        onConflict: 'update',
+        target: [push_subscriptions.staff_id, push_subscriptions.endpoint],
+        set: {
+          p256dh: sql`excluded.p256dh`,
+          auth: sql`excluded.auth`,
+          fcm_token: sql`excluded.fcm_token`,
+          device_id: sql`excluded.device_id`,
+          platform: sql`excluded.platform`,
+          user_agent: sql`excluded.user_agent`,
+        },
+        label: 'mirror:push_subscriptions',
+      },
+    );
 
     if (fcmToken) {
       let dedupeQuery = supabase
