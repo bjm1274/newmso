@@ -21,6 +21,9 @@ export type { D1Client } from './client-d1';
 export { dualInsert, dualWrite } from './dual-write';
 export type { DualWriteContext, DualWriteResult } from './dual-write';
 
+// Phase 2 — Next.js API route용 D1 binding 헬퍼
+export { getD1Binding, resolveDataBackend } from './get-binding';
+
 // Phase 1D — Postgres 함수의 TS 포트
 export {
   registerStaffFull,

@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
 import { sendFcmBatch } from '@/lib/fcm-http';
 import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push-cloudflare';
+import { mirrorNotificationsToD1, type NotificationRow } from '@/lib/notification-utils';
 
 const ROSTER_CREATOR_POSITIONS = ['\uAC04\uD638\uACFC\uC7A5', '\uAC04\uD638\uBD80\uC7A5', '\uC2E4\uC7A5'];
 const ROSTER_APPROVER_POSITIONS = ['\uCD1D\uBB34\uBD80\uC7A5', '\uC774\uC0AC'];
@@ -498,6 +499,7 @@ export async function POST(request: Request) {
 
     if (notificationRows.length > 0) {
       const { error: notificationError } = await supabase.from('notifications').insert(notificationRows);
+      await mirrorNotificationsToD1(notificationRows as NotificationRow[]);
       if (!notificationError) {
         notifiedApproverCount = notificationRows.length;
         const pushResult = await dispatchImmediateApprovalPush(supabase, notificationRows);

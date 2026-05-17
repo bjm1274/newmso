@@ -12,6 +12,7 @@ import { extractLeaveRequestMeta } from '@/lib/leave-notice';
 import { syncOfficialDocumentLogFromApproval } from '@/lib/official-document-approval';
 import { isMissingColumnError } from '@/lib/supabase-compat';
 import { formatKoreanDateKey, getKoreanTodayString } from '@/lib/seoul-time';
+import { mirrorNotificationsToD1, type NotificationRow } from './notification-utils';
 
 type ApprovalRow = Record<string, unknown>;
 
@@ -181,6 +182,7 @@ async function prepareSupplyApprovalInventoryWorkflow(supabase: SupabaseClient, 
     const notificationRows = [...managerNotifications, ...senderNotification];
     if (notificationRows.length > 0) {
       await supabase.from('notifications').insert(notificationRows);
+      await mirrorNotificationsToD1(notificationRows as NotificationRow[]);
     }
   } catch {
     // inventory workflow notification failure is non-blocking

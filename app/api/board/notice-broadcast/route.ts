@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { dispatchChatPushForMessage } from '@/lib/chat-push-dispatch';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
+import { mirrorNotificationsToD1, type NotificationRow } from '@/lib/notification-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -185,6 +186,7 @@ export async function POST(request: NextRequest) {
           body: String(post.title || '(제목 없음)').slice(0, 80),
         }));
         const { error: notifError } = await supabase.from('notifications').insert(rows);
+        await mirrorNotificationsToD1(rows as NotificationRow[]);
         if (!notifError) {
           notificationCount = staffIds.length;
         }

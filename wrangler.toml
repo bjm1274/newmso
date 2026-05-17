@@ -9,6 +9,12 @@ directory = ".open-next/assets"
 [vars]
 NEXT_PUBLIC_R2_PUBLIC_BASE_URL = "https://r2.pchos.kr"
 
+# 데이터 백엔드 선택 (Phase 2 dual-write 컷오버)
+# 'supabase'   : 기존 동작 (기본값) — write/read 모두 Supabase
+# 'dual-write' : write를 Supabase + D1 양쪽에. 진실은 Supabase, D1 실패는 alert
+# 'd1'         : 컷오버 후 — D1만 사용
+DATA_BACKEND = "supabase"
+
 # Firebase Cloud Messaging (FCM) — 모바일 푸시 알림
 # 모두 NEXT_PUBLIC_* 접두사라 클라이언트 번들에 노출됨 (정상 — Firebase Console 도메인 화이트리스트로 보호).
 # FIREBASE_SERVICE_ACCOUNT(server-only secret)는 `wrangler secret put`으로 별도 등록.

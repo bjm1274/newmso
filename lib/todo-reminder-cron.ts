@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { mirrorNotificationsToD1, type NotificationRow } from './notification-utils';
 
 type DueTodoRow = {
   id: string | number;
@@ -148,6 +149,24 @@ export async function processDueTodoRemindersServer(
         created_at: nowIso,
       },
     ]);
+    await mirrorNotificationsToD1([
+      {
+        id: notificationId,
+        user_id: userId,
+        type: 'todo',
+        title: '할 일 리마인더',
+        body,
+        metadata: {
+          type: 'todo',
+          todo_id: todoId,
+          task_date: todo.task_date || null,
+          reminder_at: reminderAt,
+          dedupe_key: dedupeKey,
+        },
+        read_at: null,
+        created_at: nowIso,
+      },
+    ] as NotificationRow[]);
 
     const duplicateNotification =
       Boolean(notificationError) &&

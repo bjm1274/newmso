@@ -5,6 +5,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getStaffEmploymentType } from './staff-meta';
+import { mirrorNotificationsToD1, type NotificationRow } from './notification-utils';
 
 export type ReportType = 'monthly_hr' | 'monthly_payroll' | 'quarterly_inventory' | 'quarterly_business';
 
@@ -120,12 +121,14 @@ export async function notifyRecipients(
   const label = typeLabels[reportType] || reportType;
 
   for (const userId of recipients) {
-    await supabase.from('notifications').insert({
+    const reportNotificationRow = {
       user_id: userId,
       type: '보고서',
       title: `${label} 보고서 생성 완료`,
       body: `${period} ${label} 보고서가 자동 생성되었습니다. 관리자 메뉴에서 확인하세요.`,
       read_at: null,
-    });
+    };
+    await supabase.from('notifications').insert(reportNotificationRow);
+    await mirrorNotificationsToD1([reportNotificationRow] as NotificationRow[]);
   }
 }

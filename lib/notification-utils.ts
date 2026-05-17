@@ -1,6 +1,80 @@
 import { supabase } from './supabase';
+import { getD1Binding, resolveDataBackend, getD1Drizzle, notifications as notificationsTable } from './db';
+import { sql } from 'drizzle-orm';
 
 const recentAdminAlertDispatches = new Map<string, number>();
+
+// ─────────────────────────────────────────────────────────────
+// Phase 2 dual-write: notifications 테이블 D1 미러
+// ─────────────────────────────────────────────────────────────
+//
+// DATA_BACKEND='supabase'   → 미러 안 함 (기존 동작)
+// DATA_BACKEND='dual-write' → Supabase 성공 후 D1에도 시도, 실패는 warn만
+// DATA_BACKEND='d1'         → D1 INSERT 결과를 throw까지 전달
+//
+// metadata는 Supabase에선 jsonb, D1에선 text(JSON 직렬화) 보관.
+
+export type NotificationRow = {
+  id?: string | null;
+  user_id?: string | null;
+  type?: string | null;
+  title?: string | null;
+  body?: string | null;
+  metadata?: Record<string, unknown> | null;
+  read_at?: string | null;
+  created_at?: string | null;
+};
+
+type NotificationsD1Row = typeof notificationsTable.$inferInsert;
+
+function normalizeForD1(row: NotificationRow): NotificationsD1Row {
+  return {
+    id: row.id ?? crypto.randomUUID(),
+    user_id: row.user_id ?? null,
+    type: row.type ?? null,
+    title: row.title ?? null,
+    body: row.body ?? null,
+    metadata: row.metadata === null || row.metadata === undefined
+      ? null
+      : JSON.stringify(row.metadata),
+    read_at: row.read_at ?? null,
+    created_at: row.created_at ?? new Date().toISOString(),
+  };
+}
+
+export async function mirrorNotificationsToD1(
+  rows: NotificationRow[],
+  options?: { onConflict?: 'do_nothing' | 'throw' },
+): Promise<void> {
+  if (rows.length === 0) return;
+
+  const backend = await resolveDataBackend();
+  if (backend === 'supabase') return;
+
+  const d1 = await getD1Binding();
+  if (!d1) {
+    if (backend === 'd1') {
+      throw new Error('[notifications] DATA_BACKEND=d1 but DB binding not available');
+    }
+    console.warn('[notifications] dual-write skipped — D1 binding unavailable');
+    return;
+  }
+
+  try {
+    const db = getD1Drizzle(d1);
+    const values = rows.map(normalizeForD1);
+    const query = options?.onConflict === 'do_nothing'
+      ? db.insert(notificationsTable).values(values).onConflictDoNothing()
+      : db.insert(notificationsTable).values(values);
+    await query;
+  } catch (err) {
+    if (backend === 'd1') throw err;
+    console.warn('[notifications] D1 mirror failed', {
+      count: rows.length,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
 
 export function toNotificationText(
   value: unknown,
@@ -197,6 +271,7 @@ export async function sendAdminNotifications(
 
   if (notifications.length > 0) {
     await supabase.from('notifications').insert(notifications);
+    await mirrorNotificationsToD1(notifications as NotificationRow[]);
   }
 
   return notifications.length;
@@ -211,6 +286,10 @@ export async function insertNotificationsOrThrow(
     .select();
 
   if (error) throw error;
+
+  const asArray = Array.isArray(notifications) ? notifications : [notifications];
+  await mirrorNotificationsToD1(asArray as NotificationRow[]);
+
   return data;
 }
 
@@ -270,6 +349,9 @@ export async function upsertNotificationWithDedupe(input: DedupedNotificationInp
       throw error;
     }
   }
+
+  // D1 미러 — 결정적 ID라 onConflictDoNothing으로 중복 race 처리.
+  await mirrorNotificationsToD1([row as NotificationRow], { onConflict: 'do_nothing' });
 
   return { id };
 }

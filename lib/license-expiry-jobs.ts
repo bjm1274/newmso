@@ -2,6 +2,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { computeCENextDue, getRenewalRule } from '@/lib/license-renewal-policy';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
+import { mirrorNotificationsToD1, type NotificationRow } from './notification-utils';
 
 // 만료 N일 전 — milestone(단계) 정의
 // 같은 단계 알림은 metadata.milestone으로 중복 발송 방지
@@ -163,6 +164,7 @@ export async function processLicenseExpiry(supabase: SupabaseClient): Promise<Li
   for (let i = 0; i < toInsert.length; i += chunkSize) {
     const chunk = toInsert.slice(i, i + chunkSize);
     const { error } = await supabase.from('notifications').insert(chunk);
+    await mirrorNotificationsToD1(chunk as NotificationRow[]);
     if (error) {
       errors.push(error.message);
       continue;
@@ -303,6 +305,7 @@ export async function processCEDue(supabase: SupabaseClient): Promise<LicenseExp
   for (let i = 0; i < toInsert.length; i += chunkSize) {
     const chunk = toInsert.slice(i, i + chunkSize);
     const { error: insErr } = await supabase.from('notifications').insert(chunk);
+    await mirrorNotificationsToD1(chunk as NotificationRow[]);
     if (insErr) {
       errors.push(insErr.message);
       continue;

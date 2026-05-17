@@ -6,6 +6,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { calculateAnnualLeaveExpiryDate } from './annual-leave-promotion';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
+import { mirrorNotificationsToD1, type NotificationRow } from './notification-utils';
 
 export type ExpiryResult = {
   staffId: string;
@@ -54,13 +55,15 @@ export async function processStaffLeaveExpiry(
   });
 
   // 소멸 알림 발송
-  await supabase.from('notifications').insert({
+  const expiryNotificationRow = {
     user_id: staffId,
     type: '연차소멸',
     title: '미사용 연차 소멸 안내',
     body: `${remainingDays}일의 미사용 연차가 소멸 처리되었습니다. (만료일: ${expiryDateStr})`,
     read_at: null,
-  });
+  };
+  await supabase.from('notifications').insert(expiryNotificationRow);
+  await mirrorNotificationsToD1([expiryNotificationRow] as NotificationRow[]);
 
   return {
     staffId,
