@@ -691,10 +691,8 @@ function WorkStatus({ user }: { user?: any }) {
   return (
     <div className="space-y-5" data-testid="work-status-view">
       <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-[var(--foreground)]">근무현황</h3>
-          </div>
+        {/* §4-1, §13.15 추가기능 모듈: PageHeader 제목/서브 삭제, 우측 액션만 유지 */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-end">
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={departmentFilter}

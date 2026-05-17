@@ -2763,14 +2763,8 @@ export default function OperationCheckView({
               : 'flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between'
           }
         >
-          <div className="min-w-0">
-            <h2 className="text-xl font-bold text-[var(--foreground)]">{headerTitle}</h2>
-            {allowEmbeddedTemplateSettings ? (
-              <p className="mt-1 text-[11px] font-medium text-[var(--toss-gray-3)]">
-                OP체크와 템플릿 설정을 같은 화면에서 바로 전환할 수 있습니다.
-              </p>
-            ) : null}
-          </div>
+          {/* §4-10, §13.15 OP체크: PageHeader 제목/서브 + 상단 4 상태 stat 박스 사용 안 함. 우측 모드 스위처와 검색만 유지. */}
+          <div aria-hidden="true" className="hidden xl:block min-w-0" />
           {allowEmbeddedTemplateSettings ? (
             <div
               data-testid="op-check-mode-switcher"

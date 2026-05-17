@@ -281,17 +281,8 @@ export default function MyDocuments(props: MyDocumentsProps) {
                 </div>
             )}
 
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                <div className="col-span-2 md:col-span-4 lg:col-span-5 xl:col-span-6 bg-blue-500/10/50 p-4 rounded-2xl border border-blue-100 flex items-center gap-4">
-                    <div className="text-2xl">📸</div>
-                    <div>
-                        <h3 className="text-xs font-black text-blue-600">스마트 스캔 기능이 활성화되었습니다.</h3>
-                        <p className="text-[10px] font-medium text-[var(--toss-gray-4)] mt-0.5">
-                            신분증은 가로형 가이드에, A4 서류는 세로형 가이드에 맞춰 촬영해 주세요.
-                        </p>
-                    </div>
-                </div>
-
+            {/* §3-5, §13.5 결정사항: 진행률 카드/스마트 스캔 배너 제거. 1366에서는 4-col 그리드. */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {REQUIRED_DOCS.map((doc, index) => {
                     const existingDoc = documents.find(d => d.category === doc.id);
                     return (

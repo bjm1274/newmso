@@ -366,14 +366,8 @@ export default function EslManager({ user }: { user?: any }) {
   return (
     <div className="flex flex-col gap-3">
       {dialog}
-      {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-bold text-[var(--foreground)]">ESL 병실 표시 관리</h2>
-          <p className="text-xs text-[var(--toss-gray-3)]">
-            인계노트 병실 데이터를 ESL 기기에 전송합니다 ({rooms.length}개 병실)
-          </p>
-        </div>
+      {/* §4-1, §13.15 추가기능 모듈: PageHeader 제목/서브 삭제, 우측 액션만 유지 */}
+      <div className="flex items-center justify-end">
         <button
           type="button"
           onClick={() => setShowSettings((v) => !v)}

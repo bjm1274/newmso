@@ -584,11 +584,8 @@ export default function DischargeReviewPage({ user }: { user: any }) {
     return (
         <div className="bg-[var(--page-bg)] animate-in fade-in duration-300" data-testid="discharge-review-view">
             {dialog}
-            {/* 헤더 */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 bg-[var(--card)] border-b border-[var(--border)] gap-4">
-                <div>
-                    <h2 className="text-xl font-bold text-[var(--foreground)] flex items-center gap-2"><span>🏥</span> 퇴원심사</h2>
-                </div>
+            {/* §4-1, §13.15 추가기능 모듈: PageHeader 제목/서브 삭제, 우측 액션만 유지 */}
+            <div className="flex flex-col md:flex-row justify-end items-start md:items-center p-4 bg-[var(--card)] border-b border-[var(--border)] gap-4">
                 <div className="flex flex-wrap gap-2">
                     {(['reviews', 'new', 'template'] as Tab[]).map(t => (
                         <button key={t} data-testid={`discharge-tab-${t}`} onClick={() => { setTab(t); if (t !== 'reviews') setSelectedReview(null); setCompareResult(null); }}

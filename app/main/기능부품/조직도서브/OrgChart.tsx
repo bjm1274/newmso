@@ -1019,13 +1019,10 @@ export default function OrgChart({
     <div data-testid="org-chart-pyramid-view" className="flex flex-col bg-[var(--page-bg)]">
       <div className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--card)] px-3 py-1.5 shadow-sm">
         <div className="flex items-center gap-3">
-          {/* 타이틀 */}
-          <div className="shrink-0 flex items-baseline gap-1.5">
-            <h2 className="text-sm font-black tracking-tight text-[var(--foreground)]">조직도</h2>
-            <span className="text-[10px] font-medium text-[var(--toss-gray-3)]">
-              {activeCount}명{isLoadingDirectory && ' …'}
-            </span>
-          </div>
+          {/* §4-1, §13.15 추가기능 모듈: PageHeader 제목 삭제. 인원수만 작은 보조 텍스트로 유지. */}
+          <span className="shrink-0 text-[10px] font-medium text-[var(--toss-gray-3)]">
+            {activeCount}명{isLoadingDirectory && ' …'}
+          </span>
 
           {/* 회사 탭 */}
           <div className="no-scrollbar flex flex-1 gap-1 overflow-x-auto">

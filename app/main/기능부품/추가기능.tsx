@@ -344,51 +344,26 @@ export default function ExtraFeatures({
 
   return (
     <div data-testid="extra-features-list" className="custom-scrollbar flex-1 overflow-y-auto bg-[var(--page-bg)] px-5 py-5 md:px-6">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-[15px] font-bold text-[var(--foreground)]">추가 기능</h2>
+      {/* §4-1 모듈 허브 hero 삭제 — 우상단 액션(컴팩트 툴바)만 유지 */}
+      <div className="mb-4 flex flex-wrap items-center justify-end gap-3">
         {compactToolbar}
       </div>
 
-      <div className="w-full space-y-6">
-          {favoriteCards.length > 0 ? (
-            <div>
-              <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">즐겨찾기</p>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {favoriteCards.map(renderCard)}
-              </div>
-            </div>
-          ) : null}
-
-          {recentCards.length > 0 ? (
-            <div>
-              <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">최근 사용</p>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {recentCards.map(renderCard)}
-              </div>
-            </div>
-          ) : null}
-
-          <div>
-            {(favoriteCards.length > 0 || recentCards.length > 0) && (
-              <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">전체</p>
+      <div className="w-full space-y-5">
+          {/* §4-1, §13.17 단일 리스트 — 그룹 구분선/라벨 삭제. 순서: 즐겨찾기 → 최근 → 전체 → 외부연동. */}
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {favoriteCards.map(renderCard)}
+            {recentCards
+              .filter((card) => !favorites.includes(card.id))
+              .map(renderCard)}
+            {groupedNormalCards.flatMap((section) =>
+              section.cards
+                .filter((card) => !recentFeatures.includes(card.id))
+                .map(renderCard)
             )}
-            <div className="space-y-5">
-              {groupedNormalCards.map((section) => (
-                <section key={section.group}>
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <p className="text-[11px] font-black uppercase tracking-wider text-[var(--toss-gray-3)]">{section.group}</p>
-                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">{section.cards.length}개</span>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    {section.cards.map(renderCard)}
-                  </div>
-                </section>
-              ))}
-            </div>
           </div>
 
           <div>
-            <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">외부 시스템</p>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {EXTERNAL_LINKS.map((item) => (
               <a

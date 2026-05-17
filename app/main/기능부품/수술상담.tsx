@@ -359,16 +359,7 @@ export default function SurgeryConsultationView({ user }: { user?: any }) {
   return (
     <div className="space-y-4 animate-in fade-in duration-500 max-w-4xl mx-auto">
       {dialog}
-      {/* 헤더 */}
-      <div className="flex items-center gap-3 border-b border-[var(--border)] pb-4">
-        <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center text-xl">🎙️</div>
-        <div>
-          <h2 className="text-xl font-bold text-[var(--foreground)]">수술상담 AI 분석</h2>
-          <p className="text-[11px] text-[var(--toss-gray-3)] font-medium mt-0.5">
-            음성 녹음 또는 파일 업로드 → Gemini AI가 상담 내용을 자동 분석합니다
-          </p>
-        </div>
-      </div>
+      {/* §4-1, §13.15 추가기능 모듈: PageHeader 제목/서브 삭제. 탭 자체가 화면 최상단으로 승격. */}
 
       {/* 탭 */}
       <div className="flex gap-1 bg-[var(--muted)] rounded-xl p-1 w-fit">

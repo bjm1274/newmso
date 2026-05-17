@@ -238,24 +238,22 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
   return (
     <div className="space-y-4">
       {dialog}
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-base font-bold text-[var(--foreground)]">부서별 물품·장비 현황</h2>
-        {departments.length > 0 && (
-          <div className="flex items-center gap-2">
-            <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">조회 부서</label>
-            <select
-              value={viewDept}
-              onChange={e => setViewDept(e.target.value)}
-              className="border border-[var(--border)] rounded-[var(--radius-md)] px-3 py-1.5 text-sm font-bold bg-[var(--card)]"
-            >
-              <option value="">내 부서 ({myDept || '미지정'})</option>
-              {departments.map(d => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
+      {/* §4-4, §13.8, §13.15 부서별 재고: PageHeader 제목 + 컨텍스트 배너 삭제. 부서 셀렉터는 우상단 액션으로. */}
+      {departments.length > 0 && (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">조회 부서</label>
+          <select
+            value={viewDept}
+            onChange={e => setViewDept(e.target.value)}
+            className="border border-[var(--border)] rounded-[var(--radius-md)] px-3 py-1.5 text-sm font-bold bg-[var(--card)]"
+          >
+            <option value="">내 부서 ({myDept || '미지정'})</option>
+            {departments.map(d => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {!effectiveDept && (
         <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-[var(--radius-lg)] text-sm text-amber-800 dark:text-amber-300">

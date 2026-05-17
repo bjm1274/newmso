@@ -1215,11 +1215,8 @@ export default function HandoverNotes({ user }: Props) {
   return (
     <div className="space-y-4 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm" data-testid="handover-notes-view">
       {dialog}
-      <div className="flex flex-col gap-3 border-b border-[var(--border)] pb-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-[var(--foreground)]">병동 인계노트</h2>
-          <p className="mt-1 text-xs font-medium text-[var(--toss-gray-3)]">{fullDateLabel(selectedDate)}</p>
-        </div>
+      {/* §4-1, §13.15 추가기능 모듈: PageHeader 제목/서브 삭제, 우측 액션만 유지 */}
+      <div className="flex flex-col gap-3 border-b border-[var(--border)] pb-4 lg:flex-row lg:items-center lg:justify-end">
         <div className="flex flex-wrap items-center gap-2">
           <input
             type="date"

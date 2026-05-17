@@ -485,28 +485,23 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
   return (
     <div data-testid="realtime-deposit-view" className="space-y-4">
       {dialog}
-      {/* 헤더 */}
+      {/* §4-11, §13.13 입금실시간조회: Chart 이관 예정 안내 + PageHeader 제목/서브 삭제, 계좌 칩만 우상단 액션과 함께 유지 */}
+      <div className="rounded-[var(--radius-lg)] border border-amber-200 bg-amber-50/70 px-3 py-2 text-[11px] font-bold text-amber-800">
+        Chart 프로그램으로 이관 예정인 모듈입니다.
+      </div>
       <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-1">
-            <h2 className="text-lg font-bold text-[var(--foreground)]">입금 실시간 조회</h2>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold text-[var(--toss-gray-3)]">정산 계좌</span>
-              <span className="px-2 py-0.5 bg-blue-500/10 text-blue-700 text-xs font-black rounded-md border border-blue-500/20">
-                🏦 토스뱅크 {TOSS_BANK_ACCOUNT}
-              </span>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              data-testid="realtime-deposit-refresh"
-              onClick={() => loadDeposits({ silent: true })}
-              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] transition hover:border-[var(--accent)]/40 hover:bg-[var(--toss-blue-light)]/60"
-            >
-              {refreshing ? '동기화 중...' : '새로고침'}
-            </button>
-          </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <span className="px-2 py-0.5 bg-blue-500/10 text-blue-700 text-xs font-black rounded-md border border-blue-500/20">
+            🏦 토스뱅크 {TOSS_BANK_ACCOUNT}
+          </span>
+          <button
+            type="button"
+            data-testid="realtime-deposit-refresh"
+            onClick={() => loadDeposits({ silent: true })}
+            className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] transition hover:border-[var(--accent)]/40 hover:bg-[var(--toss-blue-light)]/60"
+          >
+            {refreshing ? '동기화 중...' : '새로고침'}
+          </button>
         </div>
       </div>
 

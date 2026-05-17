@@ -400,23 +400,19 @@ export default function DailyClosurePage({
     return (
         <div className="space-y-4" data-testid="daily-closure-view">
             {dialog}
-            <div className="flex justify-between items-center">
-                <div>
-                    <h2 className="text-xl font-bold text-[var(--foreground)] flex items-center gap-2">
-                        <span>💰</span> 마감보고
-                    </h2>
-                    <p className="mt-1 text-[11px] font-medium text-[var(--toss-gray-3)]">
-                        마감보고 권한이 있는 사용자와 관리자는 등록된 보고를 열람하고 수정할 수 있습니다.
+            {/* §4-12, §13.13 마감보고: Chart 이관 예정 안내 배너 + PageHeader 제목/서브 삭제 */}
+            <div className="rounded-[var(--radius-lg)] border border-amber-200 bg-amber-50/70 px-3 py-2 text-[11px] font-bold text-amber-800">
+                Chart 프로그램으로 이관 예정인 모듈입니다.
+            </div>
+            <div className="flex justify-end items-center">
+                {canReadAcrossCompanies ? (
+                    <p
+                        data-testid="daily-closure-all-company-note"
+                        className="mr-auto text-[11px] font-semibold text-[var(--accent)]"
+                    >
+                        SY INC. 이사 권한으로 전체 회사 마감보고를 열람 중입니다.
                     </p>
-                    {canReadAcrossCompanies ? (
-                        <p
-                            data-testid="daily-closure-all-company-note"
-                            className="mt-1 text-[11px] font-semibold text-[var(--accent)]"
-                        >
-                            SY INC. 이사 권한으로 전체 회사 마감보고를 열람 중입니다.
-                        </p>
-                    ) : null}
-                </div>
+                ) : null}
                 {canReadClosures ? (
                     <button
                         data-testid="daily-closure-toggle-view"

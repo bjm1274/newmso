@@ -301,9 +301,9 @@ body {
 }
 
 .app-subnav-group-label {
-  color: var(--zinc-400);
-  font-size: 0.6875rem;
-  font-weight: 700;
+  color: var(--toss-gray-3);
+  font-size: 11px;
+  font-weight: 800;
   letter-spacing: 0;
 }
 
@@ -495,6 +495,162 @@ body {
 
 .erp-table tbody tr:hover {
   background: var(--surface-subtle);
+}
+
+/* ======================================================================
+ * P0-2 표 표준 — MSO_PC_Implementation_Tasks.md §7
+ * sticky thead / density 3단 / 좌측 sticky 컬럼 / 정렬 가능
+ * ====================================================================== */
+@media (min-width: 768px) {
+  .erp-table thead th,
+  .data-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--surface-muted);
+  }
+
+  /* default density */
+  .erp-table th,
+  .data-table th {
+    height: 38px;
+    font-size: 12px;
+    font-weight: 800;
+  }
+  .erp-table td,
+  .data-table td {
+    height: var(--row-h, 40px);
+  }
+
+  /* density: compact */
+  .erp-table.compact th,
+  .data-table.compact th {
+    height: 32px;
+  }
+  .erp-table.compact td,
+  .data-table.compact td {
+    height: 36px;
+  }
+
+  /* density: relaxed */
+  .erp-table.relaxed th,
+  .data-table.relaxed th {
+    height: 44px;
+  }
+  .erp-table.relaxed td,
+  .data-table.relaxed td {
+    height: 48px;
+  }
+
+  /* sortable column */
+  .erp-table th[aria-sort],
+  .data-table th[aria-sort] {
+    cursor: pointer;
+    user-select: none;
+  }
+  .erp-table th[aria-sort]::after,
+  .data-table th[aria-sort]::after {
+    content: "";
+    display: inline-block;
+    width: 0;
+    height: 0;
+    margin-left: 6px;
+    vertical-align: middle;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    opacity: 0.35;
+  }
+  .erp-table th[aria-sort="ascending"]::after,
+  .data-table th[aria-sort="ascending"]::after {
+    border-bottom: 5px solid currentColor;
+    opacity: 1;
+  }
+  .erp-table th[aria-sort="descending"]::after,
+  .data-table th[aria-sort="descending"]::after {
+    border-top: 5px solid currentColor;
+    opacity: 1;
+  }
+
+  /* 좌측 sticky 컬럼 (직원명·품목명 등) */
+  .erp-table th.col-sticky-left,
+  .erp-table td.col-sticky-left,
+  .data-table th.col-sticky-left,
+  .data-table td.col-sticky-left {
+    position: sticky;
+    left: 0;
+    z-index: 4;
+    background: var(--card);
+  }
+  .erp-table thead th.col-sticky-left,
+  .data-table thead th.col-sticky-left {
+    z-index: 6;
+    background: var(--surface-muted);
+  }
+
+  /* 행 hover 시에만 인라인 액션 노출 */
+  .erp-table .row-actions,
+  .data-table .row-actions {
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+  }
+  .erp-table tbody tr:hover .row-actions,
+  .data-table tbody tr:hover .row-actions {
+    opacity: 1;
+  }
+}
+
+/* ======================================================================
+ * P0-2 폼 표준 — MSO_PC_Implementation_Tasks.md §8
+ * 2/3-col grid, 라벨 위, 필수 *, 인라인 helper, sticky footer
+ * ====================================================================== */
+@media (min-width: 768px) {
+  .pc-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 20px;
+  }
+  @media (min-width: 1440px) {
+    .pc-form-grid.cols-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .pc-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .pc-form-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--toss-gray-5);
+    line-height: 1.2;
+  }
+  .pc-form-label.is-required::after {
+    content: " *";
+    color: var(--danger);
+    font-weight: 800;
+  }
+  .pc-form-helper {
+    font-size: 12px;
+    color: var(--toss-gray-3);
+    line-height: 1.3;
+  }
+  .pc-form-helper.is-error {
+    color: var(--danger);
+  }
+
+  .pc-form-footer {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 0;
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    z-index: 2;
+  }
 }
 
 /* ── Section header pattern ──────────────────────── */
@@ -702,6 +858,100 @@ select:not(.no-style) {
   textarea:not(.no-style),
   select:not(.no-style) {
     font-size: 1rem; /* 16px - iOS zoom 방지 */
+  }
+}
+
+/* ======================================================================
+ * P0-1 PC 데스크톱 표준 — MSO_PC_Implementation_Tasks.md §1
+ * 768px 이상에서만 적용. 모바일 토큰과 분리.
+ * ====================================================================== */
+@media (min-width: 768px) {
+  :root {
+    /* Typography — 한 단계 ↑ */
+    --body-fs: 14px;
+    --body-lh: 1.55;
+    --h1-fs: 22px;
+    --h1-fw: 800;
+    --section-fs: 16px;
+    --section-fw: 800;
+    --caption-fs: 12px;
+    --kpi-num-fs: 28px;
+
+    /* Control heights — PC 표준 */
+    --pc-control-h: 36px;
+    --pc-control-h-sm: 30px;
+    --pc-control-h-lg: 40px;
+
+    /* Spacing */
+    --pc-page-pad-x: 24px;
+    --pc-section-gap: 24px;
+    --pc-card-pad: 20px;
+
+    /* Radius — PC 전용 재정의 */
+    --radius-md: 8px;
+    --radius-lg: 10px;
+    --radius-2xl: 14px;
+
+    /* Shadow — PC 전용 */
+    --shadow-xs: 0 1px 2px rgba(0,0,0,0.05), 0 0 0 1px rgba(0,0,0,0.03);
+    --shadow-pop: 0 8px 24px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04);
+
+    /* Table density default */
+    --row-h: 40px;
+
+    /* PC 2차 사이드바 — 192 → 220px 확장 (§2-2) */
+    --submenu-width: 220px;
+  }
+
+  body {
+    font-size: var(--body-fs);
+    line-height: var(--body-lh);
+  }
+
+  .page-header-title {
+    font-size: var(--h1-fs);
+    font-weight: var(--h1-fw);
+  }
+
+  .section-title {
+    font-size: var(--section-fs);
+    font-weight: var(--section-fw);
+  }
+
+  .stat-card-value,
+  .erp-stat-card .stat-value,
+  .erp-stat-card-value {
+    font-size: var(--kpi-num-fs);
+  }
+
+  .btn-premium-primary,
+  .btn-premium-secondary,
+  .btn-premium-danger,
+  .btn-premium-ghost {
+    height: var(--pc-control-h);
+    min-height: var(--pc-control-h);
+    font-size: 13.5px;
+    font-weight: 700;
+  }
+
+  .tab-item,
+  .erp-chip,
+  .erp-status {
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  /* 본문 좌우 패딩 — 1366 24px / ≥1440 32px (§2-4) */
+  .erp-page-pad,
+  .pc-page-pad {
+    padding-left: var(--pc-page-pad-x);
+    padding-right: var(--pc-page-pad-x);
+  }
+}
+
+@media (min-width: 1440px) {
+  :root {
+    --pc-page-pad-x: 32px;
   }
 }
 

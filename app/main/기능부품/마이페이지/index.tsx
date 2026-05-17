@@ -715,8 +715,9 @@ function MyPageMain({
       onClick: isRetired ? undefined : () => setActiveTab('leave'),
     },
     {
+      // §3-2 결정사항: 급여명세서/증명서 카드는 값 없음 → chevron만 표시
       label: '급여명세서',
-      value: '열기',
+      value: '',
       note: '월별 명세서 확인',
       icon: 'Receipt',
       tone: 'text-blue-600 bg-blue-50',
@@ -727,7 +728,7 @@ function MyPageMain({
     },
     {
       label: '증명서',
-      value: '열기',
+      value: '',
       note: '발급 문서 확인',
       icon: 'FileText',
       tone: 'text-indigo-600 bg-indigo-50',
@@ -1026,9 +1027,13 @@ function MyPageMain({
                           </p>
                         </div>
                       </div>
-                      <p className={`shrink-0 font-black leading-none ${item.value === '열기' ? 'text-[13px] text-[var(--accent)]' : 'text-[18px] text-[var(--foreground)]'}`}>
-                        {item.value}
-                      </p>
+                      {item.value ? (
+                        <p className="shrink-0 text-[18px] font-black leading-none text-[var(--foreground)]">
+                          {item.value}
+                        </p>
+                      ) : item.onClick ? (
+                        <LucideIcon name="ChevronRight" size={18} className="shrink-0 text-[var(--toss-gray-3)]" />
+                      ) : null}
                     </>
                   );
 
