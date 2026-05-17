@@ -99,6 +99,9 @@ build.out
 # Local Claude preview/launch config
 .claude/launch.json
 
+# Supabase CLI temp files (link/version 메타데이터 — 로컬 전용)
+supabase/.temp/
+
 # Python tooling caches & run artifacts (스크립트 산출물은 직원 데이터 포함 — 커밋 금지)
 __pycache__/
 *.pyc
